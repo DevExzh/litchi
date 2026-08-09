@@ -8,7 +8,7 @@ pub enum Part {
     Content,
     /// The package `styles.xml` part.
     Styles,
-    /// A flat OpenDocument XML document.
+    /// A flat `OpenDocument` XML document.
     FlatDocument,
 }
 

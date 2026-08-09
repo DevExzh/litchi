@@ -1,8 +1,8 @@
-//! Contextual models for inert embedded OpenDocument resources.
+//! Contextual models for inert embedded `OpenDocument` resources.
 
 use crate::drawing::{Frame, Part};
 
-/// Normative embedded-object element kind.
+/// Normative embedded-object element `kind`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Kind {
@@ -25,13 +25,13 @@ pub struct Parameter {
     pub value: String,
 }
 
-/// Root kind of an inline XML object payload.
+/// Root `kind` of an inline XML object payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Root {
     /// An inline `office:document` payload.
     OpenDocument,
-    /// An inline MathML `math:math` payload.
+    /// An inline `MathML` `math:math` payload.
     MathMl,
 }
 
@@ -39,7 +39,7 @@ pub enum Root {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Source {
-    /// An inline `office:document` or MathML payload.
+    /// An inline `office:document` or `MathML` payload.
     InlineXml {
         root: Root,
         xml: String,
@@ -50,7 +50,7 @@ pub enum Source {
         bytes: Vec<u8>,
         ignored_href: Option<String>,
     },
-    /// A verified opaque file in the same OpenDocument package.
+    /// A verified opaque file in the same `OpenDocument` package.
     PackageFile {
         href: String,
         path: String,

@@ -1,4 +1,4 @@
-//! Inert embedded-resource inventory for OpenDocument XML parts.
+//! Inert embedded-resource inventory for `OpenDocument` XML parts.
 
 mod model;
 mod reader;

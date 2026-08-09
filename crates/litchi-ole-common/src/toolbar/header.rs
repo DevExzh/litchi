@@ -9,16 +9,19 @@ pub struct Dimensions {
 
 impl Dimensions {
     /// Construct a pair of unsigned pixel dimensions.
+    #[must_use]
     pub const fn new(width: u16, height: u16) -> Self {
         Self { width, height }
     }
 
     /// Return the width in pixels.
+    #[must_use]
     pub const fn width(self) -> u16 {
         self.width
     }
 
     /// Return the height in pixels.
+    #[must_use]
     pub const fn height(self) -> u16 {
         self.height
     }
@@ -37,6 +40,11 @@ pub struct ControlHeader {
 
 impl ControlHeader {
     /// Construct a validated toolbar-control header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the flags, type, priority, or dimensions violate
+    /// `TBCHeader` constraints.
     pub fn new(
         control_type: ControlType,
         control_id: u16,
@@ -76,31 +84,37 @@ impl ControlHeader {
     }
 
     /// Return the toolbar-control type.
+    #[must_use]
     pub const fn control_type(&self) -> ControlType {
         self.control_type
     }
 
     /// Return the format-specific toolbar-control identifier.
+    #[must_use]
     pub const fn control_id(&self) -> u16 {
         self.control_id
     }
 
     /// Return the general toolbar-control flags.
+    #[must_use]
     pub const fn flags(&self) -> ControlFlags {
         self.flags
     }
 
     /// Return the toolbar-control settings flags.
+    #[must_use]
     pub const fn specifics(&self) -> SpecificFlags {
         self.specifics
     }
 
     /// Return the drop and wrap priority.
+    #[must_use]
     pub const fn priority(&self) -> u8 {
         self.priority
     }
 
     /// Return optional saved dimensions.
+    #[must_use]
     pub const fn dimensions(&self) -> Option<Dimensions> {
         self.dimensions
     }
@@ -131,6 +145,11 @@ pub struct Header<'a> {
 
 impl<'a> Header<'a> {
     /// Construct a validated toolbar header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the control count, rows, restrictions, or flags
+    /// violate `TB` constraints.
     pub fn new(
         control_count: i16,
         restrictions: Restrictions,
@@ -166,26 +185,31 @@ impl<'a> Header<'a> {
     }
 
     /// Return the signed `cCL` field exactly as decoded.
+    #[must_use]
     pub const fn control_count(&self) -> i16 {
         self.control_count
     }
 
     /// Return toolbar type and restriction flags.
+    #[must_use]
     pub const fn restrictions(&self) -> Restrictions {
         self.restrictions
     }
 
     /// Return the preferred row count exactly as decoded.
+    #[must_use]
     pub const fn rows_default(&self) -> u16 {
         self.rows_default
     }
 
     /// Return toolbar flags.
+    #[must_use]
     pub const fn flags(&self) -> Flags {
         self.flags
     }
 
     /// Return the borrowed or owned toolbar name.
+    #[must_use]
     pub const fn name(&self) -> &WString<'a> {
         &self.name
     }
@@ -194,6 +218,7 @@ impl<'a> Header<'a> {
     ///
     /// This is used by format facades whose compound-file stream buffer is
     /// shorter-lived than the public workbook/document object.
+    #[must_use]
     pub fn into_owned(self) -> Header<'static> {
         Header {
             control_count: self.control_count,

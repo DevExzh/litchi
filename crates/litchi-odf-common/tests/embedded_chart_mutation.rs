@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        reason = "Fixed in-memory package fixtures use direct assertion setup."
+    )
+)]
+
 use litchi_odf_common::{
     chart::authoring::{ChartClass, Definition, SeriesSpec, Text, serialize_content},
     constants,
@@ -57,7 +65,7 @@ fn packaged_chart_replacement_and_removal_use_common_package_primitives() {
     ));
 
     let replacement = serialize_content(&chart("Second")).unwrap();
-    let replaced = rebuild_package(
+    let replaced_bytes = rebuild_package(
         &source,
         &content,
         vec![Addition {
@@ -70,7 +78,7 @@ fn packaged_chart_replacement_and_removal_use_common_package_primitives() {
         vec!["Object_1/".to_string()],
     )
     .unwrap();
-    let replaced = OwnedPackage::from_bytes(replaced).unwrap();
+    let replaced = OwnedPackage::from_bytes(replaced_bytes).unwrap();
     assert_eq!(
         replaced.get_file("Object_1/content.xml").unwrap(),
         replacement.as_bytes()
@@ -78,7 +86,7 @@ fn packaged_chart_replacement_and_removal_use_common_package_primitives() {
 
     let start = content.find(OBJECT).unwrap();
     let removed_content = splice(&content, start, start + OBJECT.len(), "").unwrap();
-    let removed = rebuild_package(
+    let removed_bytes = rebuild_package(
         &replaced,
         &removed_content,
         Vec::new(),
@@ -87,7 +95,7 @@ fn packaged_chart_replacement_and_removal_use_common_package_primitives() {
         vec!["Object_1/".to_string()],
     )
     .unwrap();
-    let removed = OwnedPackage::from_bytes(removed).unwrap();
+    let removed = OwnedPackage::from_bytes(removed_bytes).unwrap();
     assert!(!removed.has_file("Object_1/content.xml").unwrap());
     let removed_xml = String::from_utf8(removed.get_file(constants::ODF_CONTENT).unwrap()).unwrap();
     assert!(

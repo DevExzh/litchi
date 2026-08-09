@@ -59,12 +59,16 @@ pub(super) fn parse(path: &str, xml: &str) -> Result<GraphParse> {
                         return invalid("RDF/XML root must be rdf:RDF");
                     }
                     root_depth = Some(depth);
-                    for raw in element.attributes().with_checks(true) {
-                        let raw = raw.map_err(|error| {
+                    for raw_attribute in element.attributes().with_checks(true) {
+                        let attribute = raw_attribute.map_err(|error| {
                             Error::InvalidFormat(format!("invalid RDF root attribute: {error}"))
                         })?;
-                        let key = std::str::from_utf8(raw.key.as_ref()).unwrap_or("");
-                        let value = decode_attr(&reader, &raw)?;
+                        let key = std::str::from_utf8(attribute.key.as_ref()).map_err(|error| {
+                            Error::InvalidFormat(format!(
+                                "invalid RDF root attribute name: {error}"
+                            ))
+                        })?;
+                        let value = decode_attr(&reader, &attribute)?;
                         if key == "xml:base" {
                             base = Some(value);
                         } else if key == "xmlns" {
@@ -105,8 +109,7 @@ pub(super) fn parse(path: &str, xml: &str) -> Result<GraphParse> {
             },
             Event::Empty(element) => {
                 if subject.is_none()
-                    && root_depth.is_some()
-                    && depth == root_depth.unwrap() + 1
+                    && root_depth.is_some_and(|root| depth == root + 1)
                     && ns.as_deref() == Some(RDF_NS)
                     && element.local_name().as_ref() == b"Description"
                 {
@@ -133,30 +136,48 @@ pub(super) fn parse(path: &str, xml: &str) -> Result<GraphParse> {
                     });
                 }
             },
-            Event::Text(value) if property.is_some() => {
-                let text = value
+            Event::Text(text_event) if property.is_some() => {
+                let text = text_event
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid RDF literal: {error}"))
                     })?;
-                if let Some((_, _, _, Object::Literal { value, .. })) = property.as_mut() {
-                    value.push_str(&text);
-                    if value.len() > MAX_VALUE {
+                if let Some((
+                    _,
+                    _,
+                    _,
+                    Object::Literal {
+                        value: literal_value,
+                        ..
+                    },
+                )) = property.as_mut()
+                {
+                    literal_value.push_str(&text);
+                    if literal_value.len() > MAX_VALUE {
                         return invalid("RDF literal exceeds size limit");
                     }
                 } else if !text.trim().is_empty() {
                     return invalid("RDF resource property cannot contain text");
                 }
             },
-            Event::CData(value) if property.is_some() => {
-                let text = value
+            Event::CData(cdata_event) if property.is_some() => {
+                let text = cdata_event
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid RDF literal: {error}"))
                     })?;
-                if let Some((_, _, _, Object::Literal { value, .. })) = property.as_mut() {
-                    value.push_str(&text);
-                    if value.len() > MAX_VALUE {
+                if let Some((
+                    _,
+                    _,
+                    _,
+                    Object::Literal {
+                        value: literal_value,
+                        ..
+                    },
+                )) = property.as_mut()
+                {
+                    literal_value.push_str(&text);
+                    if literal_value.len() > MAX_VALUE {
                         return invalid("RDF literal exceeds size limit");
                     }
                 } else if !text.trim().is_empty() {
@@ -171,8 +192,18 @@ pub(super) fn parse(path: &str, xml: &str) -> Result<GraphParse> {
                     skip_depth = None;
                 } else if property.as_ref().is_some_and(|item| item.0 == depth) {
                     let (_, property_start, predicate, object) =
-                        property.take().expect("active RDF property");
-                    let current = subject.as_ref().expect("RDF subject").1.clone();
+                        property.take().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "RDF property closed without an active property".to_string(),
+                            )
+                        })?;
+                    let current = subject
+                        .as_ref()
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("RDF property has no active subject".to_string())
+                        })?
+                        .1
+                        .clone();
                     triples.push(Triple {
                         subject: current.clone(),
                         predicate,
@@ -197,14 +228,14 @@ pub(super) fn parse(path: &str, xml: &str) -> Result<GraphParse> {
             },
             Event::PI(_) => return invalid("processing instructions are prohibited in RDF/XML"),
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::Decl(_) => {},
         }
         if triples.len() > MAX_TRIPLES {
             return invalid("RDF graph exceeds triple limit");
         }
         buffer.clear();
     }
-    let root_close =
+    let root_close_offset =
         root_close.ok_or_else(|| Error::InvalidFormat("unterminated rdf:RDF root".to_string()))?;
     Ok(GraphParse {
         graph: Graph {
@@ -214,7 +245,7 @@ pub(super) fn parse(path: &str, xml: &str) -> Result<GraphParse> {
             triples,
         },
         spans,
-        root_close,
+        root_close: root_close_offset,
     })
 }
 
@@ -294,11 +325,11 @@ pub(super) fn property_xml(triple: &Triple) -> Result<String> {
             datatype,
             language,
         } => {
-            if let Some(value) = datatype {
-                attr(&mut out, "rdf:datatype", value)?;
+            if let Some(datatype_iri) = datatype {
+                attr(&mut out, "rdf:datatype", datatype_iri)?;
             }
-            if let Some(value) = language {
-                attr(&mut out, "xml:lang", value)?;
+            if let Some(language_tag) = language {
+                attr(&mut out, "xml:lang", language_tag)?;
             }
             out.push('>');
             out.push_str(&escape(value));
@@ -370,15 +401,16 @@ fn split_predicate(value: &str) -> Result<(String, &str)> {
     Ok((value[..=index].to_string(), local))
 }
 
-fn predicate_iri(namespace: Option<&[u8]>, local: &[u8]) -> Result<String> {
-    let Some(namespace) = namespace else {
+fn predicate_iri(namespace_bytes: Option<&[u8]>, local_bytes: &[u8]) -> Result<String> {
+    let Some(bound_namespace) = namespace_bytes else {
         return invalid("RDF property requires a namespace");
     };
-    let namespace = std::str::from_utf8(namespace)
-        .map_err(|_| Error::InvalidFormat("invalid RDF predicate namespace".to_string()))?;
-    let local = std::str::from_utf8(local)
-        .map_err(|_| Error::InvalidFormat("invalid RDF predicate name".to_string()))?;
-    Ok(format!("{namespace}{local}"))
+    let namespace_text = std::str::from_utf8(bound_namespace).map_err(|error| {
+        Error::InvalidFormat(format!("invalid RDF predicate namespace: {error}"))
+    })?;
+    let local_name = std::str::from_utf8(local_bytes)
+        .map_err(|error| Error::InvalidFormat(format!("invalid RDF predicate name: {error}")))?;
+    Ok(format!("{namespace_text}{local_name}"))
 }
 
 fn rdf_attr(
@@ -396,17 +428,17 @@ fn namespaced_attr(
     local: &[u8],
 ) -> Result<Option<String>> {
     let mut result = None;
-    for raw in element.attributes().with_checks(true) {
-        let raw =
-            raw.map_err(|error| Error::InvalidFormat(format!("invalid RDF attribute: {error}")))?;
-        let (resolved, name) = reader.resolver().resolve_attribute(raw.key);
+    for raw_attribute in element.attributes().with_checks(true) {
+        let attribute = raw_attribute
+            .map_err(|error| Error::InvalidFormat(format!("invalid RDF attribute: {error}")))?;
+        let (resolved, name) = reader.resolver().resolve_attribute(attribute.key);
         if matches!(resolved, ResolveResult::Bound(Namespace(value)) if value == namespace)
             && name.as_ref() == local
         {
             if result.is_some() {
                 return invalid("duplicate expanded RDF attribute");
             }
-            result = Some(decode_attr(reader, &raw)?);
+            result = Some(decode_attr(reader, &attribute)?);
         }
     }
     Ok(result)
@@ -417,20 +449,20 @@ pub(super) fn decode_attr(
     attr: &quick_xml::events::attributes::Attribute<'_>,
 ) -> Result<String> {
     attr.decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
-        .map(|value| value.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|error| Error::InvalidFormat(format!("invalid RDF attribute value: {error}")))
 }
 
-fn resolved_namespace(value: &ResolveResult<'_>) -> Option<Vec<u8>> {
-    match value {
-        ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
-        _ => None,
+fn resolved_namespace(resolution: &ResolveResult<'_>) -> Option<Vec<u8>> {
+    match resolution {
+        ResolveResult::Bound(Namespace(namespace)) => Some(namespace.to_vec()),
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
     }
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("RDF XML position overflow".to_string()))
+        .map_err(|error| Error::InvalidFormat(format!("RDF XML position overflow: {error}")))
 }
 
 fn attr(out: &mut String, name: &str, value: &str) -> Result<()> {

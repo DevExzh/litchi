@@ -17,9 +17,26 @@ const META_NAMESPACE: &[u8] = META_NAMESPACE_STR.as_bytes();
 const DC_NAMESPACE_STR: &str = "http://purl.org/dc/elements/1.1/";
 const DC_NAMESPACE: &[u8] = DC_NAMESPACE_STR.as_bytes();
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
+const PATCH_FIELD_COUNT: usize = 7;
+/// Insertion order for elements a patch appends to `office:meta`, following
+/// the ODF schema sequence for simple metadata.
+const PATCH_INSERTION_ORDER: [PatchField; PATCH_FIELD_COUNT] = [
+    PatchField::Generator,
+    PatchField::Title,
+    PatchField::Description,
+    PatchField::Subject,
+    PatchField::Keywords,
+    PatchField::Creator,
+    PatchField::ModificationDate,
+];
 
 impl Metadata {
-    /// Parse metadata from meta.xml content
+    /// Parse metadata from `meta.xml` content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the XML is malformed or contains invalid ODF
+    /// metadata values.
     pub fn from_xml(xml_content: &str) -> Result<Self> {
         let mut reader = NsReader::from_str(xml_content);
         let mut buf = Vec::new();
@@ -28,10 +45,10 @@ impl Metadata {
         let mut meta_depth = None;
 
         loop {
-            let (namespace, event) = reader
+            let (resolved_namespace, event) = reader
                 .read_resolved_event_into(&mut buf)
                 .map_err(metadata_xml_error)?;
-            let namespace = known_namespace(&namespace);
+            let namespace = known_namespace(&resolved_namespace);
             match event {
                 Event::Start(ref element) => {
                     let local_name = element.local_name();
@@ -42,7 +59,7 @@ impl Metadata {
                         depth = checked_depth_add(depth)?;
                         meta_depth = Some(depth);
                     } else if meta_depth == Some(depth) {
-                        if let Some(field) = text_field(&namespace, local_name.as_ref()) {
+                        if let Some(field) = text_field(namespace, local_name.as_ref()) {
                             let value = extract_text_content(&mut reader)?;
                             assign_text_field(&mut metadata, field, value);
                         } else if namespace == KnownNamespace::Meta
@@ -58,7 +75,7 @@ impl Metadata {
                         } else {
                             parse_metadata_attributes(
                                 &mut metadata,
-                                &namespace,
+                                namespace,
                                 local_name.as_ref(),
                                 element,
                                 &reader,
@@ -72,7 +89,7 @@ impl Metadata {
                 Event::Empty(ref element) => {
                     let local_name = element.local_name();
                     if meta_depth == Some(depth) {
-                        if let Some(field) = text_field(&namespace, local_name.as_ref()) {
+                        if let Some(field) = text_field(namespace, local_name.as_ref()) {
                             assign_text_field(&mut metadata, field, String::new());
                         } else if namespace == KnownNamespace::Meta
                             && local_name.as_ref() == b"user-defined"
@@ -86,7 +103,7 @@ impl Metadata {
                         } else {
                             parse_metadata_attributes(
                                 &mut metadata,
-                                &namespace,
+                                namespace,
                                 local_name.as_ref(),
                                 element,
                                 &reader,
@@ -108,7 +125,13 @@ impl Metadata {
                     }
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
             buf.clear();
         }
@@ -152,87 +175,6 @@ enum KnownNamespace {
     Other,
 }
 
-fn known_namespace(namespace: &ResolveResult<'_>) -> KnownNamespace {
-    if namespace_is(namespace, OFFICE_NAMESPACE) {
-        KnownNamespace::Office
-    } else if namespace_is(namespace, META_NAMESPACE) {
-        KnownNamespace::Meta
-    } else if namespace_is(namespace, DC_NAMESPACE) {
-        KnownNamespace::Dc
-    } else {
-        KnownNamespace::Other
-    }
-}
-
-fn namespace_is(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
-}
-
-fn text_field(namespace: &KnownNamespace, local_name: &[u8]) -> Option<TextField> {
-    if *namespace == KnownNamespace::Dc {
-        return match local_name {
-            b"title" => Some(TextField::Title),
-            b"description" => Some(TextField::Description),
-            b"subject" => Some(TextField::Subject),
-            b"creator" => Some(TextField::Creator),
-            b"language" => Some(TextField::Language),
-            b"contributor" => Some(TextField::Contributor),
-            b"publisher" => Some(TextField::Publisher),
-            b"rights" => Some(TextField::Rights),
-            b"coverage" => Some(TextField::Coverage),
-            b"format" => Some(TextField::Format),
-            b"identifier" => Some(TextField::Identifier),
-            b"relation" => Some(TextField::Relation),
-            b"source" => Some(TextField::Source),
-            b"type" => Some(TextField::Type),
-            b"date" => Some(TextField::Date),
-            _ => None,
-        };
-    }
-    if *namespace == KnownNamespace::Meta {
-        return match local_name {
-            b"keyword" => Some(TextField::Keyword),
-            b"initial-creator" => Some(TextField::InitialCreator),
-            b"printed-by" => Some(TextField::PrintedBy),
-            b"creation-date" => Some(TextField::CreationDate),
-            b"print-date" => Some(TextField::PrintDate),
-            b"generator" => Some(TextField::Generator),
-            b"editing-cycles" => Some(TextField::EditingCycles),
-            b"editing-duration" => Some(TextField::EditingDuration),
-            _ => None,
-        };
-    }
-    None
-}
-
-fn assign_text_field(metadata: &mut Metadata, field: TextField, value: String) {
-    match field {
-        TextField::Title => metadata.title = Some(value),
-        TextField::Description => metadata.description = Some(value),
-        TextField::Subject => metadata.subject = Some(value),
-        TextField::Keyword => metadata.keywords.push(value),
-        TextField::Creator => metadata.creator = Some(value),
-        TextField::Language => metadata.language = Some(value),
-        TextField::Contributor => metadata.contributor = Some(value),
-        TextField::Publisher => metadata.publisher = Some(value),
-        TextField::Rights => metadata.rights = Some(value),
-        TextField::Coverage => metadata.coverage = Some(value),
-        TextField::Format => metadata.format = Some(value),
-        TextField::Identifier => metadata.identifier = Some(value),
-        TextField::Relation => metadata.relation = Some(value),
-        TextField::Source => metadata.source = Some(value),
-        TextField::Type => metadata.r#type = Some(value),
-        TextField::Date => metadata.modification_date = Some(value),
-        TextField::InitialCreator => metadata.initial_creator = Some(value),
-        TextField::PrintedBy => metadata.printed_by = Some(value),
-        TextField::CreationDate => metadata.creation_date = Some(value),
-        TextField::PrintDate => metadata.print_date = Some(value),
-        TextField::Generator => metadata.generator = Some(value),
-        TextField::EditingCycles => metadata.editing_cycles = Some(value),
-        TextField::EditingDuration => metadata.editing_duration = Some(value),
-    }
-}
-
 /// Edit applied to a simple text metadata element when saving a mutable
 /// document that retains its source meta.xml.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -243,6 +185,39 @@ enum MetaFieldEdit {
     Set(String),
     /// Remove the element from the source meta.xml.
     Remove,
+}
+
+/// Field-level edits applied to a retained source meta.xml during a mutable
+/// save. Every element not named by an edit is preserved unchanged.
+#[derive(Debug, Clone)]
+pub struct MetaXmlPatch {
+    generator: MetaFieldEdit,
+    modification_date: MetaFieldEdit,
+    title: MetaFieldEdit,
+    creator: MetaFieldEdit,
+    subject: MetaFieldEdit,
+    description: MetaFieldEdit,
+    keywords: MetaFieldEdit,
+}
+
+/// A simple text element of `office:meta` that a mutable save can patch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PatchField {
+    Generator,
+    ModificationDate,
+    Title,
+    Creator,
+    Subject,
+    Description,
+    Keywords,
+}
+
+/// Prefixes the source meta.xml root binds to the Dublin Core and ODF meta
+/// namespaces, reused when a patch inserts new elements.
+#[derive(Debug, Default)]
+struct MetaNamespacePrefixes {
+    dc: Option<String>,
+    meta: Option<String>,
 }
 
 impl MetaFieldEdit {
@@ -259,21 +234,9 @@ impl MetaFieldEdit {
     }
 }
 
-/// Field-level edits applied to a retained source meta.xml during a mutable
-/// save. Every element not named by an edit is preserved unchanged.
-#[derive(Debug, Clone)]
-pub struct MetaXmlPatch {
-    generator: MetaFieldEdit,
-    modification_date: MetaFieldEdit,
-    title: MetaFieldEdit,
-    creator: MetaFieldEdit,
-    subject: MetaFieldEdit,
-    description: MetaFieldEdit,
-    keywords: MetaFieldEdit,
-}
-
 impl MetaXmlPatch {
     /// Start from a patch that preserves every source element.
+    #[must_use]
     pub fn preserve_all() -> Self {
         Self {
             generator: MetaFieldEdit::Preserve,
@@ -288,6 +251,7 @@ impl MetaXmlPatch {
 
     /// Overwrite `meta:generator` and `dc:date`, matching the values a
     /// from-scratch save would emit.
+    #[must_use]
     pub fn with_generator_and_modification_date(
         mut self,
         generator: &str,
@@ -301,6 +265,7 @@ impl MetaXmlPatch {
     /// Derive edits for the simple mutable metadata fields by comparing the
     /// current mutable metadata against the metadata the source produced.
     /// Fields the user did not change keep their source element untouched.
+    #[must_use]
     pub fn diff_simple_fields(mut self, source: &Metadata, current: &CoreMetadata) -> Self {
         let expected = CoreMetadata::from(source.clone());
         self.title = MetaFieldEdit::between(expected.title.as_deref(), current.title.as_deref());
@@ -360,33 +325,6 @@ impl MetaXmlPatch {
     }
 }
 
-/// A simple text element of `office:meta` that a mutable save can patch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PatchField {
-    Generator,
-    ModificationDate,
-    Title,
-    Creator,
-    Subject,
-    Description,
-    Keywords,
-}
-
-/// Number of [`PatchField`] variants, sizing the consumed-edit bitmap.
-const PATCH_FIELD_COUNT: usize = 7;
-
-/// Insertion order for elements a patch appends to `office:meta`, following
-/// the ODF schema sequence for simple metadata.
-const PATCH_INSERTION_ORDER: [PatchField; PATCH_FIELD_COUNT] = [
-    PatchField::Generator,
-    PatchField::Title,
-    PatchField::Description,
-    PatchField::Subject,
-    PatchField::Keywords,
-    PatchField::Creator,
-    PatchField::ModificationDate,
-];
-
 impl PatchField {
     const fn index(self) -> usize {
         self as usize
@@ -406,39 +344,11 @@ impl PatchField {
     }
 }
 
-/// Map a direct `office:meta` child to the field a patch manages.
-fn patch_field(namespace: &KnownNamespace, local_name: &[u8]) -> Option<PatchField> {
-    match namespace {
-        KnownNamespace::Dc => match local_name {
-            b"title" => Some(PatchField::Title),
-            b"creator" => Some(PatchField::Creator),
-            b"subject" => Some(PatchField::Subject),
-            b"description" => Some(PatchField::Description),
-            b"date" => Some(PatchField::ModificationDate),
-            _ => None,
-        },
-        KnownNamespace::Meta => match local_name {
-            b"generator" => Some(PatchField::Generator),
-            b"keyword" => Some(PatchField::Keywords),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-/// Prefixes the source meta.xml root binds to the Dublin Core and ODF meta
-/// namespaces, reused when a patch inserts new elements.
-#[derive(Debug, Default)]
-struct MetaNamespacePrefixes {
-    dc: Option<String>,
-    meta: Option<String>,
-}
-
 impl MetaNamespacePrefixes {
     /// Record the relevant bindings declared on the root element.
     fn observe(&mut self, element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Result<()> {
-        for attribute in element.attributes() {
-            let attribute = attribute.map_err(metadata_xml_error)?;
+        for raw_attribute in element.attributes() {
+            let attribute = raw_attribute.map_err(metadata_xml_error)?;
             let bound_prefix = if attribute.key.as_ref() == b"xmlns" {
                 String::new()
             } else if attribute
@@ -476,7 +386,9 @@ impl MetaNamespacePrefixes {
         let (binding, fallback_prefix, namespace_uri) = match namespace {
             KnownNamespace::Dc => (&self.dc, "dc", DC_NAMESPACE_STR),
             KnownNamespace::Meta => (&self.meta, "meta", META_NAMESPACE_STR),
-            _ => unreachable!("inserted metadata fields only use the dc and meta namespaces"),
+            KnownNamespace::Office | KnownNamespace::Other => {
+                return (local_name.to_string(), None);
+            },
         };
         match binding {
             Some(prefix) if prefix.is_empty() => (local_name.to_string(), None),
@@ -489,6 +401,107 @@ impl MetaNamespacePrefixes {
     }
 }
 
+fn known_namespace(namespace: &ResolveResult<'_>) -> KnownNamespace {
+    if namespace_is(namespace, OFFICE_NAMESPACE) {
+        KnownNamespace::Office
+    } else if namespace_is(namespace, META_NAMESPACE) {
+        KnownNamespace::Meta
+    } else if namespace_is(namespace, DC_NAMESPACE) {
+        KnownNamespace::Dc
+    } else {
+        KnownNamespace::Other
+    }
+}
+
+fn namespace_is(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
+}
+
+fn text_field(namespace: KnownNamespace, local_name: &[u8]) -> Option<TextField> {
+    if namespace == KnownNamespace::Dc {
+        return match local_name {
+            b"title" => Some(TextField::Title),
+            b"description" => Some(TextField::Description),
+            b"subject" => Some(TextField::Subject),
+            b"creator" => Some(TextField::Creator),
+            b"language" => Some(TextField::Language),
+            b"contributor" => Some(TextField::Contributor),
+            b"publisher" => Some(TextField::Publisher),
+            b"rights" => Some(TextField::Rights),
+            b"coverage" => Some(TextField::Coverage),
+            b"format" => Some(TextField::Format),
+            b"identifier" => Some(TextField::Identifier),
+            b"relation" => Some(TextField::Relation),
+            b"source" => Some(TextField::Source),
+            b"type" => Some(TextField::Type),
+            b"date" => Some(TextField::Date),
+            _ => None,
+        };
+    }
+    if namespace == KnownNamespace::Meta {
+        return match local_name {
+            b"keyword" => Some(TextField::Keyword),
+            b"initial-creator" => Some(TextField::InitialCreator),
+            b"printed-by" => Some(TextField::PrintedBy),
+            b"creation-date" => Some(TextField::CreationDate),
+            b"print-date" => Some(TextField::PrintDate),
+            b"generator" => Some(TextField::Generator),
+            b"editing-cycles" => Some(TextField::EditingCycles),
+            b"editing-duration" => Some(TextField::EditingDuration),
+            _ => None,
+        };
+    }
+    None
+}
+
+fn assign_text_field(metadata: &mut Metadata, field: TextField, value: String) {
+    match field {
+        TextField::Title => metadata.title = Some(value),
+        TextField::Description => metadata.description = Some(value),
+        TextField::Subject => metadata.subject = Some(value),
+        TextField::Keyword => metadata.keywords.push(value),
+        TextField::Creator => metadata.creator = Some(value),
+        TextField::Language => metadata.language = Some(value),
+        TextField::Contributor => metadata.contributor = Some(value),
+        TextField::Publisher => metadata.publisher = Some(value),
+        TextField::Rights => metadata.rights = Some(value),
+        TextField::Coverage => metadata.coverage = Some(value),
+        TextField::Format => metadata.format = Some(value),
+        TextField::Identifier => metadata.identifier = Some(value),
+        TextField::Relation => metadata.relation = Some(value),
+        TextField::Source => metadata.source = Some(value),
+        TextField::Type => metadata.r#type = Some(value),
+        TextField::Date => metadata.modification_date = Some(value),
+        TextField::InitialCreator => metadata.initial_creator = Some(value),
+        TextField::PrintedBy => metadata.printed_by = Some(value),
+        TextField::CreationDate => metadata.creation_date = Some(value),
+        TextField::PrintDate => metadata.print_date = Some(value),
+        TextField::Generator => metadata.generator = Some(value),
+        TextField::EditingCycles => metadata.editing_cycles = Some(value),
+        TextField::EditingDuration => metadata.editing_duration = Some(value),
+    }
+}
+
+/// Map a direct `office:meta` child to the field a patch manages.
+fn patch_field(namespace: KnownNamespace, local_name: &[u8]) -> Option<PatchField> {
+    match namespace {
+        KnownNamespace::Dc => match local_name {
+            b"title" => Some(PatchField::Title),
+            b"creator" => Some(PatchField::Creator),
+            b"subject" => Some(PatchField::Subject),
+            b"description" => Some(PatchField::Description),
+            b"date" => Some(PatchField::ModificationDate),
+            _ => None,
+        },
+        KnownNamespace::Meta => match local_name {
+            b"generator" => Some(PatchField::Generator),
+            b"keyword" => Some(PatchField::Keywords),
+            _ => None,
+        },
+        KnownNamespace::Office | KnownNamespace::Other => None,
+    }
+}
+
 /// Apply field-level edits to a retained source meta.xml.
 ///
 /// Elements and attributes not named by an edit are copied through unchanged
@@ -498,6 +511,11 @@ impl MetaNamespacePrefixes {
 ///
 /// Returns `Ok(None)` when the source has no `office:meta` to patch, so the
 /// caller can fall back to generating meta.xml from scratch.
+///
+/// # Errors
+///
+/// Returns an error when the source XML cannot be read or the rewritten XML
+/// cannot be emitted as UTF-8.
 pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<String>> {
     let mut reader = NsReader::from_str(source);
     let mut buffer = Vec::new();
@@ -510,10 +528,10 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
     let mut patched = false;
 
     loop {
-        let (namespace, event) = reader
+        let (resolved_namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(metadata_xml_error)?;
-        let namespace = known_namespace(&namespace);
+        let namespace = known_namespace(&resolved_namespace);
         match event {
             Event::Start(ref element) => {
                 let local_name = element.local_name();
@@ -529,7 +547,7 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
                     meta_depth = Some(depth);
                     write_event(&mut writer, event.clone())?;
                 } else if meta_depth == Some(depth)
-                    && let Some(field) = patch_field(&namespace, local_name.as_ref())
+                    && let Some(field) = patch_field(namespace, local_name.as_ref())
                     && !matches!(edits.edit(field), MetaFieldEdit::Preserve)
                 {
                     if consumed[field.index()] {
@@ -571,7 +589,7 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
                         write_event(&mut writer, event.clone())?;
                     }
                 } else if meta_depth == Some(depth)
-                    && let Some(field) = patch_field(&namespace, local_name.as_ref())
+                    && let Some(field) = patch_field(namespace, local_name.as_ref())
                     && !matches!(edits.edit(field), MetaFieldEdit::Preserve)
                 {
                     if !consumed[field.index()] {
@@ -605,7 +623,13 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
                 write_event(&mut writer, event.clone())?;
             },
             Event::Eof => break,
-            event => write_event(&mut writer, event)?,
+            other_event @ (Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)) => write_event(&mut writer, other_event)?,
         }
         buffer.clear();
     }
@@ -689,7 +713,14 @@ fn skip_element_body(reader: &mut NsReader<&[u8]>) -> Result<BytesEnd<'static>> 
                     "unexpected end of OpenDocument metadata element".to_string(),
                 ));
             },
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -740,7 +771,7 @@ fn extract_text_content(reader: &mut NsReader<&[u8]>) -> Result<String> {
                     "unexpected end of OpenDocument metadata text".to_string(),
                 ));
             },
-            _ => {
+            Event::Start(_) | Event::Empty(_) | Event::Decl(_) | Event::DocType(_) => {
                 return Err(Error::InvalidFormat(
                     "nested markup is not allowed in OpenDocument metadata values".to_string(),
                 ));
@@ -752,12 +783,12 @@ fn extract_text_content(reader: &mut NsReader<&[u8]>) -> Result<String> {
 
 fn parse_metadata_attributes(
     metadata: &mut Metadata,
-    namespace: &KnownNamespace,
+    namespace: KnownNamespace,
     local_name: &[u8],
     element: &BytesStart<'_>,
     reader: &NsReader<&[u8]>,
 ) -> Result<()> {
-    if *namespace != KnownNamespace::Meta {
+    if namespace != KnownNamespace::Meta {
         return Ok(());
     }
     match local_name {
@@ -801,8 +832,8 @@ fn parse_document_statistics(
     reader: &NsReader<&[u8]>,
 ) -> Result<DocumentStatistics> {
     let mut statistics = DocumentStatistics::default();
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(metadata_xml_error)?;
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(metadata_xml_error)?;
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
         if !namespace_is(&namespace, META_NAMESPACE) {
             continue;
@@ -876,8 +907,8 @@ fn attribute_value(
     expected_namespace: &[u8],
     expected_local_name: &[u8],
 ) -> Result<Option<String>> {
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(metadata_xml_error)?;
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(metadata_xml_error)?;
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
         if namespace_is(&namespace, expected_namespace)
             && local_name.as_ref() == expected_local_name

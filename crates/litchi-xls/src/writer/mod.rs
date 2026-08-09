@@ -15,6 +15,9 @@ pub mod formatting;
 /// Formula tokenization
 pub mod formula;
 
+/// Checked BIFF8 worksheet locations and frozen-pane counts.
+pub mod location;
+
 /// Typed worksheet view-state writing options
 pub mod view;
 
@@ -64,3 +67,4 @@ pub use formatting::{
     HorizontalAlignment, VerticalAlignment,
 };
 pub use formula::{Area, FormulaTokenizer, Ptg, Ref};
+pub use location::{Column, FrozenPanes, Row};

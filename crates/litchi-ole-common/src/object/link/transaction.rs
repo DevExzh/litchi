@@ -71,6 +71,10 @@ impl Transaction {
     }
 
     /// Replaces the raw flags while preserving the embedded/linked layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `flags` changes the embedded/linked layout.
     pub fn set_flags(&mut self, flags: u32) -> Result<&mut Self, OleError> {
         self.candidate.set_flags(flags)?;
         Ok(self)
@@ -83,18 +87,33 @@ impl Transaction {
     }
 
     /// Replaces the linked object's class identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the link has no class identifier field in its
+    /// wire layout.
     pub fn set_class_id(&mut self, value: Guid) -> Result<&mut Self, OleError> {
         self.candidate.set_class_id(value)?;
         Ok(self)
     }
 
     /// Replaces the linked object's FILETIME group.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the link has no timestamp group in its wire
+    /// layout.
     pub fn set_times(&mut self, value: Times) -> Result<&mut Self, OleError> {
         self.candidate.set_times(value)?;
         Ok(self)
     }
 
     /// Applies a custom typed edit using the existing inert [`Link`] setters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `edit` fails or leaves the candidate with an
+    /// invalid OLEDS layout.
     pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
     where
         F: FnOnce(&mut Link) -> Result<(), OleError>,
@@ -107,6 +126,10 @@ impl Transaction {
     }
 
     /// Projects and validates the current candidate without publishing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the candidate has an invalid OLEDS layout.
     pub fn snapshot(&self) -> Result<Snapshot, OleError> {
         self.materialize()
     }
@@ -118,9 +141,13 @@ impl Transaction {
     }
 
     /// Validates and publishes the candidate without mutating its source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the candidate has an invalid OLEDS layout.
     pub fn commit(self) -> Result<Commit, OleError> {
         let snapshot = self.materialize()?;
-        let patch = self.source.patch_to(snapshot.clone());
+        let patch = self.source.patch_to(&snapshot);
         Ok(Commit { snapshot, patch })
     }
 
@@ -181,6 +208,11 @@ impl Commit {
 }
 
 /// Runs one typed link edit and publishes it atomically.
+///
+/// # Errors
+///
+/// Returns an error when `edit` fails or leaves the link with an invalid OLEDS
+/// layout.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, OleError>
 where
     F: FnOnce(&mut Transaction) -> Result<(), OleError>,

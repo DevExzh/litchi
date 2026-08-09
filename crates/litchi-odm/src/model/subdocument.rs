@@ -70,6 +70,18 @@ pub struct Subdocument {
     href: String,
 }
 
+impl Subdocument {
+    pub fn new(href: impl Into<String>) -> Self {
+        Self { href: href.into() }
+    }
+
+    /// Returns the subdocument reference target.
+    #[must_use]
+    pub fn href(&self) -> &str {
+        &self.href
+    }
+}
+
 fn classify_target(href: String) -> Target {
     if is_safe_package_path(&href) {
         Target::Package(href)
@@ -111,17 +123,5 @@ mod tests {
                 Target::External(_)
             ));
         }
-    }
-}
-
-impl Subdocument {
-    pub fn new(href: impl Into<String>) -> Self {
-        Self { href: href.into() }
-    }
-
-    /// Returns the subdocument reference target.
-    #[must_use]
-    pub fn href(&self) -> &str {
-        &self.href
     }
 }

@@ -22,7 +22,6 @@ use litchi_odf_common::{
     media::authoring::{allocate_picture_path, validate_payload},
 };
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::Write as _;
 use std::path::Path;
 
 pub(crate) use self::transition::{
@@ -474,42 +473,30 @@ impl Builder {
         );
         if let Some(z_index) = &shape.z_index {
             validate_z_index(z_index)?;
-            let _ = write!(
-                shape_attributes,
-                r#" draw:z-index="{}""#,
-                escape_xml(z_index)
-            );
+            push_optional_attribute(&mut shape_attributes, "draw:z-index", Some(z_index));
         }
         if let Some(transform) = &shape.transform {
-            let _ = write!(
-                shape_attributes,
-                r#" draw:transform="{}""#,
-                escape_xml(transform)
-            );
+            push_optional_attribute(&mut shape_attributes, "draw:transform", Some(transform));
         }
         let presentation_class = shape
             .presentation_class
             .as_deref()
             .or_else(|| (shape.shape_type == ShapeType::Placeholder).then_some("object"));
         if let Some(class) = presentation_class {
-            let _ = write!(
-                shape_attributes,
-                r#" presentation:class="{}""#,
-                escape_xml(class)
-            );
+            push_optional_attribute(&mut shape_attributes, "presentation:class", Some(class));
         }
         if let Some(placeholder) = shape.presentation_placeholder {
-            let _ = write!(
-                shape_attributes,
-                r#" presentation:placeholder="{}""#,
-                if placeholder { "true" } else { "false" }
+            push_optional_attribute(
+                &mut shape_attributes,
+                "presentation:placeholder",
+                Some(if placeholder { "true" } else { "false" }),
             );
         }
         if let Some(user_transformed) = shape.presentation_user_transformed {
-            let _ = write!(
-                shape_attributes,
-                r#" presentation:user-transformed="{}""#,
-                if user_transformed { "true" } else { "false" }
+            push_optional_attribute(
+                &mut shape_attributes,
+                "presentation:user-transformed",
+                Some(if user_transformed { "true" } else { "false" }),
             );
         }
         let mut drawing_attribute_names = BTreeSet::new();
@@ -853,11 +840,9 @@ impl Builder {
 
             // Add title frame if title exists
             if let Some(ref title) = slide.title {
-                let _ = write!(
-                    body,
-                    r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" presentation:class="title" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box>{}</draw:text-box></draw:frame>"#,
-                    generate_text_paragraphs(title, Some("P1"))
-                );
+                body.push_str(r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" presentation:class="title" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box>"#);
+                body.push_str(&generate_text_paragraphs(title, Some("P1")));
+                body.push_str("</draw:text-box></draw:frame>");
             }
 
             // Add text frame
@@ -867,12 +852,11 @@ impl Builder {
                 } else {
                     "2.0cm"
                 };
-                let _ = write!(
-                    body,
-                    r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box>{}</draw:text-box></draw:frame>"#,
-                    y_position,
-                    generate_text_paragraphs(&slide.text, Some("P2"))
-                );
+                body.push_str(r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y=""#);
+                body.push_str(y_position);
+                body.push_str(r#""><draw:text-box>"#);
+                body.push_str(&generate_text_paragraphs(&slide.text, Some("P2")));
+                body.push_str("</draw:text-box></draw:frame>");
             }
 
             // Add custom shapes
@@ -954,11 +938,15 @@ impl Builder {
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            let _ = write!(meta, "<dc:title>{}</dc:title>", escape_xml(title));
+            meta.push_str("<dc:title>");
+            meta.push_str(&escape_xml(title));
+            meta.push_str("</dc:title>");
         }
 
         if let Some(ref author) = self.metadata.author {
-            let _ = write!(meta, "<dc:creator>{}</dc:creator>", escape_xml(author));
+            meta.push_str("<dc:creator>");
+            meta.push_str(&escape_xml(author));
+            meta.push_str("</dc:creator>");
         }
 
         meta.push_str("</office:meta>");

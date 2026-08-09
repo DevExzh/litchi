@@ -4,7 +4,7 @@ use litchi_core::{Metadata, Result};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
-pub use crate::package::{Commit, Patch, Snapshot, TextChange, Transaction};
+pub use crate::package::{Commit, NameChange, Patch, Snapshot, TextChange, Transaction};
 
 /// Immutable source-owning drawing facade.
 pub struct Drawing {

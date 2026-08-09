@@ -27,8 +27,12 @@ pub enum ChartClassKind {
     Unknown,
 }
 
-/// A bounded, namespace-resolved `chart:class` token retaining its QName spelling.
+/// A bounded, namespace-resolved `chart:class` token retaining its `QName` spelling.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the public `ChartClass` name distinguishes the ODF chart vocabulary type"
+)]
 pub struct ChartClass {
     kind: ChartClassKind,
     lexical: String,
@@ -36,14 +40,22 @@ pub struct ChartClass {
 }
 
 impl ChartClass {
-    /// Parse a lexical QName with the namespace URI bound to its prefix.
-    pub fn parse(lexical: impl Into<String>, namespace_uri: Option<&str>) -> Result<Self> {
-        let lexical = lexical.into();
+    /// Parse a lexical `QName` with the namespace URI bound to its prefix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `QName` is malformed or has no resolved
+    /// namespace URI.
+    pub fn parse(
+        lexical_input: impl Into<String>,
+        resolved_namespace_uri: Option<&str>,
+    ) -> Result<Self> {
+        let lexical = lexical_input.into();
         validate_qname(&lexical)?;
-        let Some(namespace_uri) = namespace_uri.filter(|uri| !uri.is_empty()) else {
+        let Some(resolved_uri) = resolved_namespace_uri.filter(|uri| !uri.is_empty()) else {
             return invalid("chart class QName has no resolved namespace URI");
         };
-        let namespace_uri = Some(namespace_uri.to_owned());
+        let namespace_uri = Some(resolved_uri.to_owned());
         let local = lexical.rsplit_once(':').map_or("", |(_, local)| local);
         let kind = if namespace_uri.as_deref() == Some(CHARTNS) {
             standard_kind(local).unwrap_or(ChartClassKind::Unknown)
@@ -57,6 +69,11 @@ impl ChartClass {
         })
     }
     /// Construct a caller-selected extension chart class.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `QName` is malformed, its namespace is absent,
+    /// or it uses the standard chart namespace.
     pub fn extension(lexical: impl Into<String>, namespace_uri: impl AsRef<str>) -> Result<Self> {
         let mut value = Self::parse(lexical, Some(namespace_uri.as_ref()))?;
         if value.namespace_uri.as_deref() == Some(CHARTNS) {
@@ -66,6 +83,10 @@ impl ChartClass {
         Ok(value)
     }
     /// Construct an explicitly unknown, inert chart class for preservation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `QName` is malformed or its namespace is absent.
     pub fn unknown(lexical: impl Into<String>, namespace_uri: impl AsRef<str>) -> Result<Self> {
         let mut value = Self::parse(lexical, Some(namespace_uri.as_ref()))?;
         value.kind = ChartClassKind::Unknown;
@@ -123,12 +144,12 @@ impl ChartClass {
     pub fn kind(&self) -> ChartClassKind {
         self.kind
     }
-    /// The exact producer or caller supplied QName spelling.
+    /// The exact producer or caller supplied `QName` spelling.
     #[must_use]
     pub fn lexical(&self) -> &str {
         &self.lexical
     }
-    /// The namespace URI resolved for the QName prefix, if available.
+    /// The namespace URI resolved for the `QName` prefix, if available.
     #[must_use]
     pub fn namespace_uri(&self) -> Option<&str> {
         self.namespace_uri.as_deref()
@@ -194,8 +215,10 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 mod tests {
     use super::{ChartClass, ChartClassKind};
     use crate::namespace::CHARTNS;
+    use litchi_core::Result;
+
     #[test]
-    fn recognizes_every_standard_class_without_normalizing_an_alias() {
+    fn recognizes_every_standard_class_without_normalizing_an_alias() -> Result<()> {
         let classes = [
             ("area", ChartClassKind::Area),
             ("bar", ChartClassKind::Bar),
@@ -211,25 +234,24 @@ mod tests {
             ("surface", ChartClassKind::Surface),
         ];
         for (local, kind) in classes {
-            let value = ChartClass::parse(format!("c:{local}"), Some(CHARTNS)).unwrap();
+            let value = ChartClass::parse(format!("c:{local}"), Some(CHARTNS))?;
             assert_eq!(value.kind(), kind);
             assert_eq!(value.lexical(), format!("c:{local}"));
         }
+        Ok(())
     }
+
     #[test]
-    fn extension_and_unknown_are_bounded_and_explicit() {
+    fn extension_and_unknown_are_bounded_and_explicit() -> Result<()> {
         assert_eq!(
-            ChartClass::extension("vendor:heat", "urn:vendor")
-                .unwrap()
-                .kind(),
+            ChartClass::extension("vendor:heat", "urn:vendor")?.kind(),
             ChartClassKind::Extension
         );
         assert_eq!(
-            ChartClass::parse("chart:future", Some(CHARTNS))
-                .unwrap()
-                .kind(),
+            ChartClass::parse("chart:future", Some(CHARTNS))?.kind(),
             ChartClassKind::Unknown
         );
         assert!(ChartClass::parse("chart:bad value", Some(CHARTNS)).is_err());
+        Ok(())
     }
 }

@@ -50,6 +50,8 @@ pub mod sprm;
 /// Complete SPRM operation definitions based on Apache POI.
 pub mod sprm_operations;
 
+/// Source-checked, reversible same-shape edits of ordinary DOC body paragraphs.
+pub mod body_text;
 pub mod bookmark;
 /// Contextual Word caption and AutoCaption metadata.
 pub mod captions {

@@ -80,6 +80,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
     let strict_excel = context.kind() == ChartKind::Excel;
     let mut cache_section = None;
     let mut next_cache_section = 0usize;
+    let mut cache_sections = [false; chart_cache::Index::ALL.len()];
     let mut zoom_seen = false;
     let mut growth_seen = false;
     let mut dimensions_seen = false;
@@ -389,7 +390,12 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
             },
             BRAI => {
                 if series_depth != Some(depth) {
-                    return invalid(record, "BRAI appears outside a Series collection");
+                    // `[MS-XLS]` `TEXTPROPS` may carry a BRAI in a label or
+                    // other text collection. It is not one of this semantic
+                    // chart model's four series bindings, so preserve it
+                    // losslessly instead of rejecting the host chart.
+                    add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
+                    continue;
                 }
                 let link = links::parse_link(record, context, limits)?;
                 let expected = Role::ALL.get(ai_next).copied().ok_or(Error::InvalidChart {
@@ -1057,12 +1063,10 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         reason: "SIIndex must identify values, categories, or bubbles",
                     },
                 )?;
-                if chart_cache::Index::ALL.get(next_cache_section).copied() != Some(index) {
-                    return invalid(
-                        record,
-                        "SIIndex sections are missing, duplicated, or out of order",
-                    );
+                if cache_sections[index.slot()] {
+                    return invalid(record, "SIIndex section is duplicated");
                 }
+                cache_sections[index.slot()] = true;
                 next_cache_section =
                     next_cache_section
                         .checked_add(1)

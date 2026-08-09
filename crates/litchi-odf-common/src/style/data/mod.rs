@@ -14,6 +14,23 @@ mod tests;
 
 use litchi_core::{Error, Result};
 
+pub use codec::parse_data_styles_xml;
+pub use model::{
+    Calendar, Clock, Currency, EmbeddedText, FormatSource, Fraction, Kind, Locale, Map, Month,
+    NumberToken, Part, Scientific, Seconds, Section, ShortLong, Style, Styles, TextProperties,
+    Token, TransliterationStyle, Version, WeekOfYear,
+};
+pub use package::{parse_flat, parse_package, remove_data_style_xml, set_data_style_xml};
+
+pub(crate) use codec::{
+    Attribute, Frame, Node, byte_offset, collect_attributes, decode, direct_style_section,
+    ensure_empty_node, ensure_no_children, ensure_whitespace, event_start, frame_section,
+    namespace_uri, parse_locale, read_document_version, reject_remaining, required, required_i64,
+    take, take_bool, take_f64, take_i64, take_versioned_bool, take_versioned_i64,
+    take_versioned_u64, validate_cell_address, validate_locale, validate_name,
+    validate_optional_string, validate_text,
+};
+
 pub(crate) const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 pub(crate) const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 pub(crate) const NUMBER: &str = "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0";
@@ -36,19 +53,3 @@ pub(crate) fn invalid<T>(message: impl Into<String>) -> Result<T> {
 pub(crate) fn bad(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
-
-pub use codec::parse_data_styles_xml;
-pub use model::{
-    Calendar, Clock, Currency, EmbeddedText, FormatSource, Fraction, Kind, Locale, Map, Month,
-    NumberToken, Part, Scientific, Seconds, Section, ShortLong, Style, Styles, TextProperties,
-    Token, TransliterationStyle, Version, WeekOfYear,
-};
-pub use package::{parse_flat, parse_package, remove_data_style_xml, set_data_style_xml};
-
-pub(crate) use codec::{
-    Attribute, Frame, Node, collect_attributes, decode, direct_style_section, ensure_empty_node,
-    ensure_no_children, ensure_whitespace, event_start, frame_section, namespace_uri, parse_locale,
-    read_document_version, reject_remaining, required, required_i64, take, take_bool, take_f64,
-    take_i64, take_versioned_bool, take_versioned_i64, take_versioned_u64, validate_cell_address,
-    validate_locale, validate_name, validate_optional_string, validate_text,
-};

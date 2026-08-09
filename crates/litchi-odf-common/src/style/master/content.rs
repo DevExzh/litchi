@@ -196,6 +196,7 @@ pub enum SenderKind {
 
 impl SenderKind {
     /// The local name of the corresponding ODF `text:sender-*` element.
+    #[must_use]
     pub const fn element_name(self) -> &'static str {
         match self {
             Self::FirstName => "sender-firstname",
@@ -229,7 +230,7 @@ struct Region {
     blocks: Vec<Block>,
     block: Option<ActiveBlock>,
     field: Option<ActiveField>,
-    column_region: Option<ActiveColumn>,
+    active_column: Option<ActiveColumn>,
     last_column_region_order: Option<u8>,
     has_plain_blocks: bool,
     token_count: usize,
@@ -252,139 +253,6 @@ struct ActiveField {
     field: Field,
 }
 
-pub(crate) fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
-    let mut reader = NsReader::from_str(xml);
-    let mut buffer = Vec::new();
-    let mut depth = 0usize;
-    let mut master: Option<Master> = None;
-    let mut region: Option<Region> = None;
-    let mut regions = HashMap::new();
-
-    loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
-        let namespace = resolved_namespace(&namespace).map(<[u8]>::to_vec);
-        let namespace = namespace.as_deref();
-        let event = event.into_owned();
-        match event {
-            Event::Start(element) => {
-                let element_depth = depth.checked_add(1).ok_or_else(depth_error)?;
-                if element_depth > MAX_XML_DEPTH {
-                    return Err(depth_error());
-                }
-                if namespace == Some(STYLE_NAMESPACE)
-                    && element.local_name().as_ref() == b"master-page"
-                {
-                    if master.is_some() {
-                        return Err(Error::InvalidFormat(
-                            "nested style:master-page element".to_string(),
-                        ));
-                    }
-                    let name = namespaced_attr(&reader, &element, STYLE_NAMESPACE, b"name")?
-                        .ok_or_else(|| {
-                            Error::InvalidFormat(
-                                "style:master-page is missing style:name".to_string(),
-                            )
-                        })?;
-                    master = Some(Master {
-                        name,
-                        depth: element_depth,
-                    });
-                } else if let Some(master_page) = master.as_ref()
-                    && region.is_none()
-                    && namespace == Some(STYLE_NAMESPACE)
-                    && let Some(kind) = Kind::parse(element.local_name().as_ref())
-                {
-                    region = Some(Region::new(master_page.name.clone(), kind, element_depth));
-                } else if let Some(active) = region.as_mut() {
-                    active.start_element(&reader, namespace, &element, element_depth, false)?;
-                }
-                depth = element_depth;
-            },
-            Event::Empty(element) => {
-                let element_depth = depth.checked_add(1).ok_or_else(depth_error)?;
-                if element_depth > MAX_XML_DEPTH {
-                    return Err(depth_error());
-                }
-                if let Some(master_page) = master.as_ref()
-                    && region.is_none()
-                    && namespace == Some(STYLE_NAMESPACE)
-                    && let Some(kind) = Kind::parse(element.local_name().as_ref())
-                {
-                    insert_region(&mut regions, master_page.name.clone(), kind, Vec::new())?;
-                } else if let Some(active) = region.as_mut() {
-                    active.start_element(&reader, namespace, &element, element_depth, true)?;
-                }
-            },
-            Event::Text(value) => {
-                if let Some(active) = region.as_mut() {
-                    let decoded = value
-                        .xml_content(XmlVersion::Explicit1_0)
-                        .map_err(|error| {
-                            Error::InvalidFormat(format!("invalid header text: {error}"))
-                        })?;
-                    active.push_text(&decoded)?;
-                }
-            },
-            Event::GeneralRef(reference) => {
-                if let Some(active) = region.as_mut() {
-                    active.push_text(&decode_reference(&reference)?)?;
-                }
-            },
-            Event::CData(value) => {
-                if let Some(active) = region.as_mut() {
-                    let decoded = value
-                        .xml_content(XmlVersion::Explicit1_0)
-                        .map_err(|error| {
-                            Error::InvalidFormat(format!("invalid header CDATA: {error}"))
-                        })?;
-                    active.push_text(&decoded)?;
-                }
-            },
-            Event::End(element) => {
-                if let Some(active) = region.as_mut() {
-                    active.end_element(namespace, element.local_name().as_ref(), depth)?;
-                }
-                if region.as_ref().is_some_and(|active| active.depth == depth) {
-                    let active = region.take().expect("checked header/footer region");
-                    if active.column_region.is_some() || active.block.is_some() {
-                        return Err(Error::InvalidFormat(
-                            "unterminated header/footer column region or block".to_string(),
-                        ));
-                    }
-                    if namespace != Some(STYLE_NAMESPACE)
-                        || Kind::parse(element.local_name().as_ref()) != Some(active.kind)
-                    {
-                        return Err(Error::InvalidFormat(
-                            "malformed header/footer region nesting".to_string(),
-                        ));
-                    }
-                    insert_region(&mut regions, active.master_name, active.kind, active.blocks)?;
-                }
-                if master.as_ref().is_some_and(|active| active.depth == depth) {
-                    master = None;
-                }
-                depth = depth.checked_sub(1).ok_or_else(depth_error)?;
-            },
-            Event::DocType(_) => {
-                return Err(Error::InvalidFormat(
-                    "DTD is not allowed in ODF styles.xml".to_string(),
-                ));
-            },
-            Event::Eof => break,
-            _ => {},
-        }
-        buffer.clear();
-    }
-    if master.is_some() || region.is_some() || depth != 0 {
-        return Err(Error::InvalidFormat(
-            "unterminated master-page header/footer".to_string(),
-        ));
-    }
-    Ok(regions)
-}
-
 impl Region {
     fn new(master_name: String, kind: Kind, depth: usize) -> Self {
         Self {
@@ -394,7 +262,7 @@ impl Region {
             blocks: Vec::new(),
             block: None,
             field: None,
-            column_region: None,
+            active_column: None,
             last_column_region_order: None,
             has_plain_blocks: false,
             token_count: 0,
@@ -412,10 +280,8 @@ impl Region {
         empty: bool,
     ) -> Result<()> {
         let local = element.local_name();
-        if self.block.is_none()
-            && namespace == Some(STYLE_NAMESPACE)
-            && let Some(kind) = Column::parse(local.as_ref())
-        {
+        let starts_column_region = self.block.is_none() && namespace == Some(STYLE_NAMESPACE);
+        if let (true, Some(kind)) = (starts_column_region, Column::parse(local.as_ref())) {
             self.start_column_region(kind, depth, empty)?;
             return Ok(());
         }
@@ -425,12 +291,12 @@ impl Region {
                     "nested header/footer paragraph or heading".to_string(),
                 ));
             }
-            if local.as_ref() == b"h" && self.column_region.is_some() {
+            if local.as_ref() == b"h" && self.active_column.is_some() {
                 return Err(Error::InvalidFormat(
                     "style:region-* column regions may contain only text:p".to_string(),
                 ));
             }
-            let column_region = self.column_region.as_ref().map(|region| region.kind);
+            let column_region = self.active_column.as_ref().map(|region| region.kind);
             if column_region.is_none() {
                 if self.last_column_region_order.is_some() {
                     return Err(Error::InvalidFormat(
@@ -474,7 +340,9 @@ impl Region {
                 },
                 b"tab" => self.push_token(Inline::Tab)?,
                 b"line-break" => self.push_token(Inline::LineBreak)?,
-                local if field_kind(local).is_some() || is_unknown_field(local) => {
+                field_local
+                    if field_kind(field_local).is_some() || is_unknown_field(field_local) =>
+                {
                     self.field_count = self
                         .field_count
                         .checked_add(1)
@@ -482,7 +350,7 @@ impl Region {
                     if self.field_count > MAX_FIELDS {
                         return Err(limit_error("field"));
                     }
-                    let field = parse_field(reader, element, local)?;
+                    let field = parse_field(reader, element, field_local)?;
                     if empty {
                         self.push_token(Inline::Field(field))?;
                     } else {
@@ -496,7 +364,7 @@ impl Region {
     }
 
     fn start_column_region(&mut self, kind: Column, depth: usize, empty: bool) -> Result<()> {
-        if self.column_region.is_some() {
+        if self.active_column.is_some() {
             return Err(Error::InvalidFormat(
                 "nested style:region-* column regions".to_string(),
             ));
@@ -516,7 +384,7 @@ impl Region {
         }
         self.last_column_region_order = Some(kind.order());
         if !empty {
-            self.column_region = Some(ActiveColumn { kind, depth });
+            self.active_column = Some(ActiveColumn { kind, depth });
         }
         Ok(())
     }
@@ -527,7 +395,9 @@ impl Region {
             .as_ref()
             .is_some_and(|field| field.depth == depth)
         {
-            let field = self.field.take().expect("checked header/footer field");
+            let field = self.field.take().ok_or_else(|| {
+                Error::InvalidFormat("missing active header/footer field".to_string())
+            })?;
             self.push_token(Inline::Field(field.field))?;
         }
         if self
@@ -548,14 +418,18 @@ impl Region {
             self.finish_block()?;
         }
         if self
-            .column_region
+            .active_column
             .as_ref()
             .is_some_and(|region| region.depth == depth)
         {
-            if namespace != Some(STYLE_NAMESPACE)
-                || Column::parse(local)
-                    != Some(self.column_region.as_ref().expect("checked region").kind)
-            {
+            let column_kind = self
+                .active_column
+                .as_ref()
+                .map(|region| region.kind)
+                .ok_or_else(|| {
+                    Error::InvalidFormat("missing active header/footer column region".to_string())
+                })?;
+            if namespace != Some(STYLE_NAMESPACE) || Column::parse(local) != Some(column_kind) {
                 return Err(Error::InvalidFormat(
                     "malformed style:region-* column region nesting".to_string(),
                 ));
@@ -565,7 +439,7 @@ impl Region {
                     "unterminated header/footer block inside a column region".to_string(),
                 ));
             }
-            self.column_region = None;
+            self.active_column = None;
         }
         Ok(())
     }
@@ -587,8 +461,7 @@ impl Region {
             field.field.displayed_text.push_str(text);
             return Ok(());
         }
-        let content = &mut self.block.as_mut().expect("checked block").block.content;
-        if let Some(Inline::Text(existing)) = content.last_mut() {
+        if let Some(Inline::Text(existing)) = self.active_block_mut()?.block.content.last_mut() {
             existing.push_str(text);
             return Ok(());
         }
@@ -604,27 +477,13 @@ impl Region {
             b"s" => {
                 let count = text_space_count(reader, element)?.unwrap_or(1);
                 self.add_spaces(count)?;
-                self.field
-                    .as_mut()
-                    .expect("checked field")
+                self.active_field_mut()?
                     .field
                     .displayed_text
                     .extend(std::iter::repeat_n(' ', count));
             },
-            b"tab" => self
-                .field
-                .as_mut()
-                .expect("checked field")
-                .field
-                .displayed_text
-                .push('\t'),
-            b"line-break" => self
-                .field
-                .as_mut()
-                .expect("checked field")
-                .field
-                .displayed_text
-                .push('\n'),
+            b"tab" => self.active_field_mut()?.field.displayed_text.push('\t'),
+            b"line-break" => self.active_field_mut()?.field.displayed_text.push('\n'),
             _ => {},
         }
         Ok(())
@@ -649,40 +508,192 @@ impl Region {
         if self.token_count > MAX_INLINE_TOKENS {
             return Err(limit_error("inline-token"));
         }
-        self.block
-            .as_mut()
-            .expect("token requires active block")
-            .block
-            .content
-            .push(token);
+        self.active_block_mut()?.block.content.push(token);
         Ok(())
     }
+
+    fn active_block_mut(&mut self) -> Result<&mut ActiveBlock> {
+        self.block.as_mut().ok_or_else(|| {
+            Error::InvalidFormat("header/footer token requires an active block".to_string())
+        })
+    }
+
+    fn active_field_mut(&mut self) -> Result<&mut ActiveField> {
+        self.field.as_mut().ok_or_else(|| {
+            Error::InvalidFormat("header/footer control requires an active field".to_string())
+        })
+    }
+}
+
+pub(crate) fn parse(xml: &str) -> Result<HashMap<(String, Kind), Vec<Block>>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut master: Option<Master> = None;
+    let mut region: Option<Region> = None;
+    let mut regions = HashMap::new();
+
+    loop {
+        let (resolved, parsed_event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let resolved_bytes = resolved_namespace(&resolved).map(<[u8]>::to_vec);
+        let namespace = resolved_bytes.as_deref();
+        let event = parsed_event.into_owned();
+        match event {
+            Event::Start(element) => {
+                let element_depth = depth.checked_add(1).ok_or_else(depth_error)?;
+                if element_depth > MAX_XML_DEPTH {
+                    return Err(depth_error());
+                }
+                if namespace == Some(STYLE_NAMESPACE)
+                    && element.local_name().as_ref() == b"master-page"
+                {
+                    if master.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "nested style:master-page element".to_string(),
+                        ));
+                    }
+                    let name = namespaced_attr(&reader, &element, STYLE_NAMESPACE, b"name")?
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "style:master-page is missing style:name".to_string(),
+                            )
+                        })?;
+                    master = Some(Master {
+                        name,
+                        depth: element_depth,
+                    });
+                } else if let (Some(master_page), Some(kind)) =
+                    (master.as_ref(), Kind::parse(element.local_name().as_ref()))
+                {
+                    if region.is_none() && namespace == Some(STYLE_NAMESPACE) {
+                        region = Some(Region::new(master_page.name.clone(), kind, element_depth));
+                    } else if let Some(active) = region.as_mut() {
+                        active.start_element(&reader, namespace, &element, element_depth, false)?;
+                    }
+                } else if let Some(active) = region.as_mut() {
+                    active.start_element(&reader, namespace, &element, element_depth, false)?;
+                }
+                depth = element_depth;
+            },
+            Event::Empty(element) => {
+                let element_depth = depth.checked_add(1).ok_or_else(depth_error)?;
+                if element_depth > MAX_XML_DEPTH {
+                    return Err(depth_error());
+                }
+                if let (Some(master_page), Some(kind)) =
+                    (master.as_ref(), Kind::parse(element.local_name().as_ref()))
+                {
+                    if region.is_none() && namespace == Some(STYLE_NAMESPACE) {
+                        insert_region(&mut regions, &master_page.name, kind, Vec::new())?;
+                    } else if let Some(active) = region.as_mut() {
+                        active.start_element(&reader, namespace, &element, element_depth, true)?;
+                    }
+                } else if let Some(active) = region.as_mut() {
+                    active.start_element(&reader, namespace, &element, element_depth, true)?;
+                }
+            },
+            Event::Text(value) => {
+                if let Some(active) = region.as_mut() {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid header text: {error}"))
+                        })?;
+                    active.push_text(&decoded)?;
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if let Some(active) = region.as_mut() {
+                    active.push_text(&decode_reference(&reference)?)?;
+                }
+            },
+            Event::CData(value) => {
+                if let Some(active) = region.as_mut() {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid header CDATA: {error}"))
+                        })?;
+                    active.push_text(&decoded)?;
+                }
+            },
+            Event::End(element) => {
+                if let Some(active) = region.as_mut() {
+                    active.end_element(namespace, element.local_name().as_ref(), depth)?;
+                }
+                if region.as_ref().is_some_and(|active| active.depth == depth) {
+                    let active = region.take().ok_or_else(|| {
+                        Error::InvalidFormat("missing active header/footer region".to_string())
+                    })?;
+                    if active.active_column.is_some() || active.block.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "unterminated header/footer column region or block".to_string(),
+                        ));
+                    }
+                    if namespace != Some(STYLE_NAMESPACE)
+                        || Kind::parse(element.local_name().as_ref()) != Some(active.kind)
+                    {
+                        return Err(Error::InvalidFormat(
+                            "malformed header/footer region nesting".to_string(),
+                        ));
+                    }
+                    insert_region(
+                        &mut regions,
+                        &active.master_name,
+                        active.kind,
+                        active.blocks,
+                    )?;
+                }
+                if master.as_ref().is_some_and(|active| active.depth == depth) {
+                    master = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(depth_error)?;
+            },
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "DTD is not allowed in ODF styles.xml".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            Event::Decl(_) | Event::PI(_) | Event::Comment(_) => {},
+        }
+        buffer.clear();
+    }
+    if master.is_some() || region.is_some() || depth != 0 {
+        return Err(Error::InvalidFormat(
+            "unterminated master-page header/footer".to_string(),
+        ));
+    }
+    Ok(regions)
 }
 
 fn parse_field(reader: &NsReader<&[u8]>, element: &BytesStart<'_>, local: &[u8]) -> Result<Field> {
     let mut attributes = Vec::new();
     let mut fixed = None;
     let mut data_style_name = None;
-    for attribute in element.attributes() {
+    for raw_attribute in element.attributes() {
         if attributes.len() >= MAX_FIELD_ATTRIBUTES {
             return Err(limit_error("field-attribute"));
         }
-        let attribute = attribute.map_err(|error| {
+        let attribute = raw_attribute.map_err(|error| {
             Error::InvalidFormat(format!("invalid header/footer field attribute: {error}"))
         })?;
-        let (namespace, attr_local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace = resolved_namespace(&namespace);
+        let (resolved_attribute, attr_local) = reader.resolver().resolve_attribute(attribute.key);
+        let attribute_namespace = resolved_namespace(&resolved_attribute);
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| {
                 Error::InvalidFormat(format!("invalid header/footer field attribute: {error}"))
             })?
             .into_owned();
-        let key = canonical_attribute_name(namespace, attr_local.as_ref())?;
-        if namespace == Some(TEXT_NAMESPACE) && attr_local.as_ref() == b"fixed" {
+        let key = canonical_attribute_name(attribute_namespace, attr_local.as_ref())?;
+        if attribute_namespace == Some(TEXT_NAMESPACE) && attr_local.as_ref() == b"fixed" {
             fixed = Some(parse_bool(&value)?);
         }
-        if namespace == Some(STYLE_NAMESPACE) && attr_local.as_ref() == b"data-style-name" {
+        if attribute_namespace == Some(STYLE_NAMESPACE) && attr_local.as_ref() == b"data-style-name"
+        {
             data_style_name = Some(value.clone());
         }
         attributes.push((key, value));
@@ -819,12 +830,12 @@ fn is_unknown_field(local: &[u8]) -> bool {
 
 fn insert_region(
     regions: &mut HashMap<(String, Kind), Vec<Block>>,
-    master_name: String,
+    master_name: &str,
     kind: Kind,
     blocks: Vec<Block>,
 ) -> Result<()> {
     if regions
-        .insert((master_name.clone(), kind), blocks)
+        .insert((master_name.to_owned(), kind), blocks)
         .is_some()
     {
         return Err(Error::InvalidFormat(format!(
@@ -840,8 +851,8 @@ fn namespaced_attr(
     expected_namespace: &[u8],
     local_name: &[u8],
 ) -> Result<Option<String>> {
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| {
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(|error| {
             Error::InvalidFormat(format!("invalid header/footer attribute: {error}"))
         })?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
@@ -860,26 +871,29 @@ fn namespaced_attr(
 }
 
 fn text_space_count(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<usize>> {
-    let value = namespaced_attr(reader, element, TEXT_NAMESPACE, b"c")?;
-    value
-        .map(|value| {
-            value.parse::<usize>().map_err(|_| {
-                Error::InvalidFormat("invalid text:c count in header/footer".to_string())
+    let count_lexical = namespaced_attr(reader, element, TEXT_NAMESPACE, b"c")?;
+    count_lexical
+        .map(|lexical_value| {
+            lexical_value.parse::<usize>().map_err(|error| {
+                Error::InvalidFormat(format!("invalid text:c count in header/footer: {error}"))
             })
         })
         .transpose()
 }
 
-fn canonical_attribute_name(namespace: Option<&[u8]>, local: &[u8]) -> Result<String> {
-    let local = std::str::from_utf8(local)
-        .map_err(|_| Error::InvalidFormat("invalid field attribute name".to_string()))?;
-    Ok(match namespace {
-        Some(TEXT_NAMESPACE) => format!("text:{local}"),
-        Some(STYLE_NAMESPACE) => format!("style:{local}"),
-        Some(OFFICE_NAMESPACE) => format!("office:{local}"),
-        Some(NUMBER_NAMESPACE) => format!("number:{local}"),
-        Some(namespace) => format!("{{{}}}{local}", String::from_utf8_lossy(namespace)),
-        None => local.to_string(),
+fn canonical_attribute_name(namespace_bytes: Option<&[u8]>, local_bytes: &[u8]) -> Result<String> {
+    let local_name = std::str::from_utf8(local_bytes)
+        .map_err(|error| Error::InvalidFormat(format!("invalid field attribute name: {error}")))?;
+    Ok(match namespace_bytes {
+        Some(TEXT_NAMESPACE) => format!("text:{local_name}"),
+        Some(STYLE_NAMESPACE) => format!("style:{local_name}"),
+        Some(OFFICE_NAMESPACE) => format!("office:{local_name}"),
+        Some(NUMBER_NAMESPACE) => format!("number:{local_name}"),
+        Some(other_namespace) => format!(
+            "{{{}}}{local_name}",
+            String::from_utf8_lossy(other_namespace)
+        ),
+        None => local_name.to_string(),
     })
 }
 
@@ -896,7 +910,7 @@ fn parse_bool(value: &str) -> Result<bool> {
 fn resolved_namespace<'a>(namespace: &'a ResolveResult<'a>) -> Option<&'a [u8]> {
     match namespace {
         ResolveResult::Bound(Namespace(value)) => Some(*value),
-        _ => None,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
     }
 }
 
@@ -935,10 +949,31 @@ fn limit_error(resource: &str) -> Error {
 mod tests {
     use super::*;
 
+    fn test_ok<T>(result: Result<T>) -> T {
+        match result {
+            Ok(value) => value,
+            Err(error) => panic!("test operation failed: {error}"),
+        }
+    }
+
+    fn field_items(block: &Block) -> Vec<&Field> {
+        block
+            .content
+            .iter()
+            .filter_map(|inline| {
+                if let Inline::Field(field) = inline {
+                    Some(field)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     #[test]
     fn parses_ordered_blocks_controls_and_fields_with_arbitrary_prefixes() {
         let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:header><t:p t:style-name="Header">Page <t:page-number t:select-page="current" t:page-adjust="2" t:fixed="false" s:data-style-name="N1">7</t:page-number><t:s t:c="2"/><t:tab/><t:line-break/><t:sender-company t:fixed="true">Example</t:sender-company></t:p><t:h>Heading</t:h></s:header></s:master-page></o:master-styles></o:document-styles>"#;
-        let regions = parse(xml).unwrap();
+        let regions = test_ok(parse(xml));
         let blocks = &regions[&(String::from("A"), Kind::Header)];
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[0].style_name.as_deref(), Some("Header"));
@@ -998,16 +1033,9 @@ mod tests {
     #[test]
     fn retains_inert_script_and_macro_metadata() {
         let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:master-styles><s:master-page s:name="A"><s:header><t:p><t:script x:type="simple" x:href="https://example.invalid/never-open">payload</t:script><t:execute-macro t:name="Standard.Module1.Main">button</t:execute-macro></t:p></s:header></s:master-page></o:master-styles></o:document-styles>"#;
-        let regions = parse(xml).unwrap();
+        let regions = test_ok(parse(xml));
         let blocks = &regions[&(String::from("A"), Kind::Header)];
-        let fields: Vec<_> = blocks[0]
-            .content
-            .iter()
-            .filter_map(|inline| match inline {
-                Inline::Field(field) => Some(field),
-                _ => None,
-            })
-            .collect();
+        let fields = field_items(&blocks[0]);
 
         assert_eq!(fields.len(), 2);
         assert_eq!(fields[0].kind, FieldKind::Script);
@@ -1028,16 +1056,9 @@ mod tests {
     #[test]
     fn classifies_cached_document_identity_and_revision_fields() {
         let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:author-initials>AI</t:author-initials><t:template-name>Letter</t:template-name><t:sheet-name>Sheet1</t:sheet-name><t:initial-creator>Initial</t:initial-creator><t:description>Summary</t:description><t:printed-by>Printer</t:printed-by><t:keywords>one,two</t:keywords><t:creator>Creator</t:creator><t:creation-date t:fixed="true" s:data-style-name="D1">2026-07-22</t:creation-date><t:creation-time>12:00</t:creation-time><t:modification-time>13:00</t:modification-time><t:print-date>2026-07-22</t:print-date><t:print-time>14:00</t:print-time><t:editing-cycles>3</t:editing-cycles><t:editing-duration t:duration="PT1H">1 hour</t:editing-duration></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
-        let regions = parse(xml).unwrap();
+        let regions = test_ok(parse(xml));
         let blocks = &regions[&(String::from("A"), Kind::Footer)];
-        let fields: Vec<_> = blocks[0]
-            .content
-            .iter()
-            .filter_map(|inline| match inline {
-                Inline::Field(field) => Some(field),
-                _ => None,
-            })
-            .collect();
+        let fields = field_items(&blocks[0]);
 
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
@@ -1072,16 +1093,9 @@ mod tests {
     #[test]
     fn classifies_cached_page_navigation_and_statistic_fields() {
         let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:page-continuation t:select-page="previous" t:string-value="Continued">Prev</t:page-continuation><t:page-variable-set t:active="true" t:page-adjust="2">3</t:page-variable-set><t:page-variable-get s:num-format="1">3</t:page-variable-get><t:paragraph-count>4</t:paragraph-count><t:word-count>5</t:word-count><t:character-count>6</t:character-count><t:table-count>7</t:table-count><t:image-count>8</t:image-count><t:object-count>9</t:object-count></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
-        let regions = parse(xml).unwrap();
+        let regions = test_ok(parse(xml));
         let blocks = &regions[&(String::from("A"), Kind::Footer)];
-        let fields: Vec<_> = blocks[0]
-            .content
-            .iter()
-            .filter_map(|inline| match inline {
-                Inline::Field(field) => Some(field),
-                _ => None,
-            })
-            .collect();
+        let fields = field_items(&blocks[0]);
 
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
@@ -1118,16 +1132,9 @@ mod tests {
     #[test]
     fn classifies_cached_reference_sequence_and_variable_fields() {
         let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:reference-ref t:ref-name="reference" t:reference-format="text">Reference</t:reference-ref><t:sequence-ref t:ref-name="sequence">Sequence reference</t:sequence-ref><t:bookmark-ref t:ref-name="bookmark">Bookmark</t:bookmark-ref><t:note-ref t:ref-name="note" t:note-class="footnote">Note</t:note-ref><t:variable-set t:name="variable" t:formula="of:=1+1">2</t:variable-set><t:variable-get t:name="variable">2</t:variable-get><t:variable-input t:name="input" t:description="Input">Input</t:variable-input><t:user-field-get t:name="user">User</t:user-field-get><t:user-field-input t:name="user-input" t:description="User input">User input</t:user-field-input><t:sequence t:name="Figure" t:formula="ooow:Figure+1">1</t:sequence><t:expression t:formula="of:=2+2">4</t:expression><t:text-input t:description="Prompt">Answer</t:text-input></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
-        let regions = parse(xml).unwrap();
+        let regions = test_ok(parse(xml));
         let blocks = &regions[&(String::from("A"), Kind::Footer)];
-        let fields: Vec<_> = blocks[0]
-            .content
-            .iter()
-            .filter_map(|inline| match inline {
-                Inline::Field(field) => Some(field),
-                _ => None,
-            })
-            .collect();
+        let fields = field_items(&blocks[0]);
 
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
@@ -1167,16 +1174,9 @@ mod tests {
     #[test]
     fn classifies_cached_conditional_dde_formula_and_metadata_fields() {
         let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:placeholder t:placeholder-type="text">Hint</t:placeholder><t:conditional-text t:condition="of:=1=1" t:string-value-if-true="yes" t:string-value-if-false="no">yes</t:conditional-text><t:hidden-text t:condition="of:=0=1" t:string-value="hidden">hidden</t:hidden-text><t:hidden-paragraph t:condition="of:=0=1">paragraph</t:hidden-paragraph><t:dde-connection t:connection-name="NeverOpen">cached DDE</t:dde-connection><t:measure t:kind="unit">cm</t:measure><t:table-formula t:formula="of:=SUM([.A1:.A2])">42</t:table-formula><t:meta-field xml:id="meta1">meta <t:span>text</t:span></t:meta-field></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
-        let regions = parse(xml).unwrap();
+        let regions = test_ok(parse(xml));
         let blocks = &regions[&(String::from("A"), Kind::Footer)];
-        let fields: Vec<_> = blocks[0]
-            .content
-            .iter()
-            .filter_map(|inline| match inline {
-                Inline::Field(field) => Some(field),
-                _ => None,
-            })
-            .collect();
+        let fields = field_items(&blocks[0]);
 
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
@@ -1212,16 +1212,9 @@ mod tests {
     #[test]
     fn classifies_inert_database_field_metadata() {
         let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:database-display t:database-name="NeverOpen" t:table-name="Records" t:column-name="Name">Ada</t:database-display><t:database-next t:database-name="NeverOpen" t:table-name="Records" t:condition="of:=TRUE">Next</t:database-next><t:database-row-select t:database-name="NeverOpen" t:table-name="Records" t:condition="of:=TRUE">Select</t:database-row-select><t:database-row-number t:database-name="NeverOpen" t:table-name="Records" t:value="7">7</t:database-row-number><t:database-name t:database-name="NeverOpen" t:table-name="Records">NeverOpen</t:database-name></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
-        let regions = parse(xml).unwrap();
+        let regions = test_ok(parse(xml));
         let blocks = &regions[&(String::from("A"), Kind::Footer)];
-        let fields: Vec<_> = blocks[0]
-            .content
-            .iter()
-            .filter_map(|inline| match inline {
-                Inline::Field(field) => Some(field),
-                _ => None,
-            })
-            .collect();
+        let fields = field_items(&blocks[0]);
 
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
@@ -1257,15 +1250,11 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/odf/odt/title-field-invalidate.fodt"
         ));
-        let regions = parse(xml).unwrap();
+        let regions = test_ok(parse(xml));
         let blocks = &regions[&(String::from("Standard"), Kind::Footer)];
-        let fields: Vec<_> = blocks[0]
-            .content
-            .iter()
-            .filter_map(|inline| match inline {
-                Inline::Field(field) => Some((&field.kind, field.displayed_text.as_str())),
-                _ => None,
-            })
+        let fields: Vec<_> = field_items(&blocks[0])
+            .into_iter()
+            .map(|field| (&field.kind, field.displayed_text.as_str()))
             .collect();
         assert_eq!(
             fields,
@@ -1303,7 +1292,7 @@ mod tests {
         let xml = column_region_document(
             r#"<s:region-left><t:p t:style-name="Left">Left <t:page-number>1</t:page-number></t:p></s:region-left><s:region-center><t:p>Center</t:p><t:p>Second</t:p></s:region-center><s:region-right><t:p>Right</t:p></s:region-right>"#,
         );
-        let regions = parse(&xml).unwrap();
+        let regions = test_ok(parse(&xml));
         let blocks = &regions[&(String::from("A"), Kind::Header)];
         assert_eq!(blocks.len(), 4);
         assert_eq!(blocks[0].column_region, Some(Column::Left));
@@ -1317,8 +1306,8 @@ mod tests {
     #[test]
     fn accepts_empty_and_skipped_column_regions() {
         let xml =
-            column_region_document(r#"<s:region-left/><s:region-right><t:p/></s:region-right>"#);
-        let regions = parse(&xml).unwrap();
+            column_region_document(r"<s:region-left/><s:region-right><t:p/></s:region-right>");
+        let regions = test_ok(parse(&xml));
         let blocks = &regions[&(String::from("A"), Kind::Header)];
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].column_region, Some(Column::Right));
@@ -1329,43 +1318,38 @@ mod tests {
         // Duplicate or out-of-order regions.
         assert!(
             parse(&column_region_document(
-                r#"<s:region-right/><s:region-left><t:p/></s:region-left>"#
+                r"<s:region-right/><s:region-left><t:p/></s:region-left>"
             ))
             .is_err()
         );
-        assert!(
-            parse(&column_region_document(
-                r#"<s:region-left/><s:region-left/>"#
-            ))
-            .is_err()
-        );
+        assert!(parse(&column_region_document(r"<s:region-left/><s:region-left/>")).is_err());
         // Plain blocks must not be mixed with column regions.
         assert!(
             parse(&column_region_document(
-                r#"<t:p>Plain</t:p><s:region-left><t:p/></s:region-left>"#
+                r"<t:p>Plain</t:p><s:region-left><t:p/></s:region-left>"
             ))
             .is_err()
         );
         assert!(
             parse(&column_region_document(
-                r#"<s:region-left><t:p/></s:region-left><t:p>Plain</t:p>"#
+                r"<s:region-left><t:p/></s:region-left><t:p>Plain</t:p>"
             ))
             .is_err()
         );
         // Regions cannot nest and may contain only paragraphs.
         assert!(
             parse(&column_region_document(
-                r#"<s:region-left><s:region-center><t:p/></s:region-center></s:region-left>"#
+                r"<s:region-left><s:region-center><t:p/></s:region-center></s:region-left>"
             ))
             .is_err()
         );
         assert!(
             parse(&column_region_document(
-                r#"<s:region-left><t:h>Heading</t:h></s:region-left>"#
+                r"<s:region-left><t:h>Heading</t:h></s:region-left>"
             ))
             .is_err()
         );
         // Unterminated regions are malformed.
-        assert!(parse(&column_region_document(r#"<s:region-left><t:p>open</t:p>"#)).is_err());
+        assert!(parse(&column_region_document(r"<s:region-left><t:p>open</t:p>")).is_err());
     }
 }

@@ -147,9 +147,6 @@ pub struct RtfWriter<W: Write> {
     writer: W,
     /// Writer options
     options: WriterOptions,
-    /// Current indentation level (reserved for formatted output)
-    #[allow(dead_code, reason = "reserved for formatted output")]
-    indent_level: usize,
     /// Font table
     font_table: FontTable<'static>,
     /// Color table
@@ -234,7 +231,6 @@ impl<W: Write> RtfWriter<W> {
         Self {
             writer,
             options,
-            indent_level: 0,
             font_table: FontTable::new(),
             color_table: ColorTable::new(),
             legacy_paragraph_numbering: Vec::new(),

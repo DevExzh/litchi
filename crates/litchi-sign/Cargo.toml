@@ -23,5 +23,8 @@ thiserror   = { workspace = true }
 x509-cert   = { workspace = true }
 zeroize     = { workspace = true }
 
+[dev-dependencies]
+soapberry-zip = { workspace = true }
+
 [lints]
 workspace = true

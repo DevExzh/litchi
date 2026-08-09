@@ -71,7 +71,9 @@ pub(crate) fn resources(package: &OwnedPackage) -> Result<Vec<ScriptResource>> {
     let mut total = 0usize;
     let mut output = Vec::with_capacity(paths.len());
     for path in paths {
-        let kind = classify_path(&path).expect("filtered script resource");
+        let kind = classify_path(&path).ok_or_else(|| {
+            Error::InvalidFormat(format!("invalid filtered script resource path '{path}'"))
+        })?;
         let entry = archive.manifest().entries.get(&path).ok_or_else(|| {
             Error::InvalidFormat(format!("script resource '{path}' has no manifest entry"))
         })?;
@@ -394,7 +396,11 @@ fn locate_scripts_element(content: &str) -> Result<(Option<(usize, usize)>, usiz
                 if active.is_some_and(|(target_depth, _)| target_depth == depth)
                     && is_office_scripts(office_namespace, element.local_name().as_ref())
                 {
-                    let (_, script_start) = active.take().expect("active scripts element");
+                    let (_, script_start) = active.take().ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "script XML lost its active office:scripts element".to_string(),
+                        )
+                    })?;
                     found = Some((script_start, end));
                 }
             },

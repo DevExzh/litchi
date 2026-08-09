@@ -49,17 +49,17 @@ impl Editor {
                 "object target path exceeds storage depth limit".into(),
             ));
         }
-        let targets = targets
-            .as_slice()
-            .iter()
+        let resolved_target_entries = targets
+            .into_vec()
+            .into_iter()
             .map(|target| target.resolve(&ole))
             .collect::<Result<Vec<_>, _>>()?;
-        let targets = Targets::new(targets)?;
+        let resolved_targets = Targets::new(resolved_target_entries)?;
         let package = Package::capture(&mut ole, limits)?;
         package.check(limits)?;
-        let objects = discovery::from_package(&package, &targets, limits)?;
+        let objects = discovery::from_package(&package, &resolved_targets, limits)?;
         Ok(Self {
-            targets,
+            targets: resolved_targets,
             limits,
             original,
             package,
@@ -225,6 +225,11 @@ impl Editor {
     /// stream is published through the same candidate-render-and-reopen path
     /// as every other object edit, so callback or CFB failures leave this
     /// editor unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `key` is absent, its OLEDS stream is missing or
+    /// malformed, `edit` fails, or the resulting package cannot be validated.
     pub fn update_link<F>(&mut self, key: &str, edit: F) -> Result<(), OleError>
     where
         F: FnOnce(&mut Link) -> Result<(), OleError>,
@@ -313,6 +318,10 @@ impl Editor {
     /// mutating a value after using the commit result. The patch is checked
     /// against the exact original artifact and the snapshot has already
     /// passed the common CFB/resource validation performed by each edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the edited package cannot be rendered.
     pub fn commit(self) -> Result<Commit, OleError> {
         let before = self.original.as_ref().clone();
         let snapshot = self.snapshot();

@@ -45,6 +45,7 @@ impl LegacyStyle {
         })
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Linear => "linear",
@@ -62,11 +63,16 @@ impl LegacyStyle {
 pub struct Percent(f64);
 
 impl Percent {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is not finite.
     pub fn new(value: f64) -> Result<Self> {
         finite(value, "gradient percentage")?;
         Ok(Self(value))
     }
 
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.0
     }
@@ -83,6 +89,10 @@ impl fmt::Display for Percent {
 pub struct Intensity(f64);
 
 impl Intensity {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is not finite or outside `0%..=100%`.
     pub fn new(value: f64) -> Result<Self> {
         finite(value, "gradient intensity")?;
         if !(0.0..=100.0).contains(&value) {
@@ -91,6 +101,7 @@ impl Intensity {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.0
     }
@@ -111,6 +122,7 @@ pub struct RgbColor {
 }
 
 impl RgbColor {
+    #[must_use]
     pub const fn new(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
     }
@@ -124,11 +136,11 @@ impl FromStr for RgbColor {
             return invalid(format!("invalid ODF color '{value}'"));
         }
         let red = u8::from_str_radix(&value[1..3], 16)
-            .map_err(|_| make_error(format!("invalid ODF color '{value}'")))?;
+            .map_err(|error| make_error(format!("invalid ODF color '{value}': {error}")))?;
         let green = u8::from_str_radix(&value[3..5], 16)
-            .map_err(|_| make_error(format!("invalid ODF color '{value}'")))?;
+            .map_err(|error| make_error(format!("invalid ODF color '{value}': {error}")))?;
         let blue = u8::from_str_radix(&value[5..7], 16)
-            .map_err(|_| make_error(format!("invalid ODF color '{value}'")))?;
+            .map_err(|error| make_error(format!("invalid ODF color '{value}': {error}")))?;
         Ok(Self::new(red, green, blue))
     }
 }
@@ -148,12 +160,17 @@ impl fmt::Display for RgbColor {
 pub struct Angle(String);
 
 impl Angle {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the angle is empty or contains XML-prohibited text.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_text(&value, "gradient angle", false)?;
-        Ok(Self(value))
+        let angle = value.into();
+        validate_text(&angle, "gradient angle", false)?;
+        Ok(Self(angle))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -194,15 +211,21 @@ pub struct Coordinate {
 }
 
 impl Coordinate {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is not finite.
     pub fn new(value: f64, unit: CoordinateUnit) -> Result<Self> {
         finite(value, "gradient coordinate")?;
         Ok(Self { value, unit })
     }
 
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
 
+    #[must_use]
     pub const fn unit(self) -> CoordinateUnit {
         self.unit
     }
@@ -212,11 +235,11 @@ impl FromStr for Coordinate {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
-        let (number, unit) = split_measure(value)?;
-        validate_decimal(number, value)?;
-        let number = number
-            .parse::<f64>()
-            .map_err(|_| make_error(format!("invalid gradient coordinate '{value}'")))?;
+        let (number_text, unit) = split_measure(value)?;
+        validate_decimal(number_text, value)?;
+        let number = number_text.parse::<f64>().map_err(|error| {
+            make_error(format!("invalid gradient coordinate '{value}': {error}"))
+        })?;
         Self::new(number, unit)
     }
 }
@@ -462,6 +485,7 @@ pub enum Definition {
 }
 
 impl Definition {
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         match self {
             Self::Legacy(value) => value.name.as_deref(),
@@ -470,6 +494,11 @@ impl Definition {
         }
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resource has invalid text, a non-finite scalar,
+    /// or exceeds a collection bound.
     pub fn validate(&self) -> Result<()> {
         match self {
             Self::Legacy(value) => value.validate(),
@@ -478,6 +507,10 @@ impl Definition {
         }
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resource fails validation.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::new();
@@ -493,12 +526,18 @@ pub struct Collection {
 }
 
 impl Collection {
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Definition> {
         self.gradients
             .iter()
             .find(|value| value.name() == Some(name))
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a resource is invalid, names are duplicated, or a
+    /// bounded aggregate limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         if self.gradients.len() > MAX_GRADIENTS {
             return invalid(format!("drawing styles exceed {MAX_GRADIENTS} gradients"));
@@ -523,6 +562,10 @@ impl Collection {
     }
 
     /// Serialize a standalone schema-positioned `office:styles` fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection fails validation.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(256 + self.gradients.len() * 256);
@@ -561,6 +604,11 @@ struct ActiveDefinition {
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse legacy and SVG gradient resources from an ODF styles or flat-document XML part.
+///
+/// # Errors
+///
+/// Returns an error if the XML is malformed, uses an invalid namespace, or
+/// violates a bounded gradient resource rule.
 pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
     if !xml.contains("gradient") && !xml.contains("Gradient") {
         return Ok(Collection::default());
@@ -614,11 +662,17 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
             Event::Empty(ref element) => {
                 let local = decode_name(element.local_name().as_ref(), "element")?;
                 reject_spoofed_name(namespace, &local)?;
-                if let Some(active) = active.as_mut() {
-                    if stack.len() != active.depth + 1 {
+                if let Some(active_definition) = active.as_mut() {
+                    if stack.len() != active_definition.depth + 1 {
                         return invalid("gradient stop must be a direct gradient child");
                     }
-                    add_stop(&reader, namespace, &local, element, &mut active.value)?;
+                    add_stop(
+                        &reader,
+                        namespace,
+                        &local,
+                        element,
+                        &mut active_definition.value,
+                    )?;
                 } else if let Some(value) =
                     parse_gradient_start(&reader, namespace, &local, element)?
                 {
@@ -639,9 +693,10 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
                     if !is_gradient(frame.namespace, &frame.local) {
                         return invalid("unexpected drawing gradient end element");
                     }
-                    result
-                        .gradients
-                        .push(active.take().expect("active gradient checked").value);
+                    let gradient = active.take().ok_or_else(|| {
+                        make_error("drawing gradient ended without an active definition")
+                    })?;
+                    result.gradients.push(gradient.value);
                 }
             },
             Event::Text(ref text) if active.is_some() => {
@@ -659,7 +714,11 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
                 return invalid("DTDs and processing instructions are prohibited in gradients");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -686,7 +745,15 @@ fn parse_gradient_start(
         (NamespaceKind::Svg, "radialGradient") => {
             Definition::Radial(parse_radial_gradient(reader, element)?)
         },
-        _ => return Ok(None),
+        (
+            NamespaceKind::None
+            | NamespaceKind::Office
+            | NamespaceKind::Draw
+            | NamespaceKind::Svg
+            | NamespaceKind::Loext
+            | NamespaceKind::Other,
+            _,
+        ) => return Ok(None),
     }))
 }
 
@@ -833,7 +900,9 @@ fn add_stop(
             }
             value.common.stops.push(parse_svg_stop(reader, element)?);
         },
-        _ => return invalid("gradient contains an unsupported stop element"),
+        Definition::Legacy(_) | Definition::Linear(_) | Definition::Radial(_) => {
+            return invalid("gradient contains an unsupported stop element");
+        },
     }
     Ok(())
 }
@@ -900,15 +969,15 @@ fn take_coordinate(values: &mut Attributes, local: &str) -> Result<Option<Coordi
 
 fn attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Attributes> {
     let mut result = HashMap::new();
-    for attribute in element.attributes() {
-        let attribute = attribute
+    for attribute_result in element.attributes() {
+        let attribute = attribute_result
             .map_err(|error| make_error(format!("invalid gradient attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        let (resolved, raw_local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_kind(&resolved)?;
-        let local = decode_name(local.as_ref(), "attribute")?;
+        let local = decode_name(raw_local.as_ref(), "attribute")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| make_error(format!("invalid gradient attribute value: {error}")))?
@@ -966,8 +1035,8 @@ fn is_stop(namespace: NamespaceKind, local: &str) -> bool {
     )
 }
 
-fn namespace_kind(value: &ResolveResult<'_>) -> Result<NamespaceKind> {
-    Ok(match value {
+fn namespace_kind(resolved: &ResolveResult<'_>) -> Result<NamespaceKind> {
+    Ok(match resolved {
         ResolveResult::Unbound => NamespaceKind::None,
         ResolveResult::Bound(Namespace(value)) if *value == OFFICE_NS => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(value)) if *value == DRAW_NS => NamespaceKind::Draw,
@@ -1109,8 +1178,8 @@ fn write_namespaces(output: &mut String, standalone: bool) {
 }
 
 fn push_optional_display<T: fmt::Display>(output: &mut String, name: &str, value: Option<T>) {
-    if let Some(value) = value {
-        push_attribute(output, name, &value.to_string());
+    if let Some(optional_value) = value {
+        push_attribute(output, name, &optional_value.to_string());
     }
 }
 
@@ -1168,11 +1237,11 @@ fn parse_intensity(value: &str, context: &str) -> Result<Intensity> {
 }
 
 fn parse_number(value: &str, context: &str) -> Result<f64> {
-    let value = value
+    let number = value
         .parse::<f64>()
-        .map_err(|_| make_error(format!("invalid {context} value '{value}'")))?;
-    finite(value, context)?;
-    Ok(value)
+        .map_err(|error| make_error(format!("invalid {context} value '{value}': {error}")))?;
+    finite(number, context)?;
+    Ok(number)
 }
 
 fn finite(value: f64, context: &str) -> Result<()> {
@@ -1191,12 +1260,14 @@ fn canonical_number(value: f64) -> String {
 }
 
 fn validate_decimal(value: &str, complete: &str) -> Result<()> {
-    let value = value.strip_prefix('-').unwrap_or(value);
-    if value.is_empty() {
+    let unsigned = value.strip_prefix('-').unwrap_or(value);
+    if unsigned.is_empty() {
         return invalid(format!("invalid decimal '{complete}'"));
     }
-    let mut parts = value.split('.');
-    let integer = parts.next().expect("split always yields one value");
+    let mut parts = unsigned.split('.');
+    let integer = parts
+        .next()
+        .ok_or_else(|| Error::InvalidFormat(format!("invalid decimal '{complete}'")))?;
     let fraction = parts.next();
     if parts.next().is_some()
         || !integer.bytes().all(|byte| byte.is_ascii_digit())
@@ -1227,7 +1298,7 @@ fn validate_text(value: &str, context: &str, empty_allowed: bool) -> Result<()> 
 fn decode_name(value: &[u8], context: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| make_error(format!("invalid UTF-8 in gradient {context} name")))
+        .map_err(|error| make_error(format!("invalid UTF-8 in gradient {context} name: {error}")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

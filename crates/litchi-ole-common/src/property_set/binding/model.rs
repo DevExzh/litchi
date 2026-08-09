@@ -48,6 +48,7 @@ pub enum Binding {
 
 impl Binding {
     /// Resolve a FMTID to its typed standard binding.
+    #[must_use]
     pub fn from_format_identifier(format_identifier: Guid) -> Self {
         match format_identifier {
             SUMMARY_INFORMATION_FMTID => Self::SummaryInformation,
@@ -61,11 +62,13 @@ impl Binding {
     }
 
     /// Create a custom binding without allocating or inspecting its FMTID.
+    #[must_use]
     pub const fn custom(format_identifier: Guid) -> Self {
         Self::Custom(format_identifier)
     }
 
     /// Return the FMTID represented by this binding.
+    #[must_use]
     pub const fn format_identifier(self) -> Guid {
         match self {
             Self::SummaryInformation => SUMMARY_INFORMATION_FMTID,
@@ -79,16 +82,23 @@ impl Binding {
     }
 
     /// Return the canonical CFB binding name without allocating.
+    #[must_use]
     pub fn name(self) -> BindingName {
         super::codec::encode(self.format_identifier())
     }
 
     /// Parse a standard CFB binding name into its typed FMTID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `name` is not a valid standard Property Set binding
+    /// name.
     pub fn from_name(name: &str) -> Result<Self, OleError> {
         super::codec::decode(name).map(Self::from_format_identifier)
     }
 
     /// Whether the binding's section is stored in the document-summary stream.
+    #[must_use]
     pub const fn uses_document_summary_stream(self) -> bool {
         matches!(
             self,
@@ -111,26 +121,46 @@ pub struct BindingName {
 
 impl BindingName {
     /// Return the encoded CFB path component.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internally validated representation is corrupted.
+    #[allow(
+        clippy::expect_used,
+        reason = "the validated fixed-size ASCII representation is constructed internally"
+    )]
+    #[must_use]
     pub fn as_str(&self) -> &str {
         std::str::from_utf8(&self.bytes[..usize::from(self.len)])
             .expect("BindingName stores only valid UTF-8 bytes")
     }
 
     /// Return the encoded CFB path component as bytes.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes[..usize::from(self.len)]
     }
 
     /// Return the number of bytes in the path component.
+    #[allow(
+        clippy::cast_lossless,
+        reason = "a const accessor cannot call From::from until primitive From impls are const"
+    )]
+    #[must_use]
     pub const fn len(self) -> usize {
         self.len as usize
     }
 
     /// Whether this is the empty binding name.  Valid names are never empty.
+    #[must_use]
     pub const fn is_empty(self) -> bool {
         self.len == 0
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "internal callers only pass fixed binding-name lengths bounded by MAX_NAME_BYTES"
+    )]
     pub(super) fn from_bytes(bytes: [u8; super::validation::MAX_NAME_BYTES], len: usize) -> Self {
         Self {
             bytes,

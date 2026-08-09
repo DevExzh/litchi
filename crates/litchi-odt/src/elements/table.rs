@@ -604,8 +604,7 @@ impl TableElements {
                         {
                             tables.push(table);
                         }
-                    } else if !stack.is_empty() {
-                        let element = stack.pop().unwrap();
+                    } else if let Some(element) = stack.pop() {
                         if let Some(parent) = stack.last_mut() {
                             parent.add_child(element);
                         }

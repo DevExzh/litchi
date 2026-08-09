@@ -38,6 +38,10 @@ fn excel_cache_dimensions_are_derived_from_the_used_range() {
         cache::Dims::Excel(cache::ExcelDims::new(0, 10, 0, 8).expect("covering range")),
         cache::Dims::Excel(excel_dims),
     ));
+    assert!(dimensions_cover(
+        cache::Dims::Excel(cache::ExcelDims::new(0, 10, 0, 8).expect("declared source range")),
+        cache::Dims::Excel(cache::ExcelDims::default()),
+    ));
 }
 
 #[test]

@@ -144,6 +144,7 @@ pub struct AxisSpec {
 }
 
 impl AxisSpec {
+    #[must_use]
     pub fn new(dimension: Dimension) -> Self {
         Self {
             dimension,
@@ -194,6 +195,7 @@ pub struct Definition {
 }
 
 impl Definition {
+    #[must_use]
     pub fn new(class: ChartClass) -> Self {
         Self {
             class,

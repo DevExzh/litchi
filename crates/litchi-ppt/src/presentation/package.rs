@@ -74,11 +74,11 @@ impl Presentation {
         #[cfg(not(feature = "encryption"))]
         {
             let _ = options;
-            if let Some(current_user) = current_user_data
+            if let Some(parsed_current_user) = current_user_data
                 .as_deref()
                 .map(CurrentUser::parse)
                 .transpose()?
-                && current_user.is_encrypted()
+                && parsed_current_user.is_encrypted()
             {
                 return Err(Error::UnsupportedEncryption(
                     crate::package::EncryptionKind::CryptoApi,

@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        reason = "Fixed signature fixtures use direct assertion setup."
+    )
+)]
+
 use litchi_odf_common::{
     core::{OwnedPackage, PackageWriter, Profile},
     signature::{CanonicalizationAlgorithm, DocumentSigner, SignatureAlgorithm, SignatureValidity},
@@ -127,11 +135,11 @@ fn rewrite_entry(
 ) -> Vec<u8> {
     let archive = soapberry_zip::office::ArchiveReader::new(bytes).unwrap();
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
-    let mut replacement = Some(replacement);
+    let mut pending_replacement = Some(replacement);
     for name in archive.file_names() {
         let mut content = archive.read(name).unwrap();
         if name == target {
-            content = replacement.take().unwrap()(content);
+            content = pending_replacement.take().unwrap()(content);
         }
         if name == "mimetype" || archive.is_stored(name).unwrap() {
             writer.write_stored(name, &content).unwrap();
@@ -177,11 +185,14 @@ fn reports_tampering_and_unsupported_algorithms() {
             )
             .into_bytes()
     });
-    let result = OwnedPackage::from_bytes(unsupported)
+    let unsupported_result = OwnedPackage::from_bytes(unsupported)
         .unwrap()
         .verify_document_signatures()
         .unwrap();
-    assert_eq!(result[0].validity, SignatureValidity::UnsupportedAlgorithm);
+    assert_eq!(
+        unsupported_result[0].validity,
+        SignatureValidity::UnsupportedAlgorithm
+    );
 
     let invalid_signature =
         rewrite_entry(&bytes, "META-INF/documentsignatures.xml", |mut content| {
@@ -194,11 +205,14 @@ fn reports_tampering_and_unsupported_algorithms() {
             content[offset] = if content[offset] == b'A' { b'B' } else { b'A' };
             content
         });
-    let result = OwnedPackage::from_bytes(invalid_signature)
+    let invalid_signature_result = OwnedPackage::from_bytes(invalid_signature)
         .unwrap()
         .verify_document_signatures()
         .unwrap();
-    assert_eq!(result[0].validity, SignatureValidity::InvalidSignature);
+    assert_eq!(
+        invalid_signature_result[0].validity,
+        SignatureValidity::InvalidSignature
+    );
 }
 
 #[test]

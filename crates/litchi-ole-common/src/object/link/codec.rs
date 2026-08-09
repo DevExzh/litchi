@@ -99,7 +99,7 @@ pub(crate) fn parse(wire: Arc<[u8]>) -> Result<Link, OleError> {
         wire,
         kind: parsed.kind,
         flags: parsed.flags,
-        link_update_option: parsed.update_option,
+        update_option: parsed.update_option,
         reserved_moniker: parsed.reserved_moniker,
         relative_source: parsed.relative_source,
         absolute_source: parsed.absolute_source,

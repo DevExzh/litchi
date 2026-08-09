@@ -1,4 +1,11 @@
-use super::*;
+use super::{
+    Attribute, Calendar, Clock, Currency, EmbeddedText, Fraction, Kind, LOEXT, Locale, MAX_PARTS,
+    Map, Month, NUMBER, Node, NumberToken, Result, STYLE, Scientific, Seconds, ShortLong, Token,
+    Version, WeekOfYear, ensure_empty_node, ensure_no_children, ensure_whitespace, invalid,
+    parse_locale, reject_remaining, required, required_i64, take, take_bool, take_f64, take_i64,
+    take_versioned_bool, take_versioned_i64, take_versioned_u64, validate_locale,
+    validate_optional_string, validate_text,
+};
 
 pub(crate) fn parse_part_node(mut node: Node, version: Version) -> Result<(Token, bool)> {
     let standard = node.namespace.as_deref() == Some(NUMBER);
@@ -125,7 +132,7 @@ pub(crate) fn parse_part_node(mut node: Node, version: Version) -> Result<(Token
         },
         "currency-symbol" => {
             ensure_no_children(&node, "number:currency-symbol")?;
-            let locale = parse_locale(&mut node.attributes)?;
+            let locale = parse_locale(&mut node.attributes);
             reject_remaining(&node.attributes, "number:currency-symbol")?;
             Token::CurrencySymbol(Currency {
                 locale,
@@ -408,7 +415,12 @@ pub(crate) fn validate_part(part: &Token, version: Version, allow_lo: bool) -> R
         Token::WeekOfYear(value) => {
             validate_optional_string(value.calendar.as_deref(), "number:calendar")?;
         },
-        _ => {},
+        Token::Hours(_)
+        | Token::Minutes(_)
+        | Token::Seconds(_)
+        | Token::AmPm
+        | Token::Boolean
+        | Token::TextContent => {},
     }
     Ok(())
 }
@@ -568,50 +580,54 @@ pub(crate) fn locale_attrs(out: &mut String, locale: &Locale) {
     );
 }
 
-pub(crate) fn short_long_attr(out: &mut String, value: Option<ShortLong>) {
-    if let Some(value) = value {
-        attr(out, "number:style", Some(value.as_str()));
+pub(crate) fn short_long_attr(out: &mut String, style_option: Option<ShortLong>) {
+    if let Some(style_value) = style_option {
+        attr(out, "number:style", Some(style_value.as_str()));
     }
 }
 
-pub(crate) fn attr(out: &mut String, name: &str, value: Option<&str>) {
-    if let Some(value) = value {
+pub(crate) fn attr(out: &mut String, name: &str, attribute_value_option: Option<&str>) {
+    if let Some(attribute_value) = attribute_value_option {
         out.push(' ');
         out.push_str(name);
         out.push_str("=\"");
-        out.push_str(&esc(value));
+        out.push_str(&esc(attribute_value));
         out.push('"');
     }
 }
 
-pub(crate) fn bool_attr(out: &mut String, name: &str, value: Option<bool>) {
-    if let Some(value) = value {
-        attr(out, name, Some(if value { "true" } else { "false" }));
+pub(crate) fn bool_attr(out: &mut String, name: &str, boolean_option: Option<bool>) {
+    if let Some(boolean_value) = boolean_option {
+        attr(
+            out,
+            name,
+            Some(if boolean_value { "true" } else { "false" }),
+        );
     }
 }
 
-pub(crate) fn i64_attr(out: &mut String, name: &str, value: Option<i64>) {
-    if let Some(value) = value {
-        attr(out, name, Some(&value.to_string()));
+pub(crate) fn i64_attr(out: &mut String, name: &str, integer_option: Option<i64>) {
+    if let Some(integer_value) = integer_option {
+        attr(out, name, Some(&integer_value.to_string()));
     }
 }
 
-pub(crate) fn u64_attr(out: &mut String, name: &str, value: Option<u64>) {
-    if let Some(value) = value {
-        attr(out, name, Some(&value.to_string()));
+pub(crate) fn u64_attr(out: &mut String, name: &str, integer_option: Option<u64>) {
+    if let Some(integer_value) = integer_option {
+        attr(out, name, Some(&integer_value.to_string()));
     }
 }
 
-pub(crate) fn f64_attr(out: &mut String, name: &str, value: Option<f64>) {
-    if let Some(value) = value {
-        let lexical = if value.is_nan() {
+pub(crate) fn f64_attr(out: &mut String, name: &str, number_option: Option<f64>) {
+    if let Some(number_value) = number_option {
+        let lexical = if number_value.is_nan() {
             "NaN".to_string()
-        } else if value == f64::INFINITY {
+        } else if number_value == f64::INFINITY {
             "INF".to_string()
-        } else if value == f64::NEG_INFINITY {
+        } else if number_value == f64::NEG_INFINITY {
             "-INF".to_string()
         } else {
-            value.to_string()
+            number_value.to_string()
         };
         attr(out, name, Some(&lexical));
     }

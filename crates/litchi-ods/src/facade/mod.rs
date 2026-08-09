@@ -55,6 +55,17 @@ impl Spreadsheet {
         crate::protection::Snapshot::parse(self.package.content_xml(), self.package.styles_xml())
     }
 
+    /// Apply an exact-source reversible protection patch and fully rehydrate
+    /// this facade only after the candidate has passed its typed readback.
+    pub fn apply_protection_patch(&mut self, patch: &crate::protection::Patch) -> Result<()> {
+        let commit = patch.apply(&self.protection()?)?;
+        if commit.changed() {
+            let package = self.package.replace_content_xml(commit.content_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
     /// Apply a failure-atomic protection edit and rebuild only `content.xml`.
     /// Password values remain inert verifiers; this method never authenticates
     /// or enforces a protection policy.
@@ -195,6 +206,11 @@ impl Spreadsheet {
         crate::data_pilot::Catalog::load(&self.package)
     }
 
+    /// Capture the DataPilot owner as an immutable, exact-package snapshot.
+    pub fn data_pilot_snapshot(&self) -> Result<crate::data_pilot::Snapshot> {
+        crate::data_pilot::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+    }
+
     /// Return the typed worksheet graph in document order.
     pub fn sheets(&self) -> &[crate::worksheet::Sheet] {
         &self.sheets
@@ -211,6 +227,19 @@ impl Spreadsheet {
         limits: crate::charts::Limits,
     ) -> Result<crate::charts::Inventory<'_>> {
         crate::charts::inventory(&self.package, limits)
+    }
+
+    /// Capture embedded charts as an immutable, exact-package snapshot.
+    pub fn chart_snapshot(&self) -> Result<crate::charts::Snapshot> {
+        self.chart_snapshot_with(crate::charts::Limits::default())
+    }
+
+    /// Capture embedded charts with an explicit resource budget.
+    pub fn chart_snapshot_with(
+        &self,
+        limits: crate::charts::Limits,
+    ) -> Result<crate::charts::Snapshot> {
+        crate::charts::Snapshot::from_bytes_with(self.package.package().as_bytes().to_vec(), limits)
     }
 
     /// Select one embedded chart by exact drawing name or checked position.

@@ -1,9 +1,9 @@
 use super::super::super::super::{
     invalid,
     model::{
-        CommonTimeNode, ConditionEvent, ConditionTarget, Duration, NextAction, PresetClass,
-        PresetTimeNode, PreviousAction, RuntimeTrigger, Sequence, TimeCondition, TimeNodeType,
-        TimingChild, TimingNode, TimingNodeKind, TimingTree,
+        CommonTimeNode, ConditionEvent, ConditionTarget, Duration, MotionFraction, NextAction,
+        PresetClass, PresetTimeNode, PreviousAction, RuntimeTrigger, Sequence, TimeCondition,
+        TimeNodeType, TimingChild, TimingNode, TimingNodeKind, TimingTree,
     },
 };
 use super::semantic::TimingParser;
@@ -13,8 +13,13 @@ use super::validation::{
     parse_xml_bool,
 };
 use crate::{Error, Result};
-use quick_xml::events::Event;
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
+
+const P14_NS: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
 
 struct RecursiveNodeFrame {
     depth: usize,
@@ -104,6 +109,7 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                                     duration: None,
                                     node_type: None,
                                     preset: None,
+                                    preset_bounce_end: None,
                                     start_conditions: Vec::new(),
                                     end_conditions: Vec::new(),
                                     children: Vec::new(),
@@ -137,6 +143,21 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                             attribute(element, b"nodeType", reader.decoder())?
                                 .map(|v| TimeNodeType::parse(&v))
                                 .transpose()?;
+                        frame.node.common.preset_bounce_end = p14_attribute(
+                            element,
+                            b"presetBounceEnd",
+                            reader.decoder(),
+                            reader.resolver(),
+                        )?
+                        .map(|value| {
+                            value
+                                .parse::<u32>()
+                                .map_err(|_err| {
+                                    invalid("invalid preset animation bounce percentage")
+                                })
+                                .and_then(MotionFraction::new)
+                        })
+                        .transpose()?;
                         if let Some(value) = attribute(element, b"presetID", reader.decoder())? {
                             let preset_id = value
                                 .parse::<u32>()
@@ -226,6 +247,18 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                                     || invalid("runtime condition target is missing its value"),
                                 )?,
                             )?));
+                        } else if is_p14_name(&namespace, element.name(), b"bmkTgt") {
+                            let shape_id = parse_shape_id(
+                                &attribute(element, b"spid", reader.decoder())?.ok_or_else(
+                                    || invalid("media bookmark target is missing its shape ID"),
+                                )?,
+                            )?;
+                            let name = attribute(element, b"bmkName", reader.decoder())?
+                                .ok_or_else(|| {
+                                    invalid("media bookmark target is missing its bookmark name")
+                                })?;
+                            current.target =
+                                Some(ConditionTarget::MediaBookmark { shape_id, name });
                         }
                     }
                 }
@@ -302,6 +335,44 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
     tree.source_roots = Some(tree.roots.clone().into_boxed_slice());
     tree.source_opaque_children = Some(tree.opaque_children.clone().into_boxed_slice());
     Ok(tree)
+}
+
+fn is_p14_name(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    expected: &[u8],
+) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P14_NS)
+        && name.local_name().as_ref() == expected
+}
+
+fn p14_attribute(
+    element: &BytesStart<'_>,
+    expected: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != expected {
+            continue;
+        }
+        if !matches!(resolver.resolve_attribute(attribute.key).0, ResolveResult::Bound(Namespace(namespace)) if namespace == P14_NS)
+        {
+            continue;
+        }
+        if value.is_some() {
+            return Err(invalid("duplicate Office 2010 animation attribute"));
+        }
+        value = Some(
+            attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?
+                .into_owned(),
+        );
+    }
+    Ok(value)
 }
 
 pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) -> Result<Sequence> {

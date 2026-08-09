@@ -3,6 +3,7 @@
     reason = "test code panics on failure; unwrap keeps assertions concise"
 )]
 
+use litchi_core::Position;
 use litchi_oth::{Builder, Template, link::Link, paragraph::Paragraph};
 
 const COMPACT_CONTENT: &str = concat!(
@@ -108,12 +109,79 @@ fn exact_noop_edit_is_source_checked_and_atomic() {
     let source = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
     let alternate =
         Template::from_bytes(Builder::new().content_xml(COMPACT_CONTENT).build().unwrap()).unwrap();
-    let commit = source.edit().commit();
+    let commit = source.edit().commit().unwrap();
+    assert!(!commit.changed());
     assert_eq!(commit.template().as_bytes(), source.as_bytes());
-    assert_eq!(commit.patch().apply(&source).unwrap(), source.as_bytes());
+    assert_eq!(
+        commit.patch().apply(&source).unwrap().as_bytes(),
+        source.as_bytes()
+    );
     assert!(commit.patch().apply(&alternate).is_err());
     assert_eq!(
-        commit.patch().inverse().apply(&source).unwrap(),
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.template())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes(),
+    );
+}
+
+#[test]
+fn paragraph_edit_is_bounded_reversible_and_preserves_unknown_content() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+        r#"<office:body><office:text><text:p>before</text:p><foreign:keep xmlns:foreign="urn:example">opaque</foreign:keep></office:text></office:body></office:document-content>"#,
+    );
+    let source =
+        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
+    let mut edit = source.edit();
+    edit.set_paragraph_text(Position::new(0), "after & exact")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(
+        commit.template().text_body().unwrap().paragraphs()[0].text(),
+        "after & exact"
+    );
+    assert!(
+        commit
+            .template()
+            .content_xml()
+            .contains("<foreign:keep xmlns:foreign=\"urn:example\">opaque</foreign:keep>")
+    );
+    assert_eq!(
+        commit.patch().change().unwrap().paragraph(),
+        Position::new(0)
+    );
+    assert_eq!(commit.patch().change().unwrap().before(), "before");
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.template())
+            .unwrap()
+            .as_bytes(),
         source.as_bytes()
+    );
+}
+
+#[test]
+fn paragraph_edit_refuses_nested_markup_that_cannot_be_rewritten_losslessly() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+        r#"<office:body><office:text><text:p>plain <text:span>nested</text:span></text:p></office:text></office:body></office:document-content>"#,
+    );
+    let source =
+        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
+    let mut edit = source.edit();
+    assert!(
+        edit.set_paragraph_text(Position::new(0), "replacement")
+            .is_err()
     );
 }

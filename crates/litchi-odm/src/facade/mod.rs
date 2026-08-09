@@ -11,6 +11,28 @@ pub struct Master {
 }
 
 impl Master {
+    pub(crate) fn from_snapshot(package: crate::package::Snapshot) -> Self {
+        Self { package }
+    }
+
+    pub(crate) fn from_shared_bytes(bytes: std::sync::Arc<Vec<u8>>) -> Result<Self> {
+        crate::package::Snapshot::from_shared_bytes(bytes).map(Self::from_snapshot)
+    }
+
+    pub(crate) fn shared_bytes(&self) -> std::sync::Arc<Vec<u8>> {
+        self.package.shared_bytes()
+    }
+
+    pub(crate) fn meta_xml(&self) -> Result<Option<String>> {
+        self.package.meta_xml()
+    }
+
+    pub(crate) fn with_meta_xml(&self, meta_xml: &str) -> Result<Self> {
+        self.package
+            .with_meta_xml(meta_xml)
+            .map(Self::from_snapshot)
+    }
+
     /// Opens a master-document package from a file path.
     ///
     /// # Errors
@@ -52,6 +74,24 @@ impl Master {
     pub fn title(&self) -> Option<&str> {
         self.metadata()
             .and_then(|metadata| metadata.title.as_deref())
+    }
+
+    /// Starts a source-checked transaction for the projected document title.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source metadata part cannot be read as UTF-8.
+    pub fn edit_title(&self) -> Result<crate::title::Edit<'_>> {
+        crate::title::Edit::new(self)
+    }
+
+    /// Applies a title patch only when this is its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package does not match the patch's source.
+    pub fn apply_title_patch(&self, patch: &crate::title::Patch) -> Result<Self> {
+        patch.apply(self)
     }
 
     /// Returns subdocument references in document order.

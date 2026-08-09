@@ -5,6 +5,7 @@ use crate::paragraph::Paragraph;
 use crate::parts::DocumentPart;
 use crate::table::Table;
 use litchi_opc::OpcPackage;
+use std::sync::Arc;
 
 /// A Word document.
 ///
@@ -55,6 +56,43 @@ pub struct ImageWatermarkPart<'a> {
     pub bytes: &'a [u8],
 }
 
+/// An active body child that this semantic facade does not model.
+///
+/// The exact selected XML element is retained without interpretation. It is
+/// inert: callers can inspect the bytes but cannot execute, resolve, or mutate
+/// the payload through this facade.
+#[derive(Debug, Clone)]
+pub struct OpaqueBlock {
+    source: Arc<Vec<u8>>,
+    start: u32,
+    length: u32,
+}
+
+impl OpaqueBlock {
+    pub(crate) const fn from_arc_range(source: Arc<Vec<u8>>, start: u32, length: u32) -> Self {
+        Self {
+            source,
+            start,
+            length,
+        }
+    }
+
+    /// Borrow the retained active XML element exactly as selected by MCE.
+    #[must_use]
+    pub fn xml_bytes(&self) -> &[u8] {
+        let Ok(start) = usize::try_from(self.start) else {
+            return &[];
+        };
+        let Ok(length) = usize::try_from(self.length) else {
+            return &[];
+        };
+        let Some(end) = start.checked_add(length) else {
+            return &[];
+        };
+        self.source.get(start..end).unwrap_or_default()
+    }
+}
+
 /// An ordered main-document block containing a paragraph or table.
 #[derive(Debug, Clone)]
 pub enum Element {
@@ -62,6 +100,8 @@ pub enum Element {
     Paragraph(Box<Paragraph>),
     /// A table block.
     Table(Box<Table>),
+    /// An active but unmodeled body child retained as exact XML.
+    Unknown(Box<OpaqueBlock>),
 }
 
 /// An ordered main-document block, including inert alternative-format parts.
@@ -73,6 +113,8 @@ pub enum Block {
     Table(Box<Table>),
     /// An opaque alternative-format anchor.
     Alt(Box<Chunk>),
+    /// An active but unmodeled body child retained as exact XML.
+    Unknown(Box<OpaqueBlock>),
 }
 
 impl<'a> Document<'a> {

@@ -28,11 +28,20 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parses a complete payload whose property bags extend to the end.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is malformed or exceeds `limits`.
     pub fn parse(data: &[u8], ansi: Ansi, limits: Limits) -> Result<Self, Error> {
         Self::parse_to_end_shared(Arc::<[u8]>::from(data), ansi, limits)
     }
 
     /// Parses a complete payload with an exact property-bag count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is malformed, has trailing bytes, or
+    /// exceeds `limits`.
     pub fn parse_bags(
         data: &[u8],
         count: usize,
@@ -44,6 +53,10 @@ impl Snapshot {
 
     /// Alias for [`Self::parse_bags`] that makes the trailing-byte policy
     /// explicit at call sites.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::parse_bags`].
     pub fn parse_exact(
         data: &[u8],
         count: usize,
@@ -55,6 +68,10 @@ impl Snapshot {
 
     /// Parses a complete payload whose property bags extend to the end,
     /// sharing the caller's source allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is malformed or exceeds `limits`.
     pub fn parse_to_end_shared(
         bytes: Arc<[u8]>,
         ansi: Ansi,
@@ -65,6 +82,11 @@ impl Snapshot {
 
     /// Parses a complete payload with an exact bag count, sharing its source
     /// allocation and rejecting any trailing bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is malformed, has trailing bytes, or
+    /// exceeds `limits`.
     pub fn parse_bags_shared(
         bytes: Arc<[u8]>,
         count: usize,
@@ -76,6 +98,11 @@ impl Snapshot {
 
     /// Creates a canonical source-preserving snapshot from the complete typed
     /// model. Parsed snapshots should be preferred when original bytes matter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the model is invalid or cannot be encoded under
+    /// `limits`.
     pub fn from_store(
         store: PropertyBagStore,
         bags: Vec<PropertyBag>,
@@ -186,7 +213,7 @@ impl Snapshot {
 
     fn parse_shared(
         bytes: Arc<[u8]>,
-        count: Option<usize>,
+        expected_bag_count: Option<usize>,
         ansi: Ansi,
         limits: Limits,
     ) -> Result<Self, Error> {
@@ -199,7 +226,7 @@ impl Snapshot {
         let remainder = bytes
             .get(consumed..)
             .ok_or_else(|| Error::new("smart-tag store offset is outside its source"))?;
-        let bags = match count {
+        let bags = match expected_bag_count {
             Some(count) => store.parse_bags(remainder, count, limits)?,
             None => store.parse_bags_to_end(remainder, limits)?,
         };

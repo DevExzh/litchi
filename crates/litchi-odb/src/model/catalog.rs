@@ -1,6 +1,7 @@
 //! Bounded, inert ODB schema and query catalogs.
 
 use super::{
+    connection::Connection,
     query::Query,
     table::{Column, Table, TableKind},
 };
@@ -14,6 +15,7 @@ use quick_xml::{
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DATABASE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:database:1.0";
+const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 
 /// Finite limits for semantic ODB catalog discovery.
 #[allow(
@@ -133,6 +135,12 @@ impl<'source> Catalog<'source> {
         self.owned.queries()
     }
 
+    /// Returns the inert connection declaration, if the data source has one.
+    #[must_use]
+    pub const fn connection(&self) -> Option<&Connection> {
+        self.owned.connection()
+    }
+
     /// Finds one unambiguous table declaration by exact producer-visible name.
     ///
     /// # Errors
@@ -165,6 +173,7 @@ impl<'source> Catalog<'source> {
 pub struct OwnedCatalog {
     tables: Vec<Table>,
     queries: Vec<Query>,
+    connection: Option<Connection>,
 }
 
 impl OwnedCatalog {
@@ -179,6 +188,12 @@ impl OwnedCatalog {
     pub fn queries(&self) -> &[Query] {
         &self.queries
     }
+
+    /// Returns the inert connection declaration, if the data source has one.
+    #[must_use]
+    pub const fn connection(&self) -> Option<&Connection> {
+        self.connection.as_ref()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -187,6 +202,11 @@ enum Element {
     Body,
     Database,
     DataSource,
+    ConnectionData,
+    DatabaseDescription,
+    FileBasedDatabase,
+    ServerDatabase,
+    ConnectionResource,
     Queries,
     QueryCollection,
     TableRepresentation,
@@ -365,6 +385,59 @@ fn start(
     if in_database
         && matches!(
             kind,
+            Element::FileBasedDatabase | Element::ServerDatabase | Element::ConnectionResource
+        )
+    {
+        let connection = match kind {
+            Element::FileBasedDatabase => Connection::file(required_attr(
+                reader,
+                element,
+                XLINK_NAMESPACE,
+                b"href",
+                limits,
+            )?),
+            Element::ServerDatabase => Connection::server(
+                required_db_attr(reader, element, b"hostname", limits)?,
+                required_db_attr(reader, element, b"database-name", limits)?,
+            ),
+            Element::ConnectionResource => Connection::resource(required_attr(
+                reader,
+                element,
+                XLINK_NAMESPACE,
+                b"href",
+                limits,
+            )?),
+            Element::Document
+            | Element::Body
+            | Element::Database
+            | Element::DataSource
+            | Element::ConnectionData
+            | Element::DatabaseDescription
+            | Element::Queries
+            | Element::QueryCollection
+            | Element::TableRepresentation
+            | Element::TableRepresentations
+            | Element::TableDefinition
+            | Element::TableDefinitions
+            | Element::SchemaDefinition
+            | Element::Columns
+            | Element::ColumnDefinitions
+            | Element::Column
+            | Element::ColumnDefinition
+            | Element::Query
+            | Element::Other => {
+                return Err(invalid("ODB connection classification is inconsistent"));
+            },
+        };
+        if catalog.connection.replace(connection).is_some() {
+            return Err(invalid(
+                "ODB data source has more than one connection declaration",
+            ));
+        }
+    }
+    if in_database
+        && matches!(
+            kind,
             Element::TableRepresentation | Element::TableDefinition
         )
     {
@@ -453,6 +526,19 @@ fn classify(parent: Option<Frame>, namespace: NamespaceKind, local: &[u8]) -> El
         (Some(Element::Document), true, _, b"body") => Element::Body,
         (Some(Element::Body), true, _, b"database") => Element::Database,
         (Some(Element::Database), _, true, b"data-source") => Element::DataSource,
+        (Some(Element::DataSource), _, true, b"connection-data") => Element::ConnectionData,
+        (Some(Element::ConnectionData), _, true, b"database-description") => {
+            Element::DatabaseDescription
+        },
+        (Some(Element::DatabaseDescription), _, true, b"file-based-database") => {
+            Element::FileBasedDatabase
+        },
+        (Some(Element::DatabaseDescription), _, true, b"server-database") => {
+            Element::ServerDatabase
+        },
+        (Some(Element::ConnectionData), _, true, b"connection-resource") => {
+            Element::ConnectionResource
+        },
         (Some(Element::Database), _, true, b"queries") => Element::Queries,
         (Some(Element::Queries | Element::QueryCollection), _, true, b"query-collection") => {
             Element::QueryCollection
@@ -488,6 +574,11 @@ fn is_catalog_node(namespace: NamespaceKind, local: &[u8]) -> bool {
         && matches!(
             local,
             b"data-source"
+                | b"connection-data"
+                | b"database-description"
+                | b"file-based-database"
+                | b"server-database"
+                | b"connection-resource"
                 | b"queries"
                 | b"query-collection"
                 | b"query"
@@ -541,6 +632,57 @@ fn optional_db_attr(
             raw_attribute.map_err(|error| invalid(&format!("invalid ODB attribute: {error}")))?;
         let (namespace, name) = reader.resolver().resolve_attribute(attribute.key);
         if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == DATABASE_NAMESPACE)
+            && name.as_ref() == local
+        {
+            if attribute.value.len() > limits.max_attribute_bytes {
+                return Err(invalid("ODB semantic attribute exceeds the byte limit"));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                .map_err(|error| invalid(&format!("invalid ODB attribute value: {error}")))?
+                .into_owned();
+            if value.len() > limits.max_attribute_bytes {
+                return Err(invalid(
+                    "decoded ODB semantic attribute exceeds the byte limit",
+                ));
+            }
+            if found.replace(value).is_some() {
+                return Err(invalid("duplicate ODB semantic attribute"));
+            }
+        }
+    }
+    Ok(found)
+}
+
+fn required_attr(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &[u8],
+    local: &[u8],
+    limits: Limits,
+) -> Result<String> {
+    optional_attr(reader, element, namespace, local, limits)?.ok_or_else(|| {
+        invalid(&format!(
+            "ODB {} is missing required attribute {}",
+            String::from_utf8_lossy(element.local_name().as_ref()),
+            String::from_utf8_lossy(local)
+        ))
+    })
+}
+
+fn optional_attr(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    expected_namespace: &[u8],
+    local: &[u8],
+    limits: Limits,
+) -> Result<Option<String>> {
+    let mut found = None;
+    for raw_attribute in element.attributes() {
+        let attribute =
+            raw_attribute.map_err(|error| invalid(&format!("invalid ODB attribute: {error}")))?;
+        let (namespace, name) = reader.resolver().resolve_attribute(attribute.key);
+        if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == expected_namespace)
             && name.as_ref() == local
         {
             if attribute.value.len() > limits.max_attribute_bytes {

@@ -1,5 +1,13 @@
 //! Shared-parser compatibility over compact in-memory ODT packages.
 
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        reason = "Fixed in-memory package fixtures use direct assertion setup."
+    )
+)]
+
 use litchi_core::Error;
 use litchi_odf_common::core::{Package, PackageWriter};
 use litchi_odf_common::style::{data, master};
@@ -49,9 +57,8 @@ fn compact_odt_exercises_shared_package_and_xml_parsers() -> Result<(), Error> {
         package.styles_xml(),
         package.content_xml(),
     )?);
-    let styles = match package.styles_xml() {
-        Some(styles) => styles,
-        None => panic!("compact package has no styles.xml"),
+    let Some(styles) = package.styles_xml() else {
+        panic!("compact package has no styles.xml");
     };
     assert!(!master::reader::read(styles)?.is_empty());
     Ok(())

@@ -72,24 +72,18 @@ pub enum ManifestEncryptionAlgorithm {
 impl ManifestEncryptionAlgorithm {
     pub(crate) const fn accepts_key_size(&self, key_size: u16) -> bool {
         match self {
-            Self::Aes128Cbc { .. } => key_size == 16,
-            Self::Aes192Cbc { .. } => key_size == 24,
-            Self::Aes256Cbc { .. } => key_size == 32,
-            Self::Aes128Gcm { .. } => key_size == 16,
-            Self::Aes192Gcm { .. } => key_size == 24,
-            Self::Aes256Gcm { .. } => key_size == 32,
+            Self::Aes128Cbc { .. } | Self::Aes128Gcm { .. } => key_size == 16,
+            Self::Aes192Cbc { .. } | Self::Aes192Gcm { .. } => key_size == 24,
+            Self::Aes256Cbc { .. } | Self::Aes256Gcm { .. } => key_size == 32,
             Self::BlowfishCfb8 { .. } => key_size >= 4 && key_size <= 56,
         }
     }
 
     const fn key_size_description(&self) -> &'static str {
         match self {
-            Self::Aes128Cbc { .. } => "16",
-            Self::Aes192Cbc { .. } => "24",
-            Self::Aes256Cbc { .. } => "32",
-            Self::Aes128Gcm { .. } => "16",
-            Self::Aes192Gcm { .. } => "24",
-            Self::Aes256Gcm { .. } => "32",
+            Self::Aes128Cbc { .. } | Self::Aes128Gcm { .. } => "16",
+            Self::Aes192Cbc { .. } | Self::Aes192Gcm { .. } => "24",
+            Self::Aes256Cbc { .. } | Self::Aes256Gcm { .. } => "32",
             Self::BlowfishCfb8 { .. } => "4 through 56",
         }
     }
@@ -142,6 +136,12 @@ struct PartialEncryption {
 }
 
 impl Manifest {
+    /// Parse a `META-INF/manifest.xml` document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the XML is malformed or its ODF manifest and
+    /// encryption descriptors are invalid.
     pub fn parse(xml: &str) -> Result<Self> {
         let common_package::Manifest {
             mimetype,
@@ -274,7 +274,16 @@ impl Manifest {
                     current_path = None;
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Start(_)
+                | Event::End(_)
+                | Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }
@@ -287,12 +296,14 @@ impl Manifest {
         Ok(Self { mimetype, entries })
     }
 
+    #[must_use]
     pub fn get_media_type(&self, path: &str) -> Option<&str> {
         self.entries
             .get(path)
             .map(|entry| entry.media_type.as_str())
     }
 
+    #[must_use]
     pub fn has_path(&self, path: &str) -> bool {
         self.entries.contains_key(path)
     }
@@ -301,10 +312,12 @@ impl Manifest {
         self.entries.keys().map(String::as_str)
     }
 
+    #[must_use]
     pub fn get_entry(&self, path: &str) -> Option<&ManifestEntry> {
         self.entries.get(path)
     }
 
+    #[must_use]
     pub fn has_encrypted_entries(&self) -> bool {
         self.entries
             .values()
@@ -329,16 +342,19 @@ fn manifest_attributes(
     element: &BytesStart<'_>,
 ) -> Result<HashMap<Vec<u8>, String>> {
     let mut values = HashMap::new();
-    for attribute in element.attributes() {
-        let attribute = attribute
-            .map_err(|_| Error::InvalidFormat("Invalid manifest attribute".to_string()))?;
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(|error| {
+            Error::InvalidFormat(format!("Invalid manifest attribute: {error}"))
+        })?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         if !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE) {
             continue;
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|_| Error::InvalidFormat("Invalid manifest attribute value".to_string()))?
+            .map_err(|error| {
+                Error::InvalidFormat(format!("Invalid manifest attribute value: {error}"))
+            })?
             .into_owned();
         if values.insert(local.as_ref().to_vec(), value).is_some() {
             return Err(Error::InvalidFormat(
@@ -349,16 +365,24 @@ fn manifest_attributes(
     Ok(values)
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "Manifest and LibreOffice extension attributes must be returned separately."
+)]
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "quick-xml's non-exhaustive ResolveResult needs forward-compatible namespace handling."
+)]
 fn manifest_and_loext_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
 ) -> Result<(HashMap<Vec<u8>, String>, HashMap<Vec<u8>, String>)> {
     let mut manifest = HashMap::new();
     let mut loext = HashMap::new();
-    for attribute in element.attributes() {
-        let attribute = attribute
-            .map_err(|_| Error::InvalidFormat("Invalid manifest attribute".to_string()))?;
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(|error| {
+            Error::InvalidFormat(format!("Invalid manifest attribute: {error}"))
+        })?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let target = match namespace {
             ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE => &mut manifest,
@@ -367,7 +391,9 @@ fn manifest_and_loext_attributes(
         };
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|_| Error::InvalidFormat("Invalid manifest attribute value".to_string()))?
+            .map_err(|error| {
+                Error::InvalidFormat(format!("Invalid manifest attribute value: {error}"))
+            })?
             .into_owned();
         if target.insert(local.as_ref().to_vec(), value).is_some() {
             return Err(Error::InvalidFormat(
@@ -388,9 +414,9 @@ fn required<'a>(attributes: &'a HashMap<Vec<u8>, String>, name: &[u8]) -> Result
 }
 
 fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {
-    BASE64_STANDARD
-        .decode(value)
-        .map_err(|_| Error::InvalidFormat(format!("Invalid Base64 in manifest {field}")))
+    BASE64_STANDARD.decode(value).map_err(|error| {
+        Error::InvalidFormat(format!("Invalid Base64 in manifest {field}: {error}"))
+    })
 }
 
 fn parse_checksum(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<ManifestChecksum> {
@@ -496,11 +522,15 @@ fn parse_algorithm(
     }
 }
 
-fn fixed_iv<const N: usize>(iv: Vec<u8>, expected: usize, algorithm: &str) -> Result<[u8; N]> {
-    iv.try_into().map_err(|iv: Vec<u8>| {
+fn fixed_iv<const N: usize>(
+    decoded_iv: Vec<u8>,
+    expected: usize,
+    algorithm: &str,
+) -> Result<[u8; N]> {
+    decoded_iv.try_into().map_err(|invalid_iv: Vec<u8>| {
         Error::InvalidFormat(format!(
             "{algorithm} IV has length {}, expected {expected}",
-            iv.len()
+            invalid_iv.len()
         ))
     })
 }
@@ -523,7 +553,7 @@ fn parse_start_key(
     };
     let key_size = required(&attributes, b"key-size")?
         .parse::<usize>()
-        .map_err(|_| Error::InvalidFormat("Invalid start-key size".to_string()))?;
+        .map_err(|error| Error::InvalidFormat(format!("Invalid start-key size: {error}")))?;
     if key_size != expected_size {
         return Err(Error::InvalidFormat(format!(
             "Start-key size {key_size} does not match its digest"
@@ -601,17 +631,16 @@ fn parse_optional_key_size(attributes: &HashMap<Vec<u8>, String>) -> Result<Opti
         .map(|value| {
             value
                 .parse::<u16>()
-                .map_err(|_| Error::InvalidFormat("Invalid derived key size".to_string()))
+                .map_err(|error| Error::InvalidFormat(format!("Invalid derived key size: {error}")))
         })
         .transpose()
 }
 
 fn parse_nonzero_u32(value: &str, field: &str) -> Result<NonZeroU32> {
-    value
+    let parsed = value
         .parse::<u32>()
-        .ok()
-        .and_then(NonZeroU32::new)
-        .ok_or_else(|| Error::InvalidFormat(format!("Invalid {field}")))
+        .map_err(|error| Error::InvalidFormat(format!("Invalid {field}: {error}")))?;
+    NonZeroU32::new(parsed).ok_or_else(|| Error::InvalidFormat(format!("Invalid {field}: zero")))
 }
 
 fn has_argon2_parameters(attributes: &HashMap<Vec<u8>, String>) -> bool {
@@ -726,6 +755,10 @@ fn finish_encryption(partial: PartialEncryption) -> Result<ManifestEncryption> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Test fixtures use infallible parsing setup so assertions can focus on manifest validation."
+)]
 mod tests {
     use super::*;
 

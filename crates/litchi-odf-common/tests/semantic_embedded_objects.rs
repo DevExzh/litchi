@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        reason = "Fixed semantic XML fixtures use direct assertion setup."
+    )
+)]
+
 use litchi_odf_common::{
     drawing::Part,
     embedded::{Kind, Object, Root, Source, scan_flat, scan_package},
@@ -48,8 +56,8 @@ fn libreoffice_inline_math_and_chart_payloads_are_retained_without_recursion() {
         assert_eq!(objects.len(), 1);
         assert!(matches!(
             &objects[0].source,
-            Source::InlineXml { root: Root::MathMl, xml, .. }
-                if xml.contains("<math") && xml.contains("</math>")
+            Source::InlineXml { root: Root::MathMl, xml: payload, .. }
+                if payload.contains("<math") && payload.contains("</math>")
         ));
     }
 
@@ -107,14 +115,14 @@ fn package_file_and_inline_ole_sources_are_inert_and_exact() {
         } if path == "Object1" && media_type == "application/vnd.sun.star.oleobject"
     ));
 
-    let body = "<office:text><text:p><draw:frame draw:name=\"OLE\"><draw:object-ole xlink:href=\"https://example.invalid/ignored\"><office:binary-data>Q0RG</office:binary-data></draw:object-ole><svg:title>OLE title</svg:title><svg:desc>OLE description</svg:desc></draw:frame></text:p></office:text>";
-    let objects = scan_flat(&flat_document(body)).unwrap();
+    let inline_body = "<office:text><text:p><draw:frame draw:name=\"OLE\"><draw:object-ole xlink:href=\"https://example.invalid/ignored\"><office:binary-data>Q0RG</office:binary-data></draw:object-ole><svg:title>OLE title</svg:title><svg:desc>OLE description</svg:desc></draw:frame></text:p></office:text>";
+    let inline_objects = scan_flat(&flat_document(inline_body)).unwrap();
     assert!(matches!(
-        &objects[0].source,
+        &inline_objects[0].source,
         Source::InlineBinary { bytes, ignored_href: Some(href) }
             if bytes == b"CDF" && href == "https://example.invalid/ignored"
     ));
-    let frame = objects[0].frame.as_ref().unwrap();
+    let frame = inline_objects[0].frame.as_ref().unwrap();
     assert_eq!(frame.title.as_deref(), Some("OLE title"));
     assert_eq!(frame.description.as_deref(), Some("OLE description"));
 }
@@ -158,12 +166,12 @@ fn depth_count_and_inline_xml_byte_limits_are_enforced() {
         "<text:span>".repeat(4_097),
         "</text:span>".repeat(4_097)
     );
-    let body = format!("<office:text><text:p>{nested}</text:p></office:text>");
-    assert!(scan_flat(&flat_document(&body)).is_err());
+    let nested_body = format!("<office:text><text:p>{nested}</text:p></office:text>");
+    assert!(scan_flat(&flat_document(&nested_body)).is_err());
 
     let objects = "<draw:object/>".repeat(100_001);
-    let body = format!("<office:text><text:p>{objects}</text:p></office:text>");
-    assert!(scan_flat(&flat_document(&body)).is_err());
+    let object_body = format!("<office:text><text:p>{objects}</text:p></office:text>");
+    assert!(scan_flat(&flat_document(&object_body)).is_err());
 }
 
 fn assert_subdocument(object: &Object) {

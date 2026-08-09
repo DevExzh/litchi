@@ -6,10 +6,6 @@ use litchi_cfb::OleError;
 const MIN_NAMED_PROPERTY_ID: u32 = 2;
 const MAX_NAMED_PROPERTY_ID: u32 = 0x00ff_ffff;
 
-fn invalid(message: impl Into<String>) -> OleError {
-    OleError::InvalidFormat(message.into())
-}
-
 /// Bounded, caller-configurable limits for the inert hyperlink property blobs.
 ///
 /// These bound this typed overlay's secondary decoding and allocation after the
@@ -18,48 +14,53 @@ fn invalid(message: impl Into<String>) -> OleError {
 /// when document-specific policy is stricter than the safe defaults.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
-    max_blob_bytes: usize,
-    max_links: usize,
-    max_string_units: usize,
-    max_total_utf16_units: usize,
+    blob_bytes: usize,
+    link_count: usize,
+    string_units: usize,
+    total_utf16_units: usize,
 }
 
 impl Limits {
     /// Creates a builder initialized to conservative safe defaults.
+    #[must_use]
     pub const fn builder() -> LimitsBuilder {
         LimitsBuilder {
-            max_blob_bytes: Self::DEFAULT.max_blob_bytes,
-            max_links: Self::DEFAULT.max_links,
-            max_string_units: Self::DEFAULT.max_string_units,
-            max_total_utf16_units: Self::DEFAULT.max_total_utf16_units,
+            blob_bytes: Self::DEFAULT.blob_bytes,
+            link_count: Self::DEFAULT.link_count,
+            string_units: Self::DEFAULT.string_units,
+            total_utf16_units: Self::DEFAULT.total_utf16_units,
         }
     }
 
     /// Maximum encoded bytes accepted for either reserved BLOB payload.
+    #[must_use]
     pub const fn max_blob_bytes(self) -> usize {
-        self.max_blob_bytes
+        self.blob_bytes
     }
 
     /// Maximum hyperlink records accepted in `_PID_HLINKS`.
+    #[must_use]
     pub const fn max_links(self) -> usize {
-        self.max_links
+        self.link_count
     }
 
     /// Maximum UTF-16 code units, including a terminating NUL, per string.
+    #[must_use]
     pub const fn max_string_units(self) -> usize {
-        self.max_string_units
+        self.string_units
     }
 
     /// Maximum decoded UTF-16 code units across one typed property read.
+    #[must_use]
     pub const fn max_total_utf16_units(self) -> usize {
-        self.max_total_utf16_units
+        self.total_utf16_units
     }
 
     const DEFAULT: Self = Self {
-        max_blob_bytes: 16 * 1024 * 1024,
-        max_links: 100_000,
-        max_string_units: 65_536,
-        max_total_utf16_units: 1_000_000,
+        blob_bytes: 16 * 1024 * 1024,
+        link_count: 100_000,
+        string_units: 65_536,
+        total_utf16_units: 1_000_000,
     };
 }
 
@@ -72,64 +73,72 @@ impl Default for Limits {
 /// Builder for [`Limits`]. Every cap must be nonzero.
 #[derive(Debug, Clone, Copy)]
 pub struct LimitsBuilder {
-    max_blob_bytes: usize,
-    max_links: usize,
-    max_string_units: usize,
-    max_total_utf16_units: usize,
+    blob_bytes: usize,
+    link_count: usize,
+    string_units: usize,
+    total_utf16_units: usize,
 }
 
 impl LimitsBuilder {
     /// Changes the encoded BLOB cap.
+    #[must_use]
     pub const fn max_blob_bytes(mut self, value: usize) -> Self {
-        self.max_blob_bytes = value;
+        self.blob_bytes = value;
         self
     }
 
     /// Changes the hyperlink-record cap.
+    #[must_use]
     pub const fn max_links(mut self, value: usize) -> Self {
-        self.max_links = value;
+        self.link_count = value;
         self
     }
 
     /// Changes the cap for one UTF-16 string, including its NUL terminator.
+    #[must_use]
     pub const fn max_string_units(mut self, value: usize) -> Self {
-        self.max_string_units = value;
+        self.string_units = value;
         self
     }
 
     /// Changes the aggregate UTF-16 decode cap.
+    #[must_use]
     pub const fn max_total_utf16_units(mut self, value: usize) -> Self {
-        self.max_total_utf16_units = value;
+        self.total_utf16_units = value;
         self
     }
 
     /// Validates and returns the configured limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any configured cap is zero.
     pub fn build(self) -> Result<Limits, OleError> {
-        if self.max_blob_bytes == 0 {
+        if self.blob_bytes == 0 {
             return Err(invalid(
                 "user-defined hyperlink maximum blob bytes must be nonzero",
             ));
         }
-        if self.max_links == 0 {
+        if self.link_count == 0 {
             return Err(invalid(
                 "user-defined hyperlink maximum link count must be nonzero",
             ));
         }
-        if self.max_string_units == 0 {
+        if self.string_units == 0 {
             return Err(invalid(
                 "user-defined hyperlink maximum string units must be nonzero",
             ));
         }
-        if self.max_total_utf16_units == 0 {
+        if self.total_utf16_units == 0 {
             return Err(invalid(
                 "user-defined hyperlink maximum aggregate string units must be nonzero",
             ));
         }
         Ok(Limits {
-            max_blob_bytes: self.max_blob_bytes,
-            max_links: self.max_links,
-            max_string_units: self.max_string_units,
-            max_total_utf16_units: self.max_total_utf16_units,
+            blob_bytes: self.blob_bytes,
+            link_count: self.link_count,
+            string_units: self.string_units,
+            total_utf16_units: self.total_utf16_units,
         })
     }
 }
@@ -142,13 +151,18 @@ pub struct LinkBase {
 
 impl LinkBase {
     /// Creates a base URL text value without resolving or otherwise using it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` contains a NUL character.
     pub fn new(value: impl Into<String>) -> Result<Self, OleError> {
-        let value = value.into();
-        validate_text(&value, "link base")?;
-        Ok(Self { value })
+        let text = value.into();
+        validate_text(&text, "link base")?;
+        Ok(Self { value: text })
     }
 
     /// Borrows the stored base text.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -167,6 +181,10 @@ pub struct Hyperlink {
 
 impl Hyperlink {
     /// Creates a record and computes the MS-OSHARED 2.4.2 SHOULD hash.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either inert text field contains a NUL character.
     pub fn new(
         app: i32,
         office_art: i32,
@@ -174,17 +192,17 @@ impl Hyperlink {
         target: impl Into<String>,
         location: impl Into<String>,
     ) -> Result<Self, OleError> {
-        let target = target.into();
-        let location = location.into();
-        validate_text(&target, "hyperlink target")?;
-        validate_text(&location, "hyperlink location")?;
+        let target_text = target.into();
+        let location_text = location.into();
+        validate_text(&target_text, "hyperlink target")?;
+        validate_text(&location_text, "hyperlink location")?;
         Ok(Self {
-            stored_hash: hyperlink_hash(&target, &location),
+            stored_hash: hyperlink_hash(&target_text, &location_text),
             app,
             office_art,
             info,
-            target,
-            location,
+            target: target_text,
+            location: location_text,
         })
     }
 
@@ -207,41 +225,49 @@ impl Hyperlink {
     }
 
     /// The hash as it was stored in the document, retained losslessly on read.
+    #[must_use]
     pub const fn stored_hash(&self) -> u32 {
         self.stored_hash
     }
 
     /// Calculates the MS-OSHARED 2.4.2 hash from the inert target and location.
+    #[must_use]
     pub fn calculated_hash(&self) -> u32 {
         hyperlink_hash(&self.target, &self.location)
     }
 
     /// Checks whether the retained stored hash matches the calculated SHOULD hash.
+    #[must_use]
     pub fn hash_matches(&self) -> bool {
         self.stored_hash == self.calculated_hash()
     }
 
     /// Implementation-specific application value.
+    #[must_use]
     pub const fn app(&self) -> i32 {
         self.app
     }
 
-    /// Inert OfficeArt shape identifier, or zero when not shape-bound.
+    /// Inert `OfficeArt` shape identifier, or zero when not shape-bound.
+    #[must_use]
     pub const fn office_art(&self) -> i32 {
         self.office_art
     }
 
     /// Implementation-specific link state value.
+    #[must_use]
     pub const fn info(&self) -> i32 {
         self.info
     }
 
     /// The inert hyperlink target text.
+    #[must_use]
     pub fn target(&self) -> &str {
         &self.target
     }
 
     /// The inert hyperlink location text.
+    #[must_use]
     pub fn location(&self) -> &str {
         &self.location
     }
@@ -255,26 +281,31 @@ pub struct Hyperlinks {
 
 impl Hyperlinks {
     /// Creates an inert hyperlink collection. Limits are applied on read/write.
+    #[must_use]
     pub fn new(links: Vec<Hyperlink>) -> Self {
         Self { links }
     }
 
     /// Borrows all records in their stored order.
+    #[must_use]
     pub fn links(&self) -> &[Hyperlink] {
         &self.links
     }
 
     /// Iterates records in their stored order.
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Hyperlink> {
         self.links.iter()
     }
 
     /// Returns the number of records.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.links.len()
     }
 
     /// Whether the list contains no records.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.links.is_empty()
     }
@@ -289,27 +320,42 @@ pub struct Properties<'a> {
 
 impl<'a> Properties<'a> {
     /// Creates a lazy view using [`Limits::default`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `section` is not a `UserDefinedProperties` section.
     pub fn new(section: &'a Section) -> Result<Self, OleError> {
         Self::with_limits(section, Limits::default())
     }
 
     /// Creates a lazy view using caller-supplied validated limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `section` is not a `UserDefinedProperties` section.
     pub fn with_limits(section: &'a Section, limits: Limits) -> Result<Self, OleError> {
         validate_section(section)?;
         Ok(Self { section, limits })
     }
 
     /// Borrows the complete section, including unknown properties.
+    #[must_use]
     pub const fn section(&self) -> &'a Section {
         self.section
     }
 
     /// Returns the limits used for subsequent lazy reads.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
 
     /// Reads `_PID_LINKBASE` only when it is accessed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the named property is not a BLOB or its payload
+    /// violates the configured decoding limits.
     pub fn link_base(&self) -> Result<Option<LinkBase>, OleError> {
         self.named_blob(LINK_BASE)?
             .map(|value| codec::decode_link_base(value, self.limits))
@@ -317,6 +363,11 @@ impl<'a> Properties<'a> {
     }
 
     /// Reads `_PID_HLINKS` only when it is accessed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the named property is not a BLOB or its payload
+    /// violates the configured decoding limits.
     pub fn hyperlinks(&self) -> Result<Option<Hyperlinks>, OleError> {
         self.named_blob(HYPERLINKS)?
             .map(|value| codec::decode_hyperlinks(value, self.limits))
@@ -343,25 +394,45 @@ pub struct Edit<'a> {
 
 impl<'a> Edit<'a> {
     /// Creates an editor using [`Limits::default`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `section` is not a `UserDefinedProperties` section or
+    /// an existing reserved property has an invalid identifier.
     pub fn new(section: &'a mut Section) -> Result<Self, OleError> {
         Self::with_limits(section, Limits::default())
     }
 
     /// Creates an editor using caller-supplied validated limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `section` is not a `UserDefinedProperties` section or
+    /// an existing reserved property has an invalid identifier.
     pub fn with_limits(section: &'a mut Section, limits: Limits) -> Result<Self, OleError> {
         validate_edit_section(section)?;
         Ok(Self { section, limits })
     }
 
     /// Borrows the complete editable section.
+    #[must_use]
     pub const fn section(&self) -> &Section {
         self.section
     }
 
     /// Sets `_PID_LINKBASE`, preserving an existing PID/name spelling/order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value cannot be encoded within the configured
+    /// limits or the section cannot accept the replacement.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "the public edit API intentionally accepts temporary validated values by value"
+    )]
     pub fn set_link_base(&mut self, value: LinkBase) -> Result<(), OleError> {
-        let value = Value::Blob(codec::encode_link_base(&value, self.limits)?);
-        self.set_named(LINK_BASE, value)
+        let encoded_value = Value::Blob(codec::encode_link_base(&value, self.limits)?);
+        self.set_named(LINK_BASE, encoded_value)
     }
 
     /// Removes `_PID_LINKBASE` if present.
@@ -370,9 +441,18 @@ impl<'a> Edit<'a> {
     }
 
     /// Sets `_PID_HLINKS`, preserving an existing PID/name spelling/order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value cannot be encoded within the configured
+    /// limits or the section cannot accept the replacement.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "the public edit API intentionally accepts temporary validated values by value"
+    )]
     pub fn set_hyperlinks(&mut self, value: Hyperlinks) -> Result<(), OleError> {
-        let value = Value::Blob(codec::encode_hyperlinks(&value, self.limits)?);
-        self.set_named(HYPERLINKS, value)
+        let encoded_value = Value::Blob(codec::encode_hyperlinks(&value, self.limits)?);
+        self.set_named(HYPERLINKS, encoded_value)
     }
 
     /// Removes `_PID_HLINKS` if present.
@@ -403,6 +483,10 @@ impl<'a> Edit<'a> {
     }
 }
 
+fn invalid(message: impl Into<String>) -> OleError {
+    OleError::InvalidFormat(message.into())
+}
+
 fn validate_section(section: &Section) -> Result<(), OleError> {
     if section.format_identifier != USER_DEFINED_PROPERTIES_FMTID {
         return Err(invalid(
@@ -415,12 +499,12 @@ fn validate_section(section: &Section) -> Result<(), OleError> {
 fn validate_edit_section(section: &Section) -> Result<(), OleError> {
     validate_section(section)?;
     for name in [LINK_BASE, HYPERLINKS] {
-        if let Some((identifier, _)) = section.find_named(name) {
-            if identifier > MAX_NAMED_PROPERTY_ID {
-                return Err(invalid(format!(
-                    "{name} property identifier {identifier} exceeds the UserDefinedProperties effective maximum"
-                )));
-            }
+        if let Some((identifier, _)) = section.find_named(name)
+            && identifier > MAX_NAMED_PROPERTY_ID
+        {
+            return Err(invalid(format!(
+                "{name} property identifier {identifier} exceeds the UserDefinedProperties effective maximum"
+            )));
         }
     }
     Ok(())
@@ -453,15 +537,15 @@ fn unicode_hash(value: &str) -> u32 {
     let mut first = None;
     let mut remaining = 255usize;
     for character in value.chars() {
-        let mut original = [0; 2];
-        let original = character.encode_utf16(&mut original);
-        if original.len() > remaining {
+        let mut unit_buffer = [0; 2];
+        let encoded_units = character.encode_utf16(&mut unit_buffer);
+        if encoded_units.len() > remaining {
             // MS-OSHARED counts WCHARs. A surrogate cut at the exact boundary
             // cannot be lowercased as a scalar, so retain that code unit.
-            hash_unit(&mut hash, &mut first, original[0]);
+            hash_unit(&mut hash, &mut first, encoded_units[0]);
             break;
         }
-        remaining -= original.len();
+        remaining -= encoded_units.len();
         for lowered in character.to_lowercase() {
             for unit in lowered.encode_utf16(&mut [0; 2]) {
                 hash_unit(&mut hash, &mut first, *unit);

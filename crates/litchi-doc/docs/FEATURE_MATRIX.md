@@ -52,10 +52,14 @@ individual typed codecs can impose additional format-specific bounds.
 
 Password-to-open input is owned by non-cloneable, zeroizing `Password` and is
 supplied through `OpenOptions::with_password`; it is redacted in diagnostics.
-`Document::text` preserves stored source text. Accepted, rejected, and combined
-revision projections are intentionally unavailable: DOC lacks a lossless,
-source-bound main-story revision commit path, so exposing those names would
-overstate semantics.
+`Document::text` preserves stored source text. `body_text::Snapshot` also
+projects ordinary main-story paragraphs as stored, accepted, or rejected text.
+Its source-checked transaction permits only a same-UTF-16-length replacement
+inside one Unicode piece, leaving CLX, FKP, PLCF, FIB, and table-stream bytes
+unchanged; compressed/cross-piece, structural, and tracked-text paragraphs are
+typed refusals rather than approximate DOC rewrites. Paragraph selection uses
+the format-neutral `litchi_core::Position`, with collection resolution returning
+a typed not-found refusal.
 
 ## Core Word binary document model
 
@@ -87,7 +91,7 @@ overstate semantics.
 | Feature family | Status | Read | Write | Notes |
 |----------------|--------|------|-------|-------|
 | CP, PLC, STTB, SPRM/PRL, and property storage primitives | ✅ | ✅ | ✅ | [MS-DOC] 2.2 defines character positions, piece and property storage, string tables, and single-property modifiers used by the typed model |
-| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable |
+| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds a source-checked reversible replacement seam for one same-shape ordinary Unicode body paragraph; anything requiring a piece/FKP/PLCF rewrite remains a typed refusal. |
 | Main, footnote, endnote, header, comment, textbox, and header-textbox parts | ✅ | ✅ | ✅ | [MS-DOC] 2.3 story ranges and the corresponding PLCs are exposed through typed document, note, comment, header/footer, picture, shape, and textbox APIs |
 | Bookmark PLCs and names | ✅ | ✅ | ✅ | Range and point bookmarks are typed and editable, including repair/validation behavior for malformed ranges |
 | Field PLCs and non-Plcfld text-only fields | ✅ | ✅ | ✅ | Native field delimiters, instruction/result text, marker positions, nesting, and the five text-only field families are reconstructed and authored with balanced graphs |

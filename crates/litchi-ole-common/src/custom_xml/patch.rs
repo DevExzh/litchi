@@ -112,6 +112,10 @@ impl Patch {
     }
 
     /// Apply the patch only to its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` is not this patch's exact base snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !source.same_source(&self.before) {
             return Err(super::model::invalid(
@@ -122,6 +126,11 @@ impl Patch {
     }
 
     /// Revert the patch only from its exact replacement snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `target` is not this patch's exact replacement
+    /// snapshot.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(target)
     }

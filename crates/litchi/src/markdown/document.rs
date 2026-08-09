@@ -31,7 +31,15 @@ pub(crate) fn resolve_docx_lists(
             resource: "Markdown DOCX list metadata",
             source,
         })?;
-    for (_, item) in elements {
+    for (element, item) in elements {
+        if let crate::docx::Element::Unknown(block) = element {
+            if crate::document::docx_unknown_is_section_properties(&block) {
+                continue;
+            }
+            return Err(Error::Unsupported(
+                "Markdown export cannot preserve an active unmodeled DOCX body block".to_owned(),
+            ));
+        }
         let Some(item) = item else {
             resolved.push(None);
             continue;

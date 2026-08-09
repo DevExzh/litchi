@@ -134,6 +134,11 @@ impl Targets {
         self.targets.is_empty()
     }
 
+    #[must_use]
+    pub(crate) fn into_vec(self) -> Vec<Target> {
+        self.targets
+    }
+
     /// Finds a target by its host-owned semantic key.
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&Target> {

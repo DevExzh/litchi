@@ -93,8 +93,16 @@ fn flat_axis_transaction_is_lossless_source_checked_and_reversible() {
     let output = std::str::from_utf8(commit.snapshot().as_bytes()).unwrap();
     assert!(output.contains("style:name=\"keep-me\""));
     assert!(output.contains("<text:p>Revenue</text:p>"));
+    assert!(!output.contains(">\n<"));
+    assert!(!output.contains(">\r\n<"));
     assert!(commit.snapshot().find_axis("renamed-x").is_some());
     assert!(source.find_axis("primary-x").is_some());
+    assert!(commit.patch().is_applicable_to(&source));
+
+    let unrelated =
+        FlatChart::from_bytes(ODC.replace("keep-me", "also-kept").into_bytes()).unwrap();
+    assert!(!commit.patch().is_applicable_to(&unrelated));
+    assert!(commit.patch().apply(&unrelated).is_err());
 
     let inverse = commit.patch().inverse();
     let restored = inverse.apply(commit.snapshot()).unwrap();

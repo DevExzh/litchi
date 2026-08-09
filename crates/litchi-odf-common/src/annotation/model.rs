@@ -1,4 +1,4 @@
-//! Semantic ODF annotation values and contextual rich-content operations.
+//! Semantic `ODF` annotation values and contextual rich-content operations.
 
 use super::package::MAX_ANNOTATION_BODY_ELEMENTS;
 use litchi_core::{Error, Result};
@@ -9,13 +9,13 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum Node {
     /// Character data. It is always XML-escaped when serialized.
     Text(String),
-    /// A nested ODF text or extension element.
+    /// A nested `ODF` text or extension element.
     Element(Element),
 }
 
-/// A lossless, ordered XML element within an ODF annotation.
+/// A lossless, ordered `XML` element within an `ODF` annotation.
 ///
-/// This representation is intentionally generic: ODF permits the full text
+/// This representation is intentionally generic: `ODF` permits the full text
 /// paragraph and list content model in annotations, including spans, links,
 /// fields, tabs, line breaks, and implementation-defined extension elements.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -27,8 +27,12 @@ pub struct Element {
 
 impl Element {
     /// Create an annotation content element with a validated XML qualified name.
-    pub fn new(name: impl Into<String>) -> Result<Self> {
-        let name = name.into();
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the name is not a valid XML qualified name.
+    pub fn new(qualified_name: impl Into<String>) -> Result<Self> {
+        let name = qualified_name.into();
         validate_qname(&name)?;
         Ok(Self {
             name,
@@ -37,28 +41,36 @@ impl Element {
         })
     }
 
-    /// Return the element's qualified XML name, such as text:span.
+    /// Return the element's qualified XML name, such as `text:span`.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Return all attributes in deterministic qualified-name order.
+    #[must_use]
     pub fn attributes(&self) -> &BTreeMap<String, String> {
         &self.attributes
     }
 
     /// Return an attribute value by qualified name.
+    #[must_use]
     pub fn attribute(&self, name: &str) -> Option<&str> {
         self.attributes.get(name).map(String::as_str)
     }
 
     /// Set an escaped attribute after validating its XML qualified name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the attribute name is not valid or attempts to
+    /// manage a namespace declaration.
     pub fn set_attribute(
         &mut self,
-        name: impl Into<String>,
+        qualified_name: impl Into<String>,
         value: impl Into<String>,
     ) -> Result<&mut Self> {
-        let name = name.into();
+        let name = qualified_name.into();
         validate_qname(&name)?;
         if name == "xmlns" || name.starts_with("xmlns:") {
             return Err(Error::InvalidFormat(
@@ -75,6 +87,7 @@ impl Element {
     }
 
     /// Return the ordered mixed-content nodes.
+    #[must_use]
     pub fn children(&self) -> &[Node] {
         &self.children
     }
@@ -92,6 +105,7 @@ impl Element {
     }
 
     /// Extract the rendered plain text represented by this element.
+    #[must_use]
     pub fn plain_text(&self) -> String {
         let local_name = local_name(&self.name);
         if local_name == "s" {
@@ -154,10 +168,9 @@ pub struct Annotation {
 }
 
 impl Annotation {
-    /// Create a plain-text annotation containing one text:p element.
+    /// Create a plain-text annotation containing one `text:p` element.
     pub fn new(text: impl Into<String>) -> Self {
-        let mut paragraph =
-            Element::new("text:p").expect("the built-in text:p qualified name is valid");
+        let mut paragraph = built_in_element("text:p");
         paragraph.push_text(text);
         Self {
             attributes: BTreeMap::new(),
@@ -167,23 +180,30 @@ impl Annotation {
     }
 
     /// Return all annotation attributes, including drawing layout attributes.
+    #[must_use]
     pub fn attributes(&self) -> &BTreeMap<String, String> {
         &self.attributes
     }
 
     /// Return namespace bindings retained for extension content.
+    #[must_use]
     pub fn namespaces(&self) -> &BTreeMap<String, String> {
         &self.namespaces
     }
 
     /// Add a namespace binding for custom rich-content elements or attributes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid prefix, an empty URI, or a standard
+    /// prefix bound to the wrong URI.
     pub fn set_namespace(
         &mut self,
-        prefix: impl Into<String>,
-        uri: impl Into<String>,
+        prefix_input: impl Into<String>,
+        uri_input: impl Into<String>,
     ) -> Result<&mut Self> {
-        let prefix = prefix.into();
-        let uri = uri.into();
+        let prefix = prefix_input.into();
+        let uri = uri_input.into();
         if prefix.contains(':') || !valid_name_part(&prefix) || prefix == "xmlns" {
             return Err(Error::InvalidFormat(format!(
                 "invalid XML namespace prefix '{prefix}'"
@@ -214,6 +234,7 @@ impl Annotation {
     }
 
     /// Return an annotation attribute by qualified name.
+    #[must_use]
     pub fn attribute(&self, name: &str) -> Option<&str> {
         self.attributes
             .get(name)
@@ -224,13 +245,18 @@ impl Annotation {
             .map(String::as_str)
     }
 
-    /// Set any ODF annotation, drawing, SVG, text, or extension attribute.
+    /// Set any `ODF` annotation, drawing, `SVG`, text, or extension attribute.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the attribute name is not valid or attempts to
+    /// manage a namespace declaration.
     pub fn set_attribute(
         &mut self,
-        name: impl Into<String>,
+        qualified_name: impl Into<String>,
         value: impl Into<String>,
     ) -> Result<&mut Self> {
-        let name = name.into();
+        let name = qualified_name.into();
         validate_qname(&name)?;
         if name == "xmlns" || name.starts_with("xmlns:") {
             return Err(Error::InvalidFormat(
@@ -251,6 +277,7 @@ impl Annotation {
     }
 
     /// Return the optional office:name identifier.
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.attribute("office:name")
     }
@@ -262,6 +289,7 @@ impl Annotation {
     }
 
     /// Return the optional requested display state.
+    #[must_use]
     pub fn display(&self) -> Option<bool> {
         match self.attribute("office:display") {
             Some("true" | "1") => Some(true),
@@ -287,6 +315,7 @@ impl Annotation {
     }
 
     /// Return the annotation author from dc:creator, if present.
+    #[must_use]
     pub fn creator(&self) -> Option<String> {
         self.metadata_text("creator")
             .or_else(|| self.attribute("office:author").map(str::to_string))
@@ -298,6 +327,7 @@ impl Annotation {
     }
 
     /// Return the machine-readable dc:date, if present.
+    #[must_use]
     pub fn date(&self) -> Option<String> {
         self.metadata_text("date")
             .or_else(|| self.attribute("office:create-date").map(str::to_string))
@@ -309,6 +339,7 @@ impl Annotation {
     }
 
     /// Return the human-readable meta:date-string, if present.
+    #[must_use]
     pub fn date_string(&self) -> Option<String> {
         self.metadata_text("date-string").or_else(|| {
             self.attribute("office:create-date-string")
@@ -321,8 +352,9 @@ impl Annotation {
         self.set_metadata("meta:date-string", date, 3);
     }
 
-    /// Return ODF 1.3 meta:creator-initials, including LibreOffice's legacy
-    /// text:sender-initials and loext:sender-initials spellings.
+    /// Return `ODF` 1.3 `meta:creator-initials`, including `LibreOffice`'s legacy
+    /// `text:sender-initials` and `loext:sender-initials` spellings.
+    #[must_use]
     pub fn initials(&self) -> Option<String> {
         self.children
             .iter()
@@ -335,17 +367,16 @@ impl Annotation {
             .map(Element::plain_text)
     }
 
-    /// Set or clear canonical ODF 1.3 meta:creator-initials metadata.
-    pub fn set_initials(&mut self, initials: Option<&str>) {
+    /// Set or clear canonical `ODF` 1.3 `meta:creator-initials` metadata.
+    pub fn set_initials(&mut self, value: Option<&str>) {
         self.children.retain(|child| {
             !matches!(
                 local_name(child.name()),
                 "creator-initials" | "sender-initials"
             )
         });
-        let Some(initials) = initials else { return };
-        let mut element = Element::new("meta:creator-initials")
-            .expect("the built-in creator-initials name is valid");
+        let Some(initials) = value else { return };
+        let mut element = built_in_element("meta:creator-initials");
         element.push_text(initials);
         let insertion = self
             .children
@@ -356,11 +387,13 @@ impl Annotation {
     }
 
     /// Return all ordered child elements, including metadata and rich content.
+    #[must_use]
     pub fn children(&self) -> &[Element] {
         &self.children
     }
 
     /// Return the rich body elements without creator/date/initials metadata.
+    #[must_use]
     pub fn body_elements(&self) -> Vec<&Element> {
         self.children
             .iter()
@@ -369,6 +402,11 @@ impl Annotation {
     }
 
     /// Replace the rich body while retaining typed metadata and its schema order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the body exceeds the annotation element limit or
+    /// refers to an undeclared namespace.
     pub fn replace_body(&mut self, body: Vec<Element>) -> Result<&mut Self> {
         if body.len() > MAX_ANNOTATION_BODY_ELEMENTS {
             return Err(Error::InvalidFormat(
@@ -389,8 +427,7 @@ impl Annotation {
 
     /// Append a plain-text paragraph.
     pub fn push_paragraph(&mut self, text: impl Into<String>) -> &mut Self {
-        let mut paragraph =
-            Element::new("text:p").expect("the built-in text:p qualified name is valid");
+        let mut paragraph = built_in_element("text:p");
         paragraph.push_text(text);
         self.children.push(paragraph);
         self
@@ -403,6 +440,7 @@ impl Annotation {
     }
 
     /// Extract annotation body text, separating top-level paragraphs/list blocks.
+    #[must_use]
     pub fn text(&self) -> String {
         self.children
             .iter()
@@ -413,6 +451,11 @@ impl Annotation {
     }
 
     /// Validate namespace bindings before serializing this annotation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an element or attribute uses an undeclared `XML`
+    /// namespace prefix.
     pub fn validate(&self) -> Result<()> {
         let mut used_prefixes = BTreeSet::new();
         for name in self.attributes.keys() {
@@ -467,14 +510,18 @@ impl Annotation {
         })
     }
 
-    fn set_metadata(&mut self, name: &str, value: Option<&str>, order: usize) {
-        let local = local_name(name);
+    fn set_metadata(
+        &mut self,
+        metadata_name: &'static str,
+        metadata_value: Option<&str>,
+        order: usize,
+    ) {
+        let local = local_name(metadata_name);
         self.children
             .retain(|child| local_name(child.name()) != local);
-        let Some(value) = value else { return };
+        let Some(value) = metadata_value else { return };
 
-        let mut element =
-            Element::new(name).expect("built-in annotation metadata qualified names are valid");
+        let mut element = built_in_element(metadata_name);
         element.push_text(value);
         let insertion = self
             .children
@@ -491,12 +538,20 @@ impl Default for Annotation {
     }
 }
 
+fn built_in_element(name: &'static str) -> Element {
+    Element {
+        name: name.to_string(),
+        attributes: BTreeMap::new(),
+        children: Vec::new(),
+    }
+}
+
 fn set_optional_attribute(
     attributes: &mut BTreeMap<String, String>,
     name: &str,
-    value: Option<&str>,
+    attribute_value: Option<&str>,
 ) {
-    if let Some(value) = value {
+    if let Some(value) = attribute_value {
         attributes.insert(name.to_string(), value.to_string());
     } else {
         attributes.remove(name);

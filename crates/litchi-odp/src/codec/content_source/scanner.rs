@@ -82,7 +82,9 @@ impl<'input> Scanner<'input> {
                 })?;
                 (namespace_of(&resolved), event)
             };
-            let end = self.reader.buffer_position() as usize;
+            let end = usize::try_from(self.reader.buffer_position()).map_err(|_error| {
+                invalid("presentation content.xml position exceeds platform limits")
+            })?;
             match event {
                 Event::Start(element) => {
                     let start = event_start(self.xml, end)?;
@@ -90,9 +92,9 @@ impl<'input> Scanner<'input> {
                     if self.stack.is_empty() {
                         self.collect_root_namespaces(&element)?;
                     }
-                    self.on_open(&namespace, &local, start, end, false)?;
+                    self.on_open(namespace.as_ref(), &local, start, end, false)?;
                     if self.styles_depth.is_some()
-                        && is(&namespace, &local, STYLE_NAMESPACE, STYLE_ELEMENT)
+                        && is(namespace.as_ref(), &local, STYLE_NAMESPACE, STYLE_ELEMENT)
                     {
                         self.record_style_name(&element)?;
                     }
@@ -111,12 +113,12 @@ impl<'input> Scanner<'input> {
                     let start = event_start(self.xml, end)?;
                     let local = element.local_name().as_ref().to_vec();
                     if self.styles_depth.is_some()
-                        && is(&namespace, &local, STYLE_NAMESPACE, STYLE_ELEMENT)
+                        && is(namespace.as_ref(), &local, STYLE_NAMESPACE, STYLE_ELEMENT)
                     {
                         self.record_style_name(&element)?;
                     }
-                    self.on_open(&namespace, &local, start, end, true)?;
-                    self.on_close(&namespace, &local, start, start, end);
+                    self.on_open(namespace.as_ref(), &local, start, end, true)?;
+                    self.on_close(namespace.as_ref(), &local, start, start, end);
                 },
                 Event::End(_) => {
                     let close_start = event_start(self.xml, end)?;
@@ -125,7 +127,7 @@ impl<'input> Scanner<'input> {
                         .pop()
                         .ok_or_else(|| invalid("presentation content.xml depth underflow"))?;
                     self.on_close(
-                        &frame.namespace,
+                        frame.namespace.as_ref(),
                         &frame.local,
                         frame.start,
                         close_start,
@@ -133,7 +135,13 @@ impl<'input> Scanner<'input> {
                     );
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
         if !self.stack.is_empty() {
@@ -145,7 +153,7 @@ impl<'input> Scanner<'input> {
     /// Handle an element start, or the start half of an empty element.
     fn on_open(
         &mut self,
-        namespace: &Option<Vec<u8>>,
+        namespace: Option<&Vec<u8>>,
         local: &[u8],
         start: usize,
         end: usize,
@@ -230,7 +238,7 @@ impl<'input> Scanner<'input> {
     /// empty elements.
     fn on_close(
         &mut self,
-        namespace: &Option<Vec<u8>>,
+        namespace: Option<&Vec<u8>>,
         local: &[u8],
         open_start: usize,
         close_start: usize,
@@ -267,8 +275,8 @@ impl<'input> Scanner<'input> {
 
     /// Record every namespace binding declared on the root element.
     fn collect_root_namespaces(&mut self, element: &BytesStart<'_>) -> Result<()> {
-        for attribute in element.attributes() {
-            let attribute = attribute.map_err(|error| {
+        for raw_attribute in element.attributes() {
+            let attribute = raw_attribute.map_err(|error| {
                 invalid(format!(
                     "invalid office:document-content attribute: {error}"
                 ))
@@ -297,9 +305,9 @@ impl<'input> Scanner<'input> {
                 "presentation content.xml declares more than {MAX_STYLE_NAMES} automatic styles"
             )));
         }
-        for attribute in element.attributes() {
-            let attribute =
-                attribute.map_err(|error| invalid(format!("invalid style attribute: {error}")))?;
+        for raw_attribute in element.attributes() {
+            let attribute = raw_attribute
+                .map_err(|error| invalid(format!("invalid style attribute: {error}")))?;
             let (namespace, local) = self.reader.resolver().resolve_attribute(attribute.key);
             if local.as_ref() != STYLE_NAME_ATTRIBUTE
                 || !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == STYLE_NAMESPACE)
@@ -331,7 +339,7 @@ impl<'input> Scanner<'input> {
         }
         let tail_start = match styles_site {
             AutomaticStylesSite::Empty { span, .. } => span.end,
-            _ => splice,
+            AutomaticStylesSite::Content | AutomaticStylesSite::Missing => splice,
         };
         Some(ContentSource {
             xml: xml.to_owned(),
@@ -362,7 +370,7 @@ impl<'input> Scanner<'input> {
 }
 
 /// Whether a presentation child is rebuilt from the typed model on save.
-fn is_regenerated_child(namespace: &Option<Vec<u8>>, local: &[u8]) -> bool {
+fn is_regenerated_child(namespace: Option<&Vec<u8>>, local: &[u8]) -> bool {
     if is(namespace, local, PRESENTATION_NAMESPACE, SETTINGS_ELEMENT) {
         return true;
     }
@@ -381,15 +389,15 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
 fn namespace_of(resolved: &ResolveResult<'_>) -> Option<Vec<u8>> {
     match resolved {
         ResolveResult::Bound(Namespace(uri)) => Some(uri.to_vec()),
-        _ => None,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
     }
 }
 
 fn is(
-    namespace: &Option<Vec<u8>>,
+    namespace: Option<&Vec<u8>>,
     local: &[u8],
     expected_uri: &[u8],
     expected_local: &str,
 ) -> bool {
-    namespace.as_deref() == Some(expected_uri) && local == expected_local.as_bytes()
+    namespace.map(Vec::as_slice) == Some(expected_uri) && local == expected_local.as_bytes()
 }

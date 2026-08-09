@@ -7,13 +7,90 @@ use super::model::{
     PropertyBagStringEncoding, Type,
 };
 
+struct Cursor<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> Cursor<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, offset: 0 }
+    }
+
+    fn remaining(&self) -> usize {
+        self.data.len() - self.offset
+    }
+
+    fn bytes(&mut self, count: usize, name: &str) -> Result<&'a [u8], Error> {
+        let end = self
+            .offset
+            .checked_add(count)
+            .ok_or_else(|| Error::new(format!("{name} offset overflows")))?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or_else(|| Error::new(format!("{name} is truncated")))?;
+        self.offset = end;
+        Ok(bytes)
+    }
+
+    fn u16(&mut self, name: &str) -> Result<u16, Error> {
+        let bytes = self.bytes(2, name)?;
+        Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
+    }
+
+    fn u32(&mut self, name: &str) -> Result<u32, Error> {
+        let bytes = self.bytes(4, name)?;
+        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+    }
+
+    fn pb_string(&mut self, ansi: Ansi) -> Result<PropertyBagString, Error> {
+        let header = self.u16("PBString header")?;
+        let count = usize::from(header & 0x7fff);
+        let encoding = if header & 0x8000 != 0 {
+            PropertyBagStringEncoding::Ansi
+        } else {
+            PropertyBagStringEncoding::Utf16
+        };
+        let byte_count = match encoding {
+            PropertyBagStringEncoding::Ansi => count,
+            PropertyBagStringEncoding::Utf16 => count
+                .checked_mul(2)
+                .ok_or_else(|| Error::new("PBString size overflows"))?,
+        };
+        let bytes = self.bytes(byte_count, "PBString")?;
+        let value = match encoding {
+            PropertyBagStringEncoding::Ansi => ansi
+                .decode(bytes)
+                .map_err(|error| Error::new(format!("PBString ANSI decoding failed: {error}")))?
+                .into_owned(),
+            PropertyBagStringEncoding::Utf16 => {
+                let units = bytes
+                    .chunks_exact(2)
+                    .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                    .collect::<Vec<_>>();
+                String::from_utf16(&units)
+                    .map_err(|_utf16_error| Error::new("PBString contains invalid UTF-16"))?
+            },
+        };
+        if value.contains('\0') {
+            return Err(Error::new("PBString contains an embedded NUL character"));
+        }
+        Ok(PropertyBagString { value, encoding })
+    }
+}
+
 impl PropertyBagStore {
     /// Parse a store prefix and return the number of bytes consumed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `data` is malformed or exceeds `limits`.
     pub fn parse_prefix(data: &[u8], ansi: Ansi, limits: Limits) -> Result<(Self, usize), Error> {
         let mut cursor = Cursor::new(data);
-        let type_count = cursor.u32("smart-tag type count")?;
+        let encoded_type_count = cursor.u32("smart-tag type count")?;
         let type_count = bounded_count(
-            type_count,
+            encoded_type_count,
             cursor.remaining(),
             14,
             limits.max_types,
@@ -23,7 +100,7 @@ impl PropertyBagStore {
         let mut type_ids = HashSet::with_capacity(type_count);
         for _ in 0..type_count {
             let size = usize::try_from(cursor.u32("FactoidType size")?)
-                .map_err(|_| Error::new("FactoidType size overflows usize"))?;
+                .map_err(|_conversion_error| Error::new("FactoidType size overflows usize"))?;
             let end = cursor
                 .offset
                 .checked_add(size)
@@ -32,7 +109,7 @@ impl PropertyBagStore {
                 return Err(Error::new("FactoidType is truncated"));
             }
             let id = u16::try_from(cursor.u32("FactoidType id")?)
-                .map_err(|_| Error::new("FactoidType id exceeds 0xFFFF"))?;
+                .map_err(|_conversion_error| Error::new("FactoidType id exceeds 0xFFFF"))?;
             let namespace_uri = cursor.pb_string(ansi)?;
             let tag_name = cursor.pb_string(ansi)?;
             let download_url = cursor.pb_string(ansi)?;
@@ -62,9 +139,9 @@ impl PropertyBagStore {
             ));
         }
         let reserved_factoid_count = cursor.u32("property-bag reserved value")?;
-        let string_count = cursor.u32("smart-tag string count")?;
+        let encoded_string_count = cursor.u32("smart-tag string count")?;
         let string_count = bounded_count(
-            string_count,
+            encoded_string_count,
             cursor.remaining(),
             2,
             limits.max_strings,
@@ -87,11 +164,13 @@ impl PropertyBagStore {
     }
 
     /// Resolve a declared type by its stable 16-bit identifier.
+    #[must_use]
     pub fn tag_type(&self, id: u16) -> Option<&Type> {
         self.types.iter().find(|kind| kind.id == id)
     }
 
     /// Resolve a string-table index.
+    #[must_use]
     pub fn string(&self, index: u32) -> Option<&str> {
         self.strings
             .get(usize::try_from(index).ok()?)
@@ -99,6 +178,7 @@ impl PropertyBagStore {
     }
 
     /// Resolve both strings referenced by a property.
+    #[must_use]
     pub fn resolve_property(&self, property: Property) -> Option<(&str, &str)> {
         Some((
             self.string(property.key_index)?,
@@ -107,6 +187,10 @@ impl PropertyBagStore {
     }
 
     /// Serialize the shared store without any format-specific property bags.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store cannot be encoded with its ANSI page.
     pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         self.to_bytes_with_bags(&[])
     }
@@ -115,11 +199,16 @@ impl PropertyBagStore {
     ///
     /// ANSI strings are encoded with [`Self::ansi`]; values that are not
     /// representable are rejected instead of being replaced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store or a bag is invalid, or a string cannot
+    /// be represented with the configured ANSI page.
     pub fn to_bytes_with_bags(&self, bags: &[PropertyBag]) -> Result<Vec<u8>, Error> {
         let type_count = u32::try_from(self.types.len())
-            .map_err(|_| Error::new("smart-tag type count exceeds u32"))?;
+            .map_err(|_conversion_error| Error::new("smart-tag type count exceeds u32"))?;
         let string_count = u32::try_from(self.strings.len())
-            .map_err(|_| Error::new("smart-tag string count exceeds u32"))?;
+            .map_err(|_conversion_error| Error::new("smart-tag string count exceeds u32"))?;
         let mut type_ids = HashSet::with_capacity(self.types.len());
         let mut output = Vec::new();
         output.extend_from_slice(&type_count.to_le_bytes());
@@ -134,7 +223,7 @@ impl PropertyBagStore {
             append_pb_string(&mut payload, &kind.tag_name, self.ansi)?;
             append_pb_string(&mut payload, &kind.download_url, self.ansi)?;
             let payload_len = u32::try_from(payload.len())
-                .map_err(|_| Error::new("FactoidType payload exceeds u32"))?;
+                .map_err(|_conversion_error| Error::new("FactoidType payload exceeds u32"))?;
             output.extend_from_slice(&payload_len.to_le_bytes());
             output.extend_from_slice(&payload);
         }
@@ -151,8 +240,10 @@ impl PropertyBagStore {
                     "PropertyBag references an unknown smart-tag type",
                 ));
             }
-            let property_count = u16::try_from(bag.properties.len())
-                .map_err(|_| Error::new("PropertyBag contains more than 65535 properties"))?;
+            let property_count =
+                u16::try_from(bag.properties.len()).map_err(|_conversion_error| {
+                    Error::new("PropertyBag contains more than 65535 properties")
+                })?;
             output.extend_from_slice(&bag.type_id.to_le_bytes());
             output.extend_from_slice(&property_count.to_le_bytes());
             output.extend_from_slice(&0u16.to_le_bytes());
@@ -170,6 +261,11 @@ impl PropertyBagStore {
     }
 
     /// Parse an exact number of property bags from `data`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bags are malformed, have trailing bytes, or
+    /// exceed `limits`.
     pub fn parse_bags(
         &self,
         data: &[u8],
@@ -194,6 +290,10 @@ impl PropertyBagStore {
     }
 
     /// Parse property bags until `data` is exhausted, as used by MS-DOC.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a bag is malformed or the payload exceeds `limits`.
     pub fn parse_bags_to_end(
         &self,
         data: &[u8],
@@ -293,91 +393,18 @@ fn append_pb_string(
 }
 
 fn bounded_count(
-    value: u32,
+    encoded_count: u32,
     remaining: usize,
     item_minimum: usize,
     configured_maximum: usize,
     name: &str,
 ) -> Result<usize, Error> {
-    let value =
-        usize::try_from(value).map_err(|_| Error::new(format!("{name} overflows usize")))?;
-    if value > configured_maximum || value > remaining / item_minimum {
+    let count = usize::try_from(encoded_count)
+        .map_err(|_conversion_error| Error::new(format!("{name} overflows usize")))?;
+    if count > configured_maximum || count > remaining / item_minimum {
         return Err(Error::new(format!(
             "{name} exceeds the configured or encoded limit"
         )));
     }
-    Ok(value)
-}
-
-struct Cursor<'a> {
-    data: &'a [u8],
-    offset: usize,
-}
-
-impl<'a> Cursor<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        Self { data, offset: 0 }
-    }
-
-    fn remaining(&self) -> usize {
-        self.data.len() - self.offset
-    }
-
-    fn bytes(&mut self, count: usize, name: &str) -> Result<&'a [u8], Error> {
-        let end = self
-            .offset
-            .checked_add(count)
-            .ok_or_else(|| Error::new(format!("{name} offset overflows")))?;
-        let bytes = self
-            .data
-            .get(self.offset..end)
-            .ok_or_else(|| Error::new(format!("{name} is truncated")))?;
-        self.offset = end;
-        Ok(bytes)
-    }
-
-    fn u16(&mut self, name: &str) -> Result<u16, Error> {
-        let bytes = self.bytes(2, name)?;
-        Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
-    }
-
-    fn u32(&mut self, name: &str) -> Result<u32, Error> {
-        let bytes = self.bytes(4, name)?;
-        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
-    }
-
-    fn pb_string(&mut self, ansi: Ansi) -> Result<PropertyBagString, Error> {
-        let header = self.u16("PBString header")?;
-        let count = usize::from(header & 0x7fff);
-        let encoding = if header & 0x8000 != 0 {
-            PropertyBagStringEncoding::Ansi
-        } else {
-            PropertyBagStringEncoding::Utf16
-        };
-        let byte_count = match encoding {
-            PropertyBagStringEncoding::Ansi => count,
-            PropertyBagStringEncoding::Utf16 => count
-                .checked_mul(2)
-                .ok_or_else(|| Error::new("PBString size overflows"))?,
-        };
-        let bytes = self.bytes(byte_count, "PBString")?;
-        let value = match encoding {
-            PropertyBagStringEncoding::Ansi => ansi
-                .decode(bytes)
-                .map_err(|error| Error::new(format!("PBString ANSI decoding failed: {error}")))?
-                .into_owned(),
-            PropertyBagStringEncoding::Utf16 => {
-                let units = bytes
-                    .chunks_exact(2)
-                    .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-                    .collect::<Vec<_>>();
-                String::from_utf16(&units)
-                    .map_err(|_| Error::new("PBString contains invalid UTF-16"))?
-            },
-        };
-        if value.contains('\0') {
-            return Err(Error::new("PBString contains an embedded NUL character"));
-        }
-        Ok(PropertyBagString { value, encoding })
-    }
+    Ok(count)
 }

@@ -29,6 +29,7 @@ pub struct ViewBox {
 }
 
 impl ViewBox {
+    #[must_use]
     pub const fn new(min_x: i64, min_y: i64, width: i64, height: i64) -> Self {
         Self {
             min_x,
@@ -51,9 +52,11 @@ impl FromStr for ViewBox {
             if component.contains('.') || component.contains('e') || component.contains('E') {
                 return invalid(format!("invalid svg:viewBox integer '{component}'"));
             }
-            component
-                .parse::<i64>()
-                .map_err(|_| make_error(format!("invalid svg:viewBox integer '{component}'")))
+            component.parse::<i64>().map_err(|error| {
+                make_error(format!(
+                    "invalid svg:viewBox integer '{component}': {error}"
+                ))
+            })
         };
         let result = Self::new(next()?, next()?, next()?, next()?);
         if values.next().is_some() {
@@ -81,12 +84,18 @@ impl fmt::Display for ViewBox {
 pub struct PathData(String);
 
 impl PathData {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the path data exceeds its bound or contains
+    /// XML-prohibited text.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_text(&value, "svg:d", true, MAX_PATH_BYTES)?;
-        Ok(Self(value))
+        let path_data = value.into();
+        validate_text(&path_data, "svg:d", true, MAX_PATH_BYTES)?;
+        Ok(Self(path_data))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -116,6 +125,10 @@ pub struct Definition {
 }
 
 impl Definition {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the marker metadata or path data is invalid.
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "draw:name", false, MAX_VALUE_BYTES)?;
         if let Some(display_name) = &self.display_name {
@@ -124,6 +137,10 @@ impl Definition {
         validate_text(self.path_data.as_str(), "svg:d", true, MAX_PATH_BYTES)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the marker fails validation.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(192 + self.path_data.as_str().len());
@@ -139,10 +156,16 @@ pub struct Collection {
 }
 
 impl Collection {
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Definition> {
         self.markers.iter().find(|marker| marker.name == name)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a marker is invalid, names are duplicated, or a
+    /// bounded aggregate limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         if self.markers.len() > MAX_MARKERS {
             return invalid(format!("drawing styles exceed {MAX_MARKERS} markers"));
@@ -169,6 +192,10 @@ impl Collection {
     }
 
     /// Serialize a standalone schema-positioned `office:styles` fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection fails validation.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
         let capacity = self.markers.iter().fold(192usize, |size, marker| {
@@ -209,6 +236,11 @@ struct ActiveDefinition {
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse marker resources from an ODF styles or flat-document XML part.
+///
+/// # Errors
+///
+/// Returns an error if the XML is malformed, uses invalid namespaced content,
+/// or violates a bounded marker resource rule.
 pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
     if !xml.contains("marker") {
         return Ok(Collection::default());
@@ -275,9 +307,10 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "marker" {
                         return invalid("unexpected drawing marker end element");
                     }
-                    result
-                        .markers
-                        .push(active.take().expect("active marker checked").value);
+                    let marker = active.take().ok_or_else(|| {
+                        make_error("drawing marker ended without an active definition")
+                    })?;
+                    result.markers.push(marker.value);
                 }
             },
             Event::Text(ref text) if active.is_some() => {
@@ -295,7 +328,11 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
                 return invalid("DTDs and processing instructions are prohibited in marker XML");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -341,12 +378,12 @@ fn attributes(
     aggregate: &mut usize,
 ) -> Result<Attributes> {
     let mut values = HashMap::new();
-    for attribute in element.attributes().with_checks(true) {
-        let attribute =
-            attribute.map_err(|error| make_error(format!("invalid marker attribute: {error}")))?;
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+    for attribute_result in element.attributes().with_checks(true) {
+        let attribute = attribute_result
+            .map_err(|error| make_error(format!("invalid marker attribute: {error}")))?;
+        let (resolved, raw_local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_kind(&resolved)?;
-        let local = decode(local.as_ref(), "attribute name")?;
+        let local = decode(raw_local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|error| make_error(format!("invalid marker attribute: {error}")))?
@@ -488,7 +525,7 @@ fn escape_xml(output: &mut String, value: &str) {
 fn decode(value: &[u8], what: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| make_error(format!("invalid UTF-8 in marker {what}")))
+        .map_err(|error| make_error(format!("invalid UTF-8 in marker {what}: {error}")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

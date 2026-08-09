@@ -29,7 +29,7 @@ impl Package {
                 .root_entry()
                 .map(directory::decode)
                 .transpose()?
-                .and_then(|metadata| metadata.class_id()),
+                .and_then(directory::Metadata::class_id),
             storages: Vec::new(),
             streams: Vec::new(),
         };
@@ -48,8 +48,8 @@ impl Package {
                 "object target path exceeds storage depth limit".into(),
             ));
         }
-        let target = target.resolve(ole)?;
-        let storage = find_storage(ole, target.path())?;
+        let resolved_target = target.resolve(ole)?;
+        let storage = find_storage(ole, resolved_target.path())?;
         let mut package = Self {
             sector_size: ole.sector_size(),
             root_clsid: storage.class_id(),
@@ -57,8 +57,15 @@ impl Package {
             streams: Vec::new(),
         };
         let mut budget = Budget::new(limits.max_streams_per_object, limits.max_object_size);
-        capture_subtree(ole, target.path(), &[], &mut package, &mut budget, limits)?;
-        package.object_from_root(target, storage, limits)
+        capture_subtree(
+            ole,
+            resolved_target.path(),
+            &[],
+            &mut package,
+            &mut budget,
+            limits,
+        )?;
+        package.object_from_root(resolved_target, storage, limits)
     }
 
     pub(crate) fn object(&self, target: Target, limits: Limits) -> Result<Object, OleError> {
@@ -152,10 +159,10 @@ impl Package {
             by_path.insert(stream.path(), stream);
         }
         for stream in &mut self.streams {
-            if let Some(previous) = by_path.get(stream.path())
-                && previous.bytes() == stream.bytes()
+            if let Some(cached_stream) = by_path.get(stream.path())
+                && cached_stream.bytes() == stream.bytes()
             {
-                stream.replace_data(previous.bytes_shared());
+                stream.replace_data(cached_stream.bytes_shared());
             }
         }
         Ok(())
@@ -534,8 +541,7 @@ fn find_storage<R: Read + Seek>(ole: &OleFile<R>, path: &[String]) -> Result<Sto
     let metadata = directory::decode(entry)?;
     if metadata.kind() != EntryKind::Storage {
         return Err(OleError::InvalidFormat(format!(
-            "object target path {:?} is not a storage",
-            path
+            "object target path {path:?} is not a storage"
         )));
     }
     Ok(Storage::new(path.to_vec(), metadata))

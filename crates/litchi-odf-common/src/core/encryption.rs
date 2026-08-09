@@ -24,10 +24,10 @@ use std::num::NonZeroU32;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
 
-type Aes192Gcm = AesGcm<Aes192, U12>;
-
 const MAX_PLAINTEXT_ENTRY_SIZE: u64 = 512 * 1024 * 1024;
 const MAX_ENCRYPTED_ENTRY_SIZE: usize = 1024 * 1024 * 1024;
+
+type Aes192Gcm = AesGcm<Aes192, U12>;
 
 /// Cipher used to encrypt ODF package payload entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,6 +85,11 @@ pub struct Profile {
 
 impl Profile {
     /// Build and validate a custom encryption profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cipher key size or KDF parameters exceed the
+    /// supported ODF encryption limits.
     pub fn new(cipher: Cipher, start_key: StartKey, kdf: Kdf) -> Result<Self> {
         let profile = Self {
             cipher,
@@ -96,37 +101,42 @@ impl Profile {
     }
 
     /// AES-256-CBC with SHA-256 and PBKDF2 for broad ODF compatibility.
+    #[must_use]
     pub fn compatible() -> Self {
         Self {
             cipher: Cipher::Aes256Cbc,
             start_key: StartKey::Sha256,
             kdf: Kdf::Pbkdf2 {
-                iterations: NonZeroU32::new(100_000).expect("constant is nonzero"),
+                iterations: NonZeroU32::new(100_000).unwrap_or(NonZeroU32::MIN),
             },
         }
     }
 
     /// AES-256-GCM with SHA-256 and Argon2id for authenticated encryption.
+    #[must_use]
     pub fn authenticated() -> Self {
         Self {
             cipher: Cipher::Aes256Gcm,
             start_key: StartKey::Sha256,
             kdf: Kdf::Argon2id {
-                iterations: NonZeroU32::new(3).expect("constant is nonzero"),
-                memory_kib: NonZeroU32::new(65_536).expect("constant is nonzero"),
-                lanes: NonZeroU32::new(1).expect("constant is nonzero"),
+                iterations: NonZeroU32::new(3).unwrap_or(NonZeroU32::MIN),
+                memory_kib: NonZeroU32::new(65_536).unwrap_or(NonZeroU32::MIN),
+                lanes: NonZeroU32::MIN,
             },
         }
     }
 
+    #[must_use]
     pub fn cipher(self) -> Cipher {
         self.cipher
     }
 
+    #[must_use]
     pub fn start_key(self) -> StartKey {
         self.start_key
     }
 
+    #[must_use]
     pub fn kdf(self) -> Kdf {
         self.kdf
     }
@@ -164,7 +174,7 @@ impl Profile {
             Kdf::Argon2id { .. } if !matches!(key_size, 16 | 24 | 32) => Err(Error::InvalidFormat(
                 "Argon2id derived key size must be 16, 24, or 32 bytes".to_string(),
             )),
-            _ => Ok(()),
+            Kdf::Pbkdf2 { .. } | Kdf::Argon2id { .. } => Ok(()),
         }
     }
 }
@@ -175,7 +185,12 @@ pub(crate) fn encrypt_entry(
     profile: Profile,
 ) -> Result<(Vec<u8>, ManifestEncryption)> {
     profile.validate()?;
-    if plaintext.len() as u64 > MAX_PLAINTEXT_ENTRY_SIZE {
+    let plaintext_length = u64::try_from(plaintext.len()).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "ODF plaintext entry size does not fit u64: {error}"
+        ))
+    })?;
+    if plaintext_length > MAX_PLAINTEXT_ENTRY_SIZE {
         return Err(Error::InvalidFormat(
             "ODF plaintext entry exceeds the supported size limit".to_string(),
         ));
@@ -250,9 +265,9 @@ pub(crate) fn encrypt_entry(
 }
 
 fn fill_random(bytes: &mut [u8], field: &str) -> Result<()> {
-    SysRng.try_fill_bytes(bytes).map_err(|_| {
+    SysRng.try_fill_bytes(bytes).map_err(|error| {
         Error::InvalidFormat(format!(
-            "Operating-system randomness unavailable for ODF {field}"
+            "Operating-system randomness unavailable for ODF {field}: {error}"
         ))
     })
 }
@@ -281,13 +296,20 @@ fn encrypt_compressed(
             let padding = 16 - compressed.len() % 16;
             let mut padded = compressed.to_vec();
             padded.resize(padded.len() + padding, 0);
-            *padded.last_mut().expect("padding is non-empty") = padding as u8;
+            let padding_byte = padded.last_mut().ok_or_else(|| {
+                Error::InvalidFormat("AES-CBC padding unexpectedly has no final byte".to_string())
+            })?;
+            *padding_byte = u8::try_from(padding).map_err(|error| {
+                Error::InvalidFormat(format!("AES-CBC padding length exceeds one byte: {error}"))
+            })?;
             let padded_len = padded.len();
             let encrypted = Encryptor::<$aes>::new_from_slices(key, &iv)
-                .map_err(|_| Error::InvalidFormat("Invalid AES-CBC key or IV".to_string()))?
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("Invalid AES-CBC key or IV: {error}"))
+                })?
                 .encrypt_padded::<NoPadding>(&mut padded, padded_len)
-                .map_err(|_| {
-                    Error::InvalidFormat("Unable to encrypt ODF AES-CBC entry".to_string())
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("Unable to encrypt ODF AES-CBC entry: {error}"))
                 })?
                 .to_vec();
             (encrypted, ManifestEncryptionAlgorithm::$variant { iv })
@@ -298,11 +320,17 @@ fn encrypt_compressed(
             let mut iv = [0_u8; 12];
             fill_random(&mut iv, "initialisation vector")?;
             let cipher = <$aes>::new_from_slice(key)
-                .map_err(|_| Error::InvalidFormat("Invalid AES-GCM key".to_string()))?;
+                .map_err(|error| Error::InvalidFormat(format!("Invalid AES-GCM key: {error}")))?;
             let mut encrypted = iv.to_vec();
-            encrypted.extend(cipher.encrypt(&Nonce::from(iv), compressed).map_err(|_| {
-                Error::InvalidFormat("Unable to encrypt ODF AES-GCM entry".to_string())
-            })?);
+            encrypted.extend(
+                cipher
+                    .encrypt(&Nonce::from(iv), compressed)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "Unable to encrypt ODF AES-GCM entry: {error}"
+                        ))
+                    })?,
+            );
             (encrypted, ManifestEncryptionAlgorithm::$variant { iv })
         }};
     }
@@ -318,16 +346,16 @@ fn encrypt_compressed(
             let mut iv = [0_u8; 8];
             fill_random(&mut iv, "initialisation vector")?;
             (
-                encrypt_blowfish_cfb8(compressed, key, &iv)?,
+                encrypt_blowfish_cfb8(compressed, key, iv)?,
                 ManifestEncryptionAlgorithm::BlowfishCfb8 { iv },
             )
         },
     })
 }
 
-fn encrypt_blowfish_cfb8(plaintext: &[u8], key: &[u8], iv: &[u8; 8]) -> Result<Vec<u8>> {
-    let cipher: Blowfish = Blowfish::new_from_slice(key).map_err(|_| encryption_failure())?;
-    let mut feedback = *iv;
+fn encrypt_blowfish_cfb8(plaintext: &[u8], key: &[u8], iv: [u8; 8]) -> Result<Vec<u8>> {
+    let cipher: Blowfish = Blowfish::new_from_slice(key).map_err(encryption_failure_from)?;
+    let mut feedback = iv;
     let mut ciphertext = Vec::with_capacity(plaintext.len());
     for &byte in plaintext {
         let mut block = Block::<Blowfish>::clone_from_slice(&feedback);
@@ -373,52 +401,52 @@ pub(crate) fn decrypt_entry(
         &descriptor.key_derivation,
         &descriptor.algorithm,
     )?);
-    let key_size = u16::try_from(key.len()).map_err(|_| encryption_failure())?;
+    let key_size = u16::try_from(key.len()).map_err(encryption_failure_from)?;
     if !descriptor.algorithm.accepts_key_size(key_size) {
         return Err(encryption_failure());
     }
     let compressed = match &descriptor.algorithm {
         ManifestEncryptionAlgorithm::Aes128Cbc { iv } => remove_w3c_padding(
             Decryptor::<Aes128>::new_from_slices(key.as_ref(), iv)
-                .map_err(|_| encryption_failure())?
+                .map_err(encryption_failure_from)?
                 .decrypt_padded_vec::<NoPadding>(ciphertext)
-                .map_err(|_| encryption_failure())?,
+                .map_err(encryption_failure_from)?,
         )?,
         ManifestEncryptionAlgorithm::Aes192Cbc { iv } => remove_w3c_padding(
             Decryptor::<Aes192>::new_from_slices(key.as_ref(), iv)
-                .map_err(|_| encryption_failure())?
+                .map_err(encryption_failure_from)?
                 .decrypt_padded_vec::<NoPadding>(ciphertext)
-                .map_err(|_| encryption_failure())?,
+                .map_err(encryption_failure_from)?,
         )?,
         ManifestEncryptionAlgorithm::Aes256Cbc { iv } => remove_w3c_padding(
             Decryptor::<Aes256>::new_from_slices(key.as_ref(), iv)
-                .map_err(|_| encryption_failure())?
+                .map_err(encryption_failure_from)?
                 .decrypt_padded_vec::<NoPadding>(ciphertext)
-                .map_err(|_| encryption_failure())?,
+                .map_err(encryption_failure_from)?,
         )?,
         ManifestEncryptionAlgorithm::Aes128Gcm { iv } => {
             let encrypted = gcm_encrypted_payload(ciphertext, iv)?;
             Aes128Gcm::new_from_slice(key.as_ref())
-                .map_err(|_| encryption_failure())?
+                .map_err(encryption_failure_from)?
                 .decrypt(&Nonce::from(*iv), encrypted)
-                .map_err(|_| encryption_failure())?
+                .map_err(encryption_failure_from)?
         },
         ManifestEncryptionAlgorithm::Aes192Gcm { iv } => {
             let encrypted = gcm_encrypted_payload(ciphertext, iv)?;
             Aes192Gcm::new_from_slice(key.as_ref())
-                .map_err(|_| encryption_failure())?
+                .map_err(encryption_failure_from)?
                 .decrypt(&Nonce::from(*iv), encrypted)
-                .map_err(|_| encryption_failure())?
+                .map_err(encryption_failure_from)?
         },
         ManifestEncryptionAlgorithm::Aes256Gcm { iv } => {
             let encrypted = gcm_encrypted_payload(ciphertext, iv)?;
             Aes256Gcm::new_from_slice(key.as_ref())
-                .map_err(|_| encryption_failure())?
+                .map_err(encryption_failure_from)?
                 .decrypt(&Nonce::from(*iv), encrypted)
-                .map_err(|_| encryption_failure())?
+                .map_err(encryption_failure_from)?
         },
         ManifestEncryptionAlgorithm::BlowfishCfb8 { iv } => {
-            decrypt_blowfish_cfb8(ciphertext, key.as_ref(), iv)?
+            decrypt_blowfish_cfb8(ciphertext, key.as_ref(), *iv)?
         },
     };
 
@@ -435,8 +463,10 @@ pub(crate) fn decrypt_entry(
         return Err(encryption_failure());
     }
 
-    let expected_size = usize::try_from(plaintext_size).map_err(|_| {
-        Error::InvalidFormat("ODF entry size does not fit this platform".to_string())
+    let expected_size = usize::try_from(plaintext_size).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "ODF entry size does not fit this platform: {error}"
+        ))
     })?;
     let mut plaintext = Vec::new();
     plaintext
@@ -447,7 +477,7 @@ pub(crate) fn decrypt_entry(
     DeflateDecoder::new(compressed.as_slice())
         .take(plaintext_size.saturating_add(1))
         .read_to_end(&mut plaintext)
-        .map_err(|_| encryption_failure())?;
+        .map_err(encryption_failure_from)?;
     if plaintext.len() != expected_size {
         return Err(encryption_failure());
     }
@@ -479,36 +509,36 @@ fn derive_key(
             lanes,
             key_size,
         } => {
-            let key_size = (*key_size)
+            let derived_key_size = (*key_size)
                 .or(algorithm.fixed_key_size())
                 .ok_or_else(encryption_failure)?;
-            if !matches!(key_size, 16 | 24 | 32) {
+            if !matches!(derived_key_size, 16 | 24 | 32) {
                 return Err(encryption_failure());
             }
             let params = Argon2Params::new(
                 memory_kib.get(),
                 iterations.get(),
                 lanes.get(),
-                Some(usize::from(key_size)),
+                Some(usize::from(derived_key_size)),
             )
-            .map_err(|_| encryption_failure())?;
+            .map_err(encryption_failure_from)?;
             let argon2 = Argon2::new(Argon2Algorithm::Argon2id, Argon2Version::V0x13, params);
-            let mut key = vec![0u8; usize::from(key_size)];
+            let mut key = vec![0u8; usize::from(derived_key_size)];
             argon2
                 .hash_password_into(start_key, salt, &mut key)
-                .map_err(|_| encryption_failure())?;
+                .map_err(encryption_failure_from)?;
             Ok(key)
         },
     }
 }
 
-fn decrypt_blowfish_cfb8(ciphertext: &[u8], key: &[u8], iv: &[u8; 8]) -> Result<Vec<u8>> {
-    let cipher: Blowfish = Blowfish::new_from_slice(key).map_err(|_| encryption_failure())?;
-    let mut feedback = *iv;
+fn decrypt_blowfish_cfb8(ciphertext: &[u8], key: &[u8], iv: [u8; 8]) -> Result<Vec<u8>> {
+    let cipher: Blowfish = Blowfish::new_from_slice(key).map_err(encryption_failure_from)?;
+    let mut feedback = iv;
     let mut plaintext = Vec::new();
     plaintext
         .try_reserve_exact(ciphertext.len())
-        .map_err(|_| encryption_failure())?;
+        .map_err(encryption_failure_from)?;
     for &ciphertext_byte in ciphertext {
         let mut block = Block::<Blowfish>::clone_from_slice(&feedback);
         cipher.encrypt_block(&mut block);
@@ -529,7 +559,7 @@ fn gcm_encrypted_payload<'a>(payload: &'a [u8], iv: &[u8; 12]) -> Result<&'a [u8
 }
 
 fn remove_w3c_padding(mut decrypted: Vec<u8>) -> Result<Vec<u8>> {
-    let padding = decrypted.last().copied().unwrap_or(0) as usize;
+    let padding = usize::from(decrypted.last().copied().unwrap_or(0));
     if padding == 0 || padding > 16 || padding > decrypted.len() {
         return Err(encryption_failure());
     }
@@ -541,7 +571,17 @@ fn encryption_failure() -> Error {
     Error::InvalidFormat("Incorrect ODF password or corrupted encrypted package entry".to_string())
 }
 
+fn encryption_failure_from(error: impl std::fmt::Display) -> Error {
+    Error::InvalidFormat(format!(
+        "Incorrect ODF password or corrupted encrypted package entry: {error}"
+    ))
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Test fixtures use infallible setup operations, keeping assertions focused on decryption behavior."
+)]
 mod tests {
     use super::*;
     use crate::core::package::OwnedPackage;
@@ -580,7 +620,10 @@ mod tests {
         let padding = 16 - (compressed.len() % 16);
         let mut padded = compressed.clone();
         padded.resize(padded.len() + padding, 0x5a);
-        *padded.last_mut().unwrap() = padding as u8;
+        let padding_byte = u8::try_from(padding).unwrap_or(u8::MAX);
+        if let Some(last_byte) = padded.last_mut() {
+            *last_byte = padding_byte;
+        }
 
         for (key_size, algorithm) in [
             (16, "http://www.w3.org/2001/04/xmlenc#aes128-cbc"),
@@ -599,7 +642,7 @@ mod tests {
                 32 => Encryptor::<Aes256>::new_from_slices(&key, &iv)
                     .unwrap()
                     .encrypt_padded_vec::<NoPadding>(&padded),
-                _ => unreachable!(),
+                _ => continue,
             };
 
             let manifest = format!(

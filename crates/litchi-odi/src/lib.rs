@@ -8,6 +8,6 @@ mod flat;
 mod model;
 mod package;
 
-pub use facade::{Builder, Image};
+pub use facade::{Builder, Commit, Edit, Image, Patch};
 pub use flat::{FlatImage, FlatImageCommit, FlatImagePatch, FlatImageTransaction, FrameChange};
 pub use model::{frame, source};

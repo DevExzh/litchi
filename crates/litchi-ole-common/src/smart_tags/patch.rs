@@ -138,6 +138,10 @@ impl Patch {
     }
 
     /// Applies the patch only to the exact source snapshot used to create it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` does not match this patch's base snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source.revision() != self.base || source.bytes() != self.before.bytes() {
             return Err(Error::new(

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "integration-test assertions panic on failure by design"
+)]
+
 use litchi_core::Error;
 use litchi_odp::FlatPresentation;
 

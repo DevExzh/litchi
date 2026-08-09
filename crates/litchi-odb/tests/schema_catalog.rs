@@ -3,7 +3,7 @@
     reason = "tests are expected to panic on unexpected fixture failures"
 )]
 
-use litchi_odb::{Database, Limits, TableKind};
+use litchi_odb::{Database, Limits, TableKind, connection::Connection};
 
 #[test]
 fn real_libreoffice_database_exposes_inert_query_and_table_catalogs() {
@@ -12,6 +12,11 @@ fn real_libreoffice_database_exposes_inert_query_and_table_catalogs() {
             .to_vec();
     let database = Database::from_bytes(bytes.clone()).unwrap();
     let catalog = database.catalog().unwrap();
+
+    assert!(matches!(
+        catalog.connection(),
+        Some(Connection::Resource(href)) if href == "sdbc:embedded:firebird"
+    ));
 
     let query = catalog.query("AliasTest").unwrap().unwrap();
     assert_eq!(
@@ -34,6 +39,10 @@ fn real_libreoffice_schema_exposes_columns_without_connecting() {
     )
     .unwrap();
     let catalog = database.catalog().unwrap();
+    assert!(matches!(
+        catalog.connection(),
+        Some(Connection::File(href)) if href == "$(userurl)/database/biblio"
+    ));
     let table = catalog.table("biblio").unwrap().unwrap();
     assert_eq!(table.columns().len(), 32);
     assert_eq!(table.columns()[0].name(), "Address");
@@ -41,10 +50,24 @@ fn real_libreoffice_schema_exposes_columns_without_connecting() {
 }
 
 #[test]
+fn server_connection_is_schema_bound_and_never_opened() {
+    let content = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0"><o:body><o:database><d:data-source><d:connection-data><d:database-description><d:server-database d:hostname="db.example.test" d:database-name="ledger"/></d:database-description></d:connection-data></d:data-source></o:database></o:body></o:document-content>"#;
+    let database = Database::from_bytes(
+        litchi_odb::Builder::new()
+            .content_xml(content)
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(matches!(
+        database.catalog().unwrap().connection(),
+        Some(Connection::Server { host, database: server_database }) if host == "db.example.test" && server_database == "ledger"
+    ));
+}
+
+#[test]
 fn namespace_aliases_and_schema_definitions_are_semantic() {
-    let content = concat!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0"><o:body><o:database><d:data-source/><d:schema-definition><d:table-definitions><d:table-definition d:name="ledger"><d:column-definitions><d:column-definition d:name="amount"/></d:column-definitions></d:table-definition></d:table-definitions></d:schema-definition><d:queries><d:query d:name="inert" d:command="SELECT &quot;amount&quot;" d:escape-processing="true"/></d:queries></o:database></o:body></o:document-content>"#,
-    );
+    let content = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0"><o:body><o:database><d:data-source/><d:schema-definition><d:table-definitions><d:table-definition d:name="ledger"><d:column-definitions><d:column-definition d:name="amount"/></d:column-definitions></d:table-definition></d:table-definitions></d:schema-definition><d:queries><d:query d:name="inert" d:command="SELECT &quot;amount&quot;" d:escape-processing="true"/></d:queries></o:database></o:body></o:document-content>"#;
     let database = Database::from_bytes(
         litchi_odb::Builder::new()
             .content_xml(content)

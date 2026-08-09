@@ -5,10 +5,6 @@ use crate::model::page_layout::Collection;
 use crate::package::Presentation;
 use litchi_core::{Error, Result};
 
-fn error(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
-}
-
 impl Presentation {
     /// Read the package's optional, singleton handout master.
     ///
@@ -89,6 +85,10 @@ impl Presentation {
     pub fn remove_handout_master(&mut self) -> Result<()> {
         self.clear_handout_master()
     }
+}
+
+fn error(message: impl Into<String>) -> Error {
+    Error::InvalidFormat(message.into())
 }
 
 fn styles(presentation: &Presentation) -> Result<&str> {

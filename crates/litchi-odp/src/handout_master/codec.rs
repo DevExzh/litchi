@@ -77,6 +77,16 @@ struct FragmentParts {
     inner: String,
 }
 
+#[derive(Clone, Debug)]
+struct ActiveFields {
+    page_layout: String,
+    presentation_page_layout: Option<String>,
+    drawing_style: Option<String>,
+    header: Option<String>,
+    footer: Option<String>,
+    date_time: Option<String>,
+}
+
 fn bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == expected)
 }
@@ -157,16 +167,6 @@ fn parse_attribute(
         }
     }
     Ok(found)
-}
-
-#[derive(Clone, Debug)]
-struct ActiveFields {
-    page_layout: String,
-    presentation_page_layout: Option<String>,
-    drawing_style: Option<String>,
-    header: Option<String>,
-    footer: Option<String>,
-    date_time: Option<String>,
 }
 
 fn root_fields(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<ActiveFields> {

@@ -272,7 +272,7 @@ impl Project {
     ///
     /// Returns [`Error::UnsupportedCodePage`] if `page` is not a checked MBCS
     /// code page known to the encoding layer.
-    #[must_use]
+    #[must_use = "project builders must be finished or further configured"]
     pub fn page_id(mut self, page: u16) -> Result<Self, Error> {
         self.page = Mbcs::new(u32::from(page)).ok_or(Error::UnsupportedCodePage(page))?;
         Ok(self)
@@ -444,8 +444,9 @@ impl BoundedCursor {
         self.inner.into_inner()
     }
 
-    fn reject_limit(&mut self, actual: u64) -> io::Error {
-        let actual = usize::try_from(actual).unwrap_or_else(|_| self.maximum.saturating_add(1));
+    fn reject_limit(&mut self, input_actual: u64) -> io::Error {
+        let actual =
+            usize::try_from(input_actual).unwrap_or_else(|_| self.maximum.saturating_add(1));
         self.exceeded_actual = Some(
             self.exceeded_actual
                 .map_or(actual, |previous| previous.max(actual)),

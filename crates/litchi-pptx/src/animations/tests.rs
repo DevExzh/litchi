@@ -59,6 +59,51 @@ mod recursive_timing_tests {
     }
 
     #[test]
+    fn parses_and_writes_media_bookmark_condition_targets() {
+        let xml = format!(
+            r#"<p:timing xmlns:p="{NS}" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><p:tnLst><p:par><p:cTn><p:stCondLst><p:cond delay="0"><p:tgtEl><p14:bmkTgt spid="7" bmkName="cue"/></p:tgtEl></p:cond></p:stCondLst></p:cTn></p:par></p:tnLst></p:timing>"#
+        );
+        let tree = TimingTree::parse(&xml).expect("media bookmark target parses");
+        let TimingChild::Node(root) = &tree.roots[0] else {
+            panic!("typed root")
+        };
+        assert!(matches!(
+            root.common.start_conditions[0].target,
+            Some(ConditionTarget::MediaBookmark { shape_id: 7, ref name }) if name == "cue"
+        ));
+
+        let mut rewritten = tree.clone();
+        rewritten.roots.push(TimingChild::Opaque("".into()));
+        let emitted = rewritten.to_xml();
+        assert!(emitted.contains(r#"<p14:bmkTgt xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" spid="7" bmkName="cue"/>"#));
+    }
+
+    #[test]
+    fn parses_and_writes_preset_bounce_end() {
+        let xml = format!(
+            r#"<p:timing xmlns:p="{NS}" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><p:tnLst><p:par><p:cTn p14:presetBounceEnd="50000"/></p:par></p:tnLst></p:timing>"#
+        );
+        let tree = TimingTree::parse(&xml).expect("preset bounce parses");
+        let TimingChild::Node(root) = &tree.roots[0] else {
+            panic!("typed root")
+        };
+        assert_eq!(
+            root.common
+                .preset_bounce_end
+                .map(MotionFraction::thousandths_percent),
+            Some(50_000)
+        );
+
+        let mut rewritten = tree.clone();
+        rewritten.roots.push(TimingChild::Opaque("".into()));
+        assert!(
+            rewritten
+                .to_xml()
+                .contains(r#"p14:presetBounceEnd="50000""#)
+        );
+    }
+
+    #[test]
     fn rejects_excessive_recursive_depth() {
         let mut xml = format!(r#"<p:timing xmlns:p="{NS}"><p:tnLst>"#);
         for id in 1..=MAX_TIMING_DEPTH + 1 {

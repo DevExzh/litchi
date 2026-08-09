@@ -20,22 +20,42 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parses a bounded directory catalog from borrowed CFB entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an entry violates CFB invariants or the supplied
+    /// resource limits, or when copying the entries cannot be allocated.
     pub fn parse(entries: &[DirectoryEntry], limits: Limits) -> Result<Self, OleError> {
         let catalog = Catalog::parse(entries, limits)?;
         Ok(Self::from_catalog(catalog))
     }
 
     /// Parses a directory catalog with the default bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an entry violates CFB invariants or the default
+    /// resource limits, or when copying the entries cannot be allocated.
     pub fn parse_default(entries: &[DirectoryEntry]) -> Result<Self, OleError> {
         Self::parse(entries, Limits::default())
     }
 
     /// Captures owned directory entries without retaining a CFB container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an entry violates CFB invariants or the supplied
+    /// resource limits.
     pub fn from_entries(entries: Vec<DirectoryEntry>, limits: Limits) -> Result<Self, OleError> {
         Ok(Self::from_catalog(Catalog::from_entries(entries, limits)?))
     }
 
     /// Captures an already shared directory-entry allocation without copying.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an entry violates CFB invariants or the supplied
+    /// resource limits.
     pub fn from_entries_shared(
         entries: Arc<[DirectoryEntry]>,
         limits: Limits,
@@ -46,6 +66,7 @@ impl Snapshot {
     }
 
     /// Publishes a validated catalog as a source-preserving snapshot.
+    #[must_use]
     pub fn from_catalog(catalog: Catalog) -> Self {
         let revision = Revision::of(catalog.raw_entries());
         Self { catalog, revision }

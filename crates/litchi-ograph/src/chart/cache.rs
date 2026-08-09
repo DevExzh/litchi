@@ -27,6 +27,15 @@ impl Index {
             _ => None,
         }
     }
+
+    /// Index into a fixed cache-section presence table.
+    pub(super) const fn slot(self) -> usize {
+        match self {
+            Self::Values => 0,
+            Self::Categories => 1,
+            Self::Bubbles => 2,
+        }
+    }
 }
 
 /// Excel extended-format-table index stored by cached chart cells.

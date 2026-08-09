@@ -11,8 +11,10 @@ fn codec_round_trips_contextual_rdf_values() {
             language: Some("en".to_string()),
         },
     };
-    let xml = codec::serialize_graph(std::slice::from_ref(&triple)).unwrap();
-    let parsed = codec::parse("metadata.rdf", &xml).unwrap();
+    let xml = codec::serialize_graph(std::slice::from_ref(&triple))
+        .unwrap_or_else(|error| panic!("RDF fixture serialization must succeed: {error}"));
+    let parsed = codec::parse("metadata.rdf", &xml)
+        .unwrap_or_else(|error| panic!("RDF fixture parsing must succeed: {error}"));
 
     assert_eq!(
         parsed.graph,

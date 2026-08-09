@@ -77,10 +77,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(not(feature = "write"))]
-fn main() {
-    eprintln!(
+fn main() -> std::io::Result<()> {
+    use std::io::Write as _;
+
+    writeln!(
+        std::io::stderr(),
         "This example requires the `write` feature. Re-run with:\n  \
          cargo run -p litchi-cfb --features write --example write_ole"
-    );
+    )?;
     std::process::exit(1);
 }

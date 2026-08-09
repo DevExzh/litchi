@@ -8,6 +8,7 @@ use quick_xml::{
     name::{Namespace, QName, ResolveResult},
     reader::NsReader,
 };
+use std::ops::Range;
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -38,19 +39,20 @@ pub(crate) fn validate(xml: &str) -> Result<()> {
     validate_structure(xml)
 }
 
-/// Project direct and inline character data from `text:p` elements.
-///
-/// This deliberately does not expand fields, evaluate links, fetch resources,
-/// or synthesize list labels. It is a bounded read-only snapshot projection.
-pub(crate) fn paragraphs(xml: &str) -> Result<Vec<crate::paragraph::Paragraph>> {
+/// Project paragraphs together with a lossless replacement site when one
+/// exists. A paragraph is editable only when its character data is one direct
+/// XML text event; mixed, nested, CDATA, and empty paragraphs stay readable
+/// but deliberately refuse replacement.
+pub(crate) fn paragraphs_with_sites(xml: &str) -> Result<Vec<ParagraphSite>> {
     validate(xml)?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut stack = Vec::new();
     let mut values = Vec::new();
-    let mut paragraph = None;
+    let mut paragraph = None::<ActiveParagraph>;
 
     loop {
+        let start = reader.buffer_position() as usize;
         match reader.read_event().map_err(xml_error)? {
             Event::Start(start) => {
                 let current = element(&reader, start.name());
@@ -60,26 +62,55 @@ pub(crate) fn paragraphs(xml: &str) -> Result<Vec<crate::paragraph::Paragraph>> 
                     if paragraph.is_some() {
                         return invalid("OTH text paragraph cannot contain another text paragraph");
                     }
-                    paragraph = Some(String::new());
+                    paragraph = Some(ActiveParagraph::new());
+                } else if let Some(paragraph) = paragraph.as_mut() {
+                    paragraph.replaceable = false;
                 }
             },
             Event::Empty(start) => {
                 if element(&reader, start.name()) == Element::Paragraph {
                     reserve(&mut values, "OTH paragraph projection")?;
-                    values.push(crate::paragraph::Paragraph::new(String::new()));
+                    values.push(ParagraphSite {
+                        value: crate::paragraph::Paragraph::new(String::new()),
+                        replacement: None,
+                    });
+                } else if let Some(paragraph) = paragraph.as_mut() {
+                    paragraph.replaceable = false;
                 }
             },
             Event::Text(text) if paragraph.is_some() => {
                 let text = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                     Error::InvalidFormat(format!("invalid OTH content.xml character data: {error}"))
                 })?;
-                append_text(paragraph.as_mut(), &text)?;
+                let end = reader.buffer_position() as usize;
+                let paragraph = paragraph.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("OTH paragraph text state is missing".to_string())
+                })?;
+                paragraph.text_events = paragraph.text_events.saturating_add(1);
+                if paragraph.text_events == 1 {
+                    paragraph.replacement = Some(start..end);
+                } else {
+                    paragraph.replaceable = false;
+                }
+                append_text(Some(&mut paragraph.value), &text)?;
             },
             Event::CData(text) if paragraph.is_some() => {
                 let text = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                     Error::InvalidFormat(format!("invalid OTH content.xml character data: {error}"))
                 })?;
-                append_text(paragraph.as_mut(), &text)?;
+                let paragraph = paragraph.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("OTH paragraph text state is missing".to_string())
+                })?;
+                paragraph.replaceable = false;
+                append_text(Some(&mut paragraph.value), &text)?;
+            },
+            Event::GeneralRef(reference) if paragraph.is_some() => {
+                let value = reference_value(&reference)?;
+                let paragraph = paragraph.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("OTH paragraph text state is missing".to_string())
+                })?;
+                paragraph.replaceable = false;
+                append_text(Some(&mut paragraph.value), &value)?;
             },
             Event::End(end) => {
                 let current = element(&reader, end.name());
@@ -90,15 +121,44 @@ pub(crate) fn paragraphs(xml: &str) -> Result<Vec<crate::paragraph::Paragraph>> 
                     return invalid("OTH XML end tag does not match its start tag");
                 }
                 if current == Element::Paragraph {
-                    let Some(text) = paragraph.take() else {
+                    let Some(paragraph) = paragraph.take() else {
                         return invalid("OTH text paragraph has no active text projection");
                     };
                     reserve(&mut values, "OTH paragraph projection")?;
-                    values.push(crate::paragraph::Paragraph::new(text));
+                    values.push(ParagraphSite {
+                        value: crate::paragraph::Paragraph::new(paragraph.value),
+                        replacement: paragraph
+                            .replaceable
+                            .then_some(paragraph.replacement)
+                            .flatten(),
+                    });
                 }
             },
             Event::Eof => return Ok(values),
             _ => {},
+        }
+    }
+}
+
+pub(crate) struct ParagraphSite {
+    pub(crate) value: crate::paragraph::Paragraph,
+    pub(crate) replacement: Option<Range<usize>>,
+}
+
+struct ActiveParagraph {
+    value: String,
+    replacement: Option<Range<usize>>,
+    text_events: usize,
+    replaceable: bool,
+}
+
+impl ActiveParagraph {
+    const fn new() -> Self {
+        Self {
+            value: String::new(),
+            replacement: None,
+            text_events: 0,
+            replaceable: true,
         }
     }
 }
@@ -276,6 +336,25 @@ fn append_text(target: Option<&mut String>, text: &str) -> Result<()> {
     Ok(())
 }
 
+fn reference_value(reference: &quick_xml::events::BytesRef<'_>) -> Result<String> {
+    if let Some(value) = reference.resolve_char_ref().map_err(|error| {
+        Error::InvalidFormat(format!("invalid OTH character reference: {error}"))
+    })? {
+        return Ok(value.to_string());
+    }
+    let name = reference
+        .decode()
+        .map_err(|error| Error::InvalidFormat(format!("invalid OTH entity reference: {error}")))?;
+    match name.as_ref() {
+        "amp" => Ok("&".to_string()),
+        "lt" => Ok("<".to_string()),
+        "gt" => Ok(">".to_string()),
+        "apos" => Ok("'".to_string()),
+        "quot" => Ok("\"".to_string()),
+        _ => invalid("OTH custom entities are not allowed"),
+    }
+}
+
 fn reserve<T>(values: &mut Vec<T>, resource: &'static str) -> Result<()> {
     values
         .try_reserve(1)
@@ -292,7 +371,7 @@ fn invalid<T>(message: &str) -> Result<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{paragraphs, validate};
+    use super::{paragraphs_with_sites, validate};
 
     #[test]
     fn accepts_a_prefix_aliased_text_web_envelope() {
@@ -319,7 +398,7 @@ mod tests {
     #[test]
     fn projects_paragraph_character_data_without_evaluation() {
         let xml = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>plain <text:a xlink:href="https://example.test" xmlns:xlink="http://www.w3.org/1999/xlink">link</text:a></text:p></office:text></office:body></office:document-content>"#;
-        let projected = paragraphs(xml).unwrap();
-        assert_eq!(projected[0].text(), "plain link");
+        let projected = paragraphs_with_sites(xml).unwrap();
+        assert_eq!(projected[0].value.text(), "plain link");
     }
 }

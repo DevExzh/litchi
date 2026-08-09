@@ -4497,9 +4497,10 @@ deleted rather than retained as compatibility shims.
 
 This slice makes the common/format-specific boundary explicit:
 
-- `litchi-odf-common` owns ODF constants, coordinates, and datatype
-  vocabulary; `litchi-odf` retains detection, package orchestration, and
-  family-specific semantics while re-exporting the established paths.
+- `litchi-odf-common` owns ODF constants, coordinates, datatype vocabulary,
+  and detection; `litchi-odf` remains a thin contextual detection facade that
+  re-exports the established detector paths. Format semantics stay in the
+  concrete ODT, ODS, ODP, and smaller ODF-family crates.
 - `litchi-ooxml-common::relationships` owns Transitional/Strict relationship
   attribute decoding, including unresolved `r:` fragments. OOXML hosts keep
   their format-specific error and facade layers.
@@ -4512,8 +4513,8 @@ The checked-in specification anchors for this batch are `[MS-PPTX]` §3.4 for
 slide-show action references and `[MS-XLSB]` §§2.4.718 and 2.5.73 for defined
 names and header/footer strings. The repository has no checked-in ODF
 specification snapshot, so the ODF extraction makes no external conformance
-claim. ADR 0009 continues to keep ODF detection in `litchi-odf`, and ADR 0010
-continues to keep archive grammar below the public facade.
+claim. ADR 0009 continues to keep ODF detection in `litchi-odf-common`, and
+ADR 0010 continues to keep archive grammar below the public facade.
 
 Verification passes for the affected common and owner crates with all features
 and targets, the no-default-features OOXML host suite, formatting, diff
@@ -5257,7 +5258,7 @@ and CRUD integration suite (4 tests) now pass.
 
 The affected-crate structural `cargo check --all-targets` matrix passes with
 lint capping, and the same matrix passes under the workspace lint policy for
-every affected crate except the pre-existing RTF strict-lint backlog. The
+every affected crate. The
 lint-capped affected library-test matrix passes, the umbrella `litchi` crate
 passes 162 unit tests plus three integration targets, formatting and diff
 checks pass, and the crate-boundary policy remains clean. The known malformed
@@ -5315,9 +5316,8 @@ lossless unknown content, and existing ergonomic owner paths while reducing
 format-local duplication.
 
 The lint-capped affected all-target check passes for the complete migration
-matrix, and strict checks pass for every affected crate except the known
-pre-existing RTF workspace-lint backlog. Library tests pass for DOC (832 with
-two ignored), DOCX (643), DrawingML (92), IWA (1,529), ODraw (59), ODP (103),
+matrix, and strict checks pass for every affected crate. Library tests pass for
+DOC (832 with two ignored), DOCX (643), DrawingML (92), IWA (1,529), ODraw (59), ODP (103),
 ODT (512), OGraph (40), PPT (882 with one ignored), PPTX (305), RTF (287), XLS
 (844), XLSB (413), and XLSX (645). The DOC facade integration targets pass,
 the umbrella library passes 162 tests, formatting/diff checks pass, and the
@@ -5438,9 +5438,9 @@ redundant format prefixes were introduced. One moved XLSX layout test required
 an explicit `Value` import after the test tree split; no production behavior
 changed.
 
-The strict all-target matrix passes for every affected crate except the known
-pre-existing RTF workspace-lint backlog. The lint-capped all-target matrix
-passes for DOC, DOCX, DrawingML, IWA, ODS, ODT, PPTX, RTF, XLSB, and XLSX. The
+The strict all-target matrix passes for every affected crate. The lint-capped
+all-target matrix passes for DOC, DOCX, DrawingML, IWA, ODS, ODT, PPTX, RTF,
+XLSB, and XLSX. The
 lint-capped library matrix passes DOC (847 with two ignored), DOCX (644),
 DrawingML (92), IWA (1,529), ODS (67), ODT (516), PPTX (305), RTF (287), XLSB
 (413), and XLSX (645). Formatting, diff, and the 46-package boundary check

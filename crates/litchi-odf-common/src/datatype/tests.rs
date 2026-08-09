@@ -1,5 +1,10 @@
 //! Behavioral tests for the public ODF scalar facade.
 
+#![allow(
+    clippy::unwrap_used,
+    reason = "Test assertions intentionally unwrap known-valid scalar fixture construction failures."
+)]
+
 use super::{Boolean, Date, DateTime, Duration};
 use chrono::{Datelike, Duration as ChronoDuration, NaiveDate, TimeZone, Utc};
 
@@ -40,11 +45,11 @@ fn test_datetime_decode() {
     assert_eq!(dt.month(), 1);
     assert_eq!(dt.day(), 31);
 
-    let dt = DateTime::decode("2024-01-31T15:30:00+01:00").unwrap();
-    assert_eq!(dt.year(), 2024);
+    let offset_datetime = DateTime::decode("2024-01-31T15:30:00+01:00").unwrap();
+    assert_eq!(offset_datetime.year(), 2024);
 
-    let dt = DateTime::decode("2024-01-31T15:30:00Z").unwrap();
-    assert_eq!(dt.year(), 2024);
+    let utc_datetime = DateTime::decode("2024-01-31T15:30:00Z").unwrap();
+    assert_eq!(utc_datetime.year(), 2024);
 }
 
 #[test]
@@ -54,7 +59,7 @@ fn test_datetime_encode() {
         .unwrap()
         .fixed_offset();
     let encoded = DateTime::encode(&dt);
-    assert!(encoded.ends_with("Z"));
+    assert!(encoded.ends_with('Z'));
     assert!(encoded.starts_with("2024-01-31"));
 }
 
@@ -63,15 +68,15 @@ fn test_duration_decode() {
     let dur = Duration::decode("PT1H30M").unwrap();
     assert_eq!(dur, ChronoDuration::minutes(90));
 
-    let dur = Duration::decode("P1D").unwrap();
-    assert_eq!(dur, ChronoDuration::days(1));
+    let day_duration = Duration::decode("P1D").unwrap();
+    assert_eq!(day_duration, ChronoDuration::days(1));
 
-    let dur = Duration::decode("-PT5M").unwrap();
-    assert_eq!(dur, ChronoDuration::minutes(-5));
+    let negative_duration = Duration::decode("-PT5M").unwrap();
+    assert_eq!(negative_duration, ChronoDuration::minutes(-5));
 
-    let dur = Duration::decode("P1DT2H30M15S").unwrap();
+    let compound_duration = Duration::decode("P1DT2H30M15S").unwrap();
     assert_eq!(
-        dur,
+        compound_duration,
         ChronoDuration::days(1)
             + ChronoDuration::hours(2)
             + ChronoDuration::minutes(30)
@@ -84,11 +89,12 @@ fn test_duration_encode() {
     let dur = ChronoDuration::minutes(90);
     assert_eq!(Duration::encode(&dur), "PT1H30M0S");
 
-    let dur = ChronoDuration::minutes(-5);
-    assert_eq!(Duration::encode(&dur), "-PT0H5M0S");
+    let negative_duration = ChronoDuration::minutes(-5);
+    assert_eq!(Duration::encode(&negative_duration), "-PT0H5M0S");
 
-    let dur = ChronoDuration::days(1) + ChronoDuration::hours(2) + ChronoDuration::minutes(30);
-    assert_eq!(Duration::encode(&dur), "PT26H30M0S");
+    let compound_duration =
+        ChronoDuration::days(1) + ChronoDuration::hours(2) + ChronoDuration::minutes(30);
+    assert_eq!(Duration::encode(&compound_duration), "PT26H30M0S");
 }
 
 #[test]

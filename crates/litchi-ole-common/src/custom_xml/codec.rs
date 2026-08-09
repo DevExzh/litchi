@@ -7,9 +7,7 @@ use litchi_cfb::{OleFile, OleWriter};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 
-use super::model::{
-    Error, Item, ItemId, Limits, Promotion, Properties, Result, Store, invalid, limit,
-};
+use super::model::{Item, ItemId, Limits, Promotion, Properties, Result, Store, invalid, limit};
 use super::xml::{
     escape_attribute, is_whitespace, normalize_encoding, reject_other_attributes,
     required_attribute, resolved_element, validate_characters, validate_payload,
@@ -19,12 +17,33 @@ use super::{
     REDUNDANT_PROMOTION_STORAGE, STORE_STORAGE,
 };
 
+#[derive(Default)]
+struct PropertiesParseState {
+    depth: usize,
+    root_seen: bool,
+    root_closed: bool,
+    schema_refs_seen: bool,
+    opaque_depth: usize,
+    item_id: Option<ItemId>,
+    schema_references: Vec<String>,
+    element_count: usize,
+}
+
 /// Inspect a complete Custom XML data store with default limits.
+///
+/// # Errors
+///
+/// Returns an error if the compound file or Custom XML store is malformed.
 pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Store>> {
     inspect_with_limits(ole, Limits::default())
 }
 
 /// Inspect a complete Custom XML data store with caller-selected limits.
+///
+/// # Errors
+///
+/// Returns an error if the compound file or Custom XML store is malformed, or
+/// if it exceeds `limits`.
 pub fn inspect_with_limits<R: Read + Seek>(
     ole: &mut OleFile<R>,
     limits: Limits,
@@ -55,16 +74,16 @@ pub fn inspect_with_limits<R: Read + Seek>(
         return Ok(None);
     }
 
-    let entries = ole.list_directory_entries(&[STORE_STORAGE])?;
-    if entries.len() > limits.max_items {
+    let store_entries = ole.list_directory_entries(&[STORE_STORAGE])?;
+    if store_entries.len() > limits.max_items {
         return Err(limit(format!(
             "item count {} exceeds {}",
-            entries.len(),
+            store_entries.len(),
             limits.max_items
         )));
     }
-    let mut names = Vec::with_capacity(entries.len());
-    for entry in entries {
+    let mut names = Vec::with_capacity(store_entries.len());
+    for entry in store_entries {
         if entry.entry_type != 1 {
             return Err(invalid(format!(
                 "MsoDataStore child '{}' is not a storage",
@@ -80,19 +99,21 @@ pub fn inspect_with_limits<R: Read + Seek>(
     let mut item_ids = HashSet::with_capacity(names.len());
     let mut items = Vec::with_capacity(names.len());
     for storage_name in names {
-        let entries = ole.list_directory_entries(&[STORE_STORAGE, storage_name.as_str()])?;
-        if entries.len() != 2 {
+        let item_entries = ole.list_directory_entries(&[STORE_STORAGE, storage_name.as_str()])?;
+        if item_entries.len() != 2 {
             return Err(invalid(format!(
                 "custom XML sub-storage '{storage_name}' must contain exactly Item and Properties"
             )));
         }
-        let mut item_size = None;
-        let mut properties_size = None;
-        for entry in entries {
+        let mut item_stream_size = None;
+        let mut properties_stream_size = None;
+        for entry in item_entries {
             match (entry.name.as_str(), entry.entry_type) {
-                (ITEM_STREAM, 2) => item_size = Some(stream_size(entry.size, "Item", &limits)?),
+                (ITEM_STREAM, 2) => {
+                    item_stream_size = Some(stream_size(entry.size, "Item", &limits)?);
+                },
                 (PROPERTIES_STREAM, 2) => {
-                    properties_size = Some(stream_size(entry.size, "Properties", &limits)?)
+                    properties_stream_size = Some(stream_size(entry.size, "Properties", &limits)?);
                 },
                 _ => {
                     return Err(invalid(format!(
@@ -102,24 +123,25 @@ pub fn inspect_with_limits<R: Read + Seek>(
                 },
             }
         }
-        let item_size = item_size.ok_or_else(|| invalid("custom XML Item stream is missing"))?;
-        let properties_size =
-            properties_size.ok_or_else(|| invalid("custom XML Properties stream is missing"))?;
-        if item_size > limits.max_item_bytes {
+        let item_bytes =
+            item_stream_size.ok_or_else(|| invalid("custom XML Item stream is missing"))?;
+        let properties_bytes = properties_stream_size
+            .ok_or_else(|| invalid("custom XML Properties stream is missing"))?;
+        if item_bytes > limits.max_item_bytes {
             return Err(limit(format!(
-                "Item stream has {item_size} bytes, limit is {}",
+                "Item stream has {item_bytes} bytes, limit is {}",
                 limits.max_item_bytes
             )));
         }
-        if properties_size > limits.max_properties_bytes {
+        if properties_bytes > limits.max_properties_bytes {
             return Err(limit(format!(
-                "Properties stream has {properties_size} bytes, limit is {}",
+                "Properties stream has {properties_bytes} bytes, limit is {}",
                 limits.max_properties_bytes
             )));
         }
         total_bytes = total_bytes
-            .checked_add(item_size)
-            .and_then(|value| value.checked_add(properties_size))
+            .checked_add(item_bytes)
+            .and_then(|accumulated| accumulated.checked_add(properties_bytes))
             .ok_or_else(|| limit("aggregate stream size overflows usize"))?;
         if total_bytes > limits.max_total_bytes {
             return Err(limit(format!(
@@ -150,6 +172,10 @@ pub fn inspect_with_limits<R: Read + Seek>(
 }
 
 /// Materialize a validated store in a newly assembled OLE writer.
+///
+/// # Errors
+///
+/// Returns an error if `store` is invalid or the writer rejects an OLE entry.
 pub fn write(writer: &mut OleWriter, store: &Store) -> Result<()> {
     validate_store(store, &Limits::default())?;
     writer.create_storage(&[STORE_STORAGE])?;
@@ -177,11 +203,19 @@ pub fn write(writer: &mut OleWriter, store: &Store) -> Result<()> {
 }
 
 /// Parse the schema-defined Custom XML data-store Properties stream.
+///
+/// # Errors
+///
+/// Returns an error if `xml` is not a valid bounded Properties document.
 pub fn parse_properties(xml: &[u8]) -> Result<Properties> {
     parse_properties_with_limits(xml, &Limits::default())
 }
 
 /// Serialize Custom XML data-store Properties in stable schema order.
+///
+/// # Errors
+///
+/// Returns an error if `properties` violates the supported format limits.
 pub fn write_properties(properties: &Properties) -> Result<Vec<u8>> {
     write_properties_with_limits(properties, &Limits::default())
 }
@@ -232,13 +266,13 @@ pub(crate) fn rewrite_properties(
     validate_properties(after, limits)?;
 
     if std::str::from_utf8(source).is_ok() {
-        let (item_id, schema_references) = property_attribute_spans(source, limits)?;
-        if let Some(item_id) = item_id
+        let (item_id_range, schema_references) = property_attribute_spans(source, limits)?;
+        if let Some(item_id_span) = item_id_range
             && schema_references.len() == after.schema_references.len()
         {
             let mut replacements = Vec::with_capacity(schema_references.len() + 1);
             replacements.push((
-                item_id,
+                item_id_span,
                 escaped_attribute(after.item_id.to_string().as_str()),
             ));
             for (span, value) in schema_references.into_iter().zip(&after.schema_references) {
@@ -269,13 +303,13 @@ fn property_attribute_spans(
 
     loop {
         let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| limit("Properties XML source offset overflows usize"))?;
+            .map_err(|_conversion_error| limit("Properties XML source offset overflows usize"))?;
         buffer.clear();
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| super::model::xml_error(error.to_string()))?;
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| limit("Properties XML source offset overflows usize"))?;
+            .map_err(|_conversion_error| limit("Properties XML source offset overflows usize"))?;
         match event {
             Event::Start(element) => {
                 let local_name = element.local_name();
@@ -318,7 +352,13 @@ fn property_attribute_spans(
                     .ok_or_else(|| invalid("Properties XML has an unexpected closing tag"))?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Ok((item_id, schema_references))
@@ -484,7 +524,11 @@ pub(crate) fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Resul
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_) => {},
         }
     }
     if !state.root_seen || !state.root_closed || state.depth != 0 {
@@ -500,18 +544,6 @@ pub(crate) fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Resul
     Ok(properties)
 }
 
-#[derive(Default)]
-struct PropertiesParseState {
-    depth: usize,
-    root_seen: bool,
-    root_closed: bool,
-    schema_refs_seen: bool,
-    opaque_depth: usize,
-    item_id: Option<ItemId>,
-    schema_references: Vec<String>,
-    element_count: usize,
-}
-
 fn process_properties_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -521,8 +553,8 @@ fn process_properties_element(
 ) -> Result<()> {
     let (namespace, local_name) = resolved_element(reader, element)?;
     match (state.depth, local_name.as_slice(), namespace.as_deref()) {
-        (0, b"datastoreItem", Some(namespace))
-            if namespace == CUSTOM_XML_NAMESPACE.as_bytes() && !state.root_seen =>
+        (0, b"datastoreItem", Some(resolved_namespace))
+            if resolved_namespace == CUSTOM_XML_NAMESPACE.as_bytes() && !state.root_seen =>
         {
             state.item_id = Some(
                 required_attribute(reader, element, CUSTOM_XML_NAMESPACE, b"itemID")?.parse()?,
@@ -530,16 +562,16 @@ fn process_properties_element(
             reject_other_attributes(reader, element, &[(CUSTOM_XML_NAMESPACE, b"itemID")])?;
             state.root_seen = true;
         },
-        (1, b"schemaRefs", Some(namespace))
-            if namespace == CUSTOM_XML_NAMESPACE.as_bytes()
+        (1, b"schemaRefs", Some(resolved_namespace))
+            if resolved_namespace == CUSTOM_XML_NAMESPACE.as_bytes()
                 && state.root_seen
                 && !state.schema_refs_seen =>
         {
             reject_other_attributes(reader, element, &[])?;
             state.schema_refs_seen = true;
         },
-        (2, b"schemaRef", Some(namespace))
-            if namespace == CUSTOM_XML_NAMESPACE.as_bytes() && state.schema_refs_seen =>
+        (2, b"schemaRef", Some(resolved_namespace))
+            if resolved_namespace == CUSTOM_XML_NAMESPACE.as_bytes() && state.schema_refs_seen =>
         {
             if state.schema_references.len() >= limits.max_schema_references {
                 return Err(limit("schema reference count exceeds its limit"));
@@ -655,13 +687,13 @@ fn validate_limits(limits: &Limits) -> Result<()> {
     Ok(())
 }
 
-fn stream_size(value: u64, label: &str, limits: &Limits) -> Result<usize> {
-    let value =
-        usize::try_from(value).map_err(|_| limit(format!("{label} size overflows usize")))?;
-    if value > limits.max_total_bytes {
+fn stream_size(stream_size: u64, label: &str, limits: &Limits) -> Result<usize> {
+    let size = usize::try_from(stream_size)
+        .map_err(|_conversion_error| limit(format!("{label} size overflows usize")))?;
+    if size > limits.max_total_bytes {
         return Err(limit(format!("{label} size exceeds aggregate byte limit")));
     }
-    Ok(value)
+    Ok(size)
 }
 
 fn marker_exists<R: Read + Seek>(ole: &OleFile<R>, name: &str) -> Result<bool> {
@@ -673,9 +705,3 @@ fn marker_exists<R: Read + Seek>(ole: &OleFile<R>, name: &str) -> Result<bool> {
     }
     Ok(false)
 }
-
-#[allow(
-    dead_code,
-    reason = "keeps the module error type explicit for API audits"
-)]
-fn _error_type_marker(_: Error) {}

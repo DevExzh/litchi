@@ -48,7 +48,7 @@ pub struct Patch {
 }
 
 impl Patch {
-    pub(crate) fn new(before: Snapshot, after: Snapshot) -> Self {
+    pub(crate) fn new(before: &Snapshot, after: &Snapshot) -> Self {
         let before_catalog = before.catalog_clone();
         let after_catalog = after.catalog_clone();
         let change = (!before_catalog.raw_equal(&after_catalog))
@@ -141,6 +141,11 @@ impl Patch {
     }
 
     /// Applies the patch only to its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `source` does not match the patch's exact base
+    /// catalog and revision.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, OleError> {
         if source.revision() != self.base || !source.catalog().raw_equal(&self.before) {
             return Err(OleError::InvalidFormat(
@@ -154,6 +159,11 @@ impl Patch {
     }
 
     /// Applies the inverse to the exact committed target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `target` does not match the patch's exact result
+    /// catalog and revision.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot, OleError> {
         self.inverse().apply(target)
     }

@@ -108,7 +108,9 @@ pub(in crate::chart) const fn dimensions_cover(
     match (declared, derived) {
         (chart_cache::Dims::Excel(declared), chart_cache::Dims::Excel(derived)) => {
             if derived.row_after() == 0 {
-                declared.row_after() == 0
+                // A chart cache may declare a source range even when its
+                // three SIIndex sections contain no cached cells.
+                true
             } else {
                 declared.row_after() != 0
                     && declared.first_row() <= derived.first_row()

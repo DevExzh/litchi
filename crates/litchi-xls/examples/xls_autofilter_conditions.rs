@@ -12,7 +12,7 @@
 //! The file is saved to `output/xls_autofilter_conditions.xls`.
 
 use litchi_xls::Writer;
-use litchi_xls::writer::AutoFilterConditionWrite;
+use litchi_xls::writer::{AutoFilterConditionWrite, Column};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dir = std::path::Path::new("output");
@@ -77,11 +77,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     w.set_sort(s, false, false, &[(2, true)])?;
 
     // Column widths for readability.
-    w.set_column_width(s, 0, 14.0)?;
-    w.set_column_width(s, 1, 14.0)?;
-    w.set_column_width(s, 2, 10.0)?;
-    w.set_column_width(s, 3, 10.0)?;
-    w.set_column_width(s, 4, 14.0)?;
+    w.set_column_width(s, Column::new(0)?, 14.0)?;
+    w.set_column_width(s, Column::new(1)?, 14.0)?;
+    w.set_column_width(s, Column::new(2)?, 10.0)?;
+    w.set_column_width(s, Column::new(3)?, 10.0)?;
+    w.set_column_width(s, Column::new(4)?, 14.0)?;
 
     println!("[Sheet 1] Filtered Products — 10 rows, filter Price > 50, sort Price desc");
 
@@ -135,9 +135,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Sort by Level (column 2) ascending, then by Name (column 0) ascending.
     w.set_sort(s2, false, false, &[(2, false), (0, false)])?;
 
-    w.set_column_width(s2, 0, 12.0)?;
-    w.set_column_width(s2, 1, 16.0)?;
-    w.set_column_width(s2, 2, 10.0)?;
+    w.set_column_width(s2, Column::new(0)?, 12.0)?;
+    w.set_column_width(s2, Column::new(1)?, 16.0)?;
+    w.set_column_width(s2, Column::new(2)?, 10.0)?;
 
     println!(
         "[Sheet 2] String Filter — 8 rows, filter Dept = Engineering OR Sales, sort by Level+Name"
@@ -204,10 +204,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Sort by Hours descending.
     w.set_sort(s3, false, false, &[(2, true)])?;
 
-    w.set_column_width(s3, 0, 16.0)?;
-    w.set_column_width(s3, 1, 10.0)?;
-    w.set_column_width(s3, 2, 10.0)?;
-    w.set_column_width(s3, 3, 10.0)?;
+    w.set_column_width(s3, Column::new(0)?, 16.0)?;
+    w.set_column_width(s3, Column::new(1)?, 10.0)?;
+    w.set_column_width(s3, Column::new(2)?, 10.0)?;
+    w.set_column_width(s3, Column::new(3)?, 10.0)?;
 
     println!("[Sheet 3] Multi-Column — range filter on Hours + boolean filter on Complete");
 

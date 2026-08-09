@@ -13,6 +13,12 @@ use quick_xml::{Writer, XmlVersion};
 
 use super::model::{Kind, Object, Parameter, Root, Source};
 
+macro_rules! required {
+    ($value:expr, $message:literal) => {
+        $value.ok_or_else(|| Error::InvalidFormat($message.to_string()))?
+    };
+}
+
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const SVG_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
@@ -88,7 +94,19 @@ struct ObjectBuilder {
     binary_encoded: String,
 }
 
+struct ScanState<'a> {
+    objects: &'a mut Vec<Object>,
+    total_xml_bytes: &'a mut usize,
+    total_binary_bytes: &'a mut usize,
+    total_accessibility_bytes: &'a mut usize,
+}
+
 /// Scan package-backed embedded-object occurrences in content and styles XML.
+///
+/// # Errors
+///
+/// Returns an error when either XML part is malformed, violates the embedded-object grammar, or
+/// exceeds a configured resource limit.
 pub fn scan_package(
     content_xml: &str,
     styles_xml: Option<&str>,
@@ -102,26 +120,35 @@ pub fn scan_package(
         content_xml,
         Part::Content,
         Some(package),
-        &mut objects,
-        &mut total_xml,
-        &mut total_binary,
-        &mut total_accessibility,
+        ScanState {
+            objects: &mut objects,
+            total_xml_bytes: &mut total_xml,
+            total_binary_bytes: &mut total_binary,
+            total_accessibility_bytes: &mut total_accessibility,
+        },
     )?;
-    if let Some(styles_xml) = styles_xml {
+    if let Some(styles_document) = styles_xml {
         scan_xml(
-            styles_xml,
+            styles_document,
             Part::Styles,
             Some(package),
-            &mut objects,
-            &mut total_xml,
-            &mut total_binary,
-            &mut total_accessibility,
+            ScanState {
+                objects: &mut objects,
+                total_xml_bytes: &mut total_xml,
+                total_binary_bytes: &mut total_binary,
+                total_accessibility_bytes: &mut total_accessibility,
+            },
         )?;
     }
     Ok(objects)
 }
 
-/// Scan a flat OpenDocument XML document for inert embedded objects.
+/// Scans a flat `OpenDocument` XML document for inert embedded objects.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed, violates the embedded-object grammar, or exceeds a
+/// configured resource limit.
 pub fn scan_flat(xml: &str) -> Result<Vec<Object>> {
     let mut objects = Vec::new();
     let mut total_xml = 0usize;
@@ -131,24 +158,28 @@ pub fn scan_flat(xml: &str) -> Result<Vec<Object>> {
         xml,
         Part::FlatDocument,
         None,
-        &mut objects,
-        &mut total_xml,
-        &mut total_binary,
-        &mut total_accessibility,
+        ScanState {
+            objects: &mut objects,
+            total_xml_bytes: &mut total_xml,
+            total_binary_bytes: &mut total_binary,
+            total_accessibility_bytes: &mut total_accessibility,
+        },
     )?;
     Ok(objects)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn scan_xml(
     xml: &str,
     part: Part,
     package: Option<&dyn PackageLookup>,
-    objects: &mut Vec<Object>,
-    total_xml_bytes: &mut usize,
-    total_binary_bytes: &mut usize,
-    total_accessibility_bytes: &mut usize,
+    state: ScanState<'_>,
 ) -> Result<()> {
+    let ScanState {
+        objects,
+        total_xml_bytes,
+        total_binary_bytes,
+        total_accessibility_bytes,
+    } = state;
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -177,12 +208,12 @@ fn scan_xml(
                 Event::Start(element) => {
                     depth = checked_depth(depth)?;
                     write_inline_event(
-                        inline_capture.as_mut().expect("active inline XML"),
+                        required!(inline_capture.as_mut(), "inline XML capture is missing"),
                         Event::Start(element),
                     )?;
                 },
                 Event::Empty(element) => write_inline_event(
-                    inline_capture.as_mut().expect("active inline XML"),
+                    required!(inline_capture.as_mut(), "inline XML capture is missing"),
                     Event::Empty(element),
                 )?,
                 Event::End(element) => {
@@ -190,13 +221,13 @@ fn scan_xml(
                         .as_ref()
                         .is_some_and(|capture| capture.depth == depth);
                     write_inline_event(
-                        inline_capture.as_mut().expect("active inline XML"),
+                        required!(inline_capture.as_mut(), "inline XML capture is missing"),
                         Event::End(element),
                     )?;
                     if closing_root {
                         finish_inline_xml(
-                            inline_capture.take().expect("closing inline XML"),
-                            active.as_mut().expect("inline XML object"),
+                            required!(inline_capture.take(), "inline XML capture is missing"),
+                            required!(active.as_mut(), "inline XML object is missing"),
                             total_xml_bytes,
                         )?;
                     }
@@ -209,9 +240,16 @@ fn scan_xml(
                         "unterminated inline embedded-object XML".to_string(),
                     ));
                 },
-                event => {
-                    write_inline_event(inline_capture.as_mut().expect("active inline XML"), event)?
-                },
+                inline_event @ (Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_)) => write_inline_event(
+                    required!(inline_capture.as_mut(), "inline XML capture is missing"),
+                    inline_event,
+                )?,
             }
             buffer.clear();
             continue;
@@ -289,7 +327,7 @@ fn scan_xml(
                         accessibility_kind(&namespace, element.local_name().as_ref())
                 {
                     begin_accessibility(
-                        frames.last_mut().expect("direct frame child"),
+                        required!(frames.last_mut(), "accessibility element has no frame"),
                         kind,
                         depth,
                         &mut accessibility,
@@ -383,7 +421,10 @@ fn scan_xml(
                     && let Some(kind) =
                         accessibility_kind(&namespace, element.local_name().as_ref())
                 {
-                    set_empty_accessibility(frames.last_mut().expect("direct frame child"), kind)?;
+                    set_empty_accessibility(
+                        required!(frames.last_mut(), "accessibility element has no frame"),
+                        kind,
+                    )?;
                 } else if let Some(kind) = object_kind(&namespace, &element) {
                     ensure_object_capacity(objects.len())?;
                     let object = start_object(
@@ -397,31 +438,35 @@ fn scan_xml(
                     objects.push(finish_object(object, part, package, total_binary_bytes)?);
                 }
             },
-            Event::Text(value)
+            Event::Text(text)
                 if active
                     .as_ref()
                     .and_then(|object| object.binary_depth)
                     .is_some() =>
             {
-                let value = value
-                    .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid inline OLE text: {error}"))
-                    })?;
-                append_binary(active.as_mut().expect("active OLE object"), &value)?;
+                let decoded_text = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid inline OLE text: {error}"))
+                })?;
+                append_binary(
+                    required!(active.as_mut(), "OLE binary data has no object"),
+                    &decoded_text,
+                )?;
             },
-            Event::CData(value)
+            Event::CData(cdata)
                 if active
                     .as_ref()
                     .and_then(|object| object.binary_depth)
                     .is_some() =>
             {
-                let value = value
+                let decoded_text = cdata
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid inline OLE CDATA: {error}"))
                     })?;
-                append_binary(active.as_mut().expect("active OLE object"), &value)?;
+                append_binary(
+                    required!(active.as_mut(), "OLE binary data has no object"),
+                    &decoded_text,
+                )?;
             },
             Event::GeneralRef(_)
                 if active
@@ -433,41 +478,39 @@ fn scan_xml(
                     "XML references are not allowed in office:binary-data".to_string(),
                 ));
             },
-            Event::Text(value) if accessibility.is_some() => {
-                let value = value
-                    .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid object accessibility text: {error}"))
-                    })?;
+            Event::Text(text) if accessibility.is_some() => {
+                let decoded_text = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid object accessibility text: {error}"))
+                })?;
                 append_accessibility(
-                    accessibility.as_mut().expect("active accessibility text"),
-                    &value,
+                    required!(accessibility.as_mut(), "accessibility text is missing"),
+                    &decoded_text,
                     total_accessibility_bytes,
                 )?;
             },
-            Event::CData(value) if accessibility.is_some() => {
-                let value = value
+            Event::CData(cdata) if accessibility.is_some() => {
+                let decoded_text = cdata
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid object accessibility CDATA: {error}"))
                     })?;
                 append_accessibility(
-                    accessibility.as_mut().expect("active accessibility text"),
-                    &value,
+                    required!(accessibility.as_mut(), "accessibility text is missing"),
+                    &decoded_text,
                     total_accessibility_bytes,
                 )?;
             },
-            Event::GeneralRef(value) if accessibility.is_some() => {
-                let value = decode_reference(&value)?;
+            Event::GeneralRef(reference) if accessibility.is_some() => {
+                let resolved_reference = decode_reference(&reference)?;
                 append_accessibility(
-                    accessibility.as_mut().expect("active accessibility text"),
-                    &value,
+                    required!(accessibility.as_mut(), "accessibility text is missing"),
+                    &resolved_reference,
                     total_accessibility_bytes,
                 )?;
             },
             Event::End(element) => {
                 if accessibility.as_ref().map(|text| text.depth) == Some(depth) {
-                    let text = accessibility.take().expect("active accessibility text");
+                    let text = required!(accessibility.take(), "accessibility text is missing");
                     if accessibility_kind(&namespace, element.local_name().as_ref())
                         != Some(text.kind)
                     {
@@ -495,12 +538,12 @@ fn scan_xml(
                     }
                     object.binary_depth = None;
                 } else if active.as_ref().map(|object| object.depth) == Some(depth) {
-                    let object = active.take().expect("closing embedded object");
+                    let object = required!(active.take(), "embedded object is missing");
                     objects.push(finish_object(object, part, package, total_binary_bytes)?);
                 }
 
                 if frames.last().map(|frame| frame.depth) == Some(depth) {
-                    let frame = frames.pop().expect("closing frame");
+                    let frame = required!(frames.pop(), "embedded object frame is missing");
                     for object_index in frame.object_indices {
                         let object = objects.get_mut(object_index).ok_or_else(|| {
                             Error::InvalidFormat(
@@ -521,7 +564,13 @@ fn scan_xml(
                 })?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -542,15 +591,15 @@ fn scan_xml(
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {
-    let depth = depth
+    let next_depth = depth
         .checked_add(1)
         .ok_or_else(|| Error::InvalidFormat("embedded-object nesting overflow".to_string()))?;
-    if depth > MAX_OBJECT_DEPTH {
+    if next_depth > MAX_OBJECT_DEPTH {
         return Err(Error::InvalidFormat(format!(
             "embedded-object nesting exceeds {MAX_OBJECT_DEPTH}"
         )));
     }
-    Ok(depth)
+    Ok(next_depth)
 }
 
 fn ensure_object_capacity(current: usize) -> Result<()> {
@@ -620,7 +669,7 @@ fn start_object(
     depth: usize,
     kind: Kind,
     object_index: usize,
-    frame: Option<&mut FrameState>,
+    frame_state: Option<&mut FrameState>,
 ) -> Result<ObjectBuilder> {
     let href = limited_attribute(reader, element, XLINK_NAMESPACE, b"href")?;
     let class_id = limited_attribute(reader, element, DRAW_NAMESPACE, b"class-id")?;
@@ -630,10 +679,10 @@ fn start_object(
         DRAW_NAMESPACE,
         b"notify-on-update-of-ranges",
     )?;
-    let frame_context = match frame {
-        Some(frame) => {
-            frame.object_indices.push(object_index);
-            Some(frame.frame.clone())
+    let frame_context = match frame_state {
+        Some(state) => {
+            state.object_indices.push(object_index);
+            Some(state.frame.clone())
         },
         None => None,
     };
@@ -720,23 +769,25 @@ fn finish_object(
             match package {
                 None => Source::Linked { href },
                 Some(_) if is_linked_href(&href) => Source::Linked { href },
-                Some(package) => {
+                Some(package_lookup) => {
                     let path = resolve_package_path(&href)?;
-                    if package.has_file(&path) {
+                    if package_lookup.has_file(&path) {
                         Source::PackageFile {
                             href,
-                            manifest_media_type: package.media_type(&path).map(str::to_owned),
+                            manifest_media_type: package_lookup
+                                .media_type(&path)
+                                .map(str::to_owned),
                             path,
                         }
                     } else {
                         let content_path = format!("{path}/content.xml");
-                        if package.has_file(&content_path) {
+                        if package_lookup.has_file(&content_path) {
                             let root_path = format!("{path}/");
                             Source::PackageSubdocument {
                                 href,
-                                manifest_media_type: package
+                                manifest_media_type: package_lookup
                                     .media_type(&root_path)
-                                    .or_else(|| package.media_type(&path))
+                                    .or_else(|| package_lookup.media_type(&path))
                                     .map(str::to_owned),
                                 root_path,
                                 content_path,
@@ -818,8 +869,10 @@ fn finish_inline_xml(
             "total inline embedded-object XML exceeds {MAX_TOTAL_INLINE_XML_BYTES} bytes"
         )));
     }
-    let xml = String::from_utf8(bytes).map_err(|_| {
-        Error::InvalidFormat("inline embedded-object XML is not valid UTF-8".to_string())
+    let xml = String::from_utf8(bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "inline embedded-object XML is not valid UTF-8: {error}"
+        ))
     })?;
     object.inline_xml = Some((capture.root, xml));
     Ok(())
@@ -982,7 +1035,7 @@ fn limited_attribute(
     let value = attribute(reader, element, namespace, local_name)?;
     if value
         .as_ref()
-        .is_some_and(|value| value.len() > MAX_ATTRIBUTE_BYTES)
+        .is_some_and(|attribute_value| attribute_value.len() > MAX_ATTRIBUTE_BYTES)
     {
         return Err(Error::InvalidFormat(format!(
             "embedded-object attribute exceeds {MAX_ATTRIBUTE_BYTES} bytes"
@@ -1001,7 +1054,7 @@ fn attribute(
 }
 
 fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(namespace)) if *namespace == expected)
+    matches!(namespace, ResolveResult::Bound(Namespace(bound_namespace)) if *bound_namespace == expected)
 }
 
 #[cfg(test)]
@@ -1012,11 +1065,11 @@ mod active_object_tests {
     const SUFFIX: &str = "</o:drawing></o:body></o:document>";
 
     #[test]
-    fn retains_applets_plugins_and_floating_frames_inertly() {
+    fn retains_applets_plugins_and_floating_frames_inertly() -> Result<()> {
         let xml = format!(
             r#"{PREFIX}<d:frame d:name="Applet"><d:applet x:href="https://example.invalid/app" d:code="Main" d:archive="app.jar" d:may-script="true"><d:param d:name="theme" d:value="dark"/></d:applet></d:frame><d:frame><d:plugin x:href="media.bin" d:mime-type="application/x-example"><d:param d:name="quality" d:value="high"></d:param></d:plugin></d:frame><d:frame><d:floating-frame x:href="https://example.invalid/frame" d:frame-name="preview"/></d:frame>{SUFFIX}"#
         );
-        let objects = scan_flat(&xml).unwrap();
+        let objects = scan_flat(&xml)?;
         assert_eq!(objects.len(), 3);
         assert_eq!(objects[0].kind, Kind::Applet);
         assert_eq!(objects[0].code.as_deref(), Some("Main"));
@@ -1030,6 +1083,7 @@ mod active_object_tests {
         );
         assert_eq!(objects[2].kind, Kind::FloatingFrame);
         assert_eq!(objects[2].frame_name.as_deref(), Some("preview"));
+        Ok(())
     }
 
     #[test]
@@ -1038,7 +1092,7 @@ mod active_object_tests {
             r#"<d:applet d:may-script="yes"/>"#,
             r#"<d:plugin><d:param d:value="x"/></d:plugin>"#,
             r#"<d:floating-frame><d:param d:name="x" d:value="y"/></d:floating-frame>"#,
-            r#"<d:plugin><d:applet/></d:plugin>"#,
+            r"<d:plugin><d:applet/></d:plugin>",
         ] {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
             assert!(scan_flat(&xml).is_err(), "accepted {body}");

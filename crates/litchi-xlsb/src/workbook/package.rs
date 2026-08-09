@@ -2,6 +2,7 @@
 
 use super::model::Workbook;
 use crate::calc::Props;
+use crate::cell_values;
 use crate::cell_watches;
 use crate::package::error::Result;
 use crate::package::formula::{Context, View, excel_name_eq, table::Definition as TableDefinition};
@@ -30,6 +31,40 @@ const CHART_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
 ];
 
 impl Workbook {
+    /// Read the source-bound, editable `BrtCellReal` values on one worksheet.
+    ///
+    /// This is deliberately limited to existing finite IEEE-754 value fields;
+    /// it does not create cells or alter formulas, strings, RK values, or
+    /// styles.
+    pub fn cell_values(&self, worksheet_index: usize) -> Result<cell_values::Snapshot> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        cell_values::workbook::read(&self.package, &uri)
+    }
+
+    /// Start a detached, source-checked edit of existing `BrtCellReal` values.
+    pub fn edit_cell_values(&self, worksheet_index: usize) -> Result<cell_values::Edit> {
+        Ok(self.cell_values(worksheet_index)?.edit())
+    }
+
+    /// Apply an exact-source numeric-cell commit and refresh this workbook's
+    /// typed sheet cache only after whole-workbook readback succeeds.
+    pub fn apply_cell_values(
+        &mut self,
+        worksheet_index: usize,
+        commit: &cell_values::Commit,
+    ) -> Result<cell_values::Snapshot> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        let mut candidate = self.package.clone();
+        let snapshot = cell_values::workbook::apply(&mut candidate, &uri, commit)?;
+        *self = Self::from_opc_package(candidate)?;
+        Ok(snapshot)
+    }
+
+    /// Read editable numeric values from a worksheet selected by exact name.
+    pub fn cell_values_by_name(&self, worksheet_name: &str) -> Result<cell_values::Snapshot> {
+        self.cell_values(self.worksheet_index(worksheet_name)?)
+    }
+
     /// Read the optional sparkline groups selected by zero-based worksheet
     /// index using safe default limits.
     pub fn sparklines(&self, worksheet_index: usize) -> Result<sparkline::Snapshot> {

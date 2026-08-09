@@ -66,6 +66,46 @@ impl CfbPath {
     }
 }
 
+/// Iterates the Unicode simple-uppercase UTF-16 comparison units required by
+/// `[MS-CFB]` 2.6.4 without retaining a second copy of the component.
+struct UppercaseUnits<'a> {
+    input: std::str::EncodeUtf16<'a>,
+    pending: [u16; 2],
+    pending_len: usize,
+    pending_index: usize,
+}
+
+impl Iterator for UppercaseUnits<'_> {
+    type Item = u16;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pending_index < self.pending_len {
+            let value = self.pending[self.pending_index];
+            self.pending_index += 1;
+            return Some(value);
+        }
+
+        let unit = self.input.next()?;
+        if (0xD800..=0xDFFF).contains(&unit) {
+            return Some(unit);
+        }
+
+        let character = char::from_u32(u32::from(unit))?;
+        let mut uppercase = character.to_uppercase();
+        let first = uppercase.next()?;
+        if uppercase.next().is_some() {
+            // This is a multi-code-point mapping, not a simple mapping.
+            return Some(unit);
+        }
+
+        self.pending = [0; 2];
+        let encoded = first.encode_utf16(&mut self.pending);
+        self.pending_len = encoded.len();
+        self.pending_index = 1;
+        Some(self.pending[0])
+    }
+}
+
 fn validate_component(component: &str) -> Result<(), OleError> {
     if component.is_empty() {
         return Err(OleError::InvalidFormat(
@@ -107,15 +147,6 @@ fn same_component(left: &str, right: &str) -> bool {
         && uppercase_units(left).eq(uppercase_units(right))
 }
 
-/// Iterates the Unicode simple-uppercase UTF-16 comparison units required by
-/// `[MS-CFB]` 2.6.4 without retaining a second copy of the component.
-struct UppercaseUnits<'a> {
-    input: std::str::EncodeUtf16<'a>,
-    pending: [u16; 2],
-    pending_len: usize,
-    pending_index: usize,
-}
-
 fn uppercase_units(value: &str) -> UppercaseUnits<'_> {
     UppercaseUnits {
         input: value.encode_utf16(),
@@ -125,38 +156,12 @@ fn uppercase_units(value: &str) -> UppercaseUnits<'_> {
     }
 }
 
-impl Iterator for UppercaseUnits<'_> {
-    type Item = u16;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pending_index < self.pending_len {
-            let value = self.pending[self.pending_index];
-            self.pending_index += 1;
-            return Some(value);
-        }
-
-        let unit = self.input.next()?;
-        if (0xD800..=0xDFFF).contains(&unit) {
-            return Some(unit);
-        }
-
-        let character = char::from_u32(u32::from(unit))?;
-        let mut uppercase = character.to_uppercase();
-        let first = uppercase.next()?;
-        if uppercase.next().is_some() {
-            // This is a multi-code-point mapping, not a simple mapping.
-            return Some(unit);
-        }
-
-        self.pending = [0; 2];
-        let encoded = first.encode_utf16(&mut self.pending);
-        self.pending_len = encoded.len();
-        self.pending_index = 1;
-        Some(self.pending[0])
-    }
-}
-
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "tests use concise assertions while exercising fallible validation paths"
+)]
 mod tests {
     use super::{CfbPath, same_component};
 

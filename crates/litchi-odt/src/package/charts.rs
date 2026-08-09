@@ -531,7 +531,11 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<ObjectSpan>> {
                 if active.as_ref().is_some_and(|object| object.depth == depth)
                     && is_object(namespace, element.local_name().as_ref())
                 {
-                    let object = active.take().expect("active object");
+                    let object = active.take().ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "embedded-object XML lost its active object element".to_string(),
+                        )
+                    })?;
                     spans.push(ObjectSpan {
                         start: object.start,
                         end: event_end,

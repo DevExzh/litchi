@@ -17,17 +17,32 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parses and retains a bounded OLEDS link stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stream is malformed or exceeds the OLEDS
+    /// metadata limit.
     pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
         Self::parse_shared(Arc::<[u8]>::from(bytes))
     }
 
     /// Parses an already shared OLEDS link stream without copying its bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stream is malformed or exceeds the OLEDS
+    /// metadata limit.
     pub fn parse_shared(bytes: Arc<[u8]>) -> Result<Self, OleError> {
         let link = Link::parse_shared(bytes)?;
         Self::from_link(link)
     }
 
     /// Captures an existing parsed link as a source-preserving snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parsed link has inconsistent field offsets or
+    /// otherwise violates the OLEDS layout invariants.
     pub fn from_link(link: Link) -> Result<Self, OleError> {
         validation::validate(&link)?;
         let revision = Revision::of(link.bytes());
@@ -70,8 +85,8 @@ impl Snapshot {
         Transaction::new(self.clone())
     }
 
-    pub(crate) fn patch_to(&self, after: Snapshot) -> Patch {
-        Patch::new(self.clone(), after)
+    pub(crate) fn patch_to(&self, after: &Snapshot) -> Patch {
+        Patch::new(self, after)
     }
 }
 

@@ -1,7 +1,8 @@
 //! Core ODF parsing functionality.
 //!
-//! This module provides the fundamental building blocks for parsing OpenDocument files.
-//! It handles ZIP package management, XML parsing, manifest processing, and metadata extraction.
+//! This module provides the fundamental building blocks for parsing
+//! `OpenDocument` files. It handles ZIP package management, XML parsing,
+//! manifest processing, and metadata extraction.
 //!
 //! # Implementation Progress
 //!
@@ -70,7 +71,10 @@ pub mod xml;
 // Manifest is internal to the package system
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
 pub use family::{Package, validate_content_part};
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "The manifest descriptors are intentionally re-exported as the core public API."
+)]
 pub use manifest::{
     Manifest, ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption,
     ManifestEncryptionAlgorithm, ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration,

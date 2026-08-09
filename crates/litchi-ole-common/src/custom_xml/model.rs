@@ -88,15 +88,18 @@ pub enum Promotion {
 pub struct ItemId([u8; 16]);
 
 impl ItemId {
+    #[must_use]
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
 
+    #[must_use]
     pub const fn as_bytes(&self) -> &[u8; 16] {
         &self.0
     }
 
     /// Produce a compact, case-insensitive-safe storage name for new items.
+    #[must_use]
     pub fn storage_name(self) -> String {
         const ALPHABET: &[u8; 32] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
         let mut output = String::with_capacity(26);
@@ -136,7 +139,7 @@ impl FromStr for ItemId {
     fn from_str(value: &str) -> Result<Self> {
         let Some(inner) = value
             .strip_prefix('{')
-            .and_then(|value| value.strip_suffix('}'))
+            .and_then(|candidate| candidate.strip_suffix('}'))
         else {
             return Err(invalid("itemID is not a braced GUID"));
         };
@@ -150,16 +153,16 @@ impl FromStr for ItemId {
         }
         let mut bytes = [0; 16];
         for (nibble, byte) in inner.bytes().filter(|byte| *byte != b'-').enumerate() {
-            let value = match byte {
+            let nibble_value = match byte {
                 b'0'..=b'9' => byte - b'0',
                 b'a'..=b'f' => byte - b'a' + 10,
                 b'A'..=b'F' => byte - b'A' + 10,
                 _ => return Err(invalid("itemID contains a non-hexadecimal digit")),
             };
             if nibble.is_multiple_of(2) {
-                bytes[nibble / 2] = value << 4;
+                bytes[nibble / 2] = nibble_value << 4;
             } else {
-                bytes[nibble / 2] |= value;
+                bytes[nibble / 2] |= nibble_value;
             }
         }
         Ok(Self(bytes))
@@ -203,19 +206,25 @@ pub struct Item {
 }
 
 impl Item {
+    /// Construct an item after validating both its payload and properties.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the storage name, item XML, or properties violate
+    /// the default Custom XML limits.
     pub fn new(
         storage_name: impl Into<String>,
         xml: Vec<u8>,
         properties: Properties,
     ) -> Result<Self> {
         let limits = Limits::default();
-        let storage_name = storage_name.into();
-        super::codec::validate_storage_name(&storage_name)?;
+        let name = storage_name.into();
+        super::codec::validate_storage_name(&name)?;
         let root_name = super::xml::validate_payload(&xml, &limits)?;
         super::codec::validate_properties(&properties, &limits)?;
         let properties_xml = super::codec::write_properties(&properties)?;
         Ok(Self {
-            storage_name,
+            storage_name: name,
             xml: Arc::from(xml),
             root_name,
             properties_xml: Arc::from(properties_xml),
@@ -223,18 +232,22 @@ impl Item {
         })
     }
 
+    #[must_use]
     pub fn storage_name(&self) -> &str {
         &self.storage_name
     }
 
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.xml
     }
 
+    #[must_use]
     pub fn root_name(&self) -> &RootName {
         &self.root_name
     }
 
+    #[must_use]
     pub fn kind(&self) -> ItemKind {
         match self.root_name.namespace.as_deref() {
             Some(CUSTOM_PROPERTY_EDITOR_NAMESPACE) => ItemKind::CustomPropertyEditor,
@@ -247,14 +260,21 @@ impl Item {
         }
     }
 
+    #[must_use]
     pub fn properties_xml(&self) -> &[u8] {
         &self.properties_xml
     }
 
+    #[must_use]
     pub fn properties(&self) -> &Properties {
         &self.properties
     }
 
+    /// Replace the item XML after validating its bounded root projection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `xml` is malformed or exceeds the default limits.
     pub fn set_xml(&mut self, xml: Vec<u8>) -> Result<()> {
         let root_name = super::xml::validate_payload(&xml, &Limits::default())?;
         self.xml = Arc::from(xml);
@@ -262,6 +282,11 @@ impl Item {
         Ok(())
     }
 
+    /// Replace the typed Properties projection and serialize it deterministically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `properties` violates the default format limits.
     pub fn set_properties(&mut self, properties: Properties) -> Result<()> {
         super::codec::validate_properties(&properties, &Limits::default())?;
         self.properties_xml = Arc::from(super::codec::write_properties(&properties)?);
@@ -278,12 +303,19 @@ pub struct Store {
 }
 
 impl Store {
+    /// Construct a complete validated store.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an item or its aggregate store state violates the
+    /// default Custom XML limits.
     pub fn new(promotion: Promotion, items: Vec<Item>) -> Result<Self> {
         let value = Self { promotion, items };
         super::codec::validate_store(&value, &Limits::default())?;
         Ok(value)
     }
 
+    #[must_use]
     pub fn items(&self) -> &[Item] {
         &self.items
     }
@@ -292,6 +324,12 @@ impl Store {
         &mut self.items
     }
 
+    /// Append one item while preserving unique storage names and identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `item` duplicates an existing name or identifier,
+    /// or would exceed the default item limit.
     pub fn push(&mut self, item: Item) -> Result<()> {
         if self.items.iter().any(|existing| {
             existing

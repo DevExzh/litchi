@@ -13,6 +13,7 @@ pub enum Type {
 
 impl Type {
     /// Return the raw eight-bit toolbar kind.
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::Basic => 0,
@@ -25,7 +26,7 @@ impl Type {
         match value {
             0 => Self::Basic,
             2 => Self::Menu,
-            value => Self::Unknown(value),
+            unknown => Self::Unknown(unknown),
         }
     }
 
@@ -60,8 +61,13 @@ impl Restrictions {
     const RESERVED_MASK: u32 = 0xFDFF_F600;
 
     /// Construct the canonical default restrictions for a toolbar kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `kind` is not supported by the shared toolbar
+    /// model.
     pub fn new(kind: Type) -> Result<Self, Error> {
-        let mut raw = (kind.raw() as u32) << 24;
+        let mut raw = u32::from(kind.raw()) << 24;
         if matches!(kind, Type::Menu) {
             raw |= (1 << 1) | (1 << 2) | (1 << 4) | (1 << 7) | (1 << 8) | (1 << 11);
         }
@@ -71,11 +77,17 @@ impl Restrictions {
     }
 
     /// Retain a raw wire value, including reserved bits.
+    #[must_use]
     pub const fn from_raw(raw: u32) -> Self {
         Self { raw }
     }
 
     /// Construct from a raw value after checking required invariants.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the kind, reserved bits, or popup restrictions are
+    /// invalid.
     pub fn try_from_raw(raw: u32) -> Result<Self, Error> {
         let value = Self::from_raw(raw);
         value.validate()?;
@@ -83,114 +95,139 @@ impl Restrictions {
     }
 
     /// Return the exact serialized flag word.
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.raw
     }
 
     /// Return all reserved bits exactly as they appeared on the wire.
+    #[must_use]
     pub const fn reserved_bits(self) -> u32 {
         self.raw & Self::RESERVED_MASK
     }
 
     /// Return the toolbar kind encoded in the most significant byte.
+    #[must_use]
     pub const fn toolbar_type(self) -> Type {
         Type::from_raw((self.raw >> 24) as u8)
     }
 
+    #[must_use]
     pub const fn no_add_delete_control(self) -> bool {
         self.raw & (1 << 0) != 0
     }
 
+    #[must_use]
     pub const fn no_resize(self) -> bool {
         self.raw & (1 << 1) != 0
     }
 
+    #[must_use]
     pub const fn no_move(self) -> bool {
         self.raw & (1 << 2) != 0
     }
 
+    #[must_use]
     pub const fn no_change_visible(self) -> bool {
         self.raw & (1 << 3) != 0
     }
 
+    #[must_use]
     pub const fn no_change_dock(self) -> bool {
         self.raw & (1 << 4) != 0
     }
 
+    #[must_use]
     pub const fn no_vertical_dock(self) -> bool {
         self.raw & (1 << 5) != 0
     }
 
+    #[must_use]
     pub const fn no_horizontal_dock(self) -> bool {
         self.raw & (1 << 6) != 0
     }
 
+    #[must_use]
     pub const fn no_border(self) -> bool {
         self.raw & (1 << 7) != 0
     }
 
+    #[must_use]
     pub const fn no_context_menu(self) -> bool {
         self.raw & (1 << 8) != 0
     }
 
+    #[must_use]
     pub const fn not_top_level(self) -> bool {
         self.raw & (1 << 11) != 0
     }
 
+    #[must_use]
     pub const fn popup_menu(self) -> bool {
         self.raw & (1 << 25) != 0
     }
 
+    #[must_use]
     pub fn with_no_add_delete_control(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 0, value);
         self
     }
 
+    #[must_use]
     pub fn with_no_resize(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 1, value);
         self
     }
 
+    #[must_use]
     pub fn with_no_move(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 2, value);
         self
     }
 
+    #[must_use]
     pub fn with_no_change_visible(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 3, value);
         self
     }
 
+    #[must_use]
     pub fn with_no_change_dock(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 4, value);
         self
     }
 
+    #[must_use]
     pub fn with_no_vertical_dock(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 5, value);
         self
     }
 
+    #[must_use]
     pub fn with_no_horizontal_dock(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 6, value);
         self
     }
 
+    #[must_use]
     pub fn with_no_border(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 7, value);
         self
     }
 
+    #[must_use]
     pub fn with_no_context_menu(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 8, value);
         self
     }
 
+    #[must_use]
     pub fn with_not_top_level(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 11, value);
         self
     }
 
+    #[must_use]
     pub fn with_popup_menu(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 25, value);
         self
@@ -217,17 +254,6 @@ impl Restrictions {
     }
 }
 
-fn set_bit<T>(raw: T, bit: u32, value: bool) -> T
-where
-    T: BitOps,
-{
-    if value {
-        raw | T::one() << bit
-    } else {
-        raw & !(T::one() << bit)
-    }
-}
-
 trait BitOps:
     Copy
     + std::ops::BitOr<Output = Self>
@@ -241,5 +267,16 @@ trait BitOps:
 impl BitOps for u32 {
     fn one() -> Self {
         1
+    }
+}
+
+fn set_bit<T>(raw: T, bit: u32, value: bool) -> T
+where
+    T: BitOps,
+{
+    if value {
+        raw | T::one() << bit
+    } else {
+        raw & !(T::one() << bit)
     }
 }

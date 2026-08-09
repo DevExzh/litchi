@@ -44,6 +44,7 @@ impl Style {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Linear => "linear",
@@ -61,6 +62,11 @@ impl Style {
 pub struct Percent(f64);
 
 impl Percent {
+    /// Creates a percentage within the ODF opacity range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is non-finite or outside `0%..=100%`.
     pub fn new(value: f64) -> Result<Self> {
         if !value.is_finite() || !(0.0..=100.0).contains(&value) {
             return invalid("opacity percentage must be between 0% and 100%");
@@ -68,6 +74,7 @@ impl Percent {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.0
     }
@@ -84,6 +91,11 @@ impl fmt::Display for Percent {
 pub struct GeometryPercent(f64);
 
 impl GeometryPercent {
+    /// Creates a finite signed ODF geometry percentage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is not finite.
     pub fn new(value: f64) -> Result<Self> {
         if !value.is_finite() {
             return invalid("opacity geometry percentage must be finite");
@@ -91,6 +103,7 @@ impl GeometryPercent {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.0
     }
@@ -107,12 +120,19 @@ impl fmt::Display for GeometryPercent {
 pub struct Angle(String);
 
 impl Angle {
+    /// Creates a validated ODF angle lexical value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the value is empty, oversized, or contains a prohibited control
+    /// character.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_text(&value, "draw:angle", false)?;
-        Ok(Self(value))
+        let angle = value.into();
+        validate_text(&angle, "draw:angle", false)?;
+        Ok(Self(angle))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -127,6 +147,11 @@ pub enum StopValue {
 }
 
 impl StopValue {
+    /// Creates a stop coordinate or opacity expressed as a fraction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is non-finite or outside `0..=1`.
     pub fn fraction(value: f64) -> Result<Self> {
         if !value.is_finite() || !(0.0..=1.0).contains(&value) {
             return invalid("opacity stop fraction must be between 0 and 1");
@@ -138,8 +163,8 @@ impl StopValue {
         if let Some(number) = value.strip_suffix('%') {
             return Ok(Self::Percent(parse_bounded_percent(number, name)?));
         }
-        let value = parse_decimal(value, false, name)?;
-        Self::fraction(value)
+        let parsed_value = parse_decimal(value, false, name)?;
+        Self::fraction(parsed_value)
     }
 }
 
@@ -175,6 +200,11 @@ pub struct Definition {
 }
 
 impl Definition {
+    /// Validates all names, dimensions, and extension stops in this definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any value is invalid or resource limits are exceeded.
     pub fn validate(&self) -> Result<()> {
         if let Some(name) = &self.name {
             validate_text(name, "draw:name", false)?;
@@ -210,6 +240,11 @@ impl Definition {
         Ok(())
     }
 
+    /// Serializes this definition as a standalone XML fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the definition fails validation.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(256 + self.extension_stops.len() * 96);
@@ -225,12 +260,18 @@ pub struct Collection {
 }
 
 impl Collection {
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Definition> {
         self.opacities
             .iter()
             .find(|opacity| opacity.name.as_deref() == Some(name))
     }
 
+    /// Validates every opacity definition and collection-wide resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a definition is invalid, names collide, or a limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         if self.opacities.len() > MAX_OPACITIES {
             return invalid(format!("drawing styles exceed {MAX_OPACITIES} opacities"));
@@ -265,6 +306,11 @@ impl Collection {
         Ok(())
     }
 
+    /// Serializes the collection in an `office:styles` XML wrapper.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the collection fails validation.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(256 + self.opacities.len() * 256);
@@ -302,6 +348,12 @@ struct ActiveDefinition {
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
+/// Parses drawing opacity-gradient resources from an `office:styles` XML fragment.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed, violates the ODF resource grammar, or exceeds a
+/// configured resource limit.
 pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
     if !xml.contains("opacity") {
         return Ok(Collection::default());
@@ -384,9 +436,10 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "opacity" {
                         return invalid("unexpected draw:opacity end element");
                     }
-                    result
-                        .opacities
-                        .push(active.take().expect("active opacity checked").value);
+                    let opacity = active.take().ok_or_else(|| {
+                        make_error("drawing opacity ended without an active definition")
+                    })?;
+                    result.opacities.push(opacity.value);
                 }
             },
             Event::Text(ref text) if active.is_some() => {
@@ -404,7 +457,11 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
                 return invalid("DTDs and processing instructions are prohibited in opacities");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -521,7 +578,7 @@ fn parse_decimal(value: &str, signed: bool, name: &str) -> Result<f64> {
     }
     value
         .parse::<f64>()
-        .map_err(|_| make_error(format!("invalid {name} value '{value}'")))
+        .map_err(|error| make_error(format!("invalid {name} value '{value}': {error}")))
 }
 
 fn attributes(
@@ -530,12 +587,12 @@ fn attributes(
     aggregate: &mut usize,
 ) -> Result<Attributes> {
     let mut values = HashMap::new();
-    for attribute in element.attributes().with_checks(true) {
-        let attribute =
-            attribute.map_err(|error| make_error(format!("invalid opacity attribute: {error}")))?;
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+    for attribute_result in element.attributes().with_checks(true) {
+        let attribute = attribute_result
+            .map_err(|error| make_error(format!("invalid opacity attribute: {error}")))?;
+        let (resolved, raw_local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_kind(&resolved)?;
-        let local = decode(local.as_ref(), "attribute name")?;
+        let local = decode(raw_local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|error| make_error(format!("invalid opacity attribute: {error}")))?
@@ -632,10 +689,10 @@ fn reject_attributes(values: &Attributes, element: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_stop_value(value: StopValue) -> Result<()> {
-    match value {
-        StopValue::Fraction(value) => StopValue::fraction(value).map(|_| ()),
-        StopValue::Percent(value) => Percent::new(value.0).map(|_| ()),
+fn validate_stop_value(stop_value: StopValue) -> Result<()> {
+    match stop_value {
+        StopValue::Fraction(fraction) => StopValue::fraction(fraction).map(|_| ()),
+        StopValue::Percent(percent) => Percent::new(percent.0).map(|_| ()),
     }
 }
 
@@ -730,7 +787,7 @@ fn canonical_number(value: f64) -> String {
 fn decode(value: &[u8], what: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| make_error(format!("invalid UTF-8 in opacity {what}")))
+        .map_err(|error| make_error(format!("invalid UTF-8 in opacity {what}: {error}")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

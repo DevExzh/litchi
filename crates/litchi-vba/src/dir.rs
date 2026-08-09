@@ -558,13 +558,10 @@ pub(crate) fn encode_mbcs(
     if value.contains('\0') {
         return Err(invalid(format!("{field} contains a null character")));
     }
-    let encoded = match encoding.encode(value) {
-        Ok(encoded) => encoded,
-        Err(_) => {
-            return Err(invalid(format!(
-                "{field} is not representable in the project code page"
-            )));
-        },
+    let Ok(encoded) = encoding.encode(value) else {
+        return Err(invalid(format!(
+            "{field} is not representable in the project code page"
+        )));
     };
     if encoded.contains(&0) {
         return Err(invalid(format!("{field} encodes to a null byte")));
@@ -760,13 +757,10 @@ fn decode_mbcs(bytes: &[u8], encoding: Mbcs, field: &'static str) -> Result<Stri
     if bytes.contains(&0) {
         return Err(invalid(format!("{field} contains a null byte")));
     }
-    let decoded = match encoding.decode(bytes) {
-        Ok(decoded) => decoded,
-        Err(_) => {
-            return Err(invalid(format!(
-                "{field} is invalid for the project code page"
-            )));
-        },
+    let Ok(decoded) = encoding.decode(bytes) else {
+        return Err(invalid(format!(
+            "{field} is invalid for the project code page"
+        )));
     };
     Ok(decoded.into_owned())
 }
@@ -779,10 +773,9 @@ fn decode_utf16(bytes: &[u8], field: &'static str) -> Result<String, Error> {
         .chunks_exact(2)
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
     let mut value = String::with_capacity(bytes.len() / 2);
-    for character in char::decode_utf16(code_units) {
-        let character = match character {
-            Ok(character) => character,
-            Err(_) => return Err(invalid(format!("{field} contains invalid UTF-16"))),
+    for decoded_unit in char::decode_utf16(code_units) {
+        let Ok(character) = decoded_unit else {
+            return Err(invalid(format!("{field} contains invalid UTF-16")));
         };
         if character == '\0' {
             return Err(invalid(format!("{field} contains a null character")));

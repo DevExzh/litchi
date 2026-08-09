@@ -38,6 +38,28 @@ fn pages_paragraph_texts(package: &litchi_pages::Package) -> impl Iterator<Item 
     })
 }
 
+/// Section properties affect pagination, not the linear body stream.  They
+/// appear as an opaque body child in DOCX's lossless ordered-block view, but
+/// have no standalone Markdown representation and must not make an otherwise
+/// textual document unexportable.
+#[cfg(feature = "docx")]
+pub(crate) fn docx_unknown_is_section_properties(block: &crate::docx::OpaqueBlock) -> bool {
+    let bytes = block.xml_bytes();
+    let Some(open) = bytes.iter().position(|byte| *byte == b'<') else {
+        return false;
+    };
+    let name_start = open.saturating_add(1);
+    let Some(name_end) = bytes[name_start..]
+        .iter()
+        .position(|byte| matches!(*byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>'))
+        .map(|offset| name_start.saturating_add(offset))
+    else {
+        return false;
+    };
+    let name = &bytes[name_start..name_end];
+    name == b"sectPr" || name.strip_prefix(b"w:") == Some(b"sectPr")
+}
+
 #[cfg(feature = "rtf")]
 fn rtf_timestamp_to_naive(
     timestamp: Option<litchi_rtf::RtfTimestamp>,
@@ -195,6 +217,16 @@ impl Document {
             #[cfg(feature = "docx")]
             DocumentImpl::Docx(package, _) => {
                 let document = package.document().map_err(crate::map_ooxml_error)?;
+                if document
+                    .elements()
+                    .map_err(crate::map_ooxml_error)?
+                    .iter()
+                    .any(|element| {
+                        matches!(element, crate::docx::Element::Unknown(block) if !docx_unknown_is_section_properties(block))
+                    })
+                {
+                    return Err(unsupported("unmodeled DOCX body blocks"));
+                }
                 if !document
                     .hyperlinks()
                     .map_err(crate::map_ooxml_error)?
@@ -263,6 +295,30 @@ impl Document {
     #[cfg(feature = "markdown")]
     pub(crate) fn markdown_heading_levels(&self) -> Result<Vec<Option<u8>>> {
         match &self.inner {
+            #[cfg(feature = "pages")]
+            DocumentImpl::Pages(document) => {
+                // `Section::heading` is the only Pages body value whose
+                // semantic role is richer than plain paragraph text.  The
+                // facade emits it first for every section, so retain that
+                // role in an equally ordered sidecar rather than guessing
+                // from its spelling or visual style.
+                let mut levels = Vec::new();
+                for section in document.sections() {
+                    if section.heading().is_some() {
+                        levels.push(Some(1));
+                    }
+                    levels.extend(std::iter::repeat_n(None, section.paragraphs().len()));
+                    levels.extend(std::iter::repeat_n(
+                        None,
+                        section
+                            .text_storages()
+                            .iter()
+                            .filter(|storage| !storage.is_empty())
+                            .count(),
+                    ));
+                }
+                Ok(levels)
+            },
             #[cfg(feature = "odt")]
             DocumentImpl::Odt(document) => {
                 use litchi_odt::elements::parser::OrderElement;
@@ -782,17 +838,34 @@ impl Document {
                     .document()
                     .and_then(|document| document.elements())
                     .map_err(crate::map_ooxml_error)?;
-                Ok(raw
-                    .into_iter()
-                    .map(|el| match el {
+                let mut elements = Vec::new();
+                elements
+                    .try_reserve_exact(raw.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "unified DOCX document elements",
+                        source,
+                    })?;
+                for element in raw {
+                    match element {
                         Element::Paragraph(p) => {
-                            DocumentElement::Paragraph(Box::new(super::Paragraph::Docx(*p)))
+                            elements.push(DocumentElement::Paragraph(Box::new(
+                                super::Paragraph::Docx(*p),
+                            )));
                         },
                         Element::Table(t) => {
-                            DocumentElement::Table(Box::new(super::Table::Docx(t)))
+                            elements.push(DocumentElement::Table(Box::new(super::Table::Docx(t))));
                         },
-                    })
-                    .collect())
+                        Element::Unknown(block) => {
+                            if !docx_unknown_is_section_properties(&block) {
+                                return Err(Error::Unsupported(
+                                    "The unified document facade cannot represent an active unmodeled DOCX body block"
+                                        .to_owned(),
+                                ));
+                            }
+                        },
+                    }
+                }
+                Ok(elements)
             },
             #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => {

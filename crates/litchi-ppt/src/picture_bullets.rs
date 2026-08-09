@@ -332,10 +332,10 @@ mod tests {
     #[test]
     fn decodes_direct_and_fbse_picture_bullets() {
         let direct = PictureBulletCollection::parse(&collection(png_bullet(1))).unwrap();
-        assert_eq!(direct.get(1).unwrap().blip().unwrap().data(), []);
+        assert_eq!(direct.get(1).unwrap().blip().unwrap().data(), b"");
 
         let embedded = PictureBulletCollection::parse(&collection(fbse_png_bullet(2))).unwrap();
-        assert_eq!(embedded.get(2).unwrap().blip().unwrap().data(), []);
+        assert_eq!(embedded.get(2).unwrap().blip().unwrap().data(), b"");
     }
 
     #[test]

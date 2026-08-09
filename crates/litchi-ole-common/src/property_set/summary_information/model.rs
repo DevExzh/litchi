@@ -1,4 +1,4 @@
-//! Semantic PIDSI values and immutable SummaryInformation snapshots.
+//! Semantic PIDSI values and immutable `SummaryInformation` snapshots.
 
 use super::super::binding::Binding;
 use super::super::codec::PropertySetReader;
@@ -10,7 +10,7 @@ use chrono::{DateTime, Duration, Utc};
 use litchi_cfb::{OleError, OleFile};
 use std::io::{Read, Seek};
 
-/// The SummaryInformation CodePage property identifier.
+/// The `SummaryInformation` `CodePage` property identifier.
 pub const CODEPAGE: u32 = super::super::model::PID_CODEPAGE;
 /// The document title property identifier.
 pub const TITLE: u32 = 0x0000_0002;
@@ -49,9 +49,9 @@ pub const APP_NAME: u32 = 0x0000_0012;
 /// The suggested document-security flag property identifier.
 pub const DOC_SECURITY: u32 = 0x0000_0013;
 
-/// Maximum UTF-8 payload accepted by a typed SummaryInformation string edit.
+/// Maximum UTF-8 payload accepted by a typed `SummaryInformation` string edit.
 pub const MAX_TEXT_BYTES: usize = super::super::model::MAX_TYPED_TEXT_BYTES;
-/// Maximum thumbnail payload accepted by the typed SummaryInformation owner.
+/// Maximum thumbnail payload accepted by the typed `SummaryInformation` owner.
 pub const MAX_THUMBNAIL_BYTES: usize = 16 * 1024 * 1024;
 
 /// A lossless 64-bit OLE FILETIME value.
@@ -60,16 +60,19 @@ pub struct FileTime(u64);
 
 impl FileTime {
     /// Creates a FILETIME from its exact wire value.
+    #[must_use]
     pub const fn from_raw(raw: u64) -> Self {
         Self(raw)
     }
 
     /// Returns the exact 100-nanosecond wire value.
+    #[must_use]
     pub const fn raw(self) -> u64 {
         self.0
     }
 
     /// Converts a timestamp FILETIME to UTC when it fits chrono's range.
+    #[must_use]
     pub fn date_time(self) -> Option<DateTime<Utc>> {
         const EPOCH_DIFF: i64 = 116_444_736_000_000_000;
         let ticks = i64::try_from(self.0).ok()?;
@@ -78,12 +81,18 @@ impl FileTime {
     }
 
     /// Converts an editing-time FILETIME to a nonnegative duration.
+    #[must_use]
     pub fn duration(self) -> Option<Duration> {
         let nanos = self.0.checked_mul(100)?;
         Some(Duration::nanoseconds(i64::try_from(nanos).ok()?))
     }
 
     /// Encodes a UTC timestamp without losing sub-100-nanosecond precision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the timestamp is outside the FILETIME range or is
+    /// not exactly representable in 100-nanosecond ticks.
     pub fn from_date_time(value: DateTime<Utc>) -> Result<Self, OleError> {
         const EPOCH_DIFF: i64 = 116_444_736_000_000_000;
         let nanos = value
@@ -96,17 +105,22 @@ impl FileTime {
         }
         let ticks = nanos
             .checked_div(100)
-            .and_then(|value| value.checked_add(EPOCH_DIFF))
+            .and_then(|ticks| ticks.checked_add(EPOCH_DIFF))
             .ok_or_else(|| invalid("FILETIME timestamp conversion overflow"))?;
         if ticks < 0 {
             return Err(invalid("DateTime cannot be represented as FILETIME"));
         }
-        Ok(Self(u64::try_from(ticks).map_err(|_| {
+        Ok(Self(u64::try_from(ticks).map_err(|_conversion_error| {
             invalid("DateTime cannot be represented as FILETIME")
         })?))
     }
 
     /// Encodes a nonnegative duration without losing sub-100-nanosecond precision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the duration is negative, outside the FILETIME
+    /// range, or not exactly representable in 100-nanosecond ticks.
     pub fn from_duration(value: Duration) -> Result<Self, OleError> {
         let nanos = value
             .num_nanoseconds()
@@ -116,13 +130,13 @@ impl FileTime {
                 "Editing duration must be a nonnegative multiple of 100 nanoseconds",
             ));
         }
-        Ok(Self(u64::try_from(nanos / 100).map_err(|_| {
-            invalid("Editing duration cannot be represented as FILETIME")
-        })?))
+        Ok(Self(u64::try_from(nanos / 100).map_err(
+            |_conversion_error| invalid("Editing duration cannot be represented as FILETIME"),
+        )?))
     }
 }
 
-/// The clipboard tag carried by a SummaryInformation thumbnail.
+/// The clipboard tag carried by a `SummaryInformation` thumbnail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ClipboardTag {
     /// No image data is present.
@@ -135,6 +149,7 @@ pub enum ClipboardTag {
 
 impl ClipboardTag {
     /// Decodes a standard wire clipboard tag.
+    #[must_use]
     pub const fn from_raw(raw: u32) -> Option<Self> {
         match raw {
             0 => Some(Self::Empty),
@@ -145,6 +160,7 @@ impl ClipboardTag {
     }
 
     /// Returns the standard wire clipboard tag.
+    #[must_use]
     pub const fn raw(self) -> u32 {
         match self {
             Self::Empty => 0,
@@ -167,6 +183,7 @@ pub enum ImageFormat {
 
 impl ImageFormat {
     /// Decodes a standard image format identifier.
+    #[must_use]
     pub const fn from_raw(raw: u32) -> Option<Self> {
         match raw {
             0x0000_0003 => Some(Self::MetafilePict),
@@ -177,6 +194,7 @@ impl ImageFormat {
     }
 
     /// Returns the standard image format identifier.
+    #[must_use]
     pub const fn raw(self) -> u32 {
         match self {
             Self::MetafilePict => 0x0000_0003,
@@ -186,7 +204,7 @@ impl ImageFormat {
     }
 }
 
-/// A bounded, inert VtThumbnailValue payload used by PIDSI_THUMBNAIL.
+/// A bounded, inert `VtThumbnailValue` payload used by `PIDSI_THUMBNAIL`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Thumbnail {
     tag: ClipboardTag,
@@ -196,6 +214,11 @@ pub struct Thumbnail {
 
 impl Thumbnail {
     /// Creates a bounded thumbnail after checking tag/format presence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tag and image format are inconsistent or the
+    /// payload exceeds the typed thumbnail size limit.
     pub fn new(
         tag: ClipboardTag,
         format: Option<ImageFormat>,
@@ -220,6 +243,7 @@ impl Thumbnail {
     }
 
     /// Creates an explicit no-image thumbnail value.
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             tag: ClipboardTag::Empty,
@@ -229,31 +253,37 @@ impl Thumbnail {
     }
 
     /// The standard clipboard tag.
+    #[must_use]
     pub const fn tag(&self) -> ClipboardTag {
         self.tag
     }
 
     /// The standard image format, when image data is present.
+    #[must_use]
     pub const fn format(&self) -> Option<ImageFormat> {
         self.format
     }
 
     /// The inert thumbnail bytes.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
     /// The thumbnail byte length.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
     /// Whether the thumbnail payload is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
     /// Returns a zero-allocation borrowed view.
+    #[must_use]
     pub fn as_ref(&self) -> ThumbnailRef<'_> {
         ThumbnailRef {
             tag: self.tag,
@@ -273,7 +303,7 @@ impl Thumbnail {
         }
         data.extend_from_slice(&self.data);
         Ok(Value::Clipboard {
-            format: self.tag.raw() as i32,
+            format: i32::from_ne_bytes(self.tag.raw().to_ne_bytes()),
             data,
         })
     }
@@ -288,11 +318,15 @@ pub struct ThumbnailRef<'a> {
 }
 
 impl ThumbnailRef<'_> {
-    pub(crate) fn from_value<'a>(value: &'a Value) -> Result<ThumbnailRef<'a>, OleError> {
-        let Value::Clipboard { format, data } = value else {
+    pub(crate) fn from_value(value: &Value) -> Result<ThumbnailRef<'_>, OleError> {
+        let Value::Clipboard {
+            format: raw_format,
+            data,
+        } = value
+        else {
             return Err(invalid("SummaryInformation Thumbnail must be VT_CF"));
         };
-        let tag = ClipboardTag::from_raw(*format as u32)
+        let tag = ClipboardTag::from_raw(u32::from_ne_bytes(raw_format.to_ne_bytes()))
             .ok_or_else(|| invalid("SummaryInformation thumbnail has an unknown clipboard tag"))?;
         if tag == ClipboardTag::Empty {
             if !data.is_empty() {
@@ -312,36 +346,41 @@ impl ThumbnailRef<'_> {
             ));
         }
         let format_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-        let format = ImageFormat::from_raw(format_id)
+        let image_format = ImageFormat::from_raw(format_id)
             .ok_or_else(|| invalid("SummaryInformation thumbnail has an unknown image format"))?;
         Ok(ThumbnailRef {
             tag,
-            format: Some(format),
+            format: Some(image_format),
             data: &data[4..],
         })
     }
 
     /// The standard clipboard tag.
+    #[must_use]
     pub const fn tag(self) -> ClipboardTag {
         self.tag
     }
 
     /// The standard image format, when image data is present.
+    #[must_use]
     pub const fn format(self) -> Option<ImageFormat> {
         self.format
     }
 
     /// The inert thumbnail bytes.
+    #[must_use]
     pub const fn data(&self) -> &[u8] {
         self.data
     }
 
     /// The thumbnail byte length.
+    #[must_use]
     pub const fn len(self) -> usize {
         self.data.len()
     }
 
     /// Whether the thumbnail payload is empty.
+    #[must_use]
     pub const fn is_empty(self) -> bool {
         self.data.is_empty()
     }
@@ -364,31 +403,37 @@ impl DocumentSecurity {
     pub const KNOWN_BITS: Self = Self(0x0000_000F);
 
     /// Constructs flags while retaining unknown bits for lossless round trips.
+    #[must_use]
     pub const fn new(raw: u32) -> Self {
         Self(raw)
     }
 
     /// Returns an empty flag set.
+    #[must_use]
     pub const fn empty() -> Self {
         Self(0)
     }
 
-    /// Returns the exact PIDSI_DOC_SECURITY value.
+    /// Returns the exact `PIDSI_DOC_SECURITY` value.
+    #[must_use]
     pub const fn bits(self) -> u32 {
         self.0
     }
 
     /// Tests whether all bits in `flag` are present.
+    #[must_use]
     pub const fn contains(self, flag: Self) -> bool {
         self.0 & flag.0 == flag.0
     }
 
     /// Returns bits not currently assigned by the standard.
+    #[must_use]
     pub const fn unknown_bits(self) -> u32 {
         self.0 & !Self::KNOWN_BITS.0
     }
 
     /// Combines two checked flag sets.
+    #[must_use]
     pub const fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
     }
@@ -402,21 +447,30 @@ impl std::ops::BitOr for DocumentSecurity {
     }
 }
 
-/// An immutable, validated SummaryInformation property-set view.
+/// An immutable, validated `SummaryInformation` property-set view.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Snapshot {
     pub(crate) section: Section,
 }
 
 impl Snapshot {
-    /// Creates an empty SummaryInformation section with a required code page.
+    /// Creates an empty `SummaryInformation` section with a required code page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if constructing the section fails typed validation.
     pub fn new(page: CodePage) -> Result<Self, OleError> {
         let mut section = Section::new(SUMMARY_INFORMATION_FMTID);
         section.set_page(page);
         Self::from_section(&section)
     }
 
-    /// Validates and clones a generic SummaryInformation section.
+    /// Validates and clones a generic `SummaryInformation` section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the section violates the `SummaryInformation`
+    /// invariants or cannot be cloned.
     pub fn from_section(section: &Section) -> Result<Self, OleError> {
         super::validation::validate_section(section)?;
         Ok(Self {
@@ -424,7 +478,12 @@ impl Snapshot {
         })
     }
 
-    /// Projects SummaryInformation from a version-zero property-set stream.
+    /// Projects `SummaryInformation` from a version-zero property-set stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream version is unsupported, the required
+    /// section is absent, or the section fails typed validation.
     pub fn from_stream(stream: &Stream) -> Result<Self, OleError> {
         if stream.version != Stream::VERSION_0 {
             return Err(invalid(
@@ -437,33 +496,46 @@ impl Snapshot {
         Self::from_section(section)
     }
 
-    /// Reads the standard SummaryInformation stream from an opened CFB.
+    /// Reads the standard `SummaryInformation` stream from an opened CFB.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading or parsing the stream fails, or its section
+    /// does not satisfy the typed invariants.
     pub fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self, OleError> {
         let stream = ole.property_set(Binding::SummaryInformation)?;
         Self::from_stream(&stream)
     }
 
     /// Borrows the complete generic section, including opaque properties.
+    #[must_use]
     pub const fn section(&self) -> &Section {
         &self.section
     }
 
     /// Returns the declared section code page.
+    #[must_use]
     pub const fn codepage(&self) -> Option<CodePage> {
         self.section.page()
     }
 
     /// Returns a raw property for extension-specific inspection.
+    #[must_use]
     pub fn property(&self, identifier: u32) -> Option<&Value> {
         self.section.property(identifier)
     }
 
     /// Starts a source-bound transactional edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source section cannot be cloned for isolation.
     pub fn transaction(&self) -> Result<super::transaction::Transaction<'_>, OleError> {
         super::transaction::Transaction::from_snapshot(self)
     }
 
     /// Consumes the view into its complete generic section.
+    #[must_use]
     pub fn into_section(self) -> Section {
         self.section
     }

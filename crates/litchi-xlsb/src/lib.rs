@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod calc;
+pub mod cell_values;
 pub mod cell_watches;
 pub mod chart;
 pub mod comments;

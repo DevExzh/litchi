@@ -1,5 +1,11 @@
 //! Bounded ODP chart discovery and XML span codecs.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::items_after_statements,
+    reason = "the codec keeps parsing helpers beside the state machines that use them; reordering them would make the bounded scans harder to audit"
+)]
+
 use super::model::{Chart, Limits, Location, Page, Part, Storage};
 use crate::core::OwnedPackage;
 use litchi_core::{Error, Result};
@@ -95,7 +101,13 @@ pub(crate) fn inventory(source: &OwnedPackage, limits: Limits) -> Result<Vec<Cha
                     None,
                 )
             },
-            _ => continue,
+            Source::InlineXml { .. }
+            | Source::InlineBinary { .. }
+            | Source::PackageFile { .. }
+            | Source::MissingPackagePart { .. }
+            | Source::Linked { .. }
+            | Source::Missing
+            | _ => continue,
         };
 
         total_bytes = total_bytes
@@ -162,6 +174,10 @@ impl Part {
         })
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "the owned XML is retained by the returned source-backed chart part without a second allocation"
+    )]
     pub(crate) fn from_inline_with_limit(xml: String, max_bytes: usize) -> Result<Self> {
         let Some(media_type) = inline_mimetype(&xml)? else {
             return invalid("inline ODP chart has no office:mimetype");
@@ -267,7 +283,12 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<ObjectSpan>> {
                 },
                 Event::DocType(_) => return invalid("DTDs are not allowed in ODP chart hosts"),
                 Event::Eof => Token::Eof,
-                _ => Token::Other,
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => Token::Other,
             }
         };
         let end = position(&reader)?;
@@ -396,7 +417,12 @@ pub(crate) fn locate_pages(xml: &str) -> Result<Vec<PageSpan>> {
                 Event::End(_) => TokenPage::EndOther,
                 Event::DocType(_) => return invalid("DTDs are not allowed in ODP chart hosts"),
                 Event::Eof => TokenPage::Eof,
-                _ => TokenPage::Other,
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => TokenPage::Other,
             }
         };
         match token {
@@ -415,7 +441,7 @@ pub(crate) fn locate_pages(xml: &str) -> Result<Vec<PageSpan>> {
                 depth = checked_depth(depth)?;
             },
             TokenPage::Empty => return invalid("ODP chart host page cannot be empty"),
-            TokenPage::EmptyOther => {},
+            TokenPage::EmptyOther | TokenPage::Other => {},
             TokenPage::End => {
                 depth = depth
                     .checked_sub(1)
@@ -437,7 +463,6 @@ pub(crate) fn locate_pages(xml: &str) -> Result<Vec<PageSpan>> {
                     .ok_or_else(|| invalid_error("ODP page XML depth underflow"))?;
             },
             TokenPage::Eof => break,
-            TokenPage::Other => {},
         }
         buffer.clear();
     }
@@ -452,7 +477,7 @@ pub(crate) fn page_index(xml: &str, page: Page<'_>) -> Result<usize> {
     match page {
         Page::Index(index) => pages
             .get(index)
-            .map(|page| page.index)
+            .map(|candidate| candidate.index)
             .ok_or_else(|| invalid_error("ODP chart page selector is out of bounds")),
         Page::Name(name) => {
             let mut found = None;
@@ -488,7 +513,13 @@ fn inline_mimetype(xml: &str) -> Result<Option<String>> {
             Event::Text(value) if value.iter().all(u8::is_ascii_whitespace) => {},
             Event::Decl(_) | Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("inline ODP chart has no office:document root"),
-            _ => return invalid("inline ODP chart has invalid content before its root"),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {
+                return invalid("inline ODP chart has invalid content before its root");
+            },
         }
         buffer.clear();
     }
@@ -515,7 +546,13 @@ fn root_has_office_mimetype(xml: &str) -> Result<bool> {
             Event::Decl(_) | Event::Comment(_) | Event::PI(_) => {},
             Event::Text(value) if value.iter().all(u8::is_ascii_whitespace) => {},
             Event::Eof => return invalid("ODP chart XML has no document root"),
-            _ => return invalid("ODP chart XML has invalid content before its root"),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return invalid("ODP chart XML has invalid content before its root");
+            },
         }
         buffer.clear();
     }
@@ -587,8 +624,8 @@ fn read_attribute(
     local: &[u8],
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
-        let attribute = attribute
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute
             .map_err(|error| invalid_error(format!("invalid ODP XML attribute: {error}")))?;
         let (attribute_namespace, attribute_local) =
             reader.resolver().resolve_attribute(attribute.key);
@@ -615,7 +652,9 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
         ResolveResult::Bound(Namespace(value)) if *value == OFFICE_NS => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(value)) if *value == DRAW_NS => NamespaceKind::Draw,
-        _ => NamespaceKind::Other,
+        ResolveResult::Bound(_) | ResolveResult::Unbound | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 

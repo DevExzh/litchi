@@ -5,7 +5,6 @@ use super::model::{EntryKind, Links, Metadata, NOSTREAM, Sid};
 use super::validation;
 use crate::property_set::Guid;
 use litchi_cfb::{DirectoryEntry, OleError};
-use std::fmt::Write as _;
 
 pub(crate) fn decode(entry: &DirectoryEntry) -> Result<Metadata, OleError> {
     let kind = match entry.entry_type {
@@ -117,7 +116,7 @@ pub(crate) fn raw_equal(left: &DirectoryEntry, right: &DirectoryEntry) -> bool {
             .children
             .iter()
             .zip(&right.children)
-            .all(|(left, right)| raw_equal(left, right))
+            .all(|(child_left, child_right)| raw_equal(child_left, child_right))
 }
 
 pub(crate) fn raw_catalog_equal(left: &[DirectoryEntry], right: &[DirectoryEntry]) -> bool {
@@ -125,7 +124,7 @@ pub(crate) fn raw_catalog_equal(left: &[DirectoryEntry], right: &[DirectoryEntry
         && left
             .iter()
             .zip(right)
-            .all(|(left, right)| raw_equal(left, right))
+            .all(|(entry_left, entry_right)| raw_equal(entry_left, entry_right))
 }
 
 pub(crate) fn fingerprint(entries: &[DirectoryEntry]) -> u64 {
@@ -199,7 +198,7 @@ pub(crate) fn parse_class_id(input: &str) -> Result<Option<Guid>, OleError> {
         && body[13] == b'-'
         && body[18] == b'-'
         && body[23] == b'-';
-    let compact = body.len() == 32 && !body.iter().any(|byte| *byte == b'-');
+    let compact = body.len() == 32 && !body.contains(&b'-');
     if !canonical && !compact {
         return Err(invalid_class_id());
     }
@@ -256,25 +255,32 @@ pub(crate) fn format_class_id(value: Guid) -> String {
     let bytes = value.as_bytes();
     let mut output = String::with_capacity(36);
     for byte in bytes[0..4].iter().rev() {
-        let _ = write!(output, "{byte:02X}");
+        push_hex_byte(&mut output, *byte);
     }
     output.push('-');
     for byte in bytes[4..6].iter().rev() {
-        let _ = write!(output, "{byte:02X}");
+        push_hex_byte(&mut output, *byte);
     }
     output.push('-');
     for byte in bytes[6..8].iter().rev() {
-        let _ = write!(output, "{byte:02X}");
+        push_hex_byte(&mut output, *byte);
     }
     output.push('-');
     for byte in &bytes[8..10] {
-        let _ = write!(output, "{byte:02X}");
+        push_hex_byte(&mut output, *byte);
     }
     output.push('-');
     for byte in &bytes[10..16] {
-        let _ = write!(output, "{byte:02X}");
+        push_hex_byte(&mut output, *byte);
     }
     output
+}
+
+fn push_hex_byte(output: &mut String, byte: u8) {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+
+    output.push(char::from(HEX[usize::from(byte >> 4)]));
+    output.push(char::from(HEX[usize::from(byte & 0x0F)]));
 }
 
 fn hex(value: u8) -> Option<u8> {

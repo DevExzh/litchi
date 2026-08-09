@@ -10,7 +10,8 @@
 
 use litchi_xls::Writer;
 use litchi_xls::writer::{
-    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
+    Column, PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig,
+    PivotTableConfig,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -57,10 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         w.write_number(src, row, 3, *revenue)?;
     }
 
-    w.set_column_width(src, 0, 12.0)?;
-    w.set_column_width(src, 1, 14.0)?;
-    w.set_column_width(src, 2, 10.0)?;
-    w.set_column_width(src, 3, 14.0)?;
+    w.set_column_width(src, Column::new(0)?, 12.0)?;
+    w.set_column_width(src, Column::new(1)?, 14.0)?;
+    w.set_column_width(src, Column::new(2)?, 10.0)?;
+    w.set_column_width(src, Column::new(3)?, 14.0)?;
 
     println!("[Sheet 1] Sales Data — {} rows of source data", rows.len());
 
@@ -266,9 +267,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     w.add_pivot_table(pt_sheet, pivot_config)?;
 
-    w.set_column_width(pt_sheet, 0, 16.0)?;
+    w.set_column_width(pt_sheet, Column::new(0)?, 16.0)?;
     for c in 1..=3 {
-        w.set_column_width(pt_sheet, c, 14.0)?;
+        w.set_column_width(pt_sheet, Column::new(c)?, 14.0)?;
     }
 
     println!(

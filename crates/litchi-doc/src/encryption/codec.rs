@@ -4,8 +4,9 @@ use super::model::EncryptionProfile;
 use crate::package::{EncryptionKind, Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use encoding_rs::{
-    BIG5, EUC_KR, Encoding, GBK, SHIFT_JIS, WINDOWS_874, WINDOWS_1250, WINDOWS_1251, WINDOWS_1252,
-    WINDOWS_1253, WINDOWS_1254, WINDOWS_1255, WINDOWS_1256, WINDOWS_1257, WINDOWS_1258,
+    BIG5, EUC_KR, EncoderResult, Encoding, GBK, SHIFT_JIS, WINDOWS_874, WINDOWS_1250, WINDOWS_1251,
+    WINDOWS_1252, WINDOWS_1253, WINDOWS_1254, WINDOWS_1255, WINDOWS_1256, WINDOWS_1257,
+    WINDOWS_1258,
 };
 use litchi_crypto::rc4 as office_rc4;
 use litchi_crypto::rc4::{Context, Error, Flags};
@@ -13,7 +14,7 @@ use md5::{Digest, Md5};
 use rand::{TryRng, rngs::SysRng};
 use rc4::{KeyInit, Rc4, StreamCipher};
 use subtle::ConstantTimeEq;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 pub(super) const FIB_BASE_LEN: usize = 68;
 const BINARY_RC4_HEADER_LEN: usize = 52;
@@ -360,20 +361,30 @@ pub(super) fn xor_password_bytes(password: &str) -> Zeroizing<Vec<u8>> {
 
 pub(super) fn ansi_password_bytes(password: &str, language_id: u16) -> Zeroizing<Vec<u8>> {
     let encoding = ansi_encoding_for_lcid(language_id);
-    let mut bytes = Vec::with_capacity(15);
+    let mut bytes = Zeroizing::new(Vec::with_capacity(15));
     for character in password.chars() {
-        let text = character.to_string();
-        let (encoded, _, had_errors) = encoding.encode(&text);
-        if had_errors {
+        // Do not allocate a `String`/`Cow` for each password character.  The
+        // fixed temporary and final byte vector are zeroized, so deriving the
+        // legacy ANSI representation never leaves an extra heap copy of any
+        // credential material behind.
+        let mut utf8 = [0u8; 4];
+        let text = character.encode_utf8(&mut utf8);
+        let mut scratch = Zeroizing::new([0u8; 16]);
+        let mut encoder = encoding.new_encoder();
+        let (result, read, written) =
+            encoder.encode_from_utf8_without_replacement(text, scratch.as_mut(), true);
+        if matches!(result, EncoderResult::Unmappable(_)) || read != text.len() {
             bytes.push(b'?');
         } else {
-            bytes.extend(encoded.iter().copied().take(15 - bytes.len()));
+            let remaining = 15 - bytes.len();
+            bytes.extend(scratch[..written].iter().copied().take(remaining));
         }
+        utf8.zeroize();
         if bytes.len() == 15 {
             break;
         }
     }
-    Zeroizing::new(bytes)
+    bytes
 }
 
 fn ansi_encoding_for_lcid(language_id: u16) -> &'static Encoding {

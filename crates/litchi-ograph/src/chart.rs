@@ -647,7 +647,7 @@ mod tests {
             owned
                 .records()
                 .map(|r| r.expect("record").encoded().len())
-                .sum()
+                .sum::<usize>()
         );
 
         let mut replay = Encoder::new();

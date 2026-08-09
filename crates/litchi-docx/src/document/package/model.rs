@@ -98,6 +98,7 @@ impl<'a> Document<'a> {
                     item
                 },
                 Element::Table(_) => None,
+                Element::Unknown(_) => None,
             };
             resolved.push((element, item));
         }
@@ -121,13 +122,14 @@ impl<'a> Document<'a> {
                 .peek()
                 .is_some_and(|item| item.paragraph_index == index)
             {
-                let item = by_paragraph.next().expect("item checked");
-                if let crate::list::ListMarker::Text(label) = item.marker {
-                    output.push_str(&label);
-                    match item.suffix {
-                        Suffix::Tab => output.push('\t'),
-                        Suffix::Space => output.push(' '),
-                        Suffix::Nothing => {},
+                if let Some(item) = by_paragraph.next() {
+                    if let crate::list::ListMarker::Text(label) = item.marker {
+                        output.push_str(&label);
+                        match item.suffix {
+                            Suffix::Tab => output.push('\t'),
+                            Suffix::Space => output.push(' '),
+                            Suffix::Nothing => {},
+                        }
                     }
                 }
             }

@@ -18,6 +18,8 @@ pub mod hex;
 pub mod metadata;
 /// Microsoft Office's shared CRC-32 checksum algorithm.
 pub mod mso_crc32;
+/// Format-neutral durable patch envelopes and undo history.
+pub mod patch;
 pub mod selector;
 pub mod shapes;
 pub mod sheet;
@@ -42,6 +44,10 @@ pub use budget::{Budget, Limits, Profile, Reservation, Resource, ResourceLimit};
 pub use detection::FileFormat;
 pub use error::{Error, Result};
 pub use metadata::Metadata;
+pub use patch::{
+    BlobBundle, BlobId, BlobLimits, ConflictSet, ForwardOnly, History, HistoryLimits,
+    JsonLimitKind, Patch, PatchError, PatchLimits, PatchOperation, Reversible, ReversibleOperation,
+};
 pub use selector::{Position, Selector};
 pub use shapes::{PlaceholderType, ShapeType};
 pub use source::{OwnedSource, ReadAt, SliceSource, SourceVersion};

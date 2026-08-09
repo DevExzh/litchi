@@ -16,13 +16,22 @@ pub struct Addition {
 }
 
 /// Rebuild an ODF package while replacing only the requested semantic parts.
+///
+/// # Errors
+///
+/// Returns an error when the replacement data exceeds a resource limit or the
+/// source package cannot be copied into a valid rebuilt package.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "The established public API distinguishes a whole-package rebuild from part edits."
+)]
 pub fn rebuild_package(
     source: &OwnedPackage,
     content: &str,
     additions: Vec<Addition>,
     directories: Vec<(String, String)>,
-    excluded_paths: Vec<String>,
-    excluded_prefixes: Vec<String>,
+    excluded_paths: impl AsRef<[String]>,
+    excluded_prefixes: impl AsRef<[String]>,
 ) -> Result<Vec<u8>> {
     if content.len() > MAX_CONTENT_BYTES {
         return invalid("outer content.xml exceeds package mutation limit");
@@ -54,11 +63,20 @@ pub fn rebuild_package(
         }
         writer.add_file_with_media_type(&addition.path, &addition.bytes, &addition.media_type)?;
     }
-    writer.copy_auxiliary_files_from_except(source, &excluded_paths, &excluded_prefixes)?;
+    writer.copy_auxiliary_files_from_except(
+        source,
+        excluded_paths.as_ref(),
+        excluded_prefixes.as_ref(),
+    )?;
     writer.finish_to_bytes()
 }
 
 /// Replace a checked UTF-8 byte span without allocating intermediate XML trees.
+///
+/// # Errors
+///
+/// Returns an error when the requested byte range is reversed, outside `xml`,
+/// or splits a UTF-8 code point.
 pub fn splice(xml: &str, start: usize, end: usize, replacement: &str) -> Result<String> {
     if start > end || end > xml.len() || !xml.is_char_boundary(start) || !xml.is_char_boundary(end)
     {

@@ -14,6 +14,11 @@ use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
+/// Read every RDF metadata graph declared by an ODF package manifest.
+///
+/// # Errors
+///
+/// Returns an error when the package, manifest, or an RDF metadata part is malformed.
 pub fn graphs(package: &OwnedPackage) -> Result<Vec<Graph>> {
     let archive = package.package()?;
     let mut paths: Vec<String> = archive
@@ -31,33 +36,38 @@ pub fn graphs(package: &OwnedPackage) -> Result<Vec<Graph>> {
         if !archive.has_file(&path) {
             return invalid(format!("RDF manifest entry '{path}' is dangling"));
         }
-        let xml = String::from_utf8(archive.get_file(&path)?).map_err(|_| {
-            Error::InvalidFormat(format!("RDF metadata part '{path}' is not UTF-8"))
+        let xml = String::from_utf8(archive.get_file(&path)?).map_err(|error| {
+            Error::InvalidFormat(format!("RDF metadata part '{path}' is not UTF-8: {error}"))
         })?;
         result.push(parse(&path, &xml)?.graph);
     }
     Ok(result)
 }
 
+/// Add a validated RDF metadata graph to an ODF package.
+///
+/// # Errors
+///
+/// Returns an error when the requested path, triples, or package is invalid.
 pub fn add_graph(
     package: &OwnedPackage,
     preferred: Option<&str>,
     triples: &[Triple],
 ) -> Result<(Vec<u8>, String)> {
     let path = match preferred {
-        Some(path) => {
-            let path = safe_path(path)?;
-            if package.has_file(&path)? {
-                return invalid(format!("RDF metadata path '{path}' already exists"));
+        Some(preferred_path) => {
+            let graph_path = safe_path(preferred_path)?;
+            if package.has_file(&graph_path)? {
+                return invalid(format!("RDF metadata path '{graph_path}' already exists"));
             }
-            path
+            graph_path
         },
         None => unused_path(package)?,
     };
     validate_triples(package, triples, Some(&path))?;
     let xml = serialize_graph(triples)?;
     let content = String::from_utf8(package.get_file(constants::ODF_CONTENT)?)
-        .map_err(|_| Error::InvalidFormat("content.xml is not UTF-8".to_string()))?;
+        .map_err(|error| Error::InvalidFormat(format!("content.xml is not UTF-8: {error}")))?;
     let bytes = rebuild_package(
         package,
         &content,
@@ -73,62 +83,82 @@ pub fn add_graph(
     Ok((bytes, path))
 }
 
+/// Replace all triples in one RDF metadata graph.
+///
+/// # Errors
+///
+/// Returns an error when the graph path, triples, or package is invalid.
 pub fn replace_graph(package: &OwnedPackage, path: &str, triples: &[Triple]) -> Result<Vec<u8>> {
-    let path = existing_graph(package, path)?;
-    validate_triples(package, triples, Some(&path))?;
-    write_graph(package, &path, serialize_graph(triples)?)
+    let graph_path = existing_graph(package, path)?;
+    validate_triples(package, triples, Some(&graph_path))?;
+    write_graph(package, &graph_path, serialize_graph(triples)?)
 }
 
+/// Remove an RDF metadata graph when no other graph references it.
+///
+/// # Errors
+///
+/// Returns an error when the graph does not exist, remains referenced, or the package is invalid.
 pub fn remove_graph(package: &OwnedPackage, path: &str) -> Result<Vec<u8>> {
-    let path = existing_graph(package, path)?;
+    let graph_path = existing_graph(package, path)?;
     for graph in graphs(package)? {
-        if graph.path != path
+        if graph.path != graph_path
             && graph
                 .triples
                 .iter()
-                .any(|triple| triple_refers_to(triple, &path))
+                .any(|triple| triple_refers_to(triple, &graph_path))
         {
             return invalid(format!(
-                "RDF metadata part '{path}' is still referenced by '{}'",
+                "RDF metadata part '{graph_path}' is still referenced by '{}'",
                 graph.path
             ));
         }
     }
     let content = String::from_utf8(package.get_file(constants::ODF_CONTENT)?)
-        .map_err(|_| Error::InvalidFormat("content.xml is not UTF-8".to_string()))?;
+        .map_err(|error| Error::InvalidFormat(format!("content.xml is not UTF-8: {error}")))?;
     rebuild_package(
         package,
         &content,
         Vec::new(),
         Vec::new(),
-        vec![path],
+        vec![graph_path],
         Vec::new(),
     )
 }
 
+/// Append one triple to an RDF metadata graph.
+///
+/// # Errors
+///
+/// Returns an error when the graph, triple, or package is invalid.
 pub fn add_triple(package: &OwnedPackage, path: &str, triple: &Triple) -> Result<(Vec<u8>, usize)> {
-    let path = existing_graph(package, path)?;
-    validate_triples(package, std::slice::from_ref(triple), Some(&path))?;
-    let xml = graph_xml(package, &path)?;
-    let parsed = parse(&path, &xml)?;
+    let graph_path = existing_graph(package, path)?;
+    validate_triples(package, std::slice::from_ref(triple), Some(&graph_path))?;
+    let xml = graph_xml(package, &graph_path)?;
+    let parsed = parse(&graph_path, &xml)?;
     if parsed.graph.triples.len() >= MAX_TRIPLES {
         return invalid("RDF graph exceeds triple limit");
     }
     let fragment = description_xml(triple)?;
     let updated = splice(&xml, parsed.root_close, parsed.root_close, &fragment)?;
-    write_graph(package, &path, updated).map(|bytes| (bytes, parsed.graph.triples.len()))
+    write_graph(package, &graph_path, updated).map(|bytes| (bytes, parsed.graph.triples.len()))
 }
 
+/// Replace one triple while retaining its RDF description subject.
+///
+/// # Errors
+///
+/// Returns an error when the index, triple, graph, or package is invalid.
 pub fn replace_triple(
     package: &OwnedPackage,
     path: &str,
     index: usize,
     triple: &Triple,
 ) -> Result<Vec<u8>> {
-    let path = existing_graph(package, path)?;
-    validate_triples(package, std::slice::from_ref(triple), Some(&path))?;
-    let xml = graph_xml(package, &path)?;
-    let parsed = parse(&path, &xml)?;
+    let graph_path = existing_graph(package, path)?;
+    validate_triples(package, std::slice::from_ref(triple), Some(&graph_path))?;
+    let xml = graph_xml(package, &graph_path)?;
+    let parsed = parse(&graph_path, &xml)?;
     let span = parsed
         .spans
         .get(index)
@@ -137,24 +167,39 @@ pub fn replace_triple(
         return invalid("replacing an RDF property cannot change its description subject");
     }
     let updated = splice(&xml, span.start, span.end, &property_xml(triple)?)?;
-    write_graph(package, &path, updated)
+    write_graph(package, &graph_path, updated)
 }
 
+/// Remove one triple from an RDF metadata graph.
+///
+/// # Errors
+///
+/// Returns an error when the index, graph, or package is invalid.
 pub fn remove_triple(package: &OwnedPackage, path: &str, index: usize) -> Result<Vec<u8>> {
-    let path = existing_graph(package, path)?;
-    let xml = graph_xml(package, &path)?;
-    let parsed = parse(&path, &xml)?;
+    let graph_path = existing_graph(package, path)?;
+    let xml = graph_xml(package, &graph_path)?;
+    let parsed = parse(&graph_path, &xml)?;
     let span = parsed
         .spans
         .get(index)
         .ok_or_else(|| bounds(index, parsed.spans.len()))?;
-    write_graph(package, &path, splice(&xml, span.start, span.end, "")?)
+    write_graph(
+        package,
+        &graph_path,
+        splice(&xml, span.start, span.end, "")?,
+    )
 }
 
+/// Reorder two triples that share an RDF description subject.
+///
+/// # Errors
+///
+/// Returns an error when either index is invalid, the triples have different subjects, or the
+/// package cannot be rewritten.
 pub fn move_triple(package: &OwnedPackage, path: &str, from: usize, to: usize) -> Result<Vec<u8>> {
-    let path = existing_graph(package, path)?;
-    let xml = graph_xml(package, &path)?;
-    let parsed = parse(&path, &xml)?;
+    let graph_path = existing_graph(package, path)?;
+    let xml = graph_xml(package, &graph_path)?;
+    let parsed = parse(&graph_path, &xml)?;
     let first = parsed
         .spans
         .get(from)
@@ -167,7 +212,7 @@ pub fn move_triple(package: &OwnedPackage, path: &str, from: usize, to: usize) -
         return invalid("RDF triples can only be reordered within one subject description");
     }
     if from == to {
-        return write_graph(package, &path, xml);
+        return write_graph(package, &graph_path, xml);
     }
     let mut out = String::with_capacity(xml.len());
     if first.start < second.start {
@@ -181,7 +226,7 @@ pub fn move_triple(package: &OwnedPackage, path: &str, from: usize, to: usize) -
         out.push_str(&xml[second.start..first.start]);
         out.push_str(&xml[first.end..]);
     }
-    write_graph(package, &path, out)
+    write_graph(package, &graph_path, out)
 }
 
 fn validate_triples(
@@ -203,21 +248,21 @@ fn validate_triples(
             Object::Iri(value) => validate_reference(package, value, new_path, &anchors)?,
             Object::BlankNode(value) => validate_blank(value)?,
             Object::Literal {
-                value,
+                value: literal_value,
                 datatype,
                 language,
             } => {
-                validate_value(value)?;
+                validate_value(literal_value)?;
                 if datatype.is_some() && language.is_some() {
                     return invalid("RDF literal cannot have both datatype and language");
                 }
-                if let Some(value) = datatype {
-                    validate_iri(value)?;
+                if let Some(datatype_iri) = datatype {
+                    validate_iri(datatype_iri)?;
                 }
-                if let Some(value) = language
-                    && (value.is_empty()
-                        || value.len() > 128
-                        || !value
+                if let Some(language_tag) = language
+                    && (language_tag.is_empty()
+                        || language_tag.len() > 128
+                        || !language_tag
                             .bytes()
                             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-'))
                 {
@@ -241,9 +286,9 @@ fn validate_reference(
             return invalid(format!("RDF reference '#{id}' has no xml:id anchor"));
         }
     } else if !external_iri(value) && !value.is_empty() {
-        let path = value.split('#').next().unwrap_or(value);
-        let path = safe_path(path)?;
-        if Some(path.as_str()) != new_path && !package.has_file(&path)? {
+        let reference_path = value.split('#').next().unwrap_or(value);
+        let resolved_path = safe_path(reference_path)?;
+        if Some(resolved_path.as_str()) != new_path && !package.has_file(&resolved_path)? {
             return invalid(format!("RDF package reference '{value}' is dangling"));
         }
     }
@@ -253,7 +298,7 @@ fn validate_reference(
 fn write_graph(package: &OwnedPackage, path: &str, xml: String) -> Result<Vec<u8>> {
     let _ = parse(path, &xml)?;
     let content = String::from_utf8(package.get_file(constants::ODF_CONTENT)?)
-        .map_err(|_| Error::InvalidFormat("content.xml is not UTF-8".to_string()))?;
+        .map_err(|error| Error::InvalidFormat(format!("content.xml is not UTF-8: {error}")))?;
     rebuild_package(
         package,
         &content,
@@ -269,18 +314,19 @@ fn write_graph(package: &OwnedPackage, path: &str, xml: String) -> Result<Vec<u8
 }
 
 fn existing_graph(package: &OwnedPackage, path: &str) -> Result<String> {
-    let path = safe_path(path)?;
+    let graph_path = safe_path(path)?;
     let archive = package.package()?;
-    if !archive.has_file(&path)
-        || archive.manifest().get_media_type(&path) != Some(constants::ODF_MANIFEST_RDF_TYPE)
+    if !archive.has_file(&graph_path)
+        || archive.manifest().get_media_type(&graph_path) != Some(constants::ODF_MANIFEST_RDF_TYPE)
     {
-        return invalid(format!("'{path}' is not an RDF metadata part"));
+        return invalid(format!("'{graph_path}' is not an RDF metadata part"));
     }
-    Ok(path)
+    Ok(graph_path)
 }
 fn graph_xml(package: &OwnedPackage, path: &str) -> Result<String> {
-    String::from_utf8(package.get_file(path)?)
-        .map_err(|_| Error::InvalidFormat(format!("RDF metadata part '{path}' is not UTF-8")))
+    String::from_utf8(package.get_file(path)?).map_err(|error| {
+        Error::InvalidFormat(format!("RDF metadata part '{path}' is not UTF-8: {error}"))
+    })
 }
 fn unused_path(package: &OwnedPackage) -> Result<String> {
     for index in 1..=100_000 {
@@ -317,7 +363,7 @@ fn xml_ids(package: &OwnedPackage) -> Result<HashSet<String>> {
         }
         let bytes = package.get_file(path)?;
         let xml = std::str::from_utf8(&bytes)
-            .map_err(|_| Error::InvalidFormat(format!("{path} is not UTF-8")))?;
+            .map_err(|error| Error::InvalidFormat(format!("{path} is not UTF-8: {error}")))?;
         let mut reader = NsReader::from_str(xml);
         let mut buffer = Vec::new();
         loop {
@@ -326,12 +372,12 @@ fn xml_ids(package: &OwnedPackage) -> Result<HashSet<String>> {
                 .map_err(|error| Error::InvalidFormat(format!("invalid {path}: {error}")))?
             {
                 Event::Start(element) | Event::Empty(element) => {
-                    for attr in element.attributes().with_checks(true) {
-                        let attr = attr.map_err(|error| {
+                    for raw_attribute in element.attributes().with_checks(true) {
+                        let attribute = raw_attribute.map_err(|error| {
                             Error::InvalidFormat(format!("invalid {path} attribute: {error}"))
                         })?;
-                        if attr.key.as_ref() == b"xml:id" {
-                            result.insert(decode_attr(&reader, &attr)?);
+                        if attribute.key.as_ref() == b"xml:id" {
+                            result.insert(decode_attr(&reader, &attribute)?);
                         }
                     }
                 },
@@ -339,7 +385,13 @@ fn xml_ids(package: &OwnedPackage) -> Result<HashSet<String>> {
                     return invalid("DTD is prohibited while validating RDF anchors");
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::End(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }

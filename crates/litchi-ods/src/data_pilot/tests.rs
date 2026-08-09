@@ -124,3 +124,21 @@ fn failed_typed_update_does_not_change_the_staged_catalog() {
     assert!(result.is_err());
     assert!(transaction.tables().is_empty());
 }
+
+#[test]
+fn owned_snapshot_commit_patch_inverse_and_conflict_are_atomic() -> litchi_core::Result<()> {
+    let snapshot = crate::data_pilot::Snapshot::from_bytes(package(XML_WITHOUT_OWNER))?;
+    let mut edit = snapshot.edit();
+    edit.editor().add(table("Pivot"))?;
+    let commit = edit.commit()?;
+    assert!(commit.changed());
+    assert!(commit.snapshot().has_owner());
+    assert_eq!(commit.snapshot().tables()[0].name, "Pivot");
+
+    let restored = commit.patch().inverse().apply(commit.snapshot())?;
+    assert_eq!(restored.snapshot().as_bytes(), snapshot.as_bytes());
+
+    let other = crate::data_pilot::Snapshot::from_bytes(package(XML))?;
+    assert!(commit.patch().apply(&other).is_err());
+    Ok(())
+}

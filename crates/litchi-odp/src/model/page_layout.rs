@@ -680,16 +680,15 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
                 let frame = stack
                     .pop()
                     .ok_or_else(|| make_error("presentation page-layout XML depth underflow"))?;
-                if let Some(target_start) = take_finished_target(&mut open_target, depth) {
-                    if target
+                if let Some(target_start) = take_finished_target(&mut open_target, depth)
+                    && target
                         .replace(XmlSpan {
                             start: target_start,
                             end,
                         })
                         .is_some()
-                    {
-                        return invalid("duplicate target presentation page layout");
-                    }
+                {
+                    return invalid("duplicate target presentation page layout");
                 }
                 if frame.namespace == NamespaceKind::Office && frame.local == "styles" {
                     if styles_site.is_some() {
@@ -815,16 +814,18 @@ fn push_attribute(output: &mut String, name: &str, value: &str) {
 }
 
 fn validate_decimal(value: &str, complete: &str) -> Result<()> {
-    let value = value.strip_prefix('-').unwrap_or(value);
-    if value.is_empty() {
+    let unsigned = value.strip_prefix('-').unwrap_or(value);
+    if unsigned.is_empty() {
         return invalid(format!("invalid presentation measure '{complete}'"));
     }
-    let mut parts = value.split('.');
-    let integer = parts.next().expect("split always yields one value");
+    let mut parts = unsigned.split('.');
+    let Some(integer) = parts.next() else {
+        return invalid(format!("invalid presentation measure '{complete}'"));
+    };
     let fraction = parts.next();
     if parts.next().is_some()
-        || !integer.bytes().all(|value| value.is_ascii_digit())
-        || fraction.is_some_and(|value| !value.bytes().all(|byte| byte.is_ascii_digit()))
+        || !integer.bytes().all(|byte| byte.is_ascii_digit())
+        || fraction.is_some_and(|part| !part.bytes().all(|byte| byte.is_ascii_digit()))
         || integer.is_empty() && fraction.is_none_or(str::is_empty)
     {
         return invalid(format!("invalid presentation measure '{complete}'"));
@@ -887,8 +888,9 @@ fn make_error(message: impl Into<String>) -> Error {
 
 #[cfg(test)]
 #[allow(
+    clippy::float_cmp,
     clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
+    reason = "test assertions panic on failure by design; one fixture uses an exactly representable decimal"
 )]
 mod tests {
     use super::*;

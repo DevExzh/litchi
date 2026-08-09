@@ -9,7 +9,7 @@ use litchi_odt::{
     },
     protection::Policy,
     rdf::{Object, Subject, Triple},
-    transaction::{OperationResult, ParagraphSelector},
+    transaction::{OperationResult, ParagraphSelector, Position},
 };
 
 fn source() -> Document {
@@ -42,6 +42,16 @@ fn real_producer_source() -> Document {
         )
         .unwrap();
     Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+}
+
+fn assert_all_package_xml_is_compact(bytes: &[u8]) {
+    let package = litchi_odt::core::package::OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
+    let archive = package.package().unwrap();
+    for path in archive.files().unwrap() {
+        if path.ends_with(".xml") || path.ends_with(".rdf") {
+            litchi_odf_common::compact_xml::validate(&archive.get_file(&path).unwrap()).unwrap();
+        }
+    }
 }
 
 #[test]
@@ -86,6 +96,25 @@ fn packaged_transaction_rejects_ambiguous_text_selectors() {
         snapshot
             .edit()
             .append_line_break(ParagraphSelector::exact_text("duplicate"))
+            .is_err()
+    );
+}
+
+#[test]
+fn checked_positions_are_resolved_against_the_source_snapshot() {
+    let source = source();
+    let snapshot = litchi_odt::transaction::Snapshot::from_document(&source).unwrap();
+    let position = Position::new(0);
+
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(position))
+        .unwrap();
+    assert!(edit.commit().is_ok());
+
+    assert!(
+        snapshot
+            .edit()
+            .append_line_break(ParagraphSelector::position(Position::new(1)))
             .is_err()
     );
 }
@@ -279,6 +308,7 @@ fn residual_semantic_families_share_one_reversible_transaction() {
     assert_eq!(document.protection().unwrap().read_only, Some(true));
     assert_eq!(document.forms().unwrap().groups[0].forms.len(), 1);
     assert_eq!(document.script_resources().unwrap()[0].bytes, script.bytes);
+    assert_all_package_xml_is_compact(commit.snapshot().as_bytes());
     assert_eq!(
         commit
             .patch()

@@ -158,9 +158,10 @@ impl FlatChartEdit {
 
     /// Validates and atomically publishes all staged changes in memory.
     pub fn commit(self) -> Result<FlatChartCommit> {
-        let mut replacements = Vec::with_capacity(self.changes.len());
-        for change in &self.changes {
-            let axis = &self.source.0.axes[change.index];
+        let FlatChartEdit { source, changes } = self;
+        let mut replacements = Vec::with_capacity(changes.len());
+        for change in &changes {
+            let axis = &source.0.axes[change.index];
             match (&change.after, &axis.name_value, &axis.name_attribute) {
                 (Some(name), Some(value), _) => replacements.push(Replacement {
                     range: value.clone(),
@@ -177,7 +178,7 @@ impl FlatChartEdit {
                                 .to_string(),
                         )
                     })?;
-                    let raw = &self.source.as_bytes()[axis.tag.clone()];
+                    let raw = &source.as_bytes()[axis.tag.clone()];
                     let relative = insertion_offset(raw)?;
                     replacements.push(Replacement {
                         range: axis.tag.start + relative..axis.tag.start + relative,
@@ -195,7 +196,7 @@ impl FlatChartEdit {
             }
         }
         replacements.sort_unstable_by(|left, right| right.range.start.cmp(&left.range.start));
-        let mut bytes = self.source.as_bytes().to_vec();
+        let mut bytes = source.as_bytes().to_vec();
         let mut previous = bytes.len();
         for replacement in replacements {
             if replacement.range.end > previous
@@ -208,15 +209,17 @@ impl FlatChartEdit {
             previous = replacement.range.start;
         }
         let snapshot = FlatChart::from_bytes(bytes)?;
-        for change in &self.changes {
+        for change in &changes {
             if snapshot.axis_name(change.index)? != change.after.as_deref() {
                 return Err(invalid_error("flat ODC edit failed typed readback"));
             }
         }
         Ok(FlatChartCommit {
-            snapshot,
+            snapshot: snapshot.clone(),
             patch: FlatChartPatch {
-                changes: self.changes,
+                source,
+                target: snapshot,
+                changes,
             },
         })
     }
@@ -248,12 +251,30 @@ impl FlatChartCommit {
 }
 
 /// A source-checked, reversible collection of axis changes.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct FlatChartPatch {
+    source: FlatChart,
+    target: FlatChart,
     changes: Vec<AxisChange>,
 }
 
+impl PartialEq for FlatChartPatch {
+    fn eq(&self, other: &Self) -> bool {
+        self.source.as_bytes() == other.source.as_bytes()
+            && self.target.as_bytes() == other.target.as_bytes()
+            && self.changes == other.changes
+    }
+}
+
+impl Eq for FlatChartPatch {}
+
 impl FlatChartPatch {
+    /// Returns whether this patch was committed from the exact supplied XML.
+    #[must_use]
+    pub fn is_applicable_to(&self, source: &FlatChart) -> bool {
+        self.source.as_bytes() == source.as_bytes()
+    }
+
     /// Returns the ordered semantic changes.
     #[must_use]
     pub fn changes(&self) -> &[AxisChange] {
@@ -264,6 +285,8 @@ impl FlatChartPatch {
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
+            source: self.target.clone(),
+            target: self.source.clone(),
             changes: self
                 .changes
                 .iter()
@@ -276,21 +299,15 @@ impl FlatChartPatch {
         }
     }
 
-    /// Applies the patch only when every source value still matches.
+    /// Applies the patch only to its exact immutable source snapshot.
     pub fn apply(&self, source: &FlatChart) -> Result<FlatChartCommit> {
-        let mut edit = source.edit();
-        for change in &self.changes {
-            if source.axis_name(change.index)? != change.before.as_deref() {
-                return Err(invalid_error("flat ODC patch source does not match"));
-            }
-            edit.update_axis(
-                change.index,
-                AxisUpdate {
-                    name: Some(change.after.clone()),
-                },
-            )?;
+        if !self.is_applicable_to(source) {
+            return Err(invalid_error("flat ODC patch source does not match"));
         }
-        edit.commit()
+        Ok(FlatChartCommit {
+            snapshot: self.target.clone(),
+            patch: self.clone(),
+        })
     }
 }
 

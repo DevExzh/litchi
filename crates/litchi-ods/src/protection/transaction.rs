@@ -71,6 +71,49 @@ impl Snapshot {
     }
 }
 
+/// A reversible protection patch bound to the exact XML source it edits.
+///
+/// Full source and target XML remain private.  Applying a patch verifies the
+/// complete captured source before parsing the target again, so a stale patch
+/// can never publish a protection change into a different spreadsheet.
+#[derive(Clone, Debug)]
+pub struct Patch {
+    source: String,
+    target: String,
+}
+
+impl Patch {
+    /// Whether this patch makes no change.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.source == self.target
+    }
+
+    /// Return the exact-source patch that restores the accepted source.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            source: self.target.clone(),
+            target: self.source.clone(),
+        }
+    }
+
+    /// Apply this patch only to the exact snapshot that produced it.
+    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
+        if snapshot.source_xml() != self.source {
+            return Err(litchi_core::Error::InvalidFormat(
+                "ODS protection patch source snapshot does not match".to_string(),
+            ));
+        }
+        let target = Snapshot::from_parts(&self.target, snapshot.styles_xml.as_deref())?;
+        Ok(Commit {
+            snapshot: target,
+            changed: !self.is_empty(),
+            patch: self.clone(),
+        })
+    }
+}
+
 /// A staged protection candidate derived from one immutable [`Snapshot`].
 #[derive(Clone, Debug)]
 pub struct Transaction {
@@ -152,9 +195,14 @@ impl Transaction {
             &self.draft.styles,
         )?;
         if !self.is_changed() {
+            let patch = Patch {
+                source: self.before.source,
+                target: self.draft.source.clone(),
+            };
             return Ok(Commit {
                 snapshot: self.draft,
                 changed: false,
+                patch,
             });
         }
         let styles_changed = self.before.styles != self.draft.styles;
@@ -170,6 +218,10 @@ impl Transaction {
         Ok(Commit {
             snapshot,
             changed: true,
+            patch: Patch {
+                source: self.before.source,
+                target: content_xml,
+            },
         })
     }
 }
@@ -179,6 +231,7 @@ impl Transaction {
 pub struct Commit {
     snapshot: Snapshot,
     changed: bool,
+    patch: Patch,
 }
 
 impl Commit {
@@ -190,6 +243,11 @@ impl Commit {
     /// The resulting immutable snapshot.
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
+    }
+
+    /// Borrow the reversible exact-source patch produced by this commit.
+    pub fn patch(&self) -> &Patch {
+        &self.patch
     }
 
     /// The resulting `content.xml`.

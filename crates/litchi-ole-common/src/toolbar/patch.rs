@@ -22,11 +22,13 @@ impl Change {
     }
 
     /// Borrow the typed source control state.
+    #[must_use]
     pub const fn before(&self) -> &Control<'static> {
         &self.before
     }
 
     /// Borrow the typed target control state.
+    #[must_use]
     pub const fn after(&self) -> &Control<'static> {
         &self.after
     }
@@ -56,61 +58,76 @@ impl Patch {
     }
 
     /// Return the required source revision.
+    #[must_use]
     pub const fn base(&self) -> Revision {
         self.base
     }
 
     /// Return the produced target revision.
+    #[must_use]
     pub const fn target(&self) -> Revision {
         self.target
     }
 
     /// Return the required source fingerprint.
+    #[must_use]
     pub const fn source_fingerprint(&self) -> u64 {
         self.base.value()
     }
 
     /// Return the resulting target fingerprint.
+    #[must_use]
     pub const fn target_fingerprint(&self) -> u64 {
         self.target.value()
     }
 
     /// Borrow the exact source bytes required by this patch.
+    #[must_use]
     pub fn before_bytes(&self) -> &[u8] {
         &self.before
     }
 
     /// Alias for [`Self::before_bytes`].
+    #[must_use]
     pub fn before(&self) -> &[u8] {
         self.before_bytes()
     }
 
     /// Borrow the exact bytes produced by this patch.
+    #[must_use]
     pub fn after_bytes(&self) -> &[u8] {
         &self.after
     }
 
     /// Alias for [`Self::after_bytes`].
+    #[must_use]
     pub fn after(&self) -> &[u8] {
         self.after_bytes()
     }
 
     /// Return the typed change, or `None` for an exact no-op.
+    #[must_use]
     pub const fn change(&self) -> Option<&Change> {
         self.change.as_ref()
     }
 
     /// Whether this patch preserves the source byte-for-byte.
+    #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
     /// Alias for [`Self::is_noop`].
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.is_noop()
     }
 
     /// Apply this patch only to its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` does not match the required base snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source.revision() != self.base || source.bytes() != self.before.as_ref() {
             return Err(Error::invalid(
@@ -124,11 +141,17 @@ impl Patch {
     }
 
     /// Revert this patch only from its exact target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `target` does not match the required replacement
+    /// snapshot.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot, Error> {
         self.inverse().apply(target)
     }
 
     /// Build the exact inverse replacement.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             base: self.target,

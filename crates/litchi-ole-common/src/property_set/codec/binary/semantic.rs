@@ -1,6 +1,10 @@
 //! Typed VARIANT semantic codec for Property Set values.
 
-use super::super::super::model::*;
+use super::super::super::model::{
+    Array, Dimension, Guid, PID_DOC_PARTS, PID_HEADING_PAIRS, Scalar, TextEncoding,
+    UNICODE_CODEPAGE, VT_ARRAY, VT_VERSIONED_STREAM, Value, Vector, VersionedStream, checked_add,
+    checked_mul, checked_u32, invalid, try_copy_bytes, try_vec_with_capacity,
+};
 use super::composite;
 use super::wire::{
     ValueReader, append_bytes, append_u16, append_u32, append_u64, encode_ansi, pad4,
@@ -8,7 +12,11 @@ use super::wire::{
 };
 use chrono::{DateTime, Duration, Utc};
 use litchi_cfb::OleError;
-use litchi_cfb::consts::*;
+use litchi_cfb::consts::{
+    VT_BLOB, VT_BLOB_OBJECT, VT_BOOL, VT_BSTR, VT_CF, VT_CLSID, VT_CY, VT_DATE, VT_DECIMAL,
+    VT_EMPTY, VT_ERROR, VT_FILETIME, VT_I1, VT_I2, VT_I4, VT_I8, VT_INT, VT_LPSTR, VT_LPWSTR,
+    VT_NULL, VT_R4, VT_R8, VT_UI1, VT_UI2, VT_UI4, VT_UI8, VT_UINT, VT_VARIANT, VT_VECTOR,
+};
 
 const MAX_VECTOR_ELEMENTS: usize = 1_000_000;
 
@@ -41,8 +49,8 @@ fn append_typed(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), O
     append_body(out, value, codepage)?;
     Ok(())
 }
-fn variant_type(value: &Value) -> u16 {
-    match value {
+fn variant_type(property: &Value) -> u16 {
+    match property {
         Value::Empty => VT_EMPTY,
         Value::Null => VT_NULL,
         Value::I1(_) => VT_I1,
@@ -71,7 +79,7 @@ fn variant_type(value: &Value) -> u16 {
         Value::Clsid(_) => VT_CLSID,
         Value::VersionedStream(_) => VT_VERSIONED_STREAM,
         Value::HeadingPairs(_) => composite::HEADING_PAIRS_TYPE,
-        Value::DocParts(value) => match value.encoding() {
+        Value::DocParts(parts) => match parts.encoding() {
             TextEncoding::Ansi => composite::DOC_PARTS_ANSI_TYPE,
             TextEncoding::Unicode => composite::DOC_PARTS_UNICODE_TYPE,
         },
@@ -80,21 +88,21 @@ fn variant_type(value: &Value) -> u16 {
         Value::Unknown { variant_type, .. } => *variant_type,
     }
 }
-fn append_body(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), OleError> {
-    match value {
+fn append_body(out: &mut Vec<u8>, property: &Value, codepage: u16) -> Result<(), OleError> {
+    match property {
         Value::Empty | Value::Null => {},
-        Value::I1(v) => append_bytes(out, &[*v as u8], "serialized property value")?,
+        Value::I1(v) => append_bytes(out, &v.to_ne_bytes(), "serialized property value")?,
         Value::UI1(v) => append_bytes(out, &[*v], "serialized property value")?,
         Value::I2(v) => append_bytes(out, &v.to_le_bytes(), "serialized property value")?,
         Value::UI2(v) => append_bytes(out, &v.to_le_bytes(), "serialized property value")?,
         Value::I4(v) | Value::Int(v) => {
-            append_bytes(out, &v.to_le_bytes(), "serialized property value")?
+            append_bytes(out, &v.to_le_bytes(), "serialized property value")?;
         },
         Value::UI4(v) | Value::UInt(v) | Value::Error(v) => {
-            append_u32(out, *v, "serialized property value")?
+            append_u32(out, *v, "serialized property value")?;
         },
         Value::I8(v) | Value::Currency(v) => {
-            append_bytes(out, &v.to_le_bytes(), "serialized property value")?
+            append_bytes(out, &v.to_le_bytes(), "serialized property value")?;
         },
         Value::UI8(v) | Value::Filetime(v) => append_u64(out, *v, "serialized property value")?,
         Value::R4(v) => append_u32(out, v.to_bits(), "serialized property value")?,
@@ -141,16 +149,16 @@ fn append_body(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), Ol
             pad4(out)?;
         },
         Value::Clsid(v) => append_bytes(out, v.as_bytes(), "serialized property value")?,
-        Value::VersionedStream(value) => {
+        Value::VersionedStream(stream) => {
             append_bytes(
                 out,
-                value.version_guid().as_bytes(),
+                stream.version_guid().as_bytes(),
                 "serialized versioned stream value",
             )?;
-            append_codepage_string(out, value.stream_name(), codepage)?;
+            append_codepage_string(out, stream.stream_name(), codepage)?;
         },
-        Value::HeadingPairs(value) => composite::append_heading_pairs(out, value, codepage)?,
-        Value::DocParts(value) => composite::append_doc_parts(out, value, codepage)?,
+        Value::HeadingPairs(pairs) => composite::append_heading_pairs(out, pairs, codepage)?,
+        Value::DocParts(parts) => composite::append_doc_parts(out, parts, codepage)?,
         Value::Vector(vector) => {
             vector.validate()?;
             append_u32(
@@ -158,12 +166,12 @@ fn append_body(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), Ol
                 checked_u32(vector.values().len(), "Vector element count")?,
                 "serialized property value",
             )?;
-            for value in vector.values() {
+            for element in vector.values() {
                 if vector.scalar() == Scalar::Variant {
-                    append_typed(out, value, codepage)?;
+                    append_typed(out, element, codepage)?;
                     pad4(out)?;
                 } else {
-                    append_body(out, value, codepage)?;
+                    append_body(out, element, codepage)?;
                 }
             }
             pad4(out)?;
@@ -188,12 +196,12 @@ fn append_body(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), Ol
                     "serialized array dimension",
                 )?;
             }
-            for value in array.values() {
+            for element in array.values() {
                 if array.scalar() == Scalar::Variant {
-                    append_typed(out, value, codepage)?;
+                    append_typed(out, element, codepage)?;
                     pad4(out)?;
                 } else {
-                    append_body(out, value, codepage)?;
+                    append_body(out, element, codepage)?;
                 }
             }
             pad4(out)?;
@@ -412,14 +420,14 @@ fn parse_value_body(
         VT_FILETIME => Ok(Value::Filetime(reader.read_u64("FILETIME value")?)),
         VT_BLOB | VT_BLOB_OBJECT => {
             let size = usize::try_from(reader.read_u32("blob size")?)
-                .map_err(|_| invalid("Blob size is too large"))?;
+                .map_err(|_conversion_error| invalid("Blob size is too large"))?;
             let blob = try_copy_bytes(reader.take(size, "blob data")?, "blob data")?;
             reader.align4(depth == 0, "blob padding")?;
             Ok(Value::Blob(blob))
         },
         VT_CF => {
             let size = usize::try_from(reader.read_u32("clipboard size")?)
-                .map_err(|_| invalid("Clipboard size is too large"))?;
+                .map_err(|_conversion_error| invalid("Clipboard size is too large"))?;
             if size < 4 {
                 return Err(invalid("Clipboard size must include its format field"));
             }
@@ -464,7 +472,7 @@ fn parse_vector(
     depth: usize,
 ) -> Result<Value, OleError> {
     let count = usize::try_from(reader.read_u32("vector element count")?)
-        .map_err(|_| invalid("Vector element count is too large"))?;
+        .map_err(|_conversion_error| invalid("Vector element count is too large"))?;
     if count > MAX_VECTOR_ELEMENTS {
         return Err(invalid(format!(
             "Vector element count {count} exceeds the safety limit"
@@ -515,7 +523,7 @@ fn parse_array(
         ));
     }
     let dimensions = usize::try_from(reader.read_u32("array dimension count")?)
-        .map_err(|_| invalid("Array dimension count is too large"))?;
+        .map_err(|_conversion_error| invalid("Array dimension count is too large"))?;
     if !(1..=31).contains(&dimensions) {
         return Err(invalid("Array dimension count must be between 1 and 31"));
     }
@@ -526,7 +534,8 @@ fn parse_array(
         let index_offset = reader.read_i32("array dimension index offset")?;
         count = count
             .checked_mul(
-                usize::try_from(size).map_err(|_| invalid("Array dimension is too large"))?,
+                usize::try_from(size)
+                    .map_err(|_conversion_error| invalid("Array dimension is too large"))?,
             )
             .ok_or_else(|| invalid("Array element count overflows usize"))?;
         if count > MAX_VECTOR_ELEMENTS {
@@ -559,10 +568,10 @@ fn minimum_value_size(variant_type: u16) -> Option<usize> {
     match variant_type {
         VT_I1 | VT_UI1 => Some(1),
         VT_I2 | VT_UI2 | VT_BOOL => Some(2),
-        VT_I4 | VT_UI4 | VT_INT | VT_UINT | VT_R4 | VT_ERROR => Some(4),
+        VT_I4 | VT_UI4 | VT_INT | VT_UINT | VT_R4 | VT_ERROR | VT_VARIANT | VT_BSTR | VT_LPSTR
+        | VT_LPWSTR | VT_CF => Some(4),
         VT_I8 | VT_UI8 | VT_R8 | VT_CY | VT_DATE | VT_FILETIME => Some(8),
         VT_CLSID => Some(16),
-        VT_VARIANT | VT_BSTR | VT_LPSTR | VT_LPWSTR | VT_CF => Some(4),
         _ => None,
     }
 }

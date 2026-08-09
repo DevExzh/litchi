@@ -123,6 +123,11 @@ pub struct DocumentSigner {
 
 impl DocumentSigner {
     /// Parse a DER PKCS#8 private key and DER X.509 chain. The leaf certificate must be first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the key or certificate chain is malformed, insecure, or does not
+    /// match the requested signature algorithm.
     pub fn from_pkcs8_der(
         algorithm: SignatureAlgorithm,
         private_key: impl AsRef<[u8]>,
@@ -138,25 +143,29 @@ impl DocumentSigner {
     }
 
     /// Parse an unencrypted PEM PKCS#8 key and a PEM X.509 certificate chain.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the PEM input does not contain one valid private key and a valid,
+    /// matching certificate chain.
     pub fn from_pkcs8_pem(
         algorithm: SignatureAlgorithm,
         private_key_pem: &str,
         certificate_chain_pem: &str,
         signing_time: impl Into<String>,
     ) -> Result<Self> {
-        let private_key = decode_pem_blocks(private_key_pem, "PRIVATE KEY")?;
-        if private_key.len() != 1 {
+        let private_keys = decode_pem_blocks(private_key_pem, "PRIVATE KEY")?;
+        if private_keys.len() != 1 {
             return invalid("exactly one PKCS#8 PRIVATE KEY PEM block is required");
         }
         let certificates = decode_pem_blocks(certificate_chain_pem, "CERTIFICATE")?;
-        Self::new(
-            algorithm,
-            private_key.into_iter().next().expect("length checked"),
-            certificates,
-            signing_time.into(),
-        )
+        let private_key = private_keys.into_iter().next().ok_or_else(|| {
+            Error::InvalidFormat("PKCS#8 key block unexpectedly disappeared".to_string())
+        })?;
+        Self::new(algorithm, private_key, certificates, signing_time.into())
     }
 
+    #[must_use]
     pub fn with_canonicalization(mut self, value: CanonicalizationAlgorithm) -> Self {
         self.canonicalization = value;
         self
@@ -176,7 +185,7 @@ impl DocumentSigner {
         }
         for certificate in &certificates {
             Certificate::from_der(certificate)
-                .map_err(|_| format_error("invalid DER X.509 certificate"))?;
+                .map_err(|error| format_error(format!("invalid DER X.509 certificate: {error}")))?;
         }
         validate_key_matches_certificate(algorithm, &private_key, &certificates[0])?;
         Ok(Self {
@@ -191,7 +200,7 @@ impl DocumentSigner {
 
 pub(crate) fn sign_package(unsigned: &[u8], signer: &DocumentSigner) -> Result<Vec<u8>> {
     let archive = ArchiveReader::new(unsigned)
-        .map_err(|_| format_error("invalid ODF ZIP archive while signing"))?;
+        .map_err(|error| format_error(format!("invalid ODF ZIP archive while signing: {error}")))?;
     let mut names: Vec<String> = archive
         .file_names()
         .filter(|name| should_reference(name))
@@ -217,10 +226,17 @@ pub(crate) fn sign_package(unsigned: &[u8], signer: &DocumentSigner) -> Result<V
         signer.algorithm.uri()
     );
     for name in &names {
-        let bytes = archive.read(name).map_err(|_| {
-            format_error(format!("unable to read ODF signature reference '{name}'"))
+        let bytes = archive.read(name).map_err(|error| {
+            format_error(format!(
+                "unable to read ODF signature reference '{name}': {error}"
+            ))
         })?;
-        let transform = if is_xml_path(name) && !archive.is_stored(name).unwrap_or(false) {
+        let stored = archive.is_stored(name).map_err(|error| {
+            format_error(format!(
+                "unable to inspect ODF signature reference '{name}': {error}"
+            ))
+        })?;
+        let transform = if is_xml_path(name) && !stored {
             Some(signer.canonicalization)
         } else {
             None
@@ -244,11 +260,18 @@ pub(crate) fn sign_package(unsigned: &[u8], signer: &DocumentSigner) -> Result<V
         signed_info.push_str(&BASE64_STANDARD.encode(digest));
         signed_info.push_str("</ds:DigestValue></ds:Reference>");
     }
-    signed_info.push_str(&format!(
-        "<ds:Reference URI=\"#{properties_id}\" Type=\"{SIGNED_PROPERTIES_TYPE}\"><ds:Transforms><ds:Transform Algorithm=\"{}\"></ds:Transform></ds:Transforms><ds:DigestMethod Algorithm=\"{SHA256_URI}\"></ds:DigestMethod><ds:DigestValue>{}</ds:DigestValue></ds:Reference></ds:SignedInfo>",
-        signer.canonicalization.uri(),
-        BASE64_STANDARD.encode(properties_digest)
-    ));
+    signed_info.push_str("<ds:Reference URI=\"");
+    signed_info.push('#');
+    signed_info.push_str(properties_id);
+    signed_info.push_str("\" Type=\"");
+    signed_info.push_str(SIGNED_PROPERTIES_TYPE);
+    signed_info.push_str("\"><ds:Transforms><ds:Transform Algorithm=\"");
+    signed_info.push_str(signer.canonicalization.uri());
+    signed_info.push_str("\"></ds:Transform></ds:Transforms><ds:DigestMethod Algorithm=\"");
+    signed_info.push_str(SHA256_URI);
+    signed_info.push_str("\"></ds:DigestMethod><ds:DigestValue>");
+    signed_info.push_str(&BASE64_STANDARD.encode(properties_digest));
+    signed_info.push_str("</ds:DigestValue></ds:Reference></ds:SignedInfo>");
 
     let canonical_signed_info = canonicalize_fragment(&signed_info, signer.canonicalization)?;
     let signature_value = sign_bytes(signer, &canonical_signed_info)?;
@@ -268,16 +291,19 @@ pub(crate) fn sign_package(unsigned: &[u8], signer: &DocumentSigner) -> Result<V
 }
 
 pub(crate) fn verify_package(data: &[u8]) -> Result<Vec<SignatureVerification>> {
-    let archive = ArchiveReader::new(data).map_err(|_| format_error("invalid ODF ZIP archive"))?;
+    let archive = ArchiveReader::new(data)
+        .map_err(|error| format_error(format!("invalid ODF ZIP archive: {error}")))?;
     if !archive.contains(DOCUMENT_SIGNATURE_PATH) {
         return Ok(Vec::new());
     }
-    let signature_xml = archive
-        .read(DOCUMENT_SIGNATURE_PATH)
-        .map_err(|_| format_error("unable to read document signature container"))?;
+    let signature_xml = archive.read(DOCUMENT_SIGNATURE_PATH).map_err(|error| {
+        format_error(format!(
+            "unable to read document signature container: {error}"
+        ))
+    })?;
     let signatures = parse_signature_container(&signature_xml)?;
     let text = std::str::from_utf8(&signature_xml)
-        .map_err(|_| format_error("signature XML is not UTF-8"))?;
+        .map_err(|error| format_error(format!("signature XML is not UTF-8: {error}")))?;
     let signed_infos = extract_elements(text, "SignedInfo", None)?;
     if signed_infos.len() != signatures.len() {
         return invalid("signature XML has ambiguous SignedInfo elements");
@@ -303,11 +329,12 @@ fn verify_one(
         .map(|value| {
             BASE64_STANDARD
                 .decode(value)
-                .map_err(|_| format_error("invalid X.509 certificate base64"))
+                .map_err(|error| format_error(format!("invalid X.509 certificate base64: {error}")))
         })
         .collect::<Result<Vec<_>>>()?;
     for value in &certificates {
-        Certificate::from_der(value).map_err(|_| format_error("invalid DER X.509 certificate"))?;
+        Certificate::from_der(value)
+            .map_err(|error| format_error(format!("invalid DER X.509 certificate: {error}")))?;
     }
     let mut result = SignatureVerification {
         signature_id: signature.id.clone(),
@@ -319,7 +346,8 @@ fn verify_one(
         signing_certificate_index: None,
         failed_reference_uri: None,
     };
-    let (Some(algorithm), Some(canonicalization)) = (algorithm, canonicalization) else {
+    let (Some(verified_algorithm), Some(verified_canonicalization)) = (algorithm, canonicalization)
+    else {
         return Ok(result);
     };
 
@@ -350,7 +378,7 @@ fn verify_one(
         }
         let expected_digest = BASE64_STANDARD
             .decode(&reference.digest_value)
-            .map_err(|_| format_error("invalid reference digest base64"))?;
+            .map_err(|error| format_error(format!("invalid reference digest base64: {error}")))?;
         if expected_digest.len() != 32 {
             return invalid("SHA-256 signature digest has the wrong size");
         }
@@ -369,9 +397,9 @@ fn verify_one(
             }
         } else {
             let path = decode_package_uri(&reference.uri)?;
-            let bytes = archive
-                .read(&path)
-                .map_err(|_| format_error("unable to read signature reference"))?;
+            let bytes = archive.read(&path).map_err(|error| {
+                format_error(format!("unable to read signature reference: {error}"))
+            })?;
             apply_transforms(&bytes, &reference.transforms)?
         };
         if Sha256::digest(&bytes).as_slice() != expected_digest.as_slice() {
@@ -384,12 +412,20 @@ fn verify_one(
         result.validity = SignatureValidity::MissingCertificate;
         return Ok(result);
     }
-    let signed_info = canonicalize_fragment(signed_info_xml, canonicalization)?;
+    let signed_info = canonicalize_fragment(signed_info_xml, verified_canonicalization)?;
     let signature_value = BASE64_STANDARD
         .decode(&signature.signature_value)
-        .map_err(|_| format_error("invalid signature value base64"))?;
+        .map_err(|error| format_error(format!("invalid signature value base64: {error}")))?;
     for (index, certificate) in result.certificate_chain_der.iter().enumerate() {
-        if verify_bytes(algorithm, certificate, &signed_info, &signature_value).unwrap_or(false) {
+        if matches!(
+            verify_bytes(
+                verified_algorithm,
+                certificate,
+                &signed_info,
+                &signature_value
+            ),
+            Ok(true)
+        ) {
             result.validity = SignatureValidity::Valid;
             result.signing_certificate_index = Some(index);
             return Ok(result);
@@ -412,7 +448,8 @@ fn apply_transforms(bytes: &[u8], transforms: &[String]) -> Result<Vec<u8>> {
 }
 
 fn digest_input_canonical_xml(bytes: &[u8], mode: CanonicalizationAlgorithm) -> Result<Vec<u8>> {
-    let xml = std::str::from_utf8(bytes).map_err(|_| format_error("C14N input is not UTF-8"))?;
+    let xml = std::str::from_utf8(bytes)
+        .map_err(|error| format_error(format!("C14N input is not UTF-8: {error}")))?;
     canonicalize_fragment(xml, mode)
 }
 
@@ -432,8 +469,9 @@ fn canonicalize_fragment(xml: &str, mode: CanonicalizationAlgorithm) -> Result<V
 fn sign_bytes(signer: &DocumentSigner, message: &[u8]) -> Result<Vec<u8>> {
     match signer.algorithm {
         SignatureAlgorithm::RsaSha256 => {
-            let key = RsaPrivateKey::from_pkcs8_der(&signer.private_key)
-                .map_err(|_| format_error("invalid RSA PKCS#8 private key"))?;
+            let key = RsaPrivateKey::from_pkcs8_der(&signer.private_key).map_err(|error| {
+                format_error(format!("invalid RSA PKCS#8 private key: {error}"))
+            })?;
             if key.n().bits() < 2048 {
                 return invalid("RSA signing keys must be at least 2048 bits");
             }
@@ -441,8 +479,9 @@ fn sign_bytes(signer: &DocumentSigner, message: &[u8]) -> Result<Vec<u8>> {
             Ok(signature.to_vec())
         },
         SignatureAlgorithm::EcdsaP256Sha256 => {
-            let key = EcdsaSigningKey::from_pkcs8_der(&signer.private_key)
-                .map_err(|_| format_error("invalid P-256 PKCS#8 private key"))?;
+            let key = EcdsaSigningKey::from_pkcs8_der(&signer.private_key).map_err(|error| {
+                format_error(format!("invalid P-256 PKCS#8 private key: {error}"))
+            })?;
             let signature: EcdsaSignature = key.sign(message);
             Ok(signature.to_bytes().to_vec())
         },
@@ -453,31 +492,39 @@ fn verify_bytes(
     algorithm: SignatureAlgorithm,
     certificate_der: &[u8],
     message: &[u8],
-    signature: &[u8],
+    signature_bytes: &[u8],
 ) -> Result<bool> {
-    let certificate = Certificate::from_der(certificate_der)
-        .map_err(|_| format_error("invalid DER X.509 certificate"))?;
-    let public = certificate
+    let parsed_certificate = Certificate::from_der(certificate_der)
+        .map_err(|error| format_error(format!("invalid DER X.509 certificate: {error}")))?;
+    let public = parsed_certificate
         .tbs_certificate
         .subject_public_key_info
         .subject_public_key
         .raw_bytes();
     Ok(match algorithm {
         SignatureAlgorithm::RsaSha256 => {
-            let key = RsaPublicKey::from_pkcs1_der(public)
-                .map_err(|_| format_error("certificate does not contain an RSA public key"))?;
-            let signature = RsaSignature::try_from(signature)
-                .map_err(|_| format_error("invalid RSA signature encoding"))?;
+            let key = RsaPublicKey::from_pkcs1_der(public).map_err(|error| {
+                format_error(format!(
+                    "certificate does not contain an RSA public key: {error}"
+                ))
+            })?;
+            let rsa_signature = RsaSignature::try_from(signature_bytes).map_err(|error| {
+                format_error(format!("invalid RSA signature encoding: {error}"))
+            })?;
             RsaVerifyingKey::<RsaSha256>::new(key)
-                .verify(message, &signature)
+                .verify(message, &rsa_signature)
                 .is_ok()
         },
         SignatureAlgorithm::EcdsaP256Sha256 => {
-            let key = VerifyingKey::from_sec1_bytes(public)
-                .map_err(|_| format_error("certificate does not contain a P-256 public key"))?;
-            let signature = EcdsaSignature::from_slice(signature)
-                .map_err(|_| format_error("invalid ECDSA signature encoding"))?;
-            key.verify(message, &signature).is_ok()
+            let key = VerifyingKey::from_sec1_bytes(public).map_err(|error| {
+                format_error(format!(
+                    "certificate does not contain a P-256 public key: {error}"
+                ))
+            })?;
+            let ecdsa_signature = EcdsaSignature::from_slice(signature_bytes).map_err(|error| {
+                format_error(format!("invalid ECDSA signature encoding: {error}"))
+            })?;
+            key.verify(message, &ecdsa_signature).is_ok()
         },
     })
 }
@@ -485,29 +532,31 @@ fn verify_bytes(
 fn validate_key_matches_certificate(
     algorithm: SignatureAlgorithm,
     private_key: &[u8],
-    certificate: &[u8],
+    certificate_der: &[u8],
 ) -> Result<()> {
-    let certificate = Certificate::from_der(certificate)
-        .map_err(|_| format_error("invalid DER X.509 certificate"))?;
-    let public = certificate
+    let parsed_certificate = Certificate::from_der(certificate_der)
+        .map_err(|error| format_error(format!("invalid DER X.509 certificate: {error}")))?;
+    let public = parsed_certificate
         .tbs_certificate
         .subject_public_key_info
         .subject_public_key
         .raw_bytes();
     let matches = match algorithm {
         SignatureAlgorithm::RsaSha256 => {
-            let private = RsaPrivateKey::from_pkcs8_der(private_key)
-                .map_err(|_| format_error("invalid RSA PKCS#8 private key"))?;
+            let private = RsaPrivateKey::from_pkcs8_der(private_key).map_err(|error| {
+                format_error(format!("invalid RSA PKCS#8 private key: {error}"))
+            })?;
             if private.n().bits() < 2048 {
                 return invalid("RSA signing keys must be at least 2048 bits");
             }
             let certificate_key = RsaPublicKey::from_pkcs1_der(public)
-                .map_err(|_| format_error("leaf certificate is not RSA"))?;
+                .map_err(|error| format_error(format!("leaf certificate is not RSA: {error}")))?;
             private.to_public_key() == certificate_key
         },
         SignatureAlgorithm::EcdsaP256Sha256 => {
-            let private = EcdsaSigningKey::from_pkcs8_der(private_key)
-                .map_err(|_| format_error("invalid P-256 PKCS#8 private key"))?;
+            let private = EcdsaSigningKey::from_pkcs8_der(private_key).map_err(|error| {
+                format_error(format!("invalid P-256 PKCS#8 private key: {error}"))
+            })?;
             private.verifying_key().to_encoded_point(false).as_bytes() == public
         },
     };
@@ -523,10 +572,15 @@ fn rebuild_with_signature(archive: &ArchiveReader<'_>, signature_xml: &str) -> R
         if name == DOCUMENT_SIGNATURE_PATH {
             continue;
         }
-        let bytes = archive
-            .read(name)
-            .map_err(|_| format_error("unable to rebuild signed ODF package"))?;
-        if name == "mimetype" || archive.is_stored(name).unwrap_or(false) {
+        let bytes = archive.read(name).map_err(|error| {
+            format_error(format!("unable to rebuild signed ODF package: {error}"))
+        })?;
+        let stored = archive.is_stored(name).map_err(|error| {
+            format_error(format!(
+                "unable to inspect ODF package entry while rebuilding: {error}"
+            ))
+        })?;
+        if name == "mimetype" || stored {
             writer.write_stored(name, &bytes)
         } else {
             writer.write_deflated(name, &bytes)
@@ -546,7 +600,9 @@ fn should_reference(name: &str) -> bool {
 }
 
 fn is_xml_path(name: &str) -> bool {
-    name.ends_with(".xml") || name.ends_with(".rdf")
+    name.rsplit_once('.').is_some_and(|(_, extension)| {
+        extension.eq_ignore_ascii_case("xml") || extension.eq_ignore_ascii_case("rdf")
+    })
 }
 
 fn encode_package_uri(path: &str) -> String {
@@ -555,7 +611,10 @@ fn encode_package_uri(path: &str) -> String {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'/') {
             result.push(char::from(byte));
         } else {
-            result.push_str(&format!("%{byte:02X}"));
+            const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
+            result.push('%');
+            result.push(char::from(HEX_DIGITS[usize::from(byte >> 4)]));
+            result.push(char::from(HEX_DIGITS[usize::from(byte & 0x0f)]));
         }
     }
     result
@@ -573,8 +632,11 @@ fn decode_package_uri(uri: &str) -> Result<String> {
             if index + 2 >= bytes.len() {
                 return invalid("invalid percent encoding in signature URI");
             }
-            let value = u8::from_str_radix(&uri[index + 1..index + 3], 16)
-                .map_err(|_| format_error("invalid percent encoding in signature URI"))?;
+            let value = u8::from_str_radix(&uri[index + 1..index + 3], 16).map_err(|error| {
+                format_error(format!(
+                    "invalid percent encoding in signature URI: {error}"
+                ))
+            })?;
             decoded.push(value);
             index += 3;
         } else {
@@ -582,8 +644,8 @@ fn decode_package_uri(uri: &str) -> Result<String> {
             index += 1;
         }
     }
-    let path =
-        String::from_utf8(decoded).map_err(|_| format_error("signature URI is not valid UTF-8"))?;
+    let path = String::from_utf8(decoded)
+        .map_err(|error| format_error(format!("signature URI is not valid UTF-8: {error}")))?;
     if path
         .split('/')
         .any(|segment| matches!(segment, "" | "." | ".."))
@@ -601,21 +663,24 @@ fn extract_elements(xml: &str, local: &str, id: Option<&str>) -> Result<Vec<Stri
     let mut found = Vec::new();
     let inherited_default_ds = xml.contains(&format!("<Signature xmlns=\"{DS}\""));
     loop {
-        let start = reader.buffer_position() as usize;
-        match reader
-            .read_event()
-            .map_err(|_| format_error("invalid signature XML while selecting signed nodes"))?
-        {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|error| format_error(format!("signature XML position is invalid: {error}")))?;
+        match reader.read_event().map_err(|error| {
+            format_error(format!(
+                "invalid signature XML while selecting signed nodes: {error}"
+            ))
+        })? {
             Event::Start(element) => {
                 let local_matches =
                     local.is_empty() || element.local_name().as_ref() == local.as_bytes();
-                let id_matches = if let Some(id) = id {
+                let id_matches = if let Some(expected_id) = id {
                     let mut matched = false;
-                    for attribute in element.attributes().with_checks(true) {
-                        let attribute =
-                            attribute.map_err(|_| format_error("invalid signed-node attribute"))?;
-                        if matches!(attribute.key.as_ref(), b"Id" | b"ID" | b"id")
-                            && attribute.value.as_ref() == id.as_bytes()
+                    for raw_attribute in element.attributes().with_checks(true) {
+                        let parsed_attribute = raw_attribute.map_err(|error| {
+                            format_error(format!("invalid signed-node attribute: {error}"))
+                        })?;
+                        if matches!(parsed_attribute.key.as_ref(), b"Id" | b"ID" | b"id")
+                            && parsed_attribute.value.as_ref() == expected_id.as_bytes()
                         {
                             matched = true;
                         }
@@ -627,20 +692,25 @@ fn extract_elements(xml: &str, local: &str, id: Option<&str>) -> Result<Vec<Stri
                 if local_matches && id_matches {
                     let mut depth = 1usize;
                     while depth != 0 {
-                        match reader
-                            .read_event()
-                            .map_err(|_| format_error("invalid signed-node XML"))?
-                        {
+                        match reader.read_event().map_err(|error| {
+                            format_error(format!("invalid signed-node XML: {error}"))
+                        })? {
                             Event::Start(_) => depth += 1,
                             Event::End(_) => depth -= 1,
                             Event::Eof => return invalid("incomplete signed-node XML"),
                             Event::DocType(_) | Event::GeneralRef(_) | Event::PI(_) => {
                                 return invalid("active XML is prohibited in signed nodes");
                             },
-                            _ => {},
+                            Event::Empty(_)
+                            | Event::Text(_)
+                            | Event::CData(_)
+                            | Event::Comment(_)
+                            | Event::Decl(_) => {},
                         }
                     }
-                    let end = reader.buffer_position() as usize;
+                    let end = usize::try_from(reader.buffer_position()).map_err(|error| {
+                        format_error(format!("signature XML position is invalid: {error}"))
+                    })?;
                     let mut fragment = xml[start..end].to_string();
                     inject_known_namespaces(&mut fragment, inherited_default_ds);
                     found.push(fragment);
@@ -650,7 +720,12 @@ fn extract_elements(xml: &str, local: &str, id: Option<&str>) -> Result<Vec<Stri
                 return invalid("active XML is prohibited in signatures");
             },
             Event::Eof => break,
-            _ => {},
+            Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_) => {},
         }
     }
     Ok(found)
@@ -663,16 +738,24 @@ fn inject_known_namespaces(fragment: &mut String, inherited_default_ds: bool) {
     let start = &fragment[..end];
     let mut declarations = String::new();
     if inherited_default_ds && !start.contains("xmlns=") {
-        declarations.push_str(&format!(" xmlns=\"{DS}\""));
+        declarations.push_str(" xmlns=\"");
+        declarations.push_str(DS);
+        declarations.push('\"');
     }
     if fragment.contains("ds:") && !start.contains("xmlns:ds=") {
-        declarations.push_str(&format!(" xmlns:ds=\"{DS}\""));
+        declarations.push_str(" xmlns:ds=\"");
+        declarations.push_str(DS);
+        declarations.push('\"');
     }
     if fragment.contains("xades:") && !start.contains("xmlns:xades=") {
-        declarations.push_str(&format!(" xmlns:xades=\"{XADES}\""));
+        declarations.push_str(" xmlns:xades=\"");
+        declarations.push_str(XADES);
+        declarations.push('\"');
     }
     if fragment.contains("xd:") && !start.contains("xmlns:xd=") {
-        declarations.push_str(&format!(" xmlns:xd=\"{XADES}\""));
+        declarations.push_str(" xmlns:xd=\"");
+        declarations.push_str(XADES);
+        declarations.push('\"');
     }
     fragment.insert_str(end, &declarations);
 }
@@ -689,12 +772,12 @@ fn decode_pem_blocks(value: &str, label: &str) -> Result<Vec<Vec<u8>>> {
             .ok_or_else(|| format_error("incomplete PEM block"))?;
         let body: String = rest[..finish]
             .chars()
-            .filter(|value| !value.is_whitespace())
+            .filter(|character| !character.is_whitespace())
             .collect();
         blocks.push(
             BASE64_STANDARD
                 .decode(body)
-                .map_err(|_| format_error("invalid PEM base64"))?,
+                .map_err(|error| format_error(format!("invalid PEM base64: {error}")))?,
         );
         rest = &rest[finish + end.len()..];
     }

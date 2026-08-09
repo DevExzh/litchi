@@ -69,7 +69,7 @@ fn linked_metadata_is_typed_and_unknown_tail_is_retained() {
         link.relative_source().unwrap().class_id(),
         Guid::from_bytes([0x10; 16])
     );
-    assert_eq!(link.source().unwrap().data(), &[]);
+    assert_eq!(link.source().unwrap().data(), b"");
     assert_eq!(
         link.absolute_source().unwrap().class_id(),
         Guid::from_bytes([0x20; 16])

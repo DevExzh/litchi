@@ -70,3 +70,42 @@ fn semantic_whitespace_is_preserved_exactly() {
     .unwrap();
     assert_eq!(image.content_xml(), SEMANTIC_WHITESPACE_CONTENT);
 }
+
+#[test]
+fn package_edit_is_source_checked_reversible_and_preserves_unknown_content() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4">"#,
+        r#"<office:body><office:image><draw:frame draw:name="before"><draw:image xlink:href="Pictures/before.png"/></draw:frame><foreign:keep xmlns:foreign="urn:example">opaque</foreign:keep></office:image></office:body></office:document-content>"#,
+    );
+    let source = Image::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
+    let mut edit = source.edit();
+    edit.set_frame_name(0, Some("after".to_string())).unwrap();
+    edit.set_source(0, Source::Linked("Pictures/after.png".to_string()))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(commit.image().frames()[0].name(), Some("after"));
+    assert_eq!(
+        commit.image().frames()[0].source(),
+        &Source::Linked("Pictures/after.png".to_string())
+    );
+    assert!(
+        commit
+            .image()
+            .content_xml()
+            .contains("<foreign:keep xmlns:foreign=\"urn:example\">opaque</foreign:keep>")
+    );
+    assert_eq!(commit.patch().changes().len(), 1);
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.image())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}

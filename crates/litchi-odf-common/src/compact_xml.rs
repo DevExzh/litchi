@@ -51,21 +51,31 @@ impl Limits {
     }
 
     /// Return the configured byte ceiling.
+    #[must_use]
     pub const fn max_bytes(self) -> usize {
         self.max_bytes
     }
 
     /// Return the configured depth ceiling.
+    #[must_use]
     pub const fn max_depth(self) -> usize {
         self.max_depth
     }
 
     /// Return a copy with a checked byte ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `max_bytes` is zero or exceeds the hard ceiling.
     pub fn with_max_bytes(self, max_bytes: usize) -> Result<Self, Error> {
         Self::new(max_bytes, self.max_depth)
     }
 
     /// Return a copy with a checked depth ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `max_depth` is zero or exceeds the hard ceiling.
     pub fn with_max_depth(self, max_depth: usize) -> Result<Self, Error> {
         Self::new(self.max_bytes, max_depth)
     }
@@ -104,11 +114,13 @@ impl Error {
     }
 
     /// Return the stable failure category.
+    #[must_use]
     pub const fn kind(&self) -> ErrorKind {
         self.kind
     }
 
     /// Return the byte offset at or immediately after the rejected construct.
+    #[must_use]
     pub const fn offset(&self) -> usize {
         self.offset
     }
@@ -164,8 +176,8 @@ pub fn validate(xml: &[u8]) -> Result<(), Error> {
 /// # Errors
 ///
 /// Returns a typed [`Error`] for malformed, non-compact, or over-limit input.
-pub fn validate_with_limits(xml: &[u8], limits: Limits) -> Result<(), Error> {
-    let limits = Limits::new(limits.max_bytes, limits.max_depth)?;
+pub fn validate_with_limits(xml: &[u8], requested_limits: Limits) -> Result<(), Error> {
+    let limits = Limits::new(requested_limits.max_bytes, requested_limits.max_depth)?;
     if xml.len() > limits.max_bytes {
         return Err(Error::new(ErrorKind::InputTooLarge, xml.len()));
     }
@@ -176,11 +188,11 @@ pub fn validate_with_limits(xml: &[u8], limits: Limits) -> Result<(), Error> {
     let mut root_seen = false;
 
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = source_offset(reader.buffer_position());
         let event = reader
             .read_event()
-            .map_err(|_| Error::new(ErrorKind::MalformedXml, start))?;
-        let end = reader.buffer_position() as usize;
+            .map_err(|_read_error| Error::new(ErrorKind::MalformedXml, start))?;
+        let end = source_offset(reader.buffer_position());
 
         match event {
             Event::Start(element) => {
@@ -195,9 +207,9 @@ pub fn validate_with_limits(xml: &[u8], limits: Limits) -> Result<(), Error> {
                     return Err(Error::new(ErrorKind::DepthLimit, start));
                 }
                 if preserve_stack.len() == preserve_stack.capacity() {
-                    preserve_stack
-                        .try_reserve(1)
-                        .map_err(|_| Error::new(ErrorKind::AllocationFailed, start))?;
+                    preserve_stack.try_reserve(1).map_err(|_allocation_error| {
+                        Error::new(ErrorKind::AllocationFailed, start)
+                    })?;
                 }
                 let inherited = preserve_stack.last().copied().unwrap_or(false);
                 preserve_stack.push(xml_space(&element, start)?.unwrap_or(inherited));
@@ -226,7 +238,7 @@ pub fn validate_with_limits(xml: &[u8], limits: Limits) -> Result<(), Error> {
                 }
                 let preserve = preserve_stack.last().copied().unwrap_or(false);
                 if !preserve
-                    && bytes.iter().all(|byte| byte.is_ascii_whitespace())
+                    && bytes.iter().all(u8::is_ascii_whitespace)
                     && bytes
                         .iter()
                         .any(|byte| matches!(byte, b'\n' | b'\r' | b'\t'))
@@ -239,10 +251,7 @@ pub fn validate_with_limits(xml: &[u8], limits: Limits) -> Result<(), Error> {
             Event::PI(_) => validate_processing_instruction(&xml[start..end], end)?,
             Event::Eof if preserve_stack.is_empty() && root_seen => return Ok(()),
             Event::Eof => return Err(Error::new(ErrorKind::MalformedXml, start)),
-            Event::CData(_) if preserve_stack.is_empty() => {
-                return Err(Error::new(ErrorKind::MalformedXml, start));
-            },
-            Event::GeneralRef(_) if preserve_stack.is_empty() => {
+            Event::CData(_) | Event::GeneralRef(_) if preserve_stack.is_empty() => {
                 return Err(Error::new(ErrorKind::MalformedXml, start));
             },
             Event::GeneralRef(reference) if !is_predefined_reference(reference.as_ref()) => {
@@ -302,15 +311,11 @@ fn validate_markup(bytes: &[u8], offset: usize) -> Result<(), Error> {
     for (index, byte) in bytes.iter().enumerate() {
         match (quote, byte) {
             (Some(delimiter), current) if current == &delimiter => quote = None,
-            (Some(_), _) => {},
             (None, b'\'' | b'"') => quote = Some(*byte),
-            (None, b' ') if previous_space => {
-                return Err(Error::new(ErrorKind::FormattingWhitespace, offset));
-            },
             (None, b'/') if previous_space && bytes.get(index + 1).copied() == Some(b'>') => {
                 return Err(Error::new(ErrorKind::SpacedEmptyElement, offset));
             },
-            (None, b'>') if previous_space => {
+            (None, b' ' | b'>') if previous_space => {
                 return Err(Error::new(ErrorKind::FormattingWhitespace, offset));
             },
             _ => {},
@@ -325,7 +330,6 @@ fn contains_unquoted(bytes: &[u8], needle: &[u8]) -> bool {
     for (index, byte) in bytes.iter().enumerate() {
         match (quote, byte) {
             (Some(delimiter), current) if current == &delimiter => quote = None,
-            (Some(_), _) => {},
             (None, b'\'' | b'"') => quote = Some(*byte),
             (None, _) if bytes[index..].starts_with(needle) => return true,
             _ => {},
@@ -339,8 +343,9 @@ fn xml_space(
     offset: usize,
 ) -> Result<Option<bool>, Error> {
     let mut preserve = None;
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(|_| Error::new(ErrorKind::MalformedXml, offset))?;
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute
+            .map_err(|_attribute_error| Error::new(ErrorKind::MalformedXml, offset))?;
         if attribute.key.as_ref() == b"xml:space" {
             preserve = match attribute.value.as_ref() {
                 b"preserve" => Some(true),
@@ -350,6 +355,10 @@ fn xml_space(
         }
     }
     Ok(preserve)
+}
+
+fn source_offset(position: u64) -> usize {
+    usize::try_from(position).unwrap_or(usize::MAX)
 }
 
 #[cfg(test)]

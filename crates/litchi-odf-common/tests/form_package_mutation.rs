@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        reason = "Fixed in-memory package fixtures use direct assertion setup."
+    )
+)]
+
 use litchi_odf_common::{
     constants,
     core::{OwnedPackage, PackageWriter},
@@ -31,7 +39,7 @@ fn neutral_rebuild_preserves_inert_forms_and_drops_stale_signatures() {
     let control = r#"<form:button form:name="SafeButton" xml:id="safe_button"/>"#;
     let insertion = content.find("</form:form>").unwrap();
     let updated = splice(&content, insertion, insertion, control).unwrap();
-    let rebuilt = rebuild_package(
+    let rebuilt_bytes = rebuild_package(
         &source,
         &updated,
         Vec::new(),
@@ -40,7 +48,7 @@ fn neutral_rebuild_preserves_inert_forms_and_drops_stale_signatures() {
         Vec::new(),
     )
     .unwrap();
-    let rebuilt = OwnedPackage::from_bytes(rebuilt).unwrap();
+    let rebuilt = OwnedPackage::from_bytes(rebuilt_bytes).unwrap();
     let rebuilt_content =
         String::from_utf8(rebuilt.get_file(constants::ODF_CONTENT).unwrap()).unwrap();
     assert!(rebuilt_content.contains(LISTENER));

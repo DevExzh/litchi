@@ -68,6 +68,7 @@ mod api;
 mod codec;
 mod content;
 mod drawing;
+pub mod edit;
 pub mod metadata;
 mod model;
 mod numbering;

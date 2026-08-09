@@ -1,4 +1,4 @@
-//! RDF values exposed by the OpenDocument facade.
+//! `RDF` values exposed by the `OpenDocument` facade.
 
 /// An RDF subject identified by an IRI or a blank-node identifier.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

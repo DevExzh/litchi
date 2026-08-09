@@ -11,6 +11,9 @@ use crate::{Document, mutable::MutableDocument};
 use litchi_core::{Error, Result};
 use std::sync::Arc;
 
+/// Shared zero-based semantic collection position.
+pub use litchi_core::Position;
+
 const MAX_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_OPERATIONS: usize = 1_024;
 
@@ -65,13 +68,23 @@ impl Snapshot {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ParagraphSelector {
+    /// A checked zero-based paragraph position in semantic document order.
+    Position(Position),
     /// The zero-based paragraph position in semantic document order.
+    ///
+    /// Prefer [`ParagraphSelector::position`] for new code.
     Index(usize),
     /// The unique paragraph whose extracted semantic text equals this value.
     ExactText(String),
 }
 
 impl ParagraphSelector {
+    /// Select a paragraph by a checked semantic document position.
+    #[must_use]
+    pub const fn position(position: Position) -> Self {
+        Self::Position(position)
+    }
+
     /// Select a paragraph by semantic document order.
     #[must_use]
     pub const fn at(index: usize) -> Self {
@@ -98,7 +111,7 @@ impl Edit {
     pub fn append_line_break(&mut self, selector: ParagraphSelector) -> Result<&mut Self> {
         let index = match &selector {
             ParagraphSelector::Index(index) => *index,
-            ParagraphSelector::ExactText(_) => {
+            ParagraphSelector::Position(_) | ParagraphSelector::ExactText(_) => {
                 resolve_paragraph(&self.source.document()?, &selector)?
             },
         };
@@ -174,6 +187,15 @@ impl Edit {
         })
     }
 
+    /// Stages removal of one RDF assertion selected by a checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn remove_rdf_triple_at(&mut self, path: &str, position: Position) -> Result<&mut Self> {
+        self.remove_rdf_triple(path, position.get())
+    }
+
     /// Stages an RDF assertion move; equal selectors are an exact no-op.
     pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<&mut Self> {
         if from == to {
@@ -184,6 +206,20 @@ impl Edit {
             from,
             to,
         })
+    }
+
+    /// Stages an RDF assertion move between checked semantic positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn move_rdf_triple_to(
+        &mut self,
+        path: &str,
+        from: Position,
+        to: Position,
+    ) -> Result<&mut Self> {
+        self.move_rdf_triple(path, from.get(), to.get())
     }
 
     /// Stages insertion of a top-level inert form into a form group.
@@ -239,12 +275,30 @@ impl Edit {
         self.push(Operation::RemoveFormControl { index })
     }
 
+    /// Stages removal of a form control selected by a checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn remove_form_control_at(&mut self, position: Position) -> Result<&mut Self> {
+        self.remove_form_control(position.get())
+    }
+
     /// Stages a form-control move; equal selectors are an exact no-op.
     pub fn move_form_control(&mut self, from: usize, to: usize) -> Result<&mut Self> {
         if from == to {
             return Ok(self);
         }
         self.push(Operation::MoveFormControl { from, to })
+    }
+
+    /// Stages a form-control move between checked semantic positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn move_form_control_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+        self.move_form_control(from.get(), to.get())
     }
 
     /// Stages replacement of a form selected in semantic document order.
@@ -264,12 +318,30 @@ impl Edit {
         self.push(Operation::RemoveForm { index })
     }
 
+    /// Stages removal of a form selected by a checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn remove_form_at(&mut self, position: Position) -> Result<&mut Self> {
+        self.remove_form(position.get())
+    }
+
     /// Stages a form move; equal selectors are an exact no-op.
     pub fn move_form(&mut self, from: usize, to: usize) -> Result<&mut Self> {
         if from == to {
             return Ok(self);
         }
         self.push(Operation::MoveForm { from, to })
+    }
+
+    /// Stages a form move between checked semantic positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn move_form_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+        self.move_form(from.get(), to.get())
     }
 
     /// Stages creation of a packaged or inline embedded chart. Formula and
@@ -307,6 +379,15 @@ impl Edit {
     /// Stages removal of an embedded chart selected in document order.
     pub fn remove_embedded_chart(&mut self, index: usize) -> Result<&mut Self> {
         self.push(Operation::RemoveEmbeddedChart { index })
+    }
+
+    /// Stages removal of an embedded chart selected by a checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn remove_embedded_chart_at(&mut self, position: Position) -> Result<&mut Self> {
+        self.remove_embedded_chart(position.get())
     }
 
     /// Stages creation of an inert embedded object or image.
@@ -348,9 +429,27 @@ impl Edit {
         self.push(Operation::RemoveEmbeddedObject { index })
     }
 
+    /// Stages removal of an embedded object selected by a checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn remove_embedded_object_at(&mut self, position: Position) -> Result<&mut Self> {
+        self.remove_embedded_object(position.get())
+    }
+
     /// Stages removal of an embedded image selected in document order.
     pub fn remove_embedded_image(&mut self, index: usize) -> Result<&mut Self> {
         self.push(Operation::RemoveEmbeddedImage { index })
+    }
+
+    /// Stages removal of an embedded image selected by a checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn remove_embedded_image_at(&mut self, position: Position) -> Result<&mut Self> {
+        self.remove_embedded_image(position.get())
     }
 
     /// Stages an embedded-object move; equal selectors are an exact no-op.
@@ -361,12 +460,30 @@ impl Edit {
         self.push(Operation::MoveEmbeddedObject { from, to })
     }
 
+    /// Stages an embedded-object move between checked semantic positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn move_embedded_object_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+        self.move_embedded_object(from.get(), to.get())
+    }
+
     /// Stages an embedded-image move; equal selectors are an exact no-op.
     pub fn move_embedded_image(&mut self, from: usize, to: usize) -> Result<&mut Self> {
         if from == to {
             return Ok(self);
         }
         self.push(Operation::MoveEmbeddedImage { from, to })
+    }
+
+    /// Stages an embedded-image move between checked semantic positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction operation limit has been reached.
+    pub fn move_embedded_image_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+        self.move_embedded_image(from.get(), to.get())
     }
 
     /// Stages validated opaque script bytes. They are never interpreted,
@@ -914,6 +1031,14 @@ fn ensure_package_size(size: usize, scope: &str) -> Result<()> {
 fn resolve_paragraph(document: &Document, selector: &ParagraphSelector) -> Result<usize> {
     let paragraphs = document.paragraphs()?;
     match selector {
+        ParagraphSelector::Position(position) if position.get() < paragraphs.len() => {
+            Ok(position.get())
+        },
+        ParagraphSelector::Position(position) => Err(Error::InvalidFormat(format!(
+            "paragraph selector position {} is out of bounds (found {})",
+            position.get(),
+            paragraphs.len()
+        ))),
         ParagraphSelector::Index(index) if *index < paragraphs.len() => Ok(*index),
         ParagraphSelector::Index(index) => Err(Error::InvalidFormat(format!(
             "paragraph selector index {index} is out of bounds (found {})",

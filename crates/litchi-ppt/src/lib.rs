@@ -83,6 +83,8 @@ pub mod persist;
 pub mod records;
 pub mod shapes;
 pub mod text;
+/// Source-checked editing of text in an existing parsed shape.
+pub mod text_edit;
 
 /// Semantic owners for content embedded in a legacy presentation.
 pub mod embedded;

@@ -1,6 +1,6 @@
 //! Structural timing-tree and condition models.
 
-use super::Duration;
+use super::{Duration, MotionFraction};
 
 /// A trigger event on an ordered timing condition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +28,15 @@ pub enum RuntimeTrigger {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConditionTarget {
     Shape(u32),
+    /// A named bookmark on an audio or video shape.
+    ///
+    /// This is the `p14:bmkTgt` extension described by MS-PPTX 2.2.2.
+    /// The shape ID remains the ordinary timing target; the bookmark name is
+    /// inert text and is checked against the bounded XML grammar.
+    MediaBookmark {
+        shape_id: u32,
+        name: String,
+    },
     Slide,
     TimeNode(u32),
     Runtime(RuntimeTrigger),
@@ -114,6 +123,11 @@ pub struct CommonTimeNode {
     pub duration: Option<Duration>,
     pub node_type: Option<TimeNodeType>,
     pub preset: Option<PresetTimeNode>,
+    /// Optional Office 2010 UI bounce fraction (`p14:presetBounceEnd`).
+    ///
+    /// This is distinct from the behavior-level `bounceEnd` attributes. It
+    /// describes the UI preset on this common time node.
+    pub preset_bounce_end: Option<MotionFraction>,
     pub start_conditions: Vec<TimeCondition>,
     pub end_conditions: Vec<TimeCondition>,
     pub children: Vec<TimingChild>,

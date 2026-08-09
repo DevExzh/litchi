@@ -17,7 +17,7 @@ catalog, not a database runtime.
 | Raw `content.xml` | 🟡 | ✅ | 🟡 | Existing package XML remains exact and is never reformatted. Fresh compact input is checked before publication. Unknown XML is not normalized or discarded. |
 | Fresh package builder | 🟡 | N/A | 🟡 | Creates a compact, structurally valid inert data-source shell plus raw content and manifest; no existing package can be saved or rebuilt. |
 | Compact XML | ✅ | N/A | ✅ | Fresh input and generated content are compact: no indentation or formatting whitespace is emitted. Semantic character data and `xml:space="preserve"` content remain exact. Existing source packages are preserved byte-for-byte. |
-| Connections and queries | 🟡 | ✅ | ❌ | `Database::catalog()` exposes bounded stored query names, command text, and `db:escape-processing`. Commands, connection metadata, scripts, and drivers are inert and never executed. |
+| Connections and queries | 🟡 | ✅ | ❌ | `Database::catalog()` exposes one inert file, resource, or server connection target plus bounded stored query names, command text, and `db:escape-processing`. Credentials and driver configuration are not modeled; targets and commands are never opened, fetched, or executed. |
 | Schemas, tables, columns, and relations | 🟡 | ✅ | ❌ | Source-bound `Catalog` exposes `db:table-representation` and `db:table-definition` declarations with columns in source order. Relations, keys, indices, forms, reports, and edits remain unsupported. |
 | Existing-package edits and patches | ❌ | ❌ | ❌ | No transaction, commit, save, stale check, or reversible patch exists. |
 | Untouched-byte preservation | ✅ | ✅ | N/A | Original archive bytes are exact before mutation; no mutation preservation claim is made. |

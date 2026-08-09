@@ -11,34 +11,49 @@ use std::io::Read;
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
-/// An ODF package (ZIP file containing XML documents)
+/// An ODF package (ZIP file containing XML documents).
 ///
 /// Uses soapberry-zip for efficient lazy decompression.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`Package` is the established public ODF archive reader name."
+)]
 pub struct Package<'data> {
     archive: Archive<'data>,
-    #[allow(dead_code)]
     manifest: super::manifest::Manifest,
     mimetype: String,
     password: Option<&'data str>,
 }
 
-/// Owned version of Package that owns the data buffer.
+/// Owned version of [`Package`] that owns the data buffer.
 #[derive(Clone)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`OwnedPackage` distinguishes the owning public archive handle."
+)]
 pub struct OwnedPackage {
     data: Arc<Vec<u8>>,
     password: Option<Zeroizing<String>>,
 }
 
-#[allow(dead_code)]
 impl OwnedPackage {
-    /// Open an ODF package from a reader
+    /// Open an ODF package from a reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when reading the input or parsing the ZIP archive
+    /// fails.
     pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         Self::from_bytes(data)
     }
 
-    /// Create an ODF package from bytes
+    /// Create an ODF package from bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
         // Validate the archive can be parsed
         let _ = Archive::new(&data)?;
@@ -50,6 +65,10 @@ impl OwnedPackage {
     }
 
     /// Adopt shared ODF package bytes without copying the archive buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_shared_bytes(data: Arc<Vec<u8>>) -> Result<Self> {
         let _ = Archive::new(data.as_slice())?;
         Ok(Self {
@@ -59,6 +78,11 @@ impl OwnedPackage {
     }
 
     /// Open an ODF package and retain a password for lazy entry decryption.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when reading the input or parsing the ZIP archive
+    /// fails.
     pub fn from_reader_with_password<R: Read>(
         mut reader: R,
         password: impl Into<String>,
@@ -69,6 +93,10 @@ impl OwnedPackage {
     }
 
     /// Open ODF bytes and retain a password for lazy entry decryption.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes_with_password(data: Vec<u8>, password: impl Into<String>) -> Result<Self> {
         let _ = Archive::new(&data)?;
         Ok(Self {
@@ -77,7 +105,12 @@ impl OwnedPackage {
         })
     }
 
-    /// Get a borrowed Package for accessing archive contents
+    /// Get a borrowed [`Package`] for accessing archive contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the archive MIME type or manifest cannot be
+    /// decoded.
     pub fn package(&self) -> Result<Package<'_>> {
         Package::new_with_password(
             &self.data,
@@ -85,48 +118,72 @@ impl OwnedPackage {
         )
     }
 
-    /// Get the underlying data
+    /// Get the underlying data.
+    #[must_use]
     pub fn into_inner(self) -> Vec<u8> {
         Arc::try_unwrap(self.data).unwrap_or_else(|data| (*data).clone())
     }
 
-    /// Get a reference to the underlying data
+    /// Get a reference to the underlying data.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.data.as_slice()
     }
 
     /// Clone the shared handle to the exact archive allocation.
+    #[must_use]
     pub fn shared_bytes(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.data)
     }
 
     // Convenience methods that delegate to Package
 
-    /// Get the MIME type from the mimetype file
+    /// Get the MIME type from the mimetype file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package metadata cannot be decoded.
     pub fn mimetype(&self) -> Result<String> {
         let package = self.package()?;
         Ok(package.mimetype().to_string())
     }
 
-    /// Get a file from the package by path
+    /// Get a file from the package by path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package metadata, requested entry, or entry
+    /// decryption is invalid.
     pub fn get_file(&self, path: &str) -> Result<Vec<u8>> {
         let package = self.package()?;
         package.get_file(path)
     }
 
-    /// Check if a file exists in the package
+    /// Check if a file exists in the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package metadata cannot be decoded.
     pub fn has_file(&self, path: &str) -> Result<bool> {
         let package = self.package()?;
         Ok(package.has_file(path))
     }
 
-    /// List all files in the package
+    /// List all files in the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package metadata cannot be decoded.
     pub fn files(&self) -> Result<Vec<String>> {
         let package = self.package()?;
         package.files()
     }
 
     /// Get all embedded media files from the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package metadata cannot be decoded.
     pub fn media_files(&self) -> Result<Vec<String>> {
         let package = self.package()?;
         package.media_files()
@@ -135,11 +192,21 @@ impl OwnedPackage {
     /// Read inert document and macro signature metadata from the package.
     ///
     /// This does not verify cryptographic signatures or execute macro content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package or its signature metadata cannot be
+    /// decoded.
     pub fn digital_signatures(&self) -> Result<crate::signature::DigitalSignatures> {
         self.package()?.digital_signatures()
     }
 
     /// Cryptographically verify document signatures without making any PKI trust claim.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package or its signature metadata cannot be
+    /// decoded or verified.
     pub fn verify_document_signatures(
         &self,
     ) -> Result<Vec<crate::signature::SignatureVerification>> {
@@ -148,8 +215,12 @@ impl OwnedPackage {
 }
 
 impl<'data> Package<'data> {
-    /// Create a new Package from a byte slice
-    #[allow(dead_code)]
+    /// Create a new [`Package`] from a byte slice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the archive MIME type or manifest cannot be
+    /// decoded.
     pub fn new(data: &'data [u8]) -> Result<Self> {
         Self::new_with_password(data, None)
     }
@@ -160,7 +231,9 @@ impl<'data> Package<'data> {
         // Read MIME type from mimetype file
         let mimetype = archive
             .read_string("mimetype")
-            .map_err(|_| Error::InvalidFormat("No mimetype file found in ODF package".to_string()))?
+            .map_err(|error| {
+                Error::InvalidFormat(format!("No mimetype file found in ODF package: {error}"))
+            })?
             .trim()
             .to_string();
 
@@ -175,25 +248,33 @@ impl<'data> Package<'data> {
         })
     }
 
-    /// Get the MIME type from the mimetype file
+    /// Get the MIME type from the mimetype file.
+    #[must_use]
     pub fn mimetype(&self) -> &str {
         &self.mimetype
     }
 
-    /// Get a file from the package by path
+    /// Get a file from the package by path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the entry does not exist, does not meet encrypted
+    /// package requirements, or cannot be decrypted.
     pub fn get_file(&self, path: &str) -> Result<Vec<u8>> {
         let bytes = self
             .archive
             .read(path)
-            .map_err(|_| Error::InvalidFormat(format!("File not found: {}", path)))?;
+            .map_err(|error| Error::InvalidFormat(format!("File not found: {path}: {error}")))?;
         let Some(entry) = self.manifest.get_entry(path) else {
             return Ok(bytes);
         };
         let Some(encryption) = &entry.encryption else {
             return Ok(bytes);
         };
-        if !self.archive.is_stored(path).map_err(|_| {
-            Error::InvalidFormat(format!("Unable to inspect encrypted ODF entry '{path}'"))
+        if !self.archive.is_stored(path).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Unable to inspect encrypted ODF entry '{path}': {error}"
+            ))
         })? {
             return Err(Error::InvalidFormat(format!(
                 "Encrypted ODF entry '{path}' must use ZIP Store"
@@ -212,18 +293,23 @@ impl<'data> Package<'data> {
         super::encryption::decrypt_entry(&bytes, password, encryption, size)
     }
 
-    /// Check if a file exists in the package
+    /// Check if a file exists in the package.
+    #[must_use]
     pub fn has_file(&self, path: &str) -> bool {
         self.archive.contains(path)
     }
 
-    /// Get the manifest
-    #[allow(dead_code)]
+    /// Get the manifest.
+    #[must_use]
     pub fn manifest(&self) -> &super::manifest::Manifest {
         &self.manifest
     }
 
-    /// List all files in the package
+    /// List all files in the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the archive cannot enumerate its entries.
     pub fn files(&self) -> Result<Vec<String>> {
         Ok(self.archive.file_names().map(String::from).collect())
     }
@@ -231,6 +317,10 @@ impl<'data> Package<'data> {
     /// Get all embedded media files (images, etc.) from the package.
     ///
     /// This returns paths to all files in the Pictures/ directory and other media directories.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the archive cannot enumerate its entries.
     pub fn media_files(&self) -> Result<Vec<String>> {
         let all_files = self.files()?;
         Ok(all_files
@@ -240,14 +330,22 @@ impl<'data> Package<'data> {
     }
 
     /// Check if the package contains any media files.
-    #[allow(dead_code)] // Reserved for future use
-    pub fn has_media(&self) -> bool {
-        self.media_files().map(|m| !m.is_empty()).unwrap_or(false)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the archive cannot enumerate its entries.
+    pub fn has_media(&self) -> Result<bool> {
+        Ok(!self.media_files()?.is_empty())
     }
 
     /// Read inert document and macro signature metadata from the package.
     ///
     /// This does not verify cryptographic signatures or execute macro content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package or its signature metadata cannot be
+    /// decoded.
     pub fn digital_signatures(&self) -> Result<crate::signature::DigitalSignatures> {
         use crate::signature::{
             DOCUMENT_SIGNATURE_PATH, MACRO_SIGNATURE_PATH, parse_signature_container,
@@ -266,7 +364,7 @@ impl<'data> Package<'data> {
     }
 }
 
-impl<'data> package::PackageLookup for Package<'data> {
+impl package::PackageLookup for Package<'_> {
     fn has_file(&self, path: &str) -> bool {
         self.has_file(path)
     }
@@ -277,6 +375,10 @@ impl<'data> package::PackageLookup for Package<'data> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Test fixtures use infallible ZIP setup operations so assertions can focus on package behavior."
+)]
 mod tests {
     use super::*;
     use std::io::Cursor;
@@ -522,11 +624,12 @@ mod tests {
     }
 
     #[test]
-    fn test_package_has_media() {
+    fn test_package_has_media() -> Result<()> {
         let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
-        let package = Package::new(&data).unwrap();
+        let package = Package::new(&data)?;
 
-        assert!(package.has_media());
+        assert!(package.has_media()?);
+        Ok(())
     }
 
     #[test]

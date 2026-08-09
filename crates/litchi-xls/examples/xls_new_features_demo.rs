@@ -8,6 +8,7 @@
 //! The file is saved to `output/xls_new_features_demo.xls`.
 
 use litchi_xls::Writer;
+use litchi_xls::writer::Column;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dir = std::path::Path::new("output");
@@ -61,10 +62,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     w.write_formula(s1, 7, 4, "SUM(E4:E7)")?;
 
     // Widen columns for readability
-    w.set_column_width(s1, 0, 14.0)?;
-    w.set_column_width(s1, 1, 14.0)?;
+    w.set_column_width(s1, Column::new(0)?, 14.0)?;
+    w.set_column_width(s1, Column::new(1)?, 14.0)?;
     for c in 2..=4 {
-        w.set_column_width(s1, c, 12.0)?;
+        w.set_column_width(s1, Column::new(c)?, 12.0)?;
     }
 
     println!("[Sheet 1] Merged Cells — 3 merge regions, 4 data rows, totals");
@@ -76,8 +77,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     w.write_string(s2, 0, 0, "Description")?;
     w.write_string(s2, 0, 1, "Link")?;
-    w.set_column_width(s2, 0, 28.0)?;
-    w.set_column_width(s2, 1, 40.0)?;
+    w.set_column_width(s2, Column::new(0)?, 28.0)?;
+    w.set_column_width(s2, Column::new(1)?, 40.0)?;
 
     // Web links
     w.write_string(s2, 1, 0, "Rust Programming Language")?;
@@ -147,11 +148,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     w.set_auto_filter(s3, 0, employees.len() as u32, 0, 4)?;
 
     // Widen columns
-    w.set_column_width(s3, 0, 14.0)?;
-    w.set_column_width(s3, 1, 16.0)?;
-    w.set_column_width(s3, 2, 12.0)?;
-    w.set_column_width(s3, 3, 8.0)?;
-    w.set_column_width(s3, 4, 14.0)?;
+    w.set_column_width(s3, Column::new(0)?, 14.0)?;
+    w.set_column_width(s3, Column::new(1)?, 16.0)?;
+    w.set_column_width(s3, Column::new(2)?, 12.0)?;
+    w.set_column_width(s3, Column::new(3)?, 8.0)?;
+    w.set_column_width(s3, Column::new(4)?, 14.0)?;
 
     println!("[Sheet 3] AutoFilter — 12 employee rows, 5 filterable columns");
 
@@ -222,10 +223,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     w.write_string(s4, footer_row, 0, "End of catalog — all prices in USD")?;
     w.merge_cells(s4, footer_row, footer_row, 0, 3)?;
 
-    w.set_column_width(s4, 0, 18.0)?;
-    w.set_column_width(s4, 1, 14.0)?;
-    w.set_column_width(s4, 2, 10.0)?;
-    w.set_column_width(s4, 3, 30.0)?;
+    w.set_column_width(s4, Column::new(0)?, 18.0)?;
+    w.set_column_width(s4, Column::new(1)?, 14.0)?;
+    w.set_column_width(s4, Column::new(2)?, 10.0)?;
+    w.set_column_width(s4, Column::new(3)?, 30.0)?;
 
     println!("[Sheet 4] Combined — merged title+footer, hyperlinks, auto-filter");
 

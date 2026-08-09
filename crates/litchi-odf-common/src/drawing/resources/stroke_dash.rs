@@ -35,6 +35,7 @@ impl Style {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Rect => "rect",
@@ -78,6 +79,11 @@ pub struct Measure {
 }
 
 impl Measure {
+    /// Creates a finite, nonnegative length or percentage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is non-finite or negative.
     pub fn new(value: f64, unit: MeasureUnit) -> Result<Self> {
         if !value.is_finite() || value < 0.0 {
             return invalid("stroke-dash measure must be finite and nonnegative");
@@ -85,10 +91,12 @@ impl Measure {
         Ok(Self { value, unit })
     }
 
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
 
+    #[must_use]
     pub const fn unit(self) -> MeasureUnit {
         self.unit
     }
@@ -98,11 +106,11 @@ impl FromStr for Measure {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
-        let (number, unit) = split_measure(value)?;
-        validate_decimal(number, value)?;
-        let number = number
-            .parse::<f64>()
-            .map_err(|_| make_error(format!("invalid stroke-dash measure '{value}'")))?;
+        let (number_text, unit) = split_measure(value)?;
+        validate_decimal(number_text, value)?;
+        let number = number_text.parse::<f64>().map_err(|error| {
+            make_error(format!("invalid stroke-dash measure '{value}': {error}"))
+        })?;
         Self::new(number, unit)
     }
 }
@@ -133,17 +141,23 @@ pub struct Definition {
 
 impl Definition {
     /// ODF defaults an omitted cap style to `rect`.
+    #[must_use]
     pub fn effective_style(&self) -> Style {
         self.style.unwrap_or(Style::Rect)
     }
 
+    /// Validates the dash name, counts, and measurements.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any field is invalid or exceeds a resource limit.
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "draw:name", false)?;
         if let Some(display_name) = &self.display_name {
             validate_text(display_name, "draw:display-name", true)?;
         }
         for (name, count) in [("draw:dots1", self.dots1), ("draw:dots2", self.dots2)] {
-            if count.is_some_and(|count| count > MAX_DOT_COUNT) {
+            if count.is_some_and(|dot_count| dot_count > MAX_DOT_COUNT) {
                 return invalid(format!("{name} exceeds {MAX_DOT_COUNT}"));
             }
         }
@@ -156,6 +170,11 @@ impl Definition {
         Ok(())
     }
 
+    /// Serializes this definition as a standalone XML fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the definition fails validation.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(192);
@@ -171,10 +190,16 @@ pub struct Collection {
 }
 
 impl Collection {
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Definition> {
         self.dashes.iter().find(|dash| dash.name == name)
     }
 
+    /// Validates every dash definition and collection-wide resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a definition is invalid, names collide, or a limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         if self.dashes.len() > MAX_DASHES {
             return invalid(format!("drawing styles exceed {MAX_DASHES} stroke dashes"));
@@ -202,7 +227,11 @@ impl Collection {
         Ok(())
     }
 
-    /// Serialize a standalone schema-positioned `office:styles` fragment.
+    /// Serializes a standalone schema-positioned `office:styles` fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the collection fails validation.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(192 + self.dashes.len() * 192);
@@ -238,7 +267,12 @@ struct ActiveDash {
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
-/// Parse stroke-dash resources from an ODF styles or flat-document XML part.
+/// Parses stroke-dash resources from an ODF styles or flat-document XML part.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed, violates the ODF resource grammar, or exceeds a
+/// configured resource limit.
 pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
     if !xml.contains("stroke-dash") {
         return Ok(Collection::default());
@@ -315,9 +349,10 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "stroke-dash" {
                         return invalid("unexpected drawing stroke-dash end element");
                     }
-                    result
-                        .dashes
-                        .push(active.take().expect("active stroke dash checked").value);
+                    let dash = active.take().ok_or_else(|| {
+                        make_error("drawing stroke-dash ended without an active definition")
+                    })?;
+                    result.dashes.push(dash.value);
                 }
             },
             Event::Text(ref text) if active.is_some() => {
@@ -337,7 +372,11 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
                 );
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -385,13 +424,13 @@ fn take_count(values: &mut Attributes, local: &str) -> Result<Option<u32>> {
             if value.starts_with('+') || value.chars().any(char::is_whitespace) {
                 return invalid(format!("invalid draw:{local} integer '{value}'"));
             }
-            let value = value
-                .parse::<u32>()
-                .map_err(|_| make_error(format!("invalid draw:{local} integer '{value}'")))?;
-            if value > MAX_DOT_COUNT {
+            let parsed_count = value.parse::<u32>().map_err(|error| {
+                make_error(format!("invalid draw:{local} integer '{value}': {error}"))
+            })?;
+            if parsed_count > MAX_DOT_COUNT {
                 return invalid(format!("draw:{local} exceeds {MAX_DOT_COUNT}"));
             }
-            Ok(value)
+            Ok(parsed_count)
         })
         .transpose()
 }
@@ -408,12 +447,12 @@ fn attributes(
     aggregate: &mut usize,
 ) -> Result<Attributes> {
     let mut values = HashMap::new();
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
+    for attribute_result in element.attributes().with_checks(true) {
+        let attribute = attribute_result
             .map_err(|error| make_error(format!("invalid stroke-dash attribute: {error}")))?;
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        let (resolved, raw_local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_kind(&resolved)?;
-        let local = decode(local.as_ref(), "attribute name")?;
+        let local = decode(raw_local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|error| make_error(format!("invalid stroke-dash attribute: {error}")))?
@@ -608,7 +647,7 @@ fn canonical_number(value: f64) -> String {
 fn decode(value: &[u8], what: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| make_error(format!("invalid UTF-8 in stroke-dash {what}")))
+        .map_err(|error| make_error(format!("invalid UTF-8 in stroke-dash {what}: {error}")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

@@ -156,6 +156,11 @@ impl Stream {
     /// `\x01Ole` stream.  The returned value shares the captured allocation.
     ///
     /// No link is resolved and no embedded payload is activated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a standard OLEDS stream is malformed or exceeds
+    /// the OLEDS metadata limit.
     pub fn link(&self) -> Result<Option<Link>, OleError> {
         if self.name() != Some(link::NAME) {
             return Ok(None);
@@ -235,6 +240,11 @@ impl Object {
     ///
     /// This is a format-neutral view used by DOC, PPT, and XLS owners.  It
     /// never resolves external references or activates embedded content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the direct-child OLEDS stream is malformed or
+    /// exceeds the OLEDS metadata limit.
     pub fn link(&self) -> Result<Option<Link>, OleError> {
         match self
             .streams

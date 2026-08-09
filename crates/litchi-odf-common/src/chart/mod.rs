@@ -17,6 +17,10 @@ pub mod reader;
 pub mod view;
 
 pub use axis::Dimension;
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the public names identify the ODF chart class vocabulary"
+)]
 pub use class::{ChartClass, ChartClassKind};
 pub use grid::Class;
 pub use legend::Position;

@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use litchi_xls::Workbook;
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::{Row, Writer};
 
 #[test]
 fn generated_worksheet_indexes_regenerate_and_parse() {
@@ -24,8 +24,12 @@ fn generated_worksheet_indexes_regenerate_and_parse() {
     writer.write_number(sparse, 76, 0, 76.0).unwrap();
 
     let formatting = writer.add_worksheet("Formatting").unwrap();
-    writer.set_row_height(formatting, 0, 18.0).unwrap();
-    writer.set_row_height(formatting, 40, 18.0).unwrap();
+    writer
+        .set_row_height(formatting, Row::new(0).unwrap(), 18.0)
+        .unwrap();
+    writer
+        .set_row_height(formatting, Row::new(40).unwrap(), 18.0)
+        .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();

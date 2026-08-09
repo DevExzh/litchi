@@ -23,22 +23,29 @@ pub struct HeadingPair {
 
 impl HeadingPair {
     /// Creates a heading pair with a nonnegative document-part count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the heading contains a NUL character or `part_count`
+    /// does not fit the `VT_I4` representation.
     pub fn new(heading: impl Into<String>, part_count: u32) -> Result<Self, OleError> {
-        let heading = heading.into();
-        validate_text(&heading, "heading")?;
+        let heading_text = heading.into();
+        validate_text(&heading_text, "heading")?;
         validate_part_count(part_count)?;
         Ok(Self {
-            heading,
+            heading: heading_text,
             part_count,
         })
     }
 
     /// Returns the heading text.
+    #[must_use]
     pub fn heading(&self) -> &str {
         &self.heading
     }
 
     /// Returns the number of document parts assigned to the heading.
+    #[must_use]
     pub const fn part_count(&self) -> u32 {
         self.part_count
     }
@@ -57,6 +64,11 @@ pub struct HeadingPairs {
 
 impl HeadingPairs {
     /// Creates an ordered heading-pair collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are too many pairs or an individual pair is
+    /// invalid.
     pub fn new(pairs: Vec<HeadingPair>) -> Result<Self, OleError> {
         let value = Self { pairs };
         value.validate()?;
@@ -64,26 +76,31 @@ impl HeadingPairs {
     }
 
     /// Returns the headings in document order.
+    #[must_use]
     pub fn pairs(&self) -> &[HeadingPair] {
         &self.pairs
     }
 
     /// Returns one heading pair by checked zero-based position.
+    #[must_use]
     pub fn pair(&self, index: usize) -> Option<&HeadingPair> {
         self.pairs.get(index)
     }
 
     /// Returns the number of heading pairs.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.pairs.len()
     }
 
     /// Returns whether the collection has no heading pairs.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.pairs.is_empty()
     }
 
     /// Returns the total number of document parts named by all headings.
+    #[must_use]
     pub fn document_part_count(&self) -> u64 {
         self.pairs
             .iter()
@@ -92,7 +109,7 @@ impl HeadingPairs {
     }
 
     pub(crate) fn validate(&self) -> Result<(), OleError> {
-        if self.pairs.len() > MAX_COMPOSITE_ELEMENTS || self.pairs.len() > (u32::MAX as usize / 2) {
+        if self.pairs.len() > MAX_COMPOSITE_ELEMENTS {
             return Err(invalid("Heading pair count exceeds the safety limit"));
         }
         for pair in &self.pairs {
@@ -122,6 +139,11 @@ pub struct DocParts {
 
 impl DocParts {
     /// Creates document parts with an explicit wire string representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are too many values or a value contains a NUL
+    /// character.
     pub fn new(encoding: TextEncoding, values: Vec<String>) -> Result<Self, OleError> {
         let value = Self { encoding, values };
         value.validate()?;
@@ -129,21 +151,33 @@ impl DocParts {
     }
 
     /// Creates a code-page (`VT_VECTOR|VT_LPSTR`) document-parts value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are too many values or a value contains a NUL
+    /// character.
     pub fn ansi(values: Vec<String>) -> Result<Self, OleError> {
         Self::new(TextEncoding::Ansi, values)
     }
 
     /// Creates a UTF-16LE (`VT_VECTOR|VT_LPWSTR`) document-parts value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are too many values or a value contains a NUL
+    /// character.
     pub fn unicode(values: Vec<String>) -> Result<Self, OleError> {
         Self::new(TextEncoding::Unicode, values)
     }
 
     /// Returns the wire string representation.
+    #[must_use]
     pub const fn encoding(&self) -> TextEncoding {
         self.encoding
     }
 
     /// Returns the ordered document-part names.
+    #[must_use]
     pub fn values(&self) -> &[String] {
         &self.values
     }
@@ -154,11 +188,13 @@ impl DocParts {
     }
 
     /// Returns the number of document parts.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.values.len()
     }
 
     /// Returns whether the collection has no document parts.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
@@ -205,7 +241,7 @@ fn validate_text(value: &str, description: &str) -> Result<(), OleError> {
 }
 
 fn validate_part_count(value: u32) -> Result<(), OleError> {
-    if value > i32::MAX as u32 {
+    if value > i32::MAX.unsigned_abs() {
         return Err(invalid("Heading pair part count exceeds VT_I4"));
     }
     Ok(())

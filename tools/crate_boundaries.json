@@ -273,7 +273,8 @@
       "litchi-core"
     ],
     "litchi-sign": [
-      "litchi-cfb"
+      "litchi-cfb",
+      "soapberry-zip"
     ],
     "litchi-slide": [
       "litchi-core"
@@ -337,6 +338,10 @@
     {
       "dependent": "litchi-iwa-structured",
       "dependency": "litchi-iwa-text"
+    },
+    {
+      "dependent": "litchi-sign",
+      "dependency": "soapberry-zip"
     }
   ],
   "migration_hosts": [

@@ -10,9 +10,10 @@
 //! writer can re-emit untouched slides exactly as they were authored and only
 //! synthesise markup for slides the caller actually changed.
 
+mod scanner;
+
 use litchi_core::{Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
-mod scanner;
 
 use scanner::Scanner;
 

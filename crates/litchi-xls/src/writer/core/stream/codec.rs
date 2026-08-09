@@ -620,21 +620,7 @@ pub(crate) fn generate_workbook_stream(
             biff::write_scenario_manager(&mut stream, manager)?;
         }
 
-        let mut def_col_width_pos = None;
-        if worksheet.pivot_tables.is_empty() {
-            def_col_width_pos = Some(stream.len());
-            biff::write_def_col_width(
-                &mut stream,
-                worksheet.sheet_layout.default_column_width_chars,
-            )?;
-            biff::write_dimensions(
-                &mut stream,
-                worksheet.first_row,
-                worksheet.last_row,
-                worksheet.first_col,
-                worksheet.last_col,
-            )?;
-        } else {
+        if !worksheet.pivot_tables.is_empty() {
             biff::write_pivot_sheet_preamble(&mut stream, &worksheet.sheet_layout)?;
         }
 
@@ -714,14 +700,15 @@ pub(crate) fn generate_workbook_stream(
             sort_data.write_biff_records(&mut stream)?;
         }
 
-        // Column width / hidden state via COLINFO records.
-        if !worksheet.pivot_tables.is_empty() {
-            def_col_width_pos = Some(stream.len());
-            biff::write_def_col_width(
-                &mut stream,
-                worksheet.sheet_layout.default_column_width_chars,
-            )?;
-        }
+        // The COLUMNS collection begins with DEFCOLWIDTH. It must directly
+        // precede COLINFO records: placing DIMENSIONS or view records between
+        // them makes a strict BIFF reader close the collection before it sees
+        // the explicit column properties.
+        let def_col_width_pos = stream.len();
+        biff::write_def_col_width(
+            &mut stream,
+            worksheet.sheet_layout.default_column_width_chars,
+        )?;
 
         if !worksheet.column_widths.is_empty() || !worksheet.hidden_columns.is_empty() {
             use std::collections::BTreeSet;
@@ -746,15 +733,13 @@ pub(crate) fn generate_workbook_stream(
             }
         }
 
-        if !worksheet.pivot_tables.is_empty() {
-            biff::write_dimensions(
-                &mut stream,
-                worksheet.first_row,
-                worksheet.last_row,
-                worksheet.first_col,
-                worksheet.last_col,
-            )?;
-        }
+        biff::write_dimensions(
+            &mut stream,
+            worksheet.first_row,
+            worksheet.last_row,
+            worksheet.first_col,
+            worksheet.last_col,
+        )?;
 
         // ROW records for rows with custom height or hidden state.
         // Pivot worksheets also emit ROW records for used rows even when the
@@ -904,9 +889,6 @@ pub(crate) fn generate_workbook_stream(
         }
 
         let staged_row_table = stream.split_off(row_table_start);
-        let def_col_width_pos = def_col_width_pos.ok_or_else(|| {
-            Error::InvalidData("worksheet is missing DEFCOLWIDTH for INDEX".to_string())
-        })?;
         let plan = crate::writer::row_blocks::RowBlockLayoutPlan::generate_from_staged(
             u64::try_from(index_record_pos)
                 .map_err(|_| Error::InvalidData("worksheet INDEX position overflow".to_string()))?,

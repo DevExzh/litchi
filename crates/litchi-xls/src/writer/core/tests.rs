@@ -923,7 +923,7 @@ fn test_writableworksheet_add_cell() {
 #[test]
 fn test_writableworksheet_set_column_width() {
     let mut ws = WritableWorksheet::new("Sheet1".to_string());
-    ws.set_column_width(0, 2560); // ~10 characters
+    ws.set_column_width(crate::writer::Column::new(0).unwrap(), 2560); // ~10 characters
     assert_eq!(ws.column_widths.get(&0), Some(&2560));
 }
 
@@ -939,7 +939,11 @@ fn test_writableworksheet_merge_cells() {
 fn test_writableworksheet_freeze_panes() {
     let mut ws = WritableWorksheet::new("Sheet1".to_string());
     assert!(ws.view.pane().is_none());
-    ws.set_freeze_panes(1, 2).unwrap();
+    ws.set_freeze_panes(crate::writer::FrozenPanes::new(
+        crate::writer::Row::new(1).unwrap(),
+        crate::writer::Column::new(2).unwrap(),
+    ))
+    .unwrap();
     let pane = ws.view.pane().unwrap();
     assert_eq!(pane.vertical(), 1);
     assert_eq!(pane.horizontal(), 2);

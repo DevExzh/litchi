@@ -3,6 +3,7 @@
 use litchi_core::{Error, Result};
 
 /// Return whether an href must remain an inert linked reference.
+#[must_use]
 pub fn is_linked_href(href: &str) -> bool {
     if href.starts_with('/')
         || href.starts_with('\\')
@@ -25,6 +26,11 @@ pub fn is_linked_href(href: &str) -> bool {
 }
 
 /// Resolve a relative ODF package href into a safe archive path.
+///
+/// # Errors
+///
+/// Returns an error when the href is not a safe, non-administrative relative
+/// package path or contains an invalid percent escape.
 pub fn resolve_package_path(href: &str) -> Result<String> {
     let decoded = percent_decode(href)?;
     if decoded.starts_with('/') || decoded.contains('\\') {
@@ -84,18 +90,18 @@ fn percent_decode(value: &str) -> Result<String> {
                 "invalid percent escape in package href '{value}'"
             )));
         }
-        let high = hex_value(bytes[index + 1]);
-        let low = hex_value(bytes[index + 2]);
-        let (Some(high), Some(low)) = (high, low) else {
+        let high_nibble_value = hex_value(bytes[index + 1]);
+        let low_nibble_value = hex_value(bytes[index + 2]);
+        let (Some(high_nibble), Some(low_nibble)) = (high_nibble_value, low_nibble_value) else {
             return Err(Error::InvalidFormat(format!(
                 "invalid percent escape in package href '{value}'"
             )));
         };
-        decoded.push((high << 4) | low);
+        decoded.push((high_nibble << 4) | low_nibble);
         index += 3;
     }
     String::from_utf8(decoded)
-        .map_err(|_| Error::InvalidFormat("package href is not valid UTF-8".to_string()))
+        .map_err(|_utf8_error| Error::InvalidFormat("package href is not valid UTF-8".to_string()))
 }
 
 fn hex_value(byte: u8) -> Option<u8> {
@@ -122,7 +128,8 @@ mod tests {
     #[test]
     fn normalizes_safe_relative_paths() {
         assert_eq!(
-            resolve_package_path("./Pictures/../Pictures/image%20one.png").unwrap(),
+            resolve_package_path("./Pictures/../Pictures/image%20one.png")
+                .unwrap_or_else(|error| panic!("safe package path must resolve: {error}")),
             "Pictures/image one.png"
         );
         assert!(resolve_package_path("../../outside.png").is_err());

@@ -38,6 +38,8 @@ pub use transaction::{Commit, Edit, Transaction};
 
 const WORD_2010_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
 const WORD_2012_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2012/wordml";
+const WORD_2010_NAMESPACE_TEXT: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
+const WORD_2012_NAMESPACE_TEXT: &str = "http://schemas.microsoft.com/office/word/2012/wordml";
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const MAX_SDT_ID: u32 = i32::MAX as u32;
 
@@ -81,6 +83,84 @@ pub enum Kind {
     RepeatingSection,
     /// Word 2012 repeating-section item (`w15:repeatingSectionItem`).
     RepeatingItem,
+}
+
+/// Calendar used by a date content control.
+///
+/// `Umalqura` is the Word 2010 extension defined by `[MS-DOCX]` §2.2.7.
+/// Its canonical writer form uses an MCE `AlternateContent` wrapper with a
+/// `hijri` fallback. Unknown future tokens remain readable and writable.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Calendar {
+    Gregorian,
+    Hijri,
+    Umalqura,
+    Hebrew,
+    Taiwan,
+    Japan,
+    Thai,
+    Korea,
+    Saka,
+    GregorianXlitEnglish,
+    GregorianXlitFrench,
+    GregorianUs,
+    GregorianMeFrench,
+    GregorianArabic,
+    None,
+    /// A calendar token not defined by the current schema vocabulary.
+    Unknown(Box<str>),
+}
+
+impl Calendar {
+    /// Return the exact schema token.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Gregorian => "gregorian",
+            Self::Hijri => "hijri",
+            Self::Umalqura => "umalqura",
+            Self::Hebrew => "hebrew",
+            Self::Taiwan => "taiwan",
+            Self::Japan => "japan",
+            Self::Thai => "thai",
+            Self::Korea => "korea",
+            Self::Saka => "saka",
+            Self::GregorianXlitEnglish => "gregorianXlitEnglish",
+            Self::GregorianXlitFrench => "gregorianXlitFrench",
+            Self::GregorianUs => "gregorianUs",
+            Self::GregorianMeFrench => "gregorianMeFrench",
+            Self::GregorianArabic => "gregorianArabic",
+            Self::None => "none",
+            Self::Unknown(value) => value,
+        }
+    }
+
+    fn from_xml(value: String) -> Result<Self> {
+        let calendar = match value.as_str() {
+            "gregorian" => Self::Gregorian,
+            "hijri" => Self::Hijri,
+            "umalqura" => Self::Umalqura,
+            "hebrew" => Self::Hebrew,
+            "taiwan" => Self::Taiwan,
+            "japan" => Self::Japan,
+            "thai" => Self::Thai,
+            "korea" => Self::Korea,
+            "saka" => Self::Saka,
+            "gregorianXlitEnglish" => Self::GregorianXlitEnglish,
+            "gregorianXlitFrench" => Self::GregorianXlitFrench,
+            "gregorianUs" => Self::GregorianUs,
+            "gregorianMeFrench" => Self::GregorianMeFrench,
+            "gregorianArabic" => Self::GregorianArabic,
+            "none" => Self::None,
+            _ if value.is_empty() => {
+                return Err(Error::InvalidFormat(
+                    "content-control calendar token is empty".to_string(),
+                ));
+            },
+            _ => Self::Unknown(value.into_boxed_str()),
+        };
+        Ok(calendar)
+    }
 }
 
 /// Visual treatment requested for a structured document tag.
@@ -296,6 +376,8 @@ pub struct ContentControl {
     date_format: Option<String>,
     /// ISO date value stored on a date control.
     date_value: Option<String>,
+    /// Calendar used by a date control.
+    date_calendar: Option<Calendar>,
     /// Title of a Word 2012 repeating section.
     repeating_section_title: Option<String>,
     /// Word 2012 visual treatment.
@@ -335,6 +417,7 @@ impl ContentControl {
             checked: None,
             date_format: None,
             date_value: None,
+            date_calendar: None,
             repeating_section_title: None,
             appearance: None,
             color: None,
@@ -495,6 +578,12 @@ impl ContentControl {
         self.date_value.as_deref()
     }
 
+    /// Get the calendar selected by a date control, preserving absence.
+    #[inline]
+    pub fn date_calendar(&self) -> Option<&Calendar> {
+        self.date_calendar.as_ref()
+    }
+
     /// Get the title of a repeating-section control.
     #[inline]
     pub fn repeating_section_title(&self) -> Option<&str> {
@@ -548,6 +637,7 @@ impl ContentControl {
             self.placeholder.as_deref(),
             self.date_format.as_deref(),
             self.date_value.as_deref(),
+            self.date_calendar.as_ref().map(Calendar::as_str),
             self.repeating_section_title.as_deref(),
         ]
         .into_iter()
@@ -609,8 +699,8 @@ pub(crate) fn parse_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Invento
 pub(crate) fn content_control_capabilities() -> Capabilities {
     let mut capabilities = Capabilities::default();
     for namespace in [
-        std::str::from_utf8(WORD_2010_NAMESPACE).expect("constant namespace is UTF-8"),
-        std::str::from_utf8(WORD_2012_NAMESPACE).expect("constant namespace is UTF-8"),
+        WORD_2010_NAMESPACE_TEXT,
+        WORD_2012_NAMESPACE_TEXT,
         STORE_ITEM_CHECKSUM_NAMESPACE,
         FORMATTING_ALLOWED_NAMESPACE,
     ] {
@@ -913,6 +1003,7 @@ struct PendingContentControl {
     checked: Option<bool>,
     date_format: Option<String>,
     date_value: Option<String>,
+    date_calendar: Option<Calendar>,
     repeating_section_title: Option<String>,
     appearance: Option<Appearance>,
     color: Option<SdtColor>,
@@ -942,6 +1033,7 @@ impl PendingContentControl {
             checked: None,
             date_format: None,
             date_value: None,
+            date_calendar: None,
             repeating_section_title: None,
             appearance: None,
             color: None,
@@ -970,6 +1062,7 @@ impl PendingContentControl {
             checked: self.checked,
             date_format: self.date_format,
             date_value: self.date_value,
+            date_calendar: self.date_calendar,
             repeating_section_title: self.repeating_section_title,
             appearance: self.appearance,
             color: self.color,
@@ -1180,6 +1273,14 @@ fn parse_nested_property(
                 &mut control.date_format,
                 value,
                 "content-control date format",
+            )?;
+        },
+        PropertyContext::Date if is_word_element(namespace, element, b"calendar") => {
+            let value = required_word_attribute(element, b"val", decoder, resolver, "calendar")?;
+            set_once(
+                &mut control.date_calendar,
+                Calendar::from_xml(value)?,
+                "content-control calendar",
             )?;
         },
         PropertyContext::List if is_word_element(namespace, element, b"listItem") => {
@@ -1904,17 +2005,7 @@ mod tests {
     #[test]
     fn extracts_namespaced_properties_and_decodes_values() {
         let xml = format!(
-            r#"<w:document xmlns:w="{W}"><w:body><w:sdt><w:sdtPr>
-                <w:id w:val="42"/><w:tag w:val="customer&amp;id"/>
-                <w:alias w:val="Customer &amp; address"/><w:tabIndex w:val="7"/>
-                <w:temporary/><w:showingPlcHdr w:val="on"/>
-                <w:placeholder><w:docPart w:val="DefaultPlaceholder_1"/></w:placeholder>
-                <w:dataBinding w:prefixMappings="xmlns:x='urn:test&amp;more'"
-                    w:xpath="/x:root/x:name" w:storeItemID="{{ABC}}"/>
-                <w:dropDownList><w:listItem w:displayText="A &amp; B" w:value="ab"/>
-                    <w:listItem w:value="fallback"/></w:dropDownList>
-                <w:lock w:val="sdtContentLocked"/>
-            </w:sdtPr><w:sdtContent/></w:sdt></w:body></w:document>"#
+            r#"<w:document xmlns:w="{W}"><w:body><w:sdt><w:sdtPr><w:id w:val="42"/><w:tag w:val="customer&amp;id"/><w:alias w:val="Customer &amp; address"/><w:tabIndex w:val="7"/><w:temporary/><w:showingPlcHdr w:val="on"/><w:placeholder><w:docPart w:val="DefaultPlaceholder_1"/></w:placeholder><w:dataBinding w:prefixMappings="xmlns:x='urn:test&amp;more'" w:xpath="/x:root/x:name" w:storeItemID="{{ABC}}"/><w:dropDownList><w:listItem w:displayText="A &amp; B" w:value="ab"/><w:listItem w:value="fallback"/></w:dropDownList><w:lock w:val="sdtContentLocked"/></w:sdtPr><w:sdtContent/></w:sdt></w:body></w:document>"#
         );
         let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
         let control = &controls[0];
@@ -1945,9 +2036,7 @@ mod tests {
 
     #[test]
     fn accepts_strict_and_aliased_word_namespaces() {
-        let xml = r#"<x:document xmlns:x="http://purl.oclc.org/ooxml/wordprocessingml/main">
-            <x:sdtPr><x:id x:val="1"/><x:text/></x:sdtPr>
-            <x:sdtPr><x:id x:val="2"/></x:sdtPr></x:document>"#;
+        let xml = r#"<x:document xmlns:x="http://purl.oclc.org/ooxml/wordprocessingml/main"><x:sdtPr><x:id x:val="1"/><x:text/></x:sdtPr><x:sdtPr><x:id x:val="2"/></x:sdtPr></x:document>"#;
         let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
         assert_eq!(controls.len(), 2);
         assert_eq!(controls[0].kind(), Kind::Text);
@@ -1957,19 +2046,7 @@ mod tests {
     #[test]
     fn extracts_checkbox_date_and_repeating_section_metadata() {
         let xml = format!(
-            r#"<w:document xmlns:w="{W}"
-                xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                xmlns:c="http://schemas.microsoft.com/office/word/2010/wordml"
-                xmlns:r="http://schemas.microsoft.com/office/word/2012/wordml"
-                mc:Ignorable="c r">
-                <w:sdtPr><w:id w:val="1"/><c:checkbox><c:checked/></c:checkbox></w:sdtPr>
-                <w:sdtPr><w:id w:val="2"/><w:date w:fullDate="2026-07-14T00:00:00Z">
-                    <w:dateFormat w:val="yyyy-MM-dd"/></w:date></w:sdtPr>
-                <w:sdtPr><w:id w:val="3"/><r:repeatingSection>
-                    <r:sectionTitle w:val="People"/></r:repeatingSection></w:sdtPr>
-                <w:sdtPr><w:id w:val="4"/><c:entityPicker/></w:sdtPr>
-                <w:sdtPr><w:id w:val="5"/><r:repeatingSectionItem/></w:sdtPr>
-            </w:document>"#
+            r#"<w:document xmlns:w="{W}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:c="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:r="http://schemas.microsoft.com/office/word/2012/wordml" mc:Ignorable="c r"><w:sdtPr><w:id w:val="1"/><c:checkbox><c:checked/></c:checkbox></w:sdtPr><w:sdtPr><w:id w:val="2"/><w:date w:fullDate="2026-07-14T00:00:00Z"><w:dateFormat w:val="yyyy-MM-dd"/></w:date></w:sdtPr><w:sdtPr><w:id w:val="3"/><r:repeatingSection><r:sectionTitle w:val="People"/></r:repeatingSection></w:sdtPr><w:sdtPr><w:id w:val="4"/><c:entityPicker/></w:sdtPr><w:sdtPr><w:id w:val="5"/><r:repeatingSectionItem/></w:sdtPr></w:document>"#
         );
         let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
         assert_eq!(controls[0].kind(), Kind::Checkbox);
@@ -1984,13 +2061,30 @@ mod tests {
     }
 
     #[test]
+    fn umalqura_calendar_uses_the_active_mce_choice() {
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w:sdtPr><w:id w:val="7"/><w:date><mc:AlternateContent><mc:Choice Requires="w14"><w:calendar w:val="umalqura"/></mc:Choice><mc:Fallback><w:calendar w:val="hijri"/></mc:Fallback></mc:AlternateContent></w:date></w:sdtPr></w:document>"#
+        );
+        let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
+        assert_eq!(controls[0].date_calendar(), Some(&Calendar::Umalqura));
+    }
+
+    #[test]
+    fn unknown_date_calendar_tokens_remain_typed_and_lossless() {
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}"><w:sdtPr><w:id w:val="8"/><w:date><w:calendar w:val="futureCalendar"/></w:date></w:sdtPr></w:document>"#
+        );
+        let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
+        assert_eq!(
+            controls[0].date_calendar().map(Calendar::as_str),
+            Some("futureCalendar")
+        );
+    }
+
+    #[test]
     fn ignores_foreign_lookalikes_and_idless_controls() {
         let xml = format!(
-            r#"<w:document xmlns:w="{W}" xmlns:f="urn:foreign">
-                <f:sdtPr><f:id f:val="8"/><f:text/></f:sdtPr>
-                <w:sdtPr><f:id f:val="9"/><f:tag f:val="spoof"/></w:sdtPr>
-                <w:sdtPr/><w:sdtPr><w:id w:val="10"/><f:text/><w:vendorKind/></w:sdtPr>
-            </w:document>"#
+            r#"<w:document xmlns:w="{W}" xmlns:f="urn:foreign"><f:sdtPr><f:id f:val="8"/><f:text/></f:sdtPr><w:sdtPr><f:id f:val="9"/><f:tag f:val="spoof"/></w:sdtPr><w:sdtPr/><w:sdtPr><w:id w:val="10"/><f:text/><w:vendorKind/></w:sdtPr></w:document>"#
         );
         let controls = ContentControl::extract_from_document(xml.as_bytes()).unwrap();
         assert_eq!(controls.len(), 1);

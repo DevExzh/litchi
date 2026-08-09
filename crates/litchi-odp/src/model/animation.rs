@@ -12,7 +12,7 @@ pub(crate) const SVG_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:sv
 pub(crate) const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 pub(crate) const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 
-/// One of the animation elements defined by ODF 1.3, Part 3, section 10.
+/// One of the SMIL animation elements defined by ODF 1.4, Part 3, section 15.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Kind {
     /// Animate an attribute value.

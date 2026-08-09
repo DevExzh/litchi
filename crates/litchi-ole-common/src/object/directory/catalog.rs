@@ -101,6 +101,11 @@ pub struct Catalog {
 
 impl Catalog {
     /// Parses a directory catalog under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an entry violates CFB invariants or resource
+    /// limits, or when copying the supplied entries cannot be allocated.
     pub fn parse(entries: &[DirectoryEntry], limits: Limits) -> Result<Self, OleError> {
         let projections = validation::validate_catalog(entries, limits)?;
         let mut owned = Vec::new();
@@ -116,11 +121,22 @@ impl Catalog {
     }
 
     /// Parses a directory catalog with the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an entry violates CFB invariants or the default
+    /// resource limits, or when copying the supplied entries cannot be
+    /// allocated.
     pub fn parse_default(entries: &[DirectoryEntry]) -> Result<Self, OleError> {
         Self::parse(entries, Limits::default())
     }
 
     /// Captures owned directory entries under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an entry violates CFB invariants or the supplied
+    /// resource limits.
     pub fn from_entries(entries: Vec<DirectoryEntry>, limits: Limits) -> Result<Self, OleError> {
         let projections = validation::validate_catalog(&entries, limits)?;
         let raw: Arc<[DirectoryEntry]> = entries.into();
@@ -128,6 +144,11 @@ impl Catalog {
     }
 
     /// Captures an already shared directory-entry allocation without copying.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an entry violates CFB invariants or the supplied
+    /// resource limits.
     pub fn from_entries_shared(
         entries: Arc<[DirectoryEntry]>,
         limits: Limits,

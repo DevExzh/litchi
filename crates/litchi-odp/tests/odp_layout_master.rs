@@ -1,3 +1,8 @@
+#![allow(
+    clippy::unwrap_used,
+    reason = "integration-test assertions panic on failure by design"
+)]
+
 use litchi_odp::{
     MasterPage, Presentation, constants,
     core::{OwnedPackage, PackageWriter},

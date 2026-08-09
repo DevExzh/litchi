@@ -8,6 +8,7 @@
 //! The file is saved to `output/xls_sheet_protection.xls`.
 
 use litchi_xls::Writer;
+use litchi_xls::writer::Column;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dir = std::path::Path::new("output");
@@ -36,8 +37,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Protect: password "secret", protect objects, protect scenarios.
     w.protect_sheet(s1, Some("secret"), true, true)?;
 
-    w.set_column_width(s1, 0, 40.0)?;
-    w.set_column_width(s1, 1, 12.0)?;
+    w.set_column_width(s1, Column::new(0)?, 40.0)?;
+    w.set_column_width(s1, Column::new(1)?, 12.0)?;
 
     println!("[Sheet 1] Protected — password 'secret', objects+scenarios protected");
 
@@ -61,8 +62,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Protect without password, no object/scenario protection.
     w.protect_sheet(s2, None, false, false)?;
 
-    w.set_column_width(s2, 0, 40.0)?;
-    w.set_column_width(s2, 1, 12.0)?;
+    w.set_column_width(s2, Column::new(0)?, 40.0)?;
+    w.set_column_width(s2, Column::new(1)?, 12.0)?;
 
     println!("[Sheet 2] No Password — protected but no password set");
 
@@ -75,7 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     w.write_string(s3, 1, 0, "All cells are editable.")?;
     w.write_number(s3, 3, 0, 42.0)?;
 
-    w.set_column_width(s3, 0, 40.0)?;
+    w.set_column_width(s3, Column::new(0)?, 40.0)?;
 
     println!("[Sheet 3] Unprotected — no protection records written");
 

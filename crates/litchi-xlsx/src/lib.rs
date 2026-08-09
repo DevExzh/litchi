@@ -57,6 +57,7 @@ mod slicer_cache;
 pub mod smart_tags;
 pub mod sort;
 pub mod style;
+pub mod survey;
 pub mod table;
 pub mod task_panes;
 pub mod threaded_comments;
@@ -190,6 +191,12 @@ pub use sheet_protection::{
 pub use sheet_view::parse_worksheet_views;
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
+pub use survey::{
+    Binding as SurveyBinding, ElementProperties as SurveyElementProperties, Guid as SurveyGuid,
+    Id as SurveyId, Part as SurveyPart, Position as SurveyPosition, Question as SurveyQuestion,
+    QuestionFormat as SurveyQuestionFormat, QuestionType as SurveyQuestionType,
+    Questions as SurveyQuestions, Survey, load as load_surveys, parse as parse_survey,
+};
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction,
     parse_table_xml, serialize_table, validate_table, write_table_xml,

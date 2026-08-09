@@ -2,8 +2,8 @@ use std::io::Cursor;
 
 use litchi_xls::Workbook;
 use litchi_xls::view::{PaneType, Range};
-use litchi_xls::writer::Writer;
 use litchi_xls::writer::view::{Pane, Scale, Selection, View};
+use litchi_xls::writer::{Column, FrozenPanes, Row, Writer};
 
 #[test]
 fn writes_and_reads_typed_view_state() {
@@ -49,7 +49,12 @@ fn writes_and_reads_typed_view_state() {
 fn freeze_and_scale_round_trip() {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Compat").unwrap();
-    writer.freeze_panes(sheet, 7, 5).unwrap();
+    writer
+        .freeze_panes(
+            sheet,
+            FrozenPanes::new(Row::new(7).unwrap(), Column::new(5).unwrap()),
+        )
+        .unwrap();
     writer
         .put_scale(sheet, Some(Scale::new(3, 4).unwrap()))
         .unwrap();

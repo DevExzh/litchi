@@ -1,6 +1,7 @@
 use super::{
-    Appearance, BindingFlavor, DataBinding, FORMATTING_ALLOWED_NAMESPACE, FormattingAllowed, Kind,
-    Limits, Lock, STORE_ITEM_CHECKSUM_NAMESPACE, SdtColor, validate_data_binding_values,
+    Appearance, BindingFlavor, Calendar, DataBinding, FORMATTING_ALLOWED_NAMESPACE,
+    FormattingAllowed, Kind, Limits, Lock, STORE_ITEM_CHECKSUM_NAMESPACE, SdtColor,
+    validate_data_binding_values,
 };
 use crate::error::{Error, Result};
 use litchi_core::xml::escape_xml;
@@ -29,6 +30,7 @@ pub struct AuthoringView<'a> {
     checked: Option<bool>,
     date_format: Option<&'a str>,
     date_value: Option<&'a str>,
+    date_calendar: Option<&'a Calendar>,
     repeating_section_title: Option<&'a str>,
     formatting_allowed: Option<FormattingAllowed>,
     appearance: Option<Appearance>,
@@ -56,6 +58,7 @@ impl<'a> AuthoringView<'a> {
             checked: None,
             date_format: None,
             date_value: None,
+            date_calendar: None,
             repeating_section_title: None,
             formatting_allowed: None,
             appearance: None,
@@ -128,6 +131,13 @@ impl<'a> AuthoringView<'a> {
     #[must_use]
     pub const fn date_value(mut self, value: Option<&'a str>) -> Self {
         self.date_value = value;
+        self
+    }
+
+    /// Set the calendar used by a date content control.
+    #[must_use]
+    pub const fn date_calendar(mut self, value: Option<&'a Calendar>) -> Self {
+        self.date_calendar = value;
         self
     }
 
@@ -366,7 +376,9 @@ fn validate_view(view: &AuthoringView<'_>, limits: &Limits) -> Result<()> {
             "checked state requires a checkbox content control".into(),
         ));
     }
-    if (view.date_format.is_some() || view.date_value.is_some()) && view.kind != Kind::Date {
+    if (view.date_format.is_some() || view.date_value.is_some() || view.date_calendar.is_some())
+        && view.kind != Kind::Date
+    {
         return Err(Error::InvalidFormat(
             "date properties require a date content control".into(),
         ));
@@ -397,6 +409,7 @@ fn validate_view(view: &AuthoringView<'_>, limits: &Limits) -> Result<()> {
         ),
         ("date format", view.date_format),
         ("date fullDate", view.date_value),
+        ("date calendar", view.date_calendar.map(Calendar::as_str)),
         ("repeating-section title", view.repeating_section_title),
     ] {
         if let Some(value) = value {
@@ -449,7 +462,8 @@ fn validate_xml_scalars(value: &str, label: &str) -> Result<()> {
 
 fn requirements(view: &AuthoringView<'_>) -> NamespaceRequirements {
     NamespaceRequirements {
-        word_2010: matches!(view.kind, Kind::Checkbox | Kind::EntityPicker),
+        word_2010: matches!(view.kind, Kind::Checkbox | Kind::EntityPicker)
+            || matches!(view.date_calendar, Some(Calendar::Umalqura)),
         word_2012: matches!(view.kind, Kind::RepeatingSection | Kind::RepeatingItem)
             || view
                 .data_binding
@@ -525,15 +539,18 @@ fn write_kind(xml: &mut String, view: &AuthoringView<'_>) -> Result<()> {
             if let Some(value) = view.date_value {
                 write!(xml, r#" w:fullDate="{}""#, escape_xml(value))?;
             }
-            if let Some(format) = view.date_format {
-                write!(
-                    xml,
-                    r#"><w:dateFormat w:val="{}"/></w:date>"#,
-                    escape_xml(format)
-                )?;
-            } else {
+            if view.date_format.is_none() && view.date_calendar.is_none() {
                 xml.push_str("/>");
+                return Ok(());
             }
+            xml.push('>');
+            if let Some(format) = view.date_format {
+                write!(xml, r#"<w:dateFormat w:val="{}"/>"#, escape_xml(format))?;
+            }
+            if let Some(calendar) = view.date_calendar {
+                write_calendar(xml, calendar)?;
+            }
+            xml.push_str("</w:date>");
         },
         Kind::Checkbox => {
             xml.push_str("<w14:checkbox>");
@@ -554,6 +571,19 @@ fn write_kind(xml: &mut String, view: &AuthoringView<'_>) -> Result<()> {
         },
         Kind::RepeatingItem => xml.push_str("<w15:repeatingSectionItem/>"),
         kind => write!(xml, "<w:{}/>", kind.as_str())?,
+    }
+    Ok(())
+}
+
+fn write_calendar(xml: &mut String, calendar: &Calendar) -> Result<()> {
+    if matches!(calendar, Calendar::Umalqura) {
+        xml.push_str("<mc:AlternateContent><mc:Choice Requires=\"w14\"><w:calendar w:val=\"umalqura\"/></mc:Choice><mc:Fallback><w:calendar w:val=\"hijri\"/></mc:Fallback></mc:AlternateContent>");
+    } else {
+        write!(
+            xml,
+            r#"<w:calendar w:val="{}"/>"#,
+            escape_xml(calendar.as_str())
+        )?;
     }
     Ok(())
 }
@@ -623,6 +653,7 @@ fn metadata_bytes(view: &AuthoringView<'_>) -> Result<usize> {
         view.placeholder_doc_part,
         view.date_format,
         view.date_value,
+        view.date_calendar.map(Calendar::as_str),
         view.repeating_section_title,
         view.data_binding.map(DataBinding::xpath),
         view.data_binding.map(DataBinding::store_item_id),
@@ -709,6 +740,20 @@ mod tests {
         assert!(authored.xml().contains("<w15:dataBinding"));
         assert!(authored.xml().contains(r#"mc:Ignorable="w15""#));
         assert!(!authored.xml().contains("<w:dataBinding"));
+    }
+
+    #[test]
+    fn umalqura_calendar_is_authored_with_its_required_hijri_fallback() {
+        let calendar = Calendar::Umalqura;
+        let view = AuthoringView::new(1, Kind::Date, Lock::Unlocked).date_calendar(Some(&calendar));
+        let authored = write_sdt_pr(&view, &Limits::default()).unwrap();
+        assert_eq!(
+            authored.xml(),
+            concat!(
+                r#"<w:sdtPr xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w:id w:val="1"/><w:date><mc:AlternateContent><mc:Choice Requires="w14"><w:calendar w:val="umalqura"/></mc:Choice><mc:Fallback><w:calendar w:val="hijri"/></mc:Fallback></mc:AlternateContent></w:date></w:sdtPr>"#
+            )
+        );
+        assert!(authored.namespace_requirements().word_2010());
     }
 
     #[test]

@@ -379,7 +379,7 @@ fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
             (namespace_of(&resolved), event)
         };
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid_error("flat ODP XML position exceeds platform limits"))?;
+            .map_err(|_error| invalid_error("flat ODP XML position exceeds platform limits"))?;
         match event {
             Event::Start(element) => {
                 let start = event_start(xml, end)?;
@@ -572,7 +572,7 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
             .map_err(|error| Error::InvalidFormat(format!("invalid flat ODP page: {error}")))?;
         let namespace = namespace_of(&resolved);
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid_error("flat ODP XML position exceeds platform limits"))?;
+            .map_err(|_error| invalid_error("flat ODP XML position exceeds platform limits"))?;
         match event {
             Event::Start(element) => {
                 let start = event_start(page, end)?;

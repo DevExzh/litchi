@@ -52,9 +52,53 @@ fn package_edit_is_source_checked_reversible_and_compact() {
             .content_xml()
             .contains("<text:p>New &lt;label&gt;</text:p>")
     );
+    assert!(!commit.snapshot().content_xml().contains(">\n<"));
+    assert!(!commit.snapshot().content_xml().contains(">\r\n<"));
     assert!(commit.patch().is_applicable_to(drawing.snapshot()));
     let reapplied = commit.patch().apply(drawing.snapshot()).unwrap();
     assert_eq!(reapplied.as_bytes(), commit.snapshot().as_bytes());
+    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(restored.as_bytes(), drawing.as_bytes());
+}
+
+#[test]
+fn package_shape_name_edit_is_source_checked_reversible_and_compact() {
+    let drawing = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let mut transaction = drawing.edit();
+    transaction.set_shape_name(0, 0, "Renamed & exact").unwrap();
+    let commit = transaction.commit().unwrap();
+
+    let shape = &commit.snapshot().pages()[0].shapes()[0];
+    assert_eq!(shape.name(), Some("Renamed & exact"));
+    assert!(
+        commit
+            .snapshot()
+            .content_xml()
+            .contains("draw:name=\"Renamed &amp; exact\"")
+    );
+    assert!(
+        commit
+            .snapshot()
+            .content_xml()
+            .contains("draw:layer=\"Foreground\"")
+    );
+    assert!(
+        commit
+            .snapshot()
+            .content_xml()
+            .contains("draw:name=\"Photo\"")
+    );
+    assert!(!commit.snapshot().content_xml().contains(">\n<"));
+    assert!(!commit.snapshot().content_xml().contains(">\r\n<"));
+
+    let change = commit.patch().name_change().unwrap();
+    assert_eq!(change.before(), "Label");
+    assert_eq!(change.after(), "Renamed & exact");
+    assert!(commit.patch().is_applicable_to(drawing.snapshot()));
+    let different =
+        Drawing::from_bytes(package(&CONTENT.replace("Photo", "Different photo"))).unwrap();
+    assert!(!commit.patch().is_applicable_to(different.snapshot()));
+    assert!(commit.patch().apply(different.snapshot()).is_err());
     let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
     assert_eq!(restored.as_bytes(), drawing.as_bytes());
 }

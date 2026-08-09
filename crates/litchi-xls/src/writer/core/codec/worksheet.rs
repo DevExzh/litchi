@@ -228,13 +228,12 @@ impl Writer {
     /// UI, i.e. the number of characters of the "0" glyph in the default
     /// font. Internally this is converted to BIFF8 units of 1/256 characters
     /// for the COLINFO record.
-    pub fn set_column_width(&mut self, sheet: usize, col: u16, width_chars: f64) -> Result<()> {
-        if col >= 256 {
-            return Err(Error::InvalidData(
-                "set_column_width: column index must be < 256 for BIFF8".to_string(),
-            ));
-        }
-
+    pub fn set_column_width(
+        &mut self,
+        sheet: usize,
+        column: crate::writer::Column,
+        width_chars: f64,
+    ) -> Result<()> {
         if !(width_chars.is_finite()) || width_chars <= 0.0 {
             return Err(Error::InvalidData(
                 "set_column_width: width must be a positive finite value".to_string(),
@@ -255,39 +254,27 @@ impl Writer {
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        worksheet.set_column_width(col, width_units);
+        worksheet.set_column_width(column, width_units);
         Ok(())
     }
 
     /// Hide a column.
-    pub fn hide_column(&mut self, sheet: usize, col: u16) -> Result<()> {
-        if col >= 256 {
-            return Err(Error::InvalidData(
-                "hide_column: column index must be < 256 for BIFF8".to_string(),
-            ));
-        }
-
+    pub fn hide_column(&mut self, sheet: usize, column: crate::writer::Column) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        worksheet.hide_column(col);
+        worksheet.hide_column(column);
         Ok(())
     }
 
     /// Show a previously hidden column.
-    pub fn show_column(&mut self, sheet: usize, col: u16) -> Result<()> {
-        if col >= 256 {
-            return Err(Error::InvalidData(
-                "show_column: column index must be < 256 for BIFF8".to_string(),
-            ));
-        }
-
+    pub fn show_column(&mut self, sheet: usize, column: crate::writer::Column) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        worksheet.show_column(col);
+        worksheet.show_column(column);
         Ok(())
     }
 
@@ -321,10 +308,10 @@ impl Writer {
 
     /// Configure freeze panes for the specified worksheet.
     ///
-    /// Row and column indices are 0-based and represent the number of
-    /// rows/columns at the top/left that remain frozen.
-    pub fn freeze_panes(&mut self, sheet: usize, freeze_rows: u32, freeze_cols: u16) -> Result<()> {
-        if freeze_rows == 0 && freeze_cols == 0 {
+    /// The checked counts represent the number of rows/columns at the top/left
+    /// that remain frozen.
+    pub fn freeze_panes(&mut self, sheet: usize, panes: crate::writer::FrozenPanes) -> Result<()> {
+        if panes.is_empty() {
             let worksheet = self
                 .worksheets
                 .get_mut(sheet)
@@ -332,17 +319,11 @@ impl Writer {
             worksheet.clear_freeze_panes();
             return Ok(());
         }
-        let freeze_rows = u16::try_from(freeze_rows).map_err(|_| {
-            Error::InvalidCellReference("freeze-panes row is outside the BIFF8 grid".to_string())
-        })?;
-        let freeze_cols = u8::try_from(freeze_cols).map_err(|_| {
-            Error::InvalidCellReference("freeze-panes column is outside the BIFF8 grid".to_string())
-        })?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
-        worksheet.set_freeze_panes(freeze_rows, freeze_cols)
+        worksheet.set_freeze_panes(panes)
     }
 
     /// Remove any freeze panes from the specified worksheet.
@@ -401,19 +382,18 @@ impl Writer {
 
     /// Set the height of a row in points.
     ///
-    /// The row index is 0-based (0 = first row), and the height is specified
+    /// The checked row is zero-based (0 = first row), and the height is specified
     /// in typographic points. Internally this is converted to twips
     /// (1/20th of a point) for the BIFF8 ROW record.
-    pub fn set_row_height(&mut self, sheet: usize, row: u32, height_points: f64) -> Result<()> {
+    pub fn set_row_height(
+        &mut self,
+        sheet: usize,
+        row: crate::writer::Row,
+        height_points: f64,
+    ) -> Result<()> {
         if !(height_points.is_finite()) || height_points <= 0.0 {
             return Err(Error::InvalidData(
                 "set_row_height: height must be a positive finite value".to_string(),
-            ));
-        }
-
-        if row > u16::MAX as u32 {
-            return Err(Error::InvalidData(
-                "set_row_height: row index must be <= 65535 for BIFF8".to_string(),
             ));
         }
 
@@ -435,13 +415,7 @@ impl Writer {
     }
 
     /// Hide a row.
-    pub fn hide_row(&mut self, sheet: usize, row: u32) -> Result<()> {
-        if row > u16::MAX as u32 {
-            return Err(Error::InvalidData(
-                "hide_row: row index must be <= 65535 for BIFF8".to_string(),
-            ));
-        }
-
+    pub fn hide_row(&mut self, sheet: usize, row: crate::writer::Row) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
@@ -451,13 +425,7 @@ impl Writer {
     }
 
     /// Show a previously hidden row.
-    pub fn show_row(&mut self, sheet: usize, row: u32) -> Result<()> {
-        if row > u16::MAX as u32 {
-            return Err(Error::InvalidData(
-                "show_row: row index must be <= 65535 for BIFF8".to_string(),
-            ));
-        }
-
+    pub fn show_row(&mut self, sheet: usize, row: crate::writer::Row) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)

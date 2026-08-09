@@ -32,10 +32,6 @@ const MAX_EVENTS: usize = 1_000_000;
 const MAX_MASTER_PAGES: usize = 65_536;
 const MAX_CHILDREN: usize = 65_536;
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
-}
-
 #[derive(Clone)]
 struct ExpandedName {
     namespace: Option<Vec<u8>>,
@@ -57,12 +53,35 @@ struct ActiveMaster {
     total_child_bytes: usize,
 }
 
+struct MasterBuilder {
+    page: Master,
+    start: usize,
+    depth: usize,
+}
+
+struct RegionBuilder {
+    kind: Kind,
+    start: usize,
+    depth: usize,
+    text: String,
+    expanded_spaces: usize,
+}
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidFormat(message.into())
+}
+
+fn byte_offset(offset: u64, context: &str) -> Result<usize> {
+    usize::try_from(offset)
+        .map_err(|error| invalid(format!("{context} byte offset is out of range: {error}")))
+}
+
 fn expanded(reader: &NsReader<&[u8]>, name: quick_xml::name::QName<'_>) -> ExpandedName {
     let (namespace, local) = reader.resolver().resolve_element(name);
     ExpandedName {
         namespace: match namespace {
             ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
-            _ => None,
+            ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
         },
         local: local.as_ref().to_vec(),
     }
@@ -149,7 +168,7 @@ fn register_child(active: &mut ActiveMaster, kind: ChildKind) -> Result<()> {
         ));
     }
     if kind != ChildKind::Shape && active.seen[usize::from(rank)] {
-        return Err(invalid(format!("duplicate {:?} master-page child", kind)));
+        return Err(invalid(format!("duplicate {kind:?} master-page child")));
     }
     active.seen[usize::from(rank)] = true;
     active.last_rank = Some(rank);
@@ -193,8 +212,8 @@ fn required_style_attr(
     element: &BytesStart<'_>,
     local: &[u8],
 ) -> Result<String> {
-    for attribute in element.attributes() {
-        let attribute = attribute
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute
             .map_err(|error| invalid(format!("invalid master-page attribute: {error}")))?;
         let (namespace, name) = reader.resolver().resolve_attribute(attribute.key);
         if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == STYLE)
@@ -264,11 +283,11 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
         if events > MAX_EVENTS {
             return Err(invalid("styles XML has too many events"));
         }
-        let start = reader.buffer_position() as usize;
+        let start = byte_offset(reader.buffer_position(), "styles XML")?;
         let (_, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(format!("styles XML parsing error: {error}")))?;
-        let end = reader.buffer_position() as usize;
+        let end = byte_offset(reader.buffer_position(), "styles XML")?;
         match event.into_owned() {
             Event::Start(element) => {
                 if stack.len() >= MAX_DEPTH {
@@ -341,11 +360,16 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
                         .as_ref()
                         .is_some_and(|child| child.depth == depth)
                 {
-                    let child = master.child.take().unwrap();
+                    let child = master
+                        .child
+                        .take()
+                        .ok_or_else(|| invalid("master-page child state is missing"))?;
                     push_child(xml, pages, master, child.kind, child.start, end)?;
                 }
-                if active.as_ref().is_some_and(|master| master.depth == depth) {
-                    if active.as_ref().unwrap().child.is_some() {
+                if let Some(master) = active.as_ref()
+                    && master.depth == depth
+                {
+                    if master.child.is_some() {
                         return Err(invalid("unterminated master-page child"));
                     }
                     active = None;
@@ -380,7 +404,7 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
                 return Err(invalid("DTDs and processing instructions are not allowed"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -390,50 +414,42 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
     Ok(())
 }
 
-struct MasterBuilder {
-    page: Master,
-    start: usize,
-    depth: usize,
-}
-
-struct RegionBuilder {
-    kind: Kind,
-    start: usize,
-    depth: usize,
-    text: String,
-    expanded_spaces: usize,
-}
-
-pub fn read(xml: &str) -> Result<Vec<Master>> {
+/// Reads the master pages from a `styles.xml` document.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed, exceeds resource limits, or
+/// cannot be reconciled with the ODF master-page schema.
+pub fn read(source: &str) -> Result<Vec<Master>> {
     // quick-xml strips a UTF-8 BOM and reports positions relative to the
     // stripped text, so slice against the same view.
-    let xml = xml.strip_prefix('\u{FEFF}').unwrap_or(xml);
+    let xml = source.strip_prefix('\u{FEFF}').unwrap_or(source);
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut pages = Vec::new();
-    let mut master: Option<MasterBuilder> = None;
-    let mut region: Option<RegionBuilder> = None;
+    let mut active_master: Option<MasterBuilder> = None;
+    let mut active_region: Option<RegionBuilder> = None;
 
     loop {
-        let event_start = reader.buffer_position() as usize;
-        let (namespace, event) = reader
+        let event_start = byte_offset(reader.buffer_position(), "styles XML")?;
+        let (namespace, parsed_event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
         let style_element = bound_to(&namespace, STYLE_NAMESPACE);
         let text_element = bound_to(&namespace, TEXT_NAMESPACE);
-        let event = event.into_owned();
-        let event_end = reader.buffer_position() as usize;
+        let event = parsed_event.into_owned();
+        let event_end = byte_offset(reader.buffer_position(), "styles XML")?;
 
         match event {
             Event::Start(element)
                 if style_element && element.local_name().as_ref() == b"master-page" =>
             {
-                if master.is_some() {
+                if active_master.is_some() {
                     return Err(Error::InvalidFormat(
                         "nested style:master-page element".to_string(),
                     ));
                 }
-                master = Some(MasterBuilder {
+                active_master = Some(MasterBuilder {
                     page: parse_master_page(&reader, &element)?,
                     start: event_start,
                     depth: 1,
@@ -446,10 +462,12 @@ pub fn read(xml: &str) -> Result<Vec<Master>> {
                 page.xml = xml[event_start..event_end].to_string();
                 pages.push(page);
             },
-            Event::Start(element) if master.is_some() => {
-                let master = master.as_mut().expect("checked master page");
+            Event::Start(element) if active_master.is_some() => {
+                let master = active_master.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active style:master-page".to_string())
+                })?;
                 master.depth += 1;
-                if region.is_none()
+                if active_region.is_none()
                     && style_element
                     && let Some(kind) = Kind::parse(element.local_name().as_ref())
                 {
@@ -459,25 +477,29 @@ pub fn read(xml: &str) -> Result<Vec<Master>> {
                             master.page.name
                         )));
                     }
-                    region = Some(RegionBuilder {
+                    active_region = Some(RegionBuilder {
                         kind,
                         start: event_start,
                         depth: 1,
                         text: String::new(),
                         expanded_spaces: 0,
                     });
-                } else if let Some(region) = region.as_mut() {
+                } else if let Some(region) = active_region.as_mut() {
                     region.depth += 1;
                 }
             },
             Event::Empty(element)
-                if master.is_some()
-                    && region.is_none()
+                if active_master.is_some()
+                    && active_region.is_none()
                     && style_element
                     && Kind::parse(element.local_name().as_ref()).is_some() =>
             {
-                let kind = Kind::parse(element.local_name().as_ref()).unwrap();
-                let master = master.as_mut().expect("checked master page");
+                let kind = Kind::parse(element.local_name().as_ref()).ok_or_else(|| {
+                    Error::InvalidFormat("invalid header/footer region name".to_string())
+                })?;
+                let master = active_master.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active style:master-page".to_string())
+                })?;
                 if master.page.region(kind).is_some() {
                     return Err(Error::InvalidFormat(format!(
                         "duplicate {kind:?} in master page '{}'",
@@ -491,8 +513,10 @@ pub fn read(xml: &str) -> Result<Vec<Master>> {
                     blocks: Vec::new(),
                 });
             },
-            Event::Empty(element) if region.is_some() && text_element => {
-                let region = region.as_mut().expect("checked region");
+            Event::Empty(element) if active_region.is_some() && text_element => {
+                let region = active_region.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active header/footer region".to_string())
+                })?;
                 append_empty_text_element(
                     &reader,
                     &element,
@@ -500,31 +524,36 @@ pub fn read(xml: &str) -> Result<Vec<Master>> {
                     &mut region.expanded_spaces,
                 )?;
             },
-            Event::Text(value) if region.is_some() => {
+            Event::Text(value) if active_region.is_some() => {
                 let decoded = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid header text: {error}"))
                     })?;
-                region.as_mut().unwrap().text.push_str(&decoded);
+                let region = active_region.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active header/footer region".to_string())
+                })?;
+                region.text.push_str(&decoded);
             },
-            Event::GeneralRef(reference) if region.is_some() => {
-                region
-                    .as_mut()
-                    .unwrap()
-                    .text
-                    .push_str(&decode_reference(&reference)?);
+            Event::GeneralRef(reference) if active_region.is_some() => {
+                let region = active_region.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active header/footer region".to_string())
+                })?;
+                region.text.push_str(&decode_reference(&reference)?);
             },
-            Event::CData(value) if region.is_some() => {
+            Event::CData(value) if active_region.is_some() => {
                 let decoded = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid header CDATA: {error}"))
                     })?;
-                region.as_mut().unwrap().text.push_str(&decoded);
+                let region = active_region.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active header/footer region".to_string())
+                })?;
+                region.text.push_str(&decoded);
             },
-            Event::End(element) if master.is_some() => {
-                if let Some(active) = region.as_mut() {
+            Event::End(element) if active_master.is_some() => {
+                if let Some(active) = active_region.as_mut() {
                     if text_element && matches!(element.local_name().as_ref(), b"p" | b"h") {
                         active.text.push('\n');
                     }
@@ -532,27 +561,38 @@ pub fn read(xml: &str) -> Result<Vec<Master>> {
                         Error::InvalidFormat("invalid header/footer nesting".to_string())
                     })?;
                     if active.depth == 0 {
-                        let active = region.take().expect("checked region");
-                        let master = master.as_mut().expect("checked master page");
+                        let finished_region = active_region.take().ok_or_else(|| {
+                            Error::InvalidFormat("missing active header/footer region".to_string())
+                        })?;
+                        let master = active_master.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat("missing active style:master-page".to_string())
+                        })?;
                         master.page.regions.push(Region {
-                            kind: active.kind,
-                            xml: xml[active.start..event_end].to_string(),
-                            text: active.text.trim_end_matches('\n').to_string(),
+                            kind: finished_region.kind,
+                            xml: xml[finished_region.start..event_end].to_string(),
+                            text: finished_region.text.trim_end_matches('\n').to_string(),
                             blocks: Vec::new(),
                         });
                     }
                 }
-                let current = master.as_mut().expect("checked master page");
-                current.depth = current.depth.checked_sub(1).ok_or_else(|| {
-                    Error::InvalidFormat("invalid master-page nesting".to_string())
-                })?;
-                if current.depth == 0 {
+                let master_finished = {
+                    let current = active_master.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active style:master-page".to_string())
+                    })?;
+                    current.depth = current.depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("invalid master-page nesting".to_string())
+                    })?;
+                    current.depth == 0
+                };
+                if master_finished {
                     if !style_element || element.local_name().as_ref() != b"master-page" {
                         return Err(Error::InvalidFormat(
                             "malformed style:master-page element".to_string(),
                         ));
                     }
-                    let mut finished = master.take().expect("checked master page");
+                    let mut finished = active_master.take().ok_or_else(|| {
+                        Error::InvalidFormat("missing active style:master-page".to_string())
+                    })?;
                     finished.page.xml = xml[finished.start..event_end].to_string();
                     pages.push(finished.page);
                 }
@@ -563,11 +603,19 @@ pub fn read(xml: &str) -> Result<Vec<Master>> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
-    if master.is_some() || region.is_some() {
+    if active_master.is_some() || active_region.is_some() {
         return Err(Error::InvalidFormat(
             "unterminated master-page header/footer".to_string(),
         ));
@@ -575,9 +623,9 @@ pub fn read(xml: &str) -> Result<Vec<Master>> {
     validate_schema(xml, &mut pages)?;
     let mut structured = parse(xml)?;
     for page in &mut pages {
-        for region in &mut page.regions {
-            region.blocks = structured
-                .remove(&(page.name.clone(), region.kind))
+        for page_region in &mut page.regions {
+            page_region.blocks = structured
+                .remove(&(page.name.clone(), page_region.kind))
                 .unwrap_or_default();
         }
     }
@@ -614,8 +662,8 @@ fn namespaced_attr(
     expected_namespace: &[u8],
     local_name: &[u8],
 ) -> Result<Option<String>> {
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| {
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(|error| {
             Error::InvalidFormat(format!("invalid master-page attribute: {error}"))
         })?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
@@ -663,8 +711,8 @@ fn style_independent_text_count(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
 ) -> Result<Option<usize>> {
-    for attribute in element.attributes() {
-        let attribute = attribute
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid text:s attribute: {error}")))?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == TEXT_NAMESPACE)
@@ -673,8 +721,8 @@ fn style_independent_text_count(
             let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| Error::XmlError(error.to_string()))?;
-            return value.parse().map(Some).map_err(|_| {
-                Error::InvalidFormat("invalid text:c count in header/footer".to_string())
+            return value.parse().map(Some).map_err(|error| {
+                Error::InvalidFormat(format!("invalid text:c count in header/footer: {error}"))
             });
         }
     }
@@ -713,23 +761,35 @@ mod tests {
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 
+    fn test_ok<T>(result: Result<T>) -> T {
+        match result {
+            Ok(value) => value,
+            Err(error) => panic!("test operation failed: {error}"),
+        }
+    }
+
+    fn test_some<T>(value: Option<T>) -> T {
+        match value {
+            Some(found_value) => found_value,
+            None => panic!("test fixture did not contain a required value"),
+        }
+    }
+
     #[test]
     fn reads_master_regions_and_lossless_attributes() {
         let xml = format!(
             r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:s="{STYLE}" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="Standard" s:display-name="Default &amp; Main" s:page-layout-name="pm1"><s:header><t:p>Page <t:page-number/></t:p><t:p>A<t:s t:c="2"/>B<t:tab/>C<t:line-break/>D</t:p></s:header><s:footer/></s:master-page></o:master-styles></o:document-styles>"#
         );
-        let pages = read(&xml).unwrap();
+        let pages = test_ok(read(&xml));
         assert_eq!(pages.len(), 1);
         assert_eq!(pages[0].name, "Standard");
         assert_eq!(pages[0].display_name.as_deref(), Some("Default & Main"));
         assert_eq!(
-            pages[0].region(Kind::Header).unwrap().text,
+            test_some(pages[0].region(Kind::Header)).text,
             "Page \nA  B\tC\nD"
         );
         assert!(
-            pages[0]
-                .region(Kind::Header)
-                .unwrap()
+            test_some(pages[0].region(Kind::Header))
                 .xml
                 .contains("page-number")
         );

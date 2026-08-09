@@ -5,8 +5,13 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::CUSTOM_XML_NAMESPACE;
 use super::model::{Limits, Result, RootName, invalid, limit, xml_error};
+
+#[derive(Clone, Copy)]
+enum Utf16Encoding {
+    LittleEndian,
+    BigEndian,
+}
 
 pub(crate) fn validate_payload(xml: &[u8], limits: &Limits) -> Result<RootName> {
     if xml.is_empty() || xml.len() > limits.max_item_bytes {
@@ -67,7 +72,11 @@ pub(crate) fn validate_payload(xml: &[u8], limits: &Limits) -> Result<RootName> 
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_) => {},
         }
     }
     if roots != 1 || depth != 0 {
@@ -77,23 +86,22 @@ pub(crate) fn validate_payload(xml: &[u8], limits: &Limits) -> Result<RootName> 
 }
 
 fn expanded_root(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<RootName> {
-    let (resolved, local_name) = reader.resolver().resolve_element(element.name());
+    let (resolved, local_name_bytes) = reader.resolver().resolve_element(element.name());
     let namespace = match resolved {
         ResolveResult::Bound(Namespace(value)) => Some(
             std::str::from_utf8(value)
-                .map_err(|_| xml_error("root namespace is not UTF-8"))?
+                .map_err(|_utf8_error| xml_error("root namespace is not UTF-8"))?
                 .to_string(),
         ),
         ResolveResult::Unbound => None,
         ResolveResult::Unknown(prefix) => {
             return Err(xml_error(format!(
-                "root uses unknown namespace prefix {:?}",
-                prefix
+                "root uses unknown namespace prefix {prefix:?}"
             )));
         },
     };
-    let local_name = std::str::from_utf8(local_name.as_ref())
-        .map_err(|_| xml_error("root local name is not UTF-8"))?
+    let local_name = std::str::from_utf8(local_name_bytes.as_ref())
+        .map_err(|_utf8_error| xml_error("root local name is not UTF-8"))?
         .to_string();
     Ok(RootName {
         namespace,
@@ -102,7 +110,7 @@ fn expanded_root(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<R
 }
 
 pub(crate) fn normalize_encoding(xml: &[u8]) -> Result<Cow<'_, [u8]>> {
-    let (encoding, bytes) = if let Some(bytes) = xml.strip_prefix(&[0xFF, 0xFE]) {
+    let (encoding_hint, bytes) = if let Some(bytes) = xml.strip_prefix(&[0xFF, 0xFE]) {
         (Some(Utf16Encoding::LittleEndian), bytes)
     } else if let Some(bytes) = xml.strip_prefix(&[0xFE, 0xFF]) {
         (Some(Utf16Encoding::BigEndian), bytes)
@@ -119,24 +127,24 @@ pub(crate) fn normalize_encoding(xml: &[u8]) -> Result<Cow<'_, [u8]>> {
     } else {
         (None, xml)
     };
-    let Some(encoding) = encoding else {
-        let text =
-            std::str::from_utf8(xml).map_err(|_| xml_error("XML is not valid UTF-8 or UTF-16"))?;
+    let Some(utf16_encoding) = encoding_hint else {
+        let text = std::str::from_utf8(xml)
+            .map_err(|_utf8_error| xml_error("XML is not valid UTF-8 or UTF-16"))?;
         validate_characters(text)?;
         return Ok(Cow::Borrowed(xml));
     };
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return Err(xml_error("UTF-16 XML has an odd byte length"));
     }
     let units = bytes
         .chunks_exact(2)
-        .map(|pair| match encoding {
+        .map(|pair| match utf16_encoding {
             Utf16Encoding::LittleEndian => u16::from_le_bytes([pair[0], pair[1]]),
             Utf16Encoding::BigEndian => u16::from_be_bytes([pair[0], pair[1]]),
         })
         .collect::<Vec<_>>();
     let text = String::from_utf16(&units)
-        .map_err(|_| xml_error("UTF-16 XML is not well-formed Unicode"))?;
+        .map_err(|_utf16_error| xml_error("UTF-16 XML is not well-formed Unicode"))?;
     validate_characters(&text)?;
     Ok(Cow::Owned(text.into_bytes()))
 }
@@ -153,12 +161,6 @@ pub(crate) fn validate_characters(value: &str) -> Result<()> {
     Ok(())
 }
 
-#[derive(Clone, Copy)]
-enum Utf16Encoding {
-    LittleEndian,
-    BigEndian,
-}
-
 pub(crate) fn resolved_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -169,8 +171,7 @@ pub(crate) fn resolved_element(
         ResolveResult::Unbound => None,
         ResolveResult::Unknown(prefix) => {
             return Err(xml_error(format!(
-                "unknown element namespace prefix {:?}",
-                prefix
+                "unknown element namespace prefix {prefix:?}"
             )));
         },
     };
@@ -184,8 +185,8 @@ pub(crate) fn required_attribute(
     local_name: &[u8],
 ) -> Result<String> {
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
+    for attribute_result in element.attributes().with_checks(true) {
+        let attribute = attribute_result.map_err(|error| xml_error(error.to_string()))?;
         let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
         if local.as_ref() == local_name
             && matches!(resolved, ResolveResult::Bound(bound) if bound.as_ref() == namespace.as_bytes())
@@ -217,8 +218,8 @@ pub(crate) fn reject_other_attributes(
     // retained Properties stream; `allowed` documents the known fields and
     // keeps duplicate-required-attribute checks at their call sites.
     let _ = allowed;
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
+    for attribute_result in element.attributes().with_checks(true) {
+        let attribute = attribute_result.map_err(|error| xml_error(error.to_string()))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
@@ -252,12 +253,4 @@ pub(crate) fn is_whitespace(value: &[u8]) -> bool {
     value
         .iter()
         .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
-}
-
-#[allow(
-    dead_code,
-    reason = "keeps the vocabulary dependency explicit for API audits"
-)]
-fn _namespace_marker() -> &'static str {
-    CUSTOM_XML_NAMESPACE
 }

@@ -18,6 +18,12 @@ use std::collections::HashSet;
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
+fn required_cell_header(header: Option<CellHeader>) -> Result<CellHeader> {
+    header.ok_or_else(|| {
+        Error::InvalidFormat("cell record was classified without a cell header".to_string())
+    })
+}
+
 impl<'a, RS> CellsReader<'a, RS>
 where
     RS: Read + Seek,
@@ -144,7 +150,7 @@ where
                 kind::CELL_BLANK
                     // BrtCellBlank
                     if self.buf.len() >= 8 => {
-                        let header = cell_header.unwrap();
+                        let header = required_cell_header(cell_header)?;
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
@@ -154,7 +160,7 @@ where
                 kind::CELL_RK
                     // BrtCellRk
                     if self.buf.len() >= 12 => {
-                        let header = cell_header.unwrap();
+                        let header = required_cell_header(cell_header)?;
                         let mut cursor = Cursor::new(&self.buf[8..], "BrtCellRk");
                         let value = super::semantic::cell_value_from_number(cursor.read_rk()?);
                         return Ok(Some(Cell::new_styled(
@@ -166,7 +172,7 @@ where
                 kind::CELL_ERROR
                     // BrtCellError
                     if self.buf.len() >= 9 => {
-                        let header = cell_header.unwrap();
+                        let header = required_cell_header(cell_header)?;
                         let error_code = self.buf[8];
                         let error_msg = match error_code {
                             0x00 => "#NULL!",
@@ -188,7 +194,7 @@ where
                 kind::CELL_BOOL
                     // BrtCellBool
                     if self.buf.len() >= 9 => {
-                        let header = cell_header.unwrap();
+                        let header = required_cell_header(cell_header)?;
                         let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool");
                         let value = cursor.read_bool8()?;
                         return Ok(Some(Cell::new_styled(
@@ -200,7 +206,7 @@ where
                 kind::CELL_REAL
                     // BrtCellReal
                     if self.buf.len() >= 16 => {
-                        let header = cell_header.unwrap();
+                        let header = required_cell_header(cell_header)?;
                         let value = binary::read_f64_le_at(&self.buf, 8)?;
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
@@ -211,7 +217,7 @@ where
                 kind::CELL_ST
                     // BrtCellSt
                     if self.buf.len() >= 8 => {
-                        let header = cell_header.unwrap();
+                        let header = required_cell_header(cell_header)?;
                         let (string, _) = crate::package::records::decode_string(&self.buf[8..])?;
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
@@ -222,7 +228,7 @@ where
                 kind::CELL_ISST
                     // BrtCellIsst
                     if self.buf.len() >= 12 => {
-                        let header = cell_header.unwrap();
+                        let header = required_cell_header(cell_header)?;
                         let idx = binary::read_u32_le_at(&self.buf, 8)? as usize;
                         let value = if idx < self.shared_strings.len() {
                             CellValue::String(self.shared_strings[idx].text.clone())
@@ -242,7 +248,7 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    let header = cell_header.unwrap();
+                    let header = required_cell_header(cell_header)?;
                     let rich_string = SharedString::parse(&self.buf[8..])?;
                     return Ok(Some(Cell::new_rich_string(
                         self.current_row,
@@ -258,7 +264,7 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    let header = cell_header.unwrap();
+                    let header = required_cell_header(cell_header)?;
                     let (string, consumed) =
                         crate::package::records::decode_string(&self.buf[8..])?;
                     let parsed =
@@ -273,7 +279,7 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    let header = cell_header.unwrap();
+                    let header = required_cell_header(cell_header)?;
                     let num_value = binary::read_f64_le_at(&self.buf, 8)?;
                     let parsed =
                         self.parse_formula_cell(header, CellValue::Float(num_value), 16)?;
@@ -287,7 +293,7 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    let header = cell_header.unwrap();
+                    let header = required_cell_header(cell_header)?;
                     let mut cursor = Cursor::new(&self.buf[8..], "BrtFmlaBool cached value");
                     let bool_value = cursor.read_bool8()?;
                     let parsed = self.parse_formula_cell(
@@ -305,7 +311,7 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    let header = cell_header.unwrap();
+                    let header = required_cell_header(cell_header)?;
                     let error_msg = super::semantic::error_text(self.buf[8]);
                     let parsed = self.parse_formula_cell(
                         header,

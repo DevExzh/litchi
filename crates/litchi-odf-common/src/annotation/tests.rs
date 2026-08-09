@@ -1,5 +1,10 @@
 //! Focused tests for the semantic annotation model and bounded XML codec.
 
+#![allow(
+    clippy::unwrap_used,
+    reason = "Test assertions intentionally unwrap known-valid fixture construction failures."
+)]
+
 use super::*;
 
 #[test]

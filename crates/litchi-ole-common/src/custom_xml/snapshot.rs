@@ -42,13 +42,6 @@ impl Revision {
     }
 }
 
-fn feed(value: &mut u64, bytes: &[u8]) {
-    for byte in bytes {
-        *value ^= u64::from(*byte);
-        *value = value.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-}
-
 /// An immutable, cheaply clonable view of one complete MS-OSHARED Custom XML
 /// data store. Item and Properties stream allocations are shared across
 /// snapshots; edits copy only the changed stream and bounded store metadata.
@@ -61,22 +54,39 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Validates a store with the default resource profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `store` violates the default Custom XML limits.
     pub fn from_store(store: Store) -> Result<Self> {
         Self::from_store_with_limits(store, Limits::default())
     }
 
     /// Validates a store with caller-selected bounded resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `store` violates `limits`.
     pub fn from_store_with_limits(store: Store, limits: Limits) -> Result<Self> {
         codec::validate_store(&store, &limits)?;
         Ok(Self::from_validated(store, limits))
     }
 
     /// Inspects a complete OLE file and captures its Custom XML store.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the OLE file or its Custom XML store is malformed.
     pub fn load<R: std::io::Read + std::io::Seek>(ole: &mut OleFile<R>) -> Result<Option<Self>> {
         Self::load_with_limits(ole, Limits::default())
     }
 
     /// Inspects a complete OLE file with caller-selected resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the OLE file or Custom XML store is malformed, or
+    /// if it exceeds `limits`.
     pub fn load_with_limits<R: std::io::Read + std::io::Seek>(
         ole: &mut OleFile<R>,
         limits: Limits,
@@ -86,6 +96,10 @@ impl Snapshot {
     }
 
     /// Alias for [`Self::load`] that emphasizes source-bound parsing.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::load`].
     pub fn read<R: std::io::Read + std::io::Seek>(ole: &mut OleFile<R>) -> Result<Option<Self>> {
         Self::load(ole)
     }
@@ -170,5 +184,12 @@ impl Snapshot {
 
     pub(super) fn same_source(&self, other: &Self) -> bool {
         self.revision == other.revision && self.store == other.store
+    }
+}
+
+fn feed(value: &mut u64, bytes: &[u8]) {
+    for byte in bytes {
+        *value ^= u64::from(*byte);
+        *value = value.wrapping_mul(0x0000_0100_0000_01b3);
     }
 }

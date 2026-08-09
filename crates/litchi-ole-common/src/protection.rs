@@ -7,6 +7,7 @@ const STORAGE_ENTRY: u8 = 1;
 
 /// Returns whether a CFB path component marks signed, encrypted, or DRM
 /// content that mutation-capable format crates must preserve unchanged.
+#[must_use]
 pub fn is_protected_component(name: &str) -> bool {
     [
         "_xmlsignatures",

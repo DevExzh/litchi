@@ -20,12 +20,12 @@ pub(crate) fn validate(link: &Link) -> Result<(), OleError> {
     }
 
     let mut previous_end = 16;
-    for (label, range, moniker) in [
+    for (label, range_option, moniker) in [
         ("reserved moniker", link.reserved_moniker.as_ref(), false),
         ("relative moniker", link.relative_source.as_ref(), true),
         ("absolute moniker", link.absolute_source.as_ref(), true),
     ] {
-        if let Some(range) = range {
+        if let Some(range) = range_option {
             previous_end = check_ordered_range(range, previous_end, length, label, moniker)?;
         }
     }

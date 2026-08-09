@@ -120,6 +120,7 @@ pub(crate) struct Inner {
     pub(super) styles_uri: Option<PackURI>,
     pub(super) styles: OnceLock<raw::styles::Catalog>,
     pub(super) task_panes: OnceCell<Option<litchi_ooxml_common::web::Panes>>,
+    pub(super) surveys: OnceCell<Box<[crate::survey::Part]>>,
     pub(crate) style_lineage: Arc<StyleLineage>,
     pub(super) flavor: Flavor,
     pub(super) date_system: DateSystem,
@@ -386,6 +387,7 @@ impl Workbook {
                 styles_uri,
                 styles: OnceLock::new(),
                 task_panes: OnceCell::new(),
+                surveys: OnceCell::new(),
                 style_lineage,
                 flavor,
                 date_system: if catalog.uses_1904_date_system {
@@ -504,6 +506,23 @@ impl Workbook {
             .task_panes
             .get_or_try_init(|| litchi_ooxml_common::web::load(&self.inner.package))?;
         Ok(panes.as_ref())
+    }
+
+    /// Table-associated Excel survey metadata, when present.
+    ///
+    /// Surveys are parsed lazily as inert descriptive data. This API neither
+    /// renders survey controls nor evaluates formulas, validates answers, or
+    /// submits data to an external service.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a survey part has an invalid table relationship,
+    /// duplicate survey ID, or malformed Survey XML.
+    pub fn surveys(&self) -> Result<&[crate::survey::Part]> {
+        let values = self.inner.surveys.get_or_try_init(|| {
+            crate::survey::load(&self.inner.package).map(Vec::into_boxed_slice)
+        })?;
+        Ok(values)
     }
 
     /// Workbook-level protection metadata, when `workbookProtection` is

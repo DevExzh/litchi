@@ -1,3 +1,10 @@
+#![allow(
+    clippy::needless_pass_by_value,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "integration-test assertions panic on failure by design"
+)]
+
 use litchi_odp::{Presentation, core::OwnedPackage, edit};
 
 macro_rules! fixture {

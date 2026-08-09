@@ -31,12 +31,12 @@ fn content(inner: &str) -> String {
 fn odm_truncation_and_mutation_sweeps_never_panic() {
     let bytes = package(MIME, CONTENT);
     for end in 0..bytes.len() {
-        let _ = Master::from_bytes(bytes[..end].to_vec());
+        drop(Master::from_bytes(bytes[..end].to_vec()));
     }
     for position in 0..bytes.len() {
         let mut mutated = bytes.clone();
         mutated[position] ^= 1;
-        let _ = Master::from_bytes(mutated);
+        drop(Master::from_bytes(mutated));
     }
     assert!(Master::from_bytes(bytes).is_ok());
 }

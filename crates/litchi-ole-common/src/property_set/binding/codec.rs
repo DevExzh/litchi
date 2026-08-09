@@ -57,7 +57,9 @@ pub(super) fn decode(name: &str) -> Result<Guid, OleError> {
         available += 5;
         while available >= 8 && written < raw.len() {
             available -= 8;
-            raw[written] = (accumulator >> available) as u8;
+            raw[written] = u8::try_from(accumulator >> available).map_err(|_conversion_error| {
+                super::super::model::invalid("GUID-derived Property Set binding byte is invalid")
+            })?;
             written += 1;
             if available == 0 {
                 accumulator = 0;

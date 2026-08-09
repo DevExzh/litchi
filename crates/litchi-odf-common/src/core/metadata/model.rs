@@ -100,9 +100,9 @@ pub struct TemplateMetadata {
     pub href: Option<String>,
     /// Human-readable template title.
     pub title: Option<String>,
-    /// Template dateTime lexical value.
+    /// Template `dateTime` lexical value.
     pub date: Option<String>,
-    /// XLink activation behavior.
+    /// `XLink` activation behavior.
     pub actuate: Option<String>,
 }
 
@@ -113,9 +113,9 @@ pub struct AutoReloadMetadata {
     pub href: Option<String>,
     /// Exact XML Schema duration delay.
     pub delay: Option<String>,
-    /// XLink show behavior.
+    /// `XLink` show behavior.
     pub show: Option<String>,
-    /// XLink activation behavior.
+    /// `XLink` activation behavior.
     pub actuate: Option<String>,
 }
 
@@ -124,7 +124,7 @@ pub struct AutoReloadMetadata {
 pub struct HyperlinkBehaviourMetadata {
     /// Target frame name.
     pub target_frame_name: Option<String>,
-    /// XLink show behavior.
+    /// `XLink` show behavior.
     pub show: Option<String>,
 }
 
@@ -164,7 +164,7 @@ pub struct DocumentStatistics {
 }
 
 impl Metadata {
-    /// Parse a date string into DateTime<Utc>.
+    /// Parse a date string into `DateTime<Utc>`.
     pub(crate) fn parse_date(date_str: Option<String>) -> Option<DateTime<Utc>> {
         date_str.and_then(|value| {
             crate::datatype::DateTime::decode(&value)
@@ -205,6 +205,6 @@ impl From<Metadata> for CoreMetadata {
     }
 }
 
-fn parse_u32_count(value: Option<String>) -> Option<u32> {
-    value.and_then(|value| value.parse().ok())
+fn parse_u32_count(source: Option<String>) -> Option<u32> {
+    source.and_then(|text| text.parse().ok())
 }

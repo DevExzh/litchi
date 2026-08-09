@@ -314,6 +314,7 @@ impl TextRun {
 
     /// Create a text run with MTEF formula AST fallback (when formula feature is disabled).
     #[cfg(not(feature = "formula"))]
+    #[must_use]
     pub fn with_mtef_formula(
         text: String,
         start_index: usize,
@@ -349,6 +350,7 @@ impl TextRun {
     }
 
     #[cfg(not(feature = "formula"))]
+    #[must_use]
     pub fn mtef_formula_ast(&self) -> Option<&Vec<()>> {
         self.mtef_formula_ast.as_ref()
     }

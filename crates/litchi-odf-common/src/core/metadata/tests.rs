@@ -1,5 +1,10 @@
 //! Focused tests for the ODF metadata model and XML codec.
 
+#![allow(
+    clippy::unwrap_used,
+    reason = "Fixed XML fixtures use infallible parsing setup so assertions can focus on metadata values."
+)]
+
 use super::*;
 use litchi_core::Metadata as CoreMetadata;
 

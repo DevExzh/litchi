@@ -133,6 +133,20 @@ impl MutableSpreadsheet {
         self.spreadsheet.charts()
     }
 
+    /// Capture embedded charts as an explicit immutable transaction snapshot.
+    pub fn chart_snapshot(&self) -> Result<crate::charts::Snapshot> {
+        self.spreadsheet.chart_snapshot()
+    }
+
+    /// Apply an exact-source embedded-chart patch and rehydrate the spreadsheet.
+    pub fn apply_chart_patch(&mut self, patch: &crate::charts::Patch) -> Result<()> {
+        let commit = patch.apply(&self.chart_snapshot()?)?;
+        if commit.changed() {
+            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(())
+    }
+
     /// Clone-stage chart replacements and publish them as one package edit.
     ///
     /// A failed closure or commit leaves this mutable facade unchanged. An
@@ -154,6 +168,21 @@ impl MutableSpreadsheet {
     /// Discover the typed DataPilot catalog in the current package snapshot.
     pub fn data_pilots(&self) -> Result<crate::data_pilot::Catalog<'_>> {
         self.spreadsheet.data_pilots()
+    }
+
+    /// Capture an immutable, exact-source DataPilot snapshot for explicit
+    /// `Snapshot` → `Edit` → `Commit` → `Patch` workflows.
+    pub fn data_pilot_snapshot(&self) -> Result<crate::data_pilot::Snapshot> {
+        self.spreadsheet.data_pilot_snapshot()
+    }
+
+    /// Apply an exact-source DataPilot patch and rehydrate the full spreadsheet.
+    pub fn apply_data_pilot_patch(&mut self, patch: &crate::data_pilot::Patch) -> Result<()> {
+        let commit = patch.apply(&self.data_pilot_snapshot()?)?;
+        if commit.changed() {
+            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(())
     }
 
     /// Clone-stage DataPilot CRUD and publish it as one package edit.

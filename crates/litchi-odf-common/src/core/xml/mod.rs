@@ -14,5 +14,9 @@ mod tests;
 
 pub use content::Content;
 pub use meta::Meta;
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`XmlPart` is the established public name for the shared XML storage type."
+)]
 pub use part::XmlPart;
 pub use styles::Styles;

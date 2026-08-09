@@ -46,3 +46,26 @@ fn source_feature_boundary_rejects_entities_bad_context_and_limits() {
         SourceFeatures::parse_with(XML, SourceFeatureLimits::default().with_events(2)).is_err()
     );
 }
+
+#[test]
+fn conditional_formats_and_sparklines_are_counted_per_sheet_under_exact_limits()
+-> litchi_core::Result<()> {
+    let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0"><office:body><office:spreadsheet><table:table table:name="First"><calcext:conditional-formats><calcext:conditional-format/><calcext:conditional-format/></calcext:conditional-formats><calcext:sparkline-groups><calcext:sparkline-group/></calcext:sparkline-groups></table:table><table:table table:name="Second"><calcext:conditional-formats><calcext:conditional-format/></calcext:conditional-formats><calcext:sparkline-groups><calcext:sparkline-group/><calcext:sparkline-group/></calcext:sparkline-groups></table:table></office:spreadsheet></office:body></office:document-content>"#;
+    let snapshot =
+        SourceFeatures::parse_with(xml, SourceFeatureLimits::default().with_items_per_sheet(2))?;
+    let first = snapshot
+        .sheet("First")
+        .ok_or_else(|| litchi_core::Error::InvalidFormat("missing First sheet".to_string()))?;
+    let second = snapshot
+        .sheet("Second")
+        .ok_or_else(|| litchi_core::Error::InvalidFormat("missing Second sheet".to_string()))?;
+    assert_eq!(first.conditional_format_count(), 2);
+    assert_eq!(first.sparkline_group_count(), 1);
+    assert_eq!(second.conditional_format_count(), 1);
+    assert_eq!(second.sparkline_group_count(), 2);
+    assert!(
+        SourceFeatures::parse_with(xml, SourceFeatureLimits::default().with_items_per_sheet(1))
+            .is_err()
+    );
+    Ok(())
+}

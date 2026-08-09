@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        reason = "Fixed in-memory package fixtures use direct assertion setup."
+    )
+)]
+
 use litchi_odf_common::{
     constants,
     core::{OwnedPackage, PackageWriter},
@@ -40,7 +48,7 @@ fn script_markup_and_resources_are_updated_as_inert_package_bytes() {
     let content = String::from_utf8(source.get_file(constants::ODF_CONTENT).unwrap()).unwrap();
     let value = content.find(">one<").unwrap() + 1;
     let updated_content = splice(&content, value, value + "one".len(), "two").unwrap();
-    let updated = rebuild_package(
+    let updated_bytes = rebuild_package(
         &source,
         &updated_content,
         vec![Addition {
@@ -53,7 +61,7 @@ fn script_markup_and_resources_are_updated_as_inert_package_bytes() {
         Vec::new(),
     )
     .unwrap();
-    let updated = OwnedPackage::from_bytes(updated).unwrap();
+    let updated = OwnedPackage::from_bytes(updated_bytes).unwrap();
     let updated_xml = String::from_utf8(updated.get_file(constants::ODF_CONTENT).unwrap()).unwrap();
     assert!(updated_xml.contains("<litchi:payload>two</litchi:payload>"));
     assert!(updated_xml.contains(LINK));

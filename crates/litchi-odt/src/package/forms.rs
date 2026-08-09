@@ -633,7 +633,9 @@ fn scan(xml: &str) -> Result<Scan> {
                     && ns == NamespaceKind::Form
                     && control_local(local)
                 {
-                    let item = active_control.take().expect("active form control");
+                    let item = active_control.take().ok_or_else(|| {
+                        Error::InvalidFormat("form XML lost its active form control".to_string())
+                    })?;
                     controls.push(Span {
                         start: item.start,
                         end,
@@ -645,7 +647,9 @@ fn scan(xml: &str) -> Result<Scan> {
                     && ns == NamespaceKind::Form
                     && local == b"form"
                 {
-                    let (_, _, item) = active_forms.pop().expect("active form");
+                    let (_, _, item) = active_forms.pop().ok_or_else(|| {
+                        Error::InvalidFormat("form XML lost its active form".to_string())
+                    })?;
                     forms.push(Span {
                         start: item.start,
                         end,
@@ -658,7 +662,11 @@ fn scan(xml: &str) -> Result<Scan> {
                     && local == b"forms"
                 {
                     let (_, group_start, group_index, name) =
-                        active_groups.pop().expect("active forms");
+                        active_groups.pop().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "form XML lost its active office:forms element".to_string(),
+                            )
+                        })?;
                     groups.push(Span {
                         start: group_start,
                         end,

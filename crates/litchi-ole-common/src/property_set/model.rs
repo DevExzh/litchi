@@ -1,21 +1,21 @@
 //! Semantic OLE Property Set values, sections, streams, and metadata projections.
 
+#[path = "model/composite.rs"]
+mod composite;
+
 use chrono::{DateTime, Duration, Utc};
 use litchi_cfb::OleError;
-use litchi_cfb::consts::*;
+use litchi_cfb::consts::{
+    VT_BOOL, VT_BSTR, VT_CF, VT_CLSID, VT_CY, VT_DATE, VT_DECIMAL, VT_ERROR, VT_FILETIME, VT_I1,
+    VT_I2, VT_I4, VT_I8, VT_INT, VT_LPSTR, VT_LPWSTR, VT_R4, VT_R8, VT_UI1, VT_UI2, VT_UI4, VT_UI8,
+    VT_UINT, VT_VARIANT,
+};
 use litchi_codepage::Mbcs;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::hash::{Hash, Hasher};
 
-#[path = "model/composite.rs"]
-mod composite;
-
 pub use composite::{DocParts, HeadingPair, HeadingPairs, TextEncoding};
-
-fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> OleError {
-    OleError::Allocation { resource, source }
-}
 
 pub(crate) const DEFAULT_CODEPAGE: u16 = 1252;
 pub(crate) const UNICODE_CODEPAGE: u16 = 1200;
@@ -30,154 +30,18 @@ pub(crate) const MAX_NAMED_PROPERTY_ID: u32 = 0x7fff_ffff;
 pub(crate) const MAX_COMPOSITE_ELEMENTS: usize = 1_000_000;
 pub(crate) const VT_ARRAY: u16 = 0x2000;
 pub(crate) const VT_VERSIONED_STREAM: u16 = 0x0049;
+const MAX_ARRAY_ELEMENTS: usize = 1_000_000;
+const MAX_ARRAY_DIMENSIONS: usize = 31;
 
-pub(crate) fn try_vec_with_capacity<T>(
-    capacity: usize,
-    resource: &'static str,
-) -> Result<Vec<T>, OleError> {
-    let mut values = Vec::new();
-    values
-        .try_reserve_exact(capacity)
-        .map_err(|source| allocation(resource, source))?;
-    Ok(values)
-}
-
-pub(crate) fn try_hash_map_with_capacity<K, V>(
-    capacity: usize,
-    resource: &'static str,
-) -> Result<HashMap<K, V>, OleError>
-where
-    K: Eq + Hash,
-{
-    let mut values = HashMap::new();
-    values
-        .try_reserve(capacity)
-        .map_err(|source| allocation(resource, source))?;
-    Ok(values)
-}
-
-pub(crate) fn try_hash_set_with_capacity<T>(
-    capacity: usize,
-    resource: &'static str,
-) -> Result<HashSet<T>, OleError>
-where
-    T: Eq + Hash,
-{
-    let mut values = HashSet::new();
-    values
-        .try_reserve(capacity)
-        .map_err(|source| allocation(resource, source))?;
-    Ok(values)
-}
-
-pub(crate) fn try_clone_vec<T: Clone>(
-    source: &[T],
-    resource: &'static str,
-) -> Result<Vec<T>, OleError> {
-    let mut values = try_vec_with_capacity(source.len(), resource)?;
-    values.extend(source.iter().cloned());
-    Ok(values)
-}
-
-pub(crate) fn try_copy_bytes(source: &[u8], resource: &'static str) -> Result<Vec<u8>, OleError> {
-    let mut values = try_vec_with_capacity(source.len(), resource)?;
-    values.extend_from_slice(source);
-    Ok(values)
-}
-
-pub(crate) fn try_clone_string(source: &str, resource: &'static str) -> Result<String, OleError> {
-    let mut value = String::new();
-    value
-        .try_reserve_exact(source.len())
-        .map_err(|source| allocation(resource, source))?;
-    value.push_str(source);
-    Ok(value)
-}
-
-pub(crate) fn checked_u32(value: usize, description: &str) -> Result<u32, OleError> {
-    u32::try_from(value).map_err(|_| invalid(format!("{description} exceeds u32")))
-}
-
-pub(crate) fn checked_add(
-    value: usize,
-    additional: usize,
-    description: &str,
-) -> Result<usize, OleError> {
-    value
-        .checked_add(additional)
-        .ok_or_else(|| invalid(format!("{description} overflow")))
-}
-
-pub(crate) fn checked_mul(
-    value: usize,
-    multiplier: usize,
-    description: &str,
-) -> Result<usize, OleError> {
-    value
-        .checked_mul(multiplier)
-        .ok_or_else(|| invalid(format!("{description} overflow")))
-}
-
-pub(crate) fn align4_len(value: usize, description: &str) -> Result<usize, OleError> {
-    checked_add(value, 3, description).map(|value| value & !3)
-}
-
-pub(crate) fn valid_property_identifier(identifier: u32) -> bool {
-    matches!(
-        identifier,
-        PID_DICTIONARY | PID_CODEPAGE | PID_LOCALE | PID_BEHAVIOR
-    ) || (2..=MAX_NAMED_PROPERTY_ID).contains(&identifier)
-}
-
-pub(crate) fn valid_named_property_identifier(identifier: u32) -> bool {
-    (2..=MAX_NAMED_PROPERTY_ID).contains(&identifier)
-}
-
-pub(crate) fn validate_property_name(name: &str) -> Result<(), OleError> {
-    if name.is_empty() || name.chars().any(|value| value == '\0') {
-        Err(invalid("Property names must be nonempty and NUL-free"))
-    } else {
-        Ok(())
-    }
-}
-
-fn indirect_property_identifier(name: &str) -> Result<u32, OleError> {
-    let digits = name
-        .strip_prefix("prop")
-        .ok_or_else(|| invalid("Indirect property name must start with 'prop'"))?;
-    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-        return Err(invalid(
-            "Indirect property name must contain a decimal property identifier",
-        ));
-    }
-    let identifier = digits
-        .parse::<u32>()
-        .map_err(|_| invalid("Indirect property identifier is too large"))?;
-    if !valid_named_property_identifier(identifier) {
-        return Err(invalid(
-            "Indirect property name cannot reference a special property",
-        ));
-    }
-    Ok(identifier)
-}
-
-fn make_indirect_property_name(identifier: u32) -> Result<String, OleError> {
-    if !valid_named_property_identifier(identifier) {
-        return Err(invalid(
-            "Versioned stream property identifier must be a non-special property",
-        ));
-    }
-    let mut name = String::new();
-    name.try_reserve_exact(14)
-        .map_err(|source| allocation("indirect property name", source))?;
-    name.write_fmt(format_args!("prop{identifier}"))
-        .map_err(|_| invalid("Could not construct indirect property name"))?;
-    Ok(name)
-}
-
-pub(crate) fn invalid(message: impl Into<String>) -> OleError {
-    OleError::InvalidFormat(message.into())
-}
+pub const SUMMARY_INFORMATION_FMTID: Guid = Guid::from_bytes([
+    0xE0, 0x85, 0x9F, 0xF2, 0xF9, 0x4F, 0x68, 0x10, 0xAB, 0x91, 0x08, 0x00, 0x2B, 0x27, 0xB3, 0xD9,
+]);
+pub const DOCUMENT_SUMMARY_INFORMATION_FMTID: Guid = Guid::from_bytes([
+    0x02, 0xD5, 0xCD, 0xD5, 0x9C, 0x2E, 0x1B, 0x10, 0x93, 0x97, 0x08, 0x00, 0x2B, 0x2C, 0xF9, 0xAE,
+]);
+pub const USER_DEFINED_PROPERTIES_FMTID: Guid = Guid::from_bytes([
+    0x05, 0xD5, 0xCD, 0xD5, 0x9C, 0x2E, 0x1B, 0x10, 0x93, 0x97, 0x08, 0x00, 0x2B, 0x2C, 0xF9, 0xAE,
+]);
 
 #[derive(Clone, Copy)]
 pub(crate) struct AsciiInsensitive<'a>(pub(crate) &'a str);
@@ -204,10 +68,12 @@ impl Hash for AsciiInsensitive<'_> {
 pub struct Guid([u8; 16]);
 
 impl Guid {
+    #[must_use]
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
 
+    #[must_use]
     pub const fn as_bytes(&self) -> &[u8; 16] {
         &self.0
     }
@@ -236,6 +102,7 @@ impl CodePage {
     }
 
     /// Numeric identifier stored in PID 1.
+    #[must_use]
     pub const fn id(self) -> u16 {
         match self {
             Self::Utf16Le => UNICODE_CODEPAGE,
@@ -258,6 +125,11 @@ pub struct VersionedStream {
 
 impl VersionedStream {
     /// Create a versioned-stream value for a property identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `property_identifier` is reserved or cannot be
+    /// represented by an indirect property name.
     pub fn new(version_guid: Guid, property_identifier: u32) -> Result<Self, OleError> {
         Ok(Self {
             version_guid,
@@ -266,11 +138,13 @@ impl VersionedStream {
     }
 
     /// The application-specific version GUID stored in the packet.
+    #[must_use]
     pub const fn version_guid(&self) -> Guid {
         self.version_guid
     }
 
     /// The inert CFB stream selector (`prop` followed by the property ID).
+    #[must_use]
     pub fn stream_name(&self) -> &str {
         &self.stream_name
     }
@@ -324,6 +198,7 @@ pub struct Section {
 }
 
 impl Section {
+    #[must_use]
     pub fn new(format_identifier: Guid) -> Self {
         Self {
             format_identifier,
@@ -334,6 +209,7 @@ impl Section {
             dictionary_order: Vec::new(),
         }
     }
+    #[must_use]
     pub fn property(&self, identifier: u32) -> Option<&Value> {
         self.properties.get(&identifier)
     }
@@ -363,6 +239,7 @@ impl Section {
         })
     }
 
+    #[must_use]
     pub fn find_named(&self, name: &str) -> Option<(u32, &Value)> {
         self.dictionary_order.iter().find_map(|identifier| {
             self.dictionary
@@ -376,6 +253,12 @@ impl Section {
         })
     }
 
+    /// Adds a non-reserved property while preserving descriptor order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `identifier` is reserved or already present, or if
+    /// allocating storage for the property fails.
     pub fn add(&mut self, identifier: u32, value: Value) -> Result<(), OleError> {
         if !valid_property_identifier(identifier)
             || matches!(identifier, PID_DICTIONARY | PID_CODEPAGE)
@@ -396,6 +279,12 @@ impl Section {
         Ok(())
     }
 
+    /// Adds a named property and its dictionary entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the identifier or name is invalid or duplicated, or
+    /// if allocating storage for the property and dictionary fails.
     pub fn add_named(
         &mut self,
         identifier: u32,
@@ -447,6 +336,12 @@ impl Section {
         Ok(())
     }
 
+    /// Replaces an existing non-code-page property.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `identifier` is the code-page property or does not
+    /// identify an existing property.
     pub fn update(&mut self, identifier: u32, value: Value) -> Result<Value, OleError> {
         if identifier == PID_CODEPAGE {
             return Err(invalid("Use set_page to update PID 1"));
@@ -491,6 +386,12 @@ impl Section {
         self.remove(identifier)
     }
 
+    /// Creates or changes the name for an existing regular property.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the identifier or name is invalid or duplicated, the
+    /// property does not exist, or allocating dictionary storage fails.
     pub fn rename(&mut self, identifier: u32, name: String) -> Result<(), OleError> {
         if identifier == PID_CODEPAGE || !valid_named_property_identifier(identifier) {
             return Err(invalid("PID 1 cannot be a named property"));
@@ -531,9 +432,15 @@ impl Section {
         Ok(())
     }
 
+    /// Reorders property descriptors without changing their values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `order` does not contain every current descriptor
+    /// exactly once or cloning the order fails.
     pub fn reorder(&mut self, order: &[u32]) -> Result<(), OleError> {
-        let current = try_hash_set_with_capacity(self.property_order.len(), "property order set")?;
-        let mut current = current;
+        let mut current =
+            try_hash_set_with_capacity(self.property_order.len(), "property order set")?;
         for identifier in self.property_order.iter().copied() {
             current.insert(identifier);
         }
@@ -559,6 +466,7 @@ impl Section {
     }
 
     /// Return the checked text page declared by PID 1.
+    #[must_use]
     pub const fn page(&self) -> Option<CodePage> {
         self.codepage
     }
@@ -567,14 +475,20 @@ impl Section {
     pub fn set_page(&mut self, page: CodePage) {
         let codepage = page.id();
         self.codepage = Some(page);
-        self.properties
-            .insert(PID_CODEPAGE, Value::I2(codepage as i16));
+        self.properties.insert(
+            PID_CODEPAGE,
+            Value::I2(i16::from_ne_bytes(codepage.to_ne_bytes())),
+        );
         if !self.property_order.contains(&PID_CODEPAGE) {
             self.property_order.insert(0, PID_CODEPAGE);
         }
     }
 
     /// Validate a raw identifier and set PID 1.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `page` is not a supported Property Set code page.
     pub fn set_page_id(&mut self, page: u16) -> Result<(), OleError> {
         self.set_page(CodePage::try_from(page)?);
         Ok(())
@@ -588,7 +502,7 @@ impl Section {
     }
 }
 
-/// Metadata projected from SummaryInformation and DocumentSummaryInformation.
+/// Metadata projected from `SummaryInformation` and `DocumentSummaryInformation`.
 #[derive(Debug, Clone, Default)]
 pub struct Metadata {
     pub codepage: Option<u32>,
@@ -649,6 +563,7 @@ pub enum Scalar {
 }
 
 impl Scalar {
+    #[must_use]
     pub const fn raw(self) -> u16 {
         match self {
             Self::I2 => VT_I2,
@@ -726,17 +641,23 @@ impl Scalar {
     }
 
     pub(crate) fn matches_value(self, value: &Value) -> bool {
-        match self {
-            Self::Variant => scalar_of(value).is_some_and(Self::allows_array_variant_element),
-            _ => scalar_of(value) == Some(self),
-        }
+        scalar_of(value).is_some_and(|value_scalar| {
+            if self == Self::Variant {
+                value_scalar.allows_array_variant_element()
+            } else {
+                value_scalar == self
+            }
+        })
     }
 
     pub(crate) fn matches_vector_value(self, value: &Value) -> bool {
-        match self {
-            Self::Variant => scalar_of(value).is_some_and(Self::allows_vector_variant_element),
-            _ => scalar_of(value) == Some(self),
-        }
+        scalar_of(value).is_some_and(|value_scalar| {
+            if self == Self::Variant {
+                value_scalar.allows_vector_variant_element()
+            } else {
+                value_scalar == self
+            }
+        })
     }
 
     const fn allows_array_variant_element(self) -> bool {
@@ -766,23 +687,23 @@ pub struct Dimension {
 
 impl Dimension {
     /// Creates a dimension with an explicit element count and lower bound.
+    #[must_use]
     pub const fn new(size: u32, index_offset: i32) -> Self {
         Self { size, index_offset }
     }
 
     /// Number of elements along this dimension.
+    #[must_use]
     pub const fn size(self) -> u32 {
         self.size
     }
 
     /// Lower-bound index offset for this dimension.
+    #[must_use]
     pub const fn index_offset(self) -> i32 {
         self.index_offset
     }
 }
-
-const MAX_ARRAY_ELEMENTS: usize = 1_000_000;
-const MAX_ARRAY_DIMENSIONS: usize = 31;
 
 /// A checked, row-major multi-dimensional OLE property array.
 #[derive(Debug, Clone, PartialEq)]
@@ -794,6 +715,11 @@ pub struct Array {
 
 impl Array {
     /// Creates an array after checking scalar type, dimensions, and element count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the scalar is unsupported, the dimensions or count
+    /// are invalid, or an element has the wrong scalar type.
     pub fn new(
         scalar: Scalar,
         dimensions: Vec<Dimension>,
@@ -808,26 +734,35 @@ impl Array {
     }
 
     /// Creates a variable-typed array whose elements carry their own VARIANT types.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the dimensions or count are invalid, or an element
+    /// is not permitted in a variant array.
     pub fn variant(dimensions: Vec<Dimension>, values: Vec<Value>) -> Result<Self, OleError> {
         Self::new(Scalar::Variant, dimensions, values)
     }
 
     /// Returns the array scalar type.
+    #[must_use]
     pub const fn scalar(&self) -> Scalar {
         self.scalar
     }
 
     /// Returns dimensions in wire order; the final dimension varies fastest.
+    #[must_use]
     pub fn dimensions(&self) -> &[Dimension] {
         &self.dimensions
     }
 
     /// Returns row-major values without materializing nested vectors.
+    #[must_use]
     pub fn values(&self) -> &[Value] {
         &self.values
     }
 
     /// Returns one row-major value by checked zero-based offset.
+    #[must_use]
     pub fn value(&self, index: usize) -> Option<&Value> {
         self.values.get(index)
     }
@@ -846,33 +781,205 @@ pub struct Vector {
 
 impl Vector {
     /// Creates a vector after checking scalar type and element values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the scalar is unsupported, the vector is too large,
+    /// or an element has the wrong scalar type.
     pub fn new(scalar: Scalar, values: Vec<Value>) -> Result<Self, OleError> {
         validate_vector_parts(scalar, &values)?;
         Ok(Self { scalar, values })
     }
 
     /// Creates a variable-typed vector whose elements carry their own VARIANT types.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the vector is too large or contains an unsupported
+    /// variant element.
     pub fn variant(values: Vec<Value>) -> Result<Self, OleError> {
         Self::new(Scalar::Variant, values)
     }
 
     /// Returns the vector scalar type.
+    #[must_use]
     pub const fn scalar(&self) -> Scalar {
         self.scalar
     }
 
     /// Returns vector values without materializing another collection.
+    #[must_use]
     pub fn values(&self) -> &[Value] {
         &self.values
     }
 
     /// Returns one vector value by checked zero-based offset.
+    #[must_use]
     pub fn value(&self, index: usize) -> Option<&Value> {
         self.values.get(index)
     }
 
     pub(crate) fn validate(&self) -> Result<(), OleError> {
         validate_vector_parts(self.scalar, &self.values)
+    }
+}
+
+/// A typed OLE property value. Unsupported variants retain their bounded raw bytes.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Value {
+    Empty,
+    Null,
+    I1(i8),
+    UI1(u8),
+    I2(i16),
+    UI2(u16),
+    I4(i32),
+    UI4(u32),
+    I8(i64),
+    UI8(u64),
+    Int(i32),
+    UInt(u32),
+    R4(f32),
+    R8(f64),
+    Currency(i64),
+    Date(f64),
+    Bstr(String),
+    Error(u32),
+    Bool(bool),
+    Decimal([u8; 16]),
+    Lpstr(String),
+    Lpwstr(String),
+    Filetime(u64),
+    Blob(Vec<u8>),
+    Clipboard { format: i32, data: Vec<u8> },
+    Clsid(Guid),
+    VersionedStream(VersionedStream),
+    HeadingPairs(HeadingPairs),
+    DocParts(DocParts),
+    Vector(Vector),
+    Array(Array),
+    Unknown { variant_type: u16, data: Vec<u8> },
+}
+
+impl Stream {
+    /// Version 0 property sets use only the original OLE Property Set types.
+    pub const VERSION_0: u16 = 0;
+    /// Version 1 property sets add the versioned numeric families.
+    pub const VERSION_1: u16 = 1;
+
+    #[must_use]
+    pub fn new(section: Section) -> Self {
+        Self {
+            version: Self::VERSION_0,
+            system_identifier: 0,
+            class_identifier: Guid::from_bytes([0; 16]),
+            sections: vec![section],
+        }
+    }
+    #[must_use]
+    pub fn section(&self, format_identifier: Guid) -> Option<&Section> {
+        self.sections
+            .iter()
+            .find(|section| section.format_identifier == format_identifier)
+    }
+    pub fn section_mut(&mut self, format_identifier: Guid) -> Option<&mut Section> {
+        self.sections
+            .iter_mut()
+            .find(|section| section.format_identifier == format_identifier)
+    }
+    /// Adds a distinct section to the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream already has two sections, the FMTID is
+    /// duplicated, or allocating section storage fails.
+    pub fn add_section(&mut self, section: Section) -> Result<(), OleError> {
+        if self.sections.len() == 2 || self.section(section.format_identifier).is_some() {
+            return Err(invalid("Duplicate or excess Property Set section"));
+        }
+        self.sections
+            .try_reserve(1)
+            .map_err(|source| allocation("property-set sections", source))?;
+        self.sections.push(section);
+        Ok(())
+    }
+    pub fn remove_section(&mut self, format_identifier: Guid) -> Option<Section> {
+        let index = self
+            .sections
+            .iter()
+            .position(|section| section.format_identifier == format_identifier)?;
+        Some(self.sections.remove(index))
+    }
+    /// Reorders all sections without changing their contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `order` is incomplete or duplicated, references an
+    /// unknown FMTID, or cloning the sections fails.
+    pub fn reorder_sections(&mut self, order: &[Guid]) -> Result<(), OleError> {
+        if order.len() != self.sections.len() {
+            return Err(invalid("Section reorder is incomplete or duplicated"));
+        }
+        let mut proposed = try_hash_set_with_capacity(order.len(), "section reorder set")?;
+        for identifier in order.iter().copied() {
+            proposed.insert(identifier);
+        }
+        if proposed.len() != order.len() {
+            return Err(invalid("Section reorder is incomplete or duplicated"));
+        }
+        let mut reordered = try_vec_with_capacity(order.len(), "property-set sections")?;
+        for id in order {
+            let index = self
+                .sections
+                .iter()
+                .position(|section| section.format_identifier == *id)
+                .ok_or_else(|| invalid("Section reorder references an unknown format ID"))?;
+            reordered.push(try_clone_property_set(&self.sections[index])?);
+        }
+        self.sections = reordered;
+        Ok(())
+    }
+    pub fn clear_sections(&mut self) {
+        self.sections.clear();
+    }
+}
+
+impl From<Metadata> for litchi_core::Metadata {
+    fn from(ole_metadata: Metadata) -> Self {
+        litchi_core::Metadata {
+            title: ole_metadata.title,
+            subject: ole_metadata.subject,
+            author: ole_metadata.author,
+            keywords: ole_metadata.keywords,
+            description: ole_metadata.comments,
+            identifier: None,
+            language: None,
+            template: ole_metadata.template,
+            last_modified_by: ole_metadata.last_saved_by,
+            revision: ole_metadata.revision_number,
+            created: ole_metadata.create_time,
+            created_local: None,
+            modified: ole_metadata.last_saved_time,
+            modified_local: None,
+            page_count: ole_metadata.num_pages,
+            word_count: ole_metadata.num_words,
+            character_count: ole_metadata.num_chars,
+            character_count_with_spaces: None,
+            editing_time_minutes: None,
+            application: ole_metadata.creating_application,
+            category: ole_metadata.category,
+            company: ole_metadata.company,
+            manager: ole_metadata.manager,
+            content_status: None,
+            content_type: None,
+            version: None,
+            last_printed_time: ole_metadata.last_printed_time,
+            last_printed_local: None,
+            last_backup_local: None,
+            hyperlink_base: None,
+            security: ole_metadata.security,
+            codepage: ole_metadata.codepage,
+        }
     }
 }
 
@@ -913,7 +1020,7 @@ fn validate_array_parts(
         count
             .checked_mul(
                 usize::try_from(dimension.size)
-                    .map_err(|_| invalid("OLE array dimension is too large"))?,
+                    .map_err(|_conversion_error| invalid("OLE array dimension is too large"))?,
             )
             .ok_or_else(|| invalid("OLE array element count overflows usize"))
     })?;
@@ -934,45 +1041,8 @@ fn validate_array_parts(
     Ok(())
 }
 
-/// A typed OLE property value. Unsupported variants retain their bounded raw bytes.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
-    Empty,
-    Null,
-    I1(i8),
-    UI1(u8),
-    I2(i16),
-    UI2(u16),
-    I4(i32),
-    UI4(u32),
-    I8(i64),
-    UI8(u64),
-    Int(i32),
-    UInt(u32),
-    R4(f32),
-    R8(f64),
-    Currency(i64),
-    Date(f64),
-    Bstr(String),
-    Error(u32),
-    Bool(bool),
-    Decimal([u8; 16]),
-    Lpstr(String),
-    Lpwstr(String),
-    Filetime(u64),
-    Blob(Vec<u8>),
-    Clipboard { format: i32, data: Vec<u8> },
-    Clsid(Guid),
-    VersionedStream(VersionedStream),
-    HeadingPairs(HeadingPairs),
-    DocParts(DocParts),
-    Vector(Vector),
-    Array(Array),
-    Unknown { variant_type: u16, data: Vec<u8> },
-}
-
-fn scalar_of(value: &Value) -> Option<Scalar> {
-    Some(match value {
+fn scalar_of(property_value: &Value) -> Option<Scalar> {
+    Some(match property_value {
         Value::I2(_) => Scalar::I2,
         Value::I4(_) => Scalar::I4,
         Value::R4(_) => Scalar::R4,
@@ -996,12 +1066,20 @@ fn scalar_of(value: &Value) -> Option<Scalar> {
         Value::Lpwstr(_) => Scalar::Lpwstr,
         Value::Filetime(_) => Scalar::Filetime,
         Value::Clipboard { .. } => Scalar::Clipboard,
-        _ => return None,
+        Value::Empty
+        | Value::Null
+        | Value::Blob(_)
+        | Value::VersionedStream(_)
+        | Value::HeadingPairs(_)
+        | Value::DocParts(_)
+        | Value::Vector(_)
+        | Value::Array(_)
+        | Value::Unknown { .. } => return None,
     })
 }
 
-pub(crate) fn try_clone_property_value(value: &Value) -> Result<Value, OleError> {
-    Ok(match value {
+pub(crate) fn try_clone_property_value(property_value: &Value) -> Result<Value, OleError> {
+    Ok(match property_value {
         Value::Empty => Value::Empty,
         Value::Null => Value::Null,
         Value::I1(value) => Value::I1(*value),
@@ -1088,120 +1166,154 @@ pub(crate) fn try_clone_property_set(section: &Section) -> Result<Section, OleEr
     })
 }
 
-impl Stream {
-    /// Version 0 property sets use only the original OLE Property Set types.
-    pub const VERSION_0: u16 = 0;
-    /// Version 1 property sets add the versioned numeric families.
-    pub const VERSION_1: u16 = 1;
+fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> OleError {
+    OleError::Allocation { resource, source }
+}
 
-    pub fn new(section: Section) -> Self {
-        Self {
-            version: Self::VERSION_0,
-            system_identifier: 0,
-            class_identifier: Guid::from_bytes([0; 16]),
-            sections: vec![section],
-        }
-    }
-    pub fn section(&self, format_identifier: Guid) -> Option<&Section> {
-        self.sections
-            .iter()
-            .find(|section| section.format_identifier == format_identifier)
-    }
-    pub fn section_mut(&mut self, format_identifier: Guid) -> Option<&mut Section> {
-        self.sections
-            .iter_mut()
-            .find(|section| section.format_identifier == format_identifier)
-    }
-    pub fn add_section(&mut self, section: Section) -> Result<(), OleError> {
-        if self.sections.len() == 2 || self.section(section.format_identifier).is_some() {
-            return Err(invalid("Duplicate or excess Property Set section"));
-        }
-        self.sections
-            .try_reserve(1)
-            .map_err(|source| allocation("property-set sections", source))?;
-        self.sections.push(section);
+pub(crate) fn try_vec_with_capacity<T>(
+    capacity: usize,
+    resource: &'static str,
+) -> Result<Vec<T>, OleError> {
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(capacity)
+        .map_err(|source| allocation(resource, source))?;
+    Ok(values)
+}
+
+pub(crate) fn try_hash_map_with_capacity<K, V>(
+    capacity: usize,
+    resource: &'static str,
+) -> Result<HashMap<K, V>, OleError>
+where
+    K: Eq + Hash,
+{
+    let mut values = HashMap::new();
+    values
+        .try_reserve(capacity)
+        .map_err(|source| allocation(resource, source))?;
+    Ok(values)
+}
+
+pub(crate) fn try_hash_set_with_capacity<T>(
+    capacity: usize,
+    resource: &'static str,
+) -> Result<HashSet<T>, OleError>
+where
+    T: Eq + Hash,
+{
+    let mut values = HashSet::new();
+    values
+        .try_reserve(capacity)
+        .map_err(|source| allocation(resource, source))?;
+    Ok(values)
+}
+
+pub(crate) fn try_clone_vec<T: Clone>(
+    source: &[T],
+    resource: &'static str,
+) -> Result<Vec<T>, OleError> {
+    let mut values = try_vec_with_capacity(source.len(), resource)?;
+    values.extend(source.iter().cloned());
+    Ok(values)
+}
+
+pub(crate) fn try_copy_bytes(source: &[u8], resource: &'static str) -> Result<Vec<u8>, OleError> {
+    let mut values = try_vec_with_capacity(source.len(), resource)?;
+    values.extend_from_slice(source);
+    Ok(values)
+}
+
+pub(crate) fn try_clone_string(source: &str, resource: &'static str) -> Result<String, OleError> {
+    let mut value = String::new();
+    value
+        .try_reserve_exact(source.len())
+        .map_err(|allocation_error| allocation(resource, allocation_error))?;
+    value.push_str(source);
+    Ok(value)
+}
+
+pub(crate) fn checked_u32(value: usize, description: &str) -> Result<u32, OleError> {
+    u32::try_from(value).map_err(|_conversion_error| invalid(format!("{description} exceeds u32")))
+}
+
+pub(crate) fn checked_add(
+    value: usize,
+    additional: usize,
+    description: &str,
+) -> Result<usize, OleError> {
+    value
+        .checked_add(additional)
+        .ok_or_else(|| invalid(format!("{description} overflow")))
+}
+
+pub(crate) fn checked_mul(
+    value: usize,
+    multiplier: usize,
+    description: &str,
+) -> Result<usize, OleError> {
+    value
+        .checked_mul(multiplier)
+        .ok_or_else(|| invalid(format!("{description} overflow")))
+}
+
+pub(crate) fn align4_len(value: usize, description: &str) -> Result<usize, OleError> {
+    checked_add(value, 3, description).map(|aligned| aligned & !3)
+}
+
+pub(crate) fn valid_property_identifier(identifier: u32) -> bool {
+    matches!(
+        identifier,
+        PID_DICTIONARY | PID_CODEPAGE | PID_LOCALE | PID_BEHAVIOR
+    ) || (2..=MAX_NAMED_PROPERTY_ID).contains(&identifier)
+}
+
+pub(crate) fn valid_named_property_identifier(identifier: u32) -> bool {
+    (2..=MAX_NAMED_PROPERTY_ID).contains(&identifier)
+}
+
+pub(crate) fn validate_property_name(name: &str) -> Result<(), OleError> {
+    if name.is_empty() || name.chars().any(|value| value == '\0') {
+        Err(invalid("Property names must be nonempty and NUL-free"))
+    } else {
         Ok(())
-    }
-    pub fn remove_section(&mut self, format_identifier: Guid) -> Option<Section> {
-        let index = self
-            .sections
-            .iter()
-            .position(|section| section.format_identifier == format_identifier)?;
-        Some(self.sections.remove(index))
-    }
-    pub fn reorder_sections(&mut self, order: &[Guid]) -> Result<(), OleError> {
-        if order.len() != self.sections.len() {
-            return Err(invalid("Section reorder is incomplete or duplicated"));
-        }
-        let mut proposed = try_hash_set_with_capacity(order.len(), "section reorder set")?;
-        for identifier in order.iter().copied() {
-            proposed.insert(identifier);
-        }
-        if proposed.len() != order.len() {
-            return Err(invalid("Section reorder is incomplete or duplicated"));
-        }
-        let mut reordered = try_vec_with_capacity(order.len(), "property-set sections")?;
-        for id in order {
-            let index = self
-                .sections
-                .iter()
-                .position(|section| section.format_identifier == *id)
-                .ok_or_else(|| invalid("Section reorder references an unknown format ID"))?;
-            reordered.push(try_clone_property_set(&self.sections[index])?);
-        }
-        self.sections = reordered;
-        Ok(())
-    }
-    pub fn clear_sections(&mut self) {
-        self.sections.clear();
     }
 }
 
-pub const SUMMARY_INFORMATION_FMTID: Guid = Guid::from_bytes([
-    0xE0, 0x85, 0x9F, 0xF2, 0xF9, 0x4F, 0x68, 0x10, 0xAB, 0x91, 0x08, 0x00, 0x2B, 0x27, 0xB3, 0xD9,
-]);
-pub const DOCUMENT_SUMMARY_INFORMATION_FMTID: Guid = Guid::from_bytes([
-    0x02, 0xD5, 0xCD, 0xD5, 0x9C, 0x2E, 0x1B, 0x10, 0x93, 0x97, 0x08, 0x00, 0x2B, 0x2C, 0xF9, 0xAE,
-]);
-pub const USER_DEFINED_PROPERTIES_FMTID: Guid = Guid::from_bytes([
-    0x05, 0xD5, 0xCD, 0xD5, 0x9C, 0x2E, 0x1B, 0x10, 0x93, 0x97, 0x08, 0x00, 0x2B, 0x2C, 0xF9, 0xAE,
-]);
-
-impl From<Metadata> for litchi_core::Metadata {
-    fn from(ole_metadata: Metadata) -> Self {
-        litchi_core::Metadata {
-            title: ole_metadata.title,
-            subject: ole_metadata.subject,
-            author: ole_metadata.author,
-            keywords: ole_metadata.keywords,
-            description: ole_metadata.comments,
-            identifier: None,
-            language: None,
-            template: ole_metadata.template,
-            last_modified_by: ole_metadata.last_saved_by,
-            revision: ole_metadata.revision_number,
-            created: ole_metadata.create_time,
-            created_local: None,
-            modified: ole_metadata.last_saved_time,
-            modified_local: None,
-            page_count: ole_metadata.num_pages,
-            word_count: ole_metadata.num_words,
-            character_count: ole_metadata.num_chars,
-            character_count_with_spaces: None,
-            editing_time_minutes: None,
-            application: ole_metadata.creating_application,
-            category: ole_metadata.category,
-            company: ole_metadata.company,
-            manager: ole_metadata.manager,
-            content_status: None,
-            content_type: None,
-            version: None,
-            last_printed_time: ole_metadata.last_printed_time,
-            last_printed_local: None,
-            last_backup_local: None,
-            hyperlink_base: None,
-            security: ole_metadata.security,
-            codepage: ole_metadata.codepage,
-        }
+fn indirect_property_identifier(name: &str) -> Result<u32, OleError> {
+    let digits = name
+        .strip_prefix("prop")
+        .ok_or_else(|| invalid("Indirect property name must start with 'prop'"))?;
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(invalid(
+            "Indirect property name must contain a decimal property identifier",
+        ));
     }
+    let identifier = digits
+        .parse::<u32>()
+        .map_err(|_parse_error| invalid("Indirect property identifier is too large"))?;
+    if !valid_named_property_identifier(identifier) {
+        return Err(invalid(
+            "Indirect property name cannot reference a special property",
+        ));
+    }
+    Ok(identifier)
+}
+
+fn make_indirect_property_name(identifier: u32) -> Result<String, OleError> {
+    if !valid_named_property_identifier(identifier) {
+        return Err(invalid(
+            "Versioned stream property identifier must be a non-special property",
+        ));
+    }
+    let mut name = String::new();
+    name.try_reserve_exact(14)
+        .map_err(|source| allocation("indirect property name", source))?;
+    name.write_fmt(format_args!("prop{identifier}"))
+        .map_err(|_format_error| invalid("Could not construct indirect property name"))?;
+    Ok(name)
+}
+
+pub(crate) fn invalid(message: impl Into<String>) -> OleError {
+    OleError::InvalidFormat(message.into())
 }

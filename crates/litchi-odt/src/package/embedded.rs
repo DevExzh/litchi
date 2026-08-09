@@ -859,7 +859,11 @@ fn locate_images(xml: &str) -> Result<Vec<ObjectSpan>> {
                     && element.local_name().as_ref() == b"image"
                     && active.as_ref().is_some_and(|item| item.depth == depth)
                 {
-                    let item = active.take().expect("active image");
+                    let item = active.take().ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "image host XML lost its active draw:image element".to_string(),
+                        )
+                    })?;
                     spans.push(ObjectSpan {
                         start: item.start,
                         end,

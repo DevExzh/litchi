@@ -13,6 +13,11 @@ pub struct WString<'a> {
 
 impl<'a> WString<'a> {
     /// Construct a string from valid Rust UTF-8 text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` contains a NUL or exceeds the one-byte
+    /// `WString` length limit.
     pub fn new(value: &str) -> Result<Self, Error> {
         if value.contains('\0') {
             return Err(Error::invalid("WString cannot contain NUL characters"));
@@ -22,6 +27,11 @@ impl<'a> WString<'a> {
     }
 
     /// Construct a string from validated UTF-16 code units.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `units` contains a NUL or unpaired surrogate, or
+    /// exceeds the one-byte `WString` length limit.
     pub fn from_units(units: &[u16]) -> Result<Self, Error> {
         validate_units(units.iter().copied())?;
         let byte_len = units
@@ -43,7 +53,7 @@ impl<'a> WString<'a> {
     }
 
     pub(crate) fn from_wire(encoded: &'a [u8]) -> Result<Self, Error> {
-        if encoded.len() % 2 != 0 {
+        if !encoded.len().is_multiple_of(2) {
             return Err(Error::invalid("WString payload has an odd byte count"));
         }
         validate_units(encoded_units(encoded))?;
@@ -53,16 +63,19 @@ impl<'a> WString<'a> {
     }
 
     /// Return the number of UTF-16 code units in the string.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.encoded.len() / 2
     }
 
     /// Return whether the string is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.encoded.is_empty()
     }
 
     /// Return the original UTF-16LE payload without its one-byte length.
+    #[must_use]
     pub fn encoded_bytes(&self) -> &[u8] {
         &self.encoded
     }
@@ -73,12 +86,14 @@ impl<'a> WString<'a> {
     }
 
     /// Decode the string into owned Rust text.
+    #[must_use]
     pub fn text(&self) -> String {
         let units = self.units().collect::<Vec<_>>();
         String::from_utf16_lossy(&units)
     }
 
     /// Copy a borrowed string into an owned representation.
+    #[must_use]
     pub fn into_owned(self) -> WString<'static> {
         WString {
             encoded: Cow::Owned(self.encoded.into_owned()),
@@ -88,41 +103,6 @@ impl<'a> WString<'a> {
     pub(crate) fn encoded_len(&self) -> usize {
         self.encoded.len()
     }
-}
-
-fn encoded_units(bytes: &[u8]) -> impl Iterator<Item = u16> + '_ {
-    bytes
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-}
-
-fn validate_units(units: impl Iterator<Item = u16>) -> Result<(), Error> {
-    let mut pending_high = false;
-    for unit in units {
-        if unit == 0 {
-            return Err(Error::invalid("WString cannot contain NUL code units"));
-        }
-        if pending_high {
-            if !(0xDC00..=0xDFFF).contains(&unit) {
-                return Err(Error::invalid(
-                    "WString contains an unpaired UTF-16 surrogate",
-                ));
-            }
-            pending_high = false;
-        } else if (0xD800..=0xDBFF).contains(&unit) {
-            pending_high = true;
-        } else if (0xDC00..=0xDFFF).contains(&unit) {
-            return Err(Error::invalid(
-                "WString contains an unpaired UTF-16 surrogate",
-            ));
-        }
-    }
-    if pending_high {
-        return Err(Error::invalid(
-            "WString ends with an unpaired UTF-16 surrogate",
-        ));
-    }
-    Ok(())
 }
 
 /// Visibility mode stored in the two-bit `textIcon` field.
@@ -139,6 +119,7 @@ pub enum TextIcon {
 }
 
 impl TextIcon {
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::IconOnly => 0,
@@ -183,6 +164,7 @@ pub enum ButtonState {
 }
 
 impl ButtonState {
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::Up => 0,
@@ -197,7 +179,7 @@ impl ButtonState {
             0 => Self::Up,
             1 => Self::Down,
             3 => Self::Mixed,
-            value => Self::Unknown(value),
+            unknown => Self::Unknown(unknown),
         }
     }
 }
@@ -228,6 +210,7 @@ pub enum HyperlinkType {
 }
 
 impl HyperlinkType {
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::None => 0,
@@ -242,7 +225,7 @@ impl HyperlinkType {
             0 => Self::None,
             1 => Self::Browser,
             2 => Self::Image,
-            value => Self::Unknown(value),
+            unknown => Self::Unknown(unknown),
         }
     }
 }
@@ -267,6 +250,7 @@ pub struct ButtonFlags {
 
 impl ButtonFlags {
     /// Retain a raw wire value, including the reserved bit.
+    #[must_use]
     pub const fn from_raw(raw: u8) -> Self {
         Self { raw }
     }
@@ -274,6 +258,10 @@ impl ButtonFlags {
     /// Construct from a raw value after checking the two reserved
     /// discriminants. The final reserved bit is advisory in [MS-OSHARED]
     /// and is therefore retained without rejection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either reserved two-bit discriminator is selected.
     pub fn try_from_raw(raw: u8) -> Result<Self, Error> {
         let value = Self::from_raw(raw);
         value.validate()?;
@@ -281,55 +269,67 @@ impl ButtonFlags {
     }
 
     /// Return the exact serialized flag byte.
+    #[must_use]
     pub const fn raw(self) -> u8 {
         self.raw
     }
 
     /// Return the advisory reserved bit exactly as stored.
+    #[must_use]
     pub const fn reserved_bits(self) -> u8 {
         self.raw & 0x80
     }
 
+    #[must_use]
     pub const fn state(self) -> ButtonState {
         ButtonState::from_raw(self.raw)
     }
 
+    #[must_use]
     pub const fn accelerator(self) -> bool {
         self.raw & (1 << 2) != 0
     }
 
+    #[must_use]
     pub const fn custom_bitmap(self) -> bool {
         self.raw & (1 << 3) != 0
     }
 
+    #[must_use]
     pub const fn custom_button_face(self) -> bool {
         self.raw & (1 << 4) != 0
     }
 
+    #[must_use]
     pub const fn hyperlink(self) -> HyperlinkType {
         HyperlinkType::from_raw(self.raw >> 5)
     }
 
+    #[must_use]
     pub fn with_state(mut self, value: ButtonState) -> Self {
         self.raw = (self.raw & !0x03) | value.raw();
         self
     }
 
+    #[must_use]
     pub fn with_accelerator(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 2, value);
         self
     }
 
+    #[must_use]
     pub fn with_custom_bitmap(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 3, value);
         self
     }
 
+    #[must_use]
     pub fn with_custom_button_face(mut self, value: bool) -> Self {
         self.raw = set_bit(self.raw, 4, value);
         self
     }
 
+    #[must_use]
     pub fn with_hyperlink(mut self, value: HyperlinkType) -> Self {
         self.raw = (self.raw & !(0x03 << 5)) | (value.raw() << 5);
         self
@@ -339,17 +339,6 @@ impl ButtonFlags {
         ButtonState::try_from(self.raw & 0x03)?;
         HyperlinkType::try_from((self.raw >> 5) & 0x03)?;
         Ok(())
-    }
-}
-
-fn set_bit<T>(raw: T, bit: u32, value: bool) -> T
-where
-    T: BitOps,
-{
-    if value {
-        raw | T::one() << bit
-    } else {
-        raw & !(T::one() << bit)
     }
 }
 
@@ -366,5 +355,51 @@ trait BitOps:
 impl BitOps for u8 {
     fn one() -> Self {
         1
+    }
+}
+
+fn encoded_units(bytes: &[u8]) -> impl Iterator<Item = u16> + '_ {
+    bytes
+        .chunks_exact(2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+}
+
+fn validate_units(units: impl Iterator<Item = u16>) -> Result<(), Error> {
+    let mut pending_high = false;
+    for unit in units {
+        if unit == 0 {
+            return Err(Error::invalid("WString cannot contain NUL code units"));
+        }
+        if pending_high {
+            if !(0xDC00..=0xDFFF).contains(&unit) {
+                return Err(Error::invalid(
+                    "WString contains an unpaired UTF-16 surrogate",
+                ));
+            }
+            pending_high = false;
+        } else if (0xD800..=0xDBFF).contains(&unit) {
+            pending_high = true;
+        } else if (0xDC00..=0xDFFF).contains(&unit) {
+            return Err(Error::invalid(
+                "WString contains an unpaired UTF-16 surrogate",
+            ));
+        }
+    }
+    if pending_high {
+        return Err(Error::invalid(
+            "WString ends with an unpaired UTF-16 surrogate",
+        ));
+    }
+    Ok(())
+}
+
+fn set_bit<T>(raw: T, bit: u32, value: bool) -> T
+where
+    T: BitOps,
+{
+    if value {
+        raw | T::one() << bit
+    } else {
+        raw & !(T::one() << bit)
     }
 }

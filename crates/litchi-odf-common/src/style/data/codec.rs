@@ -1,7 +1,11 @@
 //! Bounded ODF data-style XML codec.
 
 use super::tokens::{parse_map, parse_part_node};
-use super::*;
+use super::{
+    FormatSource, Kind, LOEXT, Locale, MAX_AGGREGATE_BYTES, MAX_ATTRIBUTES, MAX_DEPTH, MAX_EVENTS,
+    MAX_MAPS, MAX_PARTS, MAX_STYLES, MAX_VALUE_BYTES, MAX_XML_BYTES, NUMBER, OFFICE, Part, Result,
+    STYLE, Section, Style, Styles, TextProperties, TransliterationStyle, Version, bad, invalid,
+};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -39,7 +43,17 @@ pub(crate) struct Frame {
     pub(crate) local: String,
 }
 
+pub(crate) fn byte_offset(offset: u64, context: &str) -> Result<usize> {
+    usize::try_from(offset)
+        .map_err(|error| bad(format!("{context} byte offset is out of range: {error}")))
+}
+
 /// Parse direct data styles from both standard style containers in one XML part.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed, exceeds a parser safety limit, or
+/// contains an invalid data-style grammar.
 pub fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
     if xml.len() > MAX_XML_BYTES {
         return invalid("data-style XML exceeds 64 MiB");
@@ -84,7 +98,7 @@ pub fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
                 }
                 let direct = direct_style_section(&frames);
                 reject_spoofed_container(namespace.as_deref(), &local, direct.is_some())?;
-                let end = reader.buffer_position() as usize;
+                let end = byte_offset(reader.buffer_position(), "data-style XML")?;
                 let start = event_start(xml, end)?;
                 if !nodes.is_empty()
                     || direct.is_some()
@@ -109,7 +123,7 @@ pub fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 let direct = direct_style_section(&frames);
                 reject_spoofed_container(namespace.as_deref(), &local, direct.is_some())?;
-                let end = reader.buffer_position() as usize;
+                let end = byte_offset(reader.buffer_position(), "data-style XML")?;
                 let start = event_start(xml, end)?;
                 if !nodes.is_empty() {
                     let node = Node {
@@ -125,11 +139,10 @@ pub fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
                         children: Vec::new(),
                         raw: xml[start..end].to_string(),
                     };
-                    nodes
+                    let parent = nodes
                         .last_mut()
-                        .expect("active data style")
-                        .children
-                        .push(node);
+                        .ok_or_else(|| bad("data-style node stack underflow"))?;
+                    parent.children.push(node);
                 } else if let Some(section) = direct
                     && namespace.as_deref() == Some(NUMBER)
                     && Kind::parse(&local).is_some()
@@ -156,32 +169,32 @@ pub fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
                     .map_err(|error| bad(format!("invalid data-style text: {error}")))?;
                 let unescaped = quick_xml::escape::unescape(&decoded)
                     .map_err(|error| bad(format!("invalid data-style entity: {error}")))?;
-                add_text(
-                    &mut nodes.last_mut().expect("active node").text,
-                    &unescaped,
-                    &mut aggregate,
-                )?;
+                let node = nodes
+                    .last_mut()
+                    .ok_or_else(|| bad("data-style node stack underflow"))?;
+                add_text(&mut node.text, &unescaped, &mut aggregate)?;
             },
             Event::CData(ref text) if !nodes.is_empty() => {
                 let decoded = reader
                     .decoder()
                     .decode(text.as_ref())
                     .map_err(|error| bad(format!("invalid data-style CDATA: {error}")))?;
-                add_text(
-                    &mut nodes.last_mut().expect("active node").text,
-                    &decoded,
-                    &mut aggregate,
-                )?;
+                let node = nodes
+                    .last_mut()
+                    .ok_or_else(|| bad("data-style node stack underflow"))?;
+                add_text(&mut node.text, &decoded, &mut aggregate)?;
             },
             Event::GeneralRef(_) if !nodes.is_empty() => {
                 return invalid("entity references are prohibited in data styles");
             },
             Event::End(_) => {
-                let end = reader.buffer_position() as usize;
+                let end = byte_offset(reader.buffer_position(), "data-style XML")?;
                 if !nodes.is_empty()
                     && nodes.len() == frames.len() - active_base_depth(&frames, &nodes)
                 {
-                    let builder = nodes.pop().expect("active data-style node");
+                    let builder = nodes
+                        .pop()
+                        .ok_or_else(|| bad("data-style node stack underflow"))?;
                     let node = Node {
                         namespace: builder.namespace,
                         local: builder.local,
@@ -206,7 +219,7 @@ pub fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
                 return invalid("DTDs and processing instructions are prohibited");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -256,7 +269,7 @@ pub(crate) fn parse_style_node(
     ensure_whitespace(&node.text, "data-style container")?;
     let name = required(&mut node.attributes, STYLE, "name")?;
     let display_name = take(&mut node.attributes, STYLE, "display-name");
-    let locale = parse_locale(&mut node.attributes)?;
+    let locale = parse_locale(&mut node.attributes);
     let title = take(&mut node.attributes, NUMBER, "title");
     let volatile = take_bool(&mut node.attributes, STYLE, "volatile")?;
     let transliteration_format = take(&mut node.attributes, NUMBER, "transliteration-format");
@@ -355,18 +368,18 @@ pub(crate) fn collect_attributes(
 ) -> Result<Vec<Attribute>> {
     let mut output = Vec::new();
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for raw_attribute in element.attributes().with_checks(true) {
         let attribute =
-            attribute.map_err(|error| bad(format!("invalid data-style attribute: {error}")))?;
+            raw_attribute.map_err(|error| bad(format!("invalid data-style attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
         if output.len() >= MAX_ATTRIBUTES {
             return invalid("data-style element has too many attributes");
         }
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        let (resolved, raw_local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_uri(&resolved)?;
-        let local = decode(local.as_ref(), "attribute name")?;
+        let local = decode(raw_local.as_ref(), "attribute name")?;
         if !seen.insert((namespace.clone(), local.clone())) {
             return invalid("duplicate expanded data-style attribute");
         }
@@ -404,13 +417,13 @@ pub(crate) fn read_document_version(
     }
 }
 
-pub(crate) fn parse_locale(attributes: &mut Vec<Attribute>) -> Result<Locale> {
-    Ok(Locale {
+pub(crate) fn parse_locale(attributes: &mut Vec<Attribute>) -> Locale {
+    Locale {
         language: take(attributes, NUMBER, "language"),
         country: take(attributes, NUMBER, "country"),
         script: take(attributes, NUMBER, "script"),
         rfc_language_tag: take(attributes, NUMBER, "rfc-language-tag"),
-    })
+    }
 }
 
 pub(crate) fn take(
@@ -477,7 +490,7 @@ pub(crate) fn take_f64(
             _ => {
                 let parsed: f64 = value
                     .parse()
-                    .map_err(|_| bad(format!("invalid {local} double '{value}'")))?;
+                    .map_err(|error| bad(format!("invalid {local} double '{value}': {error}")))?;
                 if !parsed.is_finite() {
                     return invalid(format!("invalid {local} double '{value}'"));
                 }
@@ -567,13 +580,15 @@ pub(crate) fn parse_bool(value: &str) -> Result<bool> {
 pub(crate) fn parse_i64(value: &str, name: &str) -> Result<i64> {
     value
         .parse()
-        .map_err(|_| bad(format!("invalid {name} integer '{value}'")))
+        .map_err(|error| bad(format!("invalid {name} integer '{value}': {error}")))
 }
 
 pub(crate) fn parse_u64(value: &str, name: &str) -> Result<u64> {
-    let parsed: u64 = value
-        .parse()
-        .map_err(|_| bad(format!("invalid {name} positive integer '{value}'")))?;
+    let parsed: u64 = value.parse().map_err(|error| {
+        bad(format!(
+            "invalid {name} positive integer '{value}': {error}"
+        ))
+    })?;
     if parsed == 0 {
         return invalid(format!("invalid {name} positive integer '{value}'"));
     }
@@ -627,7 +642,7 @@ pub(crate) fn validate_cell_address(value: &str) -> Result<()> {
 }
 
 pub(crate) fn validate_locale(locale: &Locale) -> Result<()> {
-    for (value, name) in [
+    for (optional_value, name) in [
         (locale.language.as_deref(), "number:language"),
         (locale.country.as_deref(), "number:country"),
         (locale.script.as_deref(), "number:script"),
@@ -636,14 +651,14 @@ pub(crate) fn validate_locale(locale: &Locale) -> Result<()> {
             "number:rfc-language-tag",
         ),
     ] {
-        if let Some(value) = value {
-            validate_text(value, name)?;
-            if value.is_empty()
-                || value
+        if let Some(locale_value) = optional_value {
+            validate_text(locale_value, name)?;
+            if locale_value.is_empty()
+                || locale_value
                     .bytes()
                     .any(|byte| !(byte.is_ascii_alphanumeric() || byte == b'-'))
             {
-                return invalid(format!("invalid {name} '{value}'"));
+                return invalid(format!("invalid {name} '{locale_value}'"));
             }
         }
     }
@@ -651,8 +666,8 @@ pub(crate) fn validate_locale(locale: &Locale) -> Result<()> {
 }
 
 pub(crate) fn validate_optional_string(value: Option<&str>, name: &str) -> Result<()> {
-    if let Some(value) = value {
-        validate_text(value, name)?;
+    if let Some(optional_value) = value {
+        validate_text(optional_value, name)?;
     }
     Ok(())
 }
@@ -703,6 +718,9 @@ pub(crate) fn add_size(size: usize, aggregate: &mut usize) -> Result<()> {
 }
 
 pub(crate) fn event_start(xml: &str, end: usize) -> Result<usize> {
+    if end > xml.len() || !xml.is_char_boundary(end) {
+        return invalid("invalid data-style XML event boundary");
+    }
     xml[..end]
         .rfind('<')
         .ok_or_else(|| bad("invalid data-style XML event boundary"))
@@ -722,5 +740,5 @@ pub(crate) fn namespace_uri(result: &ResolveResult<'_>) -> Result<Option<String>
 pub(crate) fn decode(value: &[u8], description: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| bad(format!("invalid UTF-8 {description}")))
+        .map_err(|error| bad(format!("invalid UTF-8 {description}: {error}")))
 }

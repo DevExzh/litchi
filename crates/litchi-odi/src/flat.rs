@@ -20,6 +20,7 @@ const MAX_FRAMES: usize = 1_000_000;
 #[derive(Debug)]
 struct State {
     bytes: Vec<u8>,
+    root: Root,
     frames: Vec<Frame>,
     sites: Vec<FrameSite>,
 }
@@ -46,7 +47,20 @@ impl FlatImage {
         if litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odi) {
             return Err(invalid("input is not a flat ODI document"));
         }
-        Ok(Self(Arc::new(parse(bytes, Root::Flat)?)))
+        Self::from_root_bytes(bytes, Root::Flat)
+    }
+
+    /// Parses a packaged ODI `content.xml` part with the same bounded frame
+    /// inventory and lossless edit-site scanner used for flat documents.
+    pub(crate) fn from_content_xml(bytes: Vec<u8>) -> Result<Self> {
+        if bytes.len() > MAX_BYTES {
+            return Err(invalid("ODI content.xml exceeds the input size limit"));
+        }
+        Self::from_root_bytes(bytes, Root::Content)
+    }
+
+    fn from_root_bytes(bytes: Vec<u8>, root: Root) -> Result<Self> {
+        Ok(Self(Arc::new(parse(bytes, root)?)))
     }
 
     /// Returns the inert frames in source order.
@@ -216,7 +230,7 @@ impl FlatImageTransaction {
         }
         let bytes = apply_edits(self.source.as_bytes(), edits)?;
         compact_xml::validate(&bytes)?;
-        let snapshot = FlatImage::from_bytes(bytes)?;
+        let snapshot = FlatImage::from_root_bytes(bytes, self.source.0.root)?;
         for change in &self.changes {
             let actual = snapshot
                 .frames()
@@ -369,14 +383,7 @@ impl FrameChange {
     }
 }
 
-pub(crate) fn frames_from_content(xml: &str) -> Result<Vec<Frame>> {
-    if xml.len() > MAX_BYTES {
-        return Err(invalid("ODI content.xml exceeds the input size limit"));
-    }
-    Ok(parse(xml.as_bytes().to_vec(), Root::Content)?.frames)
-}
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Root {
     Flat,
     Content,
@@ -415,6 +422,7 @@ fn parse(bytes: Vec<u8>, root: Root) -> Result<State> {
     }
     Ok(State {
         bytes,
+        root,
         frames,
         sites,
     })

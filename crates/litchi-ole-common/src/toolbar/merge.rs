@@ -18,6 +18,7 @@ pub enum MergeMode {
 }
 
 impl MergeMode {
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::Neither => 0,
@@ -36,7 +37,7 @@ impl MergeMode {
             2 => Self::Host,
             3 => Self::Both,
             0xFF => Self::Unresolved,
-            value => Self::Unknown(value),
+            unknown => Self::Unknown(unknown),
         }
     }
 
@@ -80,6 +81,7 @@ pub enum MenuMerge {
 }
 
 impl MenuMerge {
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::File => 0,
@@ -102,7 +104,7 @@ impl MenuMerge {
             4 => Self::Window,
             5 => Self::Help,
             0xFF => Self::None,
-            value => Self::Unknown(value),
+            unknown => Self::Unknown(unknown),
         }
     }
 
@@ -138,6 +140,11 @@ pub struct ExtraInfo<'a> {
 
 impl<'a> ExtraInfo<'a> {
     /// Construct validated extra command metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either merge value is not supported by the shared
+    /// toolbar model.
     #[allow(clippy::too_many_arguments, reason = "matches the wire fields")]
     pub fn new(
         help_file: WString<'a>,
@@ -181,36 +188,44 @@ impl<'a> ExtraInfo<'a> {
         }
     }
 
+    #[must_use]
     pub const fn help_file(&self) -> &WString<'a> {
         &self.help_file
     }
 
+    #[must_use]
     pub const fn help_context(&self) -> i32 {
         self.help_context
     }
 
+    #[must_use]
     pub const fn tag(&self) -> &WString<'a> {
         &self.tag
     }
 
+    #[must_use]
     pub const fn on_action(&self) -> &WString<'a> {
         &self.on_action
     }
 
+    #[must_use]
     pub const fn param(&self) -> &WString<'a> {
         &self.param
     }
 
     /// Return the raw `tbcu` OLE host/server merge value.
+    #[must_use]
     pub const fn merge(&self) -> MergeMode {
         self.merge
     }
 
     /// Return the raw `tbmg` OLE menu merge value.
+    #[must_use]
     pub const fn menu_merge(&self) -> MenuMerge {
         self.menu_merge
     }
 
+    #[must_use]
     pub fn into_owned(self) -> ExtraInfo<'static> {
         ExtraInfo {
             help_file: self.help_file.into_owned(),

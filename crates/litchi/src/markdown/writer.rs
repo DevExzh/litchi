@@ -55,6 +55,14 @@ enum ListType {
     Unordered,
 }
 
+/// Block semantics that CommonMark can represent without inferring content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParagraphBlock {
+    Normal,
+    Quote,
+    Code,
+}
+
 impl ListItemInfo {
     pub(crate) fn bullet(level: usize) -> Self {
         Self {
@@ -353,6 +361,114 @@ impl MarkdownWriter {
         (characters.next().is_none() && (1..=6).contains(&level)).then_some(level)
     }
 
+    #[cfg(feature = "docx")]
+    fn block_from_style_id(style_id: &str) -> ParagraphBlock {
+        let normalized: String = style_id
+            .chars()
+            .filter(|character| !matches!(character, ' ' | '-' | '_'))
+            .flat_map(char::to_lowercase)
+            .collect();
+        match normalized.as_str() {
+            // Word's built-in quote styles denote a quotation block rather
+            // than merely a visual treatment.
+            "quote" | "intensequote" => ParagraphBlock::Quote,
+            // These built-in and common producer style IDs denote verbatim
+            // source.  No language is exposed by the semantic model, so emit
+            // an unannotated fenced block.
+            "code" | "codeblock" | "preformatted" => ParagraphBlock::Code,
+            _ => ParagraphBlock::Normal,
+        }
+    }
+
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "odt",
+        feature = "rtf",
+        feature = "pages"
+    ))]
+    fn paragraph_block(&self, para: &Paragraph) -> Result<ParagraphBlock> {
+        match para {
+            #[cfg(feature = "docx")]
+            Paragraph::Docx(paragraph) => Ok(paragraph
+                .style_id()
+                .map_err(crate::map_ooxml_error)?
+                .as_deref()
+                .map_or(ParagraphBlock::Normal, Self::block_from_style_id)),
+            #[cfg(feature = "doc")]
+            Paragraph::Doc(_) => Ok(ParagraphBlock::Normal),
+            #[cfg(feature = "rtf")]
+            Paragraph::Rtf(_) => Ok(ParagraphBlock::Normal),
+            #[cfg(feature = "odt")]
+            Paragraph::Odt(_) => Ok(ParagraphBlock::Normal),
+            #[cfg(feature = "pages")]
+            Paragraph::Pages(_) => Ok(ParagraphBlock::Normal),
+        }
+    }
+
+    /// Reject inline images before taking a text-only block path.  This keeps
+    /// the no-silent-loss contract true even for source paragraphs styled as
+    /// code blocks.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "odt",
+        feature = "rtf",
+        feature = "pages"
+    ))]
+    fn reject_inline_images(&self, para: &Paragraph) -> Result<()> {
+        match para {
+            #[cfg(feature = "doc")]
+            Paragraph::Doc(paragraph)
+                if paragraph
+                    .runs()
+                    .map_err(Error::from)?
+                    .iter()
+                    .any(litchi_doc::Run::has_image) =>
+            {
+                Err(Error::Unsupported(
+                    "Markdown export cannot preserve DOC inline images without an image destination policy"
+                        .to_owned(),
+                ))
+            },
+            #[cfg(feature = "docx")]
+            Paragraph::Docx(paragraph)
+                if !paragraph
+                    .images()
+                    .map_err(crate::map_ooxml_error)?
+                    .is_empty() =>
+            {
+                Err(Error::Unsupported(
+                    "Markdown export cannot preserve DOCX inline images without an image destination policy"
+                        .to_owned(),
+                ))
+            },
+            _ => Ok(()),
+        }
+    }
+
+    fn write_code_block(&mut self, text: &str) {
+        let mut longest_tilde_run = 0usize;
+        let mut current_tilde_run = 0usize;
+        for byte in text.bytes() {
+            if byte == b'~' {
+                current_tilde_run += 1;
+                longest_tilde_run = longest_tilde_run.max(current_tilde_run);
+            } else {
+                current_tilde_run = 0;
+            }
+        }
+        let required = longest_tilde_run.saturating_add(1).max(3);
+        self.buffer.extend(std::iter::repeat_n('~', required));
+        self.buffer.push('\n');
+        self.buffer.push_str(text);
+        if !text.ends_with('\n') {
+            self.buffer.push('\n');
+        }
+        self.buffer.extend(std::iter::repeat_n('~', required));
+        self.buffer.push_str("\n\n");
+    }
+
     #[cfg(any(
         feature = "doc",
         feature = "docx",
@@ -535,8 +651,23 @@ impl MarkdownWriter {
         resolved_list: Option<&ListItemInfo>,
         explicit_heading_level: Option<u8>,
     ) -> Result<()> {
+        self.reject_inline_images(para)?;
         if resolved_list.is_none() {
             self.reject_unresolved_list(para)?;
+        }
+        let block = self.paragraph_block(para)?;
+        if block == ParagraphBlock::Code {
+            if resolved_list.is_some() {
+                return Err(Error::Unsupported(
+                    "Markdown export cannot combine a semantic list item with a code-block paragraph style"
+                        .to_owned(),
+                ));
+            }
+            self.write_code_block(&para.text()?);
+            return Ok(());
+        }
+        if block == ParagraphBlock::Quote {
+            self.buffer.push_str("> ");
         }
         if let Some(level) = explicit_heading_level.or(self.heading_level(para)?) {
             self.buffer
@@ -549,16 +680,6 @@ impl MarkdownWriter {
         {
             use crate::document::Paragraph;
             if let Paragraph::Docx(docx_para) = para {
-                if !docx_para
-                    .images()
-                    .map_err(crate::map_ooxml_error)?
-                    .is_empty()
-                {
-                    return Err(Error::Unsupported(
-                        "Markdown export cannot preserve DOCX inline images without an image destination policy"
-                            .to_owned(),
-                    ));
-                }
                 let display_formulas = docx_para
                     .paragraph_level_formulas()
                     .map_err(crate::map_ooxml_error)?;
@@ -1816,6 +1937,20 @@ mod tests {
     fn literal_number_prefix_is_not_guessed_as_docx_numbering() -> litchi_core::Result<()> {
         let literal = paragraph("", "1. not a semantic list");
         assert_eq!(literal.to_markdown()?, "1\\. not a semantic list");
+        Ok(())
+    }
+
+    #[test]
+    fn quote_style_is_projected_as_a_commonmark_blockquote() -> litchi_core::Result<()> {
+        let quote = paragraph(r#"<w:pStyle w:val="IntenseQuote"/>"#, "quoted *text*");
+        assert_eq!(quote.to_markdown()?, "> quoted \\*text\\*");
+        Ok(())
+    }
+
+    #[test]
+    fn code_style_is_projected_as_an_unannotated_fenced_block() -> litchi_core::Result<()> {
+        let code = paragraph(r#"<w:pStyle w:val="CodeBlock"/>"#, "let x = ~~~~;");
+        assert_eq!(code.to_markdown()?, "~~~~~\nlet x = ~~~~;\n~~~~~");
         Ok(())
     }
 

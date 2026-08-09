@@ -7,13 +7,19 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::num::NonZeroUsize;
 
+use super::model::{Iteration, IterationStatus, NullDate, Settings};
+
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
-use super::model::{Iteration, IterationStatus, NullDate, Settings};
-
-pub fn write(out: &mut String, settings: Option<&Settings>) -> Result<()> {
-    let Some(settings) = settings else {
+/// Serialize optional calculation settings as an `office:calculation-settings` fragment.
+///
+/// # Errors
+///
+/// Returns an error when a lexical setting is malformed or exceeds a resource
+/// limit.
+pub fn write(out: &mut String, settings_option: Option<&Settings>) -> Result<()> {
+    let Some(settings) = settings_option else {
         return Ok(());
     };
     settings.validate()?;
@@ -71,6 +77,12 @@ pub fn write(out: &mut String, settings: Option<&Settings>) -> Result<()> {
     Ok(())
 }
 
+/// Parse a bounded calculation-settings XML fragment.
+///
+/// # Errors
+///
+/// Returns an error for malformed XML, invalid settings, or exceeded resource
+/// limits.
 pub fn parse(xml: &str) -> Result<Option<Settings>> {
     if xml.len() > super::MAX_XML_BYTES {
         return Err(Error::InvalidFormat(
@@ -155,8 +167,11 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
                         "calculation setting children must be empty".to_string(),
                     ));
                 }
+                let settings = current.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("calculation settings child has no parent".to_string())
+                })?;
                 parse_settings_child(
-                    current.as_mut().expect("settings were checked"),
+                    settings,
                     reader.resolver(),
                     reader.decoder(),
                     is_table,
@@ -170,8 +185,11 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
                         "calculation setting children must be empty".to_string(),
                     ));
                 }
+                let settings = current.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("calculation settings child has no parent".to_string())
+                })?;
                 parse_settings_child(
-                    current.as_mut().expect("settings were checked"),
+                    settings,
                     reader.resolver(),
                     reader.decoder(),
                     is_table,
@@ -186,20 +204,20 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
                 }
             },
             Event::Text(text) if current.is_some() => {
-                let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                let text_content = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                     Error::InvalidFormat(format!("invalid calculation settings text: {error}"))
                 })?;
-                if !value.trim().is_empty() {
+                if !text_content.trim().is_empty() {
                     return Err(Error::InvalidFormat(
                         "table:calculation-settings cannot contain text".to_string(),
                     ));
                 }
             },
             Event::CData(text) if current.is_some() => {
-                let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                let cdata_content = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                     Error::InvalidFormat(format!("invalid calculation settings CDATA: {error}"))
                 })?;
-                if !value.trim().is_empty() {
+                if !cdata_content.trim().is_empty() {
                     return Err(Error::InvalidFormat(
                         "table:calculation-settings cannot contain CDATA".to_string(),
                     ));
@@ -211,7 +229,16 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         if is_start {
             if depth >= super::MAX_DEPTH {
@@ -362,8 +389,8 @@ fn optional_attribute(
     element: &BytesStart<'_>,
     name: &[u8],
 ) -> Result<Option<String>> {
-    for attribute in element.attributes() {
-        let attribute = attribute
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
         if attribute.value.len() > super::MAX_ATTRIBUTE_BYTES {
             return Err(Error::InvalidFormat(
@@ -390,8 +417,8 @@ fn is_namespace_uri(namespace: &ResolveResult<'_>, uri: &[u8]) -> bool {
 }
 
 fn write_optional_bool(out: &mut String, name: &str, value: Option<bool>) {
-    if let Some(value) = value {
-        write_attribute(out, name, if value { "true" } else { "false" });
+    if let Some(boolean_value) = value {
+        write_attribute(out, name, if boolean_value { "true" } else { "false" });
     }
 }
 

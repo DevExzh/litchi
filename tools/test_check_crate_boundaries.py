@@ -80,6 +80,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 {
                     boundaries.Edge("litchi-iwa-detect", "litchi-iwa-protos"),
                     boundaries.Edge("litchi-iwa-structured", "litchi-iwa-text"),
+                    boundaries.Edge("litchi-sign", "soapberry-zip"),
                 }
             ),
         )

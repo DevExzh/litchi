@@ -144,8 +144,13 @@ impl Element {
 
     /// Decode the element's `chart:class` value as a typed namespaced token.
     ///
-    /// The parser retains the exact QName spelling and resolves its prefix in
+    /// The parser retains the exact `QName` spelling and resolves its prefix in
     /// the producer's namespace context, so aliases are not normalized.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the element lacks `chart:class` or its value is not
+    /// a valid resolved chart class.
     pub fn chart_class(&self) -> Result<super::ChartClass> {
         let attribute = self
             .attributes
@@ -568,24 +573,28 @@ mod tests {
     }
 
     #[test]
-    fn retains_namespace_aware_extension_content() {
+    fn retains_namespace_aware_extension_content() -> Result<()> {
         let xml = content(
             r#"<c:title><x:p>Revenue &amp; margin</x:p></c:title><vendor:extension xmlns:vendor="urn:vendor:chart" vendor:flag="yes"><vendor:value><![CDATA[opaque <value>]]></vendor:value></vendor:extension>"#,
         );
-        let chart = read(&xml).unwrap();
+        let chart = read(&xml)?;
         assert_eq!(chart.kind(), Kind::Chart);
         assert_eq!(chart.children_of_kind(Kind::Title).count(), 1);
-        let extension = chart.children().last().unwrap();
+        let extension = chart
+            .children()
+            .last()
+            .ok_or_else(|| invalid_error("missing extension child"))?;
         assert_eq!(extension.namespace_uri(), Some("urn:vendor:chart"));
         assert_eq!(extension.all_text(), "opaque <value>");
         assert_eq!(
             extension.attribute(Some("urn:vendor:chart"), "flag"),
             Some("yes")
         );
+        Ok(())
     }
 
     #[test]
-    fn resolves_namespace_aliases_and_rejects_expanded_duplicates() {
+    fn resolves_namespace_aliases_and_rejects_expanded_duplicates() -> Result<()> {
         let xml = format!(
             r#"<o:document-content xmlns:o="{OFFICE}" xmlns:c="{CHART}" xmlns:other="{CHART}"><o:body><o:chart><c:chart c:class="c:bar" other:class="c:line"><c:plot-area/></c:chart></o:chart></o:body></o:document-content>"#
         );
@@ -594,13 +603,8 @@ mod tests {
         let valid = content(
             r#"<c:plot-area table:cell-range-address="Data.A1:C4" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"/>"#,
         );
-        assert_eq!(
-            read(&valid)
-                .unwrap()
-                .children_of_kind(Kind::PlotArea)
-                .count(),
-            1
-        );
+        assert_eq!(read(&valid)?.children_of_kind(Kind::PlotArea).count(), 1);
+        Ok(())
     }
 
     #[test]

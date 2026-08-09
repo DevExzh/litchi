@@ -10,8 +10,9 @@ mod package;
 
 pub use facade::{Builder, Drawing};
 pub use facade::{
-    Commit as PackageCommit, Patch as PackagePatch, Snapshot as PackageSnapshot,
-    TextChange as PackageTextChange, Transaction as PackageTransaction,
+    Commit as PackageCommit, NameChange as PackageNameChange, Patch as PackagePatch,
+    Snapshot as PackageSnapshot, TextChange as PackageTextChange,
+    Transaction as PackageTransaction,
 };
 pub use flat::{
     FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,

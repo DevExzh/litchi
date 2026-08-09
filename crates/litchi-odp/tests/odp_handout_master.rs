@@ -1,3 +1,9 @@
+#![allow(
+    clippy::default_trait_access,
+    clippy::unwrap_used,
+    reason = "integration-test assertions panic on failure by design"
+)]
+
 use litchi_odp::{
     Presentation, constants,
     handout_master::{Child, ChildKind, Master},

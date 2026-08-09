@@ -74,6 +74,11 @@ impl Transaction {
     }
 
     /// Replaces one shared string-table entry after full candidate validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index` is absent or the resulting payload violates
+    /// the source limits.
     pub fn set_string(
         &mut self,
         index: usize,
@@ -91,6 +96,11 @@ impl Transaction {
 
     /// Replaces one declared type while retaining every other type and table
     /// entry. The replacement must retain the selected stable identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the type identifier is absent or the resulting
+    /// payload violates the source limits.
     pub fn replace_type(&mut self, value: Type) -> Result<&mut Self, Error> {
         self.update(move |store, _| {
             let kind = store
@@ -104,6 +114,11 @@ impl Transaction {
     }
 
     /// Replaces one complete property-bag while retaining the other bags.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index` is absent or the resulting payload violates
+    /// the source limits.
     pub fn replace_bag(&mut self, index: usize, value: PropertyBag) -> Result<&mut Self, Error> {
         self.update(move |_, bags| {
             let bag = bags
@@ -115,6 +130,11 @@ impl Transaction {
     }
 
     /// Appends one property bag after validating its type and all indexes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bag or resulting payload violates the source
+    /// limits.
     pub fn append_bag(&mut self, value: PropertyBag) -> Result<&mut Self, Error> {
         self.update(move |_, bags| {
             bags.push(value);
@@ -123,6 +143,11 @@ impl Transaction {
     }
 
     /// Replaces one raw key/value index pair in a property bag.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either index is absent or the resulting payload
+    /// violates the source limits.
     pub fn set_property(
         &mut self,
         bag: usize,
@@ -142,6 +167,11 @@ impl Transaction {
     }
 
     /// Replaces the key string referenced by one property.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bag, property, or referenced key string is
+    /// absent, or the resulting payload violates the source limits.
     pub fn set_property_key(
         &mut self,
         bag: usize,
@@ -149,18 +179,19 @@ impl Transaction {
         value: PropertyBagString,
     ) -> Result<&mut Self, Error> {
         self.update(move |store, bags| {
-            let index = bags
+            let string_index = bags
                 .get(bag)
                 .ok_or_else(|| Error::new("smart-tag bag index is outside the store"))?
                 .properties
                 .get(property)
                 .ok_or_else(|| Error::new("smart-tag property index is outside the bag"))?
                 .key_index;
-            let index = usize::try_from(index)
-                .map_err(|_| Error::new("smart-tag key string index overflows usize"))?;
+            let string_slot = usize::try_from(string_index).map_err(|_conversion_error| {
+                Error::new("smart-tag key string index overflows usize")
+            })?;
             let entry = store
                 .strings
-                .get_mut(index)
+                .get_mut(string_slot)
                 .ok_or_else(|| Error::new("smart-tag key string index is outside the table"))?;
             *entry = value;
             Ok(())
@@ -168,6 +199,11 @@ impl Transaction {
     }
 
     /// Replaces the value string referenced by one property.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bag, property, or referenced value string is
+    /// absent, or the resulting payload violates the source limits.
     pub fn set_property_value(
         &mut self,
         bag: usize,
@@ -175,18 +211,19 @@ impl Transaction {
         value: PropertyBagString,
     ) -> Result<&mut Self, Error> {
         self.update(move |store, bags| {
-            let index = bags
+            let string_index = bags
                 .get(bag)
                 .ok_or_else(|| Error::new("smart-tag bag index is outside the store"))?
                 .properties
                 .get(property)
                 .ok_or_else(|| Error::new("smart-tag property index is outside the bag"))?
                 .value_index;
-            let index = usize::try_from(index)
-                .map_err(|_| Error::new("smart-tag value string index overflows usize"))?;
+            let string_slot = usize::try_from(string_index).map_err(|_conversion_error| {
+                Error::new("smart-tag value string index overflows usize")
+            })?;
             let entry = store
                 .strings
-                .get_mut(index)
+                .get_mut(string_slot)
                 .ok_or_else(|| Error::new("smart-tag value string index is outside the table"))?;
             *entry = value;
             Ok(())
@@ -204,6 +241,11 @@ impl Transaction {
     /// The candidate is published only after all count, index, encoding, and
     /// serialized-size constraints pass. A failed closure or validation
     /// leaves the transaction unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error from `edit` or if the resulting payload violates the
+    /// source limits.
     pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, Error>
     where
         F: FnOnce(&mut PropertyBagStore, &mut Vec<PropertyBag>) -> Result<(), Error>,
@@ -218,6 +260,11 @@ impl Transaction {
     }
 
     /// Projects the current draft as a validated snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the draft cannot be encoded under the source
+    /// limits.
     pub fn snapshot(&self) -> Result<Snapshot, Error> {
         self.materialize()
     }
@@ -229,6 +276,11 @@ impl Transaction {
     }
 
     /// Validates and publishes the draft as a reversible source-checked edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the draft cannot be encoded under the source
+    /// limits.
     pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(self.source, snapshot.clone());
@@ -295,6 +347,11 @@ impl Commit {
 }
 
 /// Runs one isolated edit and publishes it atomically.
+///
+/// # Errors
+///
+/// Returns an error from `edit` or if the resulting payload violates the
+/// source limits.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
 where
     F: FnOnce(&mut Transaction) -> Result<(), Error>,

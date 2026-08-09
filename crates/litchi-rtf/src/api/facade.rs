@@ -9,6 +9,7 @@ use std::sync::{Arc, OnceLock};
 
 struct Inner {
     model: RtfDocument<'static>,
+    limits: ParseLimits,
     text: OnceLock<Box<str>>,
     paragraph_count: OnceLock<usize>,
 }
@@ -55,7 +56,7 @@ impl Document {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse_with_limits(input: &str, limits: ParseLimits) -> RtfResult<Self> {
-        RtfDocument::parse_with_limits(input, limits).map(Self::from_model)
+        RtfDocument::parse_with_limits(input, limits).map(|model| Self::from_model(model, limits))
     }
 
     /// Parse original RTF transport bytes with the production-safe resource
@@ -76,7 +77,8 @@ impl Document {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_bytes_with_limits(input: &[u8], limits: ParseLimits) -> RtfResult<Self> {
-        RtfDocument::parse_bytes_with_limits(input, limits).map(Self::from_model)
+        RtfDocument::parse_bytes_with_limits(input, limits)
+            .map(|model| Self::from_model(model, limits))
     }
 
     /// Open an RTF file with the production-safe resource profile.
@@ -92,13 +94,14 @@ impl Document {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn open_with_limits(path: impl AsRef<Path>, limits: ParseLimits) -> RtfResult<Self> {
-        RtfDocument::open_with_limits(path, limits).map(Self::from_model)
+        RtfDocument::open_with_limits(path, limits).map(|model| Self::from_model(model, limits))
     }
 
-    fn from_model(model: RtfDocument<'static>) -> Self {
+    fn from_model(model: RtfDocument<'static>, limits: ParseLimits) -> Self {
         Self {
             inner: Arc::new(Inner {
                 model,
+                limits,
                 text: OnceLock::new(),
                 paragraph_count: OnceLock::new(),
             }),
@@ -260,6 +263,20 @@ impl Document {
 
     pub(crate) fn model(&self) -> &RtfDocument<'static> {
         &self.inner.model
+    }
+
+    pub(crate) fn limits(&self) -> ParseLimits {
+        self.inner.limits
+    }
+
+    pub(crate) fn source_bytes(&self) -> Option<&[u8]> {
+        self.inner.model.preserved_source()
+    }
+
+    /// Starts a bounded, detached edit of this immutable snapshot.
+    #[must_use]
+    pub fn edit(&self) -> crate::edit::Edit {
+        crate::edit::Edit::new(self.clone())
     }
 }
 

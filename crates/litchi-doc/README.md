@@ -35,10 +35,13 @@ println!("paragraphs: {}", document.paragraph_count()?);
 96 MiB aggregate DOC streams). Use `Package::open_with` and
 `PackageOpenOptions` to select stricter or workload-specific limits. Passwords
 are supplied to encrypted documents through `OpenOptions::with_password` and
-the non-cloneable, zeroizing `Password` type. DOC text extraction exposes the
-stored source text only: accepted/rejected revision projections are deliberately
-not provided because this crate does not have a lossless main-story revision
-commit path.
+the non-cloneable, zeroizing `Password` type. `Document::text` exposes stored
+source text. `body_text::Snapshot::paragraphs` additionally exposes stored,
+accepted, and rejected ordinary body-paragraph projections. Its focused edit
+seam accepts only same-length UTF-16 replacement inside one Unicode piece and
+returns a typed refusal for every case requiring CLX/FKP/PLCF reconstruction.
+Paragraph selection uses the format-neutral, zero-based `litchi_core::Position`;
+resolving it against a source body reports a typed not-found refusal.
 
 Format-neutral OfficeArt image discovery lives in `litchi-odraw`; optional
 codec operations are provided by the separate `litchi-imgconv::Convert`

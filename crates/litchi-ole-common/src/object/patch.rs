@@ -56,6 +56,11 @@ impl Patch {
     ///
     /// A source mismatch is a typed conflict rather than a last-writer-wins
     /// replacement, which keeps the common layer safe for snapshot joins.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `source` does not exactly match the artifact this
+    /// patch was created from.
     pub fn apply(&self, source: &[u8]) -> Result<Vec<u8>, OleError> {
         if source != self.before.as_ref() {
             return Err(OleError::InvalidFormat(
@@ -110,6 +115,11 @@ impl Commit {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "tests use concise assertions while exercising fallible patch application"
+)]
 mod tests {
     use super::Patch;
 

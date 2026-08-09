@@ -103,6 +103,11 @@ impl Snapshot {
     /// Parses one selected object's OLEDS `\x01Ole` metadata, when present.
     ///
     /// The returned link is inert and retains unknown wire bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `key` is absent or its OLEDS stream is malformed
+    /// or exceeds the metadata limit.
     pub fn link(&self, key: &str) -> Result<Option<Link>, OleError> {
         self.state
             .objects

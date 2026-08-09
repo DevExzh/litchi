@@ -1,7 +1,10 @@
 use super::tokens::{
     attr, bool_attr, esc, locale_attrs, validate_part, validate_sequence, write_part,
 };
-use super::*;
+use super::{
+    MAX_MAPS, MAX_PARTS, MAX_STYLES, Result, invalid, validate_cell_address, validate_locale,
+    validate_name, validate_optional_string, validate_text,
+};
 
 /// XML part containing a data style.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -155,6 +158,7 @@ pub struct TextProperties {
 }
 
 impl TextProperties {
+    #[must_use]
     pub fn as_xml(&self) -> &str {
         &self.xml
     }
@@ -291,6 +295,11 @@ pub struct Style {
 }
 
 impl Style {
+    /// Create an empty data style with a validated identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the supplied style name is not valid XML text.
     pub fn new(name: impl Into<String>, kind: Kind, section: Section) -> Result<Self> {
         let value = Self {
             source_part: Part::Flat,
@@ -317,6 +326,12 @@ impl Style {
         Ok(value)
     }
 
+    /// Validate this style for the requested ODF version.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an attribute, token, map, or ordering rule is not
+    /// valid for the requested version.
     pub fn validate(&self, version: Version) -> Result<()> {
         self.validate_inner(version, false)
     }
@@ -368,7 +383,11 @@ impl Style {
         Ok(())
     }
 
-    /// Serialize a normative ODF fragment for the requested core version.
+    /// Serialize a normative compact ODF fragment for the requested core version.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the style is not valid for the requested version.
     pub fn to_xml_fragment(&self, version: Version) -> Result<String> {
         self.validate(version)?;
         let mut out = format!(
@@ -446,6 +465,7 @@ pub struct Styles {
 }
 
 impl Styles {
+    #[must_use]
     pub fn get(&self, part: Part, section: Section, name: &str) -> Option<&Style> {
         self.styles.iter().find(|style| {
             style.source_part == part && style.section == section && style.name == name

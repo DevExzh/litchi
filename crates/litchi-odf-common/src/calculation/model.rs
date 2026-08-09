@@ -63,28 +63,32 @@ pub struct Settings {
 
 impl Settings {
     /// Validate all lexical values before they cross an XML boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a retained XML Schema lexical value is malformed
+    /// or exceeds the configured attribute limit.
     pub fn validate(&self) -> Result<()> {
-        if let Some(value) = self
+        if let Some(date_value) = self
             .null_date
             .as_ref()
             .and_then(|null_date| null_date.date_value.as_deref())
+            && (date_value.len() > super::MAX_ATTRIBUTE_BYTES || !is_xsd_date(date_value))
         {
-            if value.len() > super::MAX_ATTRIBUTE_BYTES || !is_xsd_date(value) {
-                return Err(Error::InvalidFormat(format!(
-                    "invalid calculation null date '{value}'"
-                )));
-            }
+            return Err(Error::InvalidFormat(format!(
+                "invalid calculation null date '{date_value}'"
+            )));
         }
-        if let Some(value) = self
+        if let Some(maximum_difference) = self
             .iteration
             .as_ref()
             .and_then(|iteration| iteration.maximum_difference.as_deref())
+            && (maximum_difference.len() > super::MAX_ATTRIBUTE_BYTES
+                || !is_xsd_double(maximum_difference))
         {
-            if value.len() > super::MAX_ATTRIBUTE_BYTES || !is_xsd_double(value) {
-                return Err(Error::InvalidFormat(format!(
-                    "invalid iteration maximum difference '{value}'"
-                )));
-            }
+            return Err(Error::InvalidFormat(format!(
+                "invalid iteration maximum difference '{maximum_difference}'"
+            )));
         }
         Ok(())
     }
@@ -133,7 +137,7 @@ pub(crate) fn is_xsd_date(value: &str) -> bool {
     if !value.is_ascii() {
         return false;
     }
-    let date = if let Some(date) = value.strip_suffix('Z') {
+    let date_with_timezone = if let Some(date) = value.strip_suffix('Z') {
         date
     } else if value.len() >= 6 {
         let split = value.len() - 6;
@@ -149,8 +153,10 @@ pub(crate) fn is_xsd_date(value: &str) -> bool {
     } else {
         value
     };
-    let date = date.strip_prefix('-').unwrap_or(date);
-    let Some((year, rest)) = date.split_once('-') else {
+    let unsigned_date = date_with_timezone
+        .strip_prefix('-')
+        .unwrap_or(date_with_timezone);
+    let Some((year, rest)) = unsigned_date.split_once('-') else {
         return false;
     };
     let Some((month, day)) = rest.split_once('-') else {
@@ -165,19 +171,19 @@ pub(crate) fn is_xsd_date(value: &str) -> bool {
     {
         return false;
     }
-    let (Ok(month), Ok(day)) = (month.parse::<u8>(), day.parse::<u8>()) else {
+    let (Ok(parsed_month), Ok(parsed_day)) = (month.parse::<u8>(), day.parse::<u8>()) else {
         return false;
     };
     let leap =
         decimal_mod(year, 4) == 0 && (decimal_mod(year, 100) != 0 || decimal_mod(year, 400) == 0);
-    let days = match month {
+    let days = match parsed_month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
         2 if leap => 29,
         2 => 28,
         _ => return false,
     };
-    (1..=days).contains(&day)
+    (1..=days).contains(&parsed_day)
 }
 
 fn decimal_mod(value: &str, modulus: u16) -> u16 {

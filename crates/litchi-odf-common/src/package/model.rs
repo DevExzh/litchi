@@ -28,6 +28,7 @@ pub struct Entry {
 
 impl Manifest {
     /// Return the media type for a manifest path, if declared.
+    #[must_use]
     pub fn get_media_type(&self, path: &str) -> Option<&str> {
         self.entries
             .get(path)
@@ -35,6 +36,7 @@ impl Manifest {
     }
 
     /// Check whether a manifest path is declared.
+    #[must_use]
     pub fn has_path(&self, path: &str) -> bool {
         self.entries.contains_key(path)
     }
@@ -45,6 +47,7 @@ impl Manifest {
     }
 
     /// Return a manifest entry by path.
+    #[must_use]
     pub fn get_entry(&self, path: &str) -> Option<&Entry> {
         self.entries.get(path)
     }

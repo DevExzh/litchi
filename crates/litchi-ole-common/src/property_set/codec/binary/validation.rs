@@ -1,6 +1,11 @@
 //! Section and stream structure validation and serialization.
 
-use super::super::super::model::*;
+use super::super::super::model::{
+    CodePage, DEFAULT_CODEPAGE, Guid, PID_CODEPAGE, PID_DICTIONARY, Section, Stream,
+    UNICODE_CODEPAGE, Value, align4_len, checked_add, checked_mul, checked_u32, invalid,
+    try_clone_vec, try_hash_map_with_capacity, try_hash_set_with_capacity, try_vec_with_capacity,
+    valid_named_property_identifier, valid_property_identifier,
+};
 use super::super::semantic::{MAX_PROPERTY_COUNT, validate_section};
 use super::super::support::allocation;
 use super::semantic::serialize_typed_for_property;
@@ -10,7 +15,7 @@ use super::wire::{
 };
 use super::{parse_typed_property, parse_typed_property_for_property};
 use litchi_cfb::OleError;
-use litchi_cfb::consts::*;
+use litchi_cfb::consts::VT_I2;
 use std::collections::HashMap;
 
 const PROPERTY_SET_HEADER_SIZE: usize = 28;
@@ -34,7 +39,7 @@ pub(super) fn parse_stream(data: &[u8]) -> Result<Stream, OleError> {
     let system_identifier = read_u32(data, 4, "system identifier")?;
     let class_identifier = read_guid(data, 8, "class identifier")?;
     let section_count = usize::try_from(read_u32(data, 24, "section count")?)
-        .map_err(|_| invalid("Property Set section count is too large"))?;
+        .map_err(|_conversion_error| invalid("Property Set section count is too large"))?;
     if !(1..=2).contains(&section_count) {
         return Err(invalid(format!(
             "Property Set section count {section_count} is outside 1..=2"
@@ -58,7 +63,7 @@ pub(super) fn parse_stream(data: &[u8]) -> Result<Stream, OleError> {
         let format_identifier = read_guid(data, descriptor, "section format identifier")?;
         let offset_field = checked_add(descriptor, 16, "section descriptor")?;
         let offset = usize::try_from(read_u32(data, offset_field, "section offset")?)
-            .map_err(|_| invalid("Property Set section offset is too large"))?;
+            .map_err(|_conversion_error| invalid("Property Set section offset is too large"))?;
         if offset < descriptor_end || offset % 4 != 0 || offset >= data.len() {
             return Err(invalid(format!(
                 "Invalid Property Set section offset {offset}"
@@ -68,7 +73,7 @@ pub(super) fn parse_stream(data: &[u8]) -> Result<Stream, OleError> {
             return Err(invalid("Duplicate Property Set section descriptor"));
         }
         let size = usize::try_from(read_u32(data, offset, "section size")?)
-            .map_err(|_| invalid("Property Set section size is too large"))?;
+            .map_err(|_conversion_error| invalid("Property Set section size is too large"))?;
         let end = offset
             .checked_add(size)
             .filter(|end| *end <= data.len())
@@ -112,7 +117,7 @@ pub(super) fn serialize_stream(stream: &Stream) -> Result<Vec<u8>, OleError> {
         if !ids.insert(section.format_identifier) {
             return Err(invalid("Duplicate section format identifier"));
         }
-        validate_section(section, stream.version)?
+        validate_section(section, stream.version)?;
     }
     let descriptor_end = checked_add(
         PROPERTY_SET_HEADER_SIZE,
@@ -125,7 +130,7 @@ pub(super) fn serialize_stream(stream: &Stream) -> Result<Vec<u8>, OleError> {
     )?;
     let mut sections = try_vec_with_capacity(stream.sections.len(), "serialized sections")?;
     for section in &stream.sections {
-        sections.push(serialize_section(section)?)
+        sections.push(serialize_section(section)?);
     }
     let descriptor_size = align4_len(descriptor_end, "Property Set descriptor table")?;
     let mut offsets = try_vec_with_capacity(sections.len(), "section offsets")?;
@@ -152,7 +157,7 @@ pub(super) fn serialize_stream(stream: &Stream) -> Result<Vec<u8>, OleError> {
         )?;
         out[base..base + 16].copy_from_slice(section.format_identifier.as_bytes());
         out[base + 16..base + 20]
-            .copy_from_slice(&checked_u32(offsets[index], "Section offset")?.to_le_bytes())
+            .copy_from_slice(&checked_u32(offsets[index], "Section offset")?.to_le_bytes());
     }
     for (index, section) in sections.iter().enumerate() {
         let start = offsets[index];
@@ -168,11 +173,11 @@ fn serialize_section(section: &Section) -> Result<Vec<u8>, OleError> {
         .try_reserve(section.properties.len())
         .map_err(|source| allocation("property order", source))?;
     if !section.dictionary.is_empty() && !order.contains(&PID_DICTIONARY) {
-        order.insert(0, PID_DICTIONARY)
+        order.insert(0, PID_DICTIONARY);
     }
     for id in section.properties.keys() {
         if !order.contains(id) {
-            order.push(*id)
+            order.push(*id);
         }
     }
     order.retain(|id| {
@@ -206,7 +211,7 @@ fn serialize_section(section: &Section) -> Result<Vec<u8>, OleError> {
                 .get(id)
                 .ok_or_else(|| invalid(format!("Property order references missing PID {id}")))?;
             serialize_typed_for_property(*id, value, codepage)?
-        })
+        });
     }
     let table_size = align4_len(table_end, "property descriptor table")?;
     let mut offsets = try_vec_with_capacity(values.len(), "property offsets")?;
@@ -228,7 +233,7 @@ fn serialize_section(section: &Section) -> Result<Vec<u8>, OleError> {
         )?;
         out[base..base + 4].copy_from_slice(&id.to_le_bytes());
         out[base + 4..base + 8]
-            .copy_from_slice(&checked_u32(offsets[index], "Property offset")?.to_le_bytes())
+            .copy_from_slice(&checked_u32(offsets[index], "Property offset")?.to_le_bytes());
     }
     for (index, value) in values.iter().enumerate() {
         let start = offsets[index];
@@ -247,7 +252,7 @@ fn serialize_dictionary(section: &Section, codepage: u16) -> Result<Vec<u8>, Ole
         .map_err(|source| allocation("dictionary order", source))?;
     for id in section.dictionary.keys() {
         if !order.contains(id) {
-            order.push(*id)
+            order.push(*id);
         }
     }
     order.retain(|id| section.dictionary.contains_key(id));
@@ -294,7 +299,7 @@ fn serialize_dictionary(section: &Section, codepage: u16) -> Result<Vec<u8>, Ole
             )?;
             reserve_bytes(&mut out, byte_len, "serialized property dictionary")?;
             out.extend_from_slice(&bytes);
-            out.push(0)
+            out.push(0);
         }
     }
     Ok(out)
@@ -303,14 +308,14 @@ fn serialize_dictionary(section: &Section, codepage: u16) -> Result<Vec<u8>, Ole
 fn parse_section(data: &[u8], format_identifier: Guid, version: u16) -> Result<Section, OleError> {
     checked_range(data, 0, SECTION_HEADER_SIZE, "section header")?;
     let declared_size = usize::try_from(read_u32(data, 0, "section size")?)
-        .map_err(|_| invalid("Property Set section size is too large"))?;
+        .map_err(|_conversion_error| invalid("Property Set section size is too large"))?;
     if declared_size != data.len() {
         return Err(invalid(
             "Property Set section range does not match its size",
         ));
     }
     let property_count = usize::try_from(read_u32(data, 4, "property count")?)
-        .map_err(|_| invalid("Property count is too large"))?;
+        .map_err(|_conversion_error| invalid("Property count is too large"))?;
     if property_count > MAX_PROPERTY_COUNT {
         return Err(invalid(format!(
             "Property count {property_count} exceeds the safety limit"
@@ -341,7 +346,7 @@ fn parse_section(data: &[u8], format_identifier: Guid, version: u16) -> Result<S
         }
         let offset_field = checked_add(descriptor, 4, "property descriptor")?;
         let offset = usize::try_from(read_u32(data, offset_field, "property offset")?)
-            .map_err(|_| invalid("Property offset is too large"))?;
+            .map_err(|_conversion_error| invalid("Property offset is too large"))?;
         // Older Office producers emit valid properties at non-DWORD offsets.
         // Bounds and uniqueness remain mandatory, but alignment is advisory.
         if offset < table_end || offset >= data.len() {
@@ -384,7 +389,7 @@ fn parse_section(data: &[u8], format_identifier: Guid, version: u16) -> Result<S
             let Value::I2(signed) = value else {
                 return Err(invalid("PID 1 must contain a VT_I2 codepage"));
             };
-            let codepage = CodePage::try_from(signed as u16)?;
+            let codepage = CodePage::try_from(u16::from_ne_bytes(signed.to_ne_bytes()))?;
             (Some(codepage), Some(Value::I2(signed)))
         },
         None => (None, None),
@@ -438,7 +443,7 @@ fn parse_dictionary(
 ) -> Result<(HashMap<u32, String>, Vec<u32>), OleError> {
     let mut reader = ValueReader::new(data, property_offset);
     let count = usize::try_from(reader.read_u32("dictionary count")?)
-        .map_err(|_| invalid("Dictionary count is too large"))?;
+        .map_err(|_conversion_error| invalid("Dictionary count is too large"))?;
     if count > MAX_PROPERTY_COUNT {
         return Err(invalid(format!(
             "Dictionary count {count} exceeds the safety limit"
@@ -457,7 +462,7 @@ fn parse_dictionary(
             )));
         }
         let length = usize::try_from(reader.read_u32("dictionary string length")?)
-            .map_err(|_| invalid("Dictionary string length is too large"))?;
+            .map_err(|_conversion_error| invalid("Dictionary string length is too large"))?;
         if length == 0 {
             return Err(invalid("Dictionary strings must include a terminator"));
         }

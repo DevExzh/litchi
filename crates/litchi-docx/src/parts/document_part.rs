@@ -2,10 +2,12 @@
 
 use crate::alt::{Chunk, active, scan};
 use crate::error::Result;
-use crate::namespace::scan_word_element_ranges;
+use crate::namespace::{is_wordprocessing_namespace, scan_word_element_ranges};
 use crate::paragraph::{Paragraph, extract_word_text};
 use crate::table::Table;
 use litchi_opc::part::Part;
+use quick_xml::events::Event;
+use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -18,14 +20,15 @@ use std::sync::Arc;
 pub struct DocumentPart<'a> {
     /// Reference to the underlying part
     part: &'a dyn Part,
-    raw: Arc<Vec<u8>>,
     xml: Arc<Vec<u8>>,
 }
 
-/// Select document-level Word blocks in original source order and coordinates.
+/// Select the active supported block ranges from original document XML.
 ///
-/// Markup-compatibility preprocessing is used only as a visibility oracle; the
-/// ranges continue to address the untouched package part.
+/// This remains available to the mutable writer, whose source-preserving body
+/// codec operates on untouched package bytes. Read-only semantic block queries
+/// use [`body_block_ranges`] after MCE branch selection so they can retain an
+/// `Unknown` fallback for every visible direct body child.
 pub(crate) fn active_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
     let mut ranges = Vec::new();
     scan_word_element_ranges(
@@ -42,6 +45,157 @@ pub(crate) fn active_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> 
         .collect::<Vec<_>>();
     let selected = active(xml, &starts)?.into_iter().collect::<BTreeSet<_>>();
     ranges.retain(|&(_, start, _)| selected.contains(&start));
+    Ok(ranges)
+}
+
+/// Select active direct children of the main document body in source order.
+///
+/// `DocumentPart::from_part` has already selected MCE branches for this
+/// source, so every returned range addresses the visible XML and unmodeled
+/// body children can remain lossless instead of being silently discarded.
+fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
+    const PARAGRAPH: usize = 0;
+    const TABLE: usize = 1;
+    const ALT: usize = 2;
+    const UNKNOWN: usize = 3;
+    const MAX_DEPTH: usize = 256;
+    const MAX_NODES: usize = 1_000_000;
+
+    let mut reader = NsReader::from_reader(xml);
+    let mut ranges = Vec::new();
+    let mut body_depth = None;
+    let mut pending = None::<(usize, usize)>;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+
+    loop {
+        let start = usize::try_from(reader.buffer_position()).map_err(|_| {
+            crate::Error::InvalidFormat("document XML offset does not fit usize".into())
+        })?;
+        let event = reader
+            .read_event()
+            .map_err(|error| crate::Error::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        let end = usize::try_from(reader.buffer_position()).map_err(|_| {
+            crate::Error::InvalidFormat("document XML offset does not fit usize".into())
+        })?;
+
+        if matches!(event, Event::Start(_) | Event::Empty(_)) {
+            nodes = nodes.checked_add(1).ok_or_else(|| {
+                crate::Error::InvalidFormat("document XML element counter overflow".into())
+            })?;
+            if nodes > MAX_NODES {
+                return Err(crate::Error::InvalidFormat(format!(
+                    "document XML exceeds {MAX_NODES} elements"
+                )));
+            }
+        }
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    crate::Error::InvalidFormat("document XML nesting is too deep".into())
+                })?;
+                if depth > MAX_DEPTH {
+                    return Err(crate::Error::InvalidFormat(format!(
+                        "document XML nesting exceeds the {MAX_DEPTH} depth limit"
+                    )));
+                }
+                let is_word = is_wordprocessing_namespace(&namespace);
+                let local = element.local_name();
+                if body_depth.is_none() && is_word && local.as_ref() == b"body" {
+                    body_depth = Some(depth);
+                } else if body_depth.is_some_and(|body| depth == body + 1) {
+                    let kind = if is_word && local.as_ref() == b"p" {
+                        PARAGRAPH
+                    } else if is_word && local.as_ref() == b"tbl" {
+                        TABLE
+                    } else if is_word && local.as_ref() == b"altChunk" {
+                        ALT
+                    } else {
+                        UNKNOWN
+                    };
+                    pending = Some((kind, start));
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    crate::Error::InvalidFormat("document XML nesting is too deep".into())
+                })?;
+                if child_depth > MAX_DEPTH {
+                    return Err(crate::Error::InvalidFormat(format!(
+                        "document XML nesting exceeds the {MAX_DEPTH} depth limit"
+                    )));
+                }
+                if body_depth.is_some_and(|body| child_depth == body + 1) {
+                    let local = element.local_name();
+                    let kind = if is_wordprocessing_namespace(&namespace) && local.as_ref() == b"p"
+                    {
+                        PARAGRAPH
+                    } else if is_wordprocessing_namespace(&namespace) && local.as_ref() == b"tbl" {
+                        TABLE
+                    } else if is_wordprocessing_namespace(&namespace)
+                        && local.as_ref() == b"altChunk"
+                    {
+                        ALT
+                    } else {
+                        UNKNOWN
+                    };
+                    let range_start = u32::try_from(start).map_err(|_| {
+                        crate::Error::InvalidFormat("document XML offset does not fit u32".into())
+                    })?;
+                    let length = u32::try_from(end.checked_sub(start).ok_or_else(|| {
+                        crate::Error::InvalidFormat("document XML range underflow".into())
+                    })?)
+                    .map_err(|_| {
+                        crate::Error::InvalidFormat("document XML range does not fit u32".into())
+                    })?;
+                    ranges.push((kind, range_start, length));
+                }
+            },
+            Event::End(element) => {
+                if pending.is_some_and(|_| body_depth.is_some_and(|body| depth == body + 1)) {
+                    let (kind, range_start) = pending.take().ok_or_else(|| {
+                        crate::Error::InvalidFormat("missing document body block".into())
+                    })?;
+                    let start = u32::try_from(range_start).map_err(|_| {
+                        crate::Error::InvalidFormat("document XML offset does not fit u32".into())
+                    })?;
+                    let length = u32::try_from(end.checked_sub(range_start).ok_or_else(|| {
+                        crate::Error::InvalidFormat("document XML range underflow".into())
+                    })?)
+                    .map_err(|_| {
+                        crate::Error::InvalidFormat("document XML range does not fit u32".into())
+                    })?;
+                    ranges.push((kind, start, length));
+                }
+                if body_depth == Some(depth)
+                    && is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"body"
+                {
+                    body_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    crate::Error::InvalidFormat("invalid document XML nesting".into())
+                })?;
+            },
+            Event::Eof if depth != 0 || pending.is_some() => {
+                return Err(crate::Error::InvalidFormat(
+                    "unterminated document XML".into(),
+                ));
+            },
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
     Ok(ranges)
 }
 
@@ -75,19 +229,13 @@ impl<'a> DocumentPart<'a> {
             std::borrow::Cow::Borrowed(_) => Arc::clone(&raw),
             std::borrow::Cow::Owned(v) => Arc::new(v),
         };
-        Ok(Self { part, raw, xml })
+        Ok(Self { part, xml })
     }
 
     /// Get the shared Arc of XML bytes (zero-copy from Part).
     #[inline]
     fn get_xml_arc(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.xml)
-    }
-
-    /// Get the original XML backing semantic source ranges.
-    #[inline]
-    fn get_raw_arc(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.raw)
     }
 
     /// Get the XML bytes of the document.
@@ -200,6 +348,7 @@ impl<'a> DocumentPart<'a> {
                 crate::Block::Paragraph(paragraph) => Some(Element::Paragraph(paragraph)),
                 crate::Block::Table(table) => Some(Element::Table(table)),
                 crate::Block::Alt(_) => None,
+                crate::Block::Unknown(value) => Some(Element::Unknown(value)),
             })
             .collect())
     }
@@ -208,10 +357,10 @@ impl<'a> DocumentPart<'a> {
     pub fn blocks(&self) -> Result<Vec<crate::Block>> {
         use crate::Block;
 
-        let source = self.get_raw_arc();
+        let source = self.get_xml_arc();
         let mut alts = scan(source.as_slice())?;
         let mut elements = Vec::new();
-        for (target, start, length) in active_block_ranges(source.as_slice())? {
+        for (target, start, length) in body_block_ranges(source.as_slice())? {
             let block_source = Arc::clone(&source);
             elements.push(if target == 0 {
                 Block::Paragraph(Box::new(Paragraph::from_arc_range(
@@ -221,13 +370,19 @@ impl<'a> DocumentPart<'a> {
                 )))
             } else if target == 1 {
                 Block::Table(Box::new(Table::from_arc_range(block_source, start, length)))
-            } else {
+            } else if target == 2 {
                 let chunk = alts.remove(&start).ok_or_else(|| {
                     crate::error::Error::InvalidFormat(
                         "ordered altChunk lacks parsed anchor metadata".into(),
                     )
                 })?;
                 Block::Alt(Box::new(chunk))
+            } else {
+                Block::Unknown(Box::new(crate::OpaqueBlock::from_arc_range(
+                    block_source,
+                    start,
+                    length,
+                )))
             });
         }
         Ok(elements)
@@ -240,7 +395,9 @@ impl<'a> DocumentPart<'a> {
             .into_iter()
             .filter_map(|block| match block {
                 crate::Block::Alt(chunk) => Some(*chunk),
-                crate::Block::Paragraph(_) | crate::Block::Table(_) => None,
+                crate::Block::Paragraph(_) | crate::Block::Table(_) | crate::Block::Unknown(_) => {
+                    None
+                },
             })
             .collect())
     }
@@ -264,16 +421,7 @@ mod tests {
 
     #[test]
     fn extracts_aliased_word_elements_in_document_order_without_copying_text() {
-        let xml = br#"<wp:document xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml">
-            <wp:body>
-                <false:p><false:r><false:t>ignored</false:t></false:r></false:p>
-                <wp:p><wp:r><wp:t><![CDATA[A < B]]></wp:t></wp:r></wp:p>
-                <wp:tbl><wp:tr><wp:tc><wp:p><wp:r><wp:t>cell</wp:t></wp:r></wp:p></wp:tc></wp:tr></wp:tbl>
-                <wp:p><wp:r><wp:t>tail</wp:t></wp:r></wp:p>
-                <wp:p/>
-                <false:tbl/>
-            </wp:body>
-        </wp:document>"#;
+        let xml = br#"<wp:document xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml"><wp:body><false:p><false:r><false:t>ignored</false:t></false:r></false:p><wp:p><wp:r><wp:t><![CDATA[A < B]]></wp:t></wp:r></wp:p><wp:tbl><wp:tr><wp:tc><wp:p><wp:r><wp:t>cell</wp:t></wp:r></wp:p></wp:tc></wp:tr></wp:tbl><wp:p><wp:r><wp:t>tail</wp:t></wp:r></wp:p><wp:p/><false:tbl/></wp:body></wp:document>"#;
         let part = document_part(xml);
         let document = DocumentPart::from_part(&part).unwrap();
 
@@ -290,11 +438,18 @@ mod tests {
         assert_eq!(paragraphs[3].text().unwrap(), "");
 
         let elements = document.elements().unwrap();
-        assert_eq!(elements.len(), 4);
-        assert!(matches!(elements[0], Element::Paragraph(_)));
-        assert!(matches!(elements[1], Element::Table(_)));
-        assert!(matches!(elements[2], Element::Paragraph(_)));
+        assert_eq!(elements.len(), 6);
+        assert!(matches!(elements[0], Element::Unknown(_)));
+        assert!(matches!(elements[1], Element::Paragraph(_)));
+        assert!(matches!(elements[2], Element::Table(_)));
         assert!(matches!(elements[3], Element::Paragraph(_)));
+        assert!(matches!(elements[4], Element::Paragraph(_)));
+        assert!(matches!(elements[5], Element::Unknown(_)));
+
+        let blocks = document.blocks().unwrap();
+        assert!(
+            matches!(&blocks[0], crate::Block::Unknown(value) if value.xml_bytes() == br#"<false:p><false:r><false:t>ignored</false:t></false:r></false:p>"#)
+        );
     }
 
     #[test]

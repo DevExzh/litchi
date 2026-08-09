@@ -75,3 +75,21 @@ fn style_edits_replace_only_managed_automatic_styles() {
     );
     assert!(commit.content_xml().contains("draw:name=\"keep\""));
 }
+
+#[test]
+fn patch_is_exact_source_checked_and_reversible() -> litchi_core::Result<()> {
+    let snapshot = Snapshot::parse(source(), None)?;
+    let mut edit = snapshot.edit();
+    edit.document_mut().structure_protected = Some(true);
+    let commit = edit.commit()?;
+    let patch = commit.patch().clone();
+    let restored = patch.inverse().apply(commit.snapshot())?;
+    assert_eq!(restored.content_xml(), snapshot.source_xml());
+
+    let other = Snapshot::parse(
+        "<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"><office:body><office:spreadsheet/></office:body></office:document-content>",
+        None,
+    )?;
+    assert!(patch.apply(&other).is_err());
+    Ok(())
+}

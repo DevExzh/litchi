@@ -7,5 +7,5 @@ mod facade;
 mod model;
 mod package;
 
-pub use facade::{Builder, Commit, Edit, Patch, Template, TextBody};
+pub use facade::{Builder, Commit, Edit, ParagraphChange, Patch, Template, TextBody};
 pub use model::{link, paragraph};

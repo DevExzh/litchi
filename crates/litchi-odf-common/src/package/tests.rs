@@ -1,3 +1,9 @@
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test assertions intentionally unwrap known-valid package fixture construction failures."
+)]
+
 use super::{Archive, read_manifest};
 use super::{Entry, Manifest, is_media_path, parse_manifest};
 

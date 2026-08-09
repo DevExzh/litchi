@@ -40,8 +40,8 @@ impl Text {
     }
 
     fn decode(raw: Vec<u8>, page: Mbcs) -> Self {
-        let (decoded, had_decode_errors) = page.recover(&raw);
-        let decoded = decoded.into_owned();
+        let (recovered, had_decode_errors) = page.recover(&raw);
+        let decoded = recovered.into_owned();
         Self {
             raw,
             decoded,

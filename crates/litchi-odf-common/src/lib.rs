@@ -1,4 +1,4 @@
-//! Shared OpenDocument vocabulary and scalar codecs.
+//! Shared `OpenDocument` vocabulary and scalar codecs.
 //!
 //! This crate contains functionality shared by every ODF document family:
 //! constants, spreadsheet coordinates, namespace/qualified-name vocabulary,

@@ -1,6 +1,6 @@
-//! Best-effort OpenDocument format detection.
+//! Best-effort `OpenDocument Format` (`ODF`) detection.
 //!
-//! Detection is inert: it reads the standardized MIME type from a flat XML
+//! Detection is inert: it reads the standardized `MIME` type from a flat `XML`
 //! root or packaged `mimetype` member without constructing a document model.
 //!
 //! ```rust
@@ -19,6 +19,9 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::io::{Read, Seek, SeekFrom};
 
+/// Neutral file classification returned by the detector.
+pub use litchi_core::FileFormat as Format;
+
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const ZIP_SIGNATURE: &[u8] = b"PK\x03\x04";
 const LOCAL_HEADER_BYTES: usize = 30;
@@ -26,14 +29,12 @@ const MIMETYPE_PATH: &str = "mimetype";
 const MIMETYPE_NAME: &[u8] = MIMETYPE_PATH.as_bytes();
 const MAX_MIMETYPE_BYTES: usize = 256;
 
-/// Neutral file classification returned by the detector.
-pub use litchi_core::FileFormat as Format;
-
 /// Classify the raw contents of an ODF `mimetype` member.
 ///
 /// Leading and trailing ASCII whitespace is ignored without allocating.
 /// Unknown MIME types and invalid UTF-8 return `None`.
 #[inline]
+#[must_use]
 pub fn mime(value: &[u8]) -> Option<Format> {
     match std::str::from_utf8(trim_ascii(value)).ok()? {
         constants::ODF_TEXT | constants::ODF_TEXT_TEMPLATE => Some(Format::Odt),
@@ -50,43 +51,44 @@ pub fn mime(value: &[u8]) -> Option<Format> {
     }
 }
 
-/// Read a recognized `office:mimetype` value from a flat ODF XML root.
+/// Read a recognized `office:mimetype` value from a flat `ODF` `XML` root.
 ///
 /// The root must be `office:document` in the ODF office namespace. Namespace
 /// prefixes are resolved semantically. The returned value is decoded and XML
 /// attribute whitespace is normalized before classification, then copied into
 /// an owned string.
+#[must_use]
 pub fn flat_mime(value: &[u8]) -> Option<String> {
-    with_flat_mime(value, |value| {
-        let value = trim_ascii(value);
-        mime(value)?;
-        let value = std::str::from_utf8(value).ok()?;
-        Some(value.to_owned())
+    with_flat_mime(value, |raw_mimetype| {
+        let trimmed_mimetype = trim_ascii(raw_mimetype);
+        mime(trimmed_mimetype)?;
+        let mimetype_text = std::str::from_utf8(trimmed_mimetype).ok()?;
+        Some(mimetype_text.to_owned())
     })
 }
 
 fn with_flat_mime<T>(value: &[u8], classify: impl FnOnce(&[u8]) -> Option<T>) -> Option<T> {
     let mut reader = NsReader::from_reader(value);
     loop {
-        let (namespace, event) = reader.read_resolved_event().ok()?;
+        let (event_namespace, event) = reader.read_resolved_event().ok()?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                if !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                if !matches!(event_namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                     || element.local_name().as_ref() != b"document"
                 {
                     return None;
                 }
-                for attribute in element.attributes() {
-                    let attribute = attribute.ok()?;
-                    let (namespace, local_name) =
+                for raw_attribute in element.attributes() {
+                    let attribute = raw_attribute.ok()?;
+                    let (attribute_namespace, local_name) =
                         reader.resolver().resolve_attribute(attribute.key);
-                    if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                    if matches!(attribute_namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                         && local_name.as_ref() == b"mimetype"
                     {
-                        let value = attribute
+                        let decoded_mimetype = attribute
                             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                             .ok()?;
-                        return classify(value.as_bytes());
+                        return classify(decoded_mimetype.as_bytes());
                     }
                 }
                 return None;
@@ -94,22 +96,26 @@ fn with_flat_mime<T>(value: &[u8], classify: impl FnOnce(&[u8]) -> Option<T>) ->
             Event::Decl(_) | Event::Comment(_) | Event::DocType(_) | Event::PI(_) => {},
             Event::Text(text) if text.iter().all(u8::is_ascii_whitespace) => {},
             Event::Eof => return None,
-            _ => return None,
+            Event::End(_) | Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {
+                return None;
+            },
         }
     }
 }
 
-/// Detect a flat OpenDocument XML document.
+/// Detect a flat `OpenDocument` `XML` document.
 #[inline]
+#[must_use]
 pub fn flat(value: &[u8]) -> Option<Format> {
     with_flat_mime(value, mime)
 }
 
-/// Detect a packaged or flat OpenDocument document from complete bytes.
+/// Detect a packaged or flat `OpenDocument` document from complete bytes.
 ///
 /// Conforming ODF packages place an uncompressed `mimetype` entry first. The
 /// local ZIP header and payload are checked in place without allocating a
 /// decompression buffer. The central archive structure is also validated.
+#[must_use]
 pub fn bytes(value: &[u8]) -> Option<Format> {
     if value.starts_with(ZIP_SIGNATURE) {
         let format = mime(packaged_mime(value)?)?;
@@ -122,7 +128,7 @@ pub fn bytes(value: &[u8]) -> Option<Format> {
     flat(value)
 }
 
-/// Detect a packaged or flat OpenDocument stream.
+/// Detect a packaged or flat `OpenDocument` stream.
 ///
 /// Detection reads the complete stream from its beginning and restores the
 /// caller's original cursor position on every success or failure path. If the
@@ -278,8 +284,12 @@ mod tests {
     #[test]
     fn detects_packaged_documents_and_restores_nonzero_reader_position() {
         let mut writer = crate::core::PackageWriter::new();
-        writer.set_mimetype(constants::ODF_TEXT).unwrap();
-        let package = writer.finish_to_bytes().unwrap();
+        writer
+            .set_mimetype(constants::ODF_TEXT)
+            .unwrap_or_else(|error| panic!("test package mimetype must be accepted: {error}"));
+        let package = writer
+            .finish_to_bytes()
+            .unwrap_or_else(|error| panic!("test package must be writable: {error}"));
         assert_eq!(bytes(&package), Some(Format::Odt));
 
         let mut input = Cursor::new(package);
@@ -306,8 +316,12 @@ mod tests {
     #[test]
     fn packaged_detection_rejects_nonconforming_local_mimetype_entries() {
         let mut writer = crate::core::PackageWriter::new();
-        writer.set_mimetype(constants::ODF_TEXT).unwrap();
-        let package = writer.finish_to_bytes().unwrap();
+        writer
+            .set_mimetype(constants::ODF_TEXT)
+            .unwrap_or_else(|error| panic!("test package mimetype must be accepted: {error}"));
+        let package = writer
+            .finish_to_bytes()
+            .unwrap_or_else(|error| panic!("test package must be writable: {error}"));
 
         let mut compressed = package.clone();
         compressed[8..10].copy_from_slice(&8_u16.to_le_bytes());

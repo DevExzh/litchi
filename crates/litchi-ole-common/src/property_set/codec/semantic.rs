@@ -1,27 +1,35 @@
 //! Semantic validation shared by parsing, serialization, and editors.
 
-use super::super::model::*;
+use super::super::model::{
+    AsciiInsensitive, CodePage, DEFAULT_CODEPAGE, PID_BEHAVIOR, PID_CODEPAGE, PID_DOC_PARTS,
+    PID_HEADING_PAIRS, Section, Stream, Value, invalid, try_hash_set_with_capacity,
+    valid_named_property_identifier, valid_property_identifier, validate_property_name,
+};
 use litchi_cfb::OleError;
 
 pub(super) const MAX_PROPERTY_COUNT: usize = 16_384;
 
-fn minimum_property_set_version(value: &Value) -> u16 {
-    match value {
-        Value::I1(_) | Value::Int(_) | Value::UInt(_) => 1,
-        Value::Vector(vector) => vector
-            .values()
-            .iter()
-            .map(minimum_property_set_version)
-            .max()
-            .unwrap_or(Stream::VERSION_0),
-        Value::Array(array) => array
-            .values()
-            .iter()
-            .map(minimum_property_set_version)
-            .max()
-            .unwrap_or(Stream::VERSION_0),
-        _ => Stream::VERSION_0,
+fn minimum_property_set_version(property: &Value) -> u16 {
+    if matches!(property, Value::I1(_) | Value::Int(_) | Value::UInt(_)) {
+        return Stream::VERSION_1;
     }
+    if let Value::Vector(vector) = property {
+        return vector
+            .values()
+            .iter()
+            .map(minimum_property_set_version)
+            .max()
+            .unwrap_or(Stream::VERSION_0);
+    }
+    if let Value::Array(array) = property {
+        return array
+            .values()
+            .iter()
+            .map(minimum_property_set_version)
+            .max()
+            .unwrap_or(Stream::VERSION_0);
+    }
+    Stream::VERSION_0
 }
 
 pub(super) fn validate_section(section: &Section, version: u16) -> Result<(), OleError> {
@@ -33,7 +41,7 @@ pub(super) fn validate_section(section: &Section, version: u16) -> Result<(), Ol
     if section.properties.len() > MAX_PROPERTY_COUNT {
         return Err(invalid("Property count exceeds safety limit"));
     }
-    let effective_codepage = section.codepage.map_or(DEFAULT_CODEPAGE, |page| page.id());
+    let effective_codepage = section.codepage.map_or(DEFAULT_CODEPAGE, CodePage::id);
     for identifier in section.properties.keys() {
         if !valid_property_identifier(*identifier) {
             return Err(invalid(format!(
@@ -41,20 +49,21 @@ pub(super) fn validate_section(section: &Section, version: u16) -> Result<(), Ol
             )));
         }
     }
-    for (identifier, value) in &section.properties {
-        let required_version = minimum_property_set_version(value);
+    for (identifier, property) in &section.properties {
+        let required_version = minimum_property_set_version(property);
         if required_version > version {
             return Err(invalid(format!(
                 "Property {identifier} requires Property Set version {required_version}"
             )));
         }
-        if let Value::VersionedStream(value) = value {
-            value.validate_for_property(*identifier)?;
+        if let Value::VersionedStream(stream) = property {
+            stream.validate_for_property(*identifier)?;
         }
-        match value {
-            Value::HeadingPairs(value) => value.validate()?,
-            Value::DocParts(value) => value.validate_for_codepage(effective_codepage)?,
-            _ => {},
+        if let Value::HeadingPairs(pairs) = property {
+            pairs.validate()?;
+        }
+        if let Value::DocParts(parts) = property {
+            parts.validate_for_codepage(effective_codepage)?;
         }
     }
     if let (Some(Value::HeadingPairs(headings)), Some(Value::DocParts(parts))) = (
@@ -62,7 +71,8 @@ pub(super) fn validate_section(section: &Section, version: u16) -> Result<(), Ol
         section.properties.get(&PID_DOC_PARTS),
     ) {
         let expected = headings.document_part_count();
-        let actual = parts.len() as u64;
+        let actual = u64::try_from(parts.len())
+            .map_err(|_conversion_error| invalid("Document-part count exceeds u64"))?;
         if expected != actual {
             return Err(invalid(format!(
                 "Heading pair part count {expected} does not match document-part count {actual}"
@@ -96,7 +106,8 @@ pub(super) fn validate_section(section: &Section, version: u16) -> Result<(), Ol
         }
     }
     match (section.codepage, section.properties.get(&PID_CODEPAGE)) {
-        (Some(codepage), Some(Value::I2(value))) if *value == codepage.id() as i16 => {},
+        (Some(codepage), Some(Value::I2(value)))
+            if *value == i16::from_ne_bytes(codepage.id().to_ne_bytes()) => {},
         (None, None) => {},
         _ => return Err(invalid("PID 1 does not match section codepage")),
     }

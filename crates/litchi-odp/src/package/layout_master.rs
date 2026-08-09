@@ -452,12 +452,6 @@ struct Attribute {
     value: String,
 }
 
-fn required_styles(presentation: &Presentation) -> Result<&str> {
-    presentation
-        .styles_xml()
-        .ok_or_else(|| error("ODP package has no styles.xml"))
-}
-
 #[derive(Clone, Debug)]
 struct Span {
     namespace: Option<String>,
@@ -491,6 +485,12 @@ impl<'a> Change<'a> {
             prefix,
         }
     }
+}
+
+fn required_styles(presentation: &Presentation) -> Result<&str> {
+    presentation
+        .styles_xml()
+        .ok_or_else(|| error("ODP package has no styles.xml"))
 }
 
 fn scan(xml: &str) -> Result<Vec<Span>> {

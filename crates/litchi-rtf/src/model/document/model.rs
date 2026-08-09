@@ -15,7 +15,9 @@ use super::super::error::{RtfError, RtfResult, try_reserve_one};
 use super::super::lexer::Lexer;
 use super::super::limits::ParseLimits;
 use super::super::parser::Parser;
-use super::super::types::{ColorTable, FontTable, Paragraph as RtfParagraph, Run, StyleBlock};
+use super::super::types::{
+    ColorTable, FontTable, Formatting, Paragraph as RtfParagraph, Run, StyleBlock,
+};
 use bumpalo::Bump;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -994,6 +996,31 @@ impl<'a> RtfDocument<'a> {
 
     pub(crate) fn retained_blocks(&self) -> &[StyleBlock<'a>] {
         &self.blocks
+    }
+
+    pub(crate) fn plain_body_text_editability(&self) -> Result<(), &'static str> {
+        if !self.opaque_nodes.is_empty() {
+            return Err("opaque syntax is retained losslessly but not editable here");
+        }
+        if !self.body_story_events.is_empty() || !self.tables.is_empty() {
+            return Err("the body contains tables or positioned structure");
+        }
+        let formatting = self
+            .blocks
+            .first()
+            .map_or_else(Formatting::default, |block| block.formatting);
+        let paragraph = self
+            .blocks
+            .first()
+            .map_or_else(RtfParagraph::default, |block| block.paragraph);
+        if self
+            .blocks
+            .iter()
+            .any(|block| block.formatting != formatting || block.paragraph != paragraph)
+        {
+            return Err("the body has mixed run or paragraph formatting");
+        }
+        Ok(())
     }
 
     /// Get all pictures in the document.

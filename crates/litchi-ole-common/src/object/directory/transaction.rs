@@ -71,17 +71,27 @@ impl Transaction {
 
     /// Replaces a producer-visible directory name while retaining all other
     /// raw fields and unknown entry data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the SID is absent, the name is invalid, or the
+    /// resulting catalog violates its retained resource limits.
     pub fn set_name(&mut self, sid: Sid, name: impl Into<String>) -> Result<&mut Self, OleError> {
-        let name = name.into();
-        validation::validate_name_for_edit(&name, self.source.limits())?;
+        let replacement_name = name.into();
+        validation::validate_name_for_edit(&replacement_name, self.source.limits())?;
         let index = self.index(sid)?;
         self.update_raw(move |entries| {
-            entries[index].name = name;
+            entries[index].name = replacement_name;
             Ok(())
         })
     }
 
     /// Replaces containment links without requiring an entry kind to be known.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the SID is absent, a link is self-referential, or
+    /// the resulting catalog violates CFB invariants or resource limits.
     pub fn set_links(&mut self, sid: Sid, links: Links) -> Result<&mut Self, OleError> {
         validate_links(sid, links)?;
         let index = self.index(sid)?;
@@ -94,6 +104,12 @@ impl Transaction {
     }
 
     /// Replaces one complete known typed metadata value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the SID is absent or opaque, the replacement has
+    /// a different SID, or the resulting catalog violates CFB invariants or
+    /// resource limits.
     pub fn set_metadata(&mut self, sid: Sid, metadata: Metadata) -> Result<&mut Self, OleError> {
         let index = self.index(sid)?;
         let before = self
@@ -114,6 +130,10 @@ impl Transaction {
     }
 
     /// Alias for [`Self::set_metadata`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::set_metadata`].
     pub fn replace_metadata(
         &mut self,
         sid: Sid,
@@ -126,6 +146,11 @@ impl Transaction {
     ///
     /// The candidate is cloned first; a failed closure or invariant check
     /// leaves this transaction unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the SID is absent or opaque, `edit` fails, or the
+    /// resulting metadata violates CFB invariants or resource limits.
     pub fn update_metadata<F>(&mut self, sid: Sid, edit: F) -> Result<&mut Self, OleError>
     where
         F: FnOnce(&mut Metadata) -> Result<(), OleError>,
@@ -143,6 +168,10 @@ impl Transaction {
 
     /// Changes a storage or root CLSID while preserving the original raw
     /// spelling when the typed value is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::update_metadata`].
     pub fn set_class_id(
         &mut self,
         sid: Sid,
@@ -155,6 +184,10 @@ impl Transaction {
     }
 
     /// Changes the typed object kind, subject to the normal CFB invariants.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::update_metadata`].
     pub fn set_kind(&mut self, sid: Sid, kind: EntryKind) -> Result<&mut Self, OleError> {
         self.update_metadata(sid, |metadata| {
             metadata.set_kind(kind);
@@ -162,7 +195,11 @@ impl Transaction {
         })
     }
 
-    /// Changes the starting FAT or MiniFAT sector.
+    /// Changes the starting FAT or `MiniFAT` sector.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::update_metadata`].
     pub fn set_start_sector(&mut self, sid: Sid, value: u32) -> Result<&mut Self, OleError> {
         self.update_metadata(sid, |metadata| {
             metadata.set_start_sector(value);
@@ -171,6 +208,10 @@ impl Transaction {
     }
 
     /// Changes the parsed CFB stream size.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::update_metadata`].
     pub fn set_stream_size(&mut self, sid: Sid, value: u64) -> Result<&mut Self, OleError> {
         self.update_metadata(sid, |metadata| {
             metadata.set_stream_size(value);
@@ -178,7 +219,11 @@ impl Transaction {
         })
     }
 
-    /// Changes MiniFAT placement.
+    /// Changes `MiniFAT` placement.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::update_metadata`].
     pub fn set_uses_mini_stream(&mut self, sid: Sid, value: bool) -> Result<&mut Self, OleError> {
         self.update_metadata(sid, |metadata| {
             metadata.set_uses_mini_stream(value);
@@ -191,6 +236,11 @@ impl Transaction {
     /// This is the escape hatch for producer-defined fields exposed by
     /// `litchi_cfb::DirectoryEntry`; it still cannot mutate a CFB container or
     /// bypass SID, name, containment, kind, and resource checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `edit` fails or its changes violate CFB
+    /// invariants or the transaction's resource limits.
     pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
     where
         F: FnOnce(&mut [DirectoryEntry]) -> Result<(), OleError>,
@@ -199,6 +249,11 @@ impl Transaction {
     }
 
     /// Captures the current candidate as a validated snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a changed candidate no longer validates under the
+    /// transaction's retained CFB resource limits.
     pub fn snapshot(&self) -> Result<Snapshot, OleError> {
         self.materialize()
     }
@@ -210,9 +265,14 @@ impl Transaction {
     }
 
     /// Validates and publishes the candidate without mutating its source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a changed candidate no longer validates under the
+    /// transaction's retained CFB resource limits.
     pub fn commit(self) -> Result<Commit, OleError> {
         let snapshot = self.materialize()?;
-        let patch = Patch::new(self.source, snapshot.clone());
+        let patch = Patch::new(&self.source, &snapshot);
         Ok(Commit { snapshot, patch })
     }
 
@@ -244,7 +304,11 @@ impl Transaction {
         if !self.is_changed() {
             return Ok(self.source.clone());
         }
-        Ok(Snapshot::from_catalog(self.candidate.clone()))
+        let catalog = Catalog::from_entries_shared(
+            self.candidate.raw_entries_shared(),
+            self.source.limits(),
+        )?;
+        Ok(Snapshot::from_catalog(catalog))
     }
 }
 
@@ -294,6 +358,11 @@ impl Commit {
 }
 
 /// Runs one source-checked directory edit atomically.
+///
+/// # Errors
+///
+/// Returns an error when `edit` fails or its changes violate CFB invariants or
+/// the snapshot's retained resource limits.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, OleError>
 where
     F: FnOnce(&mut Transaction) -> Result<(), OleError>,

@@ -1,4 +1,4 @@
-//! Immutable ODG package snapshots and one lossless semantic text edit.
+//! Immutable ODG package snapshots and lossless semantic shape edits.
 
 use crate::model::{
     layer::Layer,
@@ -34,12 +34,14 @@ const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 
 type TextSpans = Vec<Vec<Vec<Option<Range<usize>>>>>;
+type NameSpans = Vec<Vec<Option<Range<usize>>>>;
 
 struct State {
     package: Package,
     pages: Vec<Page>,
     layers: Vec<Layer>,
     text_spans: TextSpans,
+    name_spans: NameSpans,
 }
 
 /// An immutable, source-owning ODG package snapshot.
@@ -68,6 +70,7 @@ impl Snapshot {
             pages: parsed.pages,
             layers: parsed.layers,
             text_spans: parsed.text_spans,
+            name_spans: parsed.name_spans,
         })))
     }
 
@@ -131,10 +134,10 @@ impl Snapshot {
     }
 }
 
-/// A staged source-bound package text edit.
+/// A staged source-bound package shape edit.
 pub struct Transaction {
     source: Snapshot,
-    change: Option<TextChange>,
+    change: Option<ShapeChange>,
 }
 
 impl Transaction {
@@ -153,13 +156,7 @@ impl Transaction {
         if after.len() > MAX_TEXT_BYTES {
             return invalid("ODG replacement shape text exceeds the limit");
         }
-        if self
-            .change
-            .as_ref()
-            .is_some_and(|change| change.page != page || change.shape != shape)
-        {
-            return invalid("an ODG package transaction supports one shape-text edit");
-        }
+        self.ensure_selector(page, shape)?;
         let selected = self
             .source
             .pages()
@@ -182,52 +179,174 @@ impl Transaction {
             self.change = None;
             return Ok(());
         }
-        self.change = Some(TextChange {
+        self.change = Some(ShapeChange::Text(TextChange {
             page,
             shape,
             before: selected.text().to_string(),
             after,
-        });
+        }));
+        Ok(())
+    }
+
+    /// Renames one shape through its existing `draw:name` attribute.
+    ///
+    /// ODF 1.4 Part 3 §19.197 defines `draw:name` as the reference name for
+    /// graphical elements. This preserves the original start tag and attribute
+    /// spelling, replacing only the validated attribute-value span.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-bounds selector, an unnamed shape, a
+    /// name over the bounded size, or a shape whose source attribute cannot be
+    /// losslessly addressed.
+    pub fn set_shape_name(
+        &mut self,
+        page: usize,
+        shape: usize,
+        name: impl Into<String>,
+    ) -> Result<()> {
+        let after = name.into();
+        if after.len() > MAX_TEXT_BYTES {
+            return invalid("ODG replacement shape name exceeds the limit");
+        }
+        self.ensure_selector(page, shape)?;
+        let selected = self
+            .source
+            .pages()
+            .get(page)
+            .and_then(|page_value| page_value.shapes().get(shape))
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODG shape selector is out of bounds".to_string())
+            })?;
+        let before = selected.name().ok_or_else(|| {
+            Error::Unsupported(
+                "ODG shape rename requires an existing losslessly addressable draw:name"
+                    .to_string(),
+            )
+        })?;
+        if self
+            .source
+            .0
+            .name_spans
+            .get(page)
+            .and_then(|shapes| shapes.get(shape))
+            .and_then(Option::as_ref)
+            .is_none()
+        {
+            return invalid("ODG shape name source span is missing");
+        }
+        if before == after {
+            self.change = None;
+            return Ok(());
+        }
+        self.change = Some(ShapeChange::Name(NameChange {
+            page,
+            shape,
+            before: before.to_string(),
+            after,
+        }));
+        Ok(())
+    }
+
+    fn ensure_selector(&self, page: usize, shape: usize) -> Result<()> {
+        if self
+            .change
+            .as_ref()
+            .is_some_and(|change| change.page() != page || change.shape() != shape)
+        {
+            return invalid("an ODG package transaction supports one shape edit");
+        }
         Ok(())
     }
 
     /// Atomically validates, rebuilds, and publishes the edited package.
     pub fn commit(self) -> Result<Commit> {
-        let Some(change) = self.change else {
+        let Some(staged) = self.change else {
             return Ok(Commit::unchanged(self.source));
         };
         ensure_compact_rewrite_source(&self.source)?;
-        let span = self
-            .source
-            .0
-            .text_spans
-            .get(change.page)
-            .and_then(|shapes| shapes.get(change.shape))
-            .and_then(|spans| spans.first())
-            .and_then(Option::as_ref)
-            .ok_or_else(|| Error::InvalidFormat("ODG shape source span is missing".to_string()))?;
-        let content = replace_text(self.source.content_xml(), span, &change.after)?;
+        let content = match &staged {
+            ShapeChange::Text(text_change) => {
+                let span = self
+                    .source
+                    .0
+                    .text_spans
+                    .get(text_change.page)
+                    .and_then(|shapes| shapes.get(text_change.shape))
+                    .and_then(|spans| spans.first())
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("ODG shape text source span is missing".to_string())
+                    })?;
+                replace_xml_value(self.source.content_xml(), span, &text_change.after)?
+            },
+            ShapeChange::Name(name_change) => {
+                let span = self
+                    .source
+                    .0
+                    .name_spans
+                    .get(name_change.page)
+                    .and_then(|shapes| shapes.get(name_change.shape))
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("ODG shape name source span is missing".to_string())
+                    })?;
+                replace_xml_value(self.source.content_xml(), span, &name_change.after)?
+            },
+        };
         compact_xml::validate(content.as_bytes()).map_err(Error::from)?;
         let snapshot = Snapshot::from_bytes(rebuild(&self.source, &content)?)?;
         let actual = snapshot
             .pages()
-            .get(change.page)
-            .and_then(|page| page.shapes().get(change.shape))
+            .get(staged.page())
+            .and_then(|page| page.shapes().get(staged.shape()))
             .ok_or_else(|| {
                 Error::InvalidFormat("ODG edited shape disappeared during readback".to_string())
             })?;
-        if actual.text() != change.after {
-            return invalid("ODG package edit failed typed readback");
+        match &staged {
+            ShapeChange::Text(text_change) if actual.text() != text_change.after => {
+                return invalid("ODG package text edit failed typed readback");
+            },
+            ShapeChange::Name(name_change) if actual.name() != Some(name_change.after.as_str()) => {
+                return invalid("ODG package name edit failed typed readback");
+            },
+            ShapeChange::Text(_) | ShapeChange::Name(_) => {},
         }
+        let (text_change, name_change) = match staged {
+            ShapeChange::Text(text_change) => (Some(text_change), None),
+            ShapeChange::Name(name_change) => (None, Some(name_change)),
+        };
         Ok(Commit {
             patch: Patch {
                 source: self.source,
                 target: snapshot.clone(),
-                change: Some(change),
+                text_change,
+                name_change,
             },
             snapshot,
             changed: true,
         })
+    }
+}
+
+enum ShapeChange {
+    Text(TextChange),
+    Name(NameChange),
+}
+
+impl ShapeChange {
+    const fn page(&self) -> usize {
+        match self {
+            Self::Text(change) => change.page,
+            Self::Name(change) => change.page,
+        }
+    }
+
+    const fn shape(&self) -> usize {
+        match self {
+            Self::Text(change) => change.shape,
+            Self::Name(change) => change.shape,
+        }
     }
 }
 
@@ -266,6 +385,41 @@ impl TextChange {
     }
 }
 
+/// One reversible `draw:name` change for a shape.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NameChange {
+    page: usize,
+    shape: usize,
+    before: String,
+    after: String,
+}
+
+impl NameChange {
+    /// The zero-based source-order page position.
+    #[must_use]
+    pub const fn page(&self) -> usize {
+        self.page
+    }
+
+    /// The zero-based source-order shape position.
+    #[must_use]
+    pub const fn shape(&self) -> usize {
+        self.shape
+    }
+
+    /// Name expected before application.
+    #[must_use]
+    pub fn before(&self) -> &str {
+        &self.before
+    }
+
+    /// Name produced after application.
+    #[must_use]
+    pub fn after(&self) -> &str {
+        &self.after
+    }
+}
+
 /// A committed package publication and its exact-source patch.
 pub struct Commit {
     snapshot: Snapshot,
@@ -279,7 +433,8 @@ impl Commit {
             patch: Patch {
                 source: snapshot.clone(),
                 target: snapshot.clone(),
-                change: None,
+                text_change: None,
+                name_change: None,
             },
             snapshot,
             changed: false,
@@ -316,7 +471,8 @@ impl Commit {
 pub struct Patch {
     source: Snapshot,
     target: Snapshot,
-    change: Option<TextChange>,
+    text_change: Option<TextChange>,
+    name_change: Option<NameChange>,
 }
 
 impl Patch {
@@ -337,7 +493,13 @@ impl Patch {
     /// The semantic change represented by this patch.
     #[must_use]
     pub fn change(&self) -> Option<&TextChange> {
-        self.change.as_ref()
+        self.text_change.as_ref()
+    }
+
+    /// The semantic `draw:name` change, when this is a name patch.
+    #[must_use]
+    pub fn name_change(&self) -> Option<&NameChange> {
+        self.name_change.as_ref()
     }
 
     /// An exact-source patch restoring the original package.
@@ -346,7 +508,13 @@ impl Patch {
         Self {
             source: self.target.clone(),
             target: self.source.clone(),
-            change: self.change.as_ref().map(|change| TextChange {
+            text_change: self.text_change.as_ref().map(|change| TextChange {
+                page: change.page,
+                shape: change.shape,
+                before: change.after.clone(),
+                after: change.before.clone(),
+            }),
+            name_change: self.name_change.as_ref().map(|change| NameChange {
                 page: change.page,
                 shape: change.shape,
                 before: change.after.clone(),
@@ -360,6 +528,7 @@ struct Parsed {
     pages: Vec<Page>,
     layers: Vec<Layer>,
     text_spans: TextSpans,
+    name_spans: NameSpans,
 }
 
 struct ActiveShape {
@@ -381,6 +550,7 @@ struct Scanner {
     active_shapes: Vec<ActiveShape>,
     paragraph_depths: Vec<usize>,
     text_spans: TextSpans,
+    name_spans: NameSpans,
     shape_count: usize,
     text_bytes: usize,
 }
@@ -400,6 +570,7 @@ impl Scanner {
             active_shapes: Vec::new(),
             paragraph_depths: Vec::new(),
             text_spans: Vec::new(),
+            name_spans: Vec::new(),
             shape_count: 0,
             text_bytes: 0,
         }
@@ -410,6 +581,8 @@ impl Scanner {
         reader: &NsReader<&[u8]>,
         namespace: NamespaceKind,
         element: &BytesStart<'_>,
+        tag: &[u8],
+        tag_start: usize,
         empty: bool,
     ) -> Result<()> {
         self.depth = self
@@ -419,7 +592,7 @@ impl Scanner {
         if self.depth > MAX_DEPTH {
             return invalid("ODG XML nesting exceeds the limit");
         }
-        self.observe(reader, namespace, element, empty)?;
+        self.observe(reader, namespace, element, tag, tag_start, empty)?;
         if empty {
             self.depth = self.depth.saturating_sub(1);
         }
@@ -431,6 +604,8 @@ impl Scanner {
         reader: &NsReader<&[u8]>,
         namespace: NamespaceKind,
         element: &BytesStart<'_>,
+        tag: &[u8],
+        tag_start: usize,
         empty: bool,
     ) -> Result<()> {
         let local_name = element.local_name();
@@ -477,6 +652,7 @@ impl Scanner {
             self.pages
                 .push(Page::parsed(attribute(reader, element, DRAW, b"name")?));
             self.text_spans.push(Vec::new());
+            self.name_spans.push(Vec::new());
             if !empty {
                 self.page_depths.push(self.depth);
             }
@@ -504,6 +680,7 @@ impl Scanner {
                 frame,
             ));
             self.text_spans[page].push(Vec::new());
+            self.name_spans[page].push(shape_name_span(reader, element, tag, tag_start)?);
             if !empty {
                 self.active_shapes.push(ActiveShape {
                     depth: self.depth,
@@ -603,6 +780,7 @@ impl Scanner {
             pages: self.pages,
             layers: self.layers,
             text_spans: self.text_spans,
+            name_spans: self.name_spans,
         })
     }
 }
@@ -620,8 +798,26 @@ fn parse_content(xml: &str) -> Result<Parsed> {
         let event = event.into_owned();
         let end = position(&reader)?;
         match event {
-            Event::Start(element) => scanner.start(&reader, namespace, &element, false)?,
-            Event::Empty(element) => scanner.start(&reader, namespace, &element, true)?,
+            Event::Start(element) => scanner.start(
+                &reader,
+                namespace,
+                &element,
+                xml.as_bytes().get(start..end).ok_or_else(|| {
+                    Error::InvalidFormat("ODG XML event span is invalid".to_string())
+                })?,
+                start,
+                false,
+            )?,
+            Event::Empty(element) => scanner.start(
+                &reader,
+                namespace,
+                &element,
+                xml.as_bytes().get(start..end).ok_or_else(|| {
+                    Error::InvalidFormat("ODG XML event span is invalid".to_string())
+                })?,
+                start,
+                true,
+            )?,
             Event::End(element) => scanner.end(namespace, element.local_name().as_ref())?,
             Event::Text(text) => scanner.text(Some(start..end), text_value(&text)?)?,
             Event::CData(text) => scanner.text(
@@ -699,7 +895,7 @@ fn ensure_compact_rewrite_source(source: &Snapshot) -> Result<()> {
     Ok(())
 }
 
-fn replace_text(source: &str, span: &Range<usize>, replacement: &str) -> Result<String> {
+fn replace_xml_value(source: &str, span: &Range<usize>, replacement: &str) -> Result<String> {
     if span.start > span.end || span.end > source.len() {
         return invalid("ODG text source span is invalid");
     }
@@ -768,6 +964,84 @@ fn attribute(
         }
     }
     Ok(None)
+}
+
+fn shape_name_span(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    tag: &[u8],
+    tag_start: usize,
+) -> Result<Option<Range<usize>>> {
+    let mut key = None;
+    for raw_attribute in element.attributes() {
+        let parsed_attribute = raw_attribute
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute: {error}")))?;
+        let (namespace, local) = reader.resolver().resolve_attribute(parsed_attribute.key);
+        if resolved_bound(&namespace, DRAW)
+            && local.as_ref() == b"name"
+            && key
+                .replace(parsed_attribute.key.as_ref().to_vec())
+                .is_some()
+        {
+            return invalid("ODG shape has duplicate draw:name attributes");
+        }
+    }
+    let Some(name_key) = key else {
+        return Ok(None);
+    };
+    let (start, end) = attribute_value_span(tag, &name_key)?;
+    Ok(Some(tag_start + start..tag_start + end))
+}
+
+fn attribute_value_span(tag: &[u8], wanted: &[u8]) -> Result<(usize, usize)> {
+    let mut cursor = 1usize;
+    while cursor < tag.len() && !tag[cursor].is_ascii_whitespace() && tag[cursor] != b'>' {
+        cursor += 1;
+    }
+    while cursor < tag.len() {
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag.len() || matches!(tag[cursor], b'/' | b'>') {
+            break;
+        }
+        let name_start = cursor;
+        while cursor < tag.len()
+            && !tag[cursor].is_ascii_whitespace()
+            && !matches!(tag[cursor], b'=' | b'/' | b'>')
+        {
+            cursor += 1;
+        }
+        let name_end = cursor;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if tag.get(cursor) != Some(&b'=') {
+            return invalid("ODG shape attribute is missing '='");
+        }
+        cursor += 1;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let quote = *tag
+            .get(cursor)
+            .filter(|quote| matches!(quote, b'\'' | b'\"'))
+            .ok_or_else(|| Error::InvalidFormat("ODG shape attribute is not quoted".to_string()))?;
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < tag.len() && tag[cursor] != quote {
+            cursor += 1;
+        }
+        let value_end = cursor;
+        if cursor >= tag.len() {
+            return invalid("ODG shape attribute is unterminated");
+        }
+        cursor += 1;
+        if &tag[name_start..name_end] == wanted {
+            return Ok((value_start, value_end));
+        }
+    }
+    invalid("ODG shape name span was not found")
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {

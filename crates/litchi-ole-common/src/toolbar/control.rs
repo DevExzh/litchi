@@ -13,7 +13,7 @@ use super::{ControlHeader, Data, Error, TextIcon, WString};
 /// has not yet bounded. No variant executes or interprets a command.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Body<'a> {
-    /// A control with no variable body, such as an ActiveX header-only form.
+    /// A control with no variable body, such as an `ActiveX` header-only form.
     Empty,
     /// A decoded common `TBCData` body with an opaque specific tail.
     Data(Data<'a>),
@@ -23,11 +23,13 @@ pub enum Body<'a> {
 
 impl<'a> Body<'a> {
     /// Construct an empty control body.
+    #[must_use]
     pub const fn empty() -> Self {
         Self::Empty
     }
 
     /// Construct a decoded common control-data body.
+    #[must_use]
     pub fn data(value: Data<'a>) -> Self {
         Self::Data(value)
     }
@@ -38,6 +40,7 @@ impl<'a> Body<'a> {
     }
 
     /// Return the decoded common data, when supported.
+    #[must_use]
     pub const fn data_ref(&self) -> Option<&Data<'a>> {
         match self {
             Self::Data(value) => Some(value),
@@ -46,6 +49,7 @@ impl<'a> Body<'a> {
     }
 
     /// Return opaque bytes, when this body is not decoded.
+    #[must_use]
     pub fn opaque_bytes(&self) -> Option<&[u8]> {
         match self {
             Self::Opaque(value) => Some(value),
@@ -54,6 +58,7 @@ impl<'a> Body<'a> {
     }
 
     /// Return the exact serialized body bytes.
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
             Self::Empty => Vec::new(),
@@ -87,11 +92,20 @@ pub struct Control<'a> {
 
 impl<'a> Control<'a> {
     /// Construct a control with no opaque command prefix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `header` and `body` do not form a valid authored
+    /// control.
     pub fn new(header: ControlHeader, body: Body<'a>) -> Result<Self, Error> {
         Self::from_parts(header, &[][..], body)
     }
 
     /// Construct a control while retaining its host-specific prefix bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the fields do not form a valid authored control.
     pub fn from_parts(
         header: ControlHeader,
         prefix: impl Into<Cow<'a, [u8]>>,
@@ -107,31 +121,37 @@ impl<'a> Control<'a> {
     }
 
     /// Borrow the fixed `TBCHeader` projection.
+    #[must_use]
     pub const fn header(&self) -> &ControlHeader {
         &self.header
     }
 
     /// Borrow the opaque host-specific prefix.
+    #[must_use]
     pub fn prefix(&self) -> &[u8] {
         &self.prefix
     }
 
     /// Borrow the common or opaque variable body.
+    #[must_use]
     pub const fn body(&self) -> &Body<'a> {
         &self.body
     }
 
     /// Borrow common control metadata, when the body is decoded.
+    #[must_use]
     pub const fn data(&self) -> Option<&Data<'a>> {
         self.body.data_ref()
     }
 
     /// Return the shared text/icon visibility mode.
+    #[must_use]
     pub const fn text_icon(&self) -> TextIcon {
         self.header.specifics().text_icon()
     }
 
     /// Return the custom text when the common body is decoded and present.
+    #[must_use]
     pub const fn custom_text(&self) -> Option<&WString<'a>> {
         match self.data() {
             Some(data) => data.general().custom_text(),
@@ -140,6 +160,7 @@ impl<'a> Control<'a> {
     }
 
     /// Return the description when the common body is decoded and present.
+    #[must_use]
     pub const fn description(&self) -> Option<&WString<'a>> {
         match self.data() {
             Some(data) => data.general().description(),
@@ -148,6 +169,7 @@ impl<'a> Control<'a> {
     }
 
     /// Return the tooltip when the common body is decoded and present.
+    #[must_use]
     pub const fn tooltip(&self) -> Option<&WString<'a>> {
         match self.data() {
             Some(data) => data.general().tooltip(),
@@ -156,6 +178,7 @@ impl<'a> Control<'a> {
     }
 
     /// Return the exact serialized control bytes.
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let body = self.body.to_bytes();
         let mut output =
@@ -167,6 +190,7 @@ impl<'a> Control<'a> {
     }
 
     /// Move all borrowed projections into an owned control.
+    #[must_use]
     pub fn into_owned(self) -> Control<'static> {
         Control {
             header: self.header,

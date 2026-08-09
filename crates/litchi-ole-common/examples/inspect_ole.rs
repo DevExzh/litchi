@@ -17,6 +17,11 @@
 //! [`OleFile::open`]: litchi_cfb::OleFile::open
 //! [`Metadata`]: litchi_ole_common::property_set::Metadata
 
+#![allow(
+    clippy::print_stdout,
+    reason = "the example is an interactive CFB inspector whose purpose is to print its report"
+)]
+
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
@@ -24,15 +29,14 @@ use std::path::PathBuf;
 use litchi_cfb::{DirectoryEntry, OleFile, is_ole_file};
 use litchi_ole_common::property_set::{Metadata, PropertySetReader};
 
-type ExampleResult<T> = Result<T, Box<dyn std::error::Error>>;
-
 const DEFAULT_SAMPLE: &str = "test-data/ole/doc/Lists.doc";
+
+type ExampleResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> ExampleResult<()> {
     let path: PathBuf = std::env::args()
         .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_SAMPLE));
+        .map_or_else(|| PathBuf::from(DEFAULT_SAMPLE), PathBuf::from);
 
     println!("=== litchi-cfb: inspect_ole ===");
     println!("Target file: {}", path.display());
@@ -66,8 +70,8 @@ fn main() -> ExampleResult<()> {
     // 4. Stream paths (flattened).
     let streams = ole.list_streams();
     println!("\n--- Streams ({}) ---", streams.len());
-    for path in &streams {
-        println!("  /{}", path.join("/"));
+    for stream_path in &streams {
+        println!("  /{}", stream_path.join("/"));
     }
 
     // 5. Metadata, if SummaryInformation is present.

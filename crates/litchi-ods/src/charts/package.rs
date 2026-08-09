@@ -48,7 +48,7 @@ pub(crate) fn replace(package: &Package, original: &[Chart], draft: &[Chart]) ->
         return Ok(package.package().as_bytes().to_vec());
     }
 
-    let excluded_paths = additions.keys().cloned().collect();
+    let excluded_paths: Vec<String> = additions.keys().cloned().collect();
     let additions = additions
         .into_iter()
         .map(|(path, bytes)| Addition {

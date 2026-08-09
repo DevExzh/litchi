@@ -17,19 +17,23 @@ impl Boolean {
     /// Decode an ODF boolean string to a Rust `bool`.
     ///
     /// Accepts only the schema literals `"true"` and `"false"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `data` is not an `ODF` boolean literal.
     pub fn decode(data: &str) -> Result<bool> {
         match data {
             "true" => Ok(true),
             "false" => Ok(false),
             _ => Err(litchi_core::Error::Other(format!(
-                "boolean '{}' is invalid, expected 'true' or 'false'",
-                data
+                "boolean '{data}' is invalid, expected 'true' or 'false'"
             ))),
         }
     }
 
     /// Encode a Rust `bool` as an ODF boolean string.
     #[inline]
+    #[must_use]
     pub fn encode(value: bool) -> &'static str {
         if value { "true" } else { "false" }
     }
@@ -42,14 +46,19 @@ impl Boolean {
 
 impl Date {
     /// Decode an ISO 8601 ODF date string to `chrono::NaiveDate`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `data` is not an ISO 8601 calendar date.
     pub fn decode(data: &str) -> Result<NaiveDate> {
-        NaiveDate::parse_from_str(data, "%Y-%m-%d").map_err(|e| {
-            litchi_core::Error::Other(format!("Failed to parse ODF date '{}': {}", data, e))
+        NaiveDate::parse_from_str(data, "%Y-%m-%d").map_err(|error| {
+            litchi_core::Error::Other(format!("Failed to parse ODF date '{data}': {error}"))
         })
     }
 
     /// Encode a `chrono::NaiveDate` as an ISO 8601 ODF date string.
     #[inline]
+    #[must_use]
     pub fn encode(value: &NaiveDate) -> String {
         value.format("%Y-%m-%d").to_string()
     }
@@ -65,6 +74,10 @@ impl DateTime {
     ///
     /// RFC 3339 timezone forms are preserved. A timezone-free value is
     /// interpreted as UTC, matching the former scalar behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `data` cannot be parsed as an `ODF` date-time.
     pub fn decode(data: &str) -> Result<ChronoDateTime<FixedOffset>> {
         // Handle the `Z` suffix (UTC timezone).
         let normalized = if data.ends_with('Z') {
@@ -93,14 +106,14 @@ impl DateTime {
         }
 
         Err(litchi_core::Error::Other(format!(
-            "Failed to parse ODF datetime '{}'",
-            data
+            "Failed to parse ODF datetime '{data}'"
         )))
     }
 
     /// Encode a `chrono::DateTime<FixedOffset>` as an ODF datetime string.
     ///
     /// UTC values use the canonical `Z` suffix.
+    #[must_use]
     pub fn encode(value: &ChronoDateTime<FixedOffset>) -> String {
         let formatted = value.to_rfc3339();
         // Convert +00:00 to Z for canonical representation.
@@ -123,6 +136,11 @@ impl DurationValue {
     /// Non-zero calendar years or months require a reference date and are
     /// rejected. Fractional precision beyond nanoseconds is accepted only when
     /// the additional digits are zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when calendar units are nonzero or the day/time value
+    /// cannot fit in `chrono::Duration`.
     pub fn to_chrono(&self) -> Result<ChronoDuration> {
         if self.years.as_deref().is_some_and(component_is_nonzero)
             || self.months.as_deref().is_some_and(component_is_nonzero)
@@ -153,11 +171,11 @@ impl DurationValue {
         )?;
 
         if let Some(seconds) = &self.seconds {
-            let (whole, fraction) = seconds.split_once('.').unwrap_or((seconds, ""));
-            let whole = parse_duration_i64(whole, "seconds")?;
+            let (whole_seconds_text, fraction) = seconds.split_once('.').unwrap_or((seconds, ""));
+            let whole_seconds = parse_duration_i64(whole_seconds_text, "seconds")?;
             value = value
                 .checked_add(
-                    &ChronoDuration::try_seconds(whole)
+                    &ChronoDuration::try_seconds(whole_seconds)
                         .ok_or_else(|| duration_range_error("seconds"))?,
                 )
                 .ok_or_else(|| duration_range_error("total"))?;
@@ -169,7 +187,7 @@ impl DurationValue {
                             "duration fractional seconds exceed nanosecond precision".to_string(),
                         ));
                     }
-                    let mut nanoseconds = significant.parse::<i64>().map_err(|_| {
+                    let mut nanoseconds = significant.parse::<i64>().map_err(|_parse_error| {
                         litchi_core::Error::InvalidFormat(
                             "duration fractional seconds are out of range".to_string(),
                         )
@@ -194,53 +212,32 @@ impl DurationValue {
     }
 }
 
-fn add_duration_component(
-    value: &mut ChronoDuration,
-    component: Option<&str>,
-    description: &str,
-    unit: fn(i64) -> Option<ChronoDuration>,
-) -> Result<()> {
-    let Some(component) = component else {
-        return Ok(());
-    };
-    let amount = parse_duration_i64(component, description)?;
-    let part = unit(amount).ok_or_else(|| duration_range_error(description))?;
-    *value = value
-        .checked_add(&part)
-        .ok_or_else(|| duration_range_error("total"))?;
-    Ok(())
-}
-
-fn component_is_nonzero(component: &str) -> bool {
-    component.bytes().any(|byte| byte != b'0')
-}
-
-fn parse_duration_i64(component: &str, description: &str) -> Result<i64> {
-    component.parse::<i64>().map_err(|_| {
-        litchi_core::Error::InvalidFormat(format!("duration {description} are out of range"))
-    })
-}
-
-fn duration_range_error(component: &str) -> litchi_core::Error {
-    litchi_core::Error::InvalidFormat(format!("duration {component} is out of range"))
-}
-
 impl Duration {
     /// Decode an ODF duration string to `chrono::Duration`.
     ///
     /// Supports ISO 8601 duration values such as `PT1H30M`, `P1DT2H`, and
     /// `-PT5M`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `data` is invalid, needs calendar arithmetic, or
+    /// does not fit in `chrono::Duration`.
     pub fn decode(data: &str) -> Result<ChronoDuration> {
         Self::decode_exact(data)?.to_chrono()
     }
 
     /// Parse and retain a complete XML Schema duration without narrowing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `data` is not a valid XML Schema duration.
     pub fn decode_exact(data: &str) -> Result<DurationValue> {
         parse_exact_duration(data)
     }
 
     /// Encode a `chrono::Duration` as an ODF duration string.
     #[inline]
+    #[must_use]
     pub fn encode(value: &ChronoDuration) -> String {
         let total_seconds = value.num_seconds();
         let subsecond_nanoseconds = value.subsec_nanos();
@@ -264,16 +261,47 @@ impl Duration {
     }
 }
 
+fn add_duration_component(
+    value: &mut ChronoDuration,
+    component: Option<&str>,
+    description: &str,
+    unit: fn(i64) -> Option<ChronoDuration>,
+) -> Result<()> {
+    let Some(component_text) = component else {
+        return Ok(());
+    };
+    let amount = parse_duration_i64(component_text, description)?;
+    let part = unit(amount).ok_or_else(|| duration_range_error(description))?;
+    *value = value
+        .checked_add(&part)
+        .ok_or_else(|| duration_range_error("total"))?;
+    Ok(())
+}
+
+fn component_is_nonzero(component: &str) -> bool {
+    component.bytes().any(|byte| byte != b'0')
+}
+
+fn parse_duration_i64(component: &str, description: &str) -> Result<i64> {
+    component.parse::<i64>().map_err(|_parse_error| {
+        litchi_core::Error::InvalidFormat(format!("duration {description} are out of range"))
+    })
+}
+
+fn duration_range_error(component: &str) -> litchi_core::Error {
+    litchi_core::Error::InvalidFormat(format!("duration {component} is out of range"))
+}
+
 fn parse_exact_duration(data: &str) -> Result<DurationValue> {
     if data.len() > 1_048_576 {
         return Err(litchi_core::Error::InvalidFormat(
             "duration exceeds 1 MiB".to_string(),
         ));
     }
-    let (negative, body) = data
+    let (negative, unsigned_body) = data
         .strip_prefix('-')
         .map_or((false, data), |body| (true, body));
-    let body = body.strip_prefix('P').ok_or_else(|| {
+    let duration_body = unsigned_body.strip_prefix('P').ok_or_else(|| {
         litchi_core::Error::InvalidFormat(format!(
             "invalid duration '{data}': expected a 'P' designator"
         ))
@@ -289,7 +317,7 @@ fn parse_exact_duration(data: &str) -> Result<DurationValue> {
         minutes: None,
         seconds: None,
     };
-    let bytes = body.as_bytes();
+    let bytes = duration_body.as_bytes();
     let mut position = 0usize;
     let mut in_time = false;
     let mut last_rank = 0u8;
@@ -328,7 +356,7 @@ fn parse_exact_duration(data: &str) -> Result<DurationValue> {
             return Err(invalid_duration(data, "component has no designator"));
         }
 
-        let component = &body[start..position];
+        let component = &duration_body[start..position];
         let designator = bytes[position];
         position += 1;
         let (rank, slot): (u8, &mut Option<String>) = match (in_time, designator) {

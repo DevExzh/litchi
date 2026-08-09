@@ -21,12 +21,13 @@ pub enum CachedValue {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CachedCell {
     pub value: CachedValue,
-    /// An OpenDocument formula stored as inert text; this crate never evaluates it.
+    /// An `OpenDocument` formula stored as inert text; this crate never evaluates it.
     pub formula: Option<String>,
     pub repeated: u32,
 }
 
 impl CachedCell {
+    #[must_use]
     pub fn new(value: CachedValue) -> Self {
         Self {
             value,
@@ -43,6 +44,7 @@ pub struct CachedRow {
 }
 
 impl CachedRow {
+    #[must_use]
     pub fn new(cells: Vec<CachedCell>) -> Self {
         Self { cells, repeated: 1 }
     }

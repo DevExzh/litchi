@@ -1,6 +1,9 @@
 //! Binary codecs for the contextual [MS-OSHARED] property composites.
 
-use super::super::super::model::*;
+use super::super::super::model::{
+    DocParts, HeadingPair, HeadingPairs, MAX_COMPOSITE_ELEMENTS, TextEncoding, UNICODE_CODEPAGE,
+    Value, checked_add, checked_mul, checked_u32, invalid, try_vec_with_capacity,
+};
 use super::wire::{
     ValueReader, append_bytes, append_u16, append_u32, decode_ansi, decode_utf16, encode_ansi,
     reserve_bytes,
@@ -27,11 +30,9 @@ pub(super) fn append_heading_pairs(
         append_heading_string(out, pair.heading(), codepage)?;
         append_u16(out, VT_I4, "serialized heading pair")?;
         append_u16(out, 0, "serialized heading pair")?;
-        append_bytes(
-            out,
-            &(pair.part_count() as i32).to_le_bytes(),
-            "serialized heading pair",
-        )?;
+        let part_count = i32::try_from(pair.part_count())
+            .map_err(|_conversion_error| invalid("Heading pair part count exceeds VT_I4"))?;
+        append_bytes(out, &part_count.to_le_bytes(), "serialized heading pair")?;
     }
     Ok(())
 }
@@ -61,7 +62,7 @@ pub(super) fn parse_heading_pairs(
     codepage: u16,
 ) -> Result<Value, OleError> {
     let element_count = usize::try_from(reader.read_u32("heading pair element count")?)
-        .map_err(|_| invalid("Heading pair element count is too large"))?;
+        .map_err(|_conversion_error| invalid("Heading pair element count is too large"))?;
     if element_count % 2 != 0 {
         return Err(invalid("Heading pair element count must be even"));
     }
@@ -84,11 +85,13 @@ pub(super) fn parse_heading_pairs(
                 "Heading pair part-count reserved field must be zero",
             ));
         }
-        let part_count = reader.read_i32("heading pair part count")?;
-        if part_count < 0 {
+        let raw_part_count = reader.read_i32("heading pair part count")?;
+        if raw_part_count < 0 {
             return Err(invalid("Heading pair part count must be nonnegative"));
         }
-        pairs.push(HeadingPair::new(heading, part_count as u32)?);
+        let part_count = u32::try_from(raw_part_count)
+            .map_err(|_conversion_error| invalid("Heading pair part count must be nonnegative"))?;
+        pairs.push(HeadingPair::new(heading, part_count)?);
     }
     Ok(Value::HeadingPairs(HeadingPairs::new(pairs)?))
 }
@@ -100,7 +103,7 @@ pub(super) fn parse_doc_parts(
 ) -> Result<Value, OleError> {
     validate_encoding(encoding, codepage)?;
     let count = usize::try_from(reader.read_u32("document-part count")?)
-        .map_err(|_| invalid("Document-part count is too large"))?;
+        .map_err(|_conversion_error| invalid("Document-part count is too large"))?;
     if count > MAX_COMPOSITE_ELEMENTS {
         return Err(invalid("Document-part count exceeds the safety limit"));
     }
@@ -190,7 +193,7 @@ fn read_unaligned_ansi(
     description: &str,
 ) -> Result<String, OleError> {
     let length = usize::try_from(reader.read_u32(&format!("{description} length"))?)
-        .map_err(|_| invalid(format!("{description} length is too large")))?;
+        .map_err(|_conversion_error| invalid(format!("{description} length is too large")))?;
     if length == 0 {
         return Ok(String::new());
     }
@@ -203,7 +206,7 @@ fn read_unaligned_ansi(
 
 fn read_lpwstr(reader: &mut ValueReader<'_>, description: &str) -> Result<String, OleError> {
     let units = usize::try_from(reader.read_u32(&format!("{description} length"))?)
-        .map_err(|_| invalid(format!("{description} length is too large")))?;
+        .map_err(|_conversion_error| invalid(format!("{description} length is too large")))?;
     if units == 0 {
         return Ok(String::new());
     }
@@ -212,7 +215,7 @@ fn read_lpwstr(reader: &mut ValueReader<'_>, description: &str) -> Result<String
     let end = raw
         .chunks_exact(2)
         .position(|pair| pair == [0, 0])
-        .map(|units| units * 2)
+        .map(|terminator_index| terminator_index * 2)
         .ok_or_else(|| invalid(format!("{description} is not UTF-16LE terminated")))?;
     let value = decode_utf16(&raw[..end], description)?;
     let padding = (4 - (byte_len & 3)) & 3;

@@ -13,6 +13,10 @@ mod path;
 mod tests;
 
 pub use codec::{is_media_path, parse_manifest, read_manifest};
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "The established public API explicitly distinguishes whole-package rebuilding."
+)]
 pub use edit::{Addition, rebuild_package, splice};
 pub use model::{Archive, Entry, Manifest};
 pub use path::{is_linked_href, resolve_package_path};
@@ -23,6 +27,10 @@ pub use path::{is_linked_href, resolve_package_path};
 /// not read or retain archive bytes, so format-family crates can provide a
 /// lightweight view over their package without coupling this crate to a
 /// concrete archive implementation.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "The public trait name makes its archive lookup role clear at call sites."
+)]
 pub trait PackageLookup {
     /// Return whether `path` is present in the package archive.
     fn has_file(&self, path: &str) -> bool;

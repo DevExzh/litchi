@@ -279,7 +279,11 @@ impl Parser {
                         _ if !element_stack.is_empty() => {
                             // Pop nested element and add to parent
                             if element_stack.len() > 1 {
-                                let (_, child_element) = element_stack.pop().unwrap();
+                                let (_, child_element) = element_stack.pop().ok_or_else(|| {
+                                    Error::InvalidFormat(
+                                        "ODF element parser lost a nested element".to_string(),
+                                    )
+                                })?;
                                 if let Some((_, parent_element)) = element_stack.last_mut() {
                                     parent_element.add_child(child_element);
                                 }

@@ -19,22 +19,23 @@ concrete `litchi-odf` crate.
 
 ## Decision
 
-`litchi-odf::detect` is the sole owner of packaged and flat OpenDocument
-detection. Its concise byte entry point is:
+`litchi-odf-common::detect` is the sole owner of packaged and flat
+OpenDocument detection. Its concise byte entry point is:
 
 ```rust
-litchi_odf::detect::bytes(&input)
+litchi_odf_common::detect::bytes(&input)
 ```
 
 It returns the neutral `litchi_core::detection::FileFormat` classification, so
 dependency direction remains concrete format to neutral vocabulary. ZIP and XML
-parsing dependencies belong to `litchi-odf`; `litchi-core` no longer declares
-them and no longer exposes an `odf` feature or ODF detector module.
+parsing dependencies belong to `litchi-odf-common`; `litchi-core` no longer
+declares them and no longer exposes an `odf` feature or ODF detector module.
 
-The contextual facade is `detect::{Format, mime, flat_mime, flat, bytes,
-reader}`. `Format` is a short contextual re-export of the neutral
-classification, not a legacy compatibility alias, so a direct `litchi-odf`
-consumer need not add a second dependency merely to match detector results.
+`litchi-odf::detect` re-exports the contextual facade
+`detect::{Format, mime, flat_mime, flat, bytes, reader}`. `Format` is a short
+contextual re-export of the neutral classification, not a legacy compatibility
+alias, so a direct `litchi-odf` consumer need not add a second dependency
+merely to match detector results.
 Ordinary MIME and flat classification borrow their input and do not allocate.
 Packaged detection validates the required first, stored `mimetype` local entry
 in place, bounds its size, checks its CRC, and validates the ZIP central

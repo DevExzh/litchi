@@ -13,6 +13,11 @@
 //!
 //! No CLI arguments are required — the example is fully self-contained.
 
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example exists to print its BOM walkthrough"
+)]
+
 use litchi_core::{
     BomKind, UTF8_BOM, UTF16_BE_BOM, UTF16_LE_BOM, UTF32_BE_BOM, UTF32_LE_BOM, strip_bom, write_bom,
 };
@@ -29,16 +34,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The detector itself only inspects the prefix, so any opaque trailer
     // works.
     let body_ascii = b"Hello, BOM!";
-    let body_utf16_le = encode_utf16_le("Hi");
-    let body_utf16_be = encode_utf16_be("Hi");
-    let body_utf32_le = encode_utf32_le("Hi");
-    let body_utf32_be = encode_utf32_be("Hi");
-
     demo_round_trip("UTF-8", BomKind::Utf8, body_ascii)?;
-    demo_round_trip("UTF-16 LE", BomKind::Utf16Le, &body_utf16_le)?;
-    demo_round_trip("UTF-16 BE", BomKind::Utf16Be, &body_utf16_be)?;
-    demo_round_trip("UTF-32 LE", BomKind::Utf32Le, &body_utf32_le)?;
-    demo_round_trip("UTF-32 BE", BomKind::Utf32Be, &body_utf32_be)?;
+    demo_round_trip("UTF-16 LE", BomKind::Utf16Le, &encode_utf16_le("Hi"))?;
+    demo_round_trip("UTF-16 BE", BomKind::Utf16Be, &encode_utf16_be("Hi"))?;
+    demo_round_trip("UTF-32 LE", BomKind::Utf32Le, &encode_utf32_le("Hi"))?;
+    demo_round_trip("UTF-32 BE", BomKind::Utf32Be, &encode_utf32_be("Hi"))?;
 
     println!();
     demo_no_bom(b"no-bom-here, just plain ASCII")?;
@@ -65,8 +65,7 @@ fn print_bom_constants() {
         BomKind::Utf32Be,
     ] {
         println!(
-            "  {:?}: {} bytes, prefix = {}",
-            kind,
+            "  {kind:?}: {} bytes, prefix = {}",
             kind.len(),
             hex(kind.as_bytes())
         );
@@ -93,7 +92,7 @@ fn demo_round_trip(
     let mut remaining = Vec::new();
     std::io::Read::read_to_end(&mut cursor, &mut remaining)?;
 
-    println!("--- {} ---", label);
+    println!("--- {label} ---");
     println!(
         "  full payload     : {} bytes  preview = {}",
         payload.len(),
@@ -101,11 +100,8 @@ fn demo_round_trip(
     );
     match detected {
         Some((found, consumed)) => {
-            println!(
-                "  detected BOM     : {:?} ({} bytes consumed)",
-                found, consumed
-            );
-            assert_eq!(found, kind, "round trip mismatch for {:?}", kind);
+            println!("  detected BOM     : {found:?} ({consumed} bytes consumed)");
+            assert_eq!(found, kind, "round trip mismatch for {kind:?}");
         },
         None => println!("  detected BOM     : <none>"),
     }
@@ -131,23 +127,22 @@ fn demo_no_bom(body: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         body.len(),
         hex_preview(body, 12)
     );
-    println!("  detected BOM     : {:?}", detected);
-    println!(
-        "  cursor position  : {} (should be 0 — strip_bom rewinds on miss)",
-        pos_after
-    );
+    println!("  detected BOM     : {detected:?}");
+    println!("  cursor position  : {pos_after} (should be 0 — strip_bom rewinds on miss)");
     Ok(())
 }
 
 // --- helpers -----------------------------------------------------------------
 
 fn hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789ABCDEF";
     let mut s = String::with_capacity(bytes.len() * 3);
     for (i, b) in bytes.iter().enumerate() {
         if i > 0 {
             s.push(' ');
         }
-        s.push_str(&format!("{:02X}", b));
+        s.push(char::from(DIGITS[usize::from(b >> 4)]));
+        s.push(char::from(DIGITS[usize::from(b & 0x0F)]));
     }
     s
 }

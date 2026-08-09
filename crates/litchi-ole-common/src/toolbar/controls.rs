@@ -14,6 +14,10 @@ pub struct GeneralInfo<'a> {
 
 impl<'a> GeneralInfo<'a> {
     /// Construct `TBCGeneralInfo` while enforcing its flag-controlled fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the optional fields do not agree with `flags`.
     pub fn new(
         flags: GeneralFlags,
         custom_text: Option<WString<'a>>,
@@ -48,22 +52,27 @@ impl<'a> GeneralInfo<'a> {
         }
     }
 
+    #[must_use]
     pub const fn flags(&self) -> GeneralFlags {
         self.flags
     }
 
+    #[must_use]
     pub const fn custom_text(&self) -> Option<&WString<'a>> {
         self.custom_text.as_ref()
     }
 
+    #[must_use]
     pub const fn description(&self) -> Option<&WString<'a>> {
         self.description.as_ref()
     }
 
+    #[must_use]
     pub const fn tooltip(&self) -> Option<&WString<'a>> {
         self.tooltip.as_ref()
     }
 
+    #[must_use]
     pub const fn extra(&self) -> Option<&ExtraInfo<'a>> {
         self.extra.as_ref()
     }
@@ -117,6 +126,10 @@ pub struct Data<'a> {
 
 impl<'a> Data<'a> {
     /// Construct a payload from typed common metadata and an opaque specific tail.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `general` violates its flag-controlled invariants.
     pub fn new(
         general: GeneralInfo<'a>,
         specific: impl Into<Cow<'a, [u8]>>,
@@ -135,14 +148,17 @@ impl<'a> Data<'a> {
         }
     }
 
+    #[must_use]
     pub const fn general(&self) -> &GeneralInfo<'a> {
         &self.general
     }
 
+    #[must_use]
     pub fn specific(&self) -> &[u8] {
         &self.specific
     }
 
+    #[must_use]
     pub fn into_owned(self) -> Data<'static> {
         Data {
             general: self.general.into_owned(),
@@ -188,13 +204,14 @@ pub enum ControlType {
     GraphicCombo,
     /// A pane.
     Pane,
-    /// An ActiveX control.
+    /// An `ActiveX` control.
     ActiveX,
     /// An unrecognized future wire value.
     Unknown(u8),
 }
 
 impl ControlType {
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::Button => 0x01,
@@ -239,7 +256,7 @@ impl ControlType {
             0x14 => Self::GraphicCombo,
             0x15 => Self::Pane,
             0x16 => Self::ActiveX,
-            value => Self::Unknown(value),
+            unknown => Self::Unknown(unknown),
         }
     }
 

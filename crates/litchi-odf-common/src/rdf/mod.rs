@@ -1,4 +1,4 @@
-//! Inert, bounded RDF/XML metadata for OpenDocument packages.
+//! Inert, bounded `RDF`/`XML` metadata for `OpenDocument` packages.
 
 mod codec;
 mod model;

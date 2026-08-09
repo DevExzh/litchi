@@ -2,7 +2,7 @@
 
 use crate::drawing::{Frame, Part};
 
-/// The inert source of an OpenDocument image.
+/// The inert source of an `OpenDocument` image.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Source {
@@ -12,7 +12,7 @@ pub enum Source {
         /// An href present on the parent is ignored by ODF when inline data exists.
         ignored_href: Option<String>,
     },
-    /// A verified file in the same OpenDocument package.
+    /// A verified file in the same `OpenDocument` package.
     PackagePart {
         href: String,
         path: String,
@@ -44,18 +44,22 @@ pub struct Image {
 
 impl Image {
     /// Return inline bytes without copying, if this is an inline image.
+    #[must_use]
     pub fn inline_bytes(&self) -> Option<&[u8]> {
-        match &self.source {
-            Source::Inline { bytes, .. } => Some(bytes),
-            _ => None,
+        if let Source::Inline { bytes, .. } = &self.source {
+            Some(bytes)
+        } else {
+            None
         }
     }
 
     /// Return the resolved package path, if this references an existing package part.
+    #[must_use]
     pub fn package_path(&self) -> Option<&str> {
-        match &self.source {
-            Source::PackagePart { path, .. } => Some(path),
-            _ => None,
+        if let Source::PackagePart { path, .. } = &self.source {
+            Some(path)
+        } else {
+            None
         }
     }
 }

@@ -10,4 +10,4 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub use model::{Block, Document, Element, ImageWatermarkPart};
+pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};

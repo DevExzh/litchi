@@ -65,6 +65,10 @@ impl Sid {
     ///
     /// The `NOSTREAM` terminator is represented by `None` in [`Links`] and is
     /// therefore not a valid `Sid`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `raw` is outside the regular CFB SID range.
     pub fn new(raw: u32) -> Result<Self, OleError> {
         if raw <= MAX_REGULAR_SID {
             Ok(Self(raw))
@@ -229,7 +233,7 @@ impl Metadata {
         self
     }
 
-    /// Replaces the starting FAT or MiniFAT sector in a transaction draft.
+    /// Replaces the starting FAT or `MiniFAT` sector in a transaction draft.
     pub const fn set_start_sector(&mut self, start_sector: u32) -> &mut Self {
         self.start_sector = start_sector;
         self
@@ -241,7 +245,7 @@ impl Metadata {
         self
     }
 
-    /// Replaces MiniFAT placement in a transaction draft.
+    /// Replaces `MiniFAT` placement in a transaction draft.
     pub const fn set_uses_mini_stream(&mut self, uses_mini_stream: bool) -> &mut Self {
         self.uses_mini_stream = uses_mini_stream;
         self
@@ -283,7 +287,7 @@ impl Metadata {
         self.links
     }
 
-    /// The starting FAT or MiniFAT sector location.
+    /// The starting FAT or `MiniFAT` sector location.
     #[must_use]
     pub const fn start_sector(self) -> u32 {
         self.start_sector
@@ -295,7 +299,7 @@ impl Metadata {
         self.stream_size
     }
 
-    /// Whether the stream payload is stored through the MiniFAT.
+    /// Whether the stream payload is stored through the `MiniFAT`.
     #[must_use]
     pub const fn uses_mini_stream(self) -> bool {
         self.uses_mini_stream

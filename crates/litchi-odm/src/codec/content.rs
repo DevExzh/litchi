@@ -20,6 +20,13 @@ const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NamespaceKind {
+    Office,
+    Text,
+    Other,
+}
+
 /// Bounded semantic projection retained by the package snapshot.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Semantics {
@@ -65,10 +72,10 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
     let mut sections = Vec::new();
     let mut references = Vec::new();
     loop {
-        let (namespace, event) = reader
+        let (resolved_namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| invalid(format!("invalid ODM content XML: {error}")))?;
-        let namespace = classify(&namespace);
+        let namespace = classify(&resolved_namespace);
         match event {
             Event::Start(element) => {
                 depth = checked_depth(depth)?;
@@ -133,7 +140,11 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
                 return Err(invalid("named XML entities are not allowed in ODM content"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_) => {},
         }
     }
     if depth != 0 || !root_seen || !body_seen || !master_seen {
@@ -147,7 +158,10 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
     Ok(Semantics { references })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one XML event updates the bounded ODM semantic projection"
+)]
 fn observe(
     reader: &NsReader<&[u8]>,
     namespace: NamespaceKind,
@@ -270,9 +284,9 @@ fn attribute(
     namespace: &[u8],
     local: &[u8],
 ) -> Result<Option<String>> {
-    for attribute in element.attributes() {
+    for raw_attribute in element.attributes() {
         let attribute =
-            attribute.map_err(|error| invalid(format!("invalid ODM attribute: {error}")))?;
+            raw_attribute.map_err(|error| invalid(format!("invalid ODM attribute: {error}")))?;
         let (resolved, name) = reader.resolver().resolve_attribute(attribute.key);
         if resolved_bound(&resolved, namespace) && name.as_ref() == local {
             return attribute
@@ -285,31 +299,26 @@ fn attribute(
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {
-    let depth = depth
+    let next_depth = depth
         .checked_add(1)
         .ok_or_else(|| invalid("ODM XML depth overflow"))?;
-    if depth > MAX_DEPTH {
+    if next_depth > MAX_DEPTH {
         return Err(invalid("ODM XML depth exceeds the limit"));
     }
-    Ok(depth)
+    Ok(next_depth)
 }
 
 fn resolved_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum NamespaceKind {
-    Office,
-    Text,
-    Other,
-}
-
 fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
         ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(uri)) if *uri == TEXT => NamespaceKind::Text,
-        _ => NamespaceKind::Other,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 

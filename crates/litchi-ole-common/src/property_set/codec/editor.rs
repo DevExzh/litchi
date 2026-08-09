@@ -1,7 +1,10 @@
 //! Transactional semantic editor for OLE Property Set streams.
 
 use super::super::binding::Binding;
-use super::super::model::*;
+use super::super::model::{
+    Section, Stream, USER_DEFINED_PROPERTIES_FMTID, invalid, try_clone_property_set,
+    try_clone_string, try_hash_set_with_capacity, try_vec_with_capacity,
+};
 use super::package::try_path_refs;
 use super::semantic::validate_section;
 use super::support::allocation;
@@ -18,6 +21,13 @@ pub struct Editor {
 }
 
 impl Editor {
+    /// Opens a compound file for transactional Property Set editing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `bytes` are not a readable unprotected compound
+    /// file, a contained stream cannot be read, or editor storage cannot be
+    /// allocated.
     pub fn new(bytes: Vec<u8>) -> Result<Self, OleError> {
         let streams = {
             let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
@@ -38,6 +48,12 @@ impl Editor {
         })
     }
 
+    /// Loads one property-set section by its standard binding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backing stream cannot be parsed or the selected
+    /// section cannot be cloned.
     pub fn property_set(&self, kind: Binding) -> Result<Option<Section>, OleError> {
         let Some(stream) = self.load_stream(kind)? else {
             return Ok(None);
@@ -48,6 +64,12 @@ impl Editor {
             .transpose()
     }
 
+    /// Applies an isolated typed edit to one bound property-set section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if loading, cloning, or validating the stream fails,
+    /// `edit` returns an error, or the updated stream cannot be serialized.
     pub fn update<F>(&mut self, kind: Binding, edit: F) -> Result<(), OleError>
     where
         F: FnOnce(&mut Section) -> Result<(), OleError>,
@@ -76,6 +98,12 @@ impl Editor {
         Ok(())
     }
 
+    /// Replaces one bound property-set section after validating the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the section FMTID does not match `kind` or the
+    /// replacement cannot be loaded, validated, or serialized.
     pub fn replace(
         &mut self,
         kind: Binding,
@@ -94,6 +122,12 @@ impl Editor {
         Ok(previous)
     }
 
+    /// Removes one bound property-set section or its complete stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the existing stream cannot be read or the retained
+    /// document-summary stream cannot be serialized.
     pub fn remove(&mut self, kind: Binding) -> Result<Option<Section>, OleError> {
         let Some(previous) = self.property_set(kind)? else {
             return Ok(None);
@@ -110,6 +144,12 @@ impl Editor {
         Ok(Some(previous))
     }
 
+    /// Writes all staged Property Set changes into a replacement compound file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if composing a stream path, allocating output, or
+    /// writing the replacement compound file fails.
     pub fn finish(self) -> Result<Vec<u8>, OleError> {
         if self.staged.is_empty() {
             return Ok(self.original);
@@ -162,11 +202,11 @@ impl Editor {
 
     fn load_stream(&self, kind: Binding) -> Result<Option<Stream>, OleError> {
         let name = kind.name();
-        if let Some((_, staged)) = self.staged.iter().find(|(candidate, _)| {
-            candidate.len() == 1
-                && candidate
+        if let Some((_, staged)) = self.staged.iter().find(|(staged_path, _)| {
+            staged_path.len() == 1
+                && staged_path
                     .first()
-                    .is_some_and(|candidate| candidate == name.as_str())
+                    .is_some_and(|component| component == name.as_str())
         }) {
             return staged.as_ref().map(|data| Stream::parse(data)).transpose();
         }

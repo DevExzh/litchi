@@ -2,9 +2,9 @@ use litchi_xls::writer::formatting::{
     COLOR_AUTOMATIC, COLOR_BLACK, COLOR_RED, COLOR_WHITE, FONT_WEIGHT_BOLD, FONT_WEIGHT_NORMAL,
 };
 use litchi_xls::writer::{
-    BorderStyle, Borders, CellStyle, ConditionalFormat, ConditionalFormatType, ConditionalPattern,
-    DataValidation, DataValidationType, Fill, FillPattern, Font, HorizontalAlignment,
-    VerticalAlignment, Writer,
+    BorderStyle, Borders, CellStyle, Column, ConditionalFormat, ConditionalFormatType,
+    ConditionalPattern, DataValidation, DataValidationType, Fill, FillPattern, Font, FrozenPanes,
+    HorizontalAlignment, Row, VerticalAlignment, Writer,
 };
 
 fn make_header_style() -> CellStyle {
@@ -307,24 +307,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writer.add_conditional_format(sheet, status_cf)?;
 
     // Freeze the header row and first column so they remain visible while scrolling.
-    writer.freeze_panes(sheet, 1, 1)?;
+    writer.freeze_panes(sheet, FrozenPanes::new(Row::new(1)?, Column::new(1)?))?;
 
     // Adjust column widths for the two main columns.
     //
     // Column indices are 0-based (0 = column A, 1 = column B).
     // Width is specified in characters (Excel UI units), internally
     // converted to BIFF8 1/256-character units for COLINFO.
-    writer.set_column_width(sheet, 0, 18.0)?;
-    writer.set_column_width(sheet, 1, 32.0)?;
+    writer.set_column_width(sheet, Column::new(0)?, 18.0)?;
+    writer.set_column_width(sheet, Column::new(1)?, 32.0)?;
 
     // Make the header row taller so it stands out.
     //
     // Row indices are 0-based (0 = first row), and the height is in
     // typographic points, converted to twips (1/20 point) for ROW.
-    writer.set_row_height(sheet, 0, 24.0)?;
+    writer.set_row_height(sheet, Row::new(0)?, 24.0)?;
 
     // Make the alignment demo row taller to better show wrapped text.
-    writer.set_row_height(sheet, 6, 30.0)?;
+    writer.set_row_height(sheet, Row::new(6)?, 30.0)?;
 
     writer.save("styled_output.xls")?;
     Ok(())

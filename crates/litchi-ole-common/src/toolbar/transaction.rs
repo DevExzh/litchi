@@ -27,21 +27,28 @@ impl Transaction {
     }
 
     /// Borrow the immutable source snapshot used by this transaction.
+    #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Borrow the current typed candidate.
+    #[must_use]
     pub const fn control(&self) -> &Control<'static> {
         &self.candidate
     }
 
     /// Whether the candidate currently serializes differently from its source.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.candidate.to_bytes().as_slice() != self.source.bytes()
     }
 
     /// Replace all general `TBCFlags`, retaining no invalid reserved bits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `flags` or the resulting header is invalid.
     pub fn set_control_flags(&mut self, flags: ControlFlags) -> Result<&mut Self, Error> {
         flags.validate()?;
         let header = self.header_with(flags, self.candidate.header().specifics())?;
@@ -50,6 +57,10 @@ impl Transaction {
     }
 
     /// Replace all `TBCSFlags`, retaining the body and opaque prefix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `specifics` or the resulting header is invalid.
     pub fn set_specific_flags(&mut self, specifics: SpecificFlags) -> Result<&mut Self, Error> {
         specifics.validate()?;
         let header = self.header_with(self.candidate.header().flags(), specifics)?;
@@ -58,6 +69,10 @@ impl Transaction {
     }
 
     /// Change the shared `textIcon` visibility mode without touching unknown bits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resulting header is invalid.
     pub fn set_text_icon(&mut self, value: TextIcon) -> Result<&mut Self, Error> {
         let specifics = self.candidate.header().specifics().with_text_icon(value);
         let header = self.header_with(self.candidate.header().flags(), specifics)?;
@@ -69,15 +84,20 @@ impl Transaction {
     ///
     /// Adding text also enables `fSaveUIStrings`, as required by
     /// `[MS-OSHARED]`; clearing it leaves unrelated UI-string state intact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the text is invalid or the resulting control is
+    /// invalid.
     pub fn set_custom_text(&mut self, value: Option<&str>) -> Result<&mut Self, Error> {
-        let value = value.map(WString::new).transpose()?;
-        let enable_ui_strings = value.is_some();
+        let custom_text = value.map(WString::new).transpose()?;
+        let enable_ui_strings = custom_text.is_some();
         self.update_general(
             |general| {
-                let flags = general.flags().with_save_text(value.is_some());
+                let flags = general.flags().with_save_text(custom_text.is_some());
                 GeneralInfo::new(
                     flags,
-                    value,
+                    custom_text,
                     general.description().cloned(),
                     general.tooltip().cloned(),
                     general.extra().cloned(),
@@ -89,6 +109,11 @@ impl Transaction {
     }
 
     /// Set or clear the paired description and tooltip UI strings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if only one string is supplied, a string is invalid,
+    /// or the resulting control is invalid.
     pub fn set_ui_strings(
         &mut self,
         description: Option<&str>,
@@ -99,9 +124,9 @@ impl Transaction {
                 "toolbar description and tooltip must be set or cleared together",
             ));
         }
-        let description = description.map(WString::new).transpose()?;
-        let tooltip = tooltip.map(WString::new).transpose()?;
-        let enable_ui_strings = description.is_some();
+        let decoded_description = description.map(WString::new).transpose()?;
+        let decoded_tooltip = tooltip.map(WString::new).transpose()?;
+        let enable_ui_strings = decoded_description.is_some();
         self.update_general(
             |general| {
                 let flags = general
@@ -110,8 +135,8 @@ impl Transaction {
                 GeneralInfo::new(
                     flags,
                     general.custom_text().cloned(),
-                    description,
-                    tooltip,
+                    decoded_description,
+                    decoded_tooltip,
                     general.extra().cloned(),
                 )
             },
@@ -121,6 +146,11 @@ impl Transaction {
     }
 
     /// Set the disabled bit in the common general metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the control body is opaque or the resulting control
+    /// is invalid.
     pub fn set_disabled(&mut self, value: bool) -> Result<&mut Self, Error> {
         self.update_general(
             |general| {
@@ -137,6 +167,10 @@ impl Transaction {
     }
 
     /// Replace the priority while preserving all other header fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `priority` or the resulting header is invalid.
     pub fn set_priority(&mut self, priority: u8) -> Result<&mut Self, Error> {
         let header = self.header_with_priority(priority)?;
         self.replace_header(header)?;
@@ -144,6 +178,10 @@ impl Transaction {
     }
 
     /// Set or clear dimensions and keep `fSaveDxy` consistent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resulting header is invalid.
     pub fn set_dimensions(&mut self, dimensions: Option<Dimensions>) -> Result<&mut Self, Error> {
         let flags = self
             .candidate
@@ -163,11 +201,21 @@ impl Transaction {
     }
 
     /// Capture the candidate as a snapshot without publishing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the candidate cannot be materialized as a valid
+    /// toolbar control.
     pub fn snapshot(&self) -> Result<Snapshot, Error> {
         self.materialize()
     }
 
     /// Publish the candidate and its reversible source-checked patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the candidate cannot be materialized as a valid
+    /// toolbar control.
     pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(&self.source, &snapshot);
@@ -175,11 +223,16 @@ impl Transaction {
     }
 
     /// Alias for move-oriented writer terminology.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::commit`].
     pub fn finish(self) -> Result<Commit, Error> {
         self.commit()
     }
 
     /// Discard staged changes and recover the source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -270,21 +323,25 @@ pub struct Commit {
 
 impl Commit {
     /// Whether the publication changed source bytes.
+    #[must_use]
     pub fn changed(&self) -> bool {
         !self.patch.is_noop()
     }
 
     /// Borrow the immutable target snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit into its target snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }

@@ -213,7 +213,7 @@ fn invalid_flags_and_plot_area_changes_are_refused_before_publication() {
 
     assert!(matches!(
         edit.set_props(Props {
-            flags: before.flags | (1 << 2),
+            flags: before.flags | (1 << 5),
             plot_area: before.plot_area,
         }),
         Err(Error::InvalidModel {

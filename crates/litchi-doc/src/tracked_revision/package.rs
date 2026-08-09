@@ -102,6 +102,179 @@ impl RevisionEditor {
         &self.authors
     }
 
+    /// Returns the exact main-story text after strict piece-table decoding.
+    ///
+    /// This deliberately differs from the permissive reader projection: a
+    /// transaction must not treat malformed UTF-16 or a discontinuous piece
+    /// table as editable text.
+    pub(crate) fn main_story_text(&self) -> Result<String> {
+        let mut output = String::new();
+        let mut covered = 0u32;
+        for piece in &self.pieces {
+            if piece.start >= self.main_ccp {
+                break;
+            }
+            let end = piece.end.min(self.main_ccp);
+            if end <= piece.start {
+                continue;
+            }
+            let count = end - piece.start;
+            if piece.unicode {
+                let offset = usize::try_from(piece.fc)
+                    .map_err(|_| corrupted("Unicode piece offset exceeds usize"))?;
+                let byte_count = usize::try_from(count)
+                    .ok()
+                    .and_then(|value| value.checked_mul(2))
+                    .ok_or_else(|| corrupted("Unicode piece byte count overflow"))?;
+                let bytes = self
+                    .word
+                    .get(offset..offset + byte_count)
+                    .ok_or_else(|| corrupted("Unicode piece exceeds WordDocument"))?;
+                let units = bytes
+                    .chunks_exact(2)
+                    .map(|value| u16::from_le_bytes([value[0], value[1]]))
+                    .collect::<Vec<_>>();
+                output.push_str(
+                    &String::from_utf16(&units)
+                        .map_err(|_| corrupted("main-story text contains invalid UTF-16"))?,
+                );
+            } else {
+                let offset = usize::try_from(piece.fc)
+                    .map_err(|_| corrupted("compressed piece offset exceeds usize"))?;
+                let byte_count = usize::try_from(count)
+                    .map_err(|_| corrupted("compressed piece byte count exceeds usize"))?;
+                let bytes = self
+                    .word
+                    .get(offset..offset + byte_count)
+                    .ok_or_else(|| corrupted("compressed piece exceeds WordDocument"))?;
+                let (decoded, _, had_errors) = encoding_rs::WINDOWS_1252.decode(bytes);
+                if had_errors || decoded.encode_utf16().count() != bytes.len() {
+                    return Err(corrupted("compressed piece cannot be decoded losslessly"));
+                }
+                output.push_str(&decoded);
+            }
+            covered = covered
+                .checked_add(count)
+                .ok_or_else(|| corrupted("main-story CP count overflow"))?;
+        }
+        if covered != self.main_ccp || output.encode_utf16().count() != self.main_ccp as usize {
+            return Err(corrupted(
+                "piece table does not exactly cover the main story",
+            ));
+        }
+        Ok(output)
+    }
+
+    /// Replaces a same-length Unicode text interval without changing piece
+    /// descriptors, FKP pages, PLCFs, or any table-stream byte.
+    pub(crate) fn replace_unicode_text_same_length(
+        &mut self,
+        start_cp: u32,
+        end_cp: u32,
+        replacement: &str,
+    ) -> Result<()> {
+        if start_cp >= end_cp || end_cp > self.main_ccp {
+            return Err(corrupted("body paragraph range is outside the main story"));
+        }
+        let expected = end_cp - start_cp;
+        if replacement.encode_utf16().count() != expected as usize {
+            return Err(corrupted(
+                "replacement changes the body paragraph UTF-16 length",
+            ));
+        }
+        let piece = self
+            .pieces
+            .iter()
+            .find(|piece| start_cp >= piece.start && end_cp <= piece.end)
+            .ok_or_else(|| corrupted("body paragraph crosses a piece boundary"))?;
+        if !piece.unicode {
+            return Err(corrupted("body paragraph is stored in a compressed piece"));
+        }
+        let offset = piece
+            .fc
+            .checked_add(
+                start_cp
+                    .checked_sub(piece.start)
+                    .ok_or_else(|| corrupted("body paragraph CP underflow"))?
+                    .checked_mul(2)
+                    .ok_or_else(|| corrupted("body paragraph offset overflow"))?,
+            )
+            .ok_or_else(|| corrupted("body paragraph offset overflow"))?;
+        let offset = usize::try_from(offset)
+            .map_err(|_| corrupted("body paragraph offset exceeds usize"))?;
+        let byte_count = usize::try_from(expected)
+            .ok()
+            .and_then(|value| value.checked_mul(2))
+            .ok_or_else(|| corrupted("body paragraph byte count overflow"))?;
+        let target = self
+            .word
+            .get_mut(offset..offset + byte_count)
+            .ok_or_else(|| corrupted("body paragraph exceeds WordDocument"))?;
+        for (slot, unit) in target.chunks_exact_mut(2).zip(replacement.encode_utf16()) {
+            slot.copy_from_slice(&unit.to_le_bytes());
+        }
+        self.package
+            .put_stream(&self.word_path, self.word.clone())
+            .map_err(PackageError::from)?;
+        self.changed = true;
+        Ok(())
+    }
+
+    /// Whether one main-story interval is a single Unicode piece.
+    pub(crate) fn is_unicode_piece_range(&self, start_cp: u32, end_cp: u32) -> bool {
+        self.pieces
+            .iter()
+            .any(|piece| piece.unicode && start_cp >= piece.start && end_cp <= piece.end)
+    }
+
+    /// Number of CLX pieces touched by a non-empty main-story range.
+    #[must_use]
+    pub(crate) fn piece_count_for_range(&self, start_cp: u32, end_cp: u32) -> usize {
+        self.pieces
+            .iter()
+            .filter(|piece| piece.start < end_cp && start_cp < piece.end)
+            .count()
+    }
+
+    /// Whether the paragraph ending at `cp` has the MS-DOC in-table flag.
+    pub(crate) fn is_in_table_at_cp(&self, cp: u32) -> Result<bool> {
+        let piece = self
+            .pieces
+            .iter()
+            .find(|piece| piece.start <= cp && cp < piece.end)
+            .ok_or_else(|| corrupted("paragraph terminator has no text piece"))?;
+        let width = if piece.unicode { 2 } else { 1 };
+        let fc = piece
+            .fc
+            .checked_add(
+                cp.checked_sub(piece.start)
+                    .ok_or_else(|| corrupted("paragraph CP underflow"))?
+                    .checked_mul(width)
+                    .ok_or_else(|| corrupted("paragraph FC overflow"))?,
+            )
+            .ok_or_else(|| corrupted("paragraph FC overflow"))?;
+        let run = self
+            .papx
+            .iter()
+            .find(|run| run.start <= fc && fc < run.end)
+            .ok_or_else(|| corrupted("paragraph terminator has no PAPX run"))?;
+        let body = run
+            .grpprl
+            .get(2..)
+            .ok_or_else(|| corrupted("PAPX has no style index"))?;
+        Ok(strict_sprms(body)?
+            .iter()
+            .rev()
+            .find(|sprm| sprm.opcode == SPRM_P_F_IN_TABLE)
+            .is_some_and(|sprm| sprm.operand_byte() == Some(1)))
+    }
+
+    /// Main-story length in MS-DOC CP (UTF-16 code-unit) coordinates.
+    #[must_use]
+    pub(crate) const fn main_story_cp_len(&self) -> u32 {
+        self.main_ccp
+    }
+
     /// Lists character and PAPX property revisions, merging adjacent runs with
     /// identical metadata even when the range crosses piece boundaries.
     pub fn revisions(&self) -> Result<Vec<Revision>> {

@@ -1,6 +1,6 @@
-//! Inert OpenDocument digital-signature metadata.
+//! Inert `OpenDocument` digital-signature metadata.
 //!
-//! This module parses the ODF signature containers and XMLDSIG metadata without
+//! This module parses the ODF signature containers and `XMLDSIG` metadata without
 //! verifying signatures, resolving external references, or executing macros.
 
 use litchi_core::{Error, Result};
@@ -30,7 +30,7 @@ const MAX_BASE64_BYTES: usize = 8 * 1024 * 1024;
 pub(crate) const DOCUMENT_SIGNATURE_PATH: &str = "META-INF/documentsignatures.xml";
 pub(crate) const MACRO_SIGNATURE_PATH: &str = "META-INF/macrosignatures.xml";
 
-/// Signature metadata stored in an OpenDocument package.
+/// Digital-signature metadata stored in an `OpenDocument` package.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DigitalSignatures {
     pub document_signatures: Vec<DigitalSignature>,
@@ -38,10 +38,12 @@ pub struct DigitalSignatures {
 }
 
 impl DigitalSignatures {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.document_signatures.is_empty() && self.macro_signatures.is_empty()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.document_signatures.len() + self.macro_signatures.len()
     }
@@ -58,7 +60,7 @@ pub struct DigitalSignature {
     pub signature_value: String,
     /// Whitespace-normalized base64 DER certificates, in document order.
     pub x509_certificates: Vec<String>,
-    /// XAdES `SigningTime`, or the legacy Dublin Core signature date.
+    /// `XAdES` `SigningTime`, or the legacy Dublin Core signature date.
     pub signing_time: Option<String>,
 }
 
@@ -137,7 +139,7 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
             return invalid("ODF signature XML exceeds the event limit");
         }
 
-        let decoder = reader.decoder();
+        let xml_decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| format_error(format!("invalid ODF signature XML: {error}")))?;
@@ -149,8 +151,8 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
                 if depth >= MAX_XML_DEPTH {
                     return invalid("ODF signature XML exceeds the nesting limit");
                 }
-                let local = element.local_name();
-                let local = local.as_ref();
+                let local_name = element.local_name();
+                let local = local_name.as_ref();
                 if depth == 0 {
                     if root_seen
                         || !namespace_is(&namespace, ODF_SIGNATURE_NAMESPACE)
@@ -168,12 +170,12 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
                     }
                     signature = Some(SignatureBuilder {
                         depth,
-                        id: attribute(decoder, element, b"Id")?,
+                        id: attribute(xml_decoder, element, b"Id")?,
                         ..SignatureBuilder::default()
                     });
                 } else if let Some(current) = signature.as_mut() {
                     process_start(
-                        decoder,
+                        xml_decoder,
                         &namespace,
                         element,
                         depth,
@@ -192,27 +194,27 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
                 let local_name = element.local_name();
                 let local = local_name.as_ref();
                 if let Some(current) = signature.as_mut() {
-                    process_empty(decoder, &namespace, element, depth, current)?;
+                    process_empty(xml_decoder, &namespace, element, depth, current)?;
                 } else if local == b"Signature" {
                     return invalid("signature vocabulary uses the wrong namespace or location");
                 }
             },
             Event::Text(ref value) => {
-                let decoded = value
+                let text = value
                     .decode()
                     .map_err(|error| format_error(format!("invalid signature text: {error}")))?;
                 if let Some(target) = text_target.as_mut() {
-                    append_bounded(&mut target.value, &decoded, MAX_BASE64_BYTES)?;
-                } else if signature.is_none() && !decoded.trim().is_empty() {
+                    append_bounded(&mut target.value, &text, MAX_BASE64_BYTES)?;
+                } else if signature.is_none() && !text.trim().is_empty() {
                     return invalid("text is not allowed outside an ODF signature");
                 }
             },
             Event::CData(ref value) => {
                 if let Some(target) = text_target.as_mut() {
-                    let decoded = value.decode().map_err(|error| {
+                    let text = value.decode().map_err(|error| {
                         format_error(format!("invalid signature CDATA: {error}"))
                     })?;
-                    append_bounded(&mut target.value, &decoded, MAX_BASE64_BYTES)?;
+                    append_bounded(&mut target.value, &text, MAX_BASE64_BYTES)?;
                 } else if !value.is_empty() {
                     return invalid("unexpected CDATA in ODF signature XML");
                 }
@@ -225,8 +227,10 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
                     .as_ref()
                     .is_some_and(|target| target.depth == depth)
                 {
-                    let target = text_target.take().expect("target depth checked");
-                    finish_text_target(target, signature.as_mut())?;
+                    let target = text_target.take().ok_or_else(|| {
+                        format_error("signature text target closed without an active target")
+                    })?;
+                    finish_text_target(&target, &mut signature)?;
                 }
                 if let Some(current) = signature.as_mut() {
                     if current
@@ -241,9 +245,10 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
                     }
                 }
                 if signature.as_ref().is_some_and(|value| value.depth == depth) {
-                    signatures.push(finish_signature(
-                        signature.take().expect("signature depth checked"),
-                    )?);
+                    let finished = signature.take().ok_or_else(|| {
+                        format_error("signature closed without an active signature")
+                    })?;
+                    signatures.push(finish_signature(finished)?);
                 }
                 if depth == 0 {
                     let local_name = element.local_name();
@@ -462,12 +467,14 @@ fn start_text(target: &mut Option<TextTarget>, depth: usize, kind: TextTargetKin
     Ok(())
 }
 
-fn finish_text_target(target: TextTarget, signature: Option<&mut SignatureBuilder>) -> Result<()> {
-    let signature = signature.ok_or_else(|| format_error("signature text outside a signature"))?;
+fn finish_text_target(target: &TextTarget, signature: &mut Option<SignatureBuilder>) -> Result<()> {
+    let builder = signature
+        .as_mut()
+        .ok_or_else(|| format_error("signature text outside a signature"))?;
     match target.kind {
         TextTargetKind::DigestValue => {
             let value = normalize_base64(&target.value, "digest value")?;
-            let reference = signature
+            let reference = builder
                 .reference
                 .as_mut()
                 .ok_or_else(|| format_error("digest value outside a reference"))?;
@@ -475,24 +482,24 @@ fn finish_text_target(target: TextTarget, signature: Option<&mut SignatureBuilde
         },
         TextTargetKind::SignatureValue => {
             let value = normalize_base64(&target.value, "signature value")?;
-            set_once(&mut signature.signature_value, value, "signature value")
+            set_once(&mut builder.signature_value, value, "signature value")
         },
         TextTargetKind::Certificate => {
-            if signature.certificates.len() >= MAX_CERTIFICATES {
+            if builder.certificates.len() >= MAX_CERTIFICATES {
                 return invalid("signature has too many X.509 certificates");
             }
-            signature
+            builder
                 .certificates
                 .push(normalize_base64(&target.value, "X.509 certificate")?);
             Ok(())
         },
         TextTargetKind::SigningTime => {
             let value = normalized_text(&target.value, "signing time")?;
-            set_once(&mut signature.signing_time, value, "signing time")
+            set_once(&mut builder.signing_time, value, "signing time")
         },
         TextTargetKind::LegacySigningTime => {
             let value = normalized_text(&target.value, "signature date")?;
-            set_once(&mut signature.legacy_signing_time, value, "signature date")
+            set_once(&mut builder.legacy_signing_time, value, "signature date")
         },
     }
 }
@@ -500,21 +507,27 @@ fn finish_text_target(target: TextTarget, signature: Option<&mut SignatureBuilde
 fn attribute(decoder: Decoder, element: &BytesStart<'_>, name: &[u8]) -> Result<Option<String>> {
     let mut result = None;
     let mut count = 0usize;
-    for value in element.attributes().with_checks(true) {
+    for raw_attribute in element.attributes().with_checks(true) {
         count += 1;
         if count > 64 {
             return invalid("signature element has too many attributes");
         }
-        let value = value.map_err(|error| format_error(format!("invalid attribute: {error}")))?;
-        if value.key.as_ref() == name {
+        let parsed_attribute =
+            raw_attribute.map_err(|error| format_error(format!("invalid attribute: {error}")))?;
+        if parsed_attribute.key.as_ref() == name {
             if result.is_some() {
                 return invalid("duplicate signature attribute");
             }
-            let decoded = value
+            let decoded_value = parsed_attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
                 .map_err(|error| format_error(format!("invalid attribute value: {error}")))?;
-            validate_text(&decoded, "signature attribute", MAX_ATTRIBUTE_BYTES, true)?;
-            result = Some(decoded.into_owned());
+            validate_text(
+                &decoded_value,
+                "signature attribute",
+                MAX_ATTRIBUTE_BYTES,
+                true,
+            )?;
+            result = Some(decoded_value.into_owned());
         }
     }
     Ok(result)
@@ -532,14 +545,14 @@ fn required_attribute(decoder: Decoder, element: &BytesStart<'_>, name: &[u8]) -
 fn normalize_base64(value: &str, context: &str) -> Result<String> {
     let normalized: String = value
         .chars()
-        .filter(|value| !value.is_whitespace())
+        .filter(|character| !character.is_whitespace())
         .collect();
     if normalized.is_empty()
         || normalized.len() > MAX_BASE64_BYTES
         || !normalized.len().is_multiple_of(4)
         || normalized
             .bytes()
-            .any(|value| !(value.is_ascii_alphanumeric() || matches!(value, b'+' | b'/' | b'=')))
+            .any(|byte| !(byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'=')))
         || normalized
             .find('=')
             .is_some_and(|index| index < normalized.len().saturating_sub(2))
@@ -550,9 +563,9 @@ fn normalize_base64(value: &str, context: &str) -> Result<String> {
 }
 
 fn normalized_text(value: &str, context: &str) -> Result<String> {
-    let value = value.trim();
-    validate_text(value, context, MAX_ATTRIBUTE_BYTES, false)?;
-    Ok(value.to_owned())
+    let trimmed_value = value.trim();
+    validate_text(trimmed_value, context, MAX_ATTRIBUTE_BYTES, false)?;
+    Ok(trimmed_value.to_owned())
 }
 
 fn validate_text(value: &str, context: &str, maximum: usize, allow_empty: bool) -> Result<()> {
@@ -560,7 +573,7 @@ fn validate_text(value: &str, context: &str, maximum: usize, allow_empty: bool) 
         || value.len() > maximum
         || value
             .chars()
-            .any(|value| matches!(value, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}'))
+            .any(|character| matches!(character, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}'))
     {
         return invalid(format!("invalid {context}"));
     }
@@ -608,8 +621,14 @@ mod tests {
         let bytes = include_bytes!(
             "../../../../test-data/libreoffice-core/xmlsecurity/qa/unit/signing/data/signed_with_x509certificate_chain.odt"
         );
-        let package = OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
-        let signatures = package.digital_signatures().unwrap();
+        let package = match OwnedPackage::from_bytes(bytes.to_vec()) {
+            Ok(package) => package,
+            Err(error) => panic!("fixture package must parse: {error}"),
+        };
+        let signatures = match package.digital_signatures() {
+            Ok(signatures) => signatures,
+            Err(error) => panic!("fixture signature metadata must parse: {error}"),
+        };
         assert_eq!(signatures.document_signatures.len(), 1);
         assert!(signatures.macro_signatures.is_empty());
         let signature = &signatures.document_signatures[0];
@@ -639,13 +658,13 @@ mod tests {
             r#"</SignedInfo>"#,
         );
         assert!(parse_signature_container(
-            format!(r#"{valid_start}<SignatureValue>AAAA</SignatureValue></Signature></document-signatures>"#).as_bytes()
+            format!(r"{valid_start}<SignatureValue>AAAA</SignatureValue></Signature></document-signatures>").as_bytes()
         ).is_ok());
         for xml in [
-            format!(r#"{valid_start}</Signature></document-signatures>"#),
+            format!(r"{valid_start}</Signature></document-signatures>"),
             r#"<document-signatures xmlns="urn:wrong"><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"/></document-signatures>"#.to_owned(),
-            format!(r#"<!DOCTYPE x>{valid_start}<SignatureValue>AAAA</SignatureValue></Signature></document-signatures>"#),
-            format!(r#"{valid_start}<SignatureValue>not-base64</SignatureValue></Signature></document-signatures>"#),
+            format!(r"<!DOCTYPE x>{valid_start}<SignatureValue>AAAA</SignatureValue></Signature></document-signatures>"),
+            format!(r"{valid_start}<SignatureValue>not-base64</SignatureValue></Signature></document-signatures>"),
         ] {
             assert!(parse_signature_container(xml.as_bytes()).is_err(), "accepted {xml}");
         }

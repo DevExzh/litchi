@@ -448,8 +448,9 @@ impl WritableWorksheet {
         self.conditional_formats12.push(group);
     }
 
-    pub(super) fn set_freeze_panes(&mut self, freeze_rows: u16, freeze_cols: u8) -> Result<()> {
-        self.view.set_frozen(freeze_rows, freeze_cols)
+    pub(super) fn set_freeze_panes(&mut self, panes: crate::writer::FrozenPanes) -> Result<()> {
+        self.view
+            .set_frozen(panes.rows().index(), panes.columns().index())
     }
 
     pub(super) fn clear_freeze_panes(&mut self) {
@@ -463,12 +464,12 @@ impl WritableWorksheet {
         self.view.put_scale(scale)
     }
 
-    pub(super) fn set_column_width(&mut self, col: u16, width: u16) {
-        self.column_widths.insert(col, width);
+    pub(super) fn set_column_width(&mut self, column: crate::writer::Column, width: u16) {
+        self.column_widths.insert(u16::from(column.index()), width);
     }
 
-    pub(super) fn hide_column(&mut self, col: u16) {
-        self.hidden_columns.insert(col);
+    pub(super) fn hide_column(&mut self, column: crate::writer::Column) {
+        self.hidden_columns.insert(u16::from(column.index()));
     }
 
     pub(super) fn add_hyperlink(&mut self, hyperlink: Hyperlink) {
@@ -483,20 +484,20 @@ impl WritableWorksheet {
         Ok(())
     }
 
-    pub(super) fn show_column(&mut self, col: u16) {
-        self.hidden_columns.remove(&col);
+    pub(super) fn show_column(&mut self, column: crate::writer::Column) {
+        self.hidden_columns.remove(&u16::from(column.index()));
     }
 
-    pub(super) fn set_row_height(&mut self, row: u32, height: u16) {
-        self.row_heights.insert(row, height);
+    pub(super) fn set_row_height(&mut self, row: crate::writer::Row, height: u16) {
+        self.row_heights.insert(u32::from(row.index()), height);
     }
 
-    pub(super) fn hide_row(&mut self, row: u32) {
-        self.hidden_rows.insert(row);
+    pub(super) fn hide_row(&mut self, row: crate::writer::Row) {
+        self.hidden_rows.insert(u32::from(row.index()));
     }
 
-    pub(super) fn show_row(&mut self, row: u32) {
-        self.hidden_rows.remove(&row);
+    pub(super) fn show_row(&mut self, row: crate::writer::Row) {
+        self.hidden_rows.remove(&u32::from(row.index()));
     }
 
     pub(super) fn add_auto_filter_column(&mut self, def: AutoFilterColumnDef) {

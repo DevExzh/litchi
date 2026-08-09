@@ -117,7 +117,7 @@ pub struct Link {
     pub(crate) wire: Arc<[u8]>,
     pub(crate) kind: Kind,
     pub(crate) flags: u32,
-    pub(crate) link_update_option: u32,
+    pub(crate) update_option: u32,
     pub(crate) reserved_moniker: Option<Range<usize>>,
     pub(crate) relative_source: Option<Range<usize>>,
     pub(crate) absolute_source: Option<Range<usize>>,
@@ -138,11 +138,21 @@ impl Link {
     ///
     /// Use [`Self::parse_shared`] when the caller already owns the stream in
     /// an [`Arc`], as the object layer does.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stream is malformed or exceeds the OLEDS
+    /// metadata limit.
     pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
         codec::parse(Arc::<[u8]>::from(bytes))
     }
 
     /// Parses a link stream without copying an existing allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stream is malformed or exceeds the OLEDS
+    /// metadata limit.
     pub fn parse_shared(bytes: Arc<[u8]>) -> Result<Self, OleError> {
         codec::parse(bytes)
     }
@@ -192,6 +202,10 @@ impl Link {
     /// The low bit controls the wire layout and therefore cannot be changed
     /// after parsing.  Unknown higher bits are retained for forward
     /// compatibility and round-trip losslessness.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `flags` changes the embedded/linked layout.
     pub fn set_flags(&mut self, flags: u32) -> Result<(), OleError> {
         if (flags & codec::LINKED_FLAG) != (self.flags & codec::LINKED_FLAG) {
             return Err(OleError::InvalidFormat(
@@ -205,12 +219,12 @@ impl Link {
     /// The implementation-specific OLEDS update option.
     #[must_use]
     pub const fn link_update_option(&self) -> u32 {
-        self.link_update_option
+        self.update_option
     }
 
     /// Replaces the implementation-specific OLEDS update option.
     pub const fn set_link_update_option(&mut self, value: u32) {
-        self.link_update_option = value;
+        self.update_option = value;
     }
 
     /// The reserved moniker bytes, when the producer supplied them.
@@ -250,6 +264,11 @@ impl Link {
     }
 
     /// Replaces the linked object's class identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this is an embedded link with no class identifier
+    /// field in its wire layout.
     pub fn set_class_id(&mut self, value: Guid) -> Result<(), OleError> {
         if self.class_id_offset.is_none() {
             return Err(OleError::InvalidFormat(
@@ -281,6 +300,11 @@ impl Link {
     }
 
     /// Replaces the linked-object FILETIME group.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this link has no timestamp group in its wire
+    /// layout.
     pub fn set_times(&mut self, value: Times) -> Result<(), OleError> {
         if self.times_offsets.is_none() {
             return Err(OleError::InvalidFormat(
@@ -305,7 +329,7 @@ impl Link {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut output = self.wire.as_ref().to_vec();
         output[4..8].copy_from_slice(&self.flags.to_le_bytes());
-        output[8..12].copy_from_slice(&self.link_update_option.to_le_bytes());
+        output[8..12].copy_from_slice(&self.update_option.to_le_bytes());
         if let (Some(offset), Some(class_id)) = (self.class_id_offset, self.class_id) {
             output[offset..offset + 16].copy_from_slice(class_id.as_bytes());
         }

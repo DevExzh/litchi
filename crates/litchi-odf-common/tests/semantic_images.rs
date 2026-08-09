@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        reason = "Fixed semantic XML fixtures use direct assertion setup."
+    )
+)]
+
 use litchi_odf_common::{
     drawing::Part,
     media::{Image, Source, scan_flat, scan_package},
@@ -145,9 +153,9 @@ fn accessibility_metadata_is_shared_and_deferred_to_frame_close() {
         assert_eq!(images.len(), 2);
         for (index, image) in images.iter().enumerate() {
             assert_eq!(image.alternative_index, index);
-            let frame = image.frame.as_ref().unwrap();
-            assert_eq!(frame.title.as_deref(), Some("Before & A <raw>"));
-            assert_eq!(frame.description.as_deref(), Some(""));
+            let image_frame = image.frame.as_ref().unwrap();
+            assert_eq!(image_frame.title.as_deref(), Some("Before & A <raw>"));
+            assert_eq!(image_frame.description.as_deref(), Some(""));
         }
     }
 }

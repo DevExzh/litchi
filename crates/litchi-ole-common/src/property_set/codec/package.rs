@@ -1,33 +1,45 @@
 //! CFB/package integration and metadata projection for Property Sets.
 
 use super::super::binding::Binding;
-use super::super::model::*;
+use super::super::model::{
+    Metadata, Section, Stream, Value, invalid, try_clone_property_value, try_clone_string,
+    try_vec_with_capacity,
+};
 use super::binary::{filetime_to_date, filetime_to_duration};
 use super::support::allocation;
 use litchi_cfb::{OleError, OleFile};
 use std::io::{Read, Seek};
 
-pub(super) fn try_path_refs(path: &[String]) -> Result<Vec<&str>, OleError> {
-    let mut refs = try_vec_with_capacity(path.len(), "property-set stream path")?;
-    refs.extend(path.iter().map(String::as_str));
-    Ok(refs)
-}
-
 /// Read and project OLE Property Set streams from an opened compound file.
 ///
-/// This is an extension trait because the CFB container owns OleFile.
+/// This is an extension trait because the CFB container owns `OleFile`.
 pub trait PropertySetReader {
-    /// Strictly parse a Property Set stream at path.
-    fn property_set_stream(&mut self, path: &[&str]) -> Result<Stream, OleError>;
+    /// Parse standard `SummaryInformation` and `DocumentSummaryInformation` metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a present standard stream cannot be read or parsed,
+    /// or if its metadata cannot be projected.
+    fn get_metadata(&mut self) -> Result<Metadata, OleError>;
 
     /// Strictly parse a standard or GUID-derived Property Set binding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bound stream cannot be opened or is not a valid
+    /// Property Set stream.
     fn property_set(&mut self, binding: Binding) -> Result<Stream, OleError> {
         let name = binding.name();
         self.property_set_stream(&[name.as_str()])
     }
 
-    /// Parse standard SummaryInformation and DocumentSummaryInformation metadata.
-    fn get_metadata(&mut self) -> Result<Metadata, OleError>;
+    /// Strictly parse a Property Set stream at path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream cannot be opened or is not a valid
+    /// Property Set stream.
+    fn property_set_stream(&mut self, path: &[&str]) -> Result<Stream, OleError>;
 }
 
 impl<R: Read + Seek> PropertySetReader for OleFile<R> {
@@ -63,15 +75,15 @@ impl<R: Read + Seek> PropertySetReader for OleFile<R> {
                         .custom_properties
                         .try_reserve(custom_section.dictionary.len())
                         .map_err(|source| allocation("custom properties", source))?;
-                    for (name, value) in custom_section.named_properties() {
-                        if metadata.custom_properties.contains_key(name) {
+                    for (property_name, property_value) in custom_section.named_properties() {
+                        if metadata.custom_properties.contains_key(property_name) {
                             return Err(invalid(format!(
-                                "Duplicate custom property name '{name}'"
+                                "Duplicate custom property name '{property_name}'"
                             )));
                         }
-                        let name = try_clone_string(name, "custom property name")?;
-                        let value = try_clone_property_value(value)?;
-                        metadata.custom_properties.insert(name, value);
+                        let owned_name = try_clone_string(property_name, "custom property name")?;
+                        let owned_value = try_clone_property_value(property_value)?;
+                        metadata.custom_properties.insert(owned_name, owned_value);
                     }
                 }
             },
@@ -80,6 +92,12 @@ impl<R: Read + Seek> PropertySetReader for OleFile<R> {
         }
         Ok(metadata)
     }
+}
+
+pub(super) fn try_path_refs(path: &[String]) -> Result<Vec<&str>, OleError> {
+    let mut refs = try_vec_with_capacity(path.len(), "property-set stream path")?;
+    refs.extend(path.iter().map(String::as_str));
+    Ok(refs)
 }
 
 fn extract_summary_info(metadata: &mut Metadata, section: &Section) -> Result<(), OleError> {
@@ -111,7 +129,7 @@ fn extract_summary_info(metadata: &mut Metadata, section: &Section) -> Result<()
     metadata.num_chars = section.property(16).and_then(nonnegative_i4);
     metadata.creating_application = extract_string(section.property(18))?;
     if let Some(Value::I4(value)) = section.property(19) {
-        metadata.security = Some(*value as u32);
+        metadata.security = Some(u32::from_ne_bytes(value.to_ne_bytes()));
     }
     Ok(())
 }
@@ -129,21 +147,21 @@ fn extract_document_summary_info(
     Ok(())
 }
 
-fn extract_string(value: Option<&Value>) -> Result<Option<String>, OleError> {
-    let Some(value) = value else {
+fn extract_string(candidate: Option<&Value>) -> Result<Option<String>, OleError> {
+    let Some(property) = candidate else {
         return Ok(None);
     };
-    match value {
-        Value::Bstr(value) | Value::Lpstr(value) | Value::Lpwstr(value) => {
-            Ok(Some(try_clone_string(value, "metadata string")?))
-        },
-        _ => Ok(None),
+    if let Value::Bstr(text) | Value::Lpstr(text) | Value::Lpwstr(text) = property {
+        Ok(Some(try_clone_string(text, "metadata string")?))
+    } else {
+        Ok(None)
     }
 }
 
-fn nonnegative_i4(value: &Value) -> Option<u32> {
-    match value {
-        Value::I4(value) => u32::try_from(*value).ok(),
-        _ => None,
+fn nonnegative_i4(property: &Value) -> Option<u32> {
+    if let Value::I4(count) = property {
+        u32::try_from(*count).ok()
+    } else {
+        None
     }
 }

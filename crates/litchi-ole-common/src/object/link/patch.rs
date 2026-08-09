@@ -48,7 +48,7 @@ pub struct Patch {
 }
 
 impl Patch {
-    pub(crate) fn new(before: Snapshot, after: Snapshot) -> Self {
+    pub(crate) fn new(before: &Snapshot, after: &Snapshot) -> Self {
         let change = (before.link != after.link).then(|| Change::new(&before.link, &after.link));
         Self {
             base: before.revision,
@@ -126,6 +126,12 @@ impl Patch {
     }
 
     /// Applies the patch only to the exact source snapshot used to create it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `source` does not match the patch's exact base
+    /// bytes and revision, or when its target bytes no longer parse as OLEDS
+    /// link metadata.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, OleError> {
         if source.revision != self.base || source.bytes() != self.before.as_ref() {
             return Err(OleError::InvalidFormat(

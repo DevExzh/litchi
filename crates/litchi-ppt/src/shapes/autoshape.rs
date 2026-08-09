@@ -191,6 +191,12 @@ impl AutoShapeGeometry {
 }
 
 impl<'a> AutoShape<'a> {
+    /// Native `OfficeArt` identity retained for source-bound transactions.
+    #[must_use]
+    pub(crate) const fn source_shape_id(&self) -> u32 {
+        self.container.properties.id
+    }
+
     /// Create a new auto shape with owned data.
     #[must_use]
     pub fn new(properties: ShapeProperties, raw_data: Vec<u8>) -> Self {

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::unwrap_used,
+    reason = "Test assertions intentionally unwrap known-valid coordinate fixture construction failures."
+)]
+
 use super::codec::{alpha_to_digit, digit_to_alpha};
 use super::model::{CellCoord, CellRange, MAX_INDEX};
 
@@ -43,18 +48,18 @@ fn digit_to_alpha_round_trips_the_representable_coordinate_domain() {
 
 #[test]
 fn cell_coordinate_parsing_and_display_preserve_a1_behavior() {
-    let coord: CellCoord = "A1".parse().unwrap();
-    assert_eq!(coord.column(), 0);
-    assert_eq!(coord.row(), 0);
+    let first_coord: CellCoord = "A1".parse().unwrap();
+    assert_eq!(first_coord.column(), 0);
+    assert_eq!(first_coord.row(), 0);
 
-    let coord: CellCoord = "B3".parse().unwrap();
-    assert_eq!(coord.column(), 1);
-    assert_eq!(coord.row(), 2);
+    let second_coord: CellCoord = "B3".parse().unwrap();
+    assert_eq!(second_coord.column(), 1);
+    assert_eq!(second_coord.row(), 2);
 
-    let coord: CellCoord = "AA10".parse().unwrap();
-    assert_eq!(coord.column(), 26);
-    assert_eq!(coord.row(), 9);
-    assert_eq!(coord.to_a1(), "AA10");
+    let wide_coord: CellCoord = "AA10".parse().unwrap();
+    assert_eq!(wide_coord.column(), 26);
+    assert_eq!(wide_coord.row(), 9);
+    assert_eq!(wide_coord.to_a1(), "AA10");
 
     for value in ["A0", "1A", "A"] {
         assert!(value.parse::<CellCoord>().is_err(), "accepted {value}");
@@ -67,20 +72,20 @@ fn cell_coordinate_parsing_and_display_preserve_a1_behavior() {
 
 #[test]
 fn cell_range_is_checked_and_keeps_inclusive_dimensions() {
-    let range: CellRange = "A1:B3".parse().unwrap();
-    assert_eq!(range.start().column(), 0);
-    assert_eq!(range.start().row(), 0);
-    assert_eq!(range.end().column(), 1);
-    assert_eq!(range.end().row(), 2);
-    assert_eq!(range.width(), 2);
-    assert_eq!(range.height(), 3);
-    assert!(range.contains(CellCoord::new(1, 2).unwrap()));
-    assert!(!range.contains(CellCoord::new(2, 2).unwrap()));
+    let first_range: CellRange = "A1:B3".parse().unwrap();
+    assert_eq!(first_range.start().column(), 0);
+    assert_eq!(first_range.start().row(), 0);
+    assert_eq!(first_range.end().column(), 1);
+    assert_eq!(first_range.end().row(), 2);
+    assert_eq!(first_range.width(), 2);
+    assert_eq!(first_range.height(), 3);
+    assert!(first_range.contains(CellCoord::new(1, 2).unwrap()));
+    assert!(!first_range.contains(CellCoord::new(2, 2).unwrap()));
 
-    let range: CellRange = "AA10:AB20".parse().unwrap();
-    assert_eq!(range.width(), 2);
-    assert_eq!(range.height(), 11);
-    assert_eq!(range.to_string(), "AA10:AB20");
+    let wide_range: CellRange = "AA10:AB20".parse().unwrap();
+    assert_eq!(wide_range.width(), 2);
+    assert_eq!(wide_range.height(), 11);
+    assert_eq!(wide_range.to_string(), "AA10:AB20");
 
     for value in ["A1", "A1:", ":B3", "A1:B3:C4"] {
         assert!(value.parse::<CellRange>().is_err(), "accepted {value}");
@@ -89,6 +94,6 @@ fn cell_range_is_checked_and_keeps_inclusive_dimensions() {
     let start = CellCoord::new(1, 1).unwrap();
     let end = CellCoord::new(0, 0).unwrap();
     assert!(CellRange::new(start, end).is_err());
-    let range = CellRange::new(CellCoord::new(0, 0).unwrap(), end).unwrap();
-    assert_eq!(range.to_string(), "A1:A1");
+    let single_cell_range = CellRange::new(CellCoord::new(0, 0).unwrap(), end).unwrap();
+    assert_eq!(single_cell_range.to_string(), "A1:A1");
 }

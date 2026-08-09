@@ -284,54 +284,46 @@ mod tests {
 
     const XML: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:c="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:chart><c:chart><c:legend c:legend-position="bottom-end"/><c:plot-area t:cell-range-address="Data.A1:C4" c:data-source-has-labels="both"><c:axis c:dimension="x" c:name="x"><c:categories t:cell-range-address="Data.A2:A4"/><c:grid c:class="major"/></c:axis><c:series c:values-cell-range-address="Data.B2:B4" c:label-cell-address="Data.B1"><c:domain t:cell-range-address="Data.A2:A4"/><c:data-point c:repeated="3"/></c:series></c:plot-area></c:chart></o:chart></o:body></o:document-content>"#;
 
-    #[test]
-    fn provides_zero_copy_semantic_views() {
-        let chart = read(XML).unwrap();
-        assert_eq!(
-            chart.legend().unwrap().position().unwrap(),
-            Position::BottomEnd
-        );
-        let plot = chart.plot_area().unwrap();
-        assert_eq!(plot.cell_range_address(), Some("Data.A1:C4"));
-        assert_eq!(plot.data_source_labels().unwrap(), Labels::Both);
-        let axis = plot.axes().next().unwrap();
-        assert_eq!(axis.dimension().unwrap(), Dimension::X);
-        assert_eq!(axis.categories_range(), Some("Data.A2:A4"));
-        assert_eq!(axis.grids().next().unwrap().class().unwrap(), Class::Major);
-        let series = plot.series().next().unwrap();
-        assert_eq!(series.values_range(), Some("Data.B2:B4"));
-        assert_eq!(series.domains().next(), Some("Data.A2:A4"));
-        assert_eq!(series.data_points().next().unwrap().repeated().unwrap(), 3);
+    fn required<T>(value: Option<T>, description: &str) -> Result<T> {
+        value.ok_or_else(|| Error::InvalidFormat(format!("missing {description}")))
     }
 
     #[test]
-    fn validates_domains_at_access_time() {
+    fn provides_zero_copy_semantic_views() -> Result<()> {
+        let chart = read(XML)?;
+        let legend = required(chart.legend(), "chart legend")?;
+        assert_eq!(legend.position()?, Position::BottomEnd);
+        let plot = required(chart.plot_area(), "chart plot area")?;
+        assert_eq!(plot.cell_range_address(), Some("Data.A1:C4"));
+        assert_eq!(plot.data_source_labels()?, Labels::Both);
+        let axis = required(plot.axes().next(), "plot axis")?;
+        assert_eq!(axis.dimension()?, Dimension::X);
+        assert_eq!(axis.categories_range(), Some("Data.A2:A4"));
+        let grid = required(axis.grids().next(), "axis grid")?;
+        assert_eq!(grid.class()?, Class::Major);
+        let series = required(plot.series().next(), "plot series")?;
+        assert_eq!(series.values_range(), Some("Data.B2:B4"));
+        assert_eq!(series.domains().next(), Some("Data.A2:A4"));
+        let data_point = required(series.data_points().next(), "series data point")?;
+        assert_eq!(data_point.repeated()?, 3);
+        Ok(())
+    }
+
+    #[test]
+    fn validates_domains_at_access_time() -> Result<()> {
         let xml = XML
             .replace("c:dimension=\"x\"", "c:dimension=\"time\"")
             .replace("c:class=\"major\"", "c:class=\"micro\"")
             .replace("c:repeated=\"3\"", "c:repeated=\"0\"");
-        let chart = read(&xml).unwrap();
-        let plot = chart.plot_area().unwrap();
-        assert!(plot.axes().next().unwrap().dimension().is_err());
-        assert!(
-            plot.axes()
-                .next()
-                .unwrap()
-                .grids()
-                .next()
-                .unwrap()
-                .class()
-                .is_err()
-        );
-        assert!(
-            plot.series()
-                .next()
-                .unwrap()
-                .data_points()
-                .next()
-                .unwrap()
-                .repeated()
-                .is_err()
-        );
+        let chart = read(&xml)?;
+        let plot = required(chart.plot_area(), "chart plot area")?;
+        let axis = required(plot.axes().next(), "plot axis")?;
+        assert!(axis.dimension().is_err());
+        let grid = required(axis.grids().next(), "axis grid")?;
+        assert!(grid.class().is_err());
+        let series = required(plot.series().next(), "plot series")?;
+        let data_point = required(series.data_points().next(), "series data point")?;
+        assert!(data_point.repeated().is_err());
+        Ok(())
     }
 }

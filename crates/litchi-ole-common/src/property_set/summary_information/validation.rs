@@ -2,7 +2,11 @@
 
 use super::super::codec::validate_section as validate_generic;
 use super::super::model::{CodePage, Section, Stream, Value, invalid};
-use super::model::*;
+use super::model::{
+    APP_NAME, AUTHOR, CHARACTER_COUNT, COMMENTS, CREATE_DTM, DOC_SECURITY, EDIT_TIME, KEYWORDS,
+    LAST_AUTHOR, LAST_PRINTED, LAST_SAVE_DTM, MAX_TEXT_BYTES, MAX_THUMBNAIL_BYTES, PAGE_COUNT,
+    REVISION_NUMBER, SUBJECT, TEMPLATE, THUMBNAIL, TITLE, ThumbnailRef, WORD_COUNT,
+};
 use litchi_cfb::OleError;
 
 pub(super) fn validate_section(section: &Section) -> Result<(), OleError> {
@@ -27,7 +31,6 @@ pub(super) fn validate_section(section: &Section) -> Result<(), OleError> {
             continue;
         };
         match identifier {
-            CODEPAGE => {},
             TITLE | SUBJECT | AUTHOR | KEYWORDS | COMMENTS | TEMPLATE | LAST_AUTHOR
             | REVISION_NUMBER | APP_NAME => validate_string(value, identifier, page)?,
             EDIT_TIME | LAST_PRINTED | CREATE_DTM | LAST_SAVE_DTM => {
@@ -48,19 +51,15 @@ pub(super) fn validate_section(section: &Section) -> Result<(), OleError> {
 
 pub(super) fn validate_codepage(section: &Section, page: CodePage) -> Result<(), OleError> {
     for identifier in section.property_ids() {
-        match section.property(identifier) {
-            Some(Value::Lpstr(value)) => {
-                validate_text_for_page(value, page, "Property Set string")?
-            },
-            Some(Value::Lpwstr(value)) => {
-                if page != CodePage::Utf16Le {
-                    return Err(invalid(
-                        "LPWSTR SummaryInformation strings require CP_WINUNICODE",
-                    ));
-                }
-                validate_text_for_page(value, page, "Property Set string")?;
-            },
-            _ => {},
+        if let Some(Value::Lpstr(text)) = section.property(identifier) {
+            validate_text_for_page(text, page, "Property Set string")?;
+        } else if let Some(Value::Lpwstr(text)) = section.property(identifier) {
+            if page != CodePage::Utf16Le {
+                return Err(invalid(
+                    "LPWSTR SummaryInformation strings require CP_WINUNICODE",
+                ));
+            }
+            validate_text_for_page(text, page, "Property Set string")?;
         }
     }
     for (name, _) in section.named_properties() {
@@ -84,7 +83,7 @@ pub(super) fn validate_text_for_page(
             .checked_add(1)
             .and_then(|units| units.checked_mul(2))
             .ok_or_else(|| invalid(format!("{field} length overflows")))?,
-        CodePage::Mbcs(page) => page
+        CodePage::Mbcs(mbcs) => mbcs
             .encode(value)
             .map_err(|error| {
                 invalid(format!(
@@ -101,39 +100,43 @@ pub(super) fn validate_text_for_page(
     Ok(())
 }
 
-fn validate_string(value: &Value, identifier: u32, page: CodePage) -> Result<(), OleError> {
-    let value = match value {
-        Value::Lpstr(value) => value,
-        Value::Lpwstr(value) if page == CodePage::Utf16Le => value,
-        Value::Lpwstr(_) => {
+fn validate_string(property: &Value, identifier: u32, page: CodePage) -> Result<(), OleError> {
+    let text = if let Value::Lpstr(text) = property {
+        text
+    } else if let Value::Lpwstr(text) = property {
+        if page != CodePage::Utf16Le {
             return Err(invalid(format!(
                 "SummaryInformation property {identifier} LPWSTR requires CP_WINUNICODE"
             )));
-        },
-        _ => {
-            return Err(invalid(format!(
-                "SummaryInformation property {identifier} must be a VtString"
-            )));
-        },
-    };
-    validate_text_for_page(value, page, "SummaryInformation string")?;
-    if identifier == REVISION_NUMBER && (value.is_empty() || value.parse::<u64>().is_err()) {
+        }
+        text
+    } else {
         return Err(invalid(format!(
-            "SummaryInformation revision number must be a nonnegative whole number"
+            "SummaryInformation property {identifier} must be a VtString"
         )));
+    };
+    validate_text_for_page(text, page, "SummaryInformation string")?;
+    if identifier == REVISION_NUMBER && (text.is_empty() || text.parse::<u64>().is_err()) {
+        return Err(invalid(
+            "SummaryInformation revision number must be a nonnegative whole number".to_string(),
+        ));
     }
     Ok(())
 }
 
-fn validate_count(value: &Value, identifier: u32) -> Result<(), OleError> {
-    match value {
-        Value::I4(value) if *value >= 0 => Ok(()),
-        Value::I4(_) => Err(invalid(format!(
-            "SummaryInformation count property {identifier} must be nonnegative"
-        ))),
-        _ => Err(invalid(format!(
+fn validate_count(property: &Value, identifier: u32) -> Result<(), OleError> {
+    if let Value::I4(count) = property {
+        if *count >= 0 {
+            Ok(())
+        } else {
+            Err(invalid(format!(
+                "SummaryInformation count property {identifier} must be nonnegative"
+            )))
+        }
+    } else {
+        Err(invalid(format!(
             "SummaryInformation property {identifier} must be VT_I4"
-        ))),
+        )))
     }
 }
 

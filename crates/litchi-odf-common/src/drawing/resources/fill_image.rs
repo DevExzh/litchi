@@ -57,6 +57,10 @@ pub struct Length {
 }
 
 impl Length {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is non-finite or negative.
     pub fn new(value: f64, unit: LengthUnit) -> Result<Self> {
         if !value.is_finite() || value < 0.0 {
             return invalid("fill-image length must be finite and nonnegative");
@@ -64,10 +68,12 @@ impl Length {
         Ok(Self { value, unit })
     }
 
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
 
+    #[must_use]
     pub const fn unit(self) -> LengthUnit {
         self.unit
     }
@@ -77,11 +83,11 @@ impl FromStr for Length {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
-        let (number, unit) = split_length(value)?;
-        validate_decimal(number, value)?;
-        let number = number
+        let (number_text, unit) = split_length(value)?;
+        validate_decimal(number_text, value)?;
+        let number = number_text
             .parse::<f64>()
-            .map_err(|_| make_error(format!("invalid fill-image length '{value}'")))?;
+            .map_err(|error| make_error(format!("invalid fill-image length '{value}': {error}")))?;
         Self::new(number, unit)
     }
 }
@@ -113,25 +119,35 @@ pub struct Link {
 }
 
 impl Link {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the href is too large or contains prohibited text.
     pub fn new(href: impl Into<String>) -> Result<Self> {
-        let href = href.into();
-        validate_text(&href, "xlink:href", true, MAX_VALUE_BYTES)?;
-        let kind = if safe_package_path(&href) {
+        let link_href = href.into();
+        validate_text(&link_href, "xlink:href", true, MAX_VALUE_BYTES)?;
+        let kind = if safe_package_path(&link_href) {
             LinkKind::PackagePart
         } else {
             LinkKind::InertExternal
         };
-        Ok(Self { href, kind })
+        Ok(Self {
+            href: link_href,
+            kind,
+        })
     }
 
+    #[must_use]
     pub fn href(&self) -> &str {
         &self.href
     }
 
+    #[must_use]
     pub const fn kind(&self) -> LinkKind {
         self.kind
     }
 
+    #[must_use]
     pub fn package_path(&self) -> Option<&str> {
         (self.kind == LinkKind::PackagePart).then_some(&self.href)
     }
@@ -150,6 +166,7 @@ pub enum Source {
 }
 
 impl Source {
+    #[must_use]
     pub fn inline_bytes(&self) -> Option<&[u8]> {
         match self {
             Self::Inline { bytes, .. } => Some(bytes),
@@ -157,6 +174,7 @@ impl Source {
         }
     }
 
+    #[must_use]
     pub fn link(&self) -> Option<&Link> {
         match self {
             Self::Linked(link) => Some(link),
@@ -190,6 +208,11 @@ pub struct Image {
 }
 
 impl Image {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the image has invalid metadata, an invalid source,
+    /// or exceeds an inline-data limit.
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "draw:name", false, MAX_VALUE_BYTES)?;
         if let Some(display_name) = &self.display_name {
@@ -217,6 +240,10 @@ impl Image {
         Ok(())
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the image fails validation.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(256 + encoded_size(&self.source));
@@ -232,10 +259,16 @@ pub struct Collection {
 }
 
 impl Collection {
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Image> {
         self.images.iter().find(|image| image.name == name)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a resource is invalid, names are duplicated, or a
+    /// bounded aggregate limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         if self.images.len() > MAX_IMAGES {
             return invalid(format!("drawing styles exceed {MAX_IMAGES} fill images"));
@@ -272,6 +305,10 @@ impl Collection {
         Ok(())
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection fails validation.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
         let capacity = self.images.iter().fold(256usize, |size, image| {
@@ -321,6 +358,12 @@ struct FillBuilder {
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
+/// Parse `draw:fill-image` resources from a styles or flat-document XML part.
+///
+/// # Errors
+///
+/// Returns an error if the XML is malformed, uses invalid namespaced content,
+/// or violates a fill-image resource bound.
 pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
     if !xml.contains("fill-image") {
         return Ok(Collection::default());
@@ -413,10 +456,10 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "fill-image" {
                         return invalid("unexpected draw:fill-image end element");
                     }
-                    result.images.push(finish_fill(
-                        active.take().expect("active fill image checked"),
-                        &mut inline_total,
-                    )?);
+                    let fill = active.take().ok_or_else(|| {
+                        make_error("drawing fill-image ended without an active definition")
+                    })?;
+                    result.images.push(finish_fill(fill, &mut inline_total)?);
                 }
             },
             Event::Text(ref text) if active.is_some() => {
@@ -428,29 +471,27 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                     .and_then(|fill| fill.binary_parent_depth)
                     .is_some()
                 {
-                    append_base64(
-                        active.as_mut().expect("active binary fill image"),
-                        &value,
-                        &mut aggregate,
-                    )?;
+                    let fill = active.as_mut().ok_or_else(|| {
+                        make_error("office:binary-data text appeared without an active fill image")
+                    })?;
+                    append_base64(fill, &value, &mut aggregate)?;
                 } else if !value.chars().all(char::is_whitespace) {
                     return invalid("draw:fill-image may contain only office:binary-data");
                 }
             },
-            Event::CData(ref value)
+            Event::CData(ref cdata)
                 if active
                     .as_ref()
                     .and_then(|fill| fill.binary_parent_depth)
                     .is_some() =>
             {
-                let value = value
+                let value = cdata
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| make_error(format!("invalid fill-image CDATA: {error}")))?;
-                append_base64(
-                    active.as_mut().expect("active binary fill image"),
-                    &value,
-                    &mut aggregate,
-                )?;
+                let fill = active.as_mut().ok_or_else(|| {
+                    make_error("office:binary-data CDATA appeared without an active fill image")
+                })?;
+                append_base64(fill, &value, &mut aggregate)?;
             },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
                 return invalid("draw:fill-image contains unsupported character data");
@@ -459,7 +500,11 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                 return invalid("DTDs and processing instructions are prohibited in fill images");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -588,12 +633,12 @@ fn attributes(
     aggregate: &mut usize,
 ) -> Result<Attributes> {
     let mut values = HashMap::new();
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
+    for attribute_result in element.attributes().with_checks(true) {
+        let attribute = attribute_result
             .map_err(|error| make_error(format!("invalid fill-image attribute: {error}")))?;
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        let (resolved, raw_local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_kind(&resolved)?;
-        let local = decode(local.as_ref(), "attribute name")?;
+        let local = decode(raw_local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|error| make_error(format!("invalid fill-image attribute: {error}")))?
@@ -844,7 +889,7 @@ fn canonical_number(value: f64) -> String {
 fn decode(value: &[u8], what: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| make_error(format!("invalid UTF-8 in fill-image {what}")))
+        .map_err(|error| make_error(format!("invalid UTF-8 in fill-image {what}: {error}")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

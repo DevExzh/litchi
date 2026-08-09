@@ -236,16 +236,13 @@ fn rejects_context_mismatch_tighter_replay_limit_and_invalid_properties() {
     valid_blank_mode.authoring_proven = true;
     assert!(valid_blank_mode.encode().is_ok());
 
-    let mut reserved_bit = Chart::new(Context::excel()).expect("chart");
-    reserved_bit.set_props(Props {
+    let mut not_size_with = Chart::new(Context::excel()).expect("chart");
+    not_size_with.set_props(Props {
         flags: 1 << 2,
         plot_area: true,
     });
-    reserved_bit.authoring_proven = true;
-    assert!(matches!(
-        reserved_bit.encode(),
-        Err(Error::InvalidModel { .. })
-    ));
+    not_size_with.authoring_proven = true;
+    assert!(not_size_with.encode().is_ok());
 
     let mut reserved = Chart::new(Context::excel()).expect("chart");
     reserved.set_props(Props {
@@ -604,7 +601,7 @@ fn mutable_borrow_marks_parsed_input_dirty_only_after_write() {
 }
 
 #[test]
-fn excel_rejects_proven_topology_violations_and_bad_siindex_order() {
+fn excel_rejects_proven_topology_violations_and_duplicate_siindex() {
     let context = Context::excel().with_external_sheets(1);
     let stream = fixture(excel_chart());
     for kind in [0x00A0, 0x1022, 0x104F].map(RecordKind::from_wire) {
@@ -619,8 +616,8 @@ fn excel_rejects_proven_topology_violations_and_bad_siindex_order() {
         if record.kind() == RecordKind::from_wire(0x1065) {
             section += 1;
             if section == 2 {
-                out.push(record.kind(), &3u16.to_le_bytes())
-                    .expect("out-of-order SIIndex");
+                out.push(record.kind(), &1u16.to_le_bytes())
+                    .expect("duplicate SIIndex");
                 continue;
             }
         }
@@ -630,7 +627,7 @@ fn excel_rejects_proven_topology_violations_and_bad_siindex_order() {
     assert!(matches!(
         Chart::parse(excel_input(&malformed), context),
         Err(Error::InvalidChart {
-            reason: "SIIndex sections are missing, duplicated, or out of order",
+            reason: "SIIndex section is duplicated",
             ..
         })
     ));

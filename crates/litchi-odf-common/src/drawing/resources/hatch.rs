@@ -37,6 +37,7 @@ impl Style {
         })
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Single => "single",
@@ -79,6 +80,10 @@ pub struct Length {
 }
 
 impl Length {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is not finite.
     pub fn new(value: f64, unit: LengthUnit) -> Result<Self> {
         if !value.is_finite() {
             return invalid("hatch distance must be finite");
@@ -86,10 +91,12 @@ impl Length {
         Ok(Self { value, unit })
     }
 
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
 
+    #[must_use]
     pub const fn unit(self) -> LengthUnit {
         self.unit
     }
@@ -113,10 +120,10 @@ impl FromStr for Length {
             _ => return invalid(format!("invalid hatch distance '{value}'")),
         };
         validate_decimal(number, value)?;
-        let number = number
+        let parsed_number = number
             .parse::<f64>()
-            .map_err(|_| make_error(format!("invalid hatch distance '{value}'")))?;
-        Self::new(number, unit)
+            .map_err(|error| make_error(format!("invalid hatch distance '{value}': {error}")))?;
+        Self::new(parsed_number, unit)
     }
 }
 
@@ -135,12 +142,18 @@ impl fmt::Display for Length {
 pub struct Rotation(String);
 
 impl Rotation {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the rotation is empty or contains XML-prohibited
+    /// text.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_text(&value, "hatch rotation", false)?;
-        Ok(Self(value))
+        let rotation = value.into();
+        validate_text(&rotation, "hatch rotation", false)?;
+        Ok(Self(rotation))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -158,6 +171,10 @@ pub struct Definition {
 }
 
 impl Definition {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `name` is invalid.
     pub fn new(name: impl Into<String>, style: Style) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -171,6 +188,11 @@ impl Definition {
         Ok(value)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resource has invalid text or a non-finite
+    /// distance.
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "hatch name", false)?;
         if let Some(value) = &self.display_name {
@@ -187,6 +209,10 @@ impl Definition {
         Ok(())
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resource fails validation.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(192);
@@ -202,10 +228,16 @@ pub struct Collection {
 }
 
 impl Collection {
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Definition> {
         self.hatches.iter().find(|hatch| hatch.name == name)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a resource is invalid, names are duplicated, or a
+    /// bounded aggregate limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         if self.hatches.len() > MAX_HATCHES {
             return invalid(format!("drawing styles exceed {MAX_HATCHES} hatches"));
@@ -239,6 +271,10 @@ impl Collection {
     }
 
     /// Serialize a standalone schema-positioned `office:styles` fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection fails validation.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(192 + self.hatches.len() * 160);
@@ -270,6 +306,11 @@ struct Frame {
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse named hatch resources from an ODF styles or flat-document XML part.
+///
+/// # Errors
+///
+/// Returns an error if the XML is malformed, uses an invalid namespace, or
+/// violates a bounded hatch resource rule.
 pub fn parse_drawing_hatches(xml: &str) -> Result<Collection> {
     if !xml.contains("hatch") {
         return Ok(Collection::default());
@@ -322,7 +363,11 @@ pub fn parse_drawing_hatches(xml: &str) -> Result<Collection> {
                 return invalid("DTDs and processing instructions are prohibited in hatches");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -362,15 +407,15 @@ fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Def
 
 fn attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Attributes> {
     let mut result = HashMap::new();
-    for attribute in element.attributes() {
-        let attribute =
-            attribute.map_err(|error| make_error(format!("invalid hatch attribute: {error}")))?;
+    for attribute_result in element.attributes() {
+        let attribute = attribute_result
+            .map_err(|error| make_error(format!("invalid hatch attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        let (resolved, raw_local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_kind(&resolved)?;
-        let local = decode_name(local.as_ref(), "attribute")?;
+        let local = decode_name(raw_local.as_ref(), "attribute")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| make_error(format!("invalid hatch attribute value: {error}")))?
@@ -408,8 +453,8 @@ fn ensure_location(stack: &[Frame]) -> Result<()> {
     Ok(())
 }
 
-fn namespace_kind(value: &ResolveResult<'_>) -> Result<NamespaceKind> {
-    Ok(match value {
+fn namespace_kind(resolved: &ResolveResult<'_>) -> Result<NamespaceKind> {
+    Ok(match resolved {
         ResolveResult::Unbound => NamespaceKind::None,
         ResolveResult::Bound(Namespace(value)) if *value == OFFICE_NS => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(value)) if *value == DRAW_NS => NamespaceKind::Draw,
@@ -470,12 +515,14 @@ fn push_attribute(output: &mut String, name: &str, value: &str) {
 }
 
 fn validate_decimal(value: &str, complete: &str) -> Result<()> {
-    let value = value.strip_prefix('-').unwrap_or(value);
-    if value.is_empty() {
+    let unsigned = value.strip_prefix('-').unwrap_or(value);
+    if unsigned.is_empty() {
         return invalid(format!("invalid hatch distance '{complete}'"));
     }
-    let mut parts = value.split('.');
-    let integer = parts.next().expect("split always yields one value");
+    let mut parts = unsigned.split('.');
+    let integer = parts
+        .next()
+        .ok_or_else(|| Error::InvalidFormat(format!("invalid hatch distance '{complete}'")))?;
     let fraction = parts.next();
     if parts.next().is_some()
         || !integer.bytes().all(|byte| byte.is_ascii_digit())
@@ -506,7 +553,7 @@ fn validate_text(value: &str, context: &str, empty_allowed: bool) -> Result<()> 
 fn decode_name(value: &[u8], context: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| make_error(format!("invalid UTF-8 in hatch {context} name")))
+        .map_err(|error| make_error(format!("invalid UTF-8 in hatch {context} name: {error}")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

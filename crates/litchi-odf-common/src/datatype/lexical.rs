@@ -7,8 +7,12 @@ use litchi_core::{Error, Result};
 
 /// Validate a finite numeric lexical value and preserve the caller's context
 /// in any diagnostic.
+///
+/// # Errors
+///
+/// Returns an error when the value is not a finite number.
 pub fn validate_finite_number(context: &str, value: &str) -> Result<()> {
-    let parsed: f64 = value.parse().map_err(|_| {
+    let parsed: f64 = value.parse().map_err(|_parse_error| {
         Error::InvalidFormat(format!(
             "{context} requires a numeric value, found '{value}'"
         ))
@@ -23,6 +27,10 @@ pub fn validate_finite_number(context: &str, value: &str) -> Result<()> {
 
 /// Validate an ODF `#RRGGBB` lexical color and preserve the caller's context
 /// in any diagnostic.
+///
+/// # Errors
+///
+/// Returns an error when the value is not a six-digit hexadecimal color.
 pub fn validate_rgb_color(context: &str, value: &str) -> Result<()> {
     if value.len() != 7
         || !value.starts_with('#')
@@ -36,6 +44,10 @@ pub fn validate_rgb_color(context: &str, value: &str) -> Result<()> {
 }
 
 /// Validate that one lexical value fits within a caller-owned byte limit.
+///
+/// # Errors
+///
+/// Returns an error when the value exceeds `maximum` bytes.
 pub fn validate_byte_limit(context: &str, value: &str, maximum: usize) -> Result<()> {
     if value.len() > maximum {
         return Err(Error::InvalidFormat(format!(
@@ -46,6 +58,10 @@ pub fn validate_byte_limit(context: &str, value: &str, maximum: usize) -> Result
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Assertions unwrap expected validation errors to compare their diagnostics."
+)]
 mod tests {
     use super::*;
 

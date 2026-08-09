@@ -1,24 +1,25 @@
-//! ODF constants, MIME types, and XML tags.
+//! `ODF` constants, `MIME` types, and XML tags.
 //!
-//! This module provides comprehensive constants for OpenDocument Format (ODF) parsing and creation.
-//! Based on reference implementations from odfdo and odfpy libraries.
+//! This module provides comprehensive constants for `OpenDocument Format` (`ODF`)
+//! parsing and creation. Based on reference implementations from the `odfdo`
+//! and `odfpy` libraries.
 //!
 //! # Implementation Status
 //!
-//! ✅ COMPLETED: MIME type constants
+//! ✅ COMPLETED: `MIME` type constants
 //! ✅ COMPLETED: File extension mapping
-//! ✅ COMPLETED: Standard ODF part paths
+//! ✅ COMPLETED: Standard `ODF` part paths
 //! ✅ COMPLETED: Office version constant
 //! ✅ COMPLETED: Presentation class constants
 //!
 //! # References
 //!
-//! - odfdo: `3rdparty/odfdo/src/odfdo/const.py`
-//! - odfpy: `3rdparty/odfpy/odf/namespaces.py`
+//! - `odfdo`: `3rdparty/odfdo/src/odfdo/const.py`
+//! - `odfpy`: `3rdparty/odfpy/odf/namespaces.py`
 
 use phf::{Map, phf_map};
 
-/// ODF specification version
+/// `ODF` specification version.
 pub const OFFICE_VERSION: &str = "1.2";
 
 // ============================================================================
@@ -26,60 +27,60 @@ pub const OFFICE_VERSION: &str = "1.2";
 // ============================================================================
 // Reference: odfdo/const.py lines 52-67
 
-/// MIME type for OpenDocument Text (.odt)
+/// `MIME` type for `OpenDocument` Text (`.odt`).
 pub const ODF_TEXT: &str = "application/vnd.oasis.opendocument.text";
 
-/// MIME type for OpenDocument Text Template (.ott)
+/// `MIME` type for `OpenDocument` Text Template (`.ott`).
 pub const ODF_TEXT_TEMPLATE: &str = "application/vnd.oasis.opendocument.text-template";
 
-/// MIME type for OpenDocument Spreadsheet (.ods)
+/// `MIME` type for `OpenDocument` Spreadsheet (`.ods`).
 pub const ODF_SPREADSHEET: &str = "application/vnd.oasis.opendocument.spreadsheet";
 
-/// MIME type for OpenDocument Spreadsheet Template (.ots)
+/// `MIME` type for `OpenDocument` Spreadsheet Template (`.ots`).
 pub const ODF_SPREADSHEET_TEMPLATE: &str =
     "application/vnd.oasis.opendocument.spreadsheet-template";
 
-/// MIME type for OpenDocument Presentation (.odp)
+/// `MIME` type for `OpenDocument` Presentation (`.odp`).
 pub const ODF_PRESENTATION: &str = "application/vnd.oasis.opendocument.presentation";
 
-/// MIME type for OpenDocument Presentation Template (.otp)
+/// `MIME` type for `OpenDocument` Presentation Template (`.otp`).
 pub const ODF_PRESENTATION_TEMPLATE: &str =
     "application/vnd.oasis.opendocument.presentation-template";
 
-/// MIME type for OpenDocument Drawing (.odg)
+/// `MIME` type for `OpenDocument` Drawing (`.odg`).
 pub const ODF_DRAWING: &str = "application/vnd.oasis.opendocument.graphics";
 
-/// MIME type for OpenDocument Drawing Template (.otg)
+/// `MIME` type for `OpenDocument` Drawing Template (`.otg`).
 pub const ODF_DRAWING_TEMPLATE: &str = "application/vnd.oasis.opendocument.graphics-template";
 
-/// MIME type for OpenDocument Chart (.odc)
+/// `MIME` type for `OpenDocument` Chart (`.odc`).
 pub const ODF_CHART: &str = "application/vnd.oasis.opendocument.chart";
 
-/// MIME type for OpenDocument Chart Template (.otc)
+/// `MIME` type for `OpenDocument` Chart Template (`.otc`).
 pub const ODF_CHART_TEMPLATE: &str = "application/vnd.oasis.opendocument.chart-template";
 
-/// MIME type for OpenDocument Image (.odi)
+/// `MIME` type for `OpenDocument` Image (`.odi`).
 pub const ODF_IMAGE: &str = "application/vnd.oasis.opendocument.image";
 
-/// MIME type for OpenDocument Image Template (.oti)
+/// `MIME` type for `OpenDocument` Image Template (`.oti`).
 pub const ODF_IMAGE_TEMPLATE: &str = "application/vnd.oasis.opendocument.image-template";
 
-/// MIME type for OpenDocument Formula (.odf)
+/// `MIME` type for `OpenDocument` Formula (`.odf`).
 pub const ODF_FORMULA: &str = "application/vnd.oasis.opendocument.formula";
 
-/// MIME type for OpenDocument Formula Template (.otf)
+/// `MIME` type for `OpenDocument` Formula Template (`.otf`).
 pub const ODF_FORMULA_TEMPLATE: &str = "application/vnd.oasis.opendocument.formula-template";
 
-/// MIME type for OpenDocument Master (.odm)
+/// `MIME` type for `OpenDocument` Master (`.odm`).
 pub const ODF_MASTER: &str = "application/vnd.oasis.opendocument.text-master";
 
-/// MIME type for OpenDocument Master Template (.otm)
+/// `MIME` type for `OpenDocument` Master Template (`.otm`).
 pub const ODF_MASTER_TEMPLATE: &str = "application/vnd.oasis.opendocument.text-master-template";
 
-/// MIME type for OpenDocument Web (.oth)
+/// `MIME` type for `OpenDocument` Web (`.oth`).
 pub const ODF_WEB: &str = "application/vnd.oasis.opendocument.text-web";
 
-/// MIME type for OpenDocument Database Front End (.odb)
+/// `MIME` type for `OpenDocument` Database Front End (`.odb`).
 pub const ODF_DATABASE: &str = "application/vnd.oasis.opendocument.base";
 
 // ============================================================================
@@ -88,7 +89,7 @@ pub const ODF_DATABASE: &str = "application/vnd.oasis.opendocument.base";
 // Reference: odfdo/const.py lines 70-87
 // Using phf for compile-time perfect hash map - zero runtime overhead
 
-/// File extension to MIME type mapping (compile-time perfect hash map)
+/// File extension to `MIME` type mapping (compile-time perfect hash map).
 pub static ODF_EXTENSIONS: Map<&'static str, &'static str> = phf_map! {
     "odt" => ODF_TEXT,
     "ott" => ODF_TEXT_TEMPLATE,
@@ -117,7 +118,7 @@ pub static ODF_EXTENSIONS: Map<&'static str, &'static str> = phf_map! {
     "fodf" => ODF_FORMULA,
 };
 
-/// MIME type to file extension mapping (compile-time perfect hash map)
+/// `MIME` type to file extension mapping (compile-time perfect hash map).
 pub static ODF_MIMETYPES: Map<&'static str, &'static str> = phf_map! {
     "application/vnd.oasis.opendocument.text" => "odt",
     "application/vnd.oasis.opendocument.text-template" => "ott",
@@ -139,11 +140,11 @@ pub static ODF_MIMETYPES: Map<&'static str, &'static str> = phf_map! {
     "application/vnd.oasis.opendocument.base" => "odb",
 };
 
-/// MIME type to conventional flat OpenDocument extension mapping.
+/// `MIME` type to conventional flat `OpenDocument` extension mapping.
 ///
-/// `fodf` is the extended flat-formula convention used by odfdo. ODF 1.3
+/// `fodf` is the extended flat-formula convention used by `odfdo`. `ODF` 1.3
 /// defines the formula family only for packages whose `content.xml` root is
-/// MathML; it does not define an `office:formula` body element.
+/// `MathML`; it does not define an `office:formula` body element.
 pub static ODF_FLAT_MIMETYPES: Map<&'static str, &'static str> = phf_map! {
     "application/vnd.oasis.opendocument.text" => "fodt",
     "application/vnd.oasis.opendocument.spreadsheet" => "fods",
@@ -183,7 +184,7 @@ pub const ODF_MANIFEST_RDF: &str = "manifest.rdf";
 /// MIME type for RDF manifest
 pub const ODF_MANIFEST_RDF_TYPE: &str = "application/rdf+xml";
 
-/// Standard parts in the ODF container
+/// Standard parts in the `ODF` container.
 pub const ODF_PARTS: [&str; 5] = ["content", "meta", "settings", "styles", "manifest"];
 
 // ============================================================================
@@ -201,7 +202,7 @@ pub const ODF_CLASSES: [&str; 12] = [
 // HELPER FUNCTIONS
 // ============================================================================
 
-/// Get MIME type from file extension
+/// Get a `MIME` type from a file extension.
 ///
 /// # Arguments
 ///
@@ -220,11 +221,12 @@ pub const ODF_CLASSES: [&str; 12] = [
 /// assert_eq!(mime, Some("application/vnd.oasis.opendocument.text"));
 /// ```
 #[inline]
+#[must_use]
 pub fn get_mime_type_from_extension(extension: &str) -> Option<&'static str> {
     ODF_EXTENSIONS.get(extension).copied()
 }
 
-/// Get file extension from MIME type
+/// Get a file extension from a `MIME` type.
 ///
 /// # Arguments
 ///
@@ -243,12 +245,14 @@ pub fn get_mime_type_from_extension(extension: &str) -> Option<&'static str> {
 /// assert_eq!(ext, Some("odt"));
 /// ```
 #[inline]
+#[must_use]
 pub fn get_extension_from_mime_type(mime_type: &str) -> Option<&'static str> {
     ODF_MIMETYPES.get(mime_type).copied()
 }
 
-/// Get the flat OpenDocument extension for a MIME type.
+/// Get the flat `OpenDocument` extension for a `MIME` type.
 #[inline]
+#[must_use]
 pub fn get_flat_extension_from_mime_type(mime_type: &str) -> Option<&'static str> {
     ODF_FLAT_MIMETYPES.get(mime_type).copied()
 }
@@ -273,11 +277,12 @@ pub fn get_flat_extension_from_mime_type(mime_type: &str) -> Option<&'static str
 /// assert!(!is_odf_extension("txt"));
 /// ```
 #[inline]
+#[must_use]
 pub fn is_odf_extension(extension: &str) -> bool {
     ODF_EXTENSIONS.contains_key(extension)
 }
 
-/// Check if a given MIME type is a valid ODF MIME type
+/// Check whether a `MIME` type is a valid `ODF` `MIME` type.
 ///
 /// # Arguments
 ///
@@ -296,6 +301,7 @@ pub fn is_odf_extension(extension: &str) -> bool {
 /// assert!(!is_odf_mime_type("text/plain"));
 /// ```
 #[inline]
+#[must_use]
 pub fn is_odf_mime_type(mime_type: &str) -> bool {
     ODF_MIMETYPES.contains_key(mime_type)
 }

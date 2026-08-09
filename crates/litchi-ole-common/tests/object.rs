@@ -1,3 +1,15 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_unrelated,
+    clippy::cast_possible_truncation,
+    clippy::drop_non_drop,
+    clippy::default_trait_access,
+    clippy::bool_assert_comparison,
+    reason = "integration tests use concise assertions and checked fixture-sized literals"
+)]
+
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_ole_common::object::{Editor, EntryKind, Limits, Snapshot, Target, Targets, discover};
 use std::io::Cursor;
@@ -114,7 +126,10 @@ fn discovers_only_host_selected_storage_and_keeps_metadata_opaque() {
     );
     assert!(preview_directory.links().child().is_none());
     assert!(object.compound().starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
-    assert_eq!(objects.at(0).map(|value| value.key()), Some("host-object"));
+    assert_eq!(
+        objects.at(0).map(litchi_ole_common::object::Object::key),
+        Some("host-object")
+    );
 }
 
 #[test]

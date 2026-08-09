@@ -14,6 +14,12 @@ use std::collections::HashSet;
 
 use super::{Image, Source};
 
+macro_rules! required {
+    ($value:expr, $message:literal) => {
+        $value.ok_or_else(|| Error::InvalidFormat($message.to_string()))?
+    };
+}
+
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const SVG_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
@@ -72,6 +78,11 @@ struct ImageBuilder {
 }
 
 /// Scan package-backed `draw:image` occurrences in content and styles XML.
+///
+/// # Errors
+///
+/// Returns an error when either XML part is malformed, violates the accepted image grammar, or
+/// exceeds a configured resource limit.
 pub fn scan_package(
     content_xml: &str,
     styles_xml: Option<&str>,
@@ -88,9 +99,9 @@ pub fn scan_package(
         &mut inline_bytes,
         &mut accessibility_bytes,
     )?;
-    if let Some(styles_xml) = styles_xml {
+    if let Some(styles_document) = styles_xml {
         scan_xml(
-            styles_xml,
+            styles_document,
             Part::Styles,
             Some(package),
             &mut images,
@@ -101,7 +112,12 @@ pub fn scan_package(
     Ok(images)
 }
 
-/// Scan a flat OpenDocument XML document for inert image occurrences.
+/// Scans a flat `OpenDocument` XML document for inert image occurrences.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed, violates the accepted image grammar, or exceeds a
+/// configured resource limit.
 pub fn scan_flat(xml: &str) -> Result<Vec<Image>> {
     let mut images = Vec::new();
     let mut inline_bytes = 0usize;
@@ -118,6 +134,11 @@ pub fn scan_flat(xml: &str) -> Result<Vec<Image>> {
 }
 
 /// Scan one package XML part without resolving package-local references.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed, violates the accepted image grammar, or exceeds a
+/// configured resource limit.
 pub fn scan_content(xml: &str) -> Result<Vec<Image>> {
     let mut images = Vec::new();
     let mut inline_bytes = 0usize;
@@ -185,7 +206,7 @@ fn scan_xml(
                         accessibility_kind(&namespace, element.local_name().as_ref())
                 {
                     begin_accessibility(
-                        frames.last_mut().expect("direct frame child"),
+                        required!(frames.last_mut(), "accessibility element has no frame"),
                         kind,
                         depth,
                         &mut accessibility,
@@ -215,7 +236,7 @@ fn scan_xml(
                     && element.local_name().as_ref() == b"shapes"
                     && sheets.last().is_some_and(|sheet| depth == sheet.depth + 1)
                 {
-                    let sheet_depth = sheets.last().expect("checked sheet").depth;
+                    let sheet_depth = required!(sheets.last(), "table:shapes has no sheet").depth;
                     if !sheets_with_shapes.insert(sheet_depth) {
                         return Err(Error::InvalidFormat(
                             "a table must not contain multiple table:shapes elements".to_string(),
@@ -312,7 +333,7 @@ fn scan_xml(
                     && element.local_name().as_ref() == b"shapes"
                     && sheets.last().is_some_and(|sheet| depth == sheet.depth)
                 {
-                    let sheet_depth = sheets.last().expect("checked sheet").depth;
+                    let sheet_depth = required!(sheets.last(), "table:shapes has no sheet").depth;
                     if !sheets_with_shapes.insert(sheet_depth) {
                         return Err(Error::InvalidFormat(
                             "a table must not contain multiple table:shapes elements".to_string(),
@@ -322,7 +343,10 @@ fn scan_xml(
                     && let Some(kind) =
                         accessibility_kind(&namespace, element.local_name().as_ref())
                 {
-                    set_empty_accessibility(frames.last_mut().expect("direct frame child"), kind)?;
+                    set_empty_accessibility(
+                        required!(frames.last_mut(), "accessibility element has no frame"),
+                        kind,
+                    )?;
                 } else if bound_to(&namespace, DRAW_NAMESPACE)
                     && element.local_name().as_ref() == b"image"
                 {
@@ -352,53 +376,55 @@ fn scan_xml(
                     image.inline_present = true;
                 }
             },
-            Event::Text(value)
+            Event::Text(text)
                 if active
                     .as_ref()
                     .and_then(|image| image.inline_depth)
                     .is_some() =>
             {
-                let value = value
-                    .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid inline image text: {error}"))
-                    })?;
-                append_inline(active.as_mut().expect("active inline image"), &value)?;
+                let decoded_text = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid inline image text: {error}"))
+                })?;
+                append_inline(
+                    required!(active.as_mut(), "inline image has no active image"),
+                    &decoded_text,
+                )?;
             },
-            Event::CData(value)
+            Event::CData(cdata)
                 if active
                     .as_ref()
                     .and_then(|image| image.inline_depth)
                     .is_some() =>
             {
-                let value = value
+                let decoded_text = cdata
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid inline image CDATA: {error}"))
                     })?;
-                append_inline(active.as_mut().expect("active inline image"), &value)?;
+                append_inline(
+                    required!(active.as_mut(), "inline image has no active image"),
+                    &decoded_text,
+                )?;
             },
-            Event::Text(value) if accessibility.is_some() => {
-                let value = value
-                    .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid image accessibility text: {error}"))
-                    })?;
+            Event::Text(text) if accessibility.is_some() => {
+                let decoded_text = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid image accessibility text: {error}"))
+                })?;
                 append_accessibility(
-                    accessibility.as_mut().expect("active accessibility text"),
-                    &value,
+                    required!(accessibility.as_mut(), "accessibility text is missing"),
+                    &decoded_text,
                     total_accessibility_bytes,
                 )?;
             },
-            Event::CData(value) if accessibility.is_some() => {
-                let value = value
+            Event::CData(cdata) if accessibility.is_some() => {
+                let decoded_text = cdata
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid image accessibility CDATA: {error}"))
                     })?;
                 append_accessibility(
-                    accessibility.as_mut().expect("active accessibility text"),
-                    &value,
+                    required!(accessibility.as_mut(), "accessibility text is missing"),
+                    &decoded_text,
                     total_accessibility_bytes,
                 )?;
             },
@@ -412,17 +438,17 @@ fn scan_xml(
                     "XML references are not allowed in office:binary-data".to_string(),
                 ));
             },
-            Event::GeneralRef(value) if accessibility.is_some() => {
-                let value = resolve_accessibility_reference(&value)?;
+            Event::GeneralRef(reference) if accessibility.is_some() => {
+                let resolved_reference = resolve_accessibility_reference(&reference)?;
                 append_accessibility(
-                    accessibility.as_mut().expect("active accessibility text"),
-                    &value,
+                    required!(accessibility.as_mut(), "accessibility text is missing"),
+                    &resolved_reference,
                     total_accessibility_bytes,
                 )?;
             },
             Event::End(element) => {
                 if accessibility.as_ref().map(|text| text.depth) == Some(depth) {
-                    let text = accessibility.take().expect("active accessibility text");
+                    let text = required!(accessibility.take(), "accessibility text is missing");
                     if accessibility_kind(&namespace, element.local_name().as_ref())
                         != Some(text.kind)
                     {
@@ -457,12 +483,12 @@ fn scan_xml(
                             "malformed draw:image element".to_string(),
                         ));
                     }
-                    let image = active.take().expect("active image");
+                    let image = required!(active.take(), "embedded image is missing");
                     images.push(finish_image(image, part, package, total_inline_bytes)?);
                 }
 
                 if frames.last().map(|frame| frame.depth) == Some(depth) {
-                    let frame = frames.pop().expect("closing frame");
+                    let frame = required!(frames.pop(), "image frame is missing");
                     for image_index in frame.image_indices {
                         let image = images.get_mut(image_index).ok_or_else(|| {
                             Error::InvalidFormat(
@@ -497,7 +523,11 @@ fn scan_xml(
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -555,16 +585,16 @@ fn start_image(
     element: &BytesStart<'_>,
     depth: usize,
     image_index: usize,
-    frame: Option<&mut FrameState>,
+    frame_state: Option<&mut FrameState>,
 ) -> Result<ImageBuilder> {
-    let (frame_context, alternative_index) = match frame {
-        Some(frame) => {
-            let alternative_index = frame.image_count;
-            frame.image_count = frame.image_count.checked_add(1).ok_or_else(|| {
+    let (frame_context, alternative_index) = match frame_state {
+        Some(state) => {
+            let alternative_index = state.image_count;
+            state.image_count = state.image_count.checked_add(1).ok_or_else(|| {
                 Error::InvalidFormat("image alternative count overflow".to_string())
             })?;
-            frame.image_indices.push(image_index);
-            (Some(frame.frame.clone()), alternative_index)
+            state.image_indices.push(image_index);
+            (Some(state.frame.clone()), alternative_index)
         },
         None => (None, 0),
     };
@@ -758,12 +788,12 @@ fn finish_image(
         match package {
             None => Source::Linked { href },
             Some(_) if is_linked_href(&href) => Source::Linked { href },
-            Some(package) => {
+            Some(package_lookup) => {
                 let path = resolve_package_path(&href)?;
-                if package.has_file(&path) {
+                if package_lookup.has_file(&path) {
                     Source::PackagePart {
                         href,
-                        manifest_media_type: package.media_type(&path).map(str::to_owned),
+                        manifest_media_type: package_lookup.media_type(&path).map(str::to_owned),
                         path,
                     }
                 } else {
@@ -808,5 +838,5 @@ fn attribute(
 }
 
 fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(namespace)) if *namespace == expected)
+    matches!(namespace, ResolveResult::Bound(Namespace(bound_namespace)) if *bound_namespace == expected)
 }

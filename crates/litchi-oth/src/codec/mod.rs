@@ -2,4 +2,4 @@
 
 mod content;
 
-pub(crate) use content::{paragraphs, validate};
+pub(crate) use content::{paragraphs_with_sites, validate};

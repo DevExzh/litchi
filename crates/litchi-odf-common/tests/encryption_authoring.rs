@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        reason = "Fixed cryptographic test vectors use direct assertion setup."
+    )
+)]
+
 use litchi_odf_common::core::{
     Cipher, Kdf, Manifest, OwnedPackage, PackageWriter, Profile, StartKey,
 };

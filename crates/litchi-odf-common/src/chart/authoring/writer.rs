@@ -21,7 +21,97 @@ pub(crate) const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 const MAX_EXPANDED_CELLS: u64 = 16_777_216;
 
+struct NamespaceMap {
+    by_uri: BTreeMap<String, String>,
+    aliases: BTreeMap<String, String>,
+}
+
+impl NamespaceMap {
+    fn for_definition(value: &Definition) -> Result<Self> {
+        let mut uris = BTreeSet::new();
+        collect_extensions(&value.extensions, &mut uris);
+        collect_plot_extensions(&value.plot_area, &mut uris);
+        if let Some(v) = &value.title {
+            collect_extensions(&v.extensions, &mut uris);
+        }
+        if let Some(v) = &value.subtitle {
+            collect_extensions(&v.extensions, &mut uris);
+        }
+        if let Some(v) = &value.footer {
+            collect_extensions(&v.extensions, &mut uris);
+        }
+        if let Some(v) = &value.legend {
+            collect_extensions(&v.extensions, &mut uris);
+        }
+        if let Some(v) = &value.cached_table {
+            collect_extensions(&v.extensions, &mut uris);
+        }
+        let standards = [
+            (OFFICE_NAMESPACE, "office"),
+            (CHART_NAMESPACE, "chart"),
+            (TABLE_NAMESPACE, "table"),
+            (TEXT_NAMESPACE, "text"),
+            (STYLE_NAMESPACE, "style"),
+            (SVG_NAMESPACE, "svg"),
+            (XLINK_NAMESPACE, "xlink"),
+        ];
+        let mut by_uri: BTreeMap<String, String> = standards
+            .into_iter()
+            .map(|(u, p)| (u.to_string(), p.to_string()))
+            .collect();
+        let mut index = 1usize;
+        for uri in uris {
+            if uri != XML_NAMESPACE && !by_uri.contains_key(&uri) {
+                by_uri.insert(uri, format!("ns{index}"));
+                index += 1;
+            }
+        }
+        let mut aliases = BTreeMap::new();
+        collect_class_alias(&value.class, &mut aliases)?;
+        for series in &value.plot_area.series {
+            if let Some(class) = &series.class {
+                collect_class_alias(class, &mut aliases)?;
+            }
+        }
+        for (prefix, uri) in &aliases {
+            if let Some((existing_uri, _)) =
+                by_uri.iter().find(|(_, canonical)| *canonical == prefix)
+                && existing_uri != uri
+            {
+                return invalid(format!(
+                    "chart class namespace prefix '{prefix}' conflicts with a standard prefix"
+                ));
+            }
+        }
+        Ok(Self { by_uri, aliases })
+    }
+    fn declarations(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.by_uri
+            .iter()
+            .map(|(u, p)| (p.as_str(), u.as_str()))
+            .chain(self.aliases.iter().filter_map(|(prefix, uri)| {
+                (!self.by_uri.values().any(|canonical| canonical == prefix))
+                    .then_some((prefix.as_str(), uri.as_str()))
+            }))
+    }
+    fn prefix(&self, uri: &str) -> Result<&str> {
+        if uri == XML_NAMESPACE {
+            Ok("xml")
+        } else {
+            self.by_uri.get(uri).map(String::as_str).ok_or_else(|| {
+                Error::InvalidFormat(format!("unregistered extension namespace '{uri}'"))
+            })
+        }
+    }
+}
+
 impl Definition {
+    /// Validate the chart definition before it is serialized.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any chart field, cached table, or extension fails
+    /// the bounded ODF validation rules.
     pub fn validate(&self) -> Result<()> {
         validate_optional_name(self.style_name.as_deref(), "chart style name")?;
         validate_optional_scalar(self.width.as_deref(), "chart width")?;
@@ -53,6 +143,11 @@ impl Definition {
 ///
 /// The output contains no executable behavior. Formula attributes in cached
 /// cells are emitted only as escaped, opaque strings.
+///
+/// # Errors
+///
+/// Returns an error if the definition fails validation or an XML value cannot
+/// be encoded safely.
 pub fn serialize_content(definition: &Definition) -> Result<String> {
     definition.validate()?;
     let namespaces = NamespaceMap::for_definition(definition)?;
@@ -290,6 +385,12 @@ fn write_series(out: &mut String, value: &SeriesSpec, ns: &NamespaceMap) -> Resu
     Ok(())
 }
 
+/// Serialize a standalone `chart:axis` fragment.
+///
+/// # Errors
+///
+/// Returns an error if the axis cannot be represented in a valid chart
+/// definition.
 pub fn serialize_axis_fragment(value: &AxisSpec) -> Result<String> {
     let mut definition = Definition::new(ChartClass::line());
     definition.plot_area.axes.push(value.clone());
@@ -301,6 +402,12 @@ pub fn serialize_axis_fragment(value: &AxisSpec) -> Result<String> {
     Ok(output)
 }
 
+/// Serialize a standalone `chart:series` fragment.
+///
+/// # Errors
+///
+/// Returns an error if the series cannot be represented in a valid chart
+/// definition.
 pub fn serialize_series_fragment(value: &SeriesSpec) -> Result<String> {
     let mut definition = Definition::new(value.class.clone().unwrap_or_else(ChartClass::line));
     if let Some(axis) = &value.attached_axis {
@@ -495,7 +602,7 @@ fn write_cell(out: &mut String, cell: &CachedCell) -> Result<()> {
         )?;
     }
     opt_attr(out, "table:formula", cell.formula.as_deref())?;
-    let text = match &cell.value {
+    let cell_text = match &cell.value {
         CachedValue::Empty => None,
         CachedValue::Float(value) => {
             attr(out, "office:value-type", "float")?;
@@ -533,7 +640,7 @@ fn write_cell(out: &mut String, cell: &CachedCell) -> Result<()> {
             Some(value)
         },
     };
-    if let Some(text) = text {
+    if let Some(text) = cell_text {
         out.push_str("><text:p>");
         escape_text(out, text)?;
         out.push_str("</text:p></table:table-cell>");
@@ -768,8 +875,8 @@ fn validate_extension_element(value: &ExtensionElement, depth: usize) -> Result<
 }
 
 fn validate_optional_range(value: Option<&str>, kind: &str) -> Result<()> {
-    if let Some(value) = value {
-        validate_range(value, kind)?;
+    if let Some(range) = value {
+        validate_range(range, kind)?;
     }
     Ok(())
 }
@@ -801,8 +908,8 @@ fn validate_range(value: &str, kind: &str) -> Result<()> {
 }
 
 fn validate_optional_name(value: Option<&str>, kind: &str) -> Result<()> {
-    if let Some(value) = value {
-        validate_name(value, kind)?;
+    if let Some(name) = value {
+        validate_name(name, kind)?;
     }
     Ok(())
 }
@@ -822,8 +929,8 @@ fn validate_local_name(value: &str, kind: &str) -> Result<()> {
     Ok(())
 }
 fn validate_optional_scalar(value: Option<&str>, kind: &str) -> Result<()> {
-    if let Some(value) = value {
-        validate_scalar(value, kind)?;
+    if let Some(scalar) = value {
+        validate_scalar(scalar, kind)?;
     }
     Ok(())
 }
@@ -834,94 +941,19 @@ fn validate_scalar(value: &str, kind: &str) -> Result<()> {
     validate_xml_chars(value, kind)
 }
 fn validate_xml_chars(value: &str, kind: &str) -> Result<()> {
-    if value.chars().any(|ch| !matches!(ch as u32, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)) { return invalid(format!("{kind} contains a character forbidden by XML 1.0")); }
+    if value.chars().any(|ch| {
+        !matches!(
+            ch as u32,
+            0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x1_0000..=0x0010_FFFF
+        )
+    }) {
+        return invalid(format!("{kind} contains a character forbidden by XML 1.0"));
+    }
     Ok(())
 }
+
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
-}
-
-struct NamespaceMap {
-    by_uri: BTreeMap<String, String>,
-    aliases: BTreeMap<String, String>,
-}
-impl NamespaceMap {
-    fn for_definition(value: &Definition) -> Result<Self> {
-        let mut uris = BTreeSet::new();
-        collect_extensions(&value.extensions, &mut uris);
-        collect_plot_extensions(&value.plot_area, &mut uris);
-        if let Some(v) = &value.title {
-            collect_extensions(&v.extensions, &mut uris);
-        }
-        if let Some(v) = &value.subtitle {
-            collect_extensions(&v.extensions, &mut uris);
-        }
-        if let Some(v) = &value.footer {
-            collect_extensions(&v.extensions, &mut uris);
-        }
-        if let Some(v) = &value.legend {
-            collect_extensions(&v.extensions, &mut uris);
-        }
-        if let Some(v) = &value.cached_table {
-            collect_extensions(&v.extensions, &mut uris);
-        }
-        let standards = [
-            (OFFICE_NAMESPACE, "office"),
-            (CHART_NAMESPACE, "chart"),
-            (TABLE_NAMESPACE, "table"),
-            (TEXT_NAMESPACE, "text"),
-            (STYLE_NAMESPACE, "style"),
-            (SVG_NAMESPACE, "svg"),
-            (XLINK_NAMESPACE, "xlink"),
-        ];
-        let mut by_uri: BTreeMap<String, String> = standards
-            .into_iter()
-            .map(|(u, p)| (u.to_string(), p.to_string()))
-            .collect();
-        let mut index = 1usize;
-        for uri in uris {
-            if uri != XML_NAMESPACE && !by_uri.contains_key(&uri) {
-                by_uri.insert(uri, format!("ns{index}"));
-                index += 1;
-            }
-        }
-        let mut aliases = BTreeMap::new();
-        collect_class_alias(&value.class, &mut aliases)?;
-        for series in &value.plot_area.series {
-            if let Some(class) = &series.class {
-                collect_class_alias(class, &mut aliases)?;
-            }
-        }
-        for (prefix, uri) in &aliases {
-            if let Some((existing_uri, _)) =
-                by_uri.iter().find(|(_, canonical)| *canonical == prefix)
-                && existing_uri != uri
-            {
-                return invalid(format!(
-                    "chart class namespace prefix '{prefix}' conflicts with a standard prefix"
-                ));
-            }
-        }
-        Ok(Self { by_uri, aliases })
-    }
-    fn declarations(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.by_uri
-            .iter()
-            .map(|(u, p)| (p.as_str(), u.as_str()))
-            .chain(self.aliases.iter().filter_map(|(prefix, uri)| {
-                (!self.by_uri.values().any(|canonical| canonical == prefix))
-                    .then_some((prefix.as_str(), uri.as_str()))
-            }))
-    }
-    fn prefix(&self, uri: &str) -> Result<&str> {
-        if uri == XML_NAMESPACE {
-            Ok("xml")
-        } else {
-            self.by_uri.get(uri).map(String::as_str).ok_or_else(|| {
-                Error::InvalidFormat(format!("unregistered extension namespace '{uri}'"))
-            })
-        }
-    }
 }
 
 fn collect_class_alias(value: &ChartClass, aliases: &mut BTreeMap<String, String>) -> Result<()> {
@@ -1077,8 +1109,8 @@ fn attr(out: &mut String, name: &str, value: &str) -> Result<()> {
     Ok(())
 }
 fn opt_attr(out: &mut String, name: &str, value: Option<&str>) -> Result<()> {
-    if let Some(value) = value {
-        attr(out, name, value)?;
+    if let Some(attribute_value) = value {
+        attr(out, name, attribute_value)?;
     }
     Ok(())
 }
@@ -1199,9 +1231,9 @@ mod tests {
     }
 
     #[test]
-    fn canonical_content_roundtrip_retains_typed_data() {
-        let content = serialize_content(&sample()).unwrap();
-        let chart = read(&content).unwrap();
+    fn canonical_content_roundtrip_retains_typed_data() -> Result<()> {
+        let content = serialize_content(&sample())?;
+        let chart = read(&content)?;
         assert_eq!(
             chart.attribute(Some(CHART_NAMESPACE), "class"),
             Some("chart:line")
@@ -1213,20 +1245,36 @@ mod tests {
                 .any(|node| node.namespace_uri() == Some(TABLE_NAMESPACE)
                     && node.local_name() == "table")
         );
-        assert_eq!(chart.plot_area().unwrap().series().count(), 1);
+        let plot_area = chart
+            .plot_area()
+            .ok_or_else(|| Error::InvalidFormat("missing chart plot area".to_string()))?;
+        assert_eq!(plot_area.series().count(), 1);
+        Ok(())
     }
 
     #[test]
-    fn cached_formula_is_escaped_and_inert() {
+    fn cached_formula_is_escaped_and_inert() -> Result<()> {
         let mut definition = sample();
-        definition.cached_table.as_mut().unwrap().rows[0].cells[1].formula =
-            Some("of:=SUM([.B2:.B4])&\"x\"".into());
-        let content = serialize_content(&definition).unwrap();
+        let table = definition
+            .cached_table
+            .as_mut()
+            .ok_or_else(|| Error::InvalidFormat("sample lacks a cached table".to_string()))?;
+        let row = table
+            .rows
+            .get_mut(0)
+            .ok_or_else(|| Error::InvalidFormat("sample lacks a cached row".to_string()))?;
+        let cell = row
+            .cells
+            .get_mut(1)
+            .ok_or_else(|| Error::InvalidFormat("sample lacks a cached cell".to_string()))?;
+        cell.formula = Some("of:=SUM([.B2:.B4])&\"x\"".into());
+        let content = serialize_content(&definition)?;
         assert!(content.contains("table:formula=\"of:=SUM([.B2:.B4])&amp;&quot;x&quot;\""));
         assert_eq!(
-            read(&content).unwrap().all_text(),
+            read(&content)?.all_text(),
             "Quarterly revenueQuarterRevenueQ1"
         );
+        Ok(())
     }
 
     #[test]
@@ -1240,7 +1288,7 @@ mod tests {
     }
 
     #[test]
-    fn extension_namespaces_are_stable_and_retained() {
+    fn extension_namespaces_are_stable_and_retained() -> Result<()> {
         let mut definition = Definition::new(ChartClass::line());
         definition.extensions.attributes.push(ExtensionAttribute {
             namespace_uri: Some("urn:z".into()),
@@ -1259,20 +1307,18 @@ mod tests {
             text: "opaque".into(),
             children: Vec::new(),
         });
-        let first = serialize_content(&definition).unwrap();
-        let second = serialize_content(&definition).unwrap();
+        let first = serialize_content(&definition)?;
+        let second = serialize_content(&definition)?;
         assert_eq!(first, second);
         assert!(first.contains("xmlns:ns1=\"urn:a\""));
         assert!(first.contains("xmlns:ns2=\"urn:z\""));
         assert!(first.contains("<ns2:extension>opaque</ns2:extension>"));
-        assert_eq!(
-            read(&first)
-                .unwrap()
-                .children()
-                .last()
-                .unwrap()
-                .namespace_uri(),
-            Some("urn:z")
-        );
+        let chart = read(&first)?;
+        let extension = chart
+            .children()
+            .last()
+            .ok_or_else(|| Error::InvalidFormat("missing extension child".to_string()))?;
+        assert_eq!(extension.namespace_uri(), Some("urn:z"));
+        Ok(())
     }
 }

@@ -8,6 +8,7 @@
 mod codec;
 mod model;
 mod package;
+mod snapshot;
 mod transaction;
 mod validation;
 
@@ -15,7 +16,8 @@ mod validation;
 mod tests;
 
 pub use model::{Catalog, Selector};
-pub use transaction::{Commit, Editor, Transaction};
+pub use snapshot::{Commit, Edit, OwnedEditor, Patch, Snapshot};
+pub use transaction::{Commit as CatalogCommit, Editor, Transaction};
 
 pub use crate::model::data_pilot::{
     DisplayInfo, DisplayMemberMode, Field, FieldReference, GrandTotal, GrandTotalElement,

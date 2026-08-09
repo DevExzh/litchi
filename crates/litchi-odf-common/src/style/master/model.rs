@@ -55,6 +55,7 @@ pub struct Child {
 
 impl Master {
     /// Return a particular header/footer region when it exists.
+    #[must_use]
     pub fn region(&self, kind: Kind) -> Option<&Region> {
         self.regions.iter().find(|region| region.kind == kind)
     }

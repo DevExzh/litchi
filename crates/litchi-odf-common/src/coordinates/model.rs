@@ -42,6 +42,10 @@ impl CellCoord {
     ///
     /// Values above [`MAX_INDEX`] cannot be represented by the one-based A1
     /// row and inclusive range arithmetic used by this module.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either coordinate exceeds [`MAX_INDEX`].
     pub fn new(column: usize, row: usize) -> Result<Self> {
         if column > MAX_INDEX {
             return Err(Error::InvalidFormat(format!(
@@ -58,12 +62,14 @@ impl CellCoord {
 
     /// Get the checked zero-based column index.
     #[inline]
+    #[must_use]
     pub const fn column(&self) -> usize {
         self.column
     }
 
     /// Get the checked zero-based row index.
     #[inline]
+    #[must_use]
     pub const fn row(&self) -> usize {
         self.row
     }
@@ -99,6 +105,10 @@ pub struct CellRange {
 
 impl CellRange {
     /// Create a checked inclusive range from its endpoints.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the start is below or to the right of the end.
     pub fn new(start: CellCoord, end: CellCoord) -> Result<Self> {
         if start.column > end.column || start.row > end.row {
             return Err(Error::InvalidFormat(format!(
@@ -111,30 +121,35 @@ impl CellRange {
 
     /// Get the inclusive start coordinate.
     #[inline]
+    #[must_use]
     pub const fn start(&self) -> CellCoord {
         self.start
     }
 
     /// Get the inclusive end coordinate.
     #[inline]
+    #[must_use]
     pub const fn end(&self) -> CellCoord {
         self.end
     }
 
     /// Get the number of columns in the range.
     #[inline]
+    #[must_use]
     pub fn width(&self) -> usize {
         self.end.column - self.start.column + 1
     }
 
     /// Get the number of rows in the range.
     #[inline]
+    #[must_use]
     pub fn height(&self) -> usize {
         self.end.row - self.start.row + 1
     }
 
     /// Whether the range contains a checked coordinate.
     #[inline]
+    #[must_use]
     pub const fn contains(&self, coordinate: CellCoord) -> bool {
         coordinate.column >= self.start.column
             && coordinate.column <= self.end.column

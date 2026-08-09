@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        reason = "Fixed in-memory package fixtures use direct assertion setup."
+    )
+)]
+
 use litchi_odf_common::{
     constants,
     core::{OwnedPackage, PackageWriter},
@@ -51,7 +59,7 @@ fn shared_package_payload_is_removed_only_after_the_last_reference() {
     }));
 
     let one_reference = source_xml.replacen(OBJECT, "", 1);
-    let first = rebuild_package(
+    let first_bytes = rebuild_package(
         &source,
         &one_reference,
         Vec::new(),
@@ -60,7 +68,7 @@ fn shared_package_payload_is_removed_only_after_the_last_reference() {
         Vec::new(),
     )
     .unwrap();
-    let first = OwnedPackage::from_bytes(first).unwrap();
+    let first = OwnedPackage::from_bytes(first_bytes).unwrap();
     assert!(first.has_file("Shared.bin").unwrap());
     assert_eq!(
         scan_package(&content(&first), None, &first.package().unwrap())
@@ -70,7 +78,7 @@ fn shared_package_payload_is_removed_only_after_the_last_reference() {
     );
 
     let no_references = one_reference.replacen(OBJECT, "", 1);
-    let second = rebuild_package(
+    let second_bytes = rebuild_package(
         &first,
         &no_references,
         Vec::new(),
@@ -79,7 +87,7 @@ fn shared_package_payload_is_removed_only_after_the_last_reference() {
         Vec::new(),
     )
     .unwrap();
-    let second = OwnedPackage::from_bytes(second).unwrap();
+    let second = OwnedPackage::from_bytes(second_bytes).unwrap();
     assert!(!second.has_file("Shared.bin").unwrap());
     assert!(content(&second).contains("litchi:unknown=\"preserved\""));
 }

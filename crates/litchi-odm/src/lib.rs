@@ -6,6 +6,7 @@ mod codec;
 mod facade;
 mod model;
 mod package;
+pub mod title;
 
 pub use facade::{Builder, Master};
 pub use model::{section, subdocument};

@@ -158,6 +158,13 @@ pub(super) fn write_timing_child(xml: &mut String, child: &TimingChild) {
     if let Some(id) = common.id {
         xml.push_str(&format!(" id=\"{id}\""));
     }
+    if let Some(bounce_end) = common.preset_bounce_end {
+        xml.push_str(" xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\"");
+        xml.push_str(&format!(
+            " p14:presetBounceEnd=\"{}\"",
+            bounce_end.thousandths_percent()
+        ));
+    }
     if let Some(duration) = common.duration {
         xml.push_str(&format!(" dur=\"{}\"", duration.write_value()));
     }
@@ -216,11 +223,18 @@ fn write_condition_list(xml: &mut String, name: &str, conditions: &[TimeConditio
             xml.push_str(&format!(" evt=\"{}\"", event.as_str()));
         }
         xml.push_str(&format!(" delay=\"{}\"", condition.delay.write_value()));
-        match condition.target {
+        match &condition.target {
             None => xml.push_str("/>"),
             Some(ConditionTarget::Shape(id)) => xml.push_str(&format!(
                 "><p:tgtEl><p:spTgt spid=\"{id}\"/></p:tgtEl></p:cond>"
             )),
+            Some(ConditionTarget::MediaBookmark { shape_id, name }) => {
+                xml.push_str("><p:tgtEl><p14:bmkTgt xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" spid=\"");
+                xml.push_str(&shape_id.to_string());
+                xml.push_str("\" bmkName=\"");
+                escape_xml(xml, &name);
+                xml.push_str("\"/></p:tgtEl></p:cond>");
+            },
             Some(ConditionTarget::Slide) => {
                 xml.push_str("><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond>");
             },
@@ -233,4 +247,17 @@ fn write_condition_list(xml: &mut String, name: &str, conditions: &[TimeConditio
         }
     }
     xml.push_str(&format!("</p:{name}>"));
+}
+
+fn escape_xml(xml: &mut String, value: &str) {
+    for character in value.chars() {
+        match character {
+            '&' => xml.push_str("&amp;"),
+            '<' => xml.push_str("&lt;"),
+            '>' => xml.push_str("&gt;"),
+            '"' => xml.push_str("&quot;"),
+            '\'' => xml.push_str("&apos;"),
+            _ => xml.push(character),
+        }
+    }
 }

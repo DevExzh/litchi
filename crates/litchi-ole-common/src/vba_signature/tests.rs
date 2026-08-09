@@ -162,7 +162,7 @@ fn property_payload_replacement_updates_offsets_and_preserves_unknown_fields() {
     assert_eq!(edited.info().reserved_project_name(), [0, 0]);
     assert_eq!(edited.info().reserved_timestamp_url(), [0, 0]);
     assert_eq!(edited.info().reserved_timestamp_marker(), 0xA5A5_5A5A);
-    assert_eq!(edited.info().padding(), []);
+    assert_eq!(edited.info().padding(), b"");
     assert_eq!(edited.bytes()[49], 0xCC);
     assert_eq!(edited.bytes().len(), source.len());
     assert_eq!(edited.bytes()[0..8], source[0..8]);

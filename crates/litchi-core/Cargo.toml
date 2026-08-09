@@ -10,11 +10,14 @@ rust-version.workspace = true
 
 [dependencies]
 aho-corasick    = { workspace = true }
+base64          = { workspace = true }
 chrono          = { workspace = true }
 fast-float2     = { workspace = true }
 once_cell       = { workspace = true }
 rand            = { workspace = true }
 serde           = { workspace = true }
+serde_json      = { workspace = true }
+sha2            = { workspace = true }
 smallvec        = { workspace = true }
 thiserror       = { workspace = true }
 zerocopy        = { workspace = true }
