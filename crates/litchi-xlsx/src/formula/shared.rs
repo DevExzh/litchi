@@ -243,7 +243,7 @@ struct ParsedReference<'a> {
     end: usize,
 }
 
-fn translate_formula(
+pub(crate) fn translate_formula(
     formula: &str,
     origin_row: u32,
     origin_column: u32,
@@ -275,7 +275,9 @@ fn translate_formula(
             index = end;
             continue;
         }
-        let character = formula[index..].chars().next().expect("valid UTF-8");
+        let Some(character) = formula[index..].chars().next() else {
+            break;
+        };
         output.push(character);
         index += character.len_utf8();
     }

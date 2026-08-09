@@ -78,7 +78,7 @@ fn package_axis_transaction_is_atomic_exact_source_checked_and_reversible() {
 }
 
 #[test]
-fn package_edit_preserves_auxiliary_payloads_and_refuses_signed_or_pretty_xml() {
+fn package_edit_preserves_auxiliary_payloads_refuses_signatures_and_splices_pretty_xml() {
     let content = litchi_odc::serialize_content(&source_definition()).unwrap();
     let bytes = package(&content, Some(("Pictures/keep.bin", b"keep-exact")));
     let source = Chart::from_bytes(bytes).unwrap();
@@ -107,9 +107,30 @@ fn package_edit_preserves_auxiliary_payloads_and_refuses_signed_or_pretty_xml() 
     let pretty_chart = Chart::from_bytes(raw_negative_fixture_package(&pretty)).unwrap();
     let mut pretty_edit = pretty_chart.edit();
     pretty_edit
-        .update_axis(0, AxisUpdate::named("blocked"))
+        .update_axis(0, AxisUpdate::styled("producer-style"))
         .unwrap();
-    assert!(pretty_edit.commit().is_err());
+    let pretty_commit = pretty_edit.commit().unwrap();
+    assert!(pretty_commit.chart().content_xml().contains(">\n<"));
+    assert_eq!(
+        pretty_commit
+            .chart()
+            .plot_area()
+            .unwrap()
+            .axes()
+            .next()
+            .unwrap()
+            .style_name(),
+        Some("producer-style")
+    );
+    assert_eq!(
+        pretty_commit
+            .patch()
+            .inverse()
+            .apply(pretty_commit.chart())
+            .unwrap()
+            .as_bytes(),
+        pretty_chart.as_bytes()
+    );
 }
 
 #[test]

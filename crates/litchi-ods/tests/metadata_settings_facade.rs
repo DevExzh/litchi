@@ -44,27 +44,35 @@ const SETTINGS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 #[test]
 fn facade_round_trips_typed_metadata_and_calculation_settings() {
     let bytes = package(CONTENT, Some(META), Some(SETTINGS));
-    let spreadsheet = Spreadsheet::from_bytes(bytes.clone()).unwrap();
+    let spreadsheet =
+        Spreadsheet::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
     assert_eq!(spreadsheet.metadata().title.as_deref(), Some("Before"));
     assert_eq!(spreadsheet.metadata().author.as_deref(), Some("Author"));
     assert_eq!(spreadsheet.odf_metadata().title.as_deref(), Some("Before"));
-    assert_eq!(spreadsheet.settings().unwrap().case_sensitive, Some(false));
+    assert_eq!(
+        spreadsheet
+            .settings()
+            .expect("test fixture or operation should succeed")
+            .case_sensitive,
+        Some(false)
+    );
     assert!(
         spreadsheet
             .metadata_snapshot()
             .xml()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .contains("vendor:opaque")
     );
 
-    let mut mutable = MutableSpreadsheet::from_bytes(bytes).unwrap();
+    let mut mutable =
+        MutableSpreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
     mutable
         .update_metadata(|metadata| {
             metadata.title = Some("After".to_string());
             metadata.description = Some("Edited safely".to_string());
             Ok(())
         })
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     mutable
         .update_settings(|settings| {
             settings.case_sensitive = Some(true);
@@ -75,23 +83,30 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
             });
             Ok(())
         })
-        .unwrap();
+        .expect("test fixture or operation should succeed");
 
     let output = mutable.to_bytes();
-    let reopened = Spreadsheet::from_bytes(output.clone()).unwrap();
+    let reopened =
+        Spreadsheet::from_bytes(output.clone()).expect("test fixture or operation should succeed");
     assert_eq!(reopened.metadata().title.as_deref(), Some("After"));
     assert_eq!(
         reopened.metadata().description.as_deref(),
         Some("Edited safely")
     );
-    assert_eq!(reopened.settings().unwrap().case_sensitive, Some(true));
     assert_eq!(
         reopened
             .settings()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
+            .case_sensitive,
+        Some(true)
+    );
+    assert_eq!(
+        reopened
+            .settings()
+            .expect("test fixture or operation should succeed")
             .iteration
             .as_ref()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .steps,
         NonZeroUsize::new(20)
     );
@@ -100,25 +115,33 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
         reopened
             .metadata_snapshot()
             .xml()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .contains("vendor:opaque")
     );
 
-    let archive = OwnedPackage::from_bytes(output).unwrap();
+    let archive =
+        OwnedPackage::from_bytes(output).expect("test fixture or operation should succeed");
     assert_eq!(
-        archive.get_file("settings.xml").unwrap(),
+        archive
+            .get_file("settings.xml")
+            .expect("test fixture or operation should succeed"),
         support::compact_xml_fixture(SETTINGS).as_bytes()
     );
 
-    let mut clear = MutableSpreadsheet::from_bytes(package(CONTENT, Some(META), None)).unwrap();
-    clear.clear_metadata().unwrap();
-    let cleared = Spreadsheet::from_bytes(clear.to_bytes()).unwrap();
+    let mut clear = MutableSpreadsheet::from_bytes(package(CONTENT, Some(META), None))
+        .expect("test fixture or operation should succeed");
+    clear
+        .clear_metadata()
+        .expect("test fixture or operation should succeed");
+    let cleared = Spreadsheet::from_bytes(clear.to_bytes())
+        .expect("test fixture or operation should succeed");
     assert!(!cleared.metadata_snapshot().is_present());
 }
 
 #[test]
 fn facade_edits_are_atomic_and_builder_writes_new_parts() {
-    let mut mutable = MutableSpreadsheet::from_bytes(package(CONTENT, Some(META), None)).unwrap();
+    let mut mutable = MutableSpreadsheet::from_bytes(package(CONTENT, Some(META), None))
+        .expect("test fixture or operation should succeed");
     let before = mutable.metadata().title.clone();
     let result = mutable.update_metadata(|metadata| {
         metadata.identifier = Some("unsupported".to_string());
@@ -135,18 +158,26 @@ fn facade_edits_are_atomic_and_builder_writes_new_parts() {
             author: Some("Builder".to_string()),
             ..Metadata::default()
         })
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     builder
         .set_settings(Some(Settings {
             precision_as_shown: Some(true),
             ..Settings::default()
         }))
-        .unwrap();
-    let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        .expect("test fixture or operation should succeed");
+    let spreadsheet = Spreadsheet::from_bytes(
+        builder
+            .build()
+            .expect("test fixture or operation should succeed"),
+    )
+    .expect("test fixture or operation should succeed");
     assert_eq!(spreadsheet.metadata().title.as_deref(), Some("Built"));
     assert_eq!(spreadsheet.metadata().author.as_deref(), Some("Builder"));
     assert_eq!(
-        spreadsheet.settings().unwrap().precision_as_shown,
+        spreadsheet
+            .settings()
+            .expect("test fixture or operation should succeed")
+            .precision_as_shown,
         Some(true)
     );
 }
@@ -180,11 +211,11 @@ fn package(content: &str, metadata: Option<&str>, settings: Option<&str>) -> Vec
     let compact_metadata = metadata.map(support::compact_xml_fixture);
     let compact_settings = settings.map(support::compact_xml_fixture);
     let mut entries = vec![("content.xml", compact_content.as_bytes(), "text/xml")];
-    if let Some(metadata) = compact_metadata.as_deref() {
-        entries.push(("meta.xml", metadata.as_bytes(), "text/xml"));
+    if let Some(metadata_xml) = compact_metadata.as_deref() {
+        entries.push(("meta.xml", metadata_xml.as_bytes(), "text/xml"));
     }
-    if let Some(settings) = compact_settings.as_deref() {
-        entries.push(("settings.xml", settings.as_bytes(), "text/xml"));
+    if let Some(settings_xml) = compact_settings.as_deref() {
+        entries.push(("settings.xml", settings_xml.as_bytes(), "text/xml"));
     }
     support::raw_package(&entries)
 }

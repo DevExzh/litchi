@@ -256,7 +256,8 @@ mod tests {
 
     #[test]
     fn authoring_validates_and_serializes_complete_hyperlink_metadata() {
-        let mut link = Link::with_text("https://example.test/a?x=1&y=2", "A & B").unwrap();
+        let mut link = Link::with_text("https://example.test/a?x=1&y=2", "A & B")
+            .expect("test fixture or operation should succeed");
         link.name = Some("example-link".to_string());
         link.title = Some("Example & more".to_string());
         link.target_frame_name = Some("_blank".to_string());
@@ -264,7 +265,8 @@ mod tests {
         link.actuate = Some(Actuate::OnRequest);
         link.style_name = Some("Internet_20_link".to_string());
         link.visited_style_name = Some("Visited_20_Internet_20_link".to_string());
-        link.validate().unwrap();
+        link.validate()
+            .expect("test fixture or operation should succeed");
 
         let mut xml = String::new();
         link.write_xml(&mut xml);
@@ -277,7 +279,7 @@ mod tests {
 
         assert_eq!(
             Link::with_text("https://example.test/", "A & B")
-                .unwrap()
+                .expect("test fixture or operation should succeed")
                 .range(),
             0..5
         );

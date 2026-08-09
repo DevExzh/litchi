@@ -222,6 +222,13 @@ impl Frame {
         self
     }
 
+    /// Sets the stable XML identifier on `draw:frame`.
+    #[must_use]
+    pub fn with_xml_id(mut self, value: impl Into<String>) -> Self {
+        self.xml_id = Some(value.into());
+        self
+    }
+
     /// Sets the short accessible title.
     #[must_use]
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
@@ -233,6 +240,48 @@ impl Frame {
     #[must_use]
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
+        self
+    }
+
+    /// Sets the declared media type on `draw:image`.
+    #[must_use]
+    pub fn with_media_type(mut self, value: impl Into<String>) -> Self {
+        self.media_type = Some(value.into());
+        self
+    }
+
+    /// Sets the stable XML identifier on `draw:image`.
+    #[must_use]
+    pub fn with_image_xml_id(mut self, value: impl Into<String>) -> Self {
+        self.image_xml_id = Some(value.into());
+        self
+    }
+
+    /// Sets the inert producer filter hint on `draw:image`.
+    #[must_use]
+    pub fn with_filter_name(mut self, value: impl Into<String>) -> Self {
+        self.filter_name = Some(value.into());
+        self
+    }
+
+    /// Sets the lexical `XLink` type on `draw:image`.
+    #[must_use]
+    pub fn with_link_type(mut self, value: impl Into<String>) -> Self {
+        self.link_type = Some(value.into());
+        self
+    }
+
+    /// Sets the lexical `XLink` presentation behavior on `draw:image`.
+    #[must_use]
+    pub fn with_show(mut self, value: impl Into<String>) -> Self {
+        self.show = Some(value.into());
+        self
+    }
+
+    /// Sets the lexical `XLink` activation behavior on `draw:image`.
+    #[must_use]
+    pub fn with_actuate(mut self, value: impl Into<String>) -> Self {
+        self.actuate = Some(value.into());
         self
     }
 
@@ -306,6 +355,13 @@ impl Frame {
         self
     }
 
+    /// Sets the referenced source frame for `draw:copy-of`.
+    #[must_use]
+    pub fn with_copy_of(mut self, value: impl Into<String>) -> Self {
+        self.copy_of = Some(value.into());
+        self
+    }
+
     /// Attaches a client-side image map.
     #[must_use]
     pub fn with_image_map(mut self, value: ImageMap) -> Self {
@@ -353,6 +409,42 @@ impl Frame {
 
     pub(crate) fn set_source(&mut self, value: Source) {
         self.source = value;
+    }
+
+    pub(crate) fn set_xml_id(&mut self, value: Option<String>) {
+        self.xml_id = value;
+    }
+
+    pub(crate) fn set_title(&mut self, value: Option<String>) {
+        self.title = value;
+    }
+
+    pub(crate) fn set_description(&mut self, value: Option<String>) {
+        self.description = value;
+    }
+
+    pub(crate) fn set_media_type(&mut self, value: Option<String>) {
+        self.media_type = value;
+    }
+
+    pub(crate) fn set_image_xml_id(&mut self, value: Option<String>) {
+        self.image_xml_id = value;
+    }
+
+    pub(crate) fn set_filter_name(&mut self, value: Option<String>) {
+        self.filter_name = value;
+    }
+
+    pub(crate) fn set_link_type(&mut self, value: Option<String>) {
+        self.link_type = value;
+    }
+
+    pub(crate) fn set_show(&mut self, value: Option<String>) {
+        self.show = value;
+    }
+
+    pub(crate) fn set_actuate(&mut self, value: Option<String>) {
+        self.actuate = value;
     }
 
     pub(crate) fn set_style_name(&mut self, value: Option<String>) {
@@ -423,6 +515,10 @@ impl Frame {
 
     pub(crate) fn set_relative_height(&mut self, value: Option<String>) {
         self.relative_height = value;
+    }
+
+    pub(crate) fn set_copy_of(&mut self, value: Option<String>) {
+        self.copy_of = value;
     }
 }
 

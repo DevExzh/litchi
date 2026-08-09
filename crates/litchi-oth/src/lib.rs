@@ -10,7 +10,7 @@ mod package;
 pub use facade::{
     Block, Builder, Commit, Edit, HeadingChange, History, JoinError, JoinFailure, ListChange,
     MergeConflict, MergePlan, ParagraphChange, Patch, SecurityPolicy, SecurityReport, Template,
-    TextBody,
+    TextBody, TransferPlan, TransferPolicy, TransferSelector,
 };
 pub use model::block::Content as ContentBlock;
 pub use model::{

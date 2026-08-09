@@ -264,7 +264,7 @@ impl Paragraph {
 
     /// Get the raw XML bytes.
     #[inline]
-    pub(super) fn xml_bytes(&self) -> &[u8] {
+    pub(crate) fn xml_bytes(&self) -> &[u8] {
         self.xml_data.as_bytes()
     }
 }

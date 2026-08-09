@@ -5,7 +5,13 @@ use litchi_odf_common::{
     compact_xml,
     core::{PackageWriter, Profile},
 };
-use litchi_odm::{Master, style::Origin, subdocument::Target, transaction::MergeError};
+use litchi_odm::{
+    Master,
+    style::Origin,
+    subdocument::Target,
+    transaction::{Conflict, MergeError},
+};
+use std::io::{Cursor, Read as _};
 
 const MIME: &str = "application/vnd.oasis.opendocument.text-master";
 const CONTENT: &str = concat!(
@@ -176,14 +182,14 @@ fn durable_patch_merge_and_bounded_history_preserve_lineage() {
 #[test]
 fn merge_reports_divergent_title_conflict() {
     let source = Master::from_bytes(package(CONTENT, false)).unwrap();
-    let mut left = source.edit();
-    left.set_title("Left").unwrap();
-    let left = left.commit().unwrap();
-    let mut right = source.edit();
-    right.set_title("Right").unwrap();
-    let right = right.commit().unwrap();
+    let mut left_edit = source.edit();
+    left_edit.set_title("Left").unwrap();
+    let left_commit = left_edit.commit().unwrap();
+    let mut right_edit = source.edit();
+    right_edit.set_title("Right").unwrap();
+    let right_commit = right_edit.commit().unwrap();
     assert!(matches!(
-        left.patch().merge(right.patch()),
+        left_commit.patch().merge(right_commit.patch()),
         Err(MergeError::Conflicts(conflicts)) if conflicts.len() == 1
     ));
 }
@@ -236,7 +242,7 @@ fn malformed_section_and_style_semantics_are_rejected() {
 }
 
 #[test]
-fn checked_in_libreoffice_odm_drives_real_section_and_style_projection() {
+fn original_libreoffice_odm_ingests_edits_and_reopens_without_repacking() {
     let original = include_bytes!(
         "../../../3rdparty/libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm"
     );
@@ -269,6 +275,17 @@ fn checked_in_libreoffice_odm_drives_real_section_and_style_projection() {
         commit.snapshot().subdocuments()[0].href(),
         "../edited-DUMMY2.odt"
     );
+    let mut changed_archive =
+        zip::ZipArchive::new(Cursor::new(commit.snapshot().as_bytes())).unwrap();
+    let mut mimetype = String::new();
+    {
+        let mut first = changed_archive.by_index(0).unwrap();
+        assert_eq!(first.name(), "mimetype");
+        assert_eq!(first.compression(), zip::CompressionMethod::Stored);
+        first.read_to_string(&mut mimetype).unwrap();
+    }
+    assert_eq!(mimetype, MIME);
+    assert!(Master::from_bytes(commit.snapshot().as_bytes().to_vec()).is_ok());
     assert_eq!(
         commit
             .patch()
@@ -278,4 +295,25 @@ fn checked_in_libreoffice_odm_drives_real_section_and_style_projection() {
             .as_bytes(),
         original
     );
+}
+
+#[test]
+fn three_way_planning_detects_parent_remove_against_child_edit() {
+    let source = Master::from_bytes(package(CONTENT, false)).unwrap();
+    let mut remove_parent_edit = source.edit();
+    remove_parent_edit.remove_section(Position::new(0)).unwrap();
+    let remove_parent_commit = remove_parent_edit.commit().unwrap();
+    let mut rename_child_edit = source.edit();
+    rename_child_edit
+        .rename_section(Position::new(1), "Renamed child")
+        .unwrap();
+    let rename_child_commit = rename_child_edit.commit().unwrap();
+    let plan = remove_parent_commit
+        .patch()
+        .plan_three_way(rename_child_commit.patch())
+        .unwrap();
+    assert!(plan.conflicts().conflicts().iter().any(
+        |conflict| matches!(conflict, Conflict::Section(position) if *position == Position::new(1))
+    ));
+    assert!(!plan.can_commit());
 }

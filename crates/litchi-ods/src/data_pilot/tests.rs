@@ -6,7 +6,10 @@ const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-cont
 const XML_WITHOUT_OWNER: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><t:table t:name="Input"/><t:shapes/></office:spreadsheet></office:body></office:document-content>"#;
 
 fn package(xml: &str) -> Vec<u8> {
-    Builder::new().content_xml(xml).build().unwrap()
+    Builder::new()
+        .content_xml(xml)
+        .build()
+        .expect("test fixture or operation should succeed")
 }
 
 fn table(name: &str) -> Table {
@@ -18,13 +21,27 @@ fn table(name: &str) -> Table {
 #[test]
 fn catalog_reads_rich_metadata_and_no_op_is_byte_exact() {
     let bytes = package(XML);
-    let spreadsheet = Spreadsheet::from_bytes(bytes.clone()).unwrap();
-    let catalog = spreadsheet.data_pilots().unwrap();
+    let spreadsheet =
+        Spreadsheet::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
+    let catalog = spreadsheet
+        .data_pilots()
+        .expect("test fixture or operation should succeed");
     assert!(catalog.has_owner());
     assert_eq!(catalog.len(), 1);
-    assert_eq!(catalog.named("Pivot").unwrap().unwrap().fields.len(), 1);
+    assert_eq!(
+        catalog
+            .named("Pivot")
+            .expect("test fixture or operation should succeed")
+            .expect("test fixture or operation should succeed")
+            .fields
+            .len(),
+        1
+    );
 
-    let commit = catalog.transaction().commit().unwrap();
+    let commit = catalog
+        .transaction()
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(!commit.changed());
     assert_eq!(commit.bytes(), bytes.as_slice());
 }
@@ -37,7 +54,8 @@ fn clone_staged_crud_rewrites_only_the_owner_and_reopens() {
             "",
         )
         .replace(" xmlns:v=\"urn:example:vendor\"", "");
-    let mut mutable = MutableSpreadsheet::from_bytes(package(&typed_xml)).unwrap();
+    let mut mutable = MutableSpreadsheet::from_bytes(package(&typed_xml))
+        .expect("test fixture or operation should succeed");
     mutable
         .edit_data_pilots(|editor| {
             editor.update("Pivot", |table| {
@@ -45,23 +63,41 @@ fn clone_staged_crud_rewrites_only_the_owner_and_reopens() {
                 Ok(())
             })
         })
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     let content = mutable.spreadsheet().content_xml().to_owned();
     assert!(content.contains("t:shapes"));
 
-    let spreadsheet = Spreadsheet::from_bytes(mutable.to_bytes()).unwrap();
-    let catalog = spreadsheet.data_pilots().unwrap();
-    assert_eq!(catalog.named("Renamed").unwrap().unwrap().name, "Renamed");
+    let spreadsheet = Spreadsheet::from_bytes(mutable.to_bytes())
+        .expect("test fixture or operation should succeed");
+    let catalog = spreadsheet
+        .data_pilots()
+        .expect("test fixture or operation should succeed");
+    assert_eq!(
+        catalog
+            .named("Renamed")
+            .expect("test fixture or operation should succeed")
+            .expect("test fixture or operation should succeed")
+            .name,
+        "Renamed"
+    );
 }
 
 #[test]
 fn insertion_honors_spreadsheet_order_and_supports_removal() {
-    let mut mutable = MutableSpreadsheet::from_bytes(package(XML_WITHOUT_OWNER)).unwrap();
+    let mut mutable = MutableSpreadsheet::from_bytes(package(XML_WITHOUT_OWNER))
+        .expect("test fixture or operation should succeed");
     mutable
         .edit_data_pilots(|editor| editor.add(table("Pivot")))
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     let content = mutable.spreadsheet().content_xml();
-    assert!(content.find("data-pilot-tables").unwrap() < content.find("t:shapes").unwrap());
+    assert!(
+        content
+            .find("data-pilot-tables")
+            .expect("test fixture or operation should succeed")
+            < content
+                .find("t:shapes")
+                .expect("test fixture or operation should succeed")
+    );
 
     mutable
         .edit_data_pilots(|editor| {
@@ -69,14 +105,18 @@ fn insertion_honors_spreadsheet_order_and_supports_removal() {
             assert_eq!(removed.name, "Pivot");
             Ok(())
         })
-        .unwrap();
-    let catalog = mutable.spreadsheet().data_pilots().unwrap();
+        .expect("test fixture or operation should succeed");
+    let catalog = mutable
+        .spreadsheet()
+        .data_pilots()
+        .expect("test fixture or operation should succeed");
     assert!(!catalog.has_owner());
 }
 
 #[test]
 fn opaque_markup_blocks_lossy_edits_and_leaves_source_unchanged() {
-    let mut mutable = MutableSpreadsheet::from_bytes(package(XML)).unwrap();
+    let mut mutable = MutableSpreadsheet::from_bytes(package(XML))
+        .expect("test fixture or operation should succeed");
     let before = mutable.spreadsheet().content_xml().to_owned();
     let result = mutable.edit_data_pilots(|editor| {
         editor.update("Pivot", |table| {
@@ -90,8 +130,11 @@ fn opaque_markup_blocks_lossy_edits_and_leaves_source_unchanged() {
 
 #[test]
 fn failed_typed_update_does_not_change_the_staged_catalog() {
-    let spreadsheet = Spreadsheet::from_bytes(package(XML_WITHOUT_OWNER)).unwrap();
-    let catalog = spreadsheet.data_pilots().unwrap();
+    let spreadsheet = Spreadsheet::from_bytes(package(XML_WITHOUT_OWNER))
+        .expect("test fixture or operation should succeed");
+    let catalog = spreadsheet
+        .data_pilots()
+        .expect("test fixture or operation should succeed");
     let mut transaction = catalog.transaction();
     let result = transaction.editor().update(0, |table| {
         table.fields.push(Field::new("Region", Orientation::Page));

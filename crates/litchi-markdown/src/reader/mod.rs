@@ -3,18 +3,19 @@
 //! Parsing follows `CommonMark` 0.31.2. [`Dialect::GitHubFlavored`] additionally
 //! enables GFM tables, task lists, strikethrough, alerts, and compatible
 //! footnote definitions. A snapshot retains its complete UTF-8 source byte-for-byte;
-//! parsing never renders or normalizes it. Edits replace exactly one parsed
-//! top-level block or append one block, then fully reparse before publication.
+//! parsing never renders or normalizes it. Edits target exact top-level,
+//! nested-block, or inline ranges and fully reparse before publication.
 
 mod model;
 mod parse;
 mod transaction;
 
 pub use model::{
-    Block, BlockKind, Blocks, Dialect, Error, Inline, InlineKind, Inlines, ReadLimits, Reference,
-    ReferenceKind, References, Snapshot,
+    Block, BlockKind, Blocks, Dialect, Error, Inline, InlineKind, Inlines, NestedBlock,
+    NestedBlocks, ProjectionCapabilities, ProjectionIssue, ProjectionIssueKind,
+    ProjectionPreflight, ReadLimits, Reference, ReferenceKind, References, Snapshot,
 };
 pub use transaction::{
     Commit, Conflict, ConflictSet, Diagnostics, Edit, History, HistoryLimits, JoinError, MergePlan,
-    Patch, PatchEnvelopeLimits,
+    Patch, PatchEnvelopeLimits, TransferPlan,
 };

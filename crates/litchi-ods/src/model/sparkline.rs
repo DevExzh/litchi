@@ -865,7 +865,8 @@ mod tests {
     #[test]
     fn writes_groups_in_libreoffice_attribute_order() {
         let mut xml = String::new();
-        write_sparkline_groups(&mut xml, &[sample_group()]).unwrap();
+        write_sparkline_groups(&mut xml, &[sample_group()])
+            .expect("test fixture or operation should succeed");
         assert!(xml.starts_with("<calcext:sparkline-groups>"));
         assert!(xml.contains(
             r##"<calcext:sparkline-group calcext:id="{1C5C5DE0-3C09-4CB3-A3EC-9E763301EC82}" calcext:type="column" calcext:line-width="1pt" calcext:display-empty-cells-as="gap" calcext:markers="true" calcext:high="true" calcext:display-x-axis="true" calcext:min-axis-type="custom" calcext:max-axis-type="individual" calcext:manual-min="-5" calcext:color-series="#0369a3" calcext:color-low="#c9211e">"##
@@ -885,7 +886,7 @@ mod tests {
     #[test]
     fn writes_nothing_for_an_empty_collection() {
         let mut xml = String::new();
-        write_sparkline_groups(&mut xml, &[]).unwrap();
+        write_sparkline_groups(&mut xml, &[]).expect("test fixture or operation should succeed");
         assert!(xml.is_empty());
     }
 

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use litchi_ooxml_common::web as common_web;
 use litchi_opc::Part;
 use litchi_sheet::{
-    Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Row as RowIndex, RowAt,
+    Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
 
 use super::super::super::{Selector, Visibility, Workbook, Worksheet, WorksheetKind};
@@ -19,6 +19,7 @@ use crate::Style;
 use crate::cell::{Cell, Content};
 use crate::column::{OutlineAt, State as ColumnState, WidthAt};
 use crate::error::{EditBlock, Error, RemoveBlock, Result, TabEditBlock, allocation, invalid};
+use crate::formula::{Formula, Kind as FormulaKind};
 use crate::layout;
 use crate::raw;
 use crate::raw::worksheet::edit::{
@@ -45,6 +46,15 @@ use super::super::{codec, package};
 
 use self::snapshot::Snapshot;
 use super::worksheet::{NewSheet, TabEdit, WorksheetEdit};
+
+const MAX_CELL_TRANSFER: u64 = 65_536;
+const MAX_CELL_DEPENDENCY_SCAN: usize = 1_048_576;
+
+#[derive(Clone, Copy)]
+enum CellTransfer {
+    Copy,
+    Move,
+}
 
 /// Isolated workbook transaction. Dropping it rolls back every pending change.
 #[derive(Debug)]
@@ -297,6 +307,142 @@ impl Edit {
             .entry(source.position())
             .or_default()
             .page_breaks = Some(crate::page_breaks::PageBreaks::new());
+        Ok(Some(self))
+    }
+
+    /// Copy a bounded rectangular cell region with formula, text, and local
+    /// shared-style dependencies closed inside this workbook.
+    ///
+    /// Scalar formulas are translated from each source coordinate to its
+    /// corresponding target coordinate and their stale caches are discarded.
+    /// Shared-string text is copied as owned semantic text, while local style
+    /// handles retain their validated workbook style-table lineage. Range-owned
+    /// formulas, unknown cell encodings, and merged regions are refused rather
+    /// than partially copied. An exact same-sheet, same-range transfer is a
+    /// semantic no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid selectors, coordinates, ranges exceeding
+    /// 65,536 cells, grid overflow, dependency scans exceeding their explicit
+    /// bound, merged regions, unsupported formula/cell dependencies, or a
+    /// worksheet that fails ordinary edit validation.
+    pub fn copy_cells<'source, 'range, 'target, 'anchor>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        range: impl Into<Area<'range>>,
+        target: impl Into<Selector<'target>>,
+        anchor: impl Into<At<'anchor>>,
+    ) -> Result<Option<&mut Self>> {
+        self.transfer_cells(source, range, target, anchor, CellTransfer::Copy)
+    }
+
+    /// Move a bounded cell region with the same dependency closure and
+    /// refusals as [`Self::copy_cells`].
+    ///
+    /// Source-exclusive cells are removed in the same atomic transaction. For
+    /// overlapping moves, destination writes are staged after source removals
+    /// so the collected source snapshot wins deterministically.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors documented by [`Self::copy_cells`].
+    pub fn move_cells<'source, 'range, 'target, 'anchor>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        range: impl Into<Area<'range>>,
+        target: impl Into<Selector<'target>>,
+        anchor: impl Into<At<'anchor>>,
+    ) -> Result<Option<&mut Self>> {
+        self.transfer_cells(source, range, target, anchor, CellTransfer::Move)
+    }
+
+    fn transfer_cells<'source, 'range, 'target, 'anchor>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        range: impl Into<Area<'range>>,
+        target: impl Into<Selector<'target>>,
+        anchor: impl Into<At<'anchor>>,
+        mode: CellTransfer,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "cell transfer")?;
+        let Some((source_sheet, target_sheet)) =
+            Snapshot::new(&self.base).worksheet_pair(source, target)?
+        else {
+            return Ok(None);
+        };
+        let source_range = range.into().resolve()?;
+        let target_start = anchor.into().resolve()?;
+        let target_end_row = target_start
+            .row()
+            .get()
+            .checked_add(source_range.rows())
+            .ok_or_else(|| invalid("cell-transfer target row overflow"))?;
+        let target_end_column = target_start
+            .column()
+            .get()
+            .checked_add(source_range.columns())
+            .ok_or_else(|| invalid("cell-transfer target column overflow"))?;
+        let target_range = Rect::new(target_start, target_end_row, target_end_column)?;
+        let cells = u64::from(source_range.rows())
+            .checked_mul(u64::from(source_range.columns()))
+            .ok_or_else(|| invalid("cell-transfer area overflow"))?;
+        if cells > MAX_CELL_TRANSFER {
+            return Err(invalid(format!(
+                "cell transfer contains {cells} cells; limit is {MAX_CELL_TRANSFER}"
+            )));
+        }
+        if source_sheet.position() == target_sheet.position() && source_range == target_range {
+            return Ok(Some(self));
+        }
+        self.ensure_unmerged_transfer(&source_sheet, source_range)?;
+        self.ensure_unmerged_transfer(&target_sheet, target_range)?;
+        self.ensure_no_range_formula_transfer(&source_sheet, source_range)?;
+        self.ensure_no_range_formula_transfer(&target_sheet, target_range)?;
+
+        let capacity = usize::try_from(cells)
+            .map_err(|error| invalid(format!("cell-transfer count exceeds usize: {error}")))?;
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(capacity)
+            .map_err(|source| allocation("cell-transfer plan", source))?;
+        for row_offset in 0..source_range.rows() {
+            for column_offset in 0..source_range.columns() {
+                let source_address = Address::at(
+                    source_range.start().row().get() + row_offset,
+                    source_range.start().column().get() + column_offset,
+                )?;
+                let target_address = Address::at(
+                    target_start.row().get() + row_offset,
+                    target_start.column().get() + column_offset,
+                )?;
+                if matches!(
+                    self.pending_cell_state(&target_sheet, target_address)?,
+                    State::Cell {
+                        content: Cell::Unknown(_),
+                        ..
+                    }
+                ) {
+                    return Err(Error::Unsupported {
+                        feature: "overwriting unmodeled cell encodings",
+                    });
+                }
+                let state = self.pending_cell_state(&source_sheet, source_address)?;
+                let action = transfer_action(state, source_address, target_address)?;
+                staged.push((source_address, target_address, action));
+            }
+        }
+
+        if matches!(mode, CellTransfer::Move) {
+            let source_actions = self.actions(source_sheet.position());
+            for (source_address, _, _) in &staged {
+                source_actions.insert(*source_address, Action::Remove);
+            }
+        }
+        let target_actions = self.actions(target_sheet.position());
+        for (_, target_address, action) in staged {
+            target_actions.insert(target_address, action);
+        }
         Ok(Some(self))
     }
 
@@ -1058,6 +1204,7 @@ impl Edit {
             }
             let after =
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
+            let after = raw::compact::changed(&after, "compact changed worksheet output")?;
             let parsed = raw::worksheet::parse(&after, || base.inner.shared_strings())?;
             let parsed_web = raw::web::read(&after)?;
             base.inner.validate_styles(&parsed)?;
@@ -1621,6 +1768,9 @@ impl Edit {
             if needs_recalculation {
                 after = raw::recalc::invalidate(&after)?;
             }
+            if after.as_slice() != before.as_slice() {
+                after = raw::compact::changed(&after, "compact changed workbook output")?;
+            }
             if has_existing_catalog_edit || !created.is_empty() || active_change.is_some() {
                 let catalog = raw::parse_catalog(&after)?;
                 if Some(catalog.active_sheet_index) != final_active_position {
@@ -1793,6 +1943,22 @@ impl Edit {
             web.apply(&mut package)?;
         }
         let workbook = Workbook::from_package_with_styles(package, Some(&base))?;
+        if needs_recalculation {
+            let metadata = workbook.calculation_metadata()?;
+            let properties = metadata.properties().ok_or_else(|| {
+                invalid("formula invalidation removed workbook calculation properties")
+            })?;
+            if properties.calculation_id() != 0
+                || !properties.full_calculation_on_load()
+                || !properties.force_full_calculation()
+                || properties.calculation_completed()
+                || !properties.calculate_on_save()
+            {
+                return Err(invalid(
+                    "formula invalidation did not survive compact workbook publication",
+                ));
+            }
+        }
         if web_patch.is_some()
             || changes
                 .iter()
@@ -1921,6 +2087,71 @@ impl Edit {
             return Ok(value.clone());
         }
         sheet.page_breaks()
+    }
+
+    fn pending_cell_state(&self, sheet: &Worksheet, address: Address) -> Result<State> {
+        let stored = sheet.store()?.entry(address);
+        Ok(self
+            .sheets
+            .get(&sheet.position())
+            .and_then(|actions| actions.cells.get(&address))
+            .map_or_else(
+                || State::read(stored, &self.base),
+                |action| State::after(stored, action, &self.base),
+            ))
+    }
+
+    fn ensure_unmerged_transfer(&self, sheet: &Worksheet, range: Rect) -> Result<()> {
+        let store = sheet.store()?;
+        let intents = self
+            .sheets
+            .get(&sheet.position())
+            .map_or(&[][..], |actions| actions.merges.as_slice());
+        for row in range.start().row().get()..range.end().0 {
+            for column in range.start().column().get()..range.end().1 {
+                let address = Address::at(row, column)?;
+                if pending_merge(store.merge_ranges(), intents, address).is_some() {
+                    return Err(Error::EditBlocked {
+                        sheet: sheet.name().to_owned(),
+                        address,
+                        reason: EditBlock::CoveredMerge,
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn ensure_no_range_formula_transfer(&self, sheet: &Worksheet, range: Rect) -> Result<()> {
+        for (position, entry) in sheet.store()?.entries().iter().enumerate() {
+            if position >= MAX_CELL_DEPENDENCY_SCAN {
+                return Err(invalid(format!(
+                    "cell-transfer dependency scan exceeds {MAX_CELL_DEPENDENCY_SCAN} stored cells"
+                )));
+            }
+            let State::Cell {
+                content: Cell::Formula(formula),
+                ..
+            } = self.pending_cell_state(sheet, entry.address)?
+            else {
+                continue;
+            };
+            let owned = match formula.kind() {
+                FormulaKind::Scalar => continue,
+                FormulaKind::Array { range } | FormulaKind::DataTable { range } => range
+                    .as_ref()
+                    .map(|range| Rect::from_a1(range.as_str()))
+                    .transpose()?
+                    .unwrap_or_else(|| Rect::single(entry.address)),
+                FormulaKind::Unknown(_) => Rect::single(entry.address),
+            };
+            if rectangles_overlap(range, owned) {
+                return Err(Error::Unsupported {
+                    feature: "copying or overwriting range-owned formulas",
+                });
+            }
+        }
+        Ok(())
     }
 
     pub(super) fn set_visibility(&mut self, position: usize, action: TabAction) {
@@ -2156,4 +2387,53 @@ impl Edit {
             reason,
         }
     }
+}
+
+fn transfer_action(state: State, source: Address, target: Address) -> Result<Action> {
+    let State::Cell { content, style } = state else {
+        return Ok(Action::Remove);
+    };
+    let payload = match content {
+        Cell::Empty => Payload::Clear,
+        Cell::Value(value) => {
+            let content = Content::Value(value);
+            content.validate_for_write()?;
+            Payload::Set(content)
+        },
+        Cell::Formula(formula) => {
+            if !matches!(formula.kind(), FormulaKind::Scalar) {
+                return Err(Error::Unsupported {
+                    feature: "copying range-owned formulas",
+                });
+            }
+            let translated = crate::formula::shared::translate_formula(
+                formula.text(),
+                source.row().get() + 1,
+                source.column().get() + 1,
+                target.row().get() + 1,
+                target.column().get() + 1,
+            );
+            Payload::Set(Content::Formula(Formula::new(translated)?))
+        },
+        Cell::Unknown(_) => {
+            return Err(Error::Unsupported {
+                feature: "copying unmodeled cell encodings",
+            });
+        },
+    };
+    let style = Some(match style {
+        crate::StyleState::Default => StyleEffect::Reset,
+        crate::StyleState::Shared(key) => StyleEffect::Set(key.raw()),
+    });
+    Ok(Action::Update {
+        payload: Some(payload),
+        style,
+    })
+}
+
+const fn rectangles_overlap(left: Rect, right: Rect) -> bool {
+    left.start().row().get() < right.end().0
+        && right.start().row().get() < left.end().0
+        && left.start().column().get() < right.end().1
+        && right.start().column().get() < left.end().1
 }

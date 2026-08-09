@@ -22,6 +22,7 @@ const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const FORM_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:form:1.0";
+const FO_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -126,6 +127,13 @@ struct PendingListItem {
 struct PendingForm {
     controls: Vec<crate::form::Control>,
     name: Option<String>,
+}
+
+struct PendingStyle {
+    family: Option<String>,
+    name: String,
+    parent_name: Option<String>,
+    text_properties: Option<crate::style::TextProperties>,
 }
 
 struct ActiveLink {
@@ -502,24 +510,64 @@ pub(crate) fn project_styles(
     }
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
+    let mut active = None::<PendingStyle>;
     let mut styles = Vec::new();
     loop {
         match reader.read_event().map_err(|error| xml_error(&error))? {
-            Event::Start(start) | Event::Empty(start) => {
+            Event::Start(start) => {
                 let (namespace, local) = reader.resolver().resolve_element(start.name());
                 if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == STYLE_NAMESPACE)
                     && local.as_ref() == b"style"
                 {
-                    let name = optional_attribute(&reader, &start, STYLE_NAMESPACE, b"name")?
-                        .ok_or_else(|| {
-                            Error::InvalidFormat("OTH named style has no style:name".to_string())
-                        })?;
+                    if active.is_some() {
+                        return invalid("OTH named styles cannot be nested");
+                    }
+                    active = Some(pending_style(&reader, &start)?);
+                } else if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == STYLE_NAMESPACE)
+                    && local.as_ref() == b"text-properties"
+                    && let Some(style) = active.as_mut()
+                {
+                    let properties = text_properties(&reader, &start)?;
+                    style.text_properties = (!properties.is_empty()).then_some(properties);
+                }
+            },
+            Event::Empty(start) => {
+                let (namespace, local) = reader.resolver().resolve_element(start.name());
+                if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == STYLE_NAMESPACE)
+                    && local.as_ref() == b"style"
+                {
+                    let style = pending_style(&reader, &start)?;
                     reserve(&mut styles, "OTH style inventory")?;
                     styles.push(crate::style::Style::projected(
-                        name,
-                        optional_attribute(&reader, &start, STYLE_NAMESPACE, b"family")?,
-                        optional_attribute(&reader, &start, STYLE_NAMESPACE, b"parent-style-name")?,
+                        style.name,
+                        style.family,
+                        style.parent_name,
                         origin,
+                        None,
+                    ));
+                } else if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == STYLE_NAMESPACE)
+                    && local.as_ref() == b"text-properties"
+                    && let Some(style) = active.as_mut()
+                {
+                    let properties = text_properties(&reader, &start)?;
+                    style.text_properties = (!properties.is_empty()).then_some(properties);
+                }
+            },
+            Event::End(end) => {
+                let (namespace, local) = reader.resolver().resolve_element(end.name());
+                if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == STYLE_NAMESPACE)
+                    && local.as_ref() == b"style"
+                {
+                    let style = active.take().ok_or_else(|| {
+                        Error::InvalidFormat("OTH named style state is missing".to_string())
+                    })?;
+                    reserve(&mut styles, "OTH style inventory")?;
+                    styles.push(crate::style::Style::projected(
+                        style.name,
+                        style.family,
+                        style.parent_name,
+                        origin,
+                        style.text_properties,
                     ));
                 }
             },
@@ -531,11 +579,48 @@ pub(crate) fn project_styles(
             Event::CData(_)
             | Event::Comment(_)
             | Event::Decl(_)
-            | Event::End(_)
             | Event::PI(_)
             | Event::Text(_) => {},
         }
     }
+}
+
+fn pending_style(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<PendingStyle> {
+    Ok(PendingStyle {
+        family: optional_attribute(reader, start, STYLE_NAMESPACE, b"family")?,
+        name: optional_attribute(reader, start, STYLE_NAMESPACE, b"name")?
+            .ok_or_else(|| Error::InvalidFormat("OTH named style has no style:name".to_string()))?,
+        parent_name: optional_attribute(reader, start, STYLE_NAMESPACE, b"parent-style-name")?,
+        text_properties: None,
+    })
+}
+
+fn text_properties(
+    reader: &NsReader<&[u8]>,
+    start: &BytesStart<'_>,
+) -> Result<crate::style::TextProperties> {
+    let weight =
+        optional_attribute(reader, start, FO_NAMESPACE, b"font-weight")?.and_then(|value| {
+            match value.as_str() {
+                "bold" => Some(crate::style::Weight::Bold),
+                "normal" => Some(crate::style::Weight::Normal),
+                _ => None,
+            }
+        });
+    let slant =
+        optional_attribute(reader, start, FO_NAMESPACE, b"font-style")?.and_then(
+            |value| match value.as_str() {
+                "italic" => Some(crate::style::Slant::Italic),
+                "normal" => Some(crate::style::Slant::Normal),
+                _ => None,
+            },
+        );
+    Ok(crate::style::TextProperties::projected(
+        optional_attribute(reader, start, FO_NAMESPACE, b"color")?,
+        optional_attribute(reader, start, FO_NAMESPACE, b"background-color")?,
+        weight,
+        slant,
+    ))
 }
 
 fn validate_source(xml: &str) -> Result<()> {

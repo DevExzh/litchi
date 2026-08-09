@@ -251,12 +251,7 @@ fn parse_branch<R: BufRead>(
                 let namespace = match resolved {
                     ResolveResult::Bound(Namespace(namespace)) => std::str::from_utf8(namespace)
                         .map_err(|error| Error::Xml(error.to_string()))?,
-                    ResolveResult::Unknown(_) => {
-                        return Err(invalid(format!(
-                            "Choice Requires prefix '{prefix}' is unbound"
-                        )));
-                    },
-                    ResolveResult::Unbound => {
+                    ResolveResult::Unknown(_) | ResolveResult::Unbound => {
                         return Err(invalid(format!(
                             "Choice Requires prefix '{prefix}' is unbound"
                         )));

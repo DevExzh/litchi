@@ -25,12 +25,18 @@ impl XmlMapInfo {
         Ok(parse_xml_map_info_with_conformance_and_limits(xml, limits)?.info)
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the crate-local canonical writer facade is retained for host integrations"
+    )]
     pub(crate) fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
         self.to_xml_with_limits(strict, &XmlMapLimits::DEFAULT)
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the crate-local bounded writer facade is retained for host integrations"
+    )]
     pub(crate) fn to_xml_with_limits(
         &self,
         strict: bool,
@@ -392,7 +398,10 @@ fn parse_processed(xml: &[u8], limits: &XmlMapLimits) -> Result<ParsedXmlMapInfo
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one schema start event updates the complete bounded XML Maps parser state"
+)]
 fn handle_start(
     stack: &mut Vec<Context>,
     schemas: &mut Vec<SchemaBuilder>,
@@ -603,7 +612,7 @@ fn begin_capture(
     e: BytesStart<'static>,
     bindings: &[(String, String)],
 ) -> Result<Capture> {
-    let e = add_inherited_bindings(e, bindings)?;
+    let e = add_inherited_bindings(e, bindings);
     let mut writer = Writer::new(Vec::new());
     writer.write_event(Event::Start(e)).map_err(xml_error)?;
     Ok(Capture {
@@ -618,7 +627,7 @@ fn capture_empty(
     bindings: &[(String, String)],
     limits: &XmlMapLimits,
 ) -> Result<Vec<u8>> {
-    let e = add_inherited_bindings(e, bindings)?;
+    let e = add_inherited_bindings(e, bindings);
     let mut writer = Writer::new(Vec::new());
     writer.write_event(Event::Empty(e)).map_err(xml_error)?;
     let bytes = writer.into_inner();
@@ -799,7 +808,7 @@ fn merged_bindings(
     let mut result = parent.to_vec();
     for (key, value) in local {
         if let Some(existing) = result.iter_mut().find(|v| v.0 == *key) {
-            existing.1 = value.clone();
+            existing.1.clone_from(value);
         } else {
             result.push((key.clone(), value.clone()));
         }
@@ -809,7 +818,7 @@ fn merged_bindings(
 fn add_inherited_bindings(
     mut e: BytesStart<'static>,
     bindings: &[(String, String)],
-) -> Result<BytesStart<'static>> {
+) -> BytesStart<'static> {
     let declared: HashSet<Vec<u8>> = e
         .attributes()
         .with_checks(true)
@@ -822,7 +831,7 @@ fn add_inherited_bindings(
             e.push_attribute((key.as_str(), value.as_str()));
         }
     }
-    Ok(e)
+    e
 }
 struct BoundedXml {
     bytes: Vec<u8>,

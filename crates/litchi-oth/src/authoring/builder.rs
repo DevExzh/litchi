@@ -234,7 +234,7 @@ fn push_style(output: &mut String, optional_style_name: Option<&str>) {
 
 pub(crate) fn render_styles(styles: &[crate::style::Style]) -> Result<String> {
     let mut output = String::from(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-styles xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\"><office:styles>",
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-styles xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" xmlns:fo=\"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0\"><office:styles>",
     );
     for style in styles {
         output.push_str("<style:style style:name=\"");
@@ -250,7 +250,38 @@ pub(crate) fn render_styles(styles: &[crate::style::Style]) -> Result<String> {
             output.push_str(&quick_xml::escape::escape(parent));
             output.push('"');
         }
-        output.push_str("/>");
+        if let Some(properties) = style.text_properties() {
+            output.push_str("><style:text-properties");
+            if let Some(color) = properties.color() {
+                output.push_str(" fo:color=\"");
+                output.push_str(color);
+                output.push('"');
+            }
+            if let Some(color) = properties.background_color() {
+                output.push_str(" fo:background-color=\"");
+                output.push_str(color);
+                output.push('"');
+            }
+            if let Some(weight) = properties.weight() {
+                output.push_str(" fo:font-weight=\"");
+                output.push_str(match weight {
+                    crate::style::Weight::Normal => "normal",
+                    crate::style::Weight::Bold => "bold",
+                });
+                output.push('"');
+            }
+            if let Some(slant) = properties.slant() {
+                output.push_str(" fo:font-style=\"");
+                output.push_str(match slant {
+                    crate::style::Slant::Normal => "normal",
+                    crate::style::Slant::Italic => "italic",
+                });
+                output.push('"');
+            }
+            output.push_str("/></style:style>");
+        } else {
+            output.push_str("/>");
+        }
     }
     output.push_str("</office:styles></office:document-styles>");
     compact_xml::validate(output.as_bytes())?;

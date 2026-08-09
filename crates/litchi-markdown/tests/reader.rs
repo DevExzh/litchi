@@ -1,6 +1,7 @@
 use litchi_markdown::reader::{
     BlockKind, Dialect, Error, History, HistoryLimits, InlineKind, JoinError, Patch,
-    PatchEnvelopeLimits, ReadLimits, ReferenceKind, Snapshot,
+    PatchEnvelopeLimits, ProjectionCapabilities, ProjectionIssueKind, ReadLimits, ReferenceKind,
+    Snapshot,
 };
 
 #[test]
@@ -98,6 +99,119 @@ fn nested_containers_count_as_one_top_level_block() -> Result<(), Error> {
         snapshot.block(0).map(|block| block.kind()),
         Some(BlockKind::List { start: Some(1) })
     );
+    let descendants: Vec<_> = snapshot
+        .block(0)
+        .ok_or(Error::BlockNotFound { position: 0 })?
+        .descendants()
+        .collect();
+    assert!(
+        descendants
+            .iter()
+            .any(|block| block.kind() == BlockKind::ListItem)
+    );
+    assert!(
+        descendants
+            .iter()
+            .any(|block| block.kind() == BlockKind::BlockQuote)
+    );
+    assert!(descendants.iter().any(|block| block.depth() >= 3));
+    for block in descendants {
+        assert_eq!(&source[block.range()], block.source());
+    }
+    Ok(())
+}
+
+#[test]
+fn nested_and_inline_structural_edits_are_exact_and_durable() -> Result<(), Error> {
+    let source = Snapshot::read("> old *emphasis*\n\noutside **strong**")?;
+    let quote = source
+        .block(0)
+        .ok_or(Error::BlockNotFound { position: 0 })?;
+    let paragraph_position = quote
+        .descendants()
+        .position(|block| block.kind() == BlockKind::Paragraph)
+        .ok_or(Error::NestedBlockNotFound {
+            block_position: 0,
+            nested_position: 0,
+        })?;
+    let strong_position = source
+        .block(1)
+        .ok_or(Error::BlockNotFound { position: 1 })?
+        .inlines()
+        .position(|inline| inline.kind() == InlineKind::Strong)
+        .ok_or(Error::InlineNotFound {
+            block_position: 1,
+            inline_position: 0,
+        })?;
+    let mut edit = source.edit();
+    edit.replace_nested_block(0, paragraph_position, "new `code`")?
+        .replace_inline(1, strong_position, "_gentle_")?;
+    let commit = edit.commit()?;
+    assert_eq!(
+        commit.snapshot().source(),
+        "> new `code`\n\noutside _gentle_"
+    );
+    let json = commit.patch().to_json(PatchEnvelopeLimits::DEFAULT)?;
+    let restored = Patch::from_json(&json, PatchEnvelopeLimits::DEFAULT)?;
+    assert_eq!(source.apply(&restored)?.snapshot(), commit.snapshot());
+    Ok(())
+}
+
+#[test]
+fn dependency_aware_transfer_and_projection_are_preflighted() -> Result<(), Error> {
+    let source = Snapshot::read_with(
+        "[linked][id] and a note[^n]\n\n[id]: /target \"title\"\n\n[^n]: note body",
+        Dialect::GitHubFlavored,
+        ReadLimits::DEFAULT,
+    )?;
+    let destination =
+        Snapshot::read_with("Destination", Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+    let plan = source.preflight_transfer_block(0, &destination)?;
+    assert_eq!(plan.dependency_count(), 2);
+    assert_eq!(destination.source(), "Destination");
+    let transferred = plan.into_commit();
+    assert!(transferred.snapshot().references().any(|reference| {
+        reference.kind() == ReferenceKind::LinkDefinition && reference.label() == Some("id")
+    }));
+    assert!(transferred.snapshot().references().any(|reference| {
+        reference.kind() == ReferenceKind::FootnoteDefinition && reference.label() == Some("n")
+    }));
+
+    let feature_source = Snapshot::read_with(
+        "| a |\n| - |\n| b |\n\n- [x] done\n\nraw <i>x</i>[^n]\n\n[^n]: note",
+        Dialect::GitHubFlavored,
+        ReadLimits::DEFAULT,
+    )?;
+    let report = feature_source.preflight_projection(ProjectionCapabilities::default())?;
+    assert!(!report.is_lossless());
+    assert!(
+        report
+            .issues()
+            .iter()
+            .any(|issue| issue.kind() == ProjectionIssueKind::Table)
+    );
+    assert!(
+        report
+            .issues()
+            .iter()
+            .any(|issue| issue.kind() == ProjectionIssueKind::TaskList)
+    );
+    assert!(
+        feature_source
+            .preflight_projection(ProjectionCapabilities::LOSSLESS)?
+            .is_lossless()
+    );
+    Ok(())
+}
+
+#[test]
+fn checked_transfer_refuses_conflicting_destination_definition() -> Result<(), Error> {
+    let source = Snapshot::read("[use][id]\n\n[id]: /source")?;
+    let destination = Snapshot::read("[id]: /destination")?;
+    assert!(matches!(
+        source.preflight_transfer_block(0, &destination),
+        Err(Error::TransferDependencyConflict { ref label }) if label == "id"
+    ));
     Ok(())
 }
 

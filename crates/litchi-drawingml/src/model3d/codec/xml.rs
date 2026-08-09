@@ -42,7 +42,7 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_error)?;
-        let namespace = resolved_namespace(namespace)?;
+        let namespace = resolved_namespace(&namespace)?;
         let event = event.into_owned();
         let event_end = usize::try_from(reader.buffer_position())
             .map_err(|_error| invalid("model3d XML offset exceeds usize"))?;
@@ -125,7 +125,7 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
     if root_depth != 0 || !root_closed {
         return Err(invalid("model3d XML root is not closed"));
     }
-    crate::model3d::validation::validate(&metadata).map_err(validation_error)?;
+    crate::model3d::validation::validate(&metadata).map_err(|error| validation_error(&error))?;
     Ok(metadata)
 }
 
@@ -150,7 +150,7 @@ pub fn opaque(xml: &[u8]) -> Result<Inert> {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_error)?;
-        let namespace = resolved_namespace(namespace)?;
+        let namespace = resolved_namespace(&namespace)?;
         let event = event.into_owned();
         let end = usize::try_from(reader.buffer_position())
             .map_err(|_error| invalid("model3d fragment offset exceeds usize"))?;
@@ -202,7 +202,8 @@ pub fn opaque(xml: &[u8]) -> Result<Inert> {
         .get(root_start..root_end)
         .ok_or_else(|| invalid("model3d inert fragment range is outside the input"))?;
     let value = Inert::from_wire(raw.to_vec(), local, namespace);
-    crate::model3d::validation::validate_inert_fragment(&value).map_err(validation_error)?;
+    crate::model3d::validation::validate_inert_fragment(&value)
+        .map_err(|error| validation_error(&error))?;
     Ok(value)
 }
 
@@ -212,7 +213,7 @@ pub fn opaque(xml: &[u8]) -> Result<Inert> {
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write(metadata: &Metadata) -> Result<Vec<u8>> {
-    crate::model3d::validation::validate(metadata).map_err(validation_error)?;
+    crate::model3d::validation::validate(metadata).map_err(|error| validation_error(&error))?;
     let mut output = Vec::new();
     write_inner(&mut output, metadata);
     if output.len() > super::super::MAX_XML_BYTES {
@@ -247,7 +248,8 @@ fn push_child(
             .push(Child::Raster(parse_raster(&raw, &metadata.namespaces)?));
     } else {
         let value = Inert::from_wire(raw, local, namespace);
-        crate::model3d::validation::validate_inert_fragment(&value).map_err(validation_error)?;
+        crate::model3d::validation::validate_inert_fragment(&value)
+            .map_err(|error| validation_error(&error))?;
         metadata.children.push(Child::Opaque(value));
     }
     Ok(())
@@ -357,7 +359,8 @@ fn push_raster_child(
         children.push(RasterChild::Blip(parse_blip(&raw, namespaces)?));
     } else {
         let value = Inert::from_wire(raw, local, namespace);
-        crate::model3d::validation::validate_inert_fragment(&value).map_err(validation_error)?;
+        crate::model3d::validation::validate_inert_fragment(&value)
+            .map_err(|error| validation_error(&error))?;
         children.push(RasterChild::Opaque(value));
     }
     Ok(())
@@ -811,11 +814,7 @@ fn local_name(name: &QName<'_>) -> Result<String> {
         .map_err(xml_error)
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "quick_xml yields namespace resolution tokens by value at the event boundary"
-)]
-fn resolved_namespace(namespace: ResolveResult<'_>) -> Result<String> {
+fn resolved_namespace(namespace: &ResolveResult<'_>) -> Result<String> {
     match namespace {
         ResolveResult::Bound(namespace) => std::str::from_utf8(namespace.as_ref())
             .map(str::to_owned)
@@ -836,11 +835,7 @@ fn require_root(local: &str, namespace: &str) -> Result<()> {
     Ok(())
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "map_err transfers the typed validation failure into the public error"
-)]
-fn validation_error(error: crate::model3d::Error) -> Error {
+fn validation_error(error: &crate::model3d::Error) -> Error {
     Error::Invalid(error.to_string())
 }
 

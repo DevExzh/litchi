@@ -1,19 +1,20 @@
 //! Durable semantic patches, disjoint composition, and bounded history.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_core::patch::{
-    BlobBundle, BlobId, JoinedSubEdits, Patch as CorePatch, PatchLimits, PatchOperation,
-    Reversible, ReversibleOperation, SubEdit,
+    BlobBundle, BlobId, JoinedSubEdits, MergeChoice, Patch as CorePatch, PatchLimits,
+    PatchOperation, Reversible, ReversibleOperation, SubEdit, ThreeWayMergeFailure,
+    ThreeWayMergePlan,
 };
 use serde_json::Value;
 
 use super::{
     Commit, CompositionLimits, Edit, HistoryLimits, MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS,
-    Operation, Patch, Snapshot, TransactionError, TransactionResult,
+    Operation, Patch, RevisionKind, Snapshot, TransactionError, TransactionResult,
 };
 
 const FORMAT_NAME: &str = "litchi-docx/document";
@@ -142,6 +143,89 @@ impl fmt::Debug for Composition {
     }
 }
 
+/// Recoverable failure to plan two independently composed branches.
+pub struct ThreeWayError {
+    failure: ThreeWayMergeFailure,
+    left: Box<Composition>,
+    right: Box<Composition>,
+}
+
+impl ThreeWayError {
+    /// Structured shared planning failure.
+    #[must_use]
+    pub const fn failure(&self) -> &ThreeWayMergeFailure {
+        &self.failure
+    }
+
+    /// Recover both unchanged branches.
+    #[must_use]
+    pub fn into_branches(self) -> (Composition, Composition) {
+        (*self.left, *self.right)
+    }
+}
+
+impl fmt::Debug for ThreeWayError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ThreeWayError")
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Non-mutating bounded three-way plan for two branches from one exact base.
+pub struct ThreeWayPlan {
+    source: Snapshot,
+    inner: ThreeWayMergePlan<Lineage, Vec<Operation>>,
+}
+
+impl ThreeWayPlan {
+    /// Deterministically ordered semantic overlaps requiring a choice.
+    #[must_use]
+    pub const fn conflicts(
+        &self,
+    ) -> &litchi_core::patch::ConflictSet<litchi_core::patch::SubEditConflict> {
+        self.inner.conflicts()
+    }
+
+    /// Whether every branch edit is automatically disjoint.
+    #[must_use]
+    pub fn is_clean(&self) -> bool {
+        self.inner.conflicts().is_empty()
+    }
+
+    /// Resolve the complete conservative conflict group.
+    pub fn resolve(&mut self, choice: MergeChoice) -> &mut Self {
+        self.inner.resolve(choice);
+        self
+    }
+
+    /// Finish planning and retain complete staged work for atomic commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns this unchanged plan while conflicts remain unresolved.
+    pub fn finish(self) -> Result<Composition, Box<Self>> {
+        let Self { source, inner } = self;
+        match inner.finish() {
+            Ok(joined) => Ok(Composition { source, joined }),
+            Err(unresolved) => Err(Box::new(Self {
+                source,
+                inner: *unresolved,
+            })),
+        }
+    }
+}
+
+impl fmt::Debug for ThreeWayPlan {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ThreeWayPlan")
+            .field("conflicts", self.conflicts())
+            .finish_non_exhaustive()
+    }
+}
+
 /// Explicit byte-budgeted undo/redo history for document snapshots.
 pub struct History {
     inner: litchi_core::patch::History<Snapshot>,
@@ -178,6 +262,30 @@ impl History {
     #[must_use]
     pub const fn retained_weight(&self) -> u64 {
         self.inner.retained_weight()
+    }
+
+    /// Configured finite retention bounds.
+    #[must_use]
+    pub const fn limits(&self) -> HistoryLimits {
+        self.inner.limits()
+    }
+
+    pub(crate) fn ensure_can_record(&self, commit: &Commit) -> TransactionResult<()> {
+        let bytes = u64::try_from(commit.snapshot().xml_bytes().len()).map_err(|_error| {
+            TransactionError::Limit {
+                resource: "history transition bytes",
+                max: usize::MAX,
+                actual: commit.snapshot().xml_bytes().len(),
+            }
+        })?;
+        if bytes > self.limits().max_weight() {
+            return Err(litchi_core::patch::PatchError::HistoryWeight {
+                observed: bytes,
+                limit: self.limits().max_weight(),
+            }
+            .into());
+        }
+        Ok(())
     }
 
     /// Record a commit using its exact published XML size as transition weight.
@@ -217,6 +325,47 @@ impl Snapshot {
         Composition {
             source: self.clone(),
             joined: JoinedSubEdits::new(self.lineage(), limits),
+        }
+    }
+
+    /// Plan two independently composed branches without applying either one.
+    ///
+    /// # Errors
+    ///
+    /// Returns both branches intact when exact lineage or finite bounds differ,
+    /// or when the shared planner cannot retain the complete conflict set.
+    pub fn plan_three_way(
+        &self,
+        left: Composition,
+        right: Composition,
+    ) -> Result<ThreeWayPlan, ThreeWayError> {
+        if !self.same_source(&left.source) || !self.same_source(&right.source) {
+            return Err(ThreeWayError {
+                failure: ThreeWayMergeFailure::DifferentLineage,
+                left: Box::new(left),
+                right: Box::new(right),
+            });
+        }
+        let source = self.clone();
+        let left_source = left.source.clone();
+        let right_source = right.source.clone();
+        match ThreeWayMergePlan::new(left.joined, right.joined) {
+            Ok(inner) => Ok(ThreeWayPlan { source, inner }),
+            Err(error) => {
+                let failure = error.failure().clone();
+                let (left_joined, right_joined) = error.into_branches();
+                Err(ThreeWayError {
+                    failure,
+                    left: Box::new(Composition {
+                        source: left_source,
+                        joined: left_joined,
+                    }),
+                    right: Box::new(Composition {
+                        source: right_source,
+                        joined: right_joined,
+                    }),
+                })
+            },
         }
     }
 
@@ -266,14 +415,14 @@ impl Snapshot {
         {
             return restore_snapshot(patch);
         }
-        if !patch.blobs().is_empty()
-            || patch
-                .operations()
-                .iter()
-                .any(|operation| operation.op == RESTORE_OPERATION)
+        if patch
+            .operations()
+            .iter()
+            .any(|operation| operation.op == RESTORE_OPERATION)
         {
             return Err(invalid_durable("invalid semantic blob bundle"));
         }
+        validate_semantic_blobs(patch)?;
         let expected_target = common_target_artifact(patch)?;
 
         let mut edit = self.edit();
@@ -285,7 +434,7 @@ impl Snapshot {
             {
                 continue;
             }
-            let semantic = parse_durable_operation(operation)?;
+            let semantic = parse_durable_operation(operation, patch.blobs())?;
             edit.apply_operation(&semantic)?;
         }
         let committed = edit.commit()?.snapshot;
@@ -313,7 +462,7 @@ impl Edit {
         limits: CompositionLimits,
         identifier: impl Into<String>,
     ) -> TransactionResult<PreparedEdit> {
-        let (reads, writes) = operation_effects(&self.operations);
+        let (reads, writes) = operation_effects(&self.operations, self.base.paragraph_count());
         let inner = SubEdit::new(
             self.base.lineage(),
             limits,
@@ -340,6 +489,7 @@ impl Patch {
     ) -> Result<CorePatch<Reversible>, TransactionError> {
         let forward_artifact = BlobId::of(self.before.xml_bytes()).as_hex();
         let reverse_artifact = BlobId::of(self.after.xml_bytes()).as_hex();
+        let mut forward_blobs = BlobBundle::new(limits.blobs());
         let mut reverse_blobs = BlobBundle::new(limits.blobs());
         let source_blob = reverse_blobs.insert(self.before.xml_bytes())?;
         let operations = if self.operations.is_empty() {
@@ -352,7 +502,13 @@ impl Patch {
                 .iter()
                 .map(|operation| {
                     Ok(ReversibleOperation::new(
-                        durable_operation(limits, operation, &forward_artifact, &reverse_artifact)?,
+                        durable_operation(
+                            limits,
+                            operation,
+                            &forward_artifact,
+                            &reverse_artifact,
+                            &mut forward_blobs,
+                        )?,
                         restore_operation(limits, &reverse_artifact, &source_blob)?,
                     ))
                 })
@@ -362,14 +518,17 @@ impl Patch {
             limits,
             FORMAT_NAME,
             operations,
-            BlobBundle::new(limits.blobs()),
+            forward_blobs,
             reverse_blobs,
         )
         .map_err(TransactionError::from)
     }
 }
 
-fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
+fn operation_effects(
+    operations: &[Operation],
+    source_paragraphs: usize,
+) -> (Vec<String>, Vec<String>) {
     let mut reads = Vec::new();
     let mut writes = Vec::new();
     for operation in operations {
@@ -391,6 +550,51 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
                     hyperlink.get()
                 ));
             },
+            Operation::ReplaceRunText { paragraph, run, .. } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/run:{}/text",
+                    paragraph.get(),
+                    run.get()
+                ));
+            },
+            Operation::ReplaceSimpleFieldText {
+                paragraph, field, ..
+            } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/field:{}/result-text",
+                    paragraph.get(),
+                    field.get()
+                ));
+            },
+            Operation::ReplaceRevisionText {
+                paragraph,
+                kind,
+                revision,
+                ..
+            } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/revision:{kind:?}:{}/text",
+                    paragraph.get(),
+                    revision.get()
+                ));
+            },
+            Operation::ReplaceContentControlText {
+                paragraph, control, ..
+            } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/content-control:{}/text",
+                    paragraph.get(),
+                    control.get()
+                ));
+            },
             Operation::ReplaceCellText {
                 table, row, cell, ..
             } => writes.push(format!(
@@ -399,7 +603,41 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
                 row.get(),
                 cell.get()
             )),
-            Operation::InsertParagraph { .. } | Operation::RemoveParagraph { .. } => {
+            Operation::ReplaceCellParagraphText {
+                table,
+                row,
+                cell,
+                paragraph,
+                ..
+            } => {
+                reads.push(format!(
+                    "body/table:{}/row:{}/cell:{}/text",
+                    table.get(),
+                    row.get(),
+                    cell.get()
+                ));
+                writes.push(format!(
+                    "body/table:{}/row:{}/cell:{}/paragraph:{}/text",
+                    table.get(),
+                    row.get(),
+                    cell.get(),
+                    paragraph.get()
+                ));
+            },
+            Operation::InsertParagraph { position, .. }
+            | Operation::InsertTransferredParagraph { position, .. }
+                if position.get() >= source_paragraphs =>
+            {
+                // Appending preserves every source paragraph selector. The
+                // order read still conflicts with a shifting edit, while the
+                // boundary write prevents two independent appends.
+                reads.push("body/paragraph-order".to_owned());
+                writes.push("body/paragraph-append-boundary".to_owned());
+            },
+            Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::InsertTransferredParagraph { .. }
+            | Operation::RemoveTransferredParagraph { .. } => {
                 writes.push("body/paragraph-order".to_owned());
             },
         }
@@ -412,6 +650,7 @@ fn durable_operation(
     operation: &Operation,
     artifact: &str,
     target_artifact: &str,
+    blobs: &mut BlobBundle,
 ) -> Result<PatchOperation, litchi_core::patch::PatchError> {
     let mut preconditions = artifact_precondition(artifact);
     preconditions.insert(
@@ -448,6 +687,66 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Operation::ReplaceRunText {
+            paragraph,
+            run,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "run.text.replace",
+                format!("paragraph:{}/run:{}", paragraph.get(), run.get()),
+                Value::String(after.clone()),
+            )
+        },
+        Operation::ReplaceSimpleFieldText {
+            paragraph,
+            field,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "field.result-text.replace",
+                format!("paragraph:{}/field:{}", paragraph.get(), field.get()),
+                Value::String(after.clone()),
+            )
+        },
+        Operation::ReplaceRevisionText {
+            paragraph,
+            kind,
+            revision,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                match kind {
+                    RevisionKind::Insertion => "revision.insertion-text.replace",
+                    RevisionKind::Deletion => "revision.deletion-text.replace",
+                },
+                format!("paragraph:{}/revision:{}", paragraph.get(), revision.get()),
+                Value::String(after.clone()),
+            )
+        },
+        Operation::ReplaceContentControlText {
+            paragraph,
+            control,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "content-control.text.replace",
+                format!(
+                    "paragraph:{}/content-control:{}",
+                    paragraph.get(),
+                    control.get()
+                ),
+                Value::String(after.clone()),
+            )
+        },
         Operation::ReplaceCellText {
             table,
             row,
@@ -467,6 +766,27 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Operation::ReplaceCellParagraphText {
+            table,
+            row,
+            cell,
+            paragraph,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "cell.paragraph-text.replace",
+                format!(
+                    "table:{}/row:{}/cell:{}/paragraph:{}",
+                    table.get(),
+                    row.get(),
+                    cell.get(),
+                    paragraph.get()
+                ),
+                Value::String(after.clone()),
+            )
+        },
         Operation::InsertParagraph { position, text } => (
             "paragraph.insert",
             format!("paragraph:{}", position.get()),
@@ -477,6 +797,38 @@ fn durable_operation(
             format!("paragraph:{}", position.get()),
             Value::String(text.clone()),
         ),
+        Operation::InsertTransferredParagraph {
+            position,
+            xml,
+            dependency_digest,
+        } => {
+            preconditions.insert(
+                "dependency_sha256".to_owned(),
+                Value::String(dependency_digest.to_string()),
+            );
+            let identifier = blobs.insert(xml.as_slice())?;
+            (
+                "paragraph.transfer.insert",
+                format!("paragraph:{}", position.get()),
+                Value::String(identifier.as_hex()),
+            )
+        },
+        Operation::RemoveTransferredParagraph {
+            position,
+            xml,
+            dependency_digest,
+        } => {
+            preconditions.insert(
+                "dependency_sha256".to_owned(),
+                Value::String(dependency_digest.to_string()),
+            );
+            let identifier = blobs.insert(xml.as_slice())?;
+            (
+                "paragraph.transfer.remove",
+                format!("paragraph:{}", position.get()),
+                Value::String(identifier.as_hex()),
+            )
+        },
     };
     PatchOperation::new(limits, name, target, preconditions, value)
 }
@@ -521,7 +873,10 @@ fn artifact_precondition(artifact: &str) -> BTreeMap<String, Value> {
     )])
 }
 
-fn parse_durable_operation(operation: &PatchOperation) -> TransactionResult<Operation> {
+fn parse_durable_operation(
+    operation: &PatchOperation,
+    blobs: &BlobBundle,
+) -> TransactionResult<Operation> {
     let before = || {
         operation
             .preconditions
@@ -554,12 +909,68 @@ fn parse_durable_operation(operation: &PatchOperation) -> TransactionResult<Oper
                 after: after()?,
             })
         },
+        "run.text.replace" if operation.preconditions.len() == 3 => {
+            let (paragraph, run) = parse_paragraph_child_target(&operation.target, "/run:")?;
+            Ok(Operation::ReplaceRunText {
+                paragraph,
+                run,
+                before: before()?,
+                after: after()?,
+            })
+        },
+        "field.result-text.replace" if operation.preconditions.len() == 3 => {
+            let (paragraph, field) = parse_paragraph_child_target(&operation.target, "/field:")?;
+            Ok(Operation::ReplaceSimpleFieldText {
+                paragraph,
+                field,
+                before: before()?,
+                after: after()?,
+            })
+        },
+        "revision.insertion-text.replace" | "revision.deletion-text.replace"
+            if operation.preconditions.len() == 3 =>
+        {
+            let (paragraph, revision) =
+                parse_paragraph_child_target(&operation.target, "/revision:")?;
+            Ok(Operation::ReplaceRevisionText {
+                paragraph,
+                kind: if operation.op == "revision.insertion-text.replace" {
+                    RevisionKind::Insertion
+                } else {
+                    RevisionKind::Deletion
+                },
+                revision,
+                before: before()?,
+                after: after()?,
+            })
+        },
+        "content-control.text.replace" if operation.preconditions.len() == 3 => {
+            let (paragraph, control) =
+                parse_paragraph_child_target(&operation.target, "/content-control:")?;
+            Ok(Operation::ReplaceContentControlText {
+                paragraph,
+                control,
+                before: before()?,
+                after: after()?,
+            })
+        },
         "cell.text.replace" if operation.preconditions.len() == 3 => {
             let (table, row, cell) = parse_cell_target(&operation.target)?;
             Ok(Operation::ReplaceCellText {
                 table,
                 row,
                 cell,
+                before: before()?,
+                after: after()?,
+            })
+        },
+        "cell.paragraph-text.replace" if operation.preconditions.len() == 3 => {
+            let (table, row, cell, paragraph) = parse_cell_paragraph_target(&operation.target)?;
+            Ok(Operation::ReplaceCellParagraphText {
+                table,
+                row,
+                cell,
+                paragraph,
                 before: before()?,
                 after: after()?,
             })
@@ -576,8 +987,73 @@ fn parse_durable_operation(operation: &PatchOperation) -> TransactionResult<Oper
                 text: after()?,
             })
         },
+        "paragraph.transfer.insert" | "paragraph.transfer.remove"
+            if operation.preconditions.len() == 3 =>
+        {
+            let identifier = operation
+                .value
+                .as_str()
+                .ok_or_else(|| invalid_durable("transfer value must be a blob identifier"))?;
+            let blob_id = blobs
+                .ids()
+                .find(|candidate| candidate.as_hex() == identifier)
+                .ok_or_else(|| invalid_durable("missing transfer paragraph blob"))?;
+            let bytes = blobs
+                .get(blob_id)
+                .ok_or_else(|| invalid_durable("missing transfer paragraph blob"))?;
+            let xml = Arc::new(bytes.to_vec());
+            let dependency_digest = operation
+                .preconditions
+                .get("dependency_sha256")
+                .and_then(Value::as_str)
+                .map(Arc::<str>::from)
+                .ok_or_else(|| invalid_durable("missing transfer dependency precondition"))?;
+            let position = parse_single_target(&operation.target, "paragraph:")?;
+            if operation.op == "paragraph.transfer.insert" {
+                Ok(Operation::InsertTransferredParagraph {
+                    position,
+                    xml,
+                    dependency_digest,
+                })
+            } else {
+                Ok(Operation::RemoveTransferredParagraph {
+                    position,
+                    xml,
+                    dependency_digest,
+                })
+            }
+        },
         _ => Err(invalid_durable("unsupported operation vocabulary")),
     }
+}
+
+fn validate_semantic_blobs<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<()> {
+    let referenced = patch
+        .operations()
+        .iter()
+        .filter(|operation| {
+            matches!(
+                operation.op.as_str(),
+                "paragraph.transfer.insert" | "paragraph.transfer.remove"
+            )
+        })
+        .map(|operation| {
+            operation
+                .value
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| invalid_durable("transfer value must be a blob identifier"))
+        })
+        .collect::<TransactionResult<BTreeSet<_>>>()?;
+    if referenced.len() != patch.blobs().len()
+        || patch
+            .blobs()
+            .ids()
+            .any(|identifier| !referenced.contains(&identifier.as_hex()))
+    {
+        return Err(invalid_durable("unreferenced semantic blob"));
+    }
+    Ok(())
 }
 
 fn common_target_artifact<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<&str> {
@@ -642,13 +1118,20 @@ fn parse_single_target(target: &str, prefix: &str) -> TransactionResult<Position
 }
 
 fn parse_hyperlink_target(target: &str) -> TransactionResult<(Position, Position)> {
+    parse_paragraph_child_target(target, "/hyperlink:")
+}
+
+fn parse_paragraph_child_target(
+    target: &str,
+    separator: &str,
+) -> TransactionResult<(Position, Position)> {
     let rest = target
         .strip_prefix("paragraph:")
-        .ok_or_else(|| invalid_durable("invalid hyperlink target"))?;
-    let (paragraph, hyperlink) = rest
-        .split_once("/hyperlink:")
-        .ok_or_else(|| invalid_durable("invalid hyperlink target"))?;
-    Ok((parse_position(paragraph)?, parse_position(hyperlink)?))
+        .ok_or_else(|| invalid_durable("invalid paragraph child target"))?;
+    let (paragraph, child) = rest
+        .split_once(separator)
+        .ok_or_else(|| invalid_durable("invalid paragraph child target"))?;
+    Ok((parse_position(paragraph)?, parse_position(child)?))
 }
 
 fn parse_cell_target(target: &str) -> TransactionResult<(Position, Position, Position)> {
@@ -666,6 +1149,16 @@ fn parse_cell_target(target: &str) -> TransactionResult<(Position, Position, Pos
         parse_position(row)?,
         parse_position(cell)?,
     ))
+}
+
+fn parse_cell_paragraph_target(
+    target: &str,
+) -> TransactionResult<(Position, Position, Position, Position)> {
+    let (cell_target, paragraph) = target
+        .split_once("/paragraph:")
+        .ok_or_else(|| invalid_durable("invalid cell paragraph target"))?;
+    let (table, row, cell) = parse_cell_target(cell_target)?;
+    Ok((table, row, cell, parse_position(paragraph)?))
 }
 
 fn parse_position(value: &str) -> TransactionResult<Position> {

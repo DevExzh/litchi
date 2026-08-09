@@ -1,8 +1,8 @@
 //! Atomic semantic transactions over an opened presentation.
 //!
-//! This owner deliberately edits only existing slide-order entries, existing
-//! shape text runs, and existing notes text runs. Every other OPC part,
-//! relationship, and unknown XML byte remains outside the write set.
+//! One immutable root composes slide/text/notes edits with ordinary charts,
+//! media, table styles, comments, master/layout authoring, and dependency
+//! relationship transfer. Publication uses an exact finite OPC resource patch.
 
 mod model;
 mod patch;
@@ -13,7 +13,7 @@ mod xml;
 mod tests;
 
 pub use model::{Limits, Slide, Snapshot};
-pub use patch::{History, Patch};
+pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 pub use transaction::{Commit, Transaction};
 
 pub(crate) use model::capture;

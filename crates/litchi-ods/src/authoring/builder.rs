@@ -499,7 +499,7 @@ mod tests {
                 r#"<office:document-content xmlns:office="{OFFICE}"><office:body>"#
             ))
             .build()
-            .unwrap_err()
+            .expect_err("test operation should fail as asserted")
             .to_string();
         assert!(malformed.contains("ended before its root element was closed"));
 
@@ -508,7 +508,7 @@ mod tests {
                 r#"<office:document-content xmlns:office="{OFFICE}"><office:body/></office:document-content>"#
             ))
             .build()
-            .unwrap_err()
+            .expect_err("test operation should fail as asserted")
             .to_string();
         assert!(incomplete.contains("office:spreadsheet"));
     }

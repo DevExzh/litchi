@@ -5,13 +5,17 @@ use super::{
     MAX_DECLARATIONS, MAX_DEPTH, MAX_GROUPS, MAX_NAME_BYTES, MAX_VALUE_BYTES, MAX_XML_BYTES,
     OFFICE, Part, STYLE, Scope, TEXT, Value, ValueType,
 };
+use crate::core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication};
 use crate::datatype::{Boolean, Date};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Range,
+};
 
 #[derive(Clone, Copy)]
 struct GroupSpan {
@@ -22,6 +26,7 @@ struct GroupSpan {
 
 struct ScopeScan {
     opening_end: usize,
+    parent_span: Range<usize>,
     groups: Vec<GroupSpan>,
     first_other_child: Option<usize>,
     empty_parent: Option<EmptyParentSpan>,
@@ -56,7 +61,6 @@ pub fn set_xml(xml: &str, group: &Group) -> Result<String> {
     if let Some(parent) = scan.empty_parent.as_ref() {
         return expand_empty_parent(xml, parent, &replacement);
     }
-    let desired_order = kind_order(group.kind);
     if let Some(existing) = scan
         .groups
         .iter()
@@ -65,15 +69,86 @@ pub fn set_xml(xml: &str, group: &Group) -> Result<String> {
         return replace_range(xml, existing.start, existing.end, &replacement);
     }
 
-    let insertion = scan
+    let insertion = group_insertion(&scan, group.kind);
+    replace_range(xml, insertion, insertion, &replacement)
+}
+
+pub(crate) fn splice_publication(
+    package: &OwnedPackage,
+    path: &str,
+    candidate: &str,
+    scope: &Scope,
+    kind: Kind,
+) -> Result<XmlSplicePublication> {
+    let source = XmlSourcePart::load(package, path)?;
+    let source_xml = std::str::from_utf8(source.bytes()).map_err(|error| {
+        Error::InvalidFormat(format!("invalid UTF-8 in source {path}: {error}"))
+    })?;
+    let source_scan = scan_scope(source_xml, scope)?;
+    let candidate_scan = scan_scope(candidate, scope)?;
+    let source_group = source_scan.groups.iter().find(|group| group.kind == kind);
+    let candidate_group = candidate_scan
         .groups
+        .iter()
+        .find(|group| group.kind == kind);
+    let expanded_parent = source_scan.empty_parent.is_some() && candidate_group.is_some();
+    let source_range = if expanded_parent {
+        source_scan.parent_span.clone()
+    } else {
+        source_group.map_or_else(
+            || {
+                let insertion = group_insertion(&source_scan, kind);
+                insertion..insertion
+            },
+            |group| group.start..group.end,
+        )
+    };
+    let candidate_range = if expanded_parent {
+        candidate_scan.parent_span
+    } else {
+        candidate_group.map_or_else(
+            || {
+                let insertion = group_insertion(&candidate_scan, kind);
+                insertion..insertion
+            },
+            |group| group.start..group.end,
+        )
+    };
+    if source_xml.get(..source_range.start) != candidate.get(..candidate_range.start)
+        || source_xml.get(source_range.end..) != candidate.get(candidate_range.end..)
+    {
+        return Err(invalid(
+            "variable declaration mutation escaped its checked XML range",
+        ));
+    }
+    let expected = source_xml
+        .as_bytes()
+        .get(source_range.clone())
+        .ok_or_else(|| invalid("invalid source variable declaration splice range"))?;
+    let replacement = candidate
+        .as_bytes()
+        .get(candidate_range)
+        .ok_or_else(|| invalid("invalid candidate variable declaration splice range"))?;
+    let proof = source.checked_range(source_range, expected)?;
+    let fragment = if replacement.is_empty() {
+        AuthoredXmlFragment::deletion()
+    } else {
+        AuthoredXmlFragment::markup(replacement.to_vec())?
+    };
+    let mut publication = XmlSplicePublication::new(source);
+    publication.replace(proof, fragment)?;
+    Ok(publication)
+}
+
+fn group_insertion(scan: &ScopeScan, kind: Kind) -> usize {
+    let desired_order = kind_order(kind);
+    scan.groups
         .iter()
         .find(|candidate| kind_order(candidate.kind) > desired_order)
         .map(|candidate| candidate.start)
         .or(scan.first_other_child)
         .or_else(|| scan.groups.last().map(|candidate| candidate.end))
-        .unwrap_or(scan.opening_end);
-    replace_range(xml, insertion, insertion, &replacement)
+        .unwrap_or(scan.opening_end)
 }
 
 /// Remove one declaration container from a structural scope.
@@ -283,6 +358,8 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
     let mut stack = Vec::<Frame>::new();
     let mut depth = 0usize;
     let mut parent_depth = None;
+    let mut parent_start = None;
+    let mut parent_end = None;
     let mut opening_end = None;
     let mut active_group: Option<(Kind, usize, usize)> = None;
     let mut groups = Vec::new();
@@ -306,6 +383,7 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
                         return Err(invalid("variable declaration scope is ambiguous"));
                     }
                     opening_end = Some(event_end);
+                    parent_start = Some(event_start);
                     parent_depth = Some(depth + 1);
                 } else if parent_depth == Some(depth) {
                     if let Some(kind) = container_kind(namespace.as_deref(), &local) {
@@ -347,6 +425,8 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
                         return Err(invalid("variable declaration scope is ambiguous"));
                     }
                     opening_end = Some(event_end);
+                    parent_start = Some(event_start);
+                    parent_end = Some(event_end);
                     empty_parent = Some(EmptyParentSpan {
                         start: event_start,
                         end: event_end,
@@ -378,6 +458,7 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
                     active_group = None;
                 }
                 if parent_depth == Some(depth) {
+                    parent_end = Some(event_end);
                     parent_depth = None;
                 }
                 depth = depth
@@ -398,6 +479,10 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
     }
     let opening_end =
         opening_end.ok_or_else(|| invalid("variable declaration scope was not found"))?;
+    let parent_span = parent_start
+        .zip(parent_end)
+        .map(|(start, end)| start..end)
+        .ok_or_else(|| invalid("variable declaration scope span was not found"))?;
     let mut previous_order = None;
     for group in &groups {
         let order = kind_order(group.kind);
@@ -410,6 +495,7 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
     }
     Ok(ScopeScan {
         opening_end,
+        parent_span,
         groups,
         first_other_child,
         empty_parent,

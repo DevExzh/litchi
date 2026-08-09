@@ -231,6 +231,7 @@ pub fn plan_put_with(
         external: false,
     });
     let destination_parts = planned.iter().map(|part| part.name.clone()).collect();
+    drop(task_panes);
     Patch::planned(
         package,
         PatchPlan {

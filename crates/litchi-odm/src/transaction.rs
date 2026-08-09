@@ -15,7 +15,7 @@ use crate::{Master, link::Selector};
 
 pub use crate::edit_ops::{
     ResourceChange, ResourceSpec, SectionChange, SectionSpec, SecurityPolicy, StyleChange,
-    StyleSpec,
+    StyleSpec, SubdocumentSpec,
 };
 
 const MAX_PACKAGE_BYTES: usize = 256 * 1024 * 1024;
@@ -73,13 +73,19 @@ impl<'source> Edit<'source> {
     pub fn set_title(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         let title = value.into();
         crate::title::validate_title(&title)?;
-        self.title_after = Some(title);
+        self.title_after = Some(title.clone());
+        if let Some(metadata) = &mut self.metadata {
+            metadata.title = Some(title);
+        }
         Ok(self)
     }
 
     /// Stages removal of the title element.
     pub fn clear_title(&mut self) -> &mut Self {
         self.title_after = None;
+        if let Some(metadata) = &mut self.metadata {
+            metadata.title = None;
+        }
         self
     }
 
@@ -145,8 +151,102 @@ impl<'source> Edit<'source> {
         {
             return Err(invalid("ODM section style does not exist"));
         }
+        if section
+            .subdocument()
+            .is_some_and(|subdocument| is_external_target(subdocument.href()))
+            && !self.policy.allows_external_targets()
+        {
+            return Err(invalid(
+                "ODM security policy refuses an external linked section",
+            ));
+        }
         self.sections.push(SectionChange::Add(section));
         Ok(self)
+    }
+
+    /// Copies one linked section and its package resource from another master.
+    ///
+    /// The destination must already contain the referenced section style, if
+    /// any. This prevents a partial transfer which silently loses styling.
+    /// The source package is never recursively opened or executed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a non-linked or external source section, a missing
+    /// style dependency, an existing destination path, or a policy violation.
+    pub fn transfer_linked_section(
+        &mut self,
+        source: &Master,
+        position: Position,
+        destination_name: impl Into<String>,
+        destination_path: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let node = source
+            .section_tree()
+            .get(position)
+            .ok_or_else(|| invalid("ODM transfer section selector is out of bounds"))?;
+        let reference_position = node
+            .reference()
+            .ok_or_else(|| invalid("ODM transfer source section is not linked"))?;
+        let reference = source
+            .subdocuments()
+            .get(reference_position.get())
+            .ok_or_else(|| invalid("ODM transfer subdocument dependency disappeared"))?;
+        let crate::subdocument::Target::Package(source_path) = reference.target() else {
+            return Err(invalid(
+                "ODM linked-section transfer requires a package target",
+            ));
+        };
+        let destination_path = destination_path.into();
+        if self
+            .source
+            .resources()
+            .resources()
+            .iter()
+            .any(|resource| resource.path() == destination_path)
+            || self.resources.contains_key(&destination_path)
+        {
+            return Err(invalid(
+                "ODM linked-section transfer destination already exists",
+            ));
+        }
+        if let Some(style_name) = node.style_name()
+            && !transfer_style_dependency_is_satisfied(
+                self.source,
+                &self.styles,
+                source,
+                style_name,
+            )?
+        {
+            return Err(invalid(
+                "ODM linked-section transfer has an unresolved style dependency",
+            ));
+        }
+        let source_resource = source
+            .resources()
+            .resources()
+            .iter()
+            .find(|resource| resource.path() == source_path)
+            .ok_or_else(|| invalid("ODM transfer package resource is missing"))?;
+        let resource = ResourceSpec::new(
+            destination_path.clone(),
+            source_resource
+                .media_type()
+                .unwrap_or("application/octet-stream"),
+            source.resource_bytes(source_path)?,
+        )?;
+        let mut subdocument = SubdocumentSpec::new(destination_path)?;
+        if let Some(source_section) = reference.source_section() {
+            subdocument = subdocument.with_source_section(source_section)?;
+        }
+        if let Some(filter_name) = reference.filter_name() {
+            subdocument = subdocument.with_filter_name(filter_name)?;
+        }
+        let mut section = SectionSpec::new(destination_name)?.with_subdocument(subdocument);
+        if let Some(style_name) = node.style_name() {
+            section = section.with_style(style_name)?;
+        }
+        self.put_resource(resource)?.add_section(section)
     }
 
     /// Renames one source section and its modeled local-section references.
@@ -198,6 +298,60 @@ impl<'source> Edit<'source> {
         self.sections
             .push(SectionChange::Remove { position, before });
         Ok(self)
+    }
+
+    /// Removes one section subtree and package resources referenced only by it.
+    ///
+    /// Shared resources remain in place. Local-section dependencies are
+    /// checked during atomic publication.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale selector or unreadable resource closure.
+    pub fn remove_section_with_orphaned_resources(
+        &mut self,
+        position: Position,
+    ) -> Result<&mut Self> {
+        let root = self
+            .source
+            .section_tree()
+            .get(position)
+            .ok_or_else(|| invalid("ODM section selector is out of bounds"))?;
+        let mut orphaned = Vec::new();
+        orphaned
+            .try_reserve(self.source.resources().resources().len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODM orphaned section resources",
+                source,
+            })?;
+        for resource in self.source.resources().resources() {
+            if resource.references().is_empty() {
+                continue;
+            }
+            let referenced_only_by_subtree = resource.references().iter().all(|reference| {
+                self.source
+                    .subdocuments()
+                    .get(reference.get())
+                    .and_then(|linked| {
+                        self.source
+                            .section_tree()
+                            .sections()
+                            .iter()
+                            .find(|section| section.name() == linked.section())
+                    })
+                    .is_some_and(|section| {
+                        root.source_span.start <= section.source_span.start
+                            && section.source_span.end <= root.source_span.end
+                    })
+            });
+            if referenced_only_by_subtree {
+                orphaned.push(resource.path().to_owned());
+            }
+        }
+        for path in orphaned {
+            self.remove_resource(path)?;
+        }
+        self.remove_section(position)
     }
 
     /// Adds one minimal named style definition.
@@ -345,6 +499,7 @@ impl<'source> Edit<'source> {
             || !self.styles.is_empty()
             || !self.resources.is_empty();
         if !title_changed && link_changes.is_empty() && !extended_changed {
+            validate_security_policy(self.source, self.policy)?;
             return Ok(Commit::new(
                 self.source,
                 self.source.clone(),
@@ -407,6 +562,7 @@ impl<'source> Edit<'source> {
             &removed_resources,
             &resource_writes,
         )?;
+        validate_security_policy(&snapshot, self.policy)?;
         if snapshot.title() != self.title_after.as_deref() {
             return Err(invalid(
                 "ODM transaction title readback differs from the request",
@@ -686,13 +842,13 @@ impl Patch {
         if self.before.as_slice() != other.before.as_slice() {
             return Err(MergeError::DifferentSource);
         }
-        let conflicts =
-            find_conflicts(&self.changes, &other.changes).map_err(MergeError::Invalid)?;
+        let source =
+            Master::from_shared_bytes(Arc::clone(&self.before)).map_err(MergeError::Invalid)?;
+        let conflicts = find_conflicts(&self.changes, &other.changes, source.section_tree())
+            .map_err(MergeError::Invalid)?;
         if !conflicts.is_empty() {
             return Err(MergeError::Conflicts(ConflictSet::new(conflicts)));
         }
-        let source =
-            Master::from_shared_bytes(Arc::clone(&self.before)).map_err(MergeError::Invalid)?;
         let mut edit = source.edit();
         stage_changes(&mut edit, &self.changes).map_err(MergeError::Invalid)?;
         stage_changes(&mut edit, &other.changes).map_err(MergeError::Invalid)?;
@@ -708,14 +864,16 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns an error when the branches do not share an exact base or
-    /// conflict discovery cannot allocate within process limits.
+    /// Returns an error when the branches do not share an exact base, the base
+    /// cannot be reopened, or conflict discovery cannot allocate.
     pub fn plan_three_way(&self, other: &Self) -> std::result::Result<MergePlan, MergeError> {
         if self.before.as_slice() != other.before.as_slice() {
             return Err(MergeError::DifferentSource);
         }
-        let conflicts =
-            find_conflicts(&self.changes, &other.changes).map_err(MergeError::Invalid)?;
+        let source =
+            Master::from_shared_bytes(Arc::clone(&self.before)).map_err(MergeError::Invalid)?;
+        let conflicts = find_conflicts(&self.changes, &other.changes, source.section_tree())
+            .map_err(MergeError::Invalid)?;
         Ok(MergePlan {
             left: self.clone(),
             right: other.clone(),
@@ -777,8 +935,12 @@ pub enum Conflict {
     Link(Position),
     /// Both patches write simple metadata differently.
     Metadata,
+    /// Both patches divergently write one supported metadata field.
+    MetadataField(&'static str),
     /// Both patches structurally write one source section.
     Section(Position),
+    /// Both patches create divergent effects at one section destination name.
+    SectionName(String),
     /// Both patches write one style identity.
     Style(String),
     /// Both patches write one package resource path.
@@ -1049,6 +1211,37 @@ fn style_name_exists(source: &Master, staged: &[StyleChange], name: &str) -> boo
         })
 }
 
+fn transfer_style_dependency_is_satisfied(
+    destination: &Master,
+    staged: &[StyleChange],
+    source: &Master,
+    name: &str,
+) -> Result<bool> {
+    let mut source_definitions = source
+        .styles()
+        .iter()
+        .filter(|definition| definition.name() == name);
+    let source_definition = source_definitions
+        .next()
+        .ok_or_else(|| invalid("ODM transfer source style dependency is missing"))?;
+    if source_definitions.next().is_some() {
+        return Err(invalid("ODM transfer source style dependency is ambiguous"));
+    }
+    let mut destination_matches = destination
+        .styles()
+        .iter()
+        .filter(|definition| definition.name() == name);
+    if let Some(destination_definition) = destination_matches.next()
+        && destination_matches.next().is_none()
+        && destination_definition.family() == source_definition.family()
+    {
+        return Ok(true);
+    }
+    Ok(staged.iter().any(|change| {
+        matches!(change, StyleChange::Add(spec) if spec.name() == name && Some(spec.family()) == source_definition.family())
+    }))
+}
+
 fn resolve_style(source: &Master, origin: crate::style::Origin, name: &str) -> Result<()> {
     let count = source
         .styles()
@@ -1079,6 +1272,25 @@ fn ensure_removed_resources_are_unreferenced(content: &str, removed: &[String]) 
     Ok(())
 }
 
+fn validate_security_policy(snapshot: &Master, policy: SecurityPolicy) -> Result<()> {
+    if !policy.allows_external_targets()
+        && snapshot
+            .subdocuments()
+            .iter()
+            .any(|reference| reference.target().is_external())
+    {
+        return Err(invalid(
+            "ODM security policy refuses final external link targets",
+        ));
+    }
+    if !policy.allows_missing_package_targets() && !snapshot.resources().missing().is_empty() {
+        return Err(invalid(
+            "ODM security policy refuses unresolved package targets",
+        ));
+    }
+    Ok(())
+}
+
 fn simple_metadata_equal(left: &litchi_core::Metadata, right: &litchi_core::Metadata) -> bool {
     left.title == right.title
         && left.author == right.author
@@ -1096,13 +1308,27 @@ fn verify_extended_readback(
     for change in sections {
         match change {
             SectionChange::Add(section) => {
-                if !snapshot
+                let Some(node) = snapshot
                     .section_tree()
                     .sections()
                     .iter()
-                    .any(|node| node.name() == section.name())
-                {
+                    .find(|node| node.name() == section.name())
+                else {
                     return Err(invalid("ODM added section failed semantic readback"));
+                };
+                if let Some(expected) = section.subdocument() {
+                    let actual = node
+                        .reference()
+                        .and_then(|position| snapshot.subdocuments().get(position.get()))
+                        .ok_or_else(|| invalid("ODM added linked section failed readback"))?;
+                    if actual.href() != expected.href()
+                        || actual.source_section() != expected.source_section()
+                        || actual.filter_name() != expected.filter_name()
+                    {
+                        return Err(invalid(
+                            "ODM added linked-section semantics differ from the request",
+                        ));
+                    }
                 }
             },
             SectionChange::Rename { before, after, .. } => {
@@ -1264,10 +1490,22 @@ fn inverse_changes(changes: &ChangeSet) -> ChangeSet {
     }
 }
 
-fn find_conflicts(left: &ChangeSet, right: &ChangeSet) -> Result<Vec<Conflict>> {
+fn find_conflicts(
+    left: &ChangeSet,
+    right: &ChangeSet,
+    sections: &crate::section::Tree,
+) -> Result<Vec<Conflict>> {
     let mut conflicts = Vec::new();
+    let capacity = left
+        .links
+        .len()
+        .min(right.links.len())
+        .saturating_add(6)
+        .saturating_add(left.sections.len().saturating_mul(right.sections.len()))
+        .saturating_add(left.styles.len().saturating_mul(right.styles.len()))
+        .saturating_add(left.resources.len().saturating_mul(right.resources.len()));
     conflicts
-        .try_reserve(left.links.len().min(right.links.len()).saturating_add(1))
+        .try_reserve(capacity)
         .map_err(|allocation| Error::Allocation {
             resource: "ODM merge conflicts",
             source: allocation,
@@ -1295,20 +1533,23 @@ fn find_conflicts(left: &ChangeSet, right: &ChangeSet) -> Result<Vec<Conflict>> 
             conflicts.push(Conflict::Link(change.reference));
         }
     }
-    if let (Some(left), Some(right)) = (&left.metadata, &right.metadata)
-        && !simple_metadata_equal(&left.after, &right.after)
-    {
-        conflicts.push(Conflict::Metadata);
+    if let (Some(left), Some(right)) = (&left.metadata, &right.metadata) {
+        collect_metadata_conflicts(left, right, &mut conflicts);
     }
     for left_change in &left.sections {
         for right_change in &right.sections {
-            if let (Some(left_position), Some(right_position)) = (
-                section_change_position(left_change),
-                section_change_position(right_change),
-            ) && left_position == right_position
+            if let Some(position) = section_change_overlap(sections, left_change, right_change)
                 && left_change != right_change
             {
-                conflicts.push(Conflict::Section(left_position));
+                conflicts.push(Conflict::Section(position));
+            }
+            if let (Some(left_name), Some(right_name)) = (
+                section_change_destination(left_change),
+                section_change_destination(right_change),
+            ) && left_name == right_name
+                && left_change != right_change
+            {
+                conflicts.push(Conflict::SectionName(left_name.to_owned()));
             }
         }
     }
@@ -1335,12 +1576,95 @@ fn find_conflicts(left: &ChangeSet, right: &ChangeSet) -> Result<Vec<Conflict>> 
     Ok(conflicts)
 }
 
+fn collect_metadata_conflicts(
+    left: &MetadataChange,
+    right: &MetadataChange,
+    conflicts: &mut Vec<Conflict>,
+) {
+    for (field, left_before, left_after, right_before, right_after) in [
+        (
+            "title",
+            left.before.title.as_deref(),
+            left.after.title.as_deref(),
+            right.before.title.as_deref(),
+            right.after.title.as_deref(),
+        ),
+        (
+            "author",
+            left.before.author.as_deref(),
+            left.after.author.as_deref(),
+            right.before.author.as_deref(),
+            right.after.author.as_deref(),
+        ),
+        (
+            "subject",
+            left.before.subject.as_deref(),
+            left.after.subject.as_deref(),
+            right.before.subject.as_deref(),
+            right.after.subject.as_deref(),
+        ),
+        (
+            "description",
+            left.before.description.as_deref(),
+            left.after.description.as_deref(),
+            right.before.description.as_deref(),
+            right.after.description.as_deref(),
+        ),
+        (
+            "keywords",
+            left.before.keywords.as_deref(),
+            left.after.keywords.as_deref(),
+            right.before.keywords.as_deref(),
+            right.after.keywords.as_deref(),
+        ),
+    ] {
+        if left_before != left_after && right_before != right_after && left_after != right_after {
+            conflicts.push(Conflict::MetadataField(field));
+        }
+    }
+}
+
 fn section_change_position(change: &SectionChange) -> Option<Position> {
     match change {
         SectionChange::Rename { position, .. } | SectionChange::Remove { position, .. } => {
             Some(*position)
         },
         SectionChange::Add(_) => None,
+    }
+}
+
+fn section_change_overlap(
+    tree: &crate::section::Tree,
+    left: &SectionChange,
+    right: &SectionChange,
+) -> Option<Position> {
+    let left_position = section_change_position(left)?;
+    let right_position = section_change_position(right)?;
+    if left_position == right_position {
+        return Some(left_position);
+    }
+    let left_node = tree.get(left_position)?;
+    let right_node = tree.get(right_position)?;
+    if matches!(left, SectionChange::Remove { .. })
+        && left_node.source_span.start <= right_node.source_span.start
+        && right_node.source_span.end <= left_node.source_span.end
+    {
+        return Some(right_position);
+    }
+    if matches!(right, SectionChange::Remove { .. })
+        && right_node.source_span.start <= left_node.source_span.start
+        && left_node.source_span.end <= right_node.source_span.end
+    {
+        return Some(left_position);
+    }
+    None
+}
+
+fn section_change_destination(change: &SectionChange) -> Option<&str> {
+    match change {
+        SectionChange::Add(spec) => Some(spec.name()),
+        SectionChange::Rename { after, .. } => Some(after),
+        SectionChange::Remove { .. } => None,
     }
 }
 
@@ -1360,7 +1684,7 @@ fn resource_change_path(change: &ResourceChange) -> &str {
 
 fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
     if let Some(metadata) = &changes.metadata {
-        edit.set_metadata(metadata.after.clone())?;
+        stage_metadata_delta(edit, metadata)?;
     }
     if let Some(title) = &changes.title {
         if let Some(after) = &title.after {
@@ -1373,6 +1697,9 @@ fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
         edit.set_link(link.reference, link.after.clone())?;
     }
     for section in &changes.sections {
+        if edit.sections.contains(section) {
+            continue;
+        }
         match section {
             SectionChange::Add(spec) => {
                 edit.add_section(spec.clone())?;
@@ -1388,6 +1715,9 @@ fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
         }
     }
     for style in &changes.styles {
+        if edit.styles.contains(style) {
+            continue;
+        }
         match style {
             StyleChange::Add(spec) => {
                 edit.add_style(spec.clone())?;
@@ -1414,6 +1744,32 @@ fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
             },
         }
     }
+    Ok(())
+}
+
+fn stage_metadata_delta(edit: &mut Edit<'_>, change: &MetadataChange) -> Result<()> {
+    let mut target = edit
+        .metadata
+        .clone()
+        .unwrap_or_else(|| edit.source.metadata().cloned().unwrap_or_default());
+    if change.before.title == change.after.title {
+        target.title.clone_from(&edit.title_after);
+    } else {
+        target.title.clone_from(&change.after.title);
+    }
+    if change.before.author != change.after.author {
+        target.author.clone_from(&change.after.author);
+    }
+    if change.before.subject != change.after.subject {
+        target.subject.clone_from(&change.after.subject);
+    }
+    if change.before.description != change.after.description {
+        target.description.clone_from(&change.after.description);
+    }
+    if change.before.keywords != change.after.keywords {
+        target.keywords.clone_from(&change.after.keywords);
+    }
+    edit.set_metadata(target)?;
     Ok(())
 }
 

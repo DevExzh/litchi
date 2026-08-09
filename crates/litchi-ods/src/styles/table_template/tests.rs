@@ -16,7 +16,7 @@ fn parses_complete_templates_and_legacy_axes() {
     let templates = parse(
         r#"<table:table-template table:name="Bands &amp; Body" text:first-row-start-column="row" table:first-row-end-column="column" table:use-first-row-styles="true" table:use-banding-rows-styles="1"><table:first-row table:style-name="Header" table:paragraph-style-name="HeaderP"/><table:body table:style-name="Body"/><table:even-rows table:style-name="Even"/><table:odd-rows table:style-name="Odd"/><table:background table:style-name="Background"/></table:table-template>"#,
     )
-    .unwrap();
+    .expect("test fixture or operation should succeed");
     let template = &templates[0];
     assert_eq!(template.name, "Bands & Body");
     assert_eq!(template.first_row_start_column, Some(Axis::Row));
@@ -26,13 +26,17 @@ fn parses_complete_templates_and_legacy_axes() {
         template
             .first_row
             .as_ref()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .paragraph_style_name
             .as_deref(),
         Some("HeaderP")
     );
     assert_eq!(
-        template.background.as_ref().unwrap().style_name,
+        template
+            .background
+            .as_ref()
+            .expect("test fixture or operation should succeed")
+            .style_name,
         "Background"
     );
 }
@@ -60,15 +64,19 @@ fn rejects_invalid_locations_shapes_and_duplicates() {
 fn parses_libreoffice_table_style_catalog() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sc/res/xml/tablestyles.xml");
-    let xml = std::fs::read_to_string(path).unwrap();
-    let templates = parse_parts(&[&xml]).unwrap();
+    let xml = std::fs::read_to_string(path).expect("test fixture or operation should succeed");
+    let templates = parse_parts(&[&xml]).expect("test fixture or operation should succeed");
     assert!(templates.len() > 10);
     let default = templates
         .iter()
         .find(|template| template.name == "Default Style")
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     assert_eq!(
-        default.body.as_ref().unwrap().style_name,
+        default
+            .body
+            .as_ref()
+            .expect("test fixture or operation should succeed")
+            .style_name,
         "Default-Style.body"
     );
     assert!(default.background.is_some());
@@ -79,12 +87,16 @@ fn validates_and_round_trips_deterministic_template_xml() {
     let mut template = parse(
         r#"<table:table-template table:name="A &amp; B" table:use-banding-columns-styles="false"><table:first-row table:style-name="Head&amp;" table:paragraph-style-name="P&amp;"/><table:even-columns table:style-name="Even"/><table:odd-columns table:style-name="Odd"/></table:table-template>"#,
     )
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .remove(0);
-    let xml = template.to_xml().unwrap();
+    let xml = template
+        .to_xml()
+        .expect("test fixture or operation should succeed");
     assert!(xml.contains(r#"table:name="A &amp; B""#));
     assert!(xml.contains(r#"table:style-name="Head&amp;""#));
-    let reparsed = parse(&xml).unwrap().remove(0);
+    let reparsed = parse(&xml)
+        .expect("test fixture or operation should succeed")
+        .remove(0);
     assert_eq!(reparsed, template);
 
     template.odd_columns = None;
@@ -100,11 +112,17 @@ fn exposes_typed_region_accessors() {
         Region::Body,
         Style::new("Body").with_paragraph_style("BodyText"),
     );
-    assert_eq!(template.region(Region::Body).unwrap().style_name, "Body");
     assert_eq!(
         template
             .region(Region::Body)
-            .unwrap()
+            .expect("test fixture or operation should succeed")
+            .style_name,
+        "Body"
+    );
+    assert_eq!(
+        template
+            .region(Region::Body)
+            .expect("test fixture or operation should succeed")
             .paragraph_style_name
             .as_deref(),
         Some("BodyText")

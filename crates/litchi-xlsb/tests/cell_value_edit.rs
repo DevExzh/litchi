@@ -324,9 +324,12 @@ fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() 
     reopened
         .apply_cell_values(sheet, &removed)
         .expect("remove publication");
-    let mut bytes = Cursor::new(Vec::new());
-    reopened.save(&mut bytes).expect("save removed workbook");
-    let final_workbook = Workbook::new(Cursor::new(bytes.into_inner())).expect("final reopen");
+    let mut removed_bytes = Cursor::new(Vec::new());
+    reopened
+        .save(&mut removed_bytes)
+        .expect("save removed workbook");
+    let final_workbook =
+        Workbook::new(Cursor::new(removed_bytes.into_inner())).expect("final reopen");
     let final_snapshot = final_workbook.cell_values(sheet).expect("final snapshot");
     assert!(final_snapshot.cell(string_ref).expect("lookup").is_none());
     assert!(final_snapshot.cell(formula_ref).expect("lookup").is_none());
@@ -351,10 +354,10 @@ fn real_fixture_publication_rejects_missing_style_and_shared_string_dependencies
             Value::Number(1.0),
         )
         .expect("insert");
-    let commit = invalid_style.commit().expect("worksheet commit");
+    let invalid_style_commit = invalid_style.commit().expect("worksheet commit");
     assert!(
         invalid_style_workbook
-            .apply_cell_values(sheet, &commit)
+            .apply_cell_values(sheet, &invalid_style_commit)
             .is_err()
     );
 
@@ -369,10 +372,10 @@ fn real_fixture_publication_rejects_missing_style_and_shared_string_dependencies
             Value::SharedStringIndex(u32::MAX),
         )
         .expect("insert");
-    let commit = invalid_shared.commit().expect("worksheet commit");
+    let invalid_shared_commit = invalid_shared.commit().expect("worksheet commit");
     assert!(
         invalid_shared_workbook
-            .apply_cell_values(sheet, &commit)
+            .apply_cell_values(sheet, &invalid_shared_commit)
             .is_err()
     );
 }

@@ -371,7 +371,10 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
     Ok(parsed)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one theme start event updates the complete bounded schema parser state"
+)]
 fn open(
     local: &[u8],
     depth: usize,

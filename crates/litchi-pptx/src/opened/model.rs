@@ -263,17 +263,6 @@ pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
     Ok(digest.finalize().into())
 }
 
-pub(crate) fn part_context(part: &dyn litchi_opc::Part) -> Result<[u8; 32]> {
-    let mut digest = Sha256::new();
-    feed(&mut digest, b"litchi-pptx-opened-part-v1");
-    feed(&mut digest, part.partname().as_str().as_bytes());
-    feed(&mut digest, part.content_type().as_bytes());
-    let mut relationships: Vec<_> = part.rels().iter().collect();
-    relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
-    feed_relationships(&mut digest, &relationships)?;
-    Ok(digest.finalize().into())
-}
-
 fn feed_relationships(
     digest: &mut Sha256,
     relationships: &[&litchi_opc::Relationship],

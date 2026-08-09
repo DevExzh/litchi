@@ -23,9 +23,12 @@ pub use authoring::{
     Change, ChangeAction, ChangeKind, Commit, CompositionLimits, DependencyDisposition,
     DurablePatch, Edit, EditPolicy, EncryptionPolicy, History, HistoryLimits, JoinError,
     JoinedEdits, Lineage, MergeChoice, MergePlan, MergePlanError, Patch, PreparedEdit,
-    ProtectionStatus, QueryChange, SealedPatch, SignaturePolicy,
+    ProtectionStatus, ProtectionTransition, QueryChange, SealedPatch, SignaturePolicy,
 };
 pub use facade::{Builder, Database};
+pub use litchi_odf_common::signature::{
+    DigitalSignature, DigitalSignatures, SignatureValidity, SignatureVerification,
+};
 pub use model::connection::Connection;
 pub use model::query::Query;
 pub use model::{

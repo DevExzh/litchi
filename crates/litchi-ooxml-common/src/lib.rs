@@ -7,7 +7,6 @@
 #![allow(
     clippy::borrowed_box,
     clippy::module_name_repetitions,
-    clippy::needless_pass_by_value,
     clippy::ref_option,
     clippy::struct_excessive_bools,
     reason = "shared public OOXML types mirror ECMA-376 schemas and document their common failure contract at module boundaries"
@@ -25,11 +24,7 @@
 // Codec declarations follow XML/package traversal order, and wildcard imports
 // keep generated vocabulary modules auditable against their schemas.
 #![allow(
-    clippy::allow_attributes_without_reason,
     clippy::arbitrary_source_item_ordering,
-    clippy::assigning_clones,
-    clippy::match_same_arms,
-    clippy::unnecessary_wraps,
     clippy::unreadable_literal,
     clippy::wildcard_imports,
     reason = "shared OOXML codecs retain schema and traversal order while generated vocabulary modules use bounded local preludes"

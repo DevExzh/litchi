@@ -12,6 +12,30 @@ const STYLES: &str = include_str!("../../../test-data/odf/odg/drawing-style-reso
 const LIBREOFFICE_ODG: &[u8] = include_bytes!(
     "../../../3rdparty/libreoffice-core/xmlsecurity/doc/OpenDocumentSignatures-Workflow.odg"
 );
+const REAL_DRAW_CORPUS: &[(&str, &[u8])] = &[
+    (
+        "blank",
+        include_bytes!("../../../3rdparty/libreoffice-core/desktop/qa/data/BlankDrawDocument.odg"),
+    ),
+    (
+        "three-page",
+        include_bytes!("../../../3rdparty/libreoffice-core/desktop/qa/data/3page.odg"),
+    ),
+    (
+        "transparent-fill",
+        include_bytes!(
+            "../../../3rdparty/libreoffice-core/filter/qa/unit/data/semi-transparent-fill.odg"
+        ),
+    ),
+    (
+        "fit-frame-text",
+        include_bytes!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/odg/FitToFrameText.odg"),
+    ),
+    (
+        "fontwork",
+        include_bytes!("../../../3rdparty/libreoffice-core/svx/qa/unit/data/FontWork.odg"),
+    ),
+];
 
 #[test]
 fn real_drawing_resource_xml_remains_exact_and_opaque() {
@@ -69,4 +93,49 @@ fn real_libreoffice_odg_opens_with_exact_bytes_and_declared_layers() {
                 .any(|layer| layer.name() == expected)
         );
     }
+}
+
+#[test]
+fn multiple_real_libreoffice_drawings_open_exactly_with_typed_pages() {
+    for (name, bytes) in REAL_DRAW_CORPUS {
+        let drawing = Drawing::from_bytes(bytes.to_vec())
+            .unwrap_or_else(|error| panic!("real Draw fixture {name} failed: {error}"));
+        assert_eq!(drawing.as_bytes(), *bytes, "fixture {name} lost provenance");
+        assert!(!drawing.pages().is_empty(), "fixture {name} lost pages");
+    }
+}
+
+#[test]
+fn complex_real_fontwork_change_reopens_and_inverts_exactly() {
+    let bytes = REAL_DRAW_CORPUS
+        .iter()
+        .find_map(|(name, bytes)| (*name == "fontwork").then_some(*bytes))
+        .unwrap();
+    let drawing = Drawing::from_bytes(bytes.to_vec()).unwrap();
+    let shape = drawing.pages()[0]
+        .shapes()
+        .iter()
+        .position(|shape| shape.name().is_some())
+        .unwrap();
+    let mut edit = drawing.edit();
+    edit.set_shape_name(0, shape, "Fontwork changed by Litchi")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit.snapshot().pages()[0].shapes()[shape].name(),
+        Some("Fontwork changed by Litchi")
+    );
+    let fully_reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    assert_eq!(fully_reopened.as_bytes(), commit.snapshot().as_bytes());
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        drawing.as_bytes()
+    );
 }

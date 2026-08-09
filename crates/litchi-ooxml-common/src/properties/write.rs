@@ -28,7 +28,9 @@ const CORE_CLOSE: &str = "</cp:coreProperties>";
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
 pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
-    sync(package, &props)
+    let result = sync(package, &props);
+    drop(props);
+    result
 }
 
 /// Removes the validated core-properties graph.

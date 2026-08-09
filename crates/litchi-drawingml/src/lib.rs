@@ -28,7 +28,6 @@
 // bounded serializers favor direct append operations and explicit cases so the
 // output can be audited against the standard.
 #![allow(
-    clippy::allow_attributes_without_reason,
     clippy::arbitrary_source_item_ordering,
     clippy::doc_markdown,
     clippy::format_push_string,

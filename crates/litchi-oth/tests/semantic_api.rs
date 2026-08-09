@@ -5,14 +5,16 @@
 
 use litchi_core::{HistoryLimits, Metadata, Position};
 use litchi_oth::{
-    Block, Builder, History, JoinFailure, Patch, SecurityPolicy, Template, field,
+    Block, Builder, History, JoinFailure, Patch, SecurityPolicy, Template, TransferPolicy,
+    TransferSelector, field,
     heading::Heading,
     link::Link,
     list::{Item, List},
     paragraph::Paragraph,
     resource,
-    style::Style,
+    style::{Slant, Style, TextProperties, Weight},
 };
+use soapberry_zip::office::StreamingArchiveWriter;
 use std::sync::Arc;
 
 const COMPACT_CONTENT: &str = concat!(
@@ -40,6 +42,20 @@ const SEMANTIC_WHITESPACE_CONTENT: &str = concat!(
 const PREFIX_ALIASED_TEXT_WEB: &str = include_str!("fixtures/odf14-text-web.xml");
 const WRONG_FAMILY: &str = include_str!("fixtures/wrong-family.xml");
 const DUPLICATE_BODY: &str = include_str!("fixtures/duplicate-body.xml");
+
+fn raw_negative_package(content: &str) -> Vec<u8> {
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.text-web";
+    const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text-web"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIMETYPE).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
+}
 
 #[test]
 fn focused_modules_are_the_canonical_semantic_api() {
@@ -180,6 +196,19 @@ fn local_invalid_family_fixtures_fail_before_package_publication() {
 }
 
 #[test]
+fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
+    for xml in [WRONG_FAMILY, DUPLICATE_BODY] {
+        assert!(Template::from_bytes(raw_negative_package(xml)).is_err());
+    }
+    let dtd = COMPACT_CONTENT.replacen(
+        "<office:document-content",
+        "<!DOCTYPE office:document-content><office:document-content",
+        1,
+    );
+    assert!(Template::from_bytes(raw_negative_package(&dtd)).is_err());
+}
+
+#[test]
 fn exact_noop_edit_is_source_checked_and_atomic() {
     let source = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
     let alternate =
@@ -192,6 +221,15 @@ fn exact_noop_edit_is_source_checked_and_atomic() {
         source.as_bytes()
     );
     assert!(commit.patch().apply(&alternate).is_err());
+    let mut absent_removal_edit = source.edit();
+    absent_removal_edit.remove_metadata();
+    absent_removal_edit.remove_styles();
+    let absent_removal_commit = absent_removal_edit.commit().unwrap();
+    assert!(!absent_removal_commit.changed());
+    assert_eq!(
+        absent_removal_commit.template().as_bytes(),
+        source.as_bytes()
+    );
     assert_eq!(
         commit
             .patch()
@@ -496,6 +534,19 @@ fn heading_list_durable_and_merge_workflows_are_source_checked() {
         )
         .unwrap();
     let right_commit = right.commit().unwrap();
+    let right_wire = right_commit.patch().to_bytes().unwrap();
+    let right_durable = Patch::from_bytes(&right_wire).unwrap();
+    assert_eq!(right_durable.list_changes().len(), 1);
+    assert_eq!(
+        right_durable.list_changes()[0]
+            .after()
+            .and_then(List::style_name),
+        Some("Bullets")
+    );
+    assert_eq!(
+        right_durable.apply(&source).unwrap().as_bytes(),
+        right_commit.template().as_bytes()
+    );
     let plan = Patch::plan_three_way(&source, left_commit.patch(), right_commit.patch()).unwrap();
     assert!(plan.conflicts().is_empty());
     let merged = plan.publish().unwrap();
@@ -512,10 +563,13 @@ fn heading_list_durable_and_merge_workflows_are_source_checked() {
     remove.remove_list(Position::new(0)).unwrap();
     let removed = remove.commit().unwrap();
     assert!(removed.template().text_body().unwrap().lists().is_empty());
+    let removed_wire = removed.patch().to_bytes().unwrap();
+    let durable_removed = Patch::from_bytes(&removed_wire).unwrap();
+    assert!(durable_removed.list_changes()[0].after().is_none());
+    let restored_wire = durable_removed.inverse().to_bytes().unwrap();
+    let durable_restored = Patch::from_bytes(&restored_wire).unwrap();
     assert_eq!(
-        removed
-            .patch()
-            .inverse()
+        durable_restored
             .apply(removed.template())
             .unwrap()
             .as_bytes(),
@@ -535,7 +589,16 @@ fn metadata_and_styles_are_durable_and_reversible() {
     let body_style = Style::new("Body2", "paragraph")
         .unwrap()
         .with_parent("Standard")
-        .unwrap();
+        .unwrap()
+        .with_text_properties(
+            TextProperties::new()
+                .with_color("#aa00cc")
+                .unwrap()
+                .with_background_color("#00ff00")
+                .unwrap()
+                .with_weight(Weight::Bold)
+                .with_slant(Slant::Italic),
+        );
     let mut parts = source.edit();
     parts.set_metadata(&metadata).unwrap();
     parts.set_styles(&[body_style]).unwrap();
@@ -552,6 +615,13 @@ fn metadata_and_styles_are_durable_and_reversible() {
         parts_commit.template().styles()[0].parent_name(),
         Some("Standard")
     );
+    let properties = parts_commit.template().styles()[0]
+        .text_properties()
+        .unwrap();
+    assert_eq!(properties.color(), Some("#AA00CC"));
+    assert_eq!(properties.background_color(), Some("#00FF00"));
+    assert_eq!(properties.weight(), Some(Weight::Bold));
+    assert_eq!(properties.slant(), Some(Slant::Italic));
     let parts_wire = parts_commit.patch().to_bytes().unwrap();
     let parts_durable = Patch::from_bytes(&parts_wire).unwrap();
     assert_eq!(
@@ -565,6 +635,27 @@ fn metadata_and_styles_are_durable_and_reversible() {
             .unwrap()
             .as_bytes(),
         source.as_bytes()
+    );
+
+    let mut removal = parts_commit.template().edit();
+    removal.remove_metadata();
+    removal.remove_styles();
+    let removed = removal.commit().unwrap();
+    assert!(removed.template().meta_xml().is_none());
+    assert!(removed.template().styles_xml().is_none());
+    assert!(removed.patch().removes_metadata());
+    assert!(removed.patch().removes_styles());
+    let removal_wire = removed.patch().to_bytes().unwrap();
+    let durable_removal = Patch::from_bytes(&removal_wire).unwrap();
+    assert!(durable_removal.removes_metadata());
+    assert!(durable_removal.removes_styles());
+    assert_eq!(
+        durable_removal
+            .inverse()
+            .apply(removed.template())
+            .unwrap()
+            .as_bytes(),
+        parts_commit.template().as_bytes()
     );
 }
 
@@ -595,6 +686,79 @@ fn security_policy_is_explicit_and_default_deny() {
     assert_eq!(report.embedded_objects, 1);
     assert_eq!(report.external_resources, 1);
     assert_eq!(report.forms, 1);
+}
+
+#[test]
+fn transfer_plan_resolves_style_parents_and_refuses_collisions() {
+    let source_without_styles = Template::from_bytes(
+        Builder::new()
+            .paragraph(Paragraph::styled("transfer me", "Body"))
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    let parent = Style::new("Base", "paragraph").unwrap();
+    let body = Style::new("Body", "paragraph")
+        .unwrap()
+        .with_parent("Base")
+        .unwrap()
+        .with_text_properties(TextProperties::new().with_weight(Weight::Bold));
+    let mut source_edit = source_without_styles.edit();
+    source_edit
+        .set_styles(&[parent.clone(), body.clone()])
+        .unwrap();
+    let source = source_edit.commit().unwrap().into_template();
+    let destination = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+
+    let plan = destination
+        .plan_transfer_from(
+            &source,
+            TransferSelector::Paragraph(Position::new(0)),
+            TransferPolicy::default(),
+        )
+        .unwrap();
+    assert_eq!(plan.imported_styles().len(), 2);
+    let published = plan.publish().unwrap();
+    assert_eq!(
+        published.template().text_body().unwrap().paragraphs()[0].text(),
+        "transfer me"
+    );
+    assert!(
+        published
+            .template()
+            .styles()
+            .iter()
+            .any(|style| style.name() == "Base")
+    );
+
+    assert!(
+        destination
+            .plan_transfer_from(
+                &source,
+                TransferSelector::Paragraph(Position::new(0)),
+                TransferPolicy {
+                    include_styles: false,
+                    ..TransferPolicy::default()
+                },
+            )
+            .is_err()
+    );
+
+    let colliding_source = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let mut colliding_edit = colliding_source.edit();
+    colliding_edit
+        .set_styles(&[Style::new("Body", "text").unwrap()])
+        .unwrap();
+    let colliding = colliding_edit.commit().unwrap().into_template();
+    assert!(
+        colliding
+            .plan_transfer_from(
+                &source,
+                TransferSelector::Paragraph(Position::new(0)),
+                TransferPolicy::default(),
+            )
+            .is_err()
+    );
 }
 
 #[test]
@@ -655,6 +819,8 @@ fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
         commit.template().text_body().unwrap().paragraphs()[0].text(),
         "Web template"
     );
+    assert_eq!(commit.template().meta_xml(), source.meta_xml());
+    assert_eq!(commit.template().styles_xml(), source.styles_xml());
     assert!(commit.template().styles_xml().is_some());
     assert_eq!(
         commit

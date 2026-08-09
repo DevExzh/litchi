@@ -2,6 +2,7 @@ use litchi_odt::form::TextControl;
 use litchi_odt::{
     Document, ScriptResourceKind, ScriptResourceSpec,
     core::{PackageWriter, Profile},
+    elements::field::DynamicTextField,
     mutable::MutableDocument,
     package::{
         embedded::{EmbeddedResource, EmbeddedResourceKind, EmbeddedResourceSource},
@@ -9,11 +10,13 @@ use litchi_odt::{
     },
     protection::Policy,
     rdf::{Object, Subject, Triple},
+    ruby_family::{Alignment, Properties as RubyProperties, Style as RubyStyle},
     transaction::{
         EnvelopeKind, HistoryLimits, MergeChoice, MergePlan, OperationResult, ParagraphSelector,
-        Position, SubEditJoinFailure,
+        Position, SubEditJoinFailure, TransferDependencyKind,
     },
 };
+mod support;
 
 fn source() -> Document {
     let mut document = MutableDocument::new();
@@ -350,6 +353,204 @@ fn durable_patch_round_trips_deterministically_and_remains_exactly_reversible() 
     let restored = decoded.inverse().apply(&applied).unwrap();
     assert_eq!(restored.as_bytes(), snapshot.as_bytes());
     assert!(decoded.apply(&applied).is_err());
+}
+
+#[test]
+fn semantic_durable_patch_covers_styles_fields_revisions_rdf_protection_and_script_blobs() {
+    let source = source();
+    let snapshot = source.snapshot().unwrap();
+    let ruby = RubyStyle::new(
+        "RubyReview",
+        Some(RubyProperties {
+            position: None,
+            alignment: Some(Alignment::Center),
+        }),
+    )
+    .unwrap();
+    let field = DynamicTextField::DdeConnection {
+        connection_name: "review-cache".to_string(),
+        display_text: " \t ".to_string(),
+    };
+    let triple = Triple {
+        subject: Subject::Iri("urn:litchi:durable".to_string()),
+        predicate: "urn:litchi:review#status".to_string(),
+        object: Object::Literal {
+            value: "ready".to_string(),
+            datatype: None,
+            language: Some("en".to_string()),
+        },
+    };
+    let script = ScriptResourceSpec {
+        kind: ScriptResourceKind::Opaque,
+        preferred_path: Some("Scripts/durable.bin".to_string()),
+        media_type: "application/octet-stream".to_string(),
+        bytes: b"durable inert payload".to_vec(),
+    };
+
+    let mut edit = snapshot.edit();
+    edit.set_ruby_style(&ruby)
+        .unwrap()
+        .insert_dynamic_text_field(Position::new(0), &field)
+        .unwrap()
+        .set_tracked_change_policy(
+            Some(true),
+            Some("c2FsdGVkLWtleQ=="),
+            Some("urn:litchi:digest:test"),
+        )
+        .unwrap()
+        .add_rdf_graph(Some("metadata/durable.rdf"), &[triple.clone()])
+        .unwrap()
+        .set_protection(&Policy::default().with_read_only(Some(true)))
+        .unwrap()
+        .add_script_resource(&script)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let durable = commit.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    for operation in [
+        "style.ruby.set",
+        "field.dynamic.insert",
+        "revision.policy.set",
+        "rdf.graph.add",
+        "protection.set",
+        "resource.script.add",
+    ] {
+        assert!(wire_text.contains(operation), "missing {operation}");
+    }
+    assert!(!wire_text.contains("durable inert payload"));
+
+    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let applied = decoded.apply(&snapshot).unwrap();
+    assert_eq!(applied.as_bytes(), commit.snapshot().as_bytes());
+    let reopened = applied.document().unwrap();
+    assert_eq!(reopened.ruby_styles().unwrap().styles, vec![ruby]);
+    assert_eq!(reopened.dynamic_text_fields().unwrap(), vec![field]);
+    assert_eq!(
+        reopened.tracked_changes().unwrap().track_changes,
+        Some(true)
+    );
+    assert_eq!(reopened.rdf_graphs().unwrap()[0].triples, vec![triple]);
+    assert_eq!(reopened.protection().unwrap().read_only, Some(true));
+    assert_eq!(reopened.script_resources().unwrap()[0].bytes, script.bytes);
+
+    let package =
+        litchi_odt::core::package::OwnedPackage::from_bytes(applied.as_bytes().to_vec()).unwrap();
+    let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+    assert!(content.contains("&#32;&#9;&#32;"));
+}
+
+#[test]
+fn cross_document_transfer_is_dependency_checked_and_refuses_source_local_edits() {
+    let source_snapshot = source().snapshot().unwrap();
+    let mut portable = source_snapshot.edit();
+    portable
+        .insert_paragraph(Position::new(1), "portable")
+        .unwrap()
+        .append_run(Position::new(1), " addition", None)
+        .unwrap();
+    let portable = portable.commit().unwrap();
+
+    let destination = source().snapshot().unwrap();
+    let plan = portable.patch().plan_transfer(&destination).unwrap();
+    assert_eq!(plan.operation_count(), 2);
+    assert_eq!(plan.dependencies().len(), 1);
+    assert_eq!(
+        plan.dependencies()[0].kind(),
+        TransferDependencyKind::Paragraph
+    );
+    assert!(plan.dependencies()[0].is_satisfied());
+    assert_eq!(
+        plan.commit()
+            .unwrap()
+            .snapshot()
+            .document()
+            .unwrap()
+            .text()
+            .unwrap(),
+        "Unique paragraph\nportable addition"
+    );
+
+    let mut local = source_snapshot.edit();
+    local
+        .replace_paragraph(Position::new(0), "source-local")
+        .unwrap();
+    let local = local.commit().unwrap();
+    assert!(local.patch().plan_transfer(&destination).is_err());
+
+    let empty = {
+        let document = MutableDocument::new();
+        Document::from_bytes(document.to_bytes().unwrap())
+            .unwrap()
+            .snapshot()
+            .unwrap()
+    };
+    let unresolved = portable.patch().plan_transfer(&empty).unwrap();
+    assert!(
+        unresolved
+            .dependencies()
+            .iter()
+            .any(|dependency| !dependency.is_satisfied())
+    );
+    assert!(unresolved.commit().is_err());
+}
+
+#[test]
+fn genuine_libreoffice_package_survives_transaction_reopen_and_full_resave() {
+    let producer = Document::from_bytes(
+        include_bytes!(
+            "../../../test-data/libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt"
+        )
+        .to_vec(),
+    )
+    .unwrap();
+    let snapshot = producer.snapshot().unwrap();
+    let triple = Triple {
+        subject: Subject::Iri("urn:litchi:libreoffice".to_string()),
+        predicate: "urn:litchi:review#reopened".to_string(),
+        object: Object::Literal {
+            value: "true".to_string(),
+            datatype: None,
+            language: None,
+        },
+    };
+    let mut edit = snapshot.edit();
+    edit.add_rdf_graph(Some("metadata/litchi-reopen.rdf"), &[triple.clone()])
+        .unwrap();
+    let committed = edit.commit().unwrap();
+
+    let first_reopen = Document::from_bytes(committed.snapshot().as_bytes().to_vec()).unwrap();
+    let resaved = first_reopen.to_bytes().unwrap();
+    let second_reopen = Document::from_bytes(resaved).unwrap();
+    let graph = second_reopen
+        .rdf_graphs()
+        .unwrap()
+        .into_iter()
+        .find(|graph| graph.path == "metadata/litchi-reopen.rdf")
+        .unwrap();
+    assert_eq!(graph.triples, vec![triple]);
+    assert!(!second_reopen.forms().unwrap().groups.is_empty());
+}
+
+#[test]
+fn raw_zip_signature_marker_is_classified_and_never_mutated() {
+    let content = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>signed raw fixture</text:p></office:text></office:body></office:document-content>"#;
+    let bytes = support::package(
+        "application/vnd.oasis.opendocument.text",
+        &[
+            ("content.xml", content.as_slice()),
+            (
+                "META-INF/documentsignatures.xml",
+                b"not parsed or trusted signature bytes",
+            ),
+        ],
+    );
+    let snapshot = Document::from_bytes(bytes).unwrap().snapshot().unwrap();
+    assert_eq!(snapshot.envelope_kind().unwrap(), EnvelopeKind::Signed);
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    assert!(edit.commit().is_err());
 }
 
 #[test]

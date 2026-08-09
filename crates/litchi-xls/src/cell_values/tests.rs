@@ -28,6 +28,16 @@ fn package() -> Vec<u8> {
     package.finish().unwrap()
 }
 
+fn formula_free_package() -> Vec<u8> {
+    let mut writer = crate::Writer::new();
+    let sheet = writer.add_worksheet("Plain").unwrap();
+    writer.write_number(sheet, 1, 0, 1.0).unwrap();
+    writer.write_number(sheet, 3, 1, 2.0).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
 fn signed_package() -> Vec<u8> {
     let mut ole = OleFile::open(Cursor::new(package())).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
@@ -378,5 +388,127 @@ fn bounded_history_undoes_and_redoes_immutable_snapshots() {
             .unwrap()
             .value(),
         99.0
+    );
+}
+
+#[test]
+fn structural_cell_style_and_sheet_name_round_trip_semantically() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(3, 3).unwrap();
+    let style = source
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(Reference::new(3, 2).unwrap())
+        .unwrap()
+        .unwrap()
+        .style();
+    let mut transaction = source.transaction();
+    transaction
+        .insert_cell_with_style("Sheet1".into(), reference, Value::Number(27.5), style)
+        .unwrap();
+    transaction
+        .rename_sheet("Sheet1".into(), "Renamed")
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let cell = commit
+        .snapshot()
+        .worksheet("Renamed".into())
+        .unwrap()
+        .unwrap()
+        .cell(reference)
+        .unwrap()
+        .unwrap();
+    assert_eq!(cell.value(), &Value::Number(27.5));
+    assert_eq!(cell.style(), style);
+
+    let json = commit.patch().semantic().to_deterministic_json().unwrap();
+    let durable = SemanticPatch::from_deterministic_json(&json).unwrap();
+    let replay = durable.apply(&source).unwrap();
+    assert_eq!(replay.snapshot().bytes(), commit.snapshot().bytes());
+    let restored = durable.inverse().apply(commit.snapshot()).unwrap();
+    let restored_sheet = restored
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert!(restored_sheet.cell(reference).unwrap().is_none());
+}
+
+#[test]
+fn structural_join_three_way_and_transfer_are_deterministic() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let mut left = source.transaction();
+    left.insert_cell(
+        "Sheet1".into(),
+        Reference::new(3, 3).unwrap(),
+        Value::Number(10.0),
+    )
+    .unwrap();
+    let mut right = source.transaction();
+    right
+        .insert_cell(
+            "Sheet1".into(),
+            Reference::new(4, 3).unwrap(),
+            Value::Boolean(true),
+        )
+        .unwrap();
+    left.join(right).unwrap();
+    assert_eq!(left.commit().unwrap().diagnostics().changed_cells(), 2);
+
+    let mut left = source.transaction();
+    left.set_value(
+        "Sheet1".into(),
+        Reference::new(7, 0).unwrap(),
+        Value::Boolean(false),
+    )
+    .unwrap();
+    let left = left.commit().unwrap().patch().semantic().clone();
+    let mut right = source.transaction();
+    right
+        .set_value(
+            "Sheet1".into(),
+            Reference::new(6, 0).unwrap(),
+            Value::Text("beta".to_string()),
+        )
+        .unwrap();
+    let right = right.commit().unwrap().patch().semantic().clone();
+    let plan = SemanticPatch::plan_three_way(&source, &left, &right).unwrap();
+    assert!(plan.conflicts().is_empty());
+    let merged = plan.merged().unwrap();
+    assert_eq!(merged.len(), 2);
+    let transfer = merged.plan_transfer(&source);
+    assert!(transfer.is_executable());
+    transfer.execute(&source).unwrap();
+}
+
+#[test]
+fn dependency_safe_row_insertion_reopens_and_inverts() {
+    let source = Snapshot::from_bytes(formula_free_package()).unwrap();
+    let mut transaction = source.transaction();
+    transaction.insert_rows("Plain".into(), 2, 2).unwrap();
+    let commit = transaction.commit().unwrap();
+    let moved = commit
+        .snapshot()
+        .worksheet("Plain".into())
+        .unwrap()
+        .unwrap()
+        .cell(Reference::new(5, 1).unwrap())
+        .unwrap()
+        .unwrap();
+    assert_eq!(moved.value(), &Value::Number(2.0));
+    let inverse = commit.patch().semantic().inverse();
+    let restored = inverse.apply(commit.snapshot()).unwrap();
+    assert_eq!(
+        restored
+            .snapshot()
+            .worksheet("Plain".into())
+            .unwrap()
+            .unwrap()
+            .cell(Reference::new(3, 1).unwrap())
+            .unwrap()
+            .unwrap()
+            .value(),
+        &Value::Number(2.0)
     );
 }

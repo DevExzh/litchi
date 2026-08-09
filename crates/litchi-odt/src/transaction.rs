@@ -7,16 +7,29 @@
 //! operations remain available separately while their opaque-content
 //! preservation contracts are migrated to this transaction surface.
 
-#![deny(clippy::expect_used, clippy::unwrap_used)]
+#![deny(
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::unwrap_used
+)]
 
-use crate::{Document, mutable::MutableDocument};
+use crate::{
+    Document,
+    elements::field::{DynamicTextField, FieldParser},
+    mutable::MutableDocument,
+};
 use litchi_core::{
     BlobBundle, BlobId, BlobLimits, Error, ForwardOnly, History as CoreHistory, JoinedSubEdits,
     Patch as CorePatch, PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation,
     SubEdit, ThreeWayMergePlan,
 };
 use serde_json::Value;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 /// Shared zero-based semantic collection position.
 pub use litchi_core::Position;
@@ -231,6 +244,77 @@ impl Edit {
             },
         };
         self.push(Operation::AppendLineBreak { index })
+    }
+
+    /// Stages a typed dynamic field at the end of one paragraph.
+    pub fn insert_dynamic_text_field(
+        &mut self,
+        paragraph: Position,
+        field: &DynamicTextField,
+    ) -> Result<&mut Self> {
+        field.validate()?;
+        self.push(Operation::InsertDynamicTextField {
+            paragraph: paragraph.get(),
+            field: field.clone(),
+        })
+    }
+
+    /// Stages replacement of one typed dynamic field in document order.
+    pub fn replace_dynamic_text_field(
+        &mut self,
+        field: Position,
+        replacement: &DynamicTextField,
+    ) -> Result<&mut Self> {
+        replacement.validate()?;
+        self.push(Operation::ReplaceDynamicTextField {
+            index: field.get(),
+            field: replacement.clone(),
+        })
+    }
+
+    /// Stages removal of one typed dynamic field in document order.
+    pub fn remove_dynamic_text_field(&mut self, field: Position) -> Result<&mut Self> {
+        self.push(Operation::RemoveDynamicTextField { index: field.get() })
+    }
+
+    /// Stages insertion or replacement of one named ruby style.
+    pub fn set_ruby_style(&mut self, style: &crate::ruby_family::Style) -> Result<&mut Self> {
+        style.validate()?;
+        self.push(Operation::SetRubyStyle {
+            style: style.clone(),
+        })
+    }
+
+    /// Stages removal of one named ruby style.
+    pub fn remove_ruby_style(&mut self, name: &str) -> Result<&mut Self> {
+        let name = bounded_semantic_text(name.to_owned(), "ruby style name")?;
+        self.push(Operation::RemoveRubyStyle { name })
+    }
+
+    /// Stages inert tracked-change policy metadata without accepting a credential.
+    pub fn set_tracked_change_policy(
+        &mut self,
+        track_changes: Option<bool>,
+        protection_key: Option<&str>,
+        digest_algorithm: Option<&str>,
+    ) -> Result<&mut Self> {
+        let protection_key = protection_key
+            .map(|value| bounded_semantic_text(value.to_owned(), "tracked-change protection key"))
+            .transpose()?;
+        let digest_algorithm = digest_algorithm
+            .map(|value| bounded_semantic_text(value.to_owned(), "tracked-change digest algorithm"))
+            .transpose()?;
+        self.push(Operation::SetTrackedChangePolicy {
+            track_changes,
+            protection_key,
+            digest_algorithm,
+        })
+    }
+
+    /// Stages removal of one tracked-change declaration and its correlated markers.
+    pub fn remove_tracked_change(&mut self, id: &str) -> Result<&mut Self> {
+        let id = bounded_semantic_text(id.to_owned(), "tracked-change ID")?;
+        self.push(Operation::RemoveTrackedChange { id })
     }
 
     /// Stages creation of one inert RDF/XML metadata graph.
@@ -779,6 +863,56 @@ impl Edit {
                     document = Document::from_bytes(mutable.to_bytes()?)?;
                     OperationResult::Unit
                 },
+                Operation::InsertDynamicTextField { paragraph, field } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.insert_dynamic_text_field(*paragraph, field)?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::ReplaceDynamicTextField { index, field } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.replace_dynamic_text_field(*index, field)?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::RemoveDynamicTextField { index } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.remove_dynamic_text_field(*index)?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::SetRubyStyle { style } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.set_ruby_style(style)?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::RemoveRubyStyle { name } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.remove_ruby_style(name)?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::SetTrackedChangePolicy {
+                    track_changes,
+                    protection_key,
+                    digest_algorithm,
+                } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.set_tracked_change_policy(
+                        *track_changes,
+                        protection_key.clone(),
+                        digest_algorithm.clone(),
+                    )?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::RemoveTrackedChange { id } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.remove_tracked_change(id)?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
                 Operation::AddRdfGraph {
                     preferred_path,
                     triples,
@@ -1007,7 +1141,7 @@ impl Edit {
         }
         let bytes = copy_bytes(document.original_bytes())?;
         ensure_package_size(bytes.len(), "ODT transaction output")?;
-        audit_compact_xml(&bytes)?;
+        audit_changed_xml_is_compact(self.source.as_bytes(), &bytes)?;
         let after = if bytes == self.source.as_bytes() {
             self.source.clone()
         } else {
@@ -1289,6 +1423,31 @@ enum Operation {
     AppendLineBreak {
         index: usize,
     },
+    InsertDynamicTextField {
+        paragraph: usize,
+        field: DynamicTextField,
+    },
+    ReplaceDynamicTextField {
+        index: usize,
+        field: DynamicTextField,
+    },
+    RemoveDynamicTextField {
+        index: usize,
+    },
+    SetRubyStyle {
+        style: crate::ruby_family::Style,
+    },
+    RemoveRubyStyle {
+        name: String,
+    },
+    SetTrackedChangePolicy {
+        track_changes: Option<bool>,
+        protection_key: Option<String>,
+        digest_algorithm: Option<String>,
+    },
+    RemoveTrackedChange {
+        id: String,
+    },
     AddRdfGraph {
         preferred_path: Option<String>,
         triples: Vec<crate::rdf::Triple>,
@@ -1510,6 +1669,190 @@ impl Patch {
     pub fn durable(&self) -> Result<DurablePatch> {
         DurablePatch::from_semantic_patch(self)
     }
+
+    /// Builds a non-mutating, dependency-checked plan for replaying portable
+    /// additions and policy updates onto another package snapshot.
+    ///
+    /// Source-local replacements, removals, moves, and snapshot restores are
+    /// refused because their semantic positions cannot be transferred safely.
+    pub fn plan_transfer(&self, destination: &Snapshot) -> Result<TransferPlan> {
+        TransferPlan::new(destination.clone(), &self.operations)
+    }
+}
+
+/// Kind of prerequisite checked by a cross-document transfer plan.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum TransferDependencyKind {
+    /// A paragraph must exist at the checked semantic position.
+    Paragraph,
+    /// A named ruby parent style must exist or be transferred in the same plan.
+    RubyStyle,
+}
+
+/// One deterministic prerequisite reported by a transfer plan.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TransferDependency {
+    kind: TransferDependencyKind,
+    key: String,
+    satisfied: bool,
+}
+
+impl TransferDependency {
+    /// Returns the prerequisite family.
+    #[must_use]
+    pub const fn kind(&self) -> TransferDependencyKind {
+        self.kind
+    }
+
+    /// Returns its stable semantic key.
+    #[must_use]
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    /// Whether the destination or this plan supplies the prerequisite.
+    #[must_use]
+    pub const fn is_satisfied(&self) -> bool {
+        self.satisfied
+    }
+}
+
+/// Non-mutating, bounded plan for dependency-aware cross-document replay.
+pub struct TransferPlan {
+    destination: Snapshot,
+    operations: Vec<Operation>,
+    dependencies: Vec<TransferDependency>,
+}
+
+impl TransferPlan {
+    fn new(destination: Snapshot, operations: &[Operation]) -> Result<Self> {
+        if operations.len() > MAX_OPERATIONS {
+            return Err(invalid_durable_patch());
+        }
+        let document = destination.document()?;
+        let mut paragraph_count = document.paragraphs()?.len();
+        let mut ruby_styles: BTreeSet<String> = document
+            .ruby_styles()?
+            .styles
+            .into_iter()
+            .map(|style| style.name)
+            .collect();
+        for operation in operations {
+            if let Operation::SetRubyStyle { style } = operation {
+                ruby_styles.insert(style.name.clone());
+            }
+        }
+
+        let mut dependencies = BTreeMap::new();
+        for operation in operations {
+            match operation {
+                Operation::Noop
+                | Operation::AddRdfGraph { .. }
+                | Operation::SetProtection { .. }
+                | Operation::SetTrackedChangePolicy { .. }
+                | Operation::AddScriptResource { .. } => {},
+                Operation::InsertParagraph { index, .. } => {
+                    let satisfied = *index <= paragraph_count;
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::Paragraph,
+                        index.to_string(),
+                        satisfied,
+                    );
+                    if satisfied {
+                        paragraph_count = paragraph_count.saturating_add(1);
+                    }
+                },
+                Operation::AppendRun {
+                    paragraph,
+                    style_name: None,
+                    ..
+                }
+                | Operation::AppendHyperlink { paragraph, .. }
+                | Operation::AppendLineBreak { index: paragraph }
+                | Operation::InsertDynamicTextField { paragraph, .. } => {
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::Paragraph,
+                        paragraph.to_string(),
+                        *paragraph < paragraph_count,
+                    );
+                },
+                Operation::SetRubyStyle { style } => {
+                    if let Some(parent) = &style.parent_style_name {
+                        merge_transfer_dependency(
+                            &mut dependencies,
+                            TransferDependencyKind::RubyStyle,
+                            parent.clone(),
+                            ruby_styles.contains(parent),
+                        );
+                    }
+                },
+                _ => {
+                    return Err(Error::Unsupported(
+                        "ODT cross-document transfer refuses source-local replacement, removal, or move operations"
+                            .to_string(),
+                    ));
+                },
+            }
+        }
+        let dependencies = dependencies
+            .into_iter()
+            .map(|((kind, key), satisfied)| TransferDependency {
+                kind,
+                key,
+                satisfied,
+            })
+            .collect();
+        Ok(Self {
+            destination,
+            operations: operations.to_vec(),
+            dependencies,
+        })
+    }
+
+    /// Returns prerequisites in stable kind/key order.
+    #[must_use]
+    pub fn dependencies(&self) -> &[TransferDependency] {
+        &self.dependencies
+    }
+
+    /// Returns the number of semantic operations retained by this plan.
+    #[must_use]
+    pub fn operation_count(&self) -> usize {
+        self.operations.len()
+    }
+
+    /// Applies the planned edit only when every dependency is satisfied.
+    pub fn commit(self) -> Result<Commit> {
+        if self
+            .dependencies
+            .iter()
+            .any(|dependency| !dependency.satisfied)
+        {
+            return Err(Error::InvalidFormat(
+                "ODT transfer plan has unresolved dependencies".to_string(),
+            ));
+        }
+        Edit {
+            source: self.destination,
+            operations: self.operations,
+        }
+        .commit()
+    }
+}
+
+fn merge_transfer_dependency(
+    dependencies: &mut BTreeMap<(TransferDependencyKind, String), bool>,
+    kind: TransferDependencyKind,
+    key: String,
+    satisfied: bool,
+) {
+    dependencies
+        .entry((kind, key))
+        .and_modify(|existing| *existing &= satisfied)
+        .or_insert(satisfied);
 }
 
 /// Bounded deterministic-JSON patch for cross-process ODT exchange.
@@ -1566,7 +1909,13 @@ impl DurablePatch {
                 source: allocation_error,
             })?;
         for operation in &operations {
-            let forward = semantic_patch_operation(limits, &source_id, &target_id, operation)?;
+            let forward = semantic_patch_operation(
+                limits,
+                &source_id,
+                &target_id,
+                operation,
+                &mut forward_blobs,
+            )?;
             let inverse = restore_patch_operation(limits, &target_id, &source_id, &source_blob)?;
             pairs.push(ReversibleOperation::new(forward, inverse));
         }
@@ -1694,7 +2043,11 @@ struct DurableLineage<'a> {
 
 fn durable_patch_limits() -> PatchLimits {
     PatchLimits::new(
-        BlobLimits::new(1, MAX_PACKAGE_BYTES, MAX_PACKAGE_BYTES),
+        BlobLimits::new(
+            MAX_OPERATIONS.saturating_add(1),
+            MAX_PACKAGE_BYTES,
+            MAX_WIRE_JSON_BYTES,
+        ),
         MAX_WIRE_JSON_BYTES,
         MAX_OPERATIONS,
         6,
@@ -1737,6 +2090,7 @@ fn semantic_patch_operation(
     source: &BlobId,
     target: &BlobId,
     operation: &Operation,
+    blobs: &mut BlobBundle,
 ) -> Result<PatchOperation> {
     let (name, path, value) = match operation {
         Operation::Noop => (NOOP_OPERATION, "/".to_string(), Value::Null),
@@ -1778,15 +2132,115 @@ fn semantic_patch_operation(
             format!("/body/paragraphs/{index}/runs/-"),
             Value::Null,
         ),
+        Operation::InsertDynamicTextField { paragraph, field } => (
+            "field.dynamic.insert",
+            format!("/body/paragraphs/{paragraph}/fields/-"),
+            serde_json::json!({"xml": field.to_xml_fragment()?}),
+        ),
+        Operation::ReplaceDynamicTextField { index, field } => (
+            "field.dynamic.replace",
+            format!("/body/fields/{index}"),
+            serde_json::json!({"xml": field.to_xml_fragment()?}),
+        ),
+        Operation::RemoveDynamicTextField { index } => (
+            "field.dynamic.remove",
+            format!("/body/fields/{index}"),
+            Value::Null,
+        ),
+        Operation::SetRubyStyle { style } => (
+            "style.ruby.set",
+            format!("/styles/ruby/{}", style.name),
+            serde_json::json!({"xml": style.to_xml_fragment()?}),
+        ),
+        Operation::RemoveRubyStyle { name } => (
+            "style.ruby.remove",
+            format!("/styles/ruby/{name}"),
+            Value::Null,
+        ),
+        Operation::SetTrackedChangePolicy {
+            track_changes,
+            protection_key,
+            digest_algorithm,
+        } => (
+            "revision.policy.set",
+            "/body/tracked-changes/policy".to_string(),
+            serde_json::json!({
+                "digest_algorithm": digest_algorithm,
+                "protection_key": protection_key,
+                "track_changes": track_changes,
+            }),
+        ),
+        Operation::RemoveTrackedChange { id } => (
+            "revision.remove",
+            format!("/body/tracked-changes/{id}"),
+            Value::Null,
+        ),
+        Operation::AddRdfGraph {
+            preferred_path,
+            triples,
+        } => (
+            "rdf.graph.add",
+            "/package/rdf/-".to_string(),
+            serde_json::json!({
+                "preferred_path": preferred_path,
+                "triples": rdf_triples_value(triples)?,
+            }),
+        ),
+        Operation::ReplaceRdfGraph { path, triples } => (
+            "rdf.graph.replace",
+            format!("/package/rdf/{path}"),
+            serde_json::json!({"triples": rdf_triples_value(triples)?}),
+        ),
+        Operation::RemoveRdfGraph { path } => (
+            "rdf.graph.remove",
+            format!("/package/rdf/{path}"),
+            Value::Null,
+        ),
+        Operation::SetProtection { policy } => (
+            "protection.set",
+            "/package/protection".to_string(),
+            protection_value(policy),
+        ),
+        Operation::AddRdfTriple { path, triple } => (
+            "rdf.triple.add",
+            format!("/package/rdf/{path}/triples/-"),
+            rdf_triple_value(triple)?,
+        ),
+        Operation::ReplaceRdfTriple {
+            path,
+            index,
+            triple,
+        } => (
+            "rdf.triple.replace",
+            format!("/package/rdf/{path}/triples/{index}"),
+            rdf_triple_value(triple)?,
+        ),
+        Operation::RemoveRdfTriple { path, index } => (
+            "rdf.triple.remove",
+            format!("/package/rdf/{path}/triples/{index}"),
+            Value::Null,
+        ),
+        Operation::MoveRdfTriple { path, from, to } => (
+            "rdf.triple.move",
+            format!("/package/rdf/{path}/triples/{from}"),
+            serde_json::json!({"to": to}),
+        ),
+        Operation::AddScriptResource { resource } => (
+            "resource.script.add",
+            "/package/scripts/-".to_string(),
+            script_resource_value(resource, blobs)?,
+        ),
+        Operation::ReplaceScriptResource { path, resource } => (
+            "resource.script.replace",
+            format!("/package/scripts/{path}"),
+            script_resource_value(resource, blobs)?,
+        ),
+        Operation::RemoveScriptResource { path } => (
+            "resource.script.remove",
+            format!("/package/scripts/{path}"),
+            Value::Null,
+        ),
         Operation::RestoreSnapshot
-        | Operation::AddRdfGraph { .. }
-        | Operation::ReplaceRdfGraph { .. }
-        | Operation::RemoveRdfGraph { .. }
-        | Operation::SetProtection { .. }
-        | Operation::AddRdfTriple { .. }
-        | Operation::ReplaceRdfTriple { .. }
-        | Operation::RemoveRdfTriple { .. }
-        | Operation::MoveRdfTriple { .. }
         | Operation::AddForm { .. }
         | Operation::AddNestedForm { .. }
         | Operation::AddFormControl { .. }
@@ -1806,10 +2260,7 @@ fn semantic_patch_operation(
         | Operation::RemoveEmbeddedObject { .. }
         | Operation::RemoveEmbeddedImage { .. }
         | Operation::MoveEmbeddedObject { .. }
-        | Operation::MoveEmbeddedImage { .. }
-        | Operation::AddScriptResource { .. }
-        | Operation::ReplaceScriptResource { .. }
-        | Operation::RemoveScriptResource { .. } => {
+        | Operation::MoveEmbeddedImage { .. } => {
             return Err(Error::Unsupported(
                 "this ODT operation has not migrated to the semantic durable vocabulary"
                     .to_string(),
@@ -1892,11 +2343,23 @@ fn validate_patch_direction<Mode>(patch: &CorePatch<Mode>) -> Result<()> {
         restore_target_bytes(patch)?.ok_or_else(invalid_durable_patch)?;
         return Ok(());
     }
-    if !patch.blobs().is_empty() {
-        return Err(invalid_durable_patch());
-    }
+    let mut referenced_blobs = BTreeSet::new();
     for operation in patch.operations() {
-        decode_semantic_operation(operation)?;
+        decode_semantic_operation(operation, patch.blobs())?;
+        if matches!(
+            operation.op.as_str(),
+            "resource.script.add" | "resource.script.replace"
+        ) {
+            let id = object_required_string(&operation.value, "blob")?;
+            referenced_blobs.insert(id.to_owned());
+        }
+    }
+    if referenced_blobs.len() != patch.blobs().len()
+        || referenced_blobs
+            .iter()
+            .any(|id| blob_by_hex(patch.blobs(), id).is_none())
+    {
+        return Err(invalid_durable_patch());
     }
     Ok(())
 }
@@ -1960,7 +2423,7 @@ fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Snapshot) -> Resu
             source: allocation_error,
         })?;
     for operation in patch.operations() {
-        let decoded = decode_semantic_operation(operation)?;
+        let decoded = decode_semantic_operation(operation, patch.blobs())?;
         if !matches!(decoded, Operation::Noop) {
             operations.push(decoded);
         }
@@ -1978,7 +2441,7 @@ fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Snapshot) -> Resu
     Ok(committed.into_snapshot())
 }
 
-fn decode_semantic_operation(operation: &PatchOperation) -> Result<Operation> {
+fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> Result<Operation> {
     let index = |prefix: &str, suffix: &str| parse_target_index(&operation.target, prefix, suffix);
     match operation.op.as_str() {
         NOOP_OPERATION if operation.target == "/" && operation.value.is_null() => {
@@ -2037,7 +2500,436 @@ fn decode_semantic_operation(operation: &PatchOperation) -> Result<Operation> {
         "run.append_line_break" if operation.value.is_null() => Ok(Operation::AppendLineBreak {
             index: index("/body/paragraphs/", "/runs/-")?,
         }),
+        "field.dynamic.insert" => Ok(Operation::InsertDynamicTextField {
+            paragraph: index("/body/paragraphs/", "/fields/-")?,
+            field: dynamic_field_from_value(&operation.value)?,
+        }),
+        "field.dynamic.replace" => Ok(Operation::ReplaceDynamicTextField {
+            index: index("/body/fields/", "")?,
+            field: dynamic_field_from_value(&operation.value)?,
+        }),
+        "field.dynamic.remove" if operation.value.is_null() => {
+            Ok(Operation::RemoveDynamicTextField {
+                index: index("/body/fields/", "")?,
+            })
+        },
+        "style.ruby.set" => {
+            let name = target_tail(&operation.target, "/styles/ruby/")?;
+            let style = ruby_style_from_value(&operation.value)?;
+            if style.name != name {
+                return Err(invalid_durable_patch());
+            }
+            Ok(Operation::SetRubyStyle { style })
+        },
+        "style.ruby.remove" if operation.value.is_null() => Ok(Operation::RemoveRubyStyle {
+            name: target_tail(&operation.target, "/styles/ruby/")?,
+        }),
+        "revision.policy.set" if operation.target == "/body/tracked-changes/policy" => {
+            let value = exact_object(&operation.value, 3)?;
+            Ok(Operation::SetTrackedChangePolicy {
+                track_changes: optional_bool(value.get("track_changes"))?,
+                protection_key: optional_bounded_string(
+                    value.get("protection_key"),
+                    "tracked-change protection key",
+                )?,
+                digest_algorithm: optional_bounded_string(
+                    value.get("digest_algorithm"),
+                    "tracked-change digest algorithm",
+                )?,
+            })
+        },
+        "revision.remove" if operation.value.is_null() => Ok(Operation::RemoveTrackedChange {
+            id: target_tail(&operation.target, "/body/tracked-changes/")?,
+        }),
+        "rdf.graph.add" if operation.target == "/package/rdf/-" => {
+            let value = exact_object(&operation.value, 2)?;
+            Ok(Operation::AddRdfGraph {
+                preferred_path: optional_bounded_string(
+                    value.get("preferred_path"),
+                    "RDF preferred path",
+                )?,
+                triples: rdf_triples_from_value(
+                    value.get("triples").ok_or_else(invalid_durable_patch)?,
+                )?,
+            })
+        },
+        "rdf.graph.replace" => {
+            let value = exact_object(&operation.value, 1)?;
+            Ok(Operation::ReplaceRdfGraph {
+                path: target_tail(&operation.target, "/package/rdf/")?,
+                triples: rdf_triples_from_value(
+                    value.get("triples").ok_or_else(invalid_durable_patch)?,
+                )?,
+            })
+        },
+        "rdf.graph.remove" if operation.value.is_null() => Ok(Operation::RemoveRdfGraph {
+            path: target_tail(&operation.target, "/package/rdf/")?,
+        }),
+        "protection.set" if operation.target == "/package/protection" => {
+            Ok(Operation::SetProtection {
+                policy: protection_from_value(&operation.value)?,
+            })
+        },
+        "rdf.triple.add" => Ok(Operation::AddRdfTriple {
+            path: target_middle(&operation.target, "/package/rdf/", "/triples/-")?,
+            triple: rdf_triple_from_value(&operation.value)?,
+        }),
+        "rdf.triple.replace" => {
+            let (path, triple_index) = rdf_target(&operation.target)?;
+            Ok(Operation::ReplaceRdfTriple {
+                path,
+                index: triple_index,
+                triple: rdf_triple_from_value(&operation.value)?,
+            })
+        },
+        "rdf.triple.remove" if operation.value.is_null() => {
+            let (path, triple_index) = rdf_target(&operation.target)?;
+            Ok(Operation::RemoveRdfTriple {
+                path,
+                index: triple_index,
+            })
+        },
+        "rdf.triple.move" => {
+            let (path, from) = rdf_target(&operation.target)?;
+            let value = exact_object(&operation.value, 1)?;
+            let to = value
+                .get("to")
+                .and_then(Value::as_u64)
+                .and_then(|value| usize::try_from(value).ok())
+                .ok_or_else(invalid_durable_patch)?;
+            Ok(Operation::MoveRdfTriple { path, from, to })
+        },
+        "resource.script.add" if operation.target == "/package/scripts/-" => {
+            Ok(Operation::AddScriptResource {
+                resource: script_resource_from_value(&operation.value, blobs)?,
+            })
+        },
+        "resource.script.replace" => Ok(Operation::ReplaceScriptResource {
+            path: target_tail(&operation.target, "/package/scripts/")?,
+            resource: script_resource_from_value(&operation.value, blobs)?,
+        }),
+        "resource.script.remove" if operation.value.is_null() => {
+            Ok(Operation::RemoveScriptResource {
+                path: target_tail(&operation.target, "/package/scripts/")?,
+            })
+        },
         _ => Err(invalid_durable_patch()),
+    }
+}
+
+fn dynamic_field_from_value(value: &Value) -> Result<DynamicTextField> {
+    let fragment = object_string(value, "xml", 1)?;
+    let xml = format!(
+        r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>{fragment}</text:p></office:text></office:body></office:document-content>"#
+    );
+    let mut fields = FieldParser::parse_dynamic_text_fields(&xml)?;
+    if fields.len() != 1 {
+        return Err(invalid_durable_patch());
+    }
+    fields.pop().ok_or_else(invalid_durable_patch)
+}
+
+fn ruby_style_from_value(value: &Value) -> Result<crate::ruby_family::Style> {
+    let fragment = object_string(value, "xml", 1)?;
+    let xml = format!(
+        r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles>{fragment}</office:styles></office:document-styles>"#
+    );
+    let mut styles = crate::parse_ruby_styles(&xml)?.styles;
+    if styles.len() != 1 {
+        return Err(invalid_durable_patch());
+    }
+    styles.pop().ok_or_else(invalid_durable_patch)
+}
+
+fn rdf_triples_value(triples: &[crate::rdf::Triple]) -> Result<Value> {
+    triples
+        .iter()
+        .map(rdf_triple_value)
+        .collect::<Result<Vec<_>>>()
+        .map(Value::Array)
+}
+
+fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
+    let (subject_kind, subject_value) = match &triple.subject {
+        crate::rdf::Subject::Iri(value) => ("iri", value),
+        crate::rdf::Subject::BlankNode(value) => ("blank", value),
+        _ => {
+            return Err(Error::Unsupported(
+                "unsupported RDF subject variant".to_string(),
+            ));
+        },
+    };
+    let object = match &triple.object {
+        crate::rdf::Object::Iri(value) => serde_json::json!({"kind": "iri", "value": value}),
+        crate::rdf::Object::BlankNode(value) => {
+            serde_json::json!({"kind": "blank", "value": value})
+        },
+        crate::rdf::Object::Literal {
+            value,
+            datatype,
+            language,
+        } => serde_json::json!({
+            "datatype": datatype,
+            "kind": "literal",
+            "language": language,
+            "value": value,
+        }),
+        _ => {
+            return Err(Error::Unsupported(
+                "unsupported RDF object variant".to_string(),
+            ));
+        },
+    };
+    Ok(serde_json::json!({
+        "object": object,
+        "predicate": triple.predicate,
+        "subject": {"kind": subject_kind, "value": subject_value},
+    }))
+}
+
+fn rdf_triples_from_value(value: &Value) -> Result<Vec<crate::rdf::Triple>> {
+    let values = value.as_array().ok_or_else(invalid_durable_patch)?;
+    if values.len() > MAX_OPERATIONS {
+        return Err(invalid_durable_patch());
+    }
+    values.iter().map(rdf_triple_from_value).collect()
+}
+
+fn rdf_triple_from_value(value: &Value) -> Result<crate::rdf::Triple> {
+    let value = exact_object(value, 3)?;
+    let subject = exact_object(value.get("subject").ok_or_else(invalid_durable_patch)?, 2)?;
+    let subject_value = bounded_semantic_text(
+        object_required_string_map(subject, "value")?.to_owned(),
+        "RDF subject",
+    )?;
+    let subject = match object_required_string_map(subject, "kind")? {
+        "iri" => crate::rdf::Subject::Iri(subject_value),
+        "blank" => crate::rdf::Subject::BlankNode(subject_value),
+        _ => return Err(invalid_durable_patch()),
+    };
+    let object = exact_object(
+        value.get("object").ok_or_else(invalid_durable_patch)?,
+        value
+            .get("object")
+            .and_then(Value::as_object)
+            .map_or(0, serde_json::Map::len),
+    )?;
+    let object_value = bounded_semantic_text(
+        object_required_string_map(object, "value")?.to_owned(),
+        "RDF object",
+    )?;
+    let object = match object_required_string_map(object, "kind")? {
+        "iri" if object.len() == 2 => crate::rdf::Object::Iri(object_value),
+        "blank" if object.len() == 2 => crate::rdf::Object::BlankNode(object_value),
+        "literal" if object.len() == 4 => crate::rdf::Object::Literal {
+            value: object_value,
+            datatype: optional_bounded_string(object.get("datatype"), "RDF datatype")?,
+            language: optional_bounded_string(object.get("language"), "RDF language")?,
+        },
+        _ => return Err(invalid_durable_patch()),
+    };
+    Ok(crate::rdf::Triple {
+        subject,
+        predicate: bounded_semantic_text(
+            object_required_string_map(value, "predicate")?.to_owned(),
+            "RDF predicate",
+        )?,
+        object,
+    })
+}
+
+fn protection_value(policy: &crate::protection::Policy) -> Value {
+    serde_json::json!({
+        "bookmarks": policy.bookmarks,
+        "forms": policy.forms,
+        "read_only": policy.read_only,
+        "redline_key": policy.redline_key.as_ref().map(|key| hex_encode(key.as_bytes())),
+    })
+}
+
+fn protection_from_value(value: &Value) -> Result<crate::protection::Policy> {
+    let value = exact_object(value, 4)?;
+    let redline_key = match value.get("redline_key") {
+        Some(Value::String(value)) => Some(crate::protection::Key::new(hex_decode(value)?)?),
+        Some(Value::Null) => None,
+        _ => return Err(invalid_durable_patch()),
+    };
+    let policy = crate::protection::Policy {
+        forms: optional_bool(value.get("forms"))?,
+        bookmarks: optional_bool(value.get("bookmarks"))?,
+        read_only: optional_bool(value.get("read_only"))?,
+        redline_key,
+    };
+    policy.validate()?;
+    Ok(policy)
+}
+
+fn script_resource_value(
+    resource: &crate::ScriptResourceSpec,
+    blobs: &mut BlobBundle,
+) -> Result<Value> {
+    let blob = blobs.insert(&resource.bytes).map_err(durable_wire_error)?;
+    let kind = match resource.kind {
+        crate::ScriptResourceKind::BasicLibrary => "basic-library",
+        crate::ScriptResourceKind::BasicModule => "basic-module",
+        crate::ScriptResourceKind::Dialog => "dialog",
+        crate::ScriptResourceKind::Opaque => "opaque",
+    };
+    Ok(serde_json::json!({
+        "blob": blob.as_hex(),
+        "kind": kind,
+        "media_type": resource.media_type,
+        "preferred_path": resource.preferred_path,
+    }))
+}
+
+fn script_resource_from_value(
+    value: &Value,
+    blobs: &BlobBundle,
+) -> Result<crate::ScriptResourceSpec> {
+    let value = exact_object(value, 4)?;
+    let kind = match object_required_string_map(value, "kind")? {
+        "basic-library" => crate::ScriptResourceKind::BasicLibrary,
+        "basic-module" => crate::ScriptResourceKind::BasicModule,
+        "dialog" => crate::ScriptResourceKind::Dialog,
+        "opaque" => crate::ScriptResourceKind::Opaque,
+        _ => return Err(invalid_durable_patch()),
+    };
+    let blob = object_required_string_map(value, "blob")?;
+    if !is_canonical_digest(blob) {
+        return Err(invalid_durable_patch());
+    }
+    let bytes = blob_by_hex(blobs, blob).ok_or_else(invalid_durable_patch)?;
+    Ok(crate::ScriptResourceSpec {
+        kind,
+        preferred_path: optional_bounded_string(value.get("preferred_path"), "script path")?,
+        media_type: bounded_semantic_text(
+            object_required_string_map(value, "media_type")?.to_owned(),
+            "script media type",
+        )?,
+        bytes: copy_bytes(bytes)?,
+    })
+}
+
+fn blob_by_hex<'a>(blobs: &'a BlobBundle, id: &str) -> Option<&'a [u8]> {
+    blobs
+        .ids()
+        .find(|candidate| candidate.as_hex() == id)
+        .and_then(|candidate| blobs.get(candidate))
+}
+
+fn exact_object(value: &Value, fields: usize) -> Result<&serde_json::Map<String, Value>> {
+    let value = value.as_object().ok_or_else(invalid_durable_patch)?;
+    if value.len() != fields {
+        return Err(invalid_durable_patch());
+    }
+    Ok(value)
+}
+
+fn object_required_string<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
+    object_required_string_map(value.as_object().ok_or_else(invalid_durable_patch)?, key)
+}
+
+fn object_required_string_map<'a>(
+    value: &'a serde_json::Map<String, Value>,
+    key: &str,
+) -> Result<&'a str> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .ok_or_else(invalid_durable_patch)
+}
+
+fn optional_bounded_string(value: Option<&Value>, field: &str) -> Result<Option<String>> {
+    match value {
+        Some(Value::String(value)) => bounded_semantic_text(value.clone(), field).map(Some),
+        Some(Value::Null) => Ok(None),
+        _ => Err(invalid_durable_patch()),
+    }
+}
+
+fn optional_bool(value: Option<&Value>) -> Result<Option<bool>> {
+    match value {
+        Some(Value::Bool(value)) => Ok(Some(*value)),
+        Some(Value::Null) => Ok(None),
+        _ => Err(invalid_durable_patch()),
+    }
+}
+
+fn target_tail(target: &str, prefix: &str) -> Result<String> {
+    let value = target
+        .strip_prefix(prefix)
+        .ok_or_else(invalid_durable_patch)?;
+    if value.is_empty() {
+        return Err(invalid_durable_patch());
+    }
+    bounded_semantic_text(value.to_owned(), "durable target")
+}
+
+fn target_middle(target: &str, prefix: &str, suffix: &str) -> Result<String> {
+    let value = target
+        .strip_prefix(prefix)
+        .and_then(|value| value.strip_suffix(suffix))
+        .ok_or_else(invalid_durable_patch)?;
+    if value.is_empty() {
+        return Err(invalid_durable_patch());
+    }
+    bounded_semantic_text(value.to_owned(), "durable target")
+}
+
+fn rdf_target(target: &str) -> Result<(String, usize)> {
+    let value = target
+        .strip_prefix("/package/rdf/")
+        .ok_or_else(invalid_durable_patch)?;
+    let (path, index) = value
+        .rsplit_once("/triples/")
+        .ok_or_else(invalid_durable_patch)?;
+    if path.is_empty() {
+        return Err(invalid_durable_patch());
+    }
+    Ok((
+        bounded_semantic_text(path.to_owned(), "RDF path")?,
+        parse_canonical_index(index)?,
+    ))
+}
+
+fn parse_canonical_index(value: &str) -> Result<usize> {
+    if value.is_empty() || (value.len() > 1 && value.starts_with('0')) {
+        return Err(invalid_durable_patch());
+    }
+    value.parse().map_err(|_| invalid_durable_patch())
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        output.push(char::from(HEX[usize::from(byte >> 4)]));
+        output.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    output
+}
+
+fn hex_decode(value: &str) -> Result<Vec<u8>> {
+    if !value.len().is_multiple_of(2) {
+        return Err(invalid_durable_patch());
+    }
+    value
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let high = hex_nibble(pair[0]).ok_or_else(invalid_durable_patch)?;
+            let low = hex_nibble(pair[1]).ok_or_else(invalid_durable_patch)?;
+            Ok((high << 4) | low)
+        })
+        .collect()
+}
+
+fn hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        _ => None,
     }
 }
 
@@ -2046,10 +2938,7 @@ fn parse_target_index(target: &str, prefix: &str, suffix: &str) -> Result<usize>
         .strip_prefix(prefix)
         .and_then(|value| value.strip_suffix(suffix))
         .ok_or_else(invalid_durable_patch)?;
-    if value.is_empty() || (value.len() > 1 && value.starts_with('0')) {
-        return Err(invalid_durable_patch());
-    }
-    value.parse().map_err(|_| invalid_durable_patch())
+    parse_canonical_index(value)
 }
 
 fn object_string(value: &Value, key: &str, expected_fields: usize) -> Result<String> {
@@ -2115,15 +3004,50 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             | Operation::AppendLineBreak { index: paragraph } => {
                 writes.push(format!("/body/paragraphs/{paragraph}/content"));
             },
+            Operation::InsertDynamicTextField { paragraph, .. } => {
+                writes.push(format!("/body/paragraphs/{paragraph}/content"));
+            },
+            Operation::ReplaceDynamicTextField { index, .. }
+            | Operation::RemoveDynamicTextField { index } => {
+                writes.push(format!("/body/fields/{index}"));
+            },
+            Operation::SetRubyStyle { style } => {
+                writes.push(format!("/styles/ruby/{}", style.name));
+            },
+            Operation::RemoveRubyStyle { name } => {
+                writes.push(format!("/styles/ruby/{name}"));
+            },
+            Operation::SetTrackedChangePolicy { .. } => {
+                writes.push("/body/tracked-changes/policy".to_string());
+            },
+            Operation::RemoveTrackedChange { id } => {
+                writes.push(format!("/body/tracked-changes/{id}"));
+            },
+            Operation::AddRdfGraph { .. } => writes.push("/package/rdf/order".to_string()),
+            Operation::ReplaceRdfGraph { path, .. } | Operation::RemoveRdfGraph { path } => {
+                writes.push(format!("/package/rdf/{path}"));
+            },
+            Operation::SetProtection { .. } => {
+                writes.push("/package/protection".to_string());
+            },
+            Operation::AddRdfTriple { path, .. } => {
+                writes.push(format!("/package/rdf/{path}/triples/order"));
+            },
+            Operation::ReplaceRdfTriple { path, index, .. }
+            | Operation::RemoveRdfTriple { path, index } => {
+                writes.push(format!("/package/rdf/{path}/triples/{index}"));
+            },
+            Operation::MoveRdfTriple { path, .. } => {
+                writes.push(format!("/package/rdf/{path}/triples/order"));
+            },
+            Operation::AddScriptResource { .. } => {
+                writes.push("/package/scripts/order".to_string());
+            },
+            Operation::ReplaceScriptResource { path, .. }
+            | Operation::RemoveScriptResource { path } => {
+                writes.push(format!("/package/scripts/{path}"));
+            },
             Operation::RestoreSnapshot
-            | Operation::AddRdfGraph { .. }
-            | Operation::ReplaceRdfGraph { .. }
-            | Operation::RemoveRdfGraph { .. }
-            | Operation::SetProtection { .. }
-            | Operation::AddRdfTriple { .. }
-            | Operation::ReplaceRdfTriple { .. }
-            | Operation::RemoveRdfTriple { .. }
-            | Operation::MoveRdfTriple { .. }
             | Operation::AddForm { .. }
             | Operation::AddNestedForm { .. }
             | Operation::AddFormControl { .. }
@@ -2143,10 +3067,7 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             | Operation::RemoveEmbeddedObject { .. }
             | Operation::RemoveEmbeddedImage { .. }
             | Operation::MoveEmbeddedObject { .. }
-            | Operation::MoveEmbeddedImage { .. }
-            | Operation::AddScriptResource { .. }
-            | Operation::ReplaceScriptResource { .. }
-            | Operation::RemoveScriptResource { .. } => writes.push("/package".to_string()),
+            | Operation::MoveEmbeddedImage { .. } => writes.push("/package".to_string()),
         }
     }
     (Vec::new(), writes)
@@ -2227,9 +3148,11 @@ fn resolve_paragraph(document: &Document, selector: &ParagraphSelector) -> Resul
     }
 }
 
-fn audit_compact_xml(bytes: &[u8]) -> Result<()> {
-    let package = crate::core::OwnedPackage::from_bytes(copy_bytes(bytes)?)?;
-    let archive = package.package()?;
+fn audit_changed_xml_is_compact(source: &[u8], candidate: &[u8]) -> Result<()> {
+    let source = crate::core::OwnedPackage::from_bytes(copy_bytes(source)?)?;
+    let source_archive = source.package()?;
+    let candidate = crate::core::OwnedPackage::from_bytes(copy_bytes(candidate)?)?;
+    let archive = candidate.package()?;
     for path in archive.files()? {
         let xml_media_type = archive
             .manifest()
@@ -2237,14 +3160,89 @@ fn audit_compact_xml(bytes: &[u8]) -> Result<()> {
             .get(&path)
             .is_some_and(|entry| entry.media_type.contains("xml"));
         if path.ends_with(".xml") || path.ends_with(".rdf") || xml_media_type {
-            let xml = package.get_file(&path)?;
+            let xml = candidate.get_file(&path)?;
+            if source_archive.has_file(&path) && source.get_file(&path)? == xml {
+                continue;
+            }
             let limits = litchi_odf_common::compact_xml::Limits::new(MAX_PACKAGE_BYTES, 4_096)
                 .map_err(Error::from)?;
-            litchi_odf_common::compact_xml::validate_with_limits(&xml, limits)
-                .map_err(Error::from)?;
+            let validation_xml = numeric_reference_projection(&xml)?;
+            litchi_odf_common::compact_xml::validate_with_limits(&validation_xml, limits).map_err(
+                |source| {
+                    Error::InvalidFormat(format!("XML publication rejected for '{path}': {source}"))
+                },
+            )?;
         }
     }
     Ok(())
+}
+
+fn numeric_reference_projection(xml: &[u8]) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT compact XML numeric-reference audit",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    while cursor < xml.len() {
+        if xml[cursor..].starts_with(b"&#") {
+            let relative_end = xml[cursor + 2..]
+                .iter()
+                .position(|byte| *byte == b';')
+                .ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "ODT authored XML contains an unterminated numeric reference".to_string(),
+                    )
+                })?;
+            let end = cursor
+                .checked_add(2)
+                .and_then(|value| value.checked_add(relative_end))
+                .ok_or_else(invalid_durable_patch)?;
+            let digits = &xml[cursor + 2..end];
+            let (radix, digits) = match digits.split_first() {
+                Some((b'x', digits)) => (16, digits),
+                Some(_) => (10, digits),
+                None => return Err(invalid_numeric_reference()),
+            };
+            if digits.is_empty()
+                || digits.len() > 8
+                || !digits.iter().all(|byte| match radix {
+                    16 => byte.is_ascii_hexdigit(),
+                    _ => byte.is_ascii_digit(),
+                })
+            {
+                return Err(invalid_numeric_reference());
+            }
+            let digits = std::str::from_utf8(digits).map_err(|_| invalid_numeric_reference())?;
+            let scalar =
+                u32::from_str_radix(digits, radix).map_err(|_| invalid_numeric_reference())?;
+            if !is_xml_scalar(scalar) {
+                return Err(invalid_numeric_reference());
+            }
+            // The shared compactness checker intentionally accepts only
+            // predefined named references. This sentinel preserves structure
+            // after the numeric reference has been validated here.
+            output.push(b'x');
+            cursor = end.saturating_add(1);
+        } else {
+            output.push(xml[cursor]);
+            cursor = cursor.saturating_add(1);
+        }
+    }
+    Ok(output)
+}
+
+fn is_xml_scalar(value: u32) -> bool {
+    matches!(
+        value,
+        0x9 | 0xa | 0xd | 0x20..=0xd7ff | 0xe000..=0xfffd | 0x10000..=0x10ffff
+    )
+}
+
+fn invalid_numeric_reference() -> Error {
+    Error::InvalidFormat("ODT authored XML contains an invalid numeric reference".to_string())
 }
 
 fn ensure_editable_envelope(snapshot: &Snapshot) -> Result<()> {

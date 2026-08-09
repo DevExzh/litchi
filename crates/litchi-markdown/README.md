@@ -9,13 +9,19 @@ reversible block edits, plus the `ToMarkdown` trait and configuration types
 used by Litchi's higher-level format adapters. It deliberately has no knowledge
 of any concrete document format.
 
-Snapshots expose source-ranged block and inline views plus a deterministic
-link/image/footnote reference graph. Transactions can stage multiple disjoint
-block replacements and appends, validate reference-definition dependencies,
-and publish atomically into bounded undo/redo history. Versioned JSON patches
-carry bounded, replay-verified semantic operations; independently prepared
-patches can be joined or inspected through a non-mutating three-way merge plan
-with deterministic structured conflicts.
+Snapshots expose source-ranged top-level blocks, nested block nodes, inline
+nodes, and a deterministic link/image/footnote reference graph. Transactions
+can stage multiple disjoint block, nested-block, and inline replacements plus
+appends, validate reference-definition dependencies, and publish atomically
+into bounded undo/redo history. Versioned JSON patches carry bounded,
+replay-verified semantic operations; independently prepared patches can be
+joined or inspected through a non-mutating three-way merge plan with
+deterministic structured conflicts.
+
+Reference-aware transfer preflights recursively include definitions missing
+from a destination and refuse conflicting definitions before returning a fully
+validated commit. Projection preflights report exact source ranges for raw
+HTML, tables, task lists, and footnotes unsupported by a declared target.
 
 ```rust
 use litchi_markdown::reader::Snapshot;
@@ -30,6 +36,12 @@ let restored = commit.snapshot().apply(&commit.patch().inverse())?;
 assert_eq!(restored.snapshot().source(), source.source());
 # Ok::<(), litchi_markdown::reader::Error>(())
 ```
+
+The offline conformance tests include selected verbatim inputs distributed by
+`pulldown-cmark 0.13.4` from CommonMark 0.31.2 and its GFM suites, plus
+project-authored real-document roundtrip fixtures. Exact provenance and the
+limits of those claims are recorded in `tests/data/PROVENANCE.md`; the selected
+inputs are not represented as the complete normative suites.
 
 ## Usage
 

@@ -20,7 +20,9 @@ fn parses_complete_spreadsheet_change_graph() {
       <table:movement table:id="m1"><table:source-range-address table:start-table="0" table:start-column="1" table:start-row="2" table:end-table="0" table:end-column="3" table:end-row="4"/><table:target-range-address table:table="0" table:column="5" table:row="6"/><office:change-info><dc:creator>Mover</dc:creator><dc:date>2026-07-17T00:00:00Z</dc:date></office:change-info></table:movement>
       <table:cell-content-change table:id="c1" table:acceptance-state="accepted"><table:cell-address table:table="0" table:column="1" table:row="2"/><office:change-info><dc:creator>C</dc:creator><dc:date>2026-07-17T00:00:00Z</dc:date><text:p>A &amp;&#x20;B</text:p></office:change-info><table:previous><table:change-track-table-cell office:value-type="string" office:string-value="old" table:matrix-covered="false"><text:p>old</text:p></table:change-track-table-cell></table:previous></table:cell-content-change>
     </table:tracked-changes>"#;
-    let tracked = parse(xml).unwrap().unwrap();
+    let tracked = parse(xml)
+        .expect("test fixture or operation should succeed")
+        .expect("test fixture or operation should succeed");
     assert!(tracked.enabled);
     assert_eq!(tracked.changes.len(), 4);
     let Change::Insertion(insertion) = &tracked.changes[0] else {
@@ -47,7 +49,9 @@ fn parses_complete_spreadsheet_change_graph() {
 
 #[test]
 fn applies_defaults_and_rejects_malformed_change_graphs() {
-    let empty = parse("<table:tracked-changes/>").unwrap().unwrap();
+    let empty = parse("<table:tracked-changes/>")
+        .expect("test fixture or operation should succeed")
+        .expect("test fixture or operation should succeed");
     assert!(!empty.enabled);
     assert!(empty.changes.is_empty());
     let info = "<office:change-info><dc:creator>A</dc:creator><dc:date>2026-07-17T00:00:00Z</dc:date></office:change-info>";
@@ -103,18 +107,27 @@ fn rejects_wrong_host_and_odf_child_order() {
 fn source_map_preserves_exact_spans_and_marks_rich_records() {
     let fragment = r#"<table:tracked-changes table:track-changes="false"><table:insertion table:id="plain" table:type="row" table:position="0"><office:change-info><dc:creator>A</dc:creator><dc:date>2026-07-17T00:00:00Z</dc:date></office:change-info></table:insertion><table:insertion table:id="rich" table:type="row" table:position="1"><office:change-info><dc:creator>B</dc:creator><dc:date>2026-07-17T00:00:00Z</dc:date><text:p><text:span>rich</text:span></text:p></office:change-info></table:insertion></table:tracked-changes>"#;
     let xml = format!("{PREFIX}{fragment}{SUFFIX}");
-    let source = inspect_tracked_changes_source(&xml, &Limits::default()).unwrap();
+    let source = inspect_tracked_changes_source(&xml, &Limits::default())
+        .expect("test fixture or operation should succeed");
     assert_eq!(source.records.len(), 2);
     assert_eq!(
         &xml[source.records[0].element.whole.start..source.records[0].element.whole.end],
-        &fragment[fragment.find("<table:insertion").unwrap()
-            ..fragment.find("</table:insertion>").unwrap() + "</table:insertion>".len()]
+        &fragment[fragment
+            .find("<table:insertion")
+            .expect("test fixture or operation should succeed")
+            ..fragment
+                .find("</table:insertion>")
+                .expect("test fixture or operation should succeed")
+                + "</table:insertion>".len()]
     );
     assert!(source.records[0].regenerable);
     assert!(source.records[1].has_rich_content);
     assert!(!source.records[1].regenerable);
-    let owner = source.owner.unwrap();
-    let rewritten = rewrite_owner_tracking(&xml, &owner, Some(true), &Limits::default()).unwrap();
+    let owner = source
+        .owner
+        .expect("test fixture or operation should succeed");
+    let rewritten = rewrite_owner_tracking(&xml, &owner, Some(true), &Limits::default())
+        .expect("test fixture or operation should succeed");
     assert!(rewritten.contains("table:track-changes=\"true\""));
 }
 
@@ -129,7 +142,8 @@ fn semantic_limits_ignore_unrelated_spreadsheet_content() {
         .with_max_changes(1)
         .with_max_value_bytes(8)
         .with_max_aggregate_bytes(16);
-    let source = inspect_tracked_changes_source(&xml, &limits).unwrap();
+    let source = inspect_tracked_changes_source(&xml, &limits)
+        .expect("test fixture or operation should succeed");
     assert!(source.changes.is_none());
 
     let tracked = format!(
@@ -144,9 +158,19 @@ fn opaque_owner_pi_and_foreign_children_are_preserved_and_flagged() {
     let xml = format!(
         "{PREFIX}{fragment}<ext:outside xmlns:ext=\"urn:outside\" xmlns:table=\"urn:unrelated\" table:value-type=\"inert\"/>{SUFFIX}"
     );
-    let source = inspect_tracked_changes_source(&xml, &Limits::default()).unwrap();
-    assert!(source.changes.as_ref().unwrap().changes.is_empty());
-    let owner = source.owner.unwrap();
+    let source = inspect_tracked_changes_source(&xml, &Limits::default())
+        .expect("test fixture or operation should succeed");
+    assert!(
+        source
+            .changes
+            .as_ref()
+            .expect("test fixture or operation should succeed")
+            .changes
+            .is_empty()
+    );
+    let owner = source
+        .owner
+        .expect("test fixture or operation should succeed");
     assert!(owner.has_unsupported_content);
     assert_eq!(
         &xml[owner.element.whole.start..owner.element.whole.end],
@@ -160,11 +184,14 @@ fn opaque_owner_pi_and_foreign_children_are_preserved_and_flagged() {
 #[test]
 fn owner_local_record_insertion_expands_self_closing_owner() {
     let xml = format!("{PREFIX}<table:tracked-changes/>{SUFFIX}");
-    let source = inspect_tracked_changes_source(&xml, &Limits::default()).unwrap();
-    let owner = source.owner.unwrap();
+    let source = inspect_tracked_changes_source(&xml, &Limits::default())
+        .expect("test fixture or operation should succeed");
+    let owner = source
+        .owner
+        .expect("test fixture or operation should succeed");
     let fragment = r#"<table:insertion table:id="i" table:type="row" table:position="0"><office:change-info><dc:creator>A</dc:creator><dc:date>2026-07-17T00:00:00Z</dc:date></office:change-info></table:insertion>"#;
-    let rewritten =
-        insert_tracked_change_into_owner(&xml, &owner, fragment, &Limits::default()).unwrap();
+    let rewritten = insert_tracked_change_into_owner(&xml, &owner, fragment, &Limits::default())
+        .expect("test fixture or operation should succeed");
     assert_eq!(
         rewritten,
         format!("<table:tracked-changes>{fragment}</table:tracked-changes>")
@@ -174,11 +201,12 @@ fn owner_local_record_insertion_expands_self_closing_owner() {
 #[test]
 fn owner_insertion_expands_self_closing_spreadsheet_with_exact_qname() {
     let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:spreadsheet t:structure-protected="false"/></o:body></o:document-content>"#.to_string();
-    let source = inspect_tracked_changes_source(&xml, &Limits::default()).unwrap();
+    let source = inspect_tracked_changes_source(&xml, &Limits::default())
+        .expect("test fixture or operation should succeed");
     let owner = r#"<t:tracked-changes xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"/>"#;
     let rewritten =
         insert_tracked_owner_into_spreadsheet(&xml, &source.spreadsheet, owner, &Limits::default())
-            .unwrap();
+            .expect("test fixture or operation should succeed");
     assert_eq!(
         rewritten,
         format!(r#"<o:spreadsheet t:structure-protected="false">{owner}</o:spreadsheet>"#)
@@ -201,7 +229,9 @@ fn error_and_xsd_double_specials_round_trip_with_exact_attribute_choice() {
         let owner = format!(
             r#"<table:tracked-changes><table:cell-content-change table:id="c"><table:cell-address table:table="0" table:column="0" table:row="0"/>{info}<table:previous><table:change-track-table-cell office:value-type="{value_type}"{attributes}/></table:previous></table:cell-content-change></table:tracked-changes>"#
         );
-        let changes = parse(&owner).unwrap().unwrap();
+        let changes = parse(&owner)
+            .expect("test fixture or operation should succeed")
+            .expect("test fixture or operation should succeed");
         let Change::CellContent(change) = &changes.changes[0] else {
             panic!("expected cell-content change")
         };
@@ -219,7 +249,9 @@ fn error_and_xsd_double_specials_round_trip_with_exact_attribute_choice() {
             },
             other => panic!("unexpected parsed value {other:?}"),
         }
-        let written = changes.to_xml_fragment().unwrap();
+        let written = changes
+            .to_xml_fragment()
+            .expect("test fixture or operation should succeed");
         assert!(written.contains(expected));
     }
 
@@ -246,7 +278,9 @@ fn odf_reserved_namespaces_are_schema_controlled_but_no_namespace_is_opaque() {
     assert!(parse(&unqualified_required).is_err());
 
     let no_namespace = r#"<table:tracked-changes><insertion xmlns="" id="future"><change-info><creator>opaque</creator></change-info></insertion></table:tracked-changes>"#;
-    let changes = parse(no_namespace).unwrap().unwrap();
+    let changes = parse(no_namespace)
+        .expect("test fixture or operation should succeed")
+        .expect("test fixture or operation should succeed");
     assert!(changes.changes.is_empty());
 }
 
@@ -255,13 +289,23 @@ fn parses_libreoffice_change_tracking_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let tracked_path =
         root.join("test-data/libreoffice-core/sc/qa/unit/data/ods/change-tracking.ods");
-    let tracked = crate::Spreadsheet::open(tracked_path).unwrap();
-    let changes = tracked.tracked_changes().unwrap();
-    assert_eq!(changes.changes().unwrap().changes.len(), 2);
+    let tracked =
+        crate::Spreadsheet::open(tracked_path).expect("test fixture or operation should succeed");
+    let changes = tracked
+        .tracked_changes()
+        .expect("test fixture or operation should succeed");
+    assert_eq!(
+        changes
+            .changes()
+            .expect("test fixture or operation should succeed")
+            .changes
+            .len(),
+        2
+    );
     assert!(
         changes
             .changes()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .changes
             .iter()
             .all(|change| matches!(change, Change::CellContent(_)))
@@ -269,13 +313,14 @@ fn parses_libreoffice_change_tracking_fixtures() {
 
     let protected_path = root
         .join("test-data/libreoffice-core/sc/qa/extras/testdocuments/RecordChangesProtected.ods");
-    let protected = crate::Spreadsheet::open(protected_path).unwrap();
+    let protected =
+        crate::Spreadsheet::open(protected_path).expect("test fixture or operation should succeed");
     assert!(
         protected
             .tracked_changes()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .changes()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .changes
             .is_empty()
     );

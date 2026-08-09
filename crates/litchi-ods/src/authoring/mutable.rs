@@ -642,9 +642,13 @@ mod tests {
 
     #[test]
     fn preserves_owned_package_without_edits() {
-        let bytes = Builder::new().build().unwrap();
-        let mutable = MutableSpreadsheet::from_bytes(bytes).unwrap();
-        let reopened = Spreadsheet::from_bytes(mutable.to_bytes()).unwrap();
+        let bytes = Builder::new()
+            .build()
+            .expect("test fixture or operation should succeed");
+        let mutable = MutableSpreadsheet::from_bytes(bytes)
+            .expect("test fixture or operation should succeed");
+        let reopened = Spreadsheet::from_bytes(mutable.to_bytes())
+            .expect("test fixture or operation should succeed");
         assert!(reopened.content_xml().contains("office:spreadsheet"));
     }
 }

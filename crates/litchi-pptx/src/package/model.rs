@@ -226,8 +226,12 @@ impl Package {
                 reason: "opened-presentation patches require an already-opened package",
             });
         }
+        self.ensure_plain_mutation("apply_opened_presentation_patch")?;
         let changed = !patch.is_empty();
-        let snapshot = self.edit_typed(|opc| crate::opened::apply(opc, patch))?;
+        // The opened owner validates and captures a detached complete candidate
+        // before one assignment, so the facade's clone-and-rollback wrapper
+        // would only duplicate the entire OPC graph without adding atomicity.
+        let snapshot = crate::opened::apply(&mut self.opc, patch)?;
         if changed {
             self.mutable_pres = None;
         }

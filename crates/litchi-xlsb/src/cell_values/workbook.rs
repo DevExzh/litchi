@@ -83,28 +83,95 @@ fn validate_dependencies(snapshot: &Snapshot, workbook: &crate::Workbook) -> Res
                 reference.column()
             ))
         })?;
-        if workbook.styles().get_cell_format(style).is_none() {
-            return Err(Error::InvalidCellReference(format!(
+        let format = workbook.styles().get_cell_format(style).ok_or_else(|| {
+            Error::InvalidCellReference(format!(
                 "cell ({}, {}) references missing style index {style}",
                 reference.row(),
                 reference.column()
-            )));
-        }
-        if let Value::SharedStringIndex(index) = cell.value() {
-            let index = usize::try_from(*index).map_err(|_| {
-                Error::InvalidCellReference(format!(
-                    "cell ({}, {}) shared-string index does not fit this platform",
-                    reference.row(),
-                    reference.column()
-                ))
-            })?;
-            if workbook.shared_strings().get(index).is_none() {
+            ))
+        })?;
+        for (resource, index, present) in [
+            (
+                "font",
+                format.font_id,
+                workbook
+                    .styles()
+                    .get_font(usize::try_from(format.font_id).unwrap_or(usize::MAX))
+                    .is_some(),
+            ),
+            (
+                "fill",
+                format.fill_id,
+                workbook
+                    .styles()
+                    .get_fill(usize::try_from(format.fill_id).unwrap_or(usize::MAX))
+                    .is_some(),
+            ),
+            (
+                "border",
+                format.border_id,
+                workbook
+                    .styles()
+                    .get_border(usize::try_from(format.border_id).unwrap_or(usize::MAX))
+                    .is_some(),
+            ),
+            (
+                "number format",
+                format.num_fmt_id,
+                format.num_fmt_id < 164
+                    || workbook.styles().get_num_fmt(format.num_fmt_id).is_some(),
+            ),
+        ] {
+            if !present {
                 return Err(Error::InvalidCellReference(format!(
-                    "cell ({}, {}) references missing shared-string index {index}",
+                    "cell ({}, {}) style {style} references missing {resource} {index}",
                     reference.row(),
                     reference.column()
                 )));
             }
+        }
+        match cell.value() {
+            Value::SharedStringIndex(index) => {
+                let index = usize::try_from(*index).map_err(|_| {
+                    Error::InvalidCellReference(format!(
+                        "cell ({}, {}) shared-string index does not fit this platform",
+                        reference.row(),
+                        reference.column()
+                    ))
+                })?;
+                let string = workbook.shared_strings().get(index).ok_or_else(|| {
+                    Error::InvalidCellReference(format!(
+                        "cell ({}, {}) references missing shared-string index {index}",
+                        reference.row(),
+                        reference.column()
+                    ))
+                })?;
+                validate_string_fonts(string, workbook, reference)?;
+            },
+            Value::RichString(string) => validate_string_fonts(string, workbook, reference)?,
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
+fn validate_string_fonts(
+    string: &crate::package::shared_strings::SharedString,
+    workbook: &crate::Workbook,
+    reference: super::Reference,
+) -> Result<()> {
+    for font_id in string
+        .runs
+        .iter()
+        .map(|run| run.font_id)
+        .chain(string.phonetic.iter().map(|phonetic| phonetic.font_id))
+    {
+        if workbook.styles().get_font(usize::from(font_id)).is_none() {
+            return Err(Error::InvalidCellReference(format!(
+                "cell ({}, {}) rich string references missing font {font_id}",
+                reference.row(),
+                reference.column()
+            )));
         }
     }
     Ok(())

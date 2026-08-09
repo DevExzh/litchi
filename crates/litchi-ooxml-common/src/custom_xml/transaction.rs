@@ -175,6 +175,7 @@ impl<'a> Transaction<'a> {
             Conformance::Transitional
         };
         let xml = rewrite_props(source, before, &props, conformance)?;
+        drop(props);
         self.set_properties_xml(index, xml)
     }
 

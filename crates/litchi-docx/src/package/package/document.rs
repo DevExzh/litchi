@@ -1,8 +1,22 @@
 //! Mutable document acquisition for the package facade.
 
 use super::super::model::{Error, MutableDocument, PackURI, Package, Result};
+use super::transfer::relationship_graph_digest;
 
 impl Package {
+    /// Start the ordinary immutable main-document edit directly from this
+    /// opened package.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed snapshot error when package state is stale, malformed,
+    /// or outside the document transaction bounds.
+    pub fn edit_document(
+        &self,
+    ) -> std::result::Result<crate::document::Edit, crate::document::TransactionError> {
+        self.document_snapshot().map(|snapshot| snapshot.edit())
+    }
+
     /// Capture an immutable, source-preserving main-document snapshot.
     ///
     /// # Errors
@@ -32,6 +46,7 @@ impl Package {
         patch: &crate::document::Patch,
     ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
         let current = self.document_snapshot()?;
+        self.validate_transfer_operations(patch.operations())?;
         let candidate = patch.apply(&current)?;
         if !patch.changed() {
             return Ok(candidate);
@@ -43,6 +58,89 @@ impl Package {
             Ok(())
         })?;
         Ok(candidate)
+    }
+
+    /// Commit and atomically publish an edit created by [`Self::edit_document`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a commit, stale-source, compaction, or package-validation error
+    /// without publishing a partial edit.
+    pub fn publish_document_edit(
+        &mut self,
+        edit: crate::document::Edit,
+    ) -> std::result::Result<crate::document::Commit, crate::document::TransactionError> {
+        let commit = edit.commit()?;
+        self.publish_document_commit(commit)
+    }
+
+    /// Atomically publish a previously committed document edit.
+    ///
+    /// This is the common package boundary for ordinary edits, deterministic
+    /// composition, and resolved three-way plans.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stale-source or package-validation error without publishing
+    /// any partial mutation.
+    pub fn publish_document_commit(
+        &mut self,
+        commit: crate::document::Commit,
+    ) -> std::result::Result<crate::document::Commit, crate::document::TransactionError> {
+        self.apply_document_patch(commit.patch())?;
+        Ok(commit)
+    }
+
+    /// Publish a commit and record it in bounded history as one coupled action.
+    ///
+    /// History capacity is preflighted before package publication, and the
+    /// exact history head must match the commit source.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stale-source, history-bound, or package-validation error.
+    pub fn publish_document_commit_with_history(
+        &mut self,
+        commit: crate::document::Commit,
+        history: &mut crate::document::History,
+    ) -> std::result::Result<Vec<crate::document::Snapshot>, crate::document::TransactionError>
+    {
+        if history.current().xml_bytes() != commit.patch().source().xml_bytes() {
+            return Err(crate::document::TransactionError::StaleSource);
+        }
+        if !commit.patch().changed() {
+            self.apply_document_patch(commit.patch())?;
+            return Ok(Vec::new());
+        }
+        history.ensure_can_record(&commit)?;
+        self.apply_document_patch(commit.patch())?;
+        history.record(commit)
+    }
+
+    /// Publish one bounded undo transition atomically with the package graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stale-source or package-validation error. A publication
+    /// failure restores the history cursor before returning.
+    pub fn undo_document(
+        &mut self,
+        history: &mut crate::document::History,
+    ) -> std::result::Result<bool, crate::document::TransactionError> {
+        self.publish_history_transition(history, false)
+    }
+
+    /// Publish one bounded redo transition atomically with the package graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stale-source or package-validation error. A publication
+    /// failure restores the history cursor before returning.
+    pub fn redo_document(
+        &mut self,
+        history: &mut crate::document::History,
+    ) -> std::result::Result<bool, crate::document::TransactionError> {
+        self.publish_history_transition(history, true)
     }
 
     /// Apply a common durable semantic main-document patch atomically.
@@ -59,6 +157,30 @@ impl Package {
         patch: &litchi_core::patch::Patch<Mode>,
     ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
         let current = self.document_snapshot()?;
+        let has_transfer = patch.operations().iter().any(|operation| {
+            matches!(
+                operation.op.as_str(),
+                "paragraph.transfer.insert" | "paragraph.transfer.remove"
+            )
+        });
+        if has_transfer {
+            let dependency_digest = relationship_graph_digest(self)?;
+            for operation in patch.operations().iter().filter(|operation| {
+                matches!(
+                    operation.op.as_str(),
+                    "paragraph.transfer.insert" | "paragraph.transfer.remove"
+                )
+            }) {
+                if operation
+                    .preconditions
+                    .get("dependency_sha256")
+                    .and_then(serde_json::Value::as_str)
+                    != Some(dependency_digest.as_str())
+                {
+                    return Err(crate::document::TransactionError::StaleSource);
+                }
+            }
+        }
         let candidate = current.apply_durable(patch)?;
         if candidate.xml_bytes() == current.xml_bytes() {
             return Ok(candidate);
@@ -70,6 +192,67 @@ impl Package {
             Ok(())
         })?;
         Ok(candidate)
+    }
+
+    fn publish_history_transition(
+        &mut self,
+        history: &mut crate::document::History,
+        redo: bool,
+    ) -> std::result::Result<bool, crate::document::TransactionError> {
+        let current = self.document_snapshot()?;
+        if current.xml_bytes() != history.current().xml_bytes() {
+            return Err(crate::document::TransactionError::StaleSource);
+        }
+        let moved = if redo { history.redo() } else { history.undo() };
+        if !moved {
+            return Ok(false);
+        }
+        let replacement = history.current().xml_bytes().to_vec();
+        let result = self.edit_semantic_opc("publish_document_history", move |opc| {
+            let main_name = opc.main_document_part()?.partname().clone();
+            opc.get_part_mut(&main_name)?.set_blob(replacement);
+            Ok(())
+        });
+        if let Err(error) = result {
+            if redo {
+                let _restored = history.undo();
+            } else {
+                let _restored = history.redo();
+            }
+            return Err(crate::document::TransactionError::from(error));
+        }
+        Ok(true)
+    }
+
+    fn validate_transfer_operations(
+        &self,
+        operations: &[crate::document::Operation],
+    ) -> std::result::Result<(), crate::document::TransactionError> {
+        if !operations.iter().any(|operation| {
+            matches!(
+                operation,
+                crate::document::Operation::InsertTransferredParagraph { .. }
+                    | crate::document::Operation::RemoveTransferredParagraph { .. }
+            )
+        }) {
+            return Ok(());
+        }
+        let expected = relationship_graph_digest(self)?;
+        if operations.iter().any(|operation| {
+            matches!(
+                operation,
+                crate::document::Operation::InsertTransferredParagraph {
+                    dependency_digest,
+                    ..
+                } | crate::document::Operation::RemoveTransferredParagraph {
+                    dependency_digest,
+                    ..
+                } if dependency_digest.as_ref() != expected.as_str()
+            )
+        }) {
+            return Err(crate::document::TransactionError::StaleSource);
+        }
+        Ok(())
     }
 
     /// Get a mutable document for writing and modification.

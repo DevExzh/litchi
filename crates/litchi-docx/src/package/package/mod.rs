@@ -11,4 +11,5 @@ mod document;
 mod merge;
 mod parts;
 mod settings;
+mod transfer;
 mod validation;

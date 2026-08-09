@@ -69,7 +69,12 @@ pub fn read(xml: &[u8]) -> Result<Value> {
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
         {
-            Event::Text(text) if text.decode().map_err(xml_error)?.trim().is_empty() => {},
+            Event::Text(text)
+                if text
+                    .decode()
+                    .map_err(|error| xml_error(&error))?
+                    .trim()
+                    .is_empty() => {},
             Event::Start(element) => {
                 return Ok(read_choice(&mut reader, &element)?
                     .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))));
@@ -140,7 +145,12 @@ fn read_choice(reader: &mut Reader<&[u8]>, element: &BytesStart<'_>) -> Result<O
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
         {
-            Event::Text(text) if text.decode().map_err(xml_error)?.trim().is_empty() => {},
+            Event::Text(text)
+                if text
+                    .decode()
+                    .map_err(|error| xml_error(&error))?
+                    .trim()
+                    .is_empty() => {},
             Event::Empty(element) => {
                 let Some(transform) = parse_transform(&element, reader.decoder())? else {
                     return Ok(None);
@@ -269,7 +279,12 @@ fn parse_started_transform(
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
         {
-            Event::Text(text) if text.decode().map_err(xml_error)?.trim().is_empty() => {},
+            Event::Text(text)
+                if text
+                    .decode()
+                    .map_err(|error| xml_error(&error))?
+                    .trim()
+                    .is_empty() => {},
             Event::End(end) if end.name().as_ref() == name.as_slice() => {
                 return Ok(Some(transform));
             },
@@ -539,7 +554,12 @@ fn tail_is_empty(reader: &mut Reader<&[u8]>) -> Result<bool> {
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
         {
-            Event::Text(text) if text.decode().map_err(xml_error)?.trim().is_empty() => {},
+            Event::Text(text)
+                if text
+                    .decode()
+                    .map_err(|error| xml_error(&error))?
+                    .trim()
+                    .is_empty() => {},
             Event::Eof => return Ok(true),
             Event::Start(_)
             | Event::End(_)
@@ -555,10 +575,6 @@ fn tail_is_empty(reader: &mut Reader<&[u8]>) -> Result<bool> {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "quick_xml map_err callbacks deliver this small encoding error by value"
-)]
-fn xml_error(error: quick_xml::encoding::EncodingError) -> Error {
+fn xml_error(error: &quick_xml::encoding::EncodingError) -> Error {
     Error::Xml(error.to_string())
 }

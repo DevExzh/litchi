@@ -1084,13 +1084,14 @@ mod tests {
                 sample_date_is().into(),
             ],
         )
-        .unwrap()
+        .expect("test fixture or operation should succeed")
     }
 
     #[test]
     fn writes_all_rule_types_with_escaped_values() {
         let mut xml = String::new();
-        write_conditional_formats(&mut xml, &[sample_format()]).unwrap();
+        write_conditional_formats(&mut xml, &[sample_format()])
+            .expect("test fixture or operation should succeed");
         assert!(xml.starts_with("<calcext:conditional-formats>"));
         assert!(xml.contains(
             r#"<calcext:condition calcext:apply-style-name="Good" calcext:value="cell-content()&gt;5" calcext:base-cell-address="Sheet1.A1"/>"#
@@ -1122,7 +1123,7 @@ mod tests {
     #[test]
     fn writes_nothing_for_an_empty_collection() {
         let mut xml = String::new();
-        write_conditional_formats(&mut xml, &[]).unwrap();
+        write_conditional_formats(&mut xml, &[]).expect("test fixture or operation should succeed");
         assert!(xml.is_empty());
     }
 
@@ -1206,6 +1207,7 @@ mod tests {
             ColorScaleEntry::new(EntryType::Minimum, "0", "#ff0000"),
             ColorScaleEntry::new(EntryType::Formula, "MAX([.A1:.A9])/2", "#00ff00"),
         ]);
-        Format::new(vec![".A1".to_string()], vec![scale.into()]).unwrap();
+        Format::new(vec![".A1".to_string()], vec![scale.into()])
+            .expect("test fixture or operation should succeed");
     }
 }

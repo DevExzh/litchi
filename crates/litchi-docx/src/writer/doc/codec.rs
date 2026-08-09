@@ -42,7 +42,7 @@ impl MutableDocument {
     }
 }
 
-pub(super) fn compact_changed_document_xml(source: &str) -> Result<String> {
+pub(crate) fn compact_changed_document_xml(source: &str) -> Result<String> {
     let mut reader = Reader::from_str(source);
     reader.config_mut().trim_text(false);
     let mut output = String::with_capacity(source.len());

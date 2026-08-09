@@ -9,15 +9,19 @@ use litchi_core::xml::escape_xml;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use quick_xml::{Reader, XmlVersion};
 use thiserror::Error;
 
 use crate::namespace::{
     STRICT_WORDPROCESSINGML_NAMESPACE, WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace,
 };
-use crate::paragraph::{Paragraph, is_fragment_word_name};
+use crate::paragraph::Paragraph;
 
-pub use durable::{Composition, History, JoinError, PreparedEdit};
-pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
+pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
+pub use litchi_core::patch::{
+    CompositionLimits, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
+    ThreeWayMergeFailure,
+};
 
 const MAX_DOCUMENT_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DOCUMENT_DEPTH: usize = 256;
@@ -38,6 +42,14 @@ pub enum Refusal {
     ComplexRun,
     /// The selected hyperlink does not exist.
     HyperlinkNotFound,
+    /// The selected direct paragraph run does not exist.
+    RunNotFound,
+    /// The selected simple field does not exist.
+    FieldNotFound,
+    /// The selected tracked insertion or deletion does not exist.
+    RevisionNotFound,
+    /// The selected direct inline content control does not exist.
+    ContentControlNotFound,
     /// The selected table, row, or cell does not exist.
     CellNotFound,
     /// The requested text needs structural run elements such as `w:tab` or
@@ -48,12 +60,113 @@ pub enum Refusal {
 impl std::fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
-            Self::ComplexContent => "paragraph contains non-simple inline content",
+            Self::ComplexContent => "selected owner contains unsupported structural content",
             Self::ComplexRun => "selected content has no editable Word text",
             Self::HyperlinkNotFound => "direct paragraph hyperlink was not found",
+            Self::RunNotFound => "direct paragraph run was not found",
+            Self::FieldNotFound => "direct simple field was not found",
+            Self::RevisionNotFound => "direct tracked revision was not found",
+            Self::ContentControlNotFound => "direct inline content control was not found",
             Self::CellNotFound => "table cell was not found",
             Self::StructuralText => "text requires structural WordprocessingML elements",
         })
+    }
+}
+
+/// Direct tracked-revision wrapper selected for inert text replacement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RevisionKind {
+    /// `w:ins` tracked insertion content.
+    Insertion,
+    /// `w:del` tracked deletion content.
+    Deletion,
+}
+
+/// Dependency-checked paragraph payload prepared for one exact receiving
+/// document. Package planning rewrites relationship references to dependencies
+/// already proven present in the receiver before constructing this value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParagraphTransfer {
+    target: Arc<Vec<u8>>,
+    fragment: Arc<Vec<u8>>,
+    dependency_digest: Arc<str>,
+}
+
+impl ParagraphTransfer {
+    pub(crate) fn new(target: Arc<Vec<u8>>, fragment: Vec<u8>, dependency_digest: String) -> Self {
+        Self {
+            target,
+            fragment: Arc::new(fragment),
+            dependency_digest: dependency_digest.into(),
+        }
+    }
+
+    /// Exact compact paragraph XML retained by the plan.
+    #[must_use]
+    pub fn xml_bytes(&self) -> &[u8] {
+        self.fragment.as_slice()
+    }
+}
+
+impl RevisionKind {
+    const fn local_name(self) -> &'static [u8] {
+        match self {
+            Self::Insertion => b"ins",
+            Self::Deletion => b"del",
+        }
+    }
+}
+
+/// Typed reason why a cross-package paragraph dependency closure cannot be
+/// represented without copying or guessing package resources.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TransferRefusal {
+    /// A relationship reference in the donor paragraph is dangling.
+    MissingDonorRelationship(String),
+    /// The receiving package has no semantically equivalent dependency edge.
+    MissingEquivalentDependency {
+        /// OPC relationship type URI.
+        relationship_type: String,
+        /// Exact external or relative internal target reference.
+        target: String,
+    },
+    /// Multiple receiver edges are equivalent, so choosing an ID would guess.
+    AmbiguousEquivalentDependency {
+        /// OPC relationship type URI.
+        relationship_type: String,
+        /// Exact external or relative internal target reference.
+        target: String,
+    },
+    /// The selected donor paragraph could not be represented as compact XML.
+    InvalidParagraphXml,
+}
+
+impl std::fmt::Display for TransferRefusal {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingDonorRelationship(identifier) => {
+                write!(formatter, "donor relationship {identifier} is missing")
+            },
+            Self::MissingEquivalentDependency {
+                relationship_type,
+                target,
+            } => write!(
+                formatter,
+                "receiver lacks dependency {relationship_type} -> {target}"
+            ),
+            Self::AmbiguousEquivalentDependency {
+                relationship_type,
+                target,
+            } => write!(
+                formatter,
+                "receiver dependency {relationship_type} -> {target} is ambiguous"
+            ),
+            Self::InvalidParagraphXml => {
+                formatter.write_str("donor paragraph XML is not transferable")
+            },
+        }
     }
 }
 
@@ -107,6 +220,9 @@ pub enum TransactionError {
     /// A durable patch used an unsupported or malformed DOCX vocabulary.
     #[error("invalid DOCX durable patch: {0}")]
     InvalidDurable(String),
+    /// A cross-package transfer dependency could not be closed safely.
+    #[error("paragraph transfer refused: {0}")]
+    Transfer(TransferRefusal),
 }
 
 /// An immutable, cheaply clonable snapshot of the main document XML.
@@ -223,6 +339,52 @@ pub enum Operation {
         /// Text produced by the operation.
         after: String,
     },
+    /// Replace text in one direct run inside an otherwise rich paragraph.
+    ReplaceRunText {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Direct run position within the paragraph.
+        run: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
+    /// Replace the displayed result of one direct `w:fldSimple` field.
+    ReplaceSimpleFieldText {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Direct simple-field position within the paragraph.
+        field: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
+    /// Replace inert text inside one direct tracked revision wrapper.
+    ReplaceRevisionText {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Tracked wrapper family.
+        kind: RevisionKind,
+        /// Position among direct wrappers of the selected family.
+        revision: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
+    /// Replace text in one direct inline content control.
+    ReplaceContentControlText {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Direct inline content-control position within the paragraph.
+        control: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
     /// Replace text in one basic direct-body table cell.
     ReplaceCellText {
         /// Direct-body table position.
@@ -231,6 +393,21 @@ pub enum Operation {
         row: Position,
         /// Direct cell position in the row.
         cell: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
+    /// Replace one direct paragraph inside a rich or multi-paragraph cell.
+    ReplaceCellParagraphText {
+        /// Direct-body table position.
+        table: Position,
+        /// Direct row position in the table.
+        row: Position,
+        /// Direct cell position in the row.
+        cell: Position,
+        /// Direct paragraph position in the cell.
+        paragraph: Position,
         /// Text required before applying the operation.
         before: String,
         /// Text produced by the operation.
@@ -249,6 +426,24 @@ pub enum Operation {
         position: Position,
         /// Removed inert text.
         text: String,
+    },
+    /// Insert one dependency-checked compact paragraph fragment.
+    InsertTransferredParagraph {
+        /// Projected insertion position.
+        position: Position,
+        /// Compact paragraph XML with receiver-local relationship references.
+        xml: Arc<Vec<u8>>,
+        /// Exact receiver relationship/resource inventory required at publish.
+        dependency_digest: Arc<str>,
+    },
+    /// Remove the exact transferred paragraph fragment.
+    RemoveTransferredParagraph {
+        /// Projected paragraph position.
+        position: Position,
+        /// Exact compact paragraph XML expected at the position.
+        xml: Arc<Vec<u8>>,
+        /// Exact receiver relationship/resource inventory required at publish.
+        dependency_digest: Arc<str>,
     },
 }
 
@@ -275,6 +470,52 @@ impl Operation {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::ReplaceRunText {
+                paragraph,
+                run,
+                before,
+                after,
+            } => Self::ReplaceRunText {
+                paragraph: *paragraph,
+                run: *run,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ReplaceSimpleFieldText {
+                paragraph,
+                field,
+                before,
+                after,
+            } => Self::ReplaceSimpleFieldText {
+                paragraph: *paragraph,
+                field: *field,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ReplaceRevisionText {
+                paragraph,
+                kind,
+                revision,
+                before,
+                after,
+            } => Self::ReplaceRevisionText {
+                paragraph: *paragraph,
+                kind: *kind,
+                revision: *revision,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ReplaceContentControlText {
+                paragraph,
+                control,
+                before,
+                after,
+            } => Self::ReplaceContentControlText {
+                paragraph: *paragraph,
+                control: *control,
+                before: after.clone(),
+                after: before.clone(),
+            },
             Self::ReplaceCellText {
                 table,
                 row,
@@ -288,6 +529,21 @@ impl Operation {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::ReplaceCellParagraphText {
+                table,
+                row,
+                cell,
+                paragraph,
+                before,
+                after,
+            } => Self::ReplaceCellParagraphText {
+                table: *table,
+                row: *row,
+                cell: *cell,
+                paragraph: *paragraph,
+                before: after.clone(),
+                after: before.clone(),
+            },
             Self::InsertParagraph { position, text } => Self::RemoveParagraph {
                 position: *position,
                 text: text.clone(),
@@ -295,6 +551,24 @@ impl Operation {
             Self::RemoveParagraph { position, text } => Self::InsertParagraph {
                 position: *position,
                 text: text.clone(),
+            },
+            Self::InsertTransferredParagraph {
+                position,
+                xml,
+                dependency_digest,
+            } => Self::RemoveTransferredParagraph {
+                position: *position,
+                xml: Arc::clone(xml),
+                dependency_digest: Arc::clone(dependency_digest),
+            },
+            Self::RemoveTransferredParagraph {
+                position,
+                xml,
+                dependency_digest,
+            } => Self::InsertTransferredParagraph {
+                position: *position,
+                xml: Arc::clone(xml),
+                dependency_digest: Arc::clone(dependency_digest),
             },
         }
     }
@@ -482,6 +756,159 @@ impl Edit {
         Ok(self)
     }
 
+    /// Replace text in one direct run while retaining its `w:rPr`, drawings,
+    /// and opaque run children. This provides a checked edit seam inside a
+    /// paragraph that also contains fields, hyperlinks, or revision wrappers.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot.
+    pub fn replace_run_text(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        self.replace_direct_paragraph_owner_text(
+            paragraph,
+            run,
+            b"r",
+            Refusal::RunNotFound,
+            authored_text.into(),
+            |before, after| Operation::ReplaceRunText {
+                paragraph,
+                run,
+                before,
+                after,
+            },
+        )
+    }
+
+    /// Replace the displayed text of one direct simple field while preserving
+    /// its instruction, dirty/lock state, formatting, and opaque XML.
+    ///
+    /// Field instructions remain inert and are never evaluated or refreshed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot.
+    pub fn replace_simple_field_text(
+        &mut self,
+        paragraph: Position,
+        field: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        self.replace_direct_paragraph_owner_text(
+            paragraph,
+            field,
+            b"fldSimple",
+            Refusal::FieldNotFound,
+            authored_text.into(),
+            |before, after| Operation::ReplaceSimpleFieldText {
+                paragraph,
+                field,
+                before,
+                after,
+            },
+        )
+    }
+
+    /// Replace inert text inside one direct tracked insertion or deletion.
+    /// Revision metadata and the wrapper itself remain byte-preserved.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot.
+    pub fn replace_revision_text(
+        &mut self,
+        paragraph: Position,
+        kind: RevisionKind,
+        revision: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        self.replace_direct_paragraph_owner_text(
+            paragraph,
+            revision,
+            kind.local_name(),
+            Refusal::RevisionNotFound,
+            authored_text.into(),
+            |before, after| Operation::ReplaceRevisionText {
+                paragraph,
+                kind,
+                revision,
+                before,
+                after,
+            },
+        )
+    }
+
+    /// Replace text inside one direct inline content control while retaining
+    /// `w:sdtPr`, data binding, lock state, wrapper metadata, and opaque XML.
+    ///
+    /// This operation supports an inline `w:sdtContent` whose direct children
+    /// are runs; block controls and nested control structures are refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot.
+    pub fn replace_content_control_text(
+        &mut self,
+        paragraph: Position,
+        control: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        self.reserve_operation()?;
+        let text = authored_text.into();
+        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let replacement_text_bytes = self.checked_text_total(text.len())?;
+        let content = select_content_control_content(&self.projected, paragraph, control)?;
+        let content_xml = checked_slice(
+            self.projected.xml_bytes(),
+            content.0,
+            content.1,
+            "content control content",
+        )?;
+        let owner = scan_text_owner(content_xml, b"sdtContent").map_err(|reason| {
+            TransactionError::Refused {
+                position: paragraph.get(),
+                reason,
+            }
+        })?;
+        if owner.text == text {
+            return Ok(self);
+        }
+        let replacement = rewrite_text_owner(content_xml, &owner, &text)?;
+        let candidate = Snapshot::from_xml(replace_range(
+            self.projected.xml_bytes(),
+            content.0,
+            content.1,
+            &replacement,
+        )?)?;
+        let actual = selected_content_control_text(&candidate, paragraph, control)?;
+        if actual != text {
+            return Err(crate::Error::InvalidFormat(
+                "document content-control edit failed semantic readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::ReplaceContentControlText {
+            paragraph,
+            control,
+            before: owner.text,
+            after: text,
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
     /// Replace text in a basic direct-body table cell.
     ///
     /// The supported cell contains one direct paragraph. Its existing runs,
@@ -544,6 +971,85 @@ impl Edit {
             table,
             row,
             cell,
+            before: owner.text,
+            after: text,
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
+    /// Replace one direct paragraph in a rich or multi-paragraph table cell.
+    /// Other paragraphs, nested tables, cell properties, and opaque cell XML
+    /// remain untouched.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot.
+    pub fn replace_table_cell_paragraph_text(
+        &mut self,
+        table: Position,
+        row: Position,
+        cell: Position,
+        paragraph: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        self.reserve_operation()?;
+        let text = authored_text.into();
+        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+            position: table.get(),
+            reason,
+        })?;
+        let replacement_text_bytes = self.checked_text_total(text.len())?;
+        let cell_selection = select_cell(&self.projected, table, row, cell)?;
+        let paragraph_range = select_direct_child(
+            cell_selection.xml,
+            b"tc",
+            b"p",
+            paragraph,
+            Refusal::CellNotFound,
+        )
+        .map_err(|reason| TransactionError::Refused {
+            position: table.get(),
+            reason,
+        })?;
+        let paragraph_start = checked_relative_start(cell_selection.start, paragraph_range)?;
+        let paragraph_end = checked_relative_end(cell_selection.start, paragraph_range)?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "table cell paragraph",
+        )?;
+        let owner =
+            scan_text_owner(paragraph_xml, b"p").map_err(|reason| TransactionError::Refused {
+                position: table.get(),
+                reason,
+            })?;
+        if owner.text == text {
+            return Ok(self);
+        }
+        let replacement = rewrite_text_owner(paragraph_xml, &owner, &text)?;
+        let xml = replace_range(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            &replacement,
+        )?;
+        let candidate = Snapshot::from_xml(xml)?;
+        let actual = selected_cell_paragraph_text(&candidate, table, row, cell, paragraph)?;
+        if actual != text {
+            return Err(crate::Error::InvalidFormat(
+                "document table-cell paragraph edit failed semantic readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::ReplaceCellParagraphText {
+            table,
+            row,
+            cell,
+            paragraph,
             before: owner.text,
             after: text,
         });
@@ -621,6 +1127,31 @@ impl Edit {
         Ok(self)
     }
 
+    /// Insert one non-mutating dependency-checked paragraph transfer plan.
+    ///
+    /// The plan is receiver-specific: every relationship reference was mapped
+    /// to an equivalent relationship already owned by the exact target
+    /// package. This method never copies or guesses package dependencies.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stale-plan, position, operation-bound, or XML validation
+    /// error without changing the projected snapshot.
+    pub fn insert_paragraph_transfer(
+        &mut self,
+        position: Position,
+        plan: &ParagraphTransfer,
+    ) -> TransactionResult<&mut Self> {
+        if plan.target.as_slice() != self.base.xml_bytes() {
+            return Err(TransactionError::StaleSource);
+        }
+        self.insert_transferred_paragraph(
+            position,
+            Arc::clone(&plan.fragment),
+            Arc::clone(&plan.dependency_digest),
+        )
+    }
+
     fn apply_operation(&mut self, operation: &Operation) -> TransactionResult<&mut Self> {
         match operation {
             Operation::ReplaceParagraphText {
@@ -652,6 +1183,73 @@ impl Edit {
                 }
                 self.replace_hyperlink_text(*paragraph, *hyperlink, after.clone())
             },
+            Operation::ReplaceRunText {
+                paragraph,
+                run,
+                before,
+                after,
+            } => {
+                if selected_direct_paragraph_owner_text(
+                    &self.projected,
+                    *paragraph,
+                    *run,
+                    b"r",
+                    Refusal::RunNotFound,
+                )? != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_run_text(*paragraph, *run, after.clone())
+            },
+            Operation::ReplaceSimpleFieldText {
+                paragraph,
+                field,
+                before,
+                after,
+            } => {
+                if selected_direct_paragraph_owner_text(
+                    &self.projected,
+                    *paragraph,
+                    *field,
+                    b"fldSimple",
+                    Refusal::FieldNotFound,
+                )? != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_simple_field_text(*paragraph, *field, after.clone())
+            },
+            Operation::ReplaceRevisionText {
+                paragraph,
+                kind,
+                revision,
+                before,
+                after,
+            } => {
+                if selected_direct_paragraph_owner_text(
+                    &self.projected,
+                    *paragraph,
+                    *revision,
+                    kind.local_name(),
+                    Refusal::RevisionNotFound,
+                )? != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_revision_text(*paragraph, *kind, *revision, after.clone())
+            },
+            Operation::ReplaceContentControlText {
+                paragraph,
+                control,
+                before,
+                after,
+            } => {
+                if selected_content_control_text(&self.projected, *paragraph, *control)? != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_content_control_text(*paragraph, *control, after.clone())
+            },
             Operation::ReplaceCellText {
                 table,
                 row,
@@ -664,12 +1262,47 @@ impl Edit {
                 }
                 self.replace_table_cell_text(*table, *row, *cell, after.clone())
             },
+            Operation::ReplaceCellParagraphText {
+                table,
+                row,
+                cell,
+                paragraph,
+                before,
+                after,
+            } => {
+                if selected_cell_paragraph_text(&self.projected, *table, *row, *cell, *paragraph)?
+                    != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_table_cell_paragraph_text(
+                    *table,
+                    *row,
+                    *cell,
+                    *paragraph,
+                    after.clone(),
+                )
+            },
             Operation::InsertParagraph { position, text } => {
                 self.insert_paragraph(*position, text.clone())
             },
             Operation::RemoveParagraph { position, text } => {
                 self.remove_plain_paragraph(*position, text)
             },
+            Operation::InsertTransferredParagraph {
+                position,
+                xml,
+                dependency_digest,
+            } => self.insert_transferred_paragraph(
+                *position,
+                Arc::clone(xml),
+                Arc::clone(dependency_digest),
+            ),
+            Operation::RemoveTransferredParagraph {
+                position,
+                xml,
+                dependency_digest,
+            } => self.remove_transferred_paragraph(*position, xml, dependency_digest),
         }
     }
 
@@ -703,6 +1336,147 @@ impl Edit {
         Ok(self)
     }
 
+    fn insert_transferred_paragraph(
+        &mut self,
+        position: Position,
+        xml: Arc<Vec<u8>>,
+        dependency_digest: Arc<str>,
+    ) -> TransactionResult<&mut Self> {
+        self.reserve_operation()?;
+        let count = self.projected.paragraph_count();
+        if position.get() > count {
+            return Err(TransactionError::OutOfBounds {
+                position: position.get(),
+                len: count,
+            });
+        }
+        let offset = if position.get() == count {
+            usize::try_from(self.projected.content_end).map_err(|_error| {
+                crate::Error::InvalidFormat("document insertion offset does not fit usize".into())
+            })?
+        } else {
+            checked_start(self.range(position)?, "paragraph")?
+        };
+        let candidate = Snapshot::from_xml(replace_range(
+            self.projected.xml_bytes(),
+            offset,
+            offset,
+            xml.as_slice(),
+        )?)?;
+        let inserted = candidate
+            .paragraph(position)
+            .ok_or(TransactionError::OutOfBounds {
+                position: position.get(),
+                len: candidate.paragraph_count(),
+            })?;
+        if inserted.xml_bytes() != xml.as_slice() {
+            return Err(crate::Error::InvalidFormat(
+                "transferred paragraph failed exact readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::InsertTransferredParagraph {
+            position,
+            xml,
+            dependency_digest,
+        });
+        self.projected = candidate;
+        Ok(self)
+    }
+
+    fn remove_transferred_paragraph(
+        &mut self,
+        position: Position,
+        xml: &Arc<Vec<u8>>,
+        dependency_digest: &Arc<str>,
+    ) -> TransactionResult<&mut Self> {
+        self.reserve_operation()?;
+        let range = self.range(position)?;
+        let start = checked_start(range, "paragraph")?;
+        let end = checked_end(range, "paragraph")?;
+        let source = checked_slice(self.projected.xml_bytes(), start, end, "paragraph")?;
+        if source != xml.as_slice() {
+            return Err(TransactionError::SemanticPrecondition);
+        }
+        let candidate =
+            Snapshot::from_xml(replace_range(self.projected.xml_bytes(), start, end, &[])?)?;
+        self.operations.push(Operation::RemoveTransferredParagraph {
+            position,
+            xml: Arc::clone(xml),
+            dependency_digest: Arc::clone(dependency_digest),
+        });
+        self.projected = candidate;
+        Ok(self)
+    }
+
+    fn replace_direct_paragraph_owner_text(
+        &mut self,
+        paragraph: Position,
+        owner: Position,
+        child_name: &[u8],
+        missing: Refusal,
+        text: String,
+        operation: impl FnOnce(String, String) -> Operation,
+    ) -> TransactionResult<&mut Self> {
+        self.reserve_operation()?;
+        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let replacement_text_bytes = self.checked_text_total(text.len())?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let owner_range = select_direct_child(paragraph_xml, b"p", child_name, owner, missing)
+            .map_err(|reason| TransactionError::Refused {
+                position: paragraph.get(),
+                reason,
+            })?;
+        let owner_start = checked_relative_start(paragraph_start, owner_range)?;
+        let owner_end = checked_relative_end(paragraph_start, owner_range)?;
+        let owner_xml = checked_slice(
+            self.projected.xml_bytes(),
+            owner_start,
+            owner_end,
+            "paragraph text owner",
+        )?;
+        let scanned =
+            scan_text_owner(owner_xml, child_name).map_err(|reason| TransactionError::Refused {
+                position: paragraph.get(),
+                reason,
+            })?;
+        if scanned.text == text {
+            return Ok(self);
+        }
+        let replacement = rewrite_text_owner(owner_xml, &scanned, &text)?;
+        let xml = replace_range(
+            self.projected.xml_bytes(),
+            owner_start,
+            owner_end,
+            &replacement,
+        )?;
+        let candidate = Snapshot::from_xml(xml)?;
+        let actual = selected_direct_paragraph_owner_text(
+            &candidate, paragraph, owner, child_name, missing,
+        )?;
+        if actual != text {
+            return Err(crate::Error::InvalidFormat(
+                "document owner text edit failed semantic readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(operation(scanned.text, text));
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
     /// Validate and publish the projected snapshot without changing the
     /// source snapshot.
     ///
@@ -710,17 +1484,28 @@ impl Edit {
     ///
     /// Reserved for commit-time document validation failures.
     pub fn commit(self) -> TransactionResult<Commit> {
+        let projected = if self.base.same_source(&self.projected) {
+            self.projected
+        } else {
+            let source = std::str::from_utf8(self.projected.xml_bytes()).map_err(|error| {
+                crate::Error::InvalidFormat(format!(
+                    "changed main-document XML is not UTF-8: {error}"
+                ))
+            })?;
+            let compact = crate::writer::doc::compact_changed_document_xml(source)?;
+            Snapshot::from_xml(compact.into_bytes())?
+        };
         let diagnostics = Diagnostics {
             operations: self.operations.len(),
-            changed: !self.base.same_source(&self.projected),
+            changed: !self.base.same_source(&projected),
         };
         let patch = Patch {
             before: self.base,
-            after: self.projected.clone(),
+            after: projected.clone(),
             operations: self.operations.into(),
         };
         Ok(Commit {
-            snapshot: self.projected,
+            snapshot: projected,
             patch,
             diagnostics,
         })
@@ -832,6 +1617,18 @@ pub struct Patch {
 }
 
 impl Patch {
+    /// Exact immutable source required by this patch.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.before
+    }
+
+    /// Exact immutable target produced by this patch.
+    #[must_use]
+    pub const fn target(&self) -> &Snapshot {
+        &self.after
+    }
+
     /// Borrow the semantic operations in staging order.
     #[must_use]
     pub fn operations(&self) -> &[Operation] {
@@ -915,7 +1712,22 @@ struct TextSlot {
     start: usize,
     end: usize,
     prefix: Vec<u8>,
+    local_name: Vec<u8>,
     characters: usize,
+}
+
+enum FragmentPrefix {
+    Unseen,
+    Unprefixed,
+    Prefixed(Vec<u8>),
+}
+
+impl FragmentPrefix {
+    fn from_name(name: quick_xml::name::QName<'_>) -> Self {
+        name.prefix().map_or(Self::Unprefixed, |prefix| {
+            Self::Prefixed(prefix.into_inner().to_vec())
+        })
+    }
 }
 
 struct CellSelection<'a> {
@@ -1140,11 +1952,11 @@ fn checked_range(start: usize, end: usize) -> TransactionResult<Range> {
 
 fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
     let mut reader = NsReader::from_reader(xml);
-    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut fragment_prefix = FragmentPrefix::Unseen;
     let mut root_depth = None;
     let mut run_depth = None;
     let mut slots = Vec::new();
-    let mut open_text = None::<(usize, Vec<u8>)>;
+    let mut open_text = None::<(usize, Vec<u8>, Vec<u8>)>;
     let mut text = String::new();
     let mut depth = 0usize;
     let mut saw_root = false;
@@ -1165,14 +1977,9 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
             Event::Start(element) => {
                 depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
                 if root_depth.is_none() {
-                    fragment_prefix = Some(
-                        element
-                            .name()
-                            .prefix()
-                            .map(|prefix| prefix.into_inner().to_vec()),
-                    );
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
                     if saw_root
-                        || !is_fragment_word_name(
+                        || !is_transaction_fragment_word_name(
                             &namespace,
                             element.name(),
                             root_name,
@@ -1182,13 +1989,37 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
                         return Err(Refusal::ComplexContent);
                     }
                     root_depth = Some(depth);
+                    if root_name == b"r" {
+                        run_depth = Some(depth);
+                    }
                     saw_root = true;
+                } else if run_depth.is_some_and(|run| depth == run + 1) {
+                    if is_owner_text_element(
+                        root_name,
+                        &namespace,
+                        element.name(),
+                        &fragment_prefix,
+                    ) {
+                        let prefix = element
+                            .name()
+                            .prefix()
+                            .map_or_else(Vec::new, |value| value.into_inner().to_vec());
+                        open_text =
+                            Some((event_start, prefix, element.local_name().as_ref().to_vec()));
+                    } else if is_structural_run_text(&namespace, element.name(), &fragment_prefix) {
+                        return Err(Refusal::ComplexRun);
+                    }
                 } else if root_depth.is_some_and(|root| depth == root + 1) {
-                    if is_fragment_word_name(&namespace, element.name(), b"r", &fragment_prefix) {
+                    if is_transaction_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                    ) {
                         run_depth = Some(depth);
                     } else if is_fragment_word_element(&namespace, &fragment_prefix)
                         && !(root_name == b"p"
-                            && is_fragment_word_name(
+                            && is_transaction_fragment_word_name(
                                 &namespace,
                                 element.name(),
                                 b"pPr",
@@ -1196,16 +2027,6 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
                             ))
                     {
                         return Err(Refusal::ComplexContent);
-                    }
-                } else if run_depth.is_some_and(|run| depth == run + 1) {
-                    if is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix) {
-                        let prefix = element
-                            .name()
-                            .prefix()
-                            .map_or_else(Vec::new, |value| value.into_inner().to_vec());
-                        open_text = Some((event_start, prefix));
-                    } else if is_structural_run_text(&namespace, element.name(), &fragment_prefix) {
-                        return Err(Refusal::ComplexRun);
                     }
                 } else if open_text.is_some() {
                     return Err(Refusal::ComplexRun);
@@ -1213,23 +2034,13 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
             },
             Event::Empty(element) => {
                 let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
-                if root_depth.is_some_and(|root| child_depth == root + 1) {
-                    if is_fragment_word_name(&namespace, element.name(), b"r", &fragment_prefix) {
-                        continue;
-                    }
-                    if is_fragment_word_element(&namespace, &fragment_prefix)
-                        && !(root_name == b"p"
-                            && is_fragment_word_name(
-                                &namespace,
-                                element.name(),
-                                b"pPr",
-                                &fragment_prefix,
-                            ))
-                    {
-                        return Err(Refusal::ComplexContent);
-                    }
-                } else if run_depth.is_some_and(|run| child_depth == run + 1) {
-                    if is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix) {
+                if run_depth.is_some_and(|run| child_depth == run + 1) {
+                    if is_owner_text_element(
+                        root_name,
+                        &namespace,
+                        element.name(),
+                        &fragment_prefix,
+                    ) {
                         let prefix = element
                             .name()
                             .prefix()
@@ -1238,36 +2049,65 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
                             start: event_start,
                             end: event_end,
                             prefix,
+                            local_name: element.local_name().as_ref().to_vec(),
                             characters: 0,
                         });
                     } else if is_structural_run_text(&namespace, element.name(), &fragment_prefix) {
                         return Err(Refusal::ComplexRun);
                     }
+                } else if root_depth.is_some_and(|root| child_depth == root + 1) {
+                    if is_transaction_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                    ) {
+                        continue;
+                    }
+                    if is_fragment_word_element(&namespace, &fragment_prefix)
+                        && !(root_name == b"p"
+                            && is_transaction_fragment_word_name(
+                                &namespace,
+                                element.name(),
+                                b"pPr",
+                                &fragment_prefix,
+                            ))
+                    {
+                        return Err(Refusal::ComplexContent);
+                    }
                 }
             },
             Event::End(element) => {
                 if open_text.is_some()
-                    && is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix)
-                {
-                    let (start, prefix) = open_text.take().ok_or(Refusal::ComplexRun)?;
-                    let value = Paragraph::new(
-                        xml.get(start..event_end)
-                            .ok_or(Refusal::ComplexRun)?
-                            .to_vec(),
+                    && is_owner_text_element(
+                        root_name,
+                        &namespace,
+                        element.name(),
+                        &fragment_prefix,
                     )
-                    .text()
-                    .map_err(|_text_error| Refusal::ComplexRun)?;
+                {
+                    let (start, prefix, local_name) =
+                        open_text.take().ok_or(Refusal::ComplexRun)?;
+                    let value = decode_text_fragment(
+                        xml.get(start..event_end).ok_or(Refusal::ComplexRun)?,
+                    )?;
                     let characters = value.chars().count();
                     text.push_str(&value);
                     slots.push(TextSlot {
                         start,
                         end: event_end,
                         prefix,
+                        local_name,
                         characters,
                     });
                 }
                 if run_depth == Some(depth)
-                    && is_fragment_word_name(&namespace, element.name(), b"r", &fragment_prefix)
+                    && is_transaction_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                    )
                 {
                     run_depth = None;
                 }
@@ -1308,6 +2148,78 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
     Ok(TextOwner { slots, text })
 }
 
+fn is_owner_text_element(
+    root_name: &[u8],
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &FragmentPrefix,
+) -> bool {
+    is_transaction_fragment_word_name(
+        namespace,
+        name,
+        if root_name == b"del" {
+            b"delText"
+        } else {
+            b"t"
+        },
+        fragment_prefix,
+    )
+}
+
+fn decode_text_fragment(xml: &[u8]) -> Result<String, Refusal> {
+    let mut reader = Reader::from_reader(xml);
+    let mut value = String::new();
+    let mut depth = 0usize;
+    loop {
+        match reader.read_event().map_err(|_error| Refusal::ComplexRun)? {
+            Event::Start(_) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if depth > 1 {
+                    return Err(Refusal::ComplexRun);
+                }
+            },
+            Event::Empty(_) => return Err(Refusal::ComplexRun),
+            Event::Text(text) if depth == 1 => {
+                let decoded = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|_error| Refusal::ComplexRun)?;
+                let unescaped =
+                    quick_xml::escape::unescape(&decoded).map_err(|_error| Refusal::ComplexRun)?;
+                value.push_str(&unescaped);
+            },
+            Event::CData(text) if depth == 1 => {
+                let decoded = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|_error| Refusal::ComplexRun)?;
+                value.push_str(&decoded);
+            },
+            Event::GeneralRef(reference) if depth == 1 => {
+                value.push_str(
+                    &litchi_ooxml_common::xml::decode_xml_reference(&reference)
+                        .map_err(|_error| Refusal::ComplexRun)?,
+                );
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or(Refusal::ComplexRun)?;
+            },
+            Event::Eof => {
+                if depth == 0 {
+                    break;
+                }
+                return Err(Refusal::ComplexRun);
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    Ok(value)
+}
+
 fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionResult<Vec<u8>> {
     let characters = text.chars().collect::<Vec<_>>();
     let mut cursor = 0usize;
@@ -1326,42 +2238,42 @@ fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionR
         replacements.push((
             slot.start,
             slot.end,
-            text_element(&slot.prefix, &value).into_bytes(),
+            text_element_named(&slot.prefix, &slot.local_name, &value).into_bytes(),
         ));
     }
     replace_ranges(xml, &replacements)
 }
 
-#[expect(
-    clippy::option_option,
-    clippy::ref_option,
-    reason = "the established fragment parser distinguishes unresolved, unbound, and prefixed roots"
-)]
+fn is_transaction_fragment_word_name(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    local_name: &[u8],
+    fragment_prefix: &FragmentPrefix,
+) -> bool {
+    name.local_name().as_ref() == local_name && is_fragment_word_element(namespace, fragment_prefix)
+}
+
 fn is_fragment_word_element(
     namespace: &ResolveResult<'_>,
-    fragment_prefix: &Option<Option<Vec<u8>>>,
+    fragment_prefix: &FragmentPrefix,
 ) -> bool {
     if is_wordprocessing_namespace(namespace) {
         return true;
     }
     match namespace {
-        ResolveResult::Unknown(prefix) => {
-            fragment_prefix.as_ref().and_then(|value| value.as_deref()) == Some(prefix.as_slice())
-        },
-        ResolveResult::Unbound => fragment_prefix == &Some(None),
+        ResolveResult::Unknown(prefix) => matches!(
+            fragment_prefix,
+            FragmentPrefix::Prefixed(candidate) if candidate.as_slice() == prefix.as_slice()
+        ),
+        ResolveResult::Unbound => matches!(fragment_prefix, FragmentPrefix::Unprefixed),
         ResolveResult::Bound(_) => false,
     }
 }
 
-#[expect(
-    clippy::option_option,
-    clippy::ref_option,
-    reason = "the established fragment parser distinguishes unresolved, unbound, and prefixed roots"
-)]
 fn is_structural_run_text(
     namespace: &ResolveResult<'_>,
     name: quick_xml::name::QName<'_>,
-    fragment_prefix: &Option<Option<Vec<u8>>>,
+    fragment_prefix: &FragmentPrefix,
 ) -> bool {
     [
         b"tab".as_slice(),
@@ -1374,7 +2286,7 @@ fn is_structural_run_text(
         b"fldChar".as_slice(),
     ]
     .into_iter()
-    .any(|local| is_fragment_word_name(namespace, name, local, fragment_prefix))
+    .any(|local| is_transaction_fragment_word_name(namespace, name, local, fragment_prefix))
 }
 
 fn select_direct_child(
@@ -1385,7 +2297,7 @@ fn select_direct_child(
     missing: Refusal,
 ) -> Result<Range, Refusal> {
     let mut reader = NsReader::from_reader(xml);
-    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut fragment_prefix = FragmentPrefix::Unseen;
     let mut root_depth = None;
     let mut capture = None::<(usize, usize)>;
     let mut depth = 0usize;
@@ -1401,14 +2313,9 @@ fn select_direct_child(
             Event::Start(element) => {
                 depth = depth.checked_add(1).ok_or(missing)?;
                 if root_depth.is_none() {
-                    fragment_prefix = Some(
-                        element
-                            .name()
-                            .prefix()
-                            .map(|prefix| prefix.into_inner().to_vec()),
-                    );
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
                     if saw_root
-                        || !is_fragment_word_name(
+                        || !is_transaction_fragment_word_name(
                             &namespace,
                             element.name(),
                             root_name,
@@ -1420,7 +2327,7 @@ fn select_direct_child(
                     saw_root = true;
                     root_depth = Some(depth);
                 } else if root_depth.is_some_and(|root| depth == root + 1)
-                    && is_fragment_word_name(
+                    && is_transaction_fragment_word_name(
                         &namespace,
                         element.name(),
                         child_name,
@@ -1436,7 +2343,7 @@ fn select_direct_child(
             Event::Empty(element) => {
                 let child_depth = depth.checked_add(1).ok_or(missing)?;
                 if root_depth.is_some_and(|root| child_depth == root + 1)
-                    && is_fragment_word_name(
+                    && is_transaction_fragment_word_name(
                         &namespace,
                         element.name(),
                         child_name,
@@ -1492,7 +2399,7 @@ fn single_cell_paragraph(xml: &[u8]) -> TransactionResult<Range> {
 
 fn validate_basic_cell_children(xml: &[u8]) -> Result<(), Refusal> {
     let mut reader = NsReader::from_reader(xml);
-    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut fragment_prefix = FragmentPrefix::Unseen;
     let mut root_depth = None;
     let mut depth = 0usize;
     let mut saw_root = false;
@@ -1507,14 +2414,9 @@ fn validate_basic_cell_children(xml: &[u8]) -> Result<(), Refusal> {
             Event::Start(element) => {
                 depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
                 if root_depth.is_none() {
-                    fragment_prefix = Some(
-                        element
-                            .name()
-                            .prefix()
-                            .map(|prefix| prefix.into_inner().to_vec()),
-                    );
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
                     if saw_root
-                        || !is_fragment_word_name(
+                        || !is_transaction_fragment_word_name(
                             &namespace,
                             element.name(),
                             b"tc",
@@ -1527,8 +2429,18 @@ fn validate_basic_cell_children(xml: &[u8]) -> Result<(), Refusal> {
                     root_depth = Some(depth);
                 } else if root_depth.is_some_and(|root| depth == root + 1)
                     && is_fragment_word_element(&namespace, &fragment_prefix)
-                    && !is_fragment_word_name(&namespace, element.name(), b"tcPr", &fragment_prefix)
-                    && !is_fragment_word_name(&namespace, element.name(), b"p", &fragment_prefix)
+                    && !is_transaction_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"tcPr",
+                        &fragment_prefix,
+                    )
+                    && !is_transaction_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"p",
+                        &fragment_prefix,
+                    )
                 {
                     return Err(Refusal::ComplexContent);
                 }
@@ -1537,8 +2449,18 @@ fn validate_basic_cell_children(xml: &[u8]) -> Result<(), Refusal> {
                 let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
                 if root_depth.is_some_and(|root| child_depth == root + 1)
                     && is_fragment_word_element(&namespace, &fragment_prefix)
-                    && !is_fragment_word_name(&namespace, element.name(), b"tcPr", &fragment_prefix)
-                    && !is_fragment_word_name(&namespace, element.name(), b"p", &fragment_prefix)
+                    && !is_transaction_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"tcPr",
+                        &fragment_prefix,
+                    )
+                    && !is_transaction_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"p",
+                        &fragment_prefix,
+                    )
                 {
                     return Err(Refusal::ComplexContent);
                 }
@@ -1647,6 +2569,137 @@ fn selected_hyperlink_text(
         checked_slice(snapshot.xml_bytes(), child_start, child_end, "hyperlink")?,
         b"hyperlink",
     )
+    .map(|scanned| scanned.text)
+    .map_err(|reason| TransactionError::Refused {
+        position: paragraph.get(),
+        reason,
+    })
+}
+
+fn selected_direct_paragraph_owner_text(
+    snapshot: &Snapshot,
+    paragraph: Position,
+    owner: Position,
+    child_name: &[u8],
+    missing: Refusal,
+) -> TransactionResult<String> {
+    let paragraph_range =
+        snapshot
+            .paragraphs
+            .get(paragraph.get())
+            .copied()
+            .ok_or(TransactionError::OutOfBounds {
+                position: paragraph.get(),
+                len: snapshot.paragraph_count(),
+            })?;
+    let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+    let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+    let paragraph_xml = checked_slice(
+        snapshot.xml_bytes(),
+        paragraph_start,
+        paragraph_end,
+        "paragraph",
+    )?;
+    let owner_range = select_direct_child(paragraph_xml, b"p", child_name, owner, missing)
+        .map_err(|reason| TransactionError::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+    let start = checked_relative_start(paragraph_start, owner_range)?;
+    let end = checked_relative_end(paragraph_start, owner_range)?;
+    scan_text_owner(
+        checked_slice(snapshot.xml_bytes(), start, end, "paragraph text owner")?,
+        child_name,
+    )
+    .map(|scanned| scanned.text)
+    .map_err(|reason| TransactionError::Refused {
+        position: paragraph.get(),
+        reason,
+    })
+}
+
+fn select_content_control_content(
+    snapshot: &Snapshot,
+    paragraph: Position,
+    control: Position,
+) -> TransactionResult<(usize, usize)> {
+    let paragraph_range =
+        snapshot
+            .paragraphs
+            .get(paragraph.get())
+            .copied()
+            .ok_or(TransactionError::OutOfBounds {
+                position: paragraph.get(),
+                len: snapshot.paragraph_count(),
+            })?;
+    let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+    let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+    let paragraph_xml = checked_slice(
+        snapshot.xml_bytes(),
+        paragraph_start,
+        paragraph_end,
+        "paragraph",
+    )?;
+    let control_range = select_direct_child(
+        paragraph_xml,
+        b"p",
+        b"sdt",
+        control,
+        Refusal::ContentControlNotFound,
+    )
+    .map_err(|reason| TransactionError::Refused {
+        position: paragraph.get(),
+        reason,
+    })?;
+    let control_start = checked_relative_start(paragraph_start, control_range)?;
+    let control_end = checked_relative_end(paragraph_start, control_range)?;
+    let control_xml = checked_slice(
+        snapshot.xml_bytes(),
+        control_start,
+        control_end,
+        "content control",
+    )?;
+    let content_range = select_direct_child(
+        control_xml,
+        b"sdt",
+        b"sdtContent",
+        Position::new(0),
+        Refusal::ComplexContent,
+    )
+    .map_err(|reason| TransactionError::Refused {
+        position: paragraph.get(),
+        reason,
+    })?;
+    if select_direct_child(
+        control_xml,
+        b"sdt",
+        b"sdtContent",
+        Position::new(1),
+        Refusal::ComplexContent,
+    )
+    .is_ok()
+    {
+        return Err(TransactionError::Refused {
+            position: paragraph.get(),
+            reason: Refusal::ComplexContent,
+        });
+    }
+    Ok((
+        checked_relative_start(control_start, content_range)?,
+        checked_relative_end(control_start, content_range)?,
+    ))
+}
+
+fn selected_content_control_text(
+    snapshot: &Snapshot,
+    paragraph: Position,
+    control: Position,
+) -> TransactionResult<String> {
+    let (start, end) = select_content_control_content(snapshot, paragraph, control)?;
+    scan_text_owner(
+        checked_slice(snapshot.xml_bytes(), start, end, "content control content")?,
+        b"sdtContent",
+    )
     .map(|owner| owner.text)
     .map_err(|reason| TransactionError::Refused {
         position: paragraph.get(),
@@ -1664,6 +2717,34 @@ fn selected_cell_text(
     let paragraph = single_cell_paragraph(selection.xml)?;
     let start = checked_relative_start(selection.start, paragraph)?;
     let end = checked_relative_end(selection.start, paragraph)?;
+    scan_text_owner(
+        checked_slice(snapshot.xml_bytes(), start, end, "table cell paragraph")?,
+        b"p",
+    )
+    .map(|owner| owner.text)
+    .map_err(|reason| TransactionError::Refused {
+        position: table.get(),
+        reason,
+    })
+}
+
+fn selected_cell_paragraph_text(
+    snapshot: &Snapshot,
+    table: Position,
+    row: Position,
+    cell: Position,
+    paragraph: Position,
+) -> TransactionResult<String> {
+    let selection = select_cell(snapshot, table, row, cell)?;
+    let paragraph_range =
+        select_direct_child(selection.xml, b"tc", b"p", paragraph, Refusal::CellNotFound).map_err(
+            |reason| TransactionError::Refused {
+                position: table.get(),
+                reason,
+            },
+        )?;
+    let start = checked_relative_start(selection.start, paragraph_range)?;
+    let end = checked_relative_end(selection.start, paragraph_range)?;
     scan_text_owner(
         checked_slice(snapshot.xml_bytes(), start, end, "table cell paragraph")?,
         b"p",
@@ -1740,11 +2821,16 @@ fn validate_authored_text(text: &str) -> Result<(), Refusal> {
 }
 
 fn text_element(prefix: &[u8], text: &str) -> String {
+    text_element_named(prefix, b"t", text)
+}
+
+fn text_element_named(prefix: &[u8], local_name: &[u8], text: &str) -> String {
     let prefix_text = String::from_utf8_lossy(prefix);
+    let local_name_text = String::from_utf8_lossy(local_name);
     let name = if prefix_text.is_empty() {
-        "t".to_owned()
+        local_name_text.into_owned()
     } else {
-        format!("{prefix_text}:t")
+        format!("{prefix_text}:{local_name_text}")
     };
     if text.is_empty() {
         return format!("<{name}/>");
@@ -1997,6 +3083,139 @@ mod tests {
     }
 
     #[test]
+    fn rich_owner_edits_are_compact_durable_and_exactly_reversible() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\">\n  <w:body>\n    <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>direct</w:t><x:keep xmlns:x=\"urn:test\"/></w:r><w:fldSimple w:instr=\" AUTHOR \"><w:r><w:rPr><w:i/></w:rPr><w:t>field</w:t></w:r></w:fldSimple><w:ins w:id=\"7\" w:author=\"A\"><w:r><w:t>added</w:t></w:r></w:ins><w:del w:id=\"8\" w:author=\"A\"><w:r><w:delText>gone &amp; old</w:delText></w:r></w:del><w:sdt><w:sdtPr><w:tag w:val=\"kept\"/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:smallCaps/></w:rPr><w:t>control</w:t></w:r></w:sdtContent></w:sdt></w:p>\n    <w:tbl><w:tr><w:tc><w:tcPr><w:shd w:fill=\"00FF00\"/></w:tcPr><w:p><w:r><w:t>first</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>nested kept</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:rPr><w:u/></w:rPr><w:t>second</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\n    <w:sectPr/>\n  </w:body>\n</w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        edit.replace_run_text(Position::new(0), Position::new(0), " run & entity ")
+            .unwrap()
+            .replace_simple_field_text(Position::new(0), Position::new(0), "new field")
+            .unwrap()
+            .replace_revision_text(
+                Position::new(0),
+                RevisionKind::Insertion,
+                Position::new(0),
+                "new insertion",
+            )
+            .unwrap()
+            .replace_content_control_text(Position::new(0), Position::new(0), "new control")
+            .unwrap()
+            .replace_revision_text(
+                Position::new(0),
+                RevisionKind::Deletion,
+                Position::new(0),
+                "new deletion",
+            )
+            .unwrap()
+            .replace_table_cell_paragraph_text(
+                Position::new(0),
+                Position::new(0),
+                Position::new(0),
+                Position::new(1),
+                "rich cell paragraph",
+            )
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        assert!(!xml.contains("\n  "));
+        for retained in [
+            "<w:rPr><w:b/></w:rPr>",
+            "<x:keep xmlns:x=\"urn:test\"/>",
+            "w:instr=\" AUTHOR \"",
+            "<w:ins w:id=\"7\" w:author=\"A\">",
+            "<w:del w:id=\"8\" w:author=\"A\">",
+            "<w:delText>new deletion</w:delText>",
+            "<w:tag w:val=\"kept\"/>",
+            "<w:rPr><w:smallCaps/></w:rPr>",
+            "<w:t>new control</w:t>",
+            "<w:t>nested kept</w:t>",
+            "<w:rPr><w:u/></w:rPr>",
+            "<w:t xml:space=\"preserve\"> run &amp; entity </w:t>",
+        ] {
+            assert!(xml.contains(retained), "missing retained XML: {retained}");
+        }
+
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                durable_limits(),
+            )
+            .unwrap();
+        let applied = source.apply_durable(&decoded).unwrap();
+        assert_eq!(applied.xml_bytes(), commit.snapshot().xml_bytes());
+        assert_eq!(
+            applied
+                .apply_durable(&decoded.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn three_way_planning_keeps_disjoint_rich_owners_and_resolves_overlap() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:t>run</w:t></w:r><w:fldSimple w:instr=\" AUTHOR \"><w:r><w:t>field</w:t></w:r></w:fldSimple></w:p>",
+        ))
+        .unwrap();
+        let limits = CompositionLimits::new(8, 8, 32, 8);
+
+        let mut run = source.edit();
+        run.replace_run_text(Position::new(0), Position::new(0), "changed run")
+            .unwrap();
+        let mut left = source.compose(limits);
+        left.join(run.prepare(limits, "run").unwrap()).unwrap();
+        let mut field = source.edit();
+        field
+            .replace_simple_field_text(Position::new(0), Position::new(0), "changed field")
+            .unwrap();
+        let mut right = source.compose(limits);
+        right.join(field.prepare(limits, "field").unwrap()).unwrap();
+        let plan = source.plan_three_way(left, right).unwrap();
+        assert!(plan.is_clean());
+        assert_eq!(
+            plan.finish()
+                .unwrap()
+                .commit()
+                .unwrap()
+                .patch()
+                .operations()
+                .len(),
+            2
+        );
+
+        let branch = |identifier: &str, value: &str| {
+            let mut edit = source.edit();
+            edit.replace_simple_field_text(Position::new(0), Position::new(0), value)
+                .unwrap();
+            let mut composition = source.compose(limits);
+            composition
+                .join(edit.prepare(limits, identifier).unwrap())
+                .unwrap();
+            composition
+        };
+        let mut conflict = source
+            .plan_three_way(branch("left", "left"), branch("right", "right"))
+            .unwrap();
+        assert!(!conflict.is_clean());
+        assert!(conflict.conflicts().len() >= 1);
+        conflict.resolve(MergeChoice::Left);
+        let merged = conflict.finish().unwrap().commit().unwrap();
+        assert!(
+            std::str::from_utf8(merged.snapshot().xml_bytes())
+                .unwrap()
+                .contains(">left</w:t>")
+        );
+    }
+
+    #[test]
     fn durable_patch_is_deterministic_stale_checked_and_reversible() {
         let source = Snapshot::from_xml(document(
             "<w:p><w:r><w:t>one</w:t></w:r><w:r><w:t> two</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
@@ -2078,6 +3297,41 @@ mod tests {
         overlap.join(left).unwrap();
         assert!(matches!(
             overlap.join(right).unwrap_err().failure(),
+            SubEditJoinFailure::Overlap(_)
+        ));
+
+        let mut indexed = source.edit();
+        indexed
+            .replace_run_text(Position::new(0), Position::new(0), "indexed")
+            .unwrap();
+        let indexed = indexed.prepare(limits, "indexed-owner").unwrap();
+        let mut appended = source.edit();
+        appended
+            .insert_paragraph(Position::new(source.paragraph_count()), "appended")
+            .unwrap();
+        let appended = appended.prepare(limits, "append-only").unwrap();
+        let mut append_composition = source.compose(limits);
+        append_composition
+            .join(indexed)
+            .unwrap()
+            .join(appended)
+            .unwrap();
+        append_composition.commit().unwrap();
+
+        let mut indexed = source.edit();
+        indexed
+            .replace_run_text(Position::new(0), Position::new(0), "indexed")
+            .unwrap();
+        let indexed = indexed.prepare(limits, "indexed-owner").unwrap();
+        let mut prefixed = source.edit();
+        prefixed
+            .insert_paragraph(Position::new(0), "prefixed")
+            .unwrap();
+        let prefixed = prefixed.prepare(limits, "prefix-insert").unwrap();
+        let mut prefix_overlap = source.compose(limits);
+        prefix_overlap.join(indexed).unwrap();
+        assert!(matches!(
+            prefix_overlap.join(prefixed).unwrap_err().failure(),
             SubEditJoinFailure::Overlap(_)
         ));
 

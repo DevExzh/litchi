@@ -15,6 +15,7 @@ pub struct SecurityPolicy {
     max_operations: usize,
     max_patch_bytes: usize,
     max_resource_bytes: usize,
+    max_xml_bytes: usize,
     max_text_bytes: usize,
     max_map_areas: usize,
     allow_external_links: bool,
@@ -29,6 +30,7 @@ impl SecurityPolicy {
             max_operations: 1_024,
             max_patch_bytes: 64 * MIB,
             max_resource_bytes: 16 * MIB,
+            max_xml_bytes: 4 * MIB,
             max_text_bytes: 64 * 1024,
             max_map_areas: 10_000,
             allow_external_links: false,
@@ -64,6 +66,13 @@ impl SecurityPolicy {
         self
     }
 
+    /// Sets the maximum bytes in one authored XML part value.
+    #[must_use]
+    pub const fn with_xml_bytes(mut self, bytes: usize) -> Self {
+        self.max_xml_bytes = bytes;
+        self
+    }
+
     /// Sets the maximum bytes in one semantic text value.
     #[must_use]
     pub const fn with_text_bytes(mut self, bytes: usize) -> Self {
@@ -92,6 +101,7 @@ impl Default for SecurityPolicy {
             max_operations: 100_000,
             max_patch_bytes: 512 * MIB,
             max_resource_bytes: 256 * MIB,
+            max_xml_bytes: 64 * MIB,
             max_text_bytes: 1024 * 1024,
             max_map_areas: 100_000,
             allow_external_links: true,
@@ -114,7 +124,16 @@ pub enum ArtifactKind {
 #[non_exhaustive]
 pub enum FrameProperty {
     Name,
+    XmlId,
+    Title,
+    Description,
     Source,
+    MediaType,
+    ImageXmlId,
+    FilterName,
+    LinkType,
+    Show,
+    Actuate,
     StyleName,
     TextStyleName,
     Layer,
@@ -127,6 +146,7 @@ pub enum FrameProperty {
     Height,
     RelativeWidth,
     RelativeHeight,
+    CopyOf,
     ImageMap,
 }
 
@@ -149,6 +169,7 @@ pub enum OperationKey {
         property: FrameProperty,
     },
     Metadata(MetadataProperty),
+    Styles,
     Resource(String),
 }
 
@@ -187,6 +208,7 @@ pub enum SemanticValue {
     Unsigned(Option<u32>),
     Source(Source),
     ImageMap(Option<ImageMap>),
+    Xml(Option<String>),
     Resource(Option<ResourceValue>),
 }
 
@@ -391,6 +413,13 @@ impl SemanticPatch {
         if let Some(change) = commit.patch().metadata_change() {
             operations.extend(metadata_operations(change.before(), change.after()));
         }
+        if let Some(change) = commit.patch().style_change() {
+            operations.push(SemanticOperation {
+                key: OperationKey::Styles,
+                before: SemanticValue::Xml(change.before().map(str::to_owned)),
+                after: SemanticValue::Xml(change.after().map(str::to_owned)),
+            });
+        }
         for change in commit.patch().resource_changes() {
             operations.push(resource_operation(commit.source(), commit.image(), change)?);
         }
@@ -506,7 +535,16 @@ fn frame_operations(changes: &[FrameChange]) -> Vec<SemanticOperation> {
     for change in changes {
         for property in [
             FrameProperty::Name,
+            FrameProperty::XmlId,
+            FrameProperty::Title,
+            FrameProperty::Description,
             FrameProperty::Source,
+            FrameProperty::MediaType,
+            FrameProperty::ImageXmlId,
+            FrameProperty::FilterName,
+            FrameProperty::LinkType,
+            FrameProperty::Show,
+            FrameProperty::Actuate,
             FrameProperty::StyleName,
             FrameProperty::TextStyleName,
             FrameProperty::Layer,
@@ -519,6 +557,7 @@ fn frame_operations(changes: &[FrameChange]) -> Vec<SemanticOperation> {
             FrameProperty::Height,
             FrameProperty::RelativeWidth,
             FrameProperty::RelativeHeight,
+            FrameProperty::CopyOf,
             FrameProperty::ImageMap,
         ] {
             let before = frame_value(change.before(), property);
@@ -660,7 +699,7 @@ fn flat_value(image: &FlatImage, key: &OperationKey) -> Result<Option<SemanticVa
                 *property,
             )))
         }),
-        OperationKey::Resource(_) => Ok(None),
+        OperationKey::Styles | OperationKey::Resource(_) => Ok(None),
     }
 }
 
@@ -678,6 +717,9 @@ fn package_value(image: &Image, key: &OperationKey) -> Result<Option<SemanticVal
                 *property,
             )))
         }),
+        OperationKey::Styles => Ok(Some(SemanticValue::Xml(
+            image.styles_xml().map(str::to_owned),
+        ))),
         OperationKey::Resource(path) => resource_value(image, path).map(Some),
     }
 }
@@ -685,7 +727,16 @@ fn package_value(image: &Image, key: &OperationKey) -> Result<Option<SemanticVal
 fn frame_value(frame: &Frame, property: FrameProperty) -> SemanticValue {
     match property {
         FrameProperty::Name => text(frame.name()),
+        FrameProperty::XmlId => text(frame.xml_id()),
+        FrameProperty::Title => text(frame.title()),
+        FrameProperty::Description => text(frame.description()),
         FrameProperty::Source => SemanticValue::Source(frame.source().clone()),
+        FrameProperty::MediaType => text(frame.media_type()),
+        FrameProperty::ImageXmlId => text(frame.image_xml_id()),
+        FrameProperty::FilterName => text(frame.filter_name()),
+        FrameProperty::LinkType => text(frame.link_type()),
+        FrameProperty::Show => text(frame.show()),
+        FrameProperty::Actuate => text(frame.actuate()),
         FrameProperty::StyleName => text(frame.style_name()),
         FrameProperty::TextStyleName => text(frame.text_style_name()),
         FrameProperty::Layer => text(frame.layer()),
@@ -698,6 +749,7 @@ fn frame_value(frame: &Frame, property: FrameProperty) -> SemanticValue {
         FrameProperty::Height => text(frame.height()),
         FrameProperty::RelativeWidth => text(frame.relative_width()),
         FrameProperty::RelativeHeight => text(frame.relative_height()),
+        FrameProperty::CopyOf => text(frame.copy_of()),
         FrameProperty::ImageMap => SemanticValue::ImageMap(frame.image_map().cloned()),
     }
 }
@@ -737,6 +789,7 @@ fn apply_flat_operation(
                 MetadataProperty::Keywords => edit.set_keywords(value.clone()),
             }
         },
+        OperationKey::Styles => Err(invalid("ODI flat plan contains a package style operation")),
         OperationKey::Resource(_) => Err(invalid(
             "ODI flat plan contains a package-resource operation",
         )),
@@ -759,6 +812,12 @@ fn apply_package_operation(edit: &mut Edit<'_>, operation: &SemanticOperation) -
                 MetadataProperty::Description => edit.set_description(value.clone()),
                 MetadataProperty::Keywords => edit.set_keywords(value.clone()),
             }
+        },
+        OperationKey::Styles => {
+            let SemanticValue::Xml(value) = operation.after() else {
+                return Err(invalid("ODI style operation has the wrong value type"));
+            };
+            edit.set_styles_xml(value.clone())
         },
         OperationKey::Resource(path) => {
             let SemanticValue::Resource(value) = operation.after() else {
@@ -787,8 +846,33 @@ fn apply_frame_operation(
         (FrameProperty::Name, SemanticValue::Text(value)) => {
             edit.set_frame_name(frame, value.clone())
         },
+        (FrameProperty::XmlId, SemanticValue::Text(value)) => {
+            edit.set_frame_xml_id(frame, value.clone())
+        },
+        (FrameProperty::Title, SemanticValue::Text(value)) => {
+            edit.set_frame_title(frame, value.clone())
+        },
+        (FrameProperty::Description, SemanticValue::Text(value)) => {
+            edit.set_frame_description(frame, value.clone())
+        },
         (FrameProperty::Source, SemanticValue::Source(value)) => {
             edit.set_source(frame, value.clone())
+        },
+        (FrameProperty::MediaType, SemanticValue::Text(value)) => {
+            edit.set_image_media_type(frame, value.clone())
+        },
+        (FrameProperty::ImageXmlId, SemanticValue::Text(value)) => {
+            edit.set_image_xml_id(frame, value.clone())
+        },
+        (FrameProperty::FilterName, SemanticValue::Text(value)) => {
+            edit.set_filter_name(frame, value.clone())
+        },
+        (FrameProperty::LinkType, SemanticValue::Text(value)) => {
+            edit.set_link_type(frame, value.clone())
+        },
+        (FrameProperty::Show, SemanticValue::Text(value)) => edit.set_show(frame, value.clone()),
+        (FrameProperty::Actuate, SemanticValue::Text(value)) => {
+            edit.set_actuate(frame, value.clone())
         },
         (FrameProperty::StyleName, SemanticValue::Text(value)) => {
             edit.set_style_name(frame, value.clone())
@@ -819,6 +903,9 @@ fn apply_frame_operation(
         (FrameProperty::RelativeHeight, SemanticValue::Text(value)) => {
             edit.set_relative_height(frame, value.clone())
         },
+        (FrameProperty::CopyOf, SemanticValue::Text(value)) => {
+            edit.set_copy_of(frame, value.clone())
+        },
         _ => Err(invalid("ODI frame operation has the wrong value type")),
     }
 }
@@ -844,6 +931,12 @@ fn validate_operations(operations: &[SemanticOperation], policy: &SecurityPolicy
                     return Err(invalid("ODI external link is refused by policy"));
                 },
                 SemanticValue::ImageMap(Some(map)) => validate_map(map, policy)?,
+                SemanticValue::Xml(Some(xml)) if xml.len() > policy.max_xml_bytes => {
+                    return Err(invalid("ODI authored XML part exceeds policy"));
+                },
+                SemanticValue::Xml(_) if !policy.allow_package_members => {
+                    return Err(invalid("ODI package XML part is refused by policy"));
+                },
                 SemanticValue::Resource(Some(resource))
                     if !policy.allow_package_members
                         || resource.bytes.len() > policy.max_resource_bytes =>
@@ -854,6 +947,7 @@ fn validate_operations(operations: &[SemanticOperation], policy: &SecurityPolicy
                 | SemanticValue::Unsigned(_)
                 | SemanticValue::Source(_)
                 | SemanticValue::ImageMap(_)
+                | SemanticValue::Xml(_)
                 | SemanticValue::Resource(_) => {},
             }
         }
@@ -867,10 +961,12 @@ fn operation_size(operation: &SemanticOperation) -> usize {
 
 fn value_size(value: &SemanticValue) -> usize {
     match value {
-        SemanticValue::Text(value) => value.as_ref().map_or(0, String::len),
+        SemanticValue::Text(value) | SemanticValue::Xml(value) => {
+            value.as_ref().map_or(0, String::len)
+        },
         SemanticValue::Unsigned(_) => size_of::<u32>(),
-        SemanticValue::Source(Source::Linked(value)) => value.len(),
-        SemanticValue::Source(Source::Embedded(value)) => value.len(),
+        SemanticValue::Source(Source::Linked(value)) => String::len(value),
+        SemanticValue::Source(Source::Embedded(value)) => Vec::len(value),
         SemanticValue::ImageMap(value) => value.as_ref().map_or(0, |map| map.areas().len() * 128),
         SemanticValue::Resource(value) => value.as_ref().map_or(0, |resource| {
             resource.media_type.len() + resource.bytes.len()

@@ -78,12 +78,15 @@ mod tests {
     #[test]
     fn inline_conversion_changes_only_the_document_root() {
         let content = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:chart/></office:body></office:document-content>"#;
-        let inline = content_inline(content).unwrap();
+        let inline = content_inline(content).expect("test fixture or operation should succeed");
         assert!(inline.contains(
             "office:document office:mimetype=\"application/vnd.oasis.opendocument.chart\""
         ));
         assert_eq!(
-            content_inline(&inline_content(&inline).unwrap()).unwrap(),
+            content_inline(
+                &inline_content(&inline).expect("test fixture or operation should succeed")
+            )
+            .expect("test fixture or operation should succeed"),
             inline
         );
     }

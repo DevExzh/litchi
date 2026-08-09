@@ -3,15 +3,22 @@ use std::sync::Arc;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 use super::model::{
-    BlockKind, BlockRecord, Dialect, Error, InlineKind, InlineRecord, ReadLimits, ReferenceKind,
-    ReferenceRecord, Snapshot, State,
+    BlockKind, BlockRecord, Dialect, Error, InlineKind, InlineRecord, NestedBlockRecord,
+    ReadLimits, ReferenceKind, ReferenceRecord, Snapshot, State,
 };
 
 struct OpenBlock {
     kind: BlockKind,
     start: usize,
     inlines: Vec<InlineRecord>,
+    descendants: Vec<NestedBlockRecord>,
     footnote_label: Option<String>,
+}
+
+struct OpenNestedBlock {
+    kind: BlockKind,
+    start: usize,
+    depth: usize,
 }
 
 struct OpenInline {
@@ -86,13 +93,13 @@ fn block_kind(tag: &Tag<'_>) -> Option<BlockKind> {
         Tag::List(start) => Some(BlockKind::List { start: *start }),
         Tag::FootnoteDefinition(_) => Some(BlockKind::FootnoteDefinition),
         Tag::Table(_) => Some(BlockKind::Table),
-        Tag::Item
-        | Tag::DefinitionList
+        Tag::Item => Some(BlockKind::ListItem),
+        Tag::TableHead => Some(BlockKind::TableHead),
+        Tag::TableRow => Some(BlockKind::TableRow),
+        Tag::TableCell => Some(BlockKind::TableCell),
+        Tag::DefinitionList
         | Tag::DefinitionListTitle
         | Tag::DefinitionListDefinition
-        | Tag::TableHead
-        | Tag::TableRow
-        | Tag::TableCell
         | Tag::Emphasis
         | Tag::Strong
         | Tag::Strikethrough
@@ -114,6 +121,7 @@ fn collect_event_blocks(
     let mut tag_depth = 0usize;
     let mut block_depth = 0usize;
     let mut root_block: Option<OpenBlock> = None;
+    let mut open_nested_blocks = Vec::<OpenNestedBlock>::new();
     let mut open_inlines = Vec::<OpenInline>::new();
     for (event, range) in parser.into_offset_iter() {
         event_count = event_count.saturating_add(1);
@@ -162,7 +170,20 @@ fn collect_event_blocks(
                             kind,
                             start: range.start,
                             inlines: Vec::new(),
+                            descendants: Vec::new(),
                             footnote_label,
+                        });
+                    } else {
+                        open_nested_blocks
+                            .try_reserve(1)
+                            .map_err(|allocation_error| Error::Allocation {
+                                resource: "Markdown nested block parser stack",
+                                source: allocation_error,
+                            })?;
+                        open_nested_blocks.push(OpenNestedBlock {
+                            kind,
+                            start: range.start,
+                            depth: block_depth,
                         });
                     }
                     block_depth = block_depth.saturating_add(1);
@@ -201,11 +222,31 @@ fn collect_event_blocks(
                     }
                 }
                 if is_block_end(end) {
+                    if block_depth > 1
+                        && let Some(nested) = open_nested_blocks.pop()
+                        && let Some(block) = root_block.as_mut()
+                    {
+                        push_nested_block(
+                            &mut block.descendants,
+                            NestedBlockRecord {
+                                kind: nested.kind,
+                                range: nested.start..range.end,
+                                depth: nested.depth,
+                            },
+                        )?;
+                    }
                     block_depth = block_depth.saturating_sub(1);
                     if block_depth == 0
                         && let Some(mut block) = root_block.take()
                     {
                         block.inlines.sort_by(|left, right| {
+                            left.range
+                                .start
+                                .cmp(&right.range.start)
+                                .then_with(|| left.depth.cmp(&right.depth))
+                                .then_with(|| right.range.end.cmp(&left.range.end))
+                        });
+                        block.descendants.sort_by(|left, right| {
                             left.range
                                 .start
                                 .cmp(&right.range.start)
@@ -230,6 +271,7 @@ fn collect_event_blocks(
                                 kind: block.kind,
                                 range: block.start..range.end,
                                 inlines: block.inlines.into_boxed_slice(),
+                                descendants: block.descendants.into_boxed_slice(),
                             },
                             limits,
                         )?;
@@ -243,6 +285,7 @@ fn collect_event_blocks(
                     kind: BlockKind::ThematicBreak,
                     range,
                     inlines: Box::new([]),
+                    descendants: Box::new([]),
                 },
                 limits,
             )?,
@@ -327,6 +370,7 @@ fn collect_reference_definitions(
             kind: BlockKind::LinkDefinition,
             range: definition.span.clone(),
             inlines: Box::new([]),
+            descendants: Box::new([]),
         });
         references.push(ReferenceRecord {
             kind: ReferenceKind::LinkDefinition,
@@ -435,6 +479,20 @@ fn push_inline(inlines: &mut Vec<InlineRecord>, inline: InlineRecord) -> Result<
     Ok(())
 }
 
+fn push_nested_block(
+    blocks: &mut Vec<NestedBlockRecord>,
+    block: NestedBlockRecord,
+) -> Result<(), Error> {
+    blocks
+        .try_reserve(1)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "Markdown nested block index",
+            source: allocation_error,
+        })?;
+    blocks.push(block);
+    Ok(())
+}
+
 fn push_leaf(
     root: &mut Option<OpenBlock>,
     kind: InlineKind,
@@ -505,8 +563,12 @@ const fn is_block_end(end: TagEnd) -> bool {
             | TagEnd::CodeBlock
             | TagEnd::HtmlBlock
             | TagEnd::List(_)
+            | TagEnd::Item
             | TagEnd::FootnoteDefinition
             | TagEnd::Table
+            | TagEnd::TableHead
+            | TagEnd::TableRow
+            | TagEnd::TableCell
     )
 }
 

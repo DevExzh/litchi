@@ -744,14 +744,18 @@ mod tests {
     #[test]
     fn test_parse_simple_formula() {
         let parser = FormulaParser::new("=A1+B2");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         assert_eq!(formula.tokens.len(), 3);
     }
 
     #[test]
     fn test_parse_function_formula() {
         let parser = FormulaParser::new("=SUM(A1:A10)");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         assert!(matches!(formula.tokens[0], Token::Function(_)));
     }
 
@@ -759,7 +763,7 @@ mod tests {
     fn test_parse_canonical_odf_formula_without_normalizing_the_input() {
         let formula = FormulaParser::new("of:=SUM([$Inputs.$A$1:.$B$2])")
             .parse()
-            .unwrap();
+            .expect("test fixture or operation should succeed");
 
         assert_eq!(formula.text, "of:=SUM([$Inputs.$A$1:.$B$2])");
         assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "SUM"));
@@ -781,7 +785,9 @@ mod tests {
 
     #[test]
     fn test_parse_odf_formula_with_quoted_sheet_reference() {
-        let formula = FormulaParser::new("OF:=['Bob''s'.$A$1]").parse().unwrap();
+        let formula = FormulaParser::new("OF:=['Bob''s'.$A$1]")
+            .parse()
+            .expect("test fixture or operation should succeed");
 
         assert!(matches!(
             &formula.tokens[0],
@@ -793,13 +799,24 @@ mod tests {
     #[test]
     fn test_parse_absolute_reference() {
         let parser = FormulaParser::new("=$A$1");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::CellRef(cell_ref) => {
                 assert!(cell_ref.column_absolute);
                 assert!(cell_ref.row_absolute);
             },
-            _ => panic!("Expected cell reference"),
+            Token::RangeRef(_)
+            | Token::Function(_)
+            | Token::Number(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Operator(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Comma
+            | Token::Semicolon => panic!("Expected cell reference"),
         }
     }
 
@@ -813,7 +830,9 @@ mod tests {
     #[test]
     fn test_extract_cell_refs() {
         let parser = FormulaParser::new("=A1+B2+C3");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         let refs = extract_cell_refs(&formula);
         assert!(refs.len() >= 2); // At least A1 and B2
     }
@@ -821,28 +840,43 @@ mod tests {
     #[test]
     fn test_parse_formula_without_equals() {
         let parser = FormulaParser::new("A1+B1");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         assert!(!formula.tokens.is_empty());
     }
 
     #[test]
     fn test_cell_ref_parsing() {
         let parser = FormulaParser::new("=Sheet1.A1");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::CellRef(cell_ref) => {
                 assert_eq!(cell_ref.sheet, Some("Sheet1".to_string()));
                 assert_eq!(cell_ref.column, "A");
                 assert_eq!(cell_ref.row, 1);
             },
-            _ => panic!("Expected cell reference"),
+            Token::RangeRef(_)
+            | Token::Function(_)
+            | Token::Number(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Operator(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Comma
+            | Token::Semicolon => panic!("Expected cell reference"),
         }
     }
 
     #[test]
     fn test_range_ref_parsing() {
         let parser = FormulaParser::new("=A1:B10");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::RangeRef(range_ref) => {
                 assert_eq!(range_ref.start.column, "A");
@@ -850,49 +884,86 @@ mod tests {
                 assert_eq!(range_ref.end.column, "B");
                 assert_eq!(range_ref.end.row, 10);
             },
-            _ => panic!("Expected range reference"),
+            Token::CellRef(_)
+            | Token::Function(_)
+            | Token::Number(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Operator(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Comma
+            | Token::Semicolon => panic!("Expected range reference"),
         }
     }
 
     #[test]
     fn test_number_token() {
         let parser = FormulaParser::new("=42.5");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::Number(n) => {
                 assert!((n - 42.5).abs() < 0.0001);
             },
-            _ => panic!("Expected number token"),
+            Token::CellRef(_)
+            | Token::RangeRef(_)
+            | Token::Function(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Operator(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Comma
+            | Token::Semicolon => panic!("Expected number token"),
         }
     }
 
     #[test]
     fn test_string_token() {
         let parser = FormulaParser::new("=\"Hello World\"");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::String(s) => {
                 assert_eq!(s, "Hello World");
             },
-            _ => panic!("Expected string token: {:?}", formula.tokens),
+            Token::CellRef(_)
+            | Token::RangeRef(_)
+            | Token::Function(_)
+            | Token::Number(_)
+            | Token::Boolean(_)
+            | Token::Operator(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Comma
+            | Token::Semicolon => panic!("Expected string token: {:?}", formula.tokens),
         }
     }
 
     #[test]
     fn test_boolean_tokens() {
         let parser = FormulaParser::new("=TRUE()");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::Function(f) if f == "TRUE"));
 
         let parser = FormulaParser::new("=FALSE()");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::Function(f) if f == "FALSE"));
     }
 
     #[test]
     fn test_operators() {
         let parser = FormulaParser::new("=A1+B1-C1*D1/E1^F1");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         // Should have cell refs and operators
         let operators: Vec<_> = formula
             .tokens
@@ -905,7 +976,9 @@ mod tests {
     #[test]
     fn test_parentheses() {
         let parser = FormulaParser::new("=(A1+B1)*C1");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         let has_lparen = formula.tokens.iter().any(|t| matches!(t, Token::LParen));
         let has_rparen = formula.tokens.iter().any(|t| matches!(t, Token::RParen));
         assert!(has_lparen);
@@ -915,7 +988,9 @@ mod tests {
     #[test]
     fn test_function_with_multiple_args() {
         let parser = FormulaParser::new("=IF(A1>0,\"Positive\",\"Negative\")");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::Function(f) if f == "IF"));
 
         // Check for commas
@@ -930,13 +1005,24 @@ mod tests {
     #[test]
     fn test_nested_functions() {
         let parser = FormulaParser::new("=SUM(AVERAGE(A1:A10),MAX(B1:B10))");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         let functions: Vec<_> = formula
             .tokens
             .iter()
             .filter_map(|t| match t {
                 Token::Function(f) => Some(f.as_str()),
-                _ => None,
+                Token::CellRef(_)
+                | Token::RangeRef(_)
+                | Token::Number(_)
+                | Token::String(_)
+                | Token::Boolean(_)
+                | Token::Operator(_)
+                | Token::LParen
+                | Token::RParen
+                | Token::Comma
+                | Token::Semicolon => None,
             })
             .collect();
         assert!(functions.contains(&"SUM"));
@@ -948,13 +1034,24 @@ mod tests {
     fn test_mixed_references() {
         // Mixed absolute/relative references
         let parser = FormulaParser::new("=$A1+B$1");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::CellRef(cell_ref) => {
                 assert!(cell_ref.column_absolute);
                 assert!(!cell_ref.row_absolute);
             },
-            _ => panic!("Expected cell reference"),
+            Token::RangeRef(_)
+            | Token::Function(_)
+            | Token::Number(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Operator(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Comma
+            | Token::Semicolon => panic!("Expected cell reference"),
         }
     }
 
@@ -1071,7 +1168,9 @@ mod tests {
     #[test]
     fn test_extract_functions() {
         let parser = FormulaParser::new("=SUM(A1:A10)+AVERAGE(B1:B10)");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         let funcs = extract_functions(&formula);
         assert!(funcs.contains(&"SUM"));
         assert!(funcs.contains(&"AVERAGE"));
@@ -1100,14 +1199,18 @@ mod tests {
     #[test]
     fn test_whitespace_handling() {
         let parser = FormulaParser::new("=  A1  +  B1  ");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         assert!(!formula.tokens.is_empty());
     }
 
     #[test]
     fn test_complex_formula() {
         let parser = FormulaParser::new("=IF(SUM(A1:A10)>100,AVERAGE(B1:B10),0)");
-        let formula = parser.parse().unwrap();
+        let formula = parser
+            .parse()
+            .expect("test fixture or operation should succeed");
         assert!(!formula.tokens.is_empty());
         // Check all expected tokens are present
         let funcs: Vec<_> = formula
@@ -1115,7 +1218,16 @@ mod tests {
             .iter()
             .filter_map(|t| match t {
                 Token::Function(f) => Some(f.as_str()),
-                _ => None,
+                Token::CellRef(_)
+                | Token::RangeRef(_)
+                | Token::Number(_)
+                | Token::String(_)
+                | Token::Boolean(_)
+                | Token::Operator(_)
+                | Token::LParen
+                | Token::RParen
+                | Token::Comma
+                | Token::Semicolon => None,
             })
             .collect();
         assert!(funcs.contains(&"IF"));

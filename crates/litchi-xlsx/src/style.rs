@@ -32,6 +32,10 @@ impl StyleKey {
     pub(crate) fn new(raw: u32, lineage: Arc<StyleLineage>) -> Self {
         Self { raw, lineage }
     }
+
+    pub(crate) const fn raw(&self) -> u32 {
+        self.raw
+    }
 }
 
 impl PartialEq for StyleKey {

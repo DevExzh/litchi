@@ -29,6 +29,7 @@ const STYLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const SVG: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
+const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MAX_BYTES: usize = 256 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;
 const MAX_FRAMES: usize = 1_000_000;
@@ -51,8 +52,10 @@ struct FrameSite {
     properties: Properties,
     image_tag: Range<usize>,
     href_attribute: Option<String>,
+    image_attributes: ImageAttributeSites,
     binary_contents: Option<Range<usize>>,
     map: MapEditSite,
+    accessibility: FrameTextEditSite,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -65,6 +68,7 @@ struct MapEditSite {
 #[derive(Clone, Debug, Default)]
 struct FrameAttributeSites {
     name: Option<String>,
+    xml_id: Option<String>,
     style_name: Option<String>,
     text_style_name: Option<String>,
     layer: Option<String>,
@@ -77,6 +81,25 @@ struct FrameAttributeSites {
     height: Option<String>,
     relative_width: Option<String>,
     relative_height: Option<String>,
+    copy_of: Option<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct ImageAttributeSites {
+    media_type: Option<String>,
+    xml_id: Option<String>,
+    filter_name: Option<String>,
+    link_type: Option<String>,
+    show: Option<String>,
+    actuate: Option<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct FrameTextEditSite {
+    title: Option<Range<usize>>,
+    description: Option<Range<usize>>,
+    frame_end: Option<usize>,
+    editable: bool,
 }
 
 /// An immutable, byte-preserving flat ODI snapshot.
@@ -215,6 +238,84 @@ impl FlatImageTransaction {
         Ok(())
     }
 
+    /// Stages the optional stable XML identifier on `draw:frame`.
+    pub fn set_frame_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        if self.site(frame)?.frame_tag.is_none() {
+            return Err(invalid(
+                "flat ODI image frame has no editable draw:frame owner",
+            ));
+        }
+        self.change_mut(frame)?.after.set_xml_id(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional accessible frame title.
+    pub fn set_frame_title(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        if !self.site(frame)?.accessibility.editable {
+            return Err(invalid(
+                "flat ODI frame title contains markup that cannot be edited losslessly",
+            ));
+        }
+        self.change_mut(frame)?.after.set_title(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional accessible frame description.
+    pub fn set_frame_description(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        if !self.site(frame)?.accessibility.editable {
+            return Err(invalid(
+                "flat ODI frame description contains markup that cannot be edited losslessly",
+            ));
+        }
+        self.change_mut(frame)?.after.set_description(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional declared media type on `draw:image`.
+    pub fn set_image_media_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_media_type(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional stable XML identifier on `draw:image`.
+    pub fn set_image_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_image_xml_id(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional inert producer filter hint.
+    pub fn set_filter_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_filter_name(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional image `XLink` type.
+    pub fn set_link_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_link_type(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional image `XLink` presentation behavior.
+    pub fn set_show(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_show(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional image `XLink` activation behavior.
+    pub fn set_actuate(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_actuate(value);
+        self.remove_noops();
+        Ok(())
+    }
+
     /// Stages the optional graphic style reference.
     pub fn set_style_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
         self.change_mut(frame)?.after.set_style_name(value);
@@ -345,6 +446,13 @@ impl FlatImageTransaction {
         Ok(())
     }
 
+    /// Replaces the optional `draw:copy-of` frame reference.
+    pub fn set_copy_of(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_copy_of(value);
+        self.remove_noops();
+        Ok(())
+    }
+
     /// Replaces the flat document title while preserving opaque metadata nodes.
     pub fn set_title(&mut self, value: Option<String>) -> Result<()> {
         self.metadata_mut()?.1.set_title(value);
@@ -455,25 +563,36 @@ impl FlatImageTransaction {
                     rewrite_frame_tag(raw, &site.attributes, &change.before, &change.after)?,
                 ));
             }
-            if change.before.source() != change.after.source() {
-                match change.after.source() {
-                    Source::Linked(href) => edits.push((
-                        site.image_tag.clone(),
-                        rewrite_attribute(
-                            self.source.as_bytes(),
-                            &site.image_tag,
-                            site.href_attribute.as_deref(),
-                            "xlink:href",
-                            Some(href),
-                        )?,
-                    )),
-                    Source::Embedded(bytes) => edits.push((
-                        site.binary_contents
-                            .clone()
-                            .ok_or_else(|| invalid("flat ODI inline image site disappeared"))?,
-                        base64(bytes),
-                    )),
-                }
+            let linked_source_changed = change.before.source() != change.after.source()
+                && matches!(change.after.source(), Source::Linked(_));
+            if linked_source_changed || image_attributes_differ(&change.before, &change.after) {
+                let raw = std::str::from_utf8(
+                    self.source
+                        .as_bytes()
+                        .get(site.image_tag.clone())
+                        .ok_or_else(|| invalid("ODI image tag span is invalid"))?,
+                )
+                .map_err(|error| invalid(format!("ODI image tag is not UTF-8: {error}")))?;
+                edits.push((
+                    site.image_tag.clone(),
+                    rewrite_image_tag(
+                        raw,
+                        site.href_attribute.as_deref(),
+                        &site.image_attributes,
+                        &change.before,
+                        &change.after,
+                    )?,
+                ));
+            }
+            if change.before.source() != change.after.source()
+                && let Source::Embedded(bytes) = change.after.source()
+            {
+                edits.push((
+                    site.binary_contents
+                        .clone()
+                        .ok_or_else(|| invalid("flat ODI inline image site disappeared"))?,
+                    base64(bytes),
+                ));
             }
             if change.before.image_map() != change.after.image_map() {
                 let replacement = change
@@ -490,6 +609,15 @@ impl FlatImageTransaction {
                     span.ok_or_else(|| invalid("flat ODI image-map edit site disappeared"))?,
                     replacement,
                 ));
+            }
+            if change.before.title() != change.after.title()
+                || change.before.description() != change.after.description()
+            {
+                edits.extend(frame_text_edits(
+                    &site.accessibility,
+                    &change.before,
+                    &change.after,
+                )?);
             }
         }
         let mut bytes = apply_edits(self.source.as_bytes(), edits)?;
@@ -762,8 +890,10 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
     let mut frames = Vec::with_capacity(images.len());
     let image_map = scan_image_map(xml)?;
     let map_site = scan_map_edit_site(xml)?;
+    let accessibility_site = scan_frame_text_edit_site(xml)?;
     if let Some(site) = sites.first_mut() {
         site.map = map_site;
+        site.accessibility = accessibility_site;
     }
     for (image, site) in images.into_iter().zip(&sites) {
         let source = match &image.source {
@@ -1033,6 +1163,7 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                         start..end,
                         FrameAttributeSites {
                             name: attribute_qname(&reader, &element, DRAW, b"name")?,
+                            xml_id: attribute_qname(&reader, &element, XML, b"id")?,
                             style_name: attribute_qname(&reader, &element, DRAW, b"style-name")?,
                             text_style_name: attribute_qname(
                                 &reader,
@@ -1060,6 +1191,7 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                                 STYLE,
                                 b"rel-height",
                             )?,
+                            copy_of: attribute_qname(&reader, &element, DRAW, b"copy-of")?,
                         },
                         Properties {
                             style_name: attribute_value(&reader, &element, DRAW, b"style-name")?,
@@ -1099,8 +1231,10 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                         properties,
                         image_tag: start..end,
                         href_attribute: attribute_qname(&reader, &element, XLINK, b"href")?,
+                        image_attributes: scan_image_attributes(&reader, &element)?,
                         binary_contents: None,
                         map: MapEditSite::default(),
+                        accessibility: FrameTextEditSite::default(),
                     });
                     image_depth = Some((depth, images.len() - 1));
                 } else if namespace == NamespaceKind::Office
@@ -1123,8 +1257,10 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                         properties,
                         image_tag: start..end,
                         href_attribute: attribute_qname(&reader, &element, XLINK, b"href")?,
+                        image_attributes: scan_image_attributes(&reader, &element)?,
                         binary_contents: None,
                         map: MapEditSite::default(),
+                        accessibility: FrameTextEditSite::default(),
                     });
                 }
             },
@@ -1159,6 +1295,126 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
         }
     }
     Ok(images)
+}
+
+fn scan_image_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<ImageAttributeSites> {
+    Ok(ImageAttributeSites {
+        media_type: attribute_qname(reader, element, DRAW, b"mime-type")?,
+        xml_id: attribute_qname(reader, element, XML, b"id")?,
+        filter_name: attribute_qname(reader, element, DRAW, b"filter-name")?,
+        link_type: attribute_qname(reader, element, XLINK, b"type")?,
+        show: attribute_qname(reader, element, XLINK, b"show")?,
+        actuate: attribute_qname(reader, element, XLINK, b"actuate")?,
+    })
+}
+
+#[derive(Clone, Copy)]
+enum FrameTextKind {
+    Title,
+    Description,
+}
+
+fn scan_frame_text_edit_site(xml: &str) -> Result<FrameTextEditSite> {
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    let mut depth = 0usize;
+    let mut frame_depth = None;
+    let mut active = None::<(usize, usize, FrameTextKind)>;
+    let mut site = FrameTextEditSite {
+        editable: true,
+        ..FrameTextEditSite::default()
+    };
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|error| invalid(format!("ODI XML position exceeds usize: {error}")))?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid ODI frame text XML: {error}")))?;
+        let is_draw = bound_to(&namespace, DRAW);
+        let is_svg = bound_to(&namespace, SVG);
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|error| invalid(format!("ODI XML position exceeds usize: {error}")))?;
+        match event {
+            Event::Start(element) => {
+                depth = checked_depth(depth)?;
+                let local = element.local_name();
+                if is_draw && local.as_ref() == b"frame" {
+                    frame_depth = Some(depth);
+                } else if frame_depth.is_some_and(|frame| depth == frame + 1)
+                    && is_svg
+                    && matches!(local.as_ref(), b"title" | b"desc")
+                {
+                    let kind = if local.as_ref() == b"title" {
+                        FrameTextKind::Title
+                    } else {
+                        FrameTextKind::Description
+                    };
+                    if active.is_some()
+                        || match kind {
+                            FrameTextKind::Title => site.title.is_some(),
+                            FrameTextKind::Description => site.description.is_some(),
+                        }
+                    {
+                        site.editable = false;
+                    }
+                    active = Some((depth, start, kind));
+                } else if active.is_some() {
+                    site.editable = false;
+                }
+            },
+            Event::Empty(element) => {
+                if frame_depth.is_some_and(|frame| depth == frame)
+                    && is_svg
+                    && matches!(element.local_name().as_ref(), b"title" | b"desc")
+                {
+                    let target = if element.local_name().as_ref() == b"title" {
+                        &mut site.title
+                    } else {
+                        &mut site.description
+                    };
+                    if target.replace(start..end).is_some() {
+                        site.editable = false;
+                    }
+                } else if active.is_some() {
+                    site.editable = false;
+                }
+            },
+            Event::End(_) => {
+                if active.is_some_and(|value| value.0 == depth) {
+                    let (_, element_start, kind) = active
+                        .take()
+                        .ok_or_else(|| invalid("ODI frame text edit state disappeared"))?;
+                    let target = match kind {
+                        FrameTextKind::Title => &mut site.title,
+                        FrameTextKind::Description => &mut site.description,
+                    };
+                    if target.replace(element_start..end).is_some() {
+                        site.editable = false;
+                    }
+                } else if frame_depth == Some(depth) {
+                    site.frame_end = Some(start);
+                    frame_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("ODI frame text XML depth underflow"))?;
+            },
+            Event::CData(_) | Event::Comment(_) | Event::PI(_) if active.is_some() => {
+                site.editable = false;
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODI XML")),
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    Ok(site)
 }
 
 fn scan_map_edit_site(xml: &str) -> Result<MapEditSite> {
@@ -1604,6 +1860,7 @@ fn attribute_qname(
 
 fn frame_attributes_differ(before: &Frame, after: &Frame) -> bool {
     before.name() != after.name()
+        || before.xml_id() != after.xml_id()
         || before.style_name() != after.style_name()
         || before.text_style_name() != after.text_style_name()
         || before.layer() != after.layer()
@@ -1616,6 +1873,16 @@ fn frame_attributes_differ(before: &Frame, after: &Frame) -> bool {
         || before.height() != after.height()
         || before.relative_width() != after.relative_width()
         || before.relative_height() != after.relative_height()
+        || before.copy_of() != after.copy_of()
+}
+
+fn image_attributes_differ(before: &Frame, after: &Frame) -> bool {
+    before.media_type() != after.media_type()
+        || before.image_xml_id() != after.image_xml_id()
+        || before.filter_name() != after.filter_name()
+        || before.link_type() != after.link_type()
+        || before.show() != after.show()
+        || before.actuate() != after.actuate()
 }
 
 fn rewrite_frame_tag(
@@ -1631,6 +1898,13 @@ fn rewrite_frame_tag(
         "draw:name",
         before.name(),
         after.name(),
+    )?;
+    rewrite_changed_attribute(
+        &mut tag,
+        sites.xml_id.as_deref(),
+        "xml:id",
+        before.xml_id(),
+        after.xml_id(),
     )?;
     rewrite_changed_attribute(
         &mut tag,
@@ -1703,10 +1977,142 @@ fn rewrite_frame_tag(
             before.relative_height(),
             after.relative_height(),
         ),
+        (
+            sites.copy_of.as_deref(),
+            "draw:copy-of",
+            before.copy_of(),
+            after.copy_of(),
+        ),
     ] {
         rewrite_changed_attribute(&mut tag, site, fallback, old, new)?;
     }
     Ok(tag)
+}
+
+fn rewrite_image_tag(
+    source: &str,
+    href_site: Option<&str>,
+    sites: &ImageAttributeSites,
+    before: &Frame,
+    after: &Frame,
+) -> Result<String> {
+    let mut tag = source.to_owned();
+    if before.source() != after.source()
+        && let Source::Linked(href) = after.source()
+    {
+        let before_href = match before.source() {
+            Source::Linked(value) => Some(value.as_str()),
+            Source::Embedded(_) => None,
+        };
+        rewrite_changed_attribute(&mut tag, href_site, "xlink:href", before_href, Some(href))?;
+    }
+    for (site, fallback, old, new) in [
+        (
+            sites.media_type.as_deref(),
+            "draw:mime-type",
+            before.media_type(),
+            after.media_type(),
+        ),
+        (
+            sites.xml_id.as_deref(),
+            "xml:id",
+            before.image_xml_id(),
+            after.image_xml_id(),
+        ),
+        (
+            sites.filter_name.as_deref(),
+            "draw:filter-name",
+            before.filter_name(),
+            after.filter_name(),
+        ),
+        (
+            sites.link_type.as_deref(),
+            "xlink:type",
+            before.link_type(),
+            after.link_type(),
+        ),
+        (
+            sites.show.as_deref(),
+            "xlink:show",
+            before.show(),
+            after.show(),
+        ),
+        (
+            sites.actuate.as_deref(),
+            "xlink:actuate",
+            before.actuate(),
+            after.actuate(),
+        ),
+    ] {
+        rewrite_changed_attribute(&mut tag, site, fallback, old, new)?;
+    }
+    Ok(tag)
+}
+
+fn frame_text_edits(
+    site: &FrameTextEditSite,
+    before: &Frame,
+    after: &Frame,
+) -> Result<Vec<(Range<usize>, String)>> {
+    if !site.editable {
+        return Err(invalid(
+            "flat ODI frame accessibility text cannot be edited losslessly",
+        ));
+    }
+    let frame_end = site
+        .frame_end
+        .ok_or_else(|| invalid("flat ODI frame accessibility insertion site disappeared"))?;
+    let mut edits = Vec::<(Range<usize>, String)>::new();
+    let mut insertions = std::collections::BTreeMap::<usize, String>::new();
+    for (span, position, element, old, new) in [
+        (
+            site.title.as_ref(),
+            site.description
+                .as_ref()
+                .map_or(frame_end, |span| span.start),
+            "svg:title",
+            before.title(),
+            after.title(),
+        ),
+        (
+            site.description.as_ref(),
+            frame_end,
+            "svg:desc",
+            before.description(),
+            after.description(),
+        ),
+    ] {
+        if old == new {
+            continue;
+        }
+        let replacement = new.map_or_else(String::new, |value| text_element(element, value));
+        if let Some(span) = span {
+            edits.push((span.clone(), replacement));
+        } else if !replacement.is_empty() {
+            insertions
+                .entry(position)
+                .or_default()
+                .push_str(&replacement);
+        }
+    }
+    for (position, insertion) in insertions {
+        if let Some((_, replacement)) = edits
+            .iter_mut()
+            .find(|(span, _)| span.start == position && span.end > position)
+        {
+            replacement.insert_str(0, &insertion);
+        } else {
+            edits.push((position..position, insertion));
+        }
+    }
+    Ok(edits)
+}
+
+fn text_element(name: &str, value: &str) -> String {
+    format!(
+        "<{name} xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\">{}</{name}>",
+        quick_xml::escape::escape(value)
+    )
 }
 
 fn rewrite_changed_attribute(
@@ -1727,28 +2133,6 @@ fn rewrite_changed_attribute(
         (None, None) => tag.clone(),
     };
     Ok(())
-}
-
-fn rewrite_attribute(
-    bytes: &[u8],
-    span: &Range<usize>,
-    existing: Option<&str>,
-    fallback: &str,
-    new_value: Option<&str>,
-) -> Result<String> {
-    let tag = std::str::from_utf8(
-        bytes
-            .get(span.clone())
-            .ok_or_else(|| invalid("ODI attribute tag span is invalid"))?,
-    )
-    .map_err(|error| invalid(format!("ODI attribute tag is not UTF-8: {error}")))?;
-    let escaped = new_value.map(|candidate| quick_xml::escape::escape(candidate).into_owned());
-    match (existing, escaped) {
-        (Some(name), Some(replacement)) => replace_attribute(tag, name, &replacement),
-        (Some(name), None) => remove_attribute(tag, name),
-        (None, Some(replacement)) => insert_attribute(tag, fallback, &replacement),
-        (None, None) => Ok(tag.to_owned()),
-    }
 }
 
 fn replace_attribute(tag: &str, name: &str, value: &str) -> Result<String> {
@@ -1847,6 +2231,19 @@ fn find_attribute(tag: &str, wanted: &str) -> Result<Option<(Range<usize>, Range
 }
 
 fn apply_edits(source: &[u8], mut edits: Vec<(Range<usize>, String)>) -> Result<Vec<u8>> {
+    let mut merged = Vec::<(Range<usize>, String)>::with_capacity(edits.len());
+    for (span, replacement) in edits.drain(..) {
+        if span.is_empty()
+            && let Some((_, existing)) = merged
+                .iter_mut()
+                .find(|(candidate, _)| candidate.is_empty() && candidate.start == span.start)
+        {
+            existing.push_str(&replacement);
+        } else {
+            merged.push((span, replacement));
+        }
+    }
+    edits = merged;
     edits.sort_unstable_by_key(|edit| std::cmp::Reverse(edit.0.start));
     let mut output = source.to_vec();
     let mut prior = source.len();

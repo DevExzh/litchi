@@ -1,14 +1,28 @@
-//! Lossless fixed-width edits of existing BIFF8 cell records.
+//! Lossless opened-workbook transactions for BIFF8 cell records and sheets.
 //!
 //! The owner covers `Number` (`[MS-XLS]` 2.4.180), standalone and packed `RK`,
 //! `BoolErr`, `Blank`, `LabelSst`, and non-string `Formula` caches. Every
-//! change is confined to an existing fixed-width field. The only record-family
-//! conversion is equal-width standalone `RK` ↔ `LabelSst`, with an existing
-//! SST value and atomic reference-count validation. Insertion and physical
-//! removal are refused until row-block, `INDEX`/`DBCELL`, dimensions, and
-//! formula dependencies can be rebuilt together. The complete CFB package is
-//! reopened before publication, and every other captured stream retains its
-//! exact payload.
+//! fixed-width changes retain their source slots. Structural cell insertion,
+//! removal, row/column movement, and sheet rename regenerate the complete
+//! affected row-block/`INDEX`/`DBCELL`/dimension closure. Operations that meet
+//! an unsupported formula, range, drawing, or packed-cell dependency are
+//! refused before bytes are changed. The complete CFB package is reopened
+//! before publication, and every other captured stream retains its exact
+//! payload.
+
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::expect_used,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unwrap_used,
+        reason = "opened-workbook mutation paths must return typed refusals instead of terminating"
+    )
+)]
+
+mod structural;
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::{Error, Result, Workbook};
@@ -31,6 +45,7 @@ const CODE_PAGE: u16 = 0x0042;
 const BOUND_SHEET: u16 = 0x0085;
 const FILE_PASS: u16 = 0x002f;
 const SST: u16 = 0x00fc;
+const XF: u16 = 0x00e0;
 const FORMULA: u16 = 0x0006;
 const MUL_RK: u16 = 0x00bd;
 const BLANK: u16 = 0x0201;
@@ -160,6 +175,33 @@ pub enum Storage {
     Formula,
 }
 
+/// A checked workbook-global BIFF8 extended-format resource index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct StyleIndex(u16);
+
+impl StyleIndex {
+    /// Creates an index after checking it against an opened workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsafeEdit`] if the resource does not exist.
+    pub fn new(snapshot: &Snapshot, index: u16) -> Result<Self> {
+        if usize::from(index) >= snapshot.inner.xf_records.len() {
+            return Err(Error::UnsafeEdit(format!(
+                "BIFF8 XF index {index} is outside the workbook's {} resources",
+                snapshot.inner.xf_records.len()
+            )));
+        }
+        Ok(Self(index))
+    }
+
+    /// Returns the workbook-global XF index.
+    #[must_use]
+    pub const fn get(self) -> u16 {
+        self.0
+    }
+}
+
 /// A checked BIFF8 error value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CellError(u8);
@@ -224,6 +266,7 @@ pub enum Value {
 pub struct Cell {
     reference: Reference,
     storage: Storage,
+    style: StyleIndex,
     value: Value,
 }
 
@@ -238,6 +281,12 @@ impl Cell {
     #[must_use]
     pub const fn storage(&self) -> Storage {
         self.storage
+    }
+
+    /// Workbook-global formatting resource used by this record.
+    #[must_use]
+    pub const fn style(&self) -> StyleIndex {
+        self.style
     }
 
     /// Semantic value or inert formula cache.
@@ -268,6 +317,7 @@ struct Inner {
     workbook_stream: Arc<[u8]>,
     shared_strings: Arc<Vec<String>>,
     sst_total_offset: Option<usize>,
+    xf_records: Arc<Vec<Vec<u8>>>,
     sheets: Vec<SheetData>,
 }
 
@@ -304,7 +354,7 @@ impl Snapshot {
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
         let source = package.finish()?;
 
-        let (mut sheets, sst_total_offset) = parse_workbook_stream(&workbook_stream)?;
+        let (mut sheets, sst_total_offset, xf_records) = parse_workbook_stream(&workbook_stream)?;
         // A full semantic open catches cross-stream and workbook-global
         // dependencies before the narrower source-offset inventory is kept.
         // The legacy reader intentionally skips some malformed optional sheet
@@ -334,6 +384,7 @@ impl Snapshot {
                 workbook_stream,
                 shared_strings,
                 sst_total_offset,
+                xf_records: Arc::new(xf_records),
                 sheets,
             }),
         })
@@ -384,6 +435,7 @@ impl Snapshot {
         Transaction {
             source: self.clone(),
             changes: Vec::new(),
+            structural_changes: Vec::new(),
         }
     }
 
@@ -533,11 +585,39 @@ struct Change {
     value: Value,
 }
 
+#[derive(Debug, Clone)]
+enum StructuralChange {
+    Cell {
+        sheet: usize,
+        reference: Reference,
+        before: Option<(Storage, Value, StyleIndex)>,
+        after: Option<(Storage, Value, StyleIndex)>,
+    },
+    Rows {
+        sheet: usize,
+        start: u16,
+        count: u16,
+        insert: bool,
+    },
+    Columns {
+        sheet: usize,
+        start: u8,
+        count: u8,
+        insert: bool,
+    },
+    RenameSheet {
+        sheet: usize,
+        before: String,
+        after: String,
+    },
+}
+
 /// Detached, failure-atomic edits of existing fixed-width BIFF8 cell fields.
 #[derive(Clone)]
 pub struct Transaction {
     source: Snapshot,
     changes: Vec<Change>,
+    structural_changes: Vec<StructuralChange>,
 }
 
 /// Backward-compatible name for [`Transaction`].
@@ -550,6 +630,20 @@ pub struct CellConflict {
     reference: Reference,
     left_storage: Storage,
     right_storage: Storage,
+}
+
+/// One structural semantic target with incompatible requested outcomes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperationConflict {
+    target: String,
+}
+
+impl OperationConflict {
+    /// Canonical workbook-relative conflict target.
+    #[must_use]
+    pub fn target(&self) -> &str {
+        &self.target
+    }
 }
 
 impl CellConflict {
@@ -586,6 +680,8 @@ pub enum JoinError {
     DifferentSource,
     /// At least one cell has incompatible requested outcomes.
     Conflicts(Box<[CellConflict]>),
+    /// Structural operations overlap or request divergent outcomes.
+    StructuralConflicts(Box<[OperationConflict]>),
     /// The joined transaction would exceed its finite change bound.
     Limit { observed: usize, limit: usize },
     /// Retaining deterministic conflict or joined state failed.
@@ -636,7 +732,41 @@ impl Transaction {
         if !conflicts.is_empty() {
             return Err(JoinError::Conflicts(conflicts.into_boxed_slice()));
         }
+        let mut structural_conflicts = Vec::new();
+        for right in &incoming.structural_changes {
+            for left in &self.structural_changes {
+                if structural_changes_overlap(left, right) && !structural_changes_equal(left, right)
+                {
+                    structural_conflicts
+                        .try_reserve(1)
+                        .map_err(|_error| JoinError::Allocation)?;
+                    structural_conflicts.push(OperationConflict {
+                        target: structural_target(&self.source, right),
+                    });
+                }
+            }
+        }
+        structural_conflicts.sort_by(|left, right| left.target.cmp(&right.target));
+        structural_conflicts.dedup();
+        if !structural_conflicts.is_empty() {
+            return Err(JoinError::StructuralConflicts(
+                structural_conflicts.into_boxed_slice(),
+            ));
+        }
         let observed = self.changes.len().saturating_add(additions);
+        let structural_additions = incoming
+            .structural_changes
+            .iter()
+            .filter(|right| {
+                !self
+                    .structural_changes
+                    .iter()
+                    .any(|left| structural_changes_equal(left, right))
+            })
+            .count();
+        let observed = observed
+            .saturating_add(self.structural_changes.len())
+            .saturating_add(structural_additions);
         if observed > MAX_STAGED_CHANGES {
             return Err(JoinError::Limit {
                 observed,
@@ -660,6 +790,26 @@ impl Transaction {
             }
             self.changes.push(change);
         }
+        self.changes.sort_by_key(|change| {
+            (
+                self.source.inner.sheets[change.sheet].workbook_index,
+                change.reference,
+            )
+        });
+        self.structural_changes
+            .try_reserve(structural_additions)
+            .map_err(|_error| JoinError::Allocation)?;
+        for change in incoming.structural_changes {
+            if !self
+                .structural_changes
+                .iter()
+                .any(|left| structural_changes_equal(left, &change))
+            {
+                self.structural_changes.push(change);
+            }
+        }
+        self.structural_changes
+            .sort_by_key(|change| structural_target(&self.source, change));
         Ok(self)
     }
 
@@ -773,6 +923,271 @@ impl Transaction {
         self.stage(sheet_index, entry_index, Storage::Blank, Value::Blank)
     }
 
+    /// Inserts a previously absent scalar cell using workbook XF zero.
+    ///
+    /// The affected worksheet's row blocks, `INDEX`, `DBCELL`, row extents,
+    /// and `DIMENSIONS` are regenerated as one checked closure. Text must
+    /// already exist in the SST; formulas and packed-cell overlaps are
+    /// deliberately refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed grid, resource, occupancy, dependency, or bound error.
+    pub fn insert_cell(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        value: Value,
+    ) -> Result<()> {
+        let style = StyleIndex::new(&self.source, 0)?;
+        self.insert_cell_with_style(selector, reference, value, style)
+    }
+
+    /// Inserts a previously absent scalar cell with an existing XF resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an occupied location, unsupported value,
+    /// stale style resource, dependency closure, or finite transaction bound.
+    pub fn insert_cell_with_style(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        value: Value,
+        style: StyleIndex,
+    ) -> Result<()> {
+        let sheet = self.require_sheet(selector, "cell insertion")?;
+        if unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?.is_some() {
+            return Err(Error::UnsafeEdit(
+                "BIFF8 cell insertion target is occupied".into(),
+            ));
+        }
+        let storage = storage_for_new_value(&value, &self.source.inner.shared_strings)?;
+        self.stage_structural(StructuralChange::Cell {
+            sheet,
+            reference,
+            before: None,
+            after: Some((storage, value, style)),
+        })
+    }
+
+    /// Physically removes an existing standalone BIFF8 cell record.
+    ///
+    /// Packed `MulRk` cells and formula ownership groups are refused because a
+    /// partial deletion would not preserve their dependency semantics.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed absence, ambiguity, dependency, or bound error.
+    pub fn remove_cell(&mut self, selector: Selector<'_>, reference: Reference) -> Result<()> {
+        let sheet = self.require_sheet(selector, "cell removal")?;
+        let entry = unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?
+            .ok_or_else(|| Error::UnsafeEdit("BIFF8 cell removal target is absent".into()))?;
+        let cell = &self.source.inner.sheets[sheet].entries[entry].cell;
+        if matches!(cell.storage, Storage::MulRk | Storage::Formula) {
+            return Err(Error::UnsafeEdit(
+                "packed RK and formula records require a wider dependency rewrite".into(),
+            ));
+        }
+        self.stage_structural(StructuralChange::Cell {
+            sheet,
+            reference,
+            before: Some((cell.storage, cell.value.clone(), cell.style)),
+            after: None,
+        })
+    }
+
+    /// Changes an existing cell to an existing workbook XF resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed absence, ambiguity, stale-resource, or bound error.
+    pub fn set_style(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        style: StyleIndex,
+    ) -> Result<()> {
+        let sheet = self.require_sheet(selector, "cell style edit")?;
+        let entry = unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?
+            .ok_or_else(|| Error::UnsafeEdit("BIFF8 style target is absent".into()))?;
+        let cell = &self.source.inner.sheets[sheet].entries[entry].cell;
+        self.stage_structural(StructuralChange::Cell {
+            sheet,
+            reference,
+            before: Some((cell.storage, cell.value.clone(), cell.style)),
+            after: Some((cell.storage, cell.value.clone(), style)),
+        })
+    }
+
+    /// Inserts empty row coordinates and moves every retained row below them.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed grid, dependency-closure, or finite-bound error.
+    pub fn insert_rows(&mut self, selector: Selector<'_>, start: u16, count: u16) -> Result<()> {
+        self.stage_rows(selector, start, count, true)
+    }
+
+    /// Deletes row coordinates and their cells, moving later rows upward.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed dependency or reversibility refusal. Deletion is
+    /// durable only when the deleted coordinate span contains no cells.
+    pub fn delete_rows(&mut self, selector: Selector<'_>, start: u16, count: u16) -> Result<()> {
+        self.stage_rows(selector, start, count, false)
+    }
+
+    /// Inserts empty column coordinates and moves every retained cell right.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed grid, dependency-closure, or finite-bound error.
+    pub fn insert_columns(&mut self, selector: Selector<'_>, start: u8, count: u8) -> Result<()> {
+        self.stage_columns(selector, start, count, true)
+    }
+
+    /// Deletes column coordinates and their cells, moving later cells left.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed dependency or reversibility refusal. Deletion is
+    /// durable only when the deleted coordinate span contains no cells.
+    pub fn delete_columns(&mut self, selector: Selector<'_>, start: u8, count: u8) -> Result<()> {
+        self.stage_columns(selector, start, count, false)
+    }
+
+    /// Renames one worksheet tab while preserving its `BoundSheet` identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed name, ambiguity, allocation, or finite-bound error.
+    pub fn rename_sheet(&mut self, selector: Selector<'_>, name: &str) -> Result<()> {
+        let sheet = self.require_sheet(selector, "worksheet rename")?;
+        structural::validate_sheet_name(name)?;
+        if self
+            .source
+            .inner
+            .sheets
+            .iter()
+            .enumerate()
+            .any(|(index, item)| index != sheet && caseless_eq(&item.name, name))
+        {
+            return Err(Error::UnsafeEdit(format!(
+                "worksheet name {name:?} would be ambiguous"
+            )));
+        }
+        let before = self.source.inner.sheets[sheet].name.clone();
+        if before == name {
+            return Ok(());
+        }
+        self.stage_structural(StructuralChange::RenameSheet {
+            sheet,
+            before,
+            after: name.to_string(),
+        })
+    }
+
+    fn require_sheet(&self, selector: Selector<'_>, context: &str) -> Result<usize> {
+        self.source
+            .resolve_sheet(selector)?
+            .ok_or_else(|| Error::WorksheetNotFound(context.into()))
+    }
+
+    fn stage_rows(
+        &mut self,
+        selector: Selector<'_>,
+        start: u16,
+        count: u16,
+        insert: bool,
+    ) -> Result<()> {
+        if count == 0 {
+            return Err(Error::InvalidData(
+                "row operation count must be nonzero".into(),
+            ));
+        }
+        if insert && start.checked_add(count).is_none() {
+            return Err(Error::UnsafeEdit(
+                "row insertion exceeds the BIFF8 grid".into(),
+            ));
+        }
+        let sheet = self.require_sheet(selector, "row operation")?;
+        self.stage_structural(StructuralChange::Rows {
+            sheet,
+            start,
+            count,
+            insert,
+        })
+    }
+
+    fn stage_columns(
+        &mut self,
+        selector: Selector<'_>,
+        start: u8,
+        count: u8,
+        insert: bool,
+    ) -> Result<()> {
+        if count == 0 {
+            return Err(Error::InvalidData(
+                "column operation count must be nonzero".into(),
+            ));
+        }
+        if insert && start.checked_add(count).is_none() {
+            return Err(Error::UnsafeEdit(
+                "column insertion exceeds the BIFF8 grid".into(),
+            ));
+        }
+        let sheet = self.require_sheet(selector, "column operation")?;
+        self.stage_structural(StructuralChange::Columns {
+            sheet,
+            start,
+            count,
+            insert,
+        })
+    }
+
+    fn stage_structural(&mut self, change: StructuralChange) -> Result<()> {
+        if self
+            .structural_changes
+            .iter()
+            .any(|existing| structural_changes_overlap(existing, &change))
+        {
+            return Err(Error::UnsafeEdit(
+                "overlapping structural operations must be prepared and joined separately".into(),
+            ));
+        }
+        let sheet = operation_sheet_index(&change);
+        let fixed_overlap = self.changes.iter().any(|fixed| {
+            fixed.sheet == sheet
+                && match &change {
+                    StructuralChange::Cell { reference, .. } => fixed.reference == *reference,
+                    StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => true,
+                    StructuralChange::RenameSheet { .. } => false,
+                }
+        });
+        if fixed_overlap {
+            return Err(Error::UnsafeEdit(
+                "fixed-width and structural operations overlap in one worksheet".into(),
+            ));
+        }
+        let observed = self
+            .changes
+            .len()
+            .checked_add(self.structural_changes.len())
+            .ok_or_else(|| Error::InvalidData("cell transaction size overflow".into()))?;
+        if observed >= MAX_STAGED_CHANGES {
+            return Err(Error::UnsafeEdit(format!(
+                "cell transaction exceeds its {MAX_STAGED_CHANGES}-change limit"
+            )));
+        }
+        self.structural_changes
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("staging structural XLS changes"))?;
+        self.structural_changes.push(change);
+        Ok(())
+    }
+
     fn stage(
         &mut self,
         sheet_index: usize,
@@ -780,6 +1195,26 @@ impl Transaction {
         storage: Storage,
         value: Value,
     ) -> Result<()> {
+        if self.structural_changes.iter().any(|change| {
+            operation_sheet_index(change) == sheet_index
+                && match change {
+                    StructuralChange::Cell {
+                        reference: structural_reference,
+                        ..
+                    } => {
+                        *structural_reference
+                            == self.source.inner.sheets[sheet_index].entries[entry]
+                                .cell
+                                .reference
+                    },
+                    StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => true,
+                    StructuralChange::RenameSheet { .. } => false,
+                }
+        }) {
+            return Err(Error::UnsafeEdit(
+                "fixed-width and structural operations overlap in one worksheet".into(),
+            ));
+        }
         if let Some(change) = self
             .changes
             .iter_mut()
@@ -816,13 +1251,20 @@ impl Transaction {
     /// Returns an error if stream patching, CFB reconstruction, complete XLS
     /// reopen, or typed semantic readback fails.
     pub fn commit(self) -> Result<Commit> {
-        let changed_cells = self
+        let fixed_cells = self
             .changes
             .iter()
             .filter(|change| change_is_effective(&self.source, change))
             .count();
-        let semantic = SemanticPatch::from_changes(&self.source, &self.changes)?;
-        if changed_cells == 0 {
+        let changed_cells = fixed_cells.saturating_add(
+            self.structural_changes
+                .iter()
+                .filter(|change| matches!(change, StructuralChange::Cell { .. }))
+                .count(),
+        );
+        let semantic =
+            SemanticPatch::from_transaction(&self.source, &self.changes, &self.structural_changes)?;
+        if changed_cells == 0 && self.structural_changes.is_empty() {
             let patch = Patch::new(
                 Arc::clone(&self.source.inner.bytes),
                 Arc::clone(&self.source.inner.bytes),
@@ -866,12 +1308,23 @@ impl Transaction {
                 &self.source.inner.shared_strings,
             )?;
         }
+        for change in &self.structural_changes {
+            if let StructuralChange::Cell { before, after, .. } = change {
+                sst_delta += i64::from(matches!(after, Some((Storage::LabelSst, _, _))))
+                    - i64::from(matches!(before, Some((Storage::LabelSst, _, _))));
+            }
+        }
         if sst_delta != 0 {
             update_sst_total(
                 &mut workbook_bytes,
                 self.source.inner.sst_total_offset,
                 sst_delta,
             )?;
+        }
+
+        if !self.structural_changes.is_empty() {
+            workbook_bytes =
+                structural::apply(workbook_bytes, &self.source, &self.structural_changes)?;
         }
 
         let workbook: Arc<[u8]> = Arc::from(workbook_bytes);
@@ -885,6 +1338,7 @@ impl Transaction {
         let candidate = package.finish()?;
         let snapshot = Snapshot::from_bytes(candidate)?;
         verify_readback(&snapshot, &self.changes)?;
+        verify_structural_readback(&snapshot, &self.source, &self.structural_changes)?;
         let patch = Patch::new(
             Arc::clone(&self.source.inner.bytes),
             Arc::clone(&snapshot.inner.bytes),
@@ -918,6 +1372,7 @@ impl fmt::Debug for Transaction {
             .debug_struct("Edit")
             .field("source", &self.source)
             .field("staged_changes", &self.changes.len())
+            .field("structural_changes", &self.structural_changes.len())
             .finish()
     }
 }
@@ -1027,11 +1482,15 @@ pub struct SemanticPatch {
 }
 
 impl SemanticPatch {
-    fn from_changes(snapshot: &Snapshot, changes: &[Change]) -> Result<Self> {
+    fn from_transaction(
+        snapshot: &Snapshot,
+        changes: &[Change],
+        structural_changes: &[StructuralChange],
+    ) -> Result<Self> {
         let limits = semantic_patch_limits();
         let mut operations = Vec::new();
         operations
-            .try_reserve(changes.len())
+            .try_reserve(changes.len().saturating_add(structural_changes.len()))
             .map_err(|_error| Error::Allocation("retaining semantic cell operations"))?;
         for change in changes {
             if !change_is_effective(snapshot, change) {
@@ -1076,6 +1535,15 @@ impl SemanticPatch {
             .map_err(patch_error)?;
             operations.push(ReversibleOperation::new(forward, inverse));
         }
+        for change in structural_changes {
+            append_structural_semantic(snapshot, change, limits, &mut operations)?;
+        }
+        operations.sort_by(|left, right| {
+            semantic_operation_order(left.forward())
+                .cmp(&semantic_operation_order(right.forward()))
+                .then_with(|| left.forward().target.cmp(&right.forward().target))
+                .then_with(|| left.forward().op.cmp(&right.forward().op))
+        });
         let blobs = BlobBundle::new(limits.blobs());
         let reverse_blobs = BlobBundle::new(limits.blobs());
         let inner = CorePatch::<Reversible>::new(
@@ -1146,54 +1614,723 @@ impl SemanticPatch {
     /// error without changing the source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Commit> {
         let mut transaction = source.transaction();
+        let mut sheet_names = semantic_sheet_names(source);
         for operation in self.inner.operations() {
-            if operation.op != "cell.set" {
-                return Err(Error::InvalidData(format!(
-                    "unsupported XLS cell patch operation {:?}",
-                    operation.op
-                )));
-            }
-            let (sheet_position, reference) = parse_semantic_target(&operation.target)?;
-            let sheet_index = source
-                .resolve_sheet(Selector::Position(sheet_position))?
-                .ok_or_else(|| Error::UnsafeEdit("semantic patch worksheet is absent".into()))?;
-            let sheet = &source.inner.sheets[sheet_index];
-            let expected_name = operation
-                .preconditions
-                .get("sheet_name")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| {
-                    Error::InvalidData("cell patch has no sheet-name precondition".into())
-                })?;
-            if sheet.name != expected_name {
-                return Err(Error::UnsafeEdit(
-                    "semantic patch worksheet identity is stale".into(),
-                ));
-            }
-            let entry_index = unique_entry_index(&sheet.entries, reference)?
-                .ok_or_else(|| Error::UnsafeEdit("semantic patch cell is absent".into()))?;
-            let cell = &sheet.entries[entry_index].cell;
-            let expected = operation
-                .preconditions
-                .get("state")
-                .ok_or_else(|| Error::InvalidData("cell patch has no state precondition".into()))?;
-            let (expected_storage, expected_value) = parse_cell_state(expected)?;
-            if cell.storage != expected_storage || !values_equal(&cell.value, &expected_value) {
-                return Err(Error::UnsafeEdit(
-                    "semantic patch cell precondition is stale".into(),
-                ));
-            }
-            let (storage, value) = parse_cell_state(&operation.value)?;
-            let represented = target_storage(cell.storage, &value, &source.inner.shared_strings)?;
-            if represented != storage {
-                return Err(Error::InvalidData(
-                    "cell patch target storage disagrees with its value".into(),
-                ));
-            }
-            transaction.stage(sheet_index, entry_index, storage, value)?;
+            apply_semantic_operation(source, &mut transaction, operation, &mut sheet_names)?;
         }
         transaction.commit()
     }
+
+    /// Plans a deterministic three-way semantic merge against a common base.
+    ///
+    /// Both patches are preflighted against `base`. Identical outcomes
+    /// coalesce, disjoint targets compose, and overlapping divergent outcomes
+    /// are retained as typed conflicts without publishing bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stale-precondition, malformed-operation, allocation, or
+    /// finite-patch-bound error before a plan is returned.
+    pub fn plan_three_way(base: &Snapshot, left: &Self, right: &Self) -> Result<ThreeWayPlan> {
+        preflight_semantic(base, left)?;
+        preflight_semantic(base, right)?;
+        build_three_way_plan(left, right)
+    }
+
+    /// Preflights dependency-aware application to another opened workbook.
+    ///
+    /// The plan records per-operation resource, identity, storage, and
+    /// structural-closure refusals. No candidate bytes are built until an
+    /// executable plan is applied.
+    #[must_use]
+    pub fn plan_transfer(&self, target: &Snapshot) -> TransferPlan {
+        let mut refusals = Vec::new();
+        let mut transaction = target.transaction();
+        let mut sheet_names = semantic_sheet_names(target);
+        for operation in self.inner.operations() {
+            if let Err(error) =
+                apply_semantic_operation(target, &mut transaction, operation, &mut sheet_names)
+            {
+                refusals.push(TransferRefusal {
+                    target: operation.target.clone(),
+                    reason: error.to_string(),
+                });
+                break;
+            }
+        }
+        TransferPlan {
+            patch: self.clone(),
+            refusals: refusals.into_boxed_slice(),
+        }
+    }
+}
+
+/// One deterministic three-way conflict between semantic operations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ThreeWayConflict {
+    target: String,
+    left: serde_json::Value,
+    right: serde_json::Value,
+}
+
+impl ThreeWayConflict {
+    /// Canonical semantic target.
+    #[must_use]
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    /// Left requested outcome.
+    #[must_use]
+    pub const fn left(&self) -> &serde_json::Value {
+        &self.left
+    }
+
+    /// Right requested outcome.
+    #[must_use]
+    pub const fn right(&self) -> &serde_json::Value {
+        &self.right
+    }
+}
+
+/// Non-mutating deterministic result of semantic three-way planning.
+#[derive(Clone)]
+pub struct ThreeWayPlan {
+    merged: Option<SemanticPatch>,
+    conflicts: Box<[ThreeWayConflict]>,
+}
+
+impl ThreeWayPlan {
+    /// Conflicts in canonical target order.
+    #[must_use]
+    pub fn conflicts(&self) -> &[ThreeWayConflict] {
+        &self.conflicts
+    }
+
+    /// Conflict-free merged patch, when every overlap agreed.
+    #[must_use]
+    pub const fn merged(&self) -> Option<&SemanticPatch> {
+        self.merged.as_ref()
+    }
+}
+
+impl fmt::Debug for ThreeWayPlan {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ThreeWayPlan")
+            .field(
+                "merged_operations",
+                &self.merged.as_ref().map(SemanticPatch::len),
+            )
+            .field("conflicts", &self.conflicts)
+            .finish()
+    }
+}
+
+/// One dependency or precondition that prevents semantic transfer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransferRefusal {
+    target: String,
+    reason: String,
+}
+
+impl TransferRefusal {
+    /// Canonical semantic target.
+    #[must_use]
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    /// Stable typed-error description produced during preflight.
+    #[must_use]
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+/// Dependency-aware transfer plan for a durable semantic patch.
+#[derive(Debug, Clone)]
+pub struct TransferPlan {
+    patch: SemanticPatch,
+    refusals: Box<[TransferRefusal]>,
+}
+
+impl TransferPlan {
+    /// Whether every operation and resource dependency preflighted.
+    #[must_use]
+    pub fn is_executable(&self) -> bool {
+        self.refusals.is_empty()
+    }
+
+    /// Refusals in durable operation order.
+    #[must_use]
+    pub fn refusals(&self) -> &[TransferRefusal] {
+        &self.refusals
+    }
+
+    /// Applies the planned semantic transfer and fully reopens the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first retained refusal or a typed commit/reopen error.
+    pub fn execute(&self, target: &Snapshot) -> Result<Commit> {
+        if let Some(refusal) = self.refusals.first() {
+            return Err(Error::UnsafeEdit(format!(
+                "semantic transfer is not executable at {}: {}",
+                refusal.target, refusal.reason
+            )));
+        }
+        self.patch.apply(target)
+    }
+}
+
+fn append_structural_semantic(
+    snapshot: &Snapshot,
+    change: &StructuralChange,
+    limits: PatchLimits,
+    operations: &mut Vec<ReversibleOperation>,
+) -> Result<()> {
+    let sheet_data = &snapshot.inner.sheets[operation_sheet_index(change)];
+    let target = structural_target(snapshot, change);
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "sheet_name".to_string(),
+        serde_json::Value::String(sheet_data.name.clone()),
+    );
+    let (op, value, inverse_op, inverse_value, inverse_name) = match change {
+        StructuralChange::Cell { before, after, .. } => {
+            preconditions.insert("state".to_string(), optional_cell_state(before.as_ref()));
+            if let Some((_, _, style)) = after {
+                preconditions.insert(
+                    "target_xf".to_string(),
+                    serde_json::Value::String(xf_fingerprint(snapshot, *style)?),
+                );
+            }
+            (
+                "cell.structural",
+                optional_cell_state(after.as_ref()),
+                "cell.structural",
+                optional_cell_state(before.as_ref()),
+                sheet_data.name.clone(),
+            )
+        },
+        StructuralChange::Rows {
+            sheet,
+            start,
+            count,
+            insert,
+        } => {
+            let end = start.saturating_add(*count);
+            if !insert
+                && snapshot.inner.sheets[*sheet].entries.iter().any(|entry| {
+                    entry.cell.reference.row() >= *start && entry.cell.reference.row() < end
+                })
+            {
+                return Err(Error::UnsafeEdit(
+                    "durable row deletion is refused when the deleted span contains cells".into(),
+                ));
+            }
+            (
+                if *insert {
+                    "rows.insert"
+                } else {
+                    "rows.delete"
+                },
+                serde_json::json!({"count": count}),
+                if *insert {
+                    "rows.delete"
+                } else {
+                    "rows.insert"
+                },
+                serde_json::json!({"count": count}),
+                sheet_data.name.clone(),
+            )
+        },
+        StructuralChange::Columns {
+            sheet,
+            start,
+            count,
+            insert,
+        } => {
+            let end = start.saturating_add(*count);
+            if !insert
+                && snapshot.inner.sheets[*sheet].entries.iter().any(|entry| {
+                    entry.cell.reference.column() >= *start && entry.cell.reference.column() < end
+                })
+            {
+                return Err(Error::UnsafeEdit(
+                    "durable column deletion is refused when the deleted span contains cells"
+                        .into(),
+                ));
+            }
+            (
+                if *insert {
+                    "columns.insert"
+                } else {
+                    "columns.delete"
+                },
+                serde_json::json!({"count": count}),
+                if *insert {
+                    "columns.delete"
+                } else {
+                    "columns.insert"
+                },
+                serde_json::json!({"count": count}),
+                sheet_data.name.clone(),
+            )
+        },
+        StructuralChange::RenameSheet { before, after, .. } => {
+            preconditions.clear();
+            preconditions.insert(
+                "sheet_name".to_string(),
+                serde_json::Value::String(before.clone()),
+            );
+            (
+                "sheet.rename",
+                serde_json::Value::String(after.clone()),
+                "sheet.rename",
+                serde_json::Value::String(before.clone()),
+                after.clone(),
+            )
+        },
+    };
+    let forward = PatchOperation::new(limits, op, target.clone(), preconditions, value)
+        .map_err(patch_error)?;
+    let mut inverse_preconditions = BTreeMap::new();
+    inverse_preconditions.insert(
+        "sheet_name".to_string(),
+        serde_json::Value::String(inverse_name),
+    );
+    if let StructuralChange::Cell { after, .. } = change {
+        inverse_preconditions.insert("state".to_string(), optional_cell_state(after.as_ref()));
+        if let StructuralChange::Cell {
+            before: Some((_, _, style)),
+            ..
+        } = change
+        {
+            inverse_preconditions.insert(
+                "target_xf".to_string(),
+                serde_json::Value::String(xf_fingerprint(snapshot, *style)?),
+            );
+        }
+    }
+    let inverse = PatchOperation::new(
+        limits,
+        inverse_op,
+        target,
+        inverse_preconditions,
+        inverse_value,
+    )
+    .map_err(patch_error)?;
+    operations.push(ReversibleOperation::new(forward, inverse));
+    Ok(())
+}
+
+fn preflight_semantic(source: &Snapshot, patch: &SemanticPatch) -> Result<()> {
+    let mut transaction = source.transaction();
+    let mut sheet_names = semantic_sheet_names(source);
+    for operation in patch.inner.operations() {
+        apply_semantic_operation(source, &mut transaction, operation, &mut sheet_names)?;
+    }
+    Ok(())
+}
+
+fn build_three_way_plan(left: &SemanticPatch, right: &SemanticPatch) -> Result<ThreeWayPlan> {
+    let mut merged = reversible_pairs(left);
+    let mut conflicts = Vec::new();
+    for pair in reversible_pairs(right) {
+        let first_overlap = merged
+            .iter()
+            .position(|existing| semantic_operations_overlap(&existing.0, &pair.0));
+        let Some(first_overlap) = first_overlap else {
+            merged.push(pair);
+            continue;
+        };
+        if merged.iter().any(|existing| {
+            semantic_operations_overlap(&existing.0, &pair.0) && existing.0 == pair.0
+        }) {
+            continue;
+        }
+        conflicts.push(ThreeWayConflict {
+            target: pair.0.target.clone(),
+            left: merged[first_overlap].0.value.clone(),
+            right: pair.0.value.clone(),
+        });
+    }
+    conflicts.sort_by(|left, right| left.target.cmp(&right.target));
+    conflicts.dedup_by(|left, right| left.target == right.target);
+    if !conflicts.is_empty() {
+        return Ok(ThreeWayPlan {
+            merged: None,
+            conflicts: conflicts.into_boxed_slice(),
+        });
+    }
+    merged.sort_by(|left, right| {
+        semantic_operation_order(&left.0)
+            .cmp(&semantic_operation_order(&right.0))
+            .then_with(|| left.0.target.cmp(&right.0.target))
+            .then_with(|| left.0.op.cmp(&right.0.op))
+    });
+    let inner = CorePatch::<Reversible>::new(
+        semantic_patch_limits(),
+        "litchi-xls.cell-values",
+        merged
+            .into_iter()
+            .map(|(forward, inverse)| ReversibleOperation::new(forward, inverse)),
+        BlobBundle::new(semantic_patch_limits().blobs()),
+        BlobBundle::new(semantic_patch_limits().blobs()),
+    )
+    .map_err(patch_error)?;
+    Ok(ThreeWayPlan {
+        merged: Some(SemanticPatch { inner }),
+        conflicts: Box::default(),
+    })
+}
+
+fn reversible_pairs(patch: &SemanticPatch) -> Vec<(PatchOperation, PatchOperation)> {
+    let inverse = patch.inner.inverse();
+    patch
+        .inner
+        .operations()
+        .iter()
+        .cloned()
+        .zip(inverse.operations().iter().rev().cloned())
+        .collect()
+}
+
+fn semantic_operations_overlap(left: &PatchOperation, right: &PatchOperation) -> bool {
+    let left_sheet = semantic_operation_sheet(left);
+    let right_sheet = semantic_operation_sheet(right);
+    if left_sheet != right_sheet {
+        return false;
+    }
+    let left_axis = matches!(
+        left.op.as_str(),
+        "rows.insert" | "rows.delete" | "columns.insert" | "columns.delete"
+    );
+    let right_axis = matches!(
+        right.op.as_str(),
+        "rows.insert" | "rows.delete" | "columns.insert" | "columns.delete"
+    );
+    if left_axis || right_axis {
+        return left.op != "sheet.rename" && right.op != "sheet.rename";
+    }
+    left.target == right.target
+}
+
+fn semantic_operation_order(operation: &PatchOperation) -> u8 {
+    if operation.op == "sheet.rename" {
+        2
+    } else {
+        u8::from(matches!(
+            operation.op.as_str(),
+            "rows.insert" | "rows.delete" | "columns.insert" | "columns.delete"
+        ))
+    }
+}
+
+fn semantic_operation_sheet(operation: &PatchOperation) -> Option<usize> {
+    let mut parts = operation.target.split('/');
+    (parts.next() == Some("sheet"))
+        .then(|| parts.next()?.parse::<usize>().ok())
+        .flatten()
+}
+
+fn apply_semantic_operation(
+    source: &Snapshot,
+    transaction: &mut Transaction,
+    operation: &PatchOperation,
+    sheet_names: &mut [String],
+) -> Result<()> {
+    match operation.op.as_str() {
+        "cell.set" => apply_fixed_semantic(source, transaction, operation, sheet_names),
+        "cell.structural" => {
+            apply_structural_cell_semantic(source, transaction, operation, sheet_names)
+        },
+        "rows.insert" | "rows.delete" => {
+            let (sheet, start) = parse_axis_target(&operation.target, "rows")?;
+            verify_semantic_sheet(source, sheet_names, sheet, operation)?;
+            let count = parse_count(&operation.value, "row")?;
+            if operation.op == "rows.insert" {
+                transaction.insert_rows(Selector::Position(sheet), start, count)
+            } else {
+                transaction.delete_rows(Selector::Position(sheet), start, count)
+            }
+        },
+        "columns.insert" | "columns.delete" => {
+            let (sheet, start) = parse_axis_target(&operation.target, "columns")?;
+            verify_semantic_sheet(source, sheet_names, sheet, operation)?;
+            let start = u8::try_from(start)
+                .map_err(|_error| Error::InvalidData("column patch start exceeds u8".into()))?;
+            let count = u8::try_from(parse_count(&operation.value, "column")?)
+                .map_err(|_error| Error::InvalidData("column patch count exceeds u8".into()))?;
+            if operation.op == "columns.insert" {
+                transaction.insert_columns(Selector::Position(sheet), start, count)
+            } else {
+                transaction.delete_columns(Selector::Position(sheet), start, count)
+            }
+        },
+        "sheet.rename" => {
+            let sheet = parse_sheet_target(&operation.target, "name")?;
+            let sheet_index = verify_semantic_sheet(source, sheet_names, sheet, operation)?;
+            let name = operation
+                .value
+                .as_str()
+                .ok_or_else(|| Error::InvalidData("sheet rename value is not text".into()))?;
+            transaction.rename_sheet(Selector::Position(sheet), name)?;
+            sheet_names[sheet_index] = name.to_string();
+            Ok(())
+        },
+        _ => Err(Error::InvalidData(format!(
+            "unsupported XLS cell patch operation {:?}",
+            operation.op
+        ))),
+    }
+}
+
+fn apply_fixed_semantic(
+    source: &Snapshot,
+    transaction: &mut Transaction,
+    operation: &PatchOperation,
+    sheet_names: &[String],
+) -> Result<()> {
+    let (sheet_position, reference) = parse_semantic_target(&operation.target)?;
+    let sheet_index = verify_semantic_sheet(source, sheet_names, sheet_position, operation)?;
+    let sheet = &source.inner.sheets[sheet_index];
+    let entry_index = unique_entry_index(&sheet.entries, reference)?
+        .ok_or_else(|| Error::UnsafeEdit("semantic patch cell is absent".into()))?;
+    let cell = &sheet.entries[entry_index].cell;
+    let expected = operation
+        .preconditions
+        .get("state")
+        .ok_or_else(|| Error::InvalidData("cell patch has no state precondition".into()))?;
+    let (expected_storage, expected_value) = parse_cell_state(expected)?;
+    if cell.storage != expected_storage || !values_equal(&cell.value, &expected_value) {
+        return Err(Error::UnsafeEdit(
+            "semantic patch cell precondition is stale".into(),
+        ));
+    }
+    let (storage, value) = parse_cell_state(&operation.value)?;
+    let represented = target_storage(cell.storage, &value, &source.inner.shared_strings)?;
+    if represented != storage {
+        return Err(Error::InvalidData(
+            "cell patch target storage disagrees with its value".into(),
+        ));
+    }
+    transaction.stage(sheet_index, entry_index, storage, value)
+}
+
+fn apply_structural_cell_semantic(
+    source: &Snapshot,
+    transaction: &mut Transaction,
+    operation: &PatchOperation,
+    sheet_names: &[String],
+) -> Result<()> {
+    let (sheet_position, reference) = parse_semantic_target(&operation.target)?;
+    let sheet_index = verify_semantic_sheet(source, sheet_names, sheet_position, operation)?;
+    let sheet = &source.inner.sheets[sheet_index];
+    let current = unique_entry(&sheet.entries, reference)?.map(|entry| {
+        (
+            entry.cell.storage,
+            entry.cell.value.clone(),
+            entry.cell.style,
+        )
+    });
+    let expected = operation
+        .preconditions
+        .get("state")
+        .ok_or_else(|| Error::InvalidData("structural cell patch has no state".into()))?;
+    let expected = parse_optional_cell_state(expected)?;
+    if !optional_cell_states_equal(current.as_ref(), expected.as_ref()) {
+        return Err(Error::UnsafeEdit(
+            "structural cell patch precondition is stale".into(),
+        ));
+    }
+    let after = parse_optional_cell_state(&operation.value)?;
+    if let Some((_, _, style)) = &after {
+        let expected_xf = operation
+            .preconditions
+            .get("target_xf")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                Error::InvalidData("structural cell patch has no XF dependency".into())
+            })?;
+        if xf_fingerprint(source, *style)? != expected_xf {
+            return Err(Error::UnsafeEdit(
+                "structural cell XF resource dependency is stale".into(),
+            ));
+        }
+    }
+    match (current, after) {
+        (None, Some((storage, value, style))) => {
+            if storage_for_new_value(&value, &source.inner.shared_strings)? != storage {
+                return Err(Error::InvalidData(
+                    "structural cell storage disagrees with its value".into(),
+                ));
+            }
+            transaction.insert_cell_with_style(
+                Selector::Position(sheet_position),
+                reference,
+                value,
+                StyleIndex::new(source, style.get())?,
+            )
+        },
+        (Some(_), None) => transaction.remove_cell(Selector::Position(sheet_position), reference),
+        (Some(before), Some(after)) if before.0 == after.0 && values_equal(&before.1, &after.1) => {
+            transaction.set_style(
+                Selector::Position(sheet_position),
+                reference,
+                StyleIndex::new(source, after.2.get())?,
+            )
+        },
+        _ => Err(Error::InvalidData(
+            "structural cell patch requests an unsupported replacement".into(),
+        )),
+    }
+}
+
+fn verify_semantic_sheet(
+    source: &Snapshot,
+    sheet_names: &[String],
+    sheet_position: usize,
+    operation: &PatchOperation,
+) -> Result<usize> {
+    let sheet_index = source
+        .resolve_sheet(Selector::Position(sheet_position))?
+        .ok_or_else(|| Error::UnsafeEdit("semantic patch worksheet is absent".into()))?;
+    let expected_name = operation
+        .preconditions
+        .get("sheet_name")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| Error::InvalidData("patch has no sheet-name precondition".into()))?;
+    if sheet_names.get(sheet_index).map(String::as_str) != Some(expected_name) {
+        return Err(Error::UnsafeEdit(
+            "semantic patch worksheet identity is stale".into(),
+        ));
+    }
+    Ok(sheet_index)
+}
+
+fn semantic_sheet_names(source: &Snapshot) -> Vec<String> {
+    source
+        .inner
+        .sheets
+        .iter()
+        .map(|sheet| sheet.name.clone())
+        .collect()
+}
+
+fn optional_cell_state(state: Option<&(Storage, Value, StyleIndex)>) -> serde_json::Value {
+    state.map_or(serde_json::Value::Null, |(storage, value, style)| {
+        serde_json::json!({
+            "storage": storage_name(*storage),
+            "style": style.get(),
+            "value": encode_value(value),
+        })
+    })
+}
+
+fn xf_fingerprint(snapshot: &Snapshot, style: StyleIndex) -> Result<String> {
+    let bytes = snapshot
+        .inner
+        .xf_records
+        .get(usize::from(style.get()))
+        .ok_or_else(|| Error::UnsafeEdit("cell XF resource is absent".into()))?;
+    let mut encoded = String::new();
+    encoded
+        .try_reserve(bytes.len().saturating_mul(2))
+        .map_err(|_error| Error::Allocation("encoding XF dependency fingerprint"))?;
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for byte in bytes {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    Ok(encoded)
+}
+
+fn parse_optional_cell_state(
+    state: &serde_json::Value,
+) -> Result<Option<(Storage, Value, StyleIndex)>> {
+    if state.is_null() {
+        return Ok(None);
+    }
+    let object = state
+        .as_object()
+        .ok_or_else(|| Error::InvalidData("structural cell state is not an object".into()))?;
+    let storage = parse_storage(
+        object
+            .get("storage")
+            .ok_or_else(|| Error::InvalidData("structural cell state has no storage".into()))?,
+    )?;
+    let style = object
+        .get("style")
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|value| u16::try_from(value).ok())
+        .map(StyleIndex)
+        .ok_or_else(|| Error::InvalidData("structural cell style is malformed".into()))?;
+    let value = parse_value(
+        object
+            .get("value")
+            .ok_or_else(|| Error::InvalidData("structural cell state has no value".into()))?,
+    )?;
+    Ok(Some((storage, value, style)))
+}
+
+fn parse_axis_target(target: &str, axis: &str) -> Result<(usize, u16)> {
+    let mut parts = target.split('/');
+    if parts.next() != Some("sheet") {
+        return Err(Error::InvalidData(
+            "axis patch target has invalid prefix".into(),
+        ));
+    }
+    let sheet = parts
+        .next()
+        .ok_or_else(|| Error::InvalidData("axis patch target has no sheet".into()))?
+        .parse::<usize>()
+        .map_err(|error| Error::InvalidData(format!("invalid axis sheet: {error}")))?;
+    if parts.next() != Some(axis) {
+        return Err(Error::InvalidData(
+            "axis patch target has wrong axis".into(),
+        ));
+    }
+    let start = parts
+        .next()
+        .ok_or_else(|| Error::InvalidData("axis patch target has no start".into()))?
+        .parse::<u16>()
+        .map_err(|error| Error::InvalidData(format!("invalid axis start: {error}")))?;
+    if parts.next().is_some() {
+        return Err(Error::InvalidData(
+            "axis patch target has trailing data".into(),
+        ));
+    }
+    Ok((sheet, start))
+}
+
+fn parse_sheet_target(target: &str, suffix: &str) -> Result<usize> {
+    let mut parts = target.split('/');
+    if parts.next() != Some("sheet") {
+        return Err(Error::InvalidData(
+            "sheet patch target has invalid prefix".into(),
+        ));
+    }
+    let sheet = parts
+        .next()
+        .ok_or_else(|| Error::InvalidData("sheet patch target has no position".into()))?
+        .parse::<usize>()
+        .map_err(|error| Error::InvalidData(format!("invalid sheet position: {error}")))?;
+    if parts.next() != Some(suffix) || parts.next().is_some() {
+        return Err(Error::InvalidData("sheet patch target is malformed".into()));
+    }
+    Ok(sheet)
+}
+
+fn parse_count(value: &serde_json::Value, label: &str) -> Result<u16> {
+    value
+        .get("count")
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|count| u16::try_from(count).ok())
+        .filter(|count| *count != 0)
+        .ok_or_else(|| Error::InvalidData(format!("{label} patch count is malformed")))
 }
 
 impl fmt::Debug for SemanticPatch {
@@ -1286,7 +2423,9 @@ impl fmt::Debug for Patch {
     }
 }
 
-fn parse_workbook_stream(source: &Arc<[u8]>) -> Result<(Vec<SheetData>, Option<usize>)> {
+fn parse_workbook_stream(
+    source: &Arc<[u8]>,
+) -> Result<(Vec<SheetData>, Option<usize>, Vec<Vec<u8>>)> {
     let mut records = Records::new(source);
     let first = records.next().ok_or(Error::Eof("Workbook globals BOF"))??;
     require_bof(first.payload(), WORKBOOK_GLOBALS)?;
@@ -1294,6 +2433,7 @@ fn parse_workbook_stream(source: &Arc<[u8]>) -> Result<(Vec<SheetData>, Option<u
     let mut encoding = Encoding::from_codepage(1252)?;
     let mut bound_payloads = Vec::new();
     let mut sst_total_offset = None;
+    let mut xf_records = Vec::new();
     let mut globals_eof = false;
     for record_result in records.by_ref() {
         let record = record_result?;
@@ -1325,6 +2465,12 @@ fn parse_workbook_stream(source: &Arc<[u8]>) -> Result<(Vec<SheetData>, Option<u
                         .checked_add(4)
                         .ok_or_else(|| Error::InvalidData("SST total offset overflow".into()))?,
                 );
+            },
+            XF => {
+                xf_records
+                    .try_reserve(1)
+                    .map_err(|_error| Error::Allocation("retaining XF resources"))?;
+                xf_records.push(record.payload().to_vec());
             },
             FILE_PASS => return Err(Error::PasswordRequired),
             EOF => {
@@ -1378,7 +2524,26 @@ fn parse_workbook_stream(source: &Arc<[u8]>) -> Result<(Vec<SheetData>, Option<u
             entries,
         });
     }
-    Ok((sheets, sst_total_offset))
+    if xf_records.is_empty() {
+        return Err(Error::UnsafeEdit(
+            "opened-workbook transaction requires at least one XF resource".into(),
+        ));
+    }
+    if let Some(cell) = sheets
+        .iter()
+        .flat_map(|sheet| &sheet.entries)
+        .find(|entry| usize::from(entry.cell.style.get()) >= xf_records.len())
+    {
+        return Err(Error::InvalidRecord {
+            record_type: storage_record_kind(cell.cell.storage),
+            message: format!(
+                "cell XF index {} is outside {} workbook resources",
+                cell.cell.style.get(),
+                xf_records.len()
+            ),
+        });
+    }
+    Ok((sheets, sst_total_offset, xf_records))
 }
 
 fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
@@ -1413,6 +2578,7 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
                     Cell {
                         reference,
                         storage: Storage::Number,
+                        style: parse_style(record.payload(), 4)?,
                         value: Value::Number(value),
                     },
                     Some(payload_offset(kind_offset, NUMBER_VALUE_OFFSET)?),
@@ -1430,6 +2596,7 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
                     Cell {
                         reference,
                         storage: Storage::Rk,
+                        style: parse_style(record.payload(), 4)?,
                         value: Value::Number(value),
                     },
                     Some(payload_offset(kind_offset, 6)?),
@@ -1456,6 +2623,7 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
                     Cell {
                         reference,
                         storage: Storage::BoolErr,
+                        style: parse_style(record.payload(), 4)?,
                         value,
                     },
                     Some(payload_offset(kind_offset, 6)?),
@@ -1470,6 +2638,7 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
                     Cell {
                         reference: parse_reference(record.payload(), kind)?,
                         storage: Storage::Blank,
+                        style: parse_style(record.payload(), 4)?,
                         value: Value::Blank,
                     },
                     None,
@@ -1485,6 +2654,7 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
                     Cell {
                         reference: parse_reference(record.payload(), kind)?,
                         storage: Storage::LabelSst,
+                        style: parse_style(record.payload(), 4)?,
                         value: Value::Text(String::new()),
                     },
                     Some(payload_offset(kind_offset, 6)?),
@@ -1531,6 +2701,7 @@ fn parse_formula_entry(payload: &[u8], kind_offset: usize, entries: &mut Vec<Ent
         Cell {
             reference: parse_reference(payload, FORMULA)?,
             storage: Storage::Formula,
+            style: parse_style(payload, 4)?,
             value: Value::FormulaCache(cache),
         },
         Some(payload_offset(kind_offset, 6)?),
@@ -1599,6 +2770,7 @@ fn parse_mul_rk_entries(
             Cell {
                 reference: Reference { row, column },
                 storage: Storage::MulRk,
+                style: parse_style(payload, item_offset)?,
                 value: Value::Number(value),
             },
             Some(payload_offset(kind_offset, rk_offset)?),
@@ -1623,6 +2795,10 @@ fn parse_reference(payload: &[u8], record_type: u16) -> Result<Reference> {
         message: "cell column is outside the BIFF8 worksheet grid".into(),
     })?;
     Ok(Reference { row, column })
+}
+
+fn parse_style(payload: &[u8], offset: usize) -> Result<StyleIndex> {
+    Ok(StyleIndex(binary::read_u16_le_at(payload, offset)?))
 }
 
 fn payload_offset(kind_offset: usize, relative: usize) -> Result<usize> {
@@ -1702,6 +2878,26 @@ fn target_storage(source: Storage, value: &Value, shared_strings: &[String]) -> 
     Ok(target)
 }
 
+fn storage_for_new_value(value: &Value, shared_strings: &[String]) -> Result<Storage> {
+    match value {
+        Value::Number(number) if valid_xnum(*number) => Ok(Storage::Number),
+        Value::Boolean(_) | Value::Error(_) => Ok(Storage::BoolErr),
+        Value::Blank => Ok(Storage::Blank),
+        Value::Text(text) if shared_strings.iter().any(|candidate| candidate == text) => {
+            Ok(Storage::LabelSst)
+        },
+        Value::Text(_) => Err(Error::UnsafeEdit(
+            "new BIFF8 text must already exist in the workbook SST".into(),
+        )),
+        Value::Number(_) => Err(Error::UnsupportedFeature(
+            "BIFF8 Number insertion requires a normal IEEE-754 value or positive zero".into(),
+        )),
+        Value::FormulaCache(_) => Err(Error::UnsupportedFeature(
+            "a cached result cannot create a formula without formula tokens".into(),
+        )),
+    }
+}
+
 fn valid_formula_cache(cache: &FormulaCache) -> bool {
     match cache {
         FormulaCache::Number(value) => valid_xnum(*value),
@@ -1734,6 +2930,134 @@ fn encode_rk(value: f64) -> Option<u32> {
 fn change_is_effective(snapshot: &Snapshot, change: &Change) -> bool {
     let source = &snapshot.inner.sheets[change.sheet].entries[change.entry].cell;
     source.storage != change.storage || !values_equal(&source.value, &change.value)
+}
+
+fn structural_changes_overlap(left: &StructuralChange, right: &StructuralChange) -> bool {
+    match (left, right) {
+        (
+            StructuralChange::RenameSheet { sheet: left, .. },
+            StructuralChange::RenameSheet { sheet: right, .. },
+        ) => left == right,
+        (StructuralChange::RenameSheet { .. }, _) | (_, StructuralChange::RenameSheet { .. }) => {
+            false
+        },
+        (
+            StructuralChange::Cell {
+                sheet: left_sheet,
+                reference: left_reference,
+                ..
+            },
+            StructuralChange::Cell {
+                sheet: right_sheet,
+                reference: right_reference,
+                ..
+            },
+        ) => left_sheet == right_sheet && left_reference == right_reference,
+        (left, right) => operation_sheet_index(left) == operation_sheet_index(right),
+    }
+}
+
+fn structural_changes_equal(left: &StructuralChange, right: &StructuralChange) -> bool {
+    match (left, right) {
+        (
+            StructuralChange::Cell {
+                sheet: left_sheet,
+                reference: left_reference,
+                before: left_before,
+                after: left_after,
+            },
+            StructuralChange::Cell {
+                sheet: right_sheet,
+                reference: right_reference,
+                before: right_before,
+                after: right_after,
+            },
+        ) => {
+            left_sheet == right_sheet
+                && left_reference == right_reference
+                && optional_cell_states_equal(left_before.as_ref(), right_before.as_ref())
+                && optional_cell_states_equal(left_after.as_ref(), right_after.as_ref())
+        },
+        (
+            StructuralChange::Rows {
+                sheet: left_sheet,
+                start: left_start,
+                count: left_count,
+                insert: left_insert,
+            },
+            StructuralChange::Rows {
+                sheet: right_sheet,
+                start: right_start,
+                count: right_count,
+                insert: right_insert,
+            },
+        ) => {
+            (left_sheet, left_start, left_count, left_insert)
+                == (right_sheet, right_start, right_count, right_insert)
+        },
+        (
+            StructuralChange::Columns {
+                sheet: left_sheet,
+                start: left_start,
+                count: left_count,
+                insert: left_insert,
+            },
+            StructuralChange::Columns {
+                sheet: right_sheet,
+                start: right_start,
+                count: right_count,
+                insert: right_insert,
+            },
+        ) => {
+            (left_sheet, left_start, left_count, left_insert)
+                == (right_sheet, right_start, right_count, right_insert)
+        },
+        (
+            StructuralChange::RenameSheet {
+                sheet: left_sheet,
+                before: left_before,
+                after: left_after,
+            },
+            StructuralChange::RenameSheet {
+                sheet: right_sheet,
+                before: right_before,
+                after: right_after,
+            },
+        ) => (left_sheet, left_before, left_after) == (right_sheet, right_before, right_after),
+        _ => false,
+    }
+}
+
+fn optional_cell_states_equal(
+    left: Option<&(Storage, Value, StyleIndex)>,
+    right: Option<&(Storage, Value, StyleIndex)>,
+) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => {
+            left.0 == right.0 && values_equal(&left.1, &right.1) && left.2 == right.2
+        },
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+fn operation_sheet_index(change: &StructuralChange) -> usize {
+    match change {
+        StructuralChange::Cell { sheet, .. }
+        | StructuralChange::Rows { sheet, .. }
+        | StructuralChange::Columns { sheet, .. }
+        | StructuralChange::RenameSheet { sheet, .. } => *sheet,
+    }
+}
+
+fn structural_target(snapshot: &Snapshot, change: &StructuralChange) -> String {
+    let sheet = snapshot.inner.sheets[operation_sheet_index(change)].workbook_index;
+    match change {
+        StructuralChange::Cell { reference, .. } => semantic_target(sheet, *reference),
+        StructuralChange::Rows { start, .. } => format!("sheet/{sheet}/rows/{start}"),
+        StructuralChange::Columns { start, .. } => format!("sheet/{sheet}/columns/{start}"),
+        StructuralChange::RenameSheet { .. } => format!("sheet/{sheet}/name"),
+    }
 }
 
 fn values_equal(left: &Value, right: &Value) -> bool {
@@ -2148,6 +3472,179 @@ fn verify_readback(snapshot: &Snapshot, changes: &[Change]) -> Result<()> {
         if cell.storage != change.storage || !values_equal(&cell.value, &change.value) {
             return Err(Error::UnsafeEdit(
                 "edited cell value failed semantic readback".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_structural_readback(
+    snapshot: &Snapshot,
+    source: &Snapshot,
+    changes: &[StructuralChange],
+) -> Result<()> {
+    for change in changes {
+        match change {
+            StructuralChange::Cell {
+                sheet,
+                reference,
+                after,
+                ..
+            } => {
+                let entries = &snapshot
+                    .inner
+                    .sheets
+                    .get(*sheet)
+                    .ok_or_else(|| {
+                        Error::UnsafeEdit("structurally edited worksheet disappeared".into())
+                    })?
+                    .entries;
+                let actual = unique_entry(entries, *reference)?
+                    .map(|entry| (entry.cell.storage, &entry.cell.value, entry.cell.style));
+                match (after, actual) {
+                    (None, None) => {},
+                    (
+                        Some((storage, value, style)),
+                        Some((found_storage, found_value, found_style)),
+                    ) if storage == &found_storage
+                        && values_equal(value, found_value)
+                        && style == &found_style => {},
+                    _ => {
+                        return Err(Error::UnsafeEdit(
+                            "structural cell failed semantic readback".into(),
+                        ));
+                    },
+                }
+            },
+            StructuralChange::Rows {
+                sheet,
+                start,
+                count,
+                insert,
+            } => verify_shifted_cells(
+                snapshot,
+                source,
+                *sheet,
+                Shift::Rows {
+                    start: *start,
+                    count: *count,
+                    insert: *insert,
+                },
+            )?,
+            StructuralChange::Columns {
+                sheet,
+                start,
+                count,
+                insert,
+            } => verify_shifted_cells(
+                snapshot,
+                source,
+                *sheet,
+                Shift::Columns {
+                    start: *start,
+                    count: *count,
+                    insert: *insert,
+                },
+            )?,
+            StructuralChange::RenameSheet { sheet, after, .. } => {
+                if snapshot
+                    .inner
+                    .sheets
+                    .get(*sheet)
+                    .map(|item| item.name.as_str())
+                    != Some(after.as_str())
+                {
+                    return Err(Error::UnsafeEdit(
+                        "worksheet rename failed semantic readback".into(),
+                    ));
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum Shift {
+    Rows {
+        start: u16,
+        count: u16,
+        insert: bool,
+    },
+    Columns {
+        start: u8,
+        count: u8,
+        insert: bool,
+    },
+}
+
+fn verify_shifted_cells(
+    snapshot: &Snapshot,
+    source: &Snapshot,
+    sheet: usize,
+    shift: Shift,
+) -> Result<()> {
+    let before = &source.inner.sheets[sheet].entries;
+    let after = &snapshot.inner.sheets[sheet].entries;
+    for entry in before {
+        let reference = match shift {
+            Shift::Rows {
+                start,
+                count,
+                insert,
+            } => {
+                if insert && entry.cell.reference.row() >= start {
+                    Reference {
+                        row: entry.cell.reference.row() + count,
+                        column: entry.cell.reference.column(),
+                    }
+                } else if !insert
+                    && entry.cell.reference.row() >= start
+                    && entry.cell.reference.row() < start.saturating_add(count)
+                {
+                    continue;
+                } else if !insert && entry.cell.reference.row() >= start.saturating_add(count) {
+                    Reference {
+                        row: entry.cell.reference.row() - count,
+                        column: entry.cell.reference.column(),
+                    }
+                } else {
+                    entry.cell.reference
+                }
+            },
+            Shift::Columns {
+                start,
+                count,
+                insert,
+            } => {
+                if insert && entry.cell.reference.column() >= start {
+                    Reference {
+                        row: entry.cell.reference.row(),
+                        column: entry.cell.reference.column() + count,
+                    }
+                } else if !insert
+                    && entry.cell.reference.column() >= start
+                    && entry.cell.reference.column() < start.saturating_add(count)
+                {
+                    continue;
+                } else if !insert && entry.cell.reference.column() >= start.saturating_add(count) {
+                    Reference {
+                        row: entry.cell.reference.row(),
+                        column: entry.cell.reference.column() - count,
+                    }
+                } else {
+                    entry.cell.reference
+                }
+            },
+        };
+        let found = unique_entry(after, reference)?
+            .ok_or_else(|| Error::UnsafeEdit("shifted cell disappeared on readback".into()))?;
+        if found.cell.storage != entry.cell.storage
+            || found.cell.style != entry.cell.style
+            || !values_equal(&found.cell.value, &entry.cell.value)
+        {
+            return Err(Error::UnsafeEdit(
+                "shifted cell changed storage, style, or value".into(),
             ));
         }
     }

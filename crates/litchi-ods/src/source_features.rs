@@ -718,8 +718,10 @@ mod tests {
 
     #[test]
     fn inventories_inert_source_features_without_contacting_them() {
-        let snapshot = Snapshot::parse(XML).unwrap();
-        let sheet = snapshot.sheet("Sheet 1").unwrap();
+        let snapshot = Snapshot::parse(XML).expect("test fixture or operation should succeed");
+        let sheet = snapshot
+            .sheet("Sheet 1")
+            .expect("test fixture or operation should succeed");
         assert_eq!(sheet.conditional_format_count(), 1);
         assert_eq!(sheet.sparkline_group_count(), 1);
         assert_eq!(

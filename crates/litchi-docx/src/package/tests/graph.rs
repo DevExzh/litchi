@@ -85,12 +85,11 @@ fn document_patch_publishes_atomically_and_reopens() {
         })
         .unwrap();
 
-    let source = package.document_snapshot().unwrap();
-    let mut edit = source.edit();
+    let mut edit = package.edit_document().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
         .unwrap();
-    let commit = edit.commit().unwrap();
-    let published = package.apply_document_patch(commit.patch()).unwrap();
+    let commit = package.publish_document_edit(edit).unwrap();
+    let published = commit.snapshot();
     assert_eq!(
         published
             .paragraph(litchi_core::Position::new(0))
@@ -248,6 +247,18 @@ fn durable_hyperlink_edit_round_trips_real_open_xml_sdk_fixture() {
         relationships_before
     );
 
+    let mut changed = Cursor::new(Vec::new());
+    package.to_plain_stream(&mut changed).unwrap();
+    let reopened = Package::from_reader(Cursor::new(changed.into_inner())).unwrap();
+    assert_eq!(
+        reopened.document_snapshot().unwrap().xml_bytes(),
+        commit.snapshot().xml_bytes()
+    );
+    assert_eq!(
+        document_relationship_inventory(&reopened),
+        relationships_before
+    );
+
     package
         .apply_durable_document_patch(&durable.inverse())
         .unwrap();
@@ -259,6 +270,249 @@ fn durable_hyperlink_edit_round_trips_real_open_xml_sdk_fixture() {
         document_relationship_inventory(&package),
         relationships_before
     );
+}
+
+#[test]
+fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
+    let donor_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><w:body><w:p><w:hyperlink r:id="donorLink"><w:r><w:t>linked transfer</w:t></w:r></w:hyperlink><w:r><w:drawing><a:blip r:embed="donorImage"/></w:drawing><w:t> image</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#;
+    let receiver_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>receiver</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#;
+    let donor = transfer_package(donor_xml, "donorLink", "donorImage", b"same image");
+    let mut receiver =
+        transfer_package(receiver_xml, "receiverLink", "receiverImage", b"same image");
+    let plan = receiver
+        .plan_paragraph_transfer_from(&donor, litchi_core::Position::new(0))
+        .unwrap();
+    assert!(
+        std::str::from_utf8(plan.xml_bytes())
+            .unwrap()
+            .contains("r:id=\"receiverLink\"")
+    );
+    assert!(
+        std::str::from_utf8(plan.xml_bytes())
+            .unwrap()
+            .contains("r:embed=\"receiverImage\"")
+    );
+    assert!(
+        !std::str::from_utf8(plan.xml_bytes())
+            .unwrap()
+            .contains("donorLink")
+    );
+    assert!(
+        std::str::from_utf8(plan.xml_bytes())
+            .unwrap()
+            .contains("xmlns:a=")
+    );
+
+    let source = receiver.document_snapshot().unwrap();
+    let composition_limits = litchi_core::patch::CompositionLimits::new(8, 8, 32, 8);
+    let mut text = source.edit();
+    text.replace_run_text(
+        litchi_core::Position::new(0),
+        litchi_core::Position::new(0),
+        "receiver edited",
+    )
+    .unwrap();
+    let mut left = source.compose(composition_limits);
+    left.join(text.prepare(composition_limits, "receiver-text").unwrap())
+        .unwrap();
+    let mut transfer = source.edit();
+    transfer
+        .insert_paragraph_transfer(litchi_core::Position::new(1), &plan)
+        .unwrap();
+    let mut right = source.compose(composition_limits);
+    right
+        .join(
+            transfer
+                .prepare(composition_limits, "paragraph-transfer")
+                .unwrap(),
+        )
+        .unwrap();
+    let three_way = source.plan_three_way(left, right).unwrap();
+    assert!(three_way.is_clean());
+    let commit = three_way.finish().unwrap().commit().unwrap();
+
+    let patch_limits = litchi_core::patch::PatchLimits::new(
+        litchi_core::patch::BlobLimits::new(2, 4 * 1024 * 1024, 8 * 1024 * 1024),
+        16 * 1024 * 1024,
+        32,
+        8,
+        4 * 1024 * 1024,
+        8 * 1024 * 1024,
+    );
+    let durable = commit.patch().to_durable(patch_limits).unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let decoded =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &wire,
+            patch_limits,
+        )
+        .unwrap();
+    let relationships_before = document_relationship_inventory(&receiver);
+    let history_budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap() * 2;
+    let mut history = source.history(litchi_core::patch::HistoryLimits::new(4, history_budget));
+    receiver
+        .publish_document_commit_with_history(commit.clone(), &mut history)
+        .unwrap();
+    assert_eq!(
+        document_relationship_inventory(&receiver),
+        relationships_before
+    );
+    assert!(receiver.undo_document(&mut history).unwrap());
+    assert_eq!(
+        receiver.document_snapshot().unwrap().xml_bytes(),
+        source.xml_bytes()
+    );
+    assert!(receiver.redo_document(&mut history).unwrap());
+
+    let mut output = Cursor::new(Vec::new());
+    receiver.to_plain_stream(&mut output).unwrap();
+    let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(
+        reopened.document_snapshot().unwrap().xml_bytes(),
+        commit.snapshot().xml_bytes()
+    );
+    assert_eq!(
+        document_relationship_inventory(&reopened),
+        relationships_before
+    );
+
+    let mut durable_receiver =
+        transfer_package(receiver_xml, "receiverLink", "receiverImage", b"same image");
+    durable_receiver
+        .apply_durable_document_patch(&decoded)
+        .unwrap();
+    let mut durable_output = Cursor::new(Vec::new());
+    durable_receiver
+        .to_plain_stream(&mut durable_output)
+        .unwrap();
+    let durable_reopened = Package::from_reader(Cursor::new(durable_output.into_inner())).unwrap();
+    assert_eq!(
+        durable_reopened.document_snapshot().unwrap().xml_bytes(),
+        commit.snapshot().xml_bytes()
+    );
+
+    let mut stale_receiver =
+        transfer_package(receiver_xml, "receiverLink", "receiverImage", b"same image");
+    let stale_plan = stale_receiver
+        .plan_paragraph_transfer_from(&donor, litchi_core::Position::new(0))
+        .unwrap();
+    let mut stale_edit = stale_receiver.edit_document().unwrap();
+    stale_edit
+        .insert_paragraph_transfer(litchi_core::Position::new(1), &stale_plan)
+        .unwrap();
+    let stale_commit = stale_edit.commit().unwrap();
+    let stale_durable = stale_commit.patch().to_durable(patch_limits).unwrap();
+    stale_receiver
+        .edit_opc(|opc| {
+            opc.get_part_mut(&PackURI::new("/word/document.xml").unwrap())?
+                .rels_mut()
+                .try_add_relationship(
+                    litchi_opc::constants::relationship_type::HYPERLINK.to_owned(),
+                    "https://example.invalid/unrelated".to_owned(),
+                    "lateRelationship".to_owned(),
+                    TargetMode::External,
+                )?;
+            Ok(())
+        })
+        .unwrap();
+    let stale_xml = stale_receiver
+        .document_snapshot()
+        .unwrap()
+        .xml_bytes()
+        .to_vec();
+    assert!(matches!(
+        stale_receiver.publish_document_commit(stale_commit),
+        Err(crate::document::TransactionError::StaleSource)
+    ));
+    assert_eq!(
+        stale_receiver.document_snapshot().unwrap().xml_bytes(),
+        stale_xml
+    );
+    assert!(matches!(
+        stale_receiver.apply_durable_document_patch(&stale_durable),
+        Err(crate::document::TransactionError::StaleSource)
+    ));
+    assert_eq!(
+        stale_receiver.document_snapshot().unwrap().xml_bytes(),
+        stale_xml
+    );
+
+    let mismatched = transfer_package(
+        receiver_xml,
+        "receiverLink",
+        "receiverImage",
+        b"different image",
+    );
+    assert!(matches!(
+        mismatched.plan_paragraph_transfer_from(&donor, litchi_core::Position::new(0)),
+        Err(crate::document::TransactionError::Transfer(
+            crate::document::TransferRefusal::MissingEquivalentDependency { .. }
+        ))
+    ));
+    assert_eq!(
+        mismatched.document_snapshot().unwrap().xml_bytes(),
+        receiver_xml
+    );
+
+    let mut ambiguous =
+        transfer_package(receiver_xml, "receiverLink", "receiverImage", b"same image");
+    ambiguous
+        .edit_opc(|opc| {
+            opc.get_part_mut(&PackURI::new("/word/document.xml").unwrap())?
+                .rels_mut()
+                .try_add_relationship(
+                    litchi_opc::constants::relationship_type::HYPERLINK.to_owned(),
+                    "https://example.invalid/transfer".to_owned(),
+                    "ambiguousLink".to_owned(),
+                    TargetMode::External,
+                )?;
+            Ok(())
+        })
+        .unwrap();
+    assert!(matches!(
+        ambiguous.plan_paragraph_transfer_from(&donor, litchi_core::Position::new(0)),
+        Err(crate::document::TransactionError::Transfer(
+            crate::document::TransferRefusal::AmbiguousEquivalentDependency { .. }
+        ))
+    ));
+}
+
+fn transfer_package(
+    document_xml: &[u8],
+    hyperlink_id: &str,
+    image_id: &str,
+    image: &[u8],
+) -> Package {
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let image_uri = PackURI::new("/word/media/shared.png").unwrap();
+    let mut package = Package::new().unwrap();
+    package
+        .edit_opc(|opc| {
+            if opc.get_part(&image_uri).is_err() {
+                opc.try_add_part(Box::new(BlobPart::new(
+                    image_uri.clone(),
+                    "image/png".to_owned(),
+                    image.to_vec(),
+                )))?;
+            }
+            let main = opc.get_part_mut(&document_uri)?;
+            main.set_blob(document_xml.to_vec());
+            main.rels_mut().try_add_relationship(
+                litchi_opc::constants::relationship_type::HYPERLINK.to_owned(),
+                "https://example.invalid/transfer".to_owned(),
+                hyperlink_id.to_owned(),
+                TargetMode::External,
+            )?;
+            main.rels_mut().try_add_relationship(
+                litchi_opc::constants::relationship_type::IMAGE.to_owned(),
+                "media/shared.png".to_owned(),
+                image_id.to_owned(),
+                TargetMode::Internal,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    package
 }
 
 fn document_relationship_inventory(package: &Package) -> Vec<(String, String, String, bool)> {

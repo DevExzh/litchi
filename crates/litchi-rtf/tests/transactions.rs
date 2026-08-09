@@ -5,10 +5,10 @@
 )]
 
 use litchi_rtf::{
-    Alignment, Document,
+    Alignment, Document, HeaderFooterType, TableCellPath,
     edit::{
-        Composition, CompositionError, CompositionLimits, Error, History, HistoryLimits, Limits,
-        MergePlan, MergeResolution, TextSpan,
+        Composition, CompositionError, CompositionLimits, Error, HeaderFooterParagraph, History,
+        HistoryLimits, Limits, MergePlan, MergeResolution, TextSpan, TransferPlan,
     },
 };
 
@@ -448,4 +448,161 @@ fn three_way_merge_is_non_mutating_until_resolved_and_committed() {
     let merged = unresolved.finish().unwrap().commit().unwrap();
     assert_eq!(merged.snapshot().text(), "Left Beta");
     assert_eq!(source.text(), "Alpha Beta");
+}
+
+#[test]
+fn retained_destinations_are_multi_operation_durable_and_reversible() {
+    let source = Document::parse(
+        r"{\rtf1\ansi{\header Head}\pard Body\par\trowd\cellx1000\cellx2000\intbl A\cell B\cell\row}",
+    )
+    .unwrap();
+    let header = HeaderFooterParagraph::new(0, HeaderFooterType::Header, 0);
+    let first_cell = TableCellPath::outer(0, 0, 0);
+    let second_cell = TableCellPath::outer(0, 0, 1);
+    let mut edit = source.edit();
+    edit.set_header_footer_text(header, "Running head").unwrap();
+    edit.set_table_cell_text(first_cell.clone(), "First")
+        .unwrap();
+    edit.set_table_cell_text(second_cell, "Second").unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_eq!(
+        commit.snapshot().sections()[0].headers_footers[0].text(),
+        "Running head"
+    );
+    assert_eq!(
+        commit.snapshot().tables()[0].rows()[0].cells()[0].text(),
+        "First"
+    );
+    assert_eq!(
+        commit.snapshot().tables()[0].rows()[0].cells()[1].text(),
+        "Second"
+    );
+    assert_eq!(source.tables()[0].rows()[0].cells()[0].text(), "A");
+
+    let durable = commit.patch().to_durable(durable_limits(3)).unwrap();
+    let applied = source.apply_durable(&durable).unwrap();
+    assert_eq!(
+        applied.to_bytes().unwrap(),
+        commit.snapshot().to_bytes().unwrap()
+    );
+    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    assert_eq!(restored.tables()[0].rows()[0].cells()[0].text(), "A");
+    assert_eq!(restored.sections()[0].headers_footers[0].text(), "Head");
+}
+
+#[test]
+fn destination_edit_refuses_unknown_syntax_without_mutating_source() {
+    let source =
+        Document::parse(r"{\rtf1\ansi{\*\vendor retained}\trowd\cellx1000\intbl A\cell\row}")
+            .unwrap();
+    let exact = source.to_bytes().unwrap();
+    let mut edit = source.edit();
+    edit.set_table_cell_text(TableCellPath::outer(0, 0, 0), "Changed")
+        .unwrap();
+
+    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    assert_eq!(source.to_bytes().unwrap(), exact);
+    assert_eq!(source.tables()[0].rows()[0].cells()[0].text(), "A");
+}
+
+#[test]
+fn transfer_is_dependency_free_and_uses_checked_ordinary_transactions() {
+    let paragraph_source = Document::parse(r"{\rtf1\ansi Imported}").unwrap();
+    let paragraph_target = Document::parse(r"{\rtf1\ansi Existing}").unwrap();
+    let paragraph =
+        TransferPlan::plain_paragraph(&paragraph_source, 0, &paragraph_target, 0).unwrap();
+    assert!(paragraph.is_dependency_free());
+    assert_eq!(
+        paragraph.commit().unwrap().snapshot().text(),
+        "Existing\nImported"
+    );
+
+    let cell_source =
+        Document::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl Source cell\cell\row}").unwrap();
+    let cell_target =
+        Document::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl Target\cell\row}").unwrap();
+    let transfer = TransferPlan::table_cell_text(
+        &cell_source,
+        &TableCellPath::outer(0, 0, 0),
+        &cell_target,
+        TableCellPath::outer(0, 0, 0),
+    )
+    .unwrap();
+    assert!(transfer.is_dependency_free());
+    assert_eq!(
+        transfer.commit().unwrap().snapshot().tables()[0].rows()[0].cells()[0].text(),
+        "Source cell"
+    );
+}
+
+#[test]
+fn destination_subedits_join_disjointly_and_plan_same_target_conflicts() {
+    let source =
+        Document::parse(r"{\rtf1\ansi\trowd\cellx1000\cellx2000\intbl A\cell B\cell\row}").unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut first = source.edit();
+    first
+        .set_table_cell_text(TableCellPath::outer(0, 0, 0), "First")
+        .unwrap();
+    let mut second = source.edit();
+    second
+        .set_table_cell_text(TableCellPath::outer(0, 0, 1), "Second")
+        .unwrap();
+    let mut joined = Composition::new(&source, limits);
+    joined
+        .join(first.into_sub_edit("first", limits).unwrap())
+        .unwrap()
+        .join(second.into_sub_edit("second", limits).unwrap())
+        .unwrap();
+    let committed = joined.commit().unwrap();
+    assert_eq!(
+        committed.snapshot().tables()[0].rows()[0].cells()[0].text(),
+        "First"
+    );
+    assert_eq!(
+        committed.snapshot().tables()[0].rows()[0].cells()[1].text(),
+        "Second"
+    );
+
+    let mut left_edit = source.edit();
+    left_edit
+        .set_table_cell_text(TableCellPath::outer(0, 0, 0), "Left")
+        .unwrap();
+    let mut right_edit = source.edit();
+    right_edit
+        .set_table_cell_text(TableCellPath::outer(0, 0, 0), "Right")
+        .unwrap();
+    let mut left = Composition::new(&source, limits);
+    left.join(left_edit.into_sub_edit("left-cell", limits).unwrap())
+        .unwrap();
+    let mut right = Composition::new(&source, limits);
+    right
+        .join(right_edit.into_sub_edit("right-cell", limits).unwrap())
+        .unwrap();
+    let plan = MergePlan::new(left, right).unwrap();
+    assert_eq!(plan.conflicts().len(), 1);
+    assert!(plan.finish().is_err());
+    assert_eq!(source.tables()[0].rows()[0].cells()[0].text(), "A");
+
+    let mut body_edit = source.edit();
+    body_edit
+        .replace_text(TextSpan::new(0, 0).unwrap(), "Body")
+        .unwrap();
+    let mut destination_edit = source.edit();
+    destination_edit
+        .set_table_cell_text(TableCellPath::outer(0, 0, 1), "Destination")
+        .unwrap();
+    let mut incompatible = Composition::new(&source, limits);
+    incompatible
+        .join(body_edit.into_sub_edit("body-domain", limits).unwrap())
+        .unwrap();
+    assert!(matches!(
+        incompatible.join(
+            destination_edit
+                .into_sub_edit("destination-domain", limits)
+                .unwrap()
+        ),
+        Err(CompositionError::Conflicts(conflicts)) if conflicts.len() == 1
+    ));
 }

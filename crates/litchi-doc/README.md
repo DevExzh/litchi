@@ -36,17 +36,24 @@ println!("paragraphs: {}", document.paragraph_count()?);
 `PackageOpenOptions` to select stricter or workload-specific limits. Passwords
 are supplied to encrypted documents through `OpenOptions::with_password` and
 the non-cloneable, zeroizing `Password` type. `Document::text` exposes stored
-source text. `body_text::Snapshot::paragraphs` additionally exposes stored,
-accepted, and rejected ordinary body-paragraph projections. Its focused edit
-seam supports bounded length-changing replacements across multiple ordinary
-paragraphs plus direct-bold changes in one immutable transaction. It rebuilds
-the CLX and CHPX FKPs, shifts its modeled main-story PLCFs, fully reopens the
-result, and explicitly refuses structural, tracked, mixed-format, or unmodeled
-position dependencies. Source-checked in-memory and durable semantic patches,
-disjoint composition, and bounded undo/redo history use the same operation
-model.
-Paragraph selection uses the format-neutral, zero-based `litchi_core::Position`;
-resolving it against a source body reports a typed not-found refusal.
+source text. `body_text::Snapshot` additionally exposes stored, accepted, and
+rejected body projections plus paragraph selectors for every DOC story, simple
+table cells, simple cached field results, and revision marks. Its bounded
+immutable transaction can resize modeled main-story text, overwrite
+equal-length Unicode text in auxiliary stories, apply direct
+bold/italic/underline, dispose of non-destructive revision marks, and change
+passive embedded-object display metadata. It rebuilds CLX and CHPX FKPs, shifts
+the modeled CP/PLCF closure, updates FIB story counts, and fully reopens the CFB
+and DOC before publication. Source-checked in-memory and durable semantic
+patches, disjoint composition, three-way planning, dependency-free text
+transfer, and bounded undo/redo history use the same operation model.
+Structural table edits, field delimiters or nesting, destructive revision
+dispositions, auxiliary-story length changes, mixed formatting, and unmodeled
+CP dependencies are typed refusals. OfficeArt, drawing payload, and resource
+transfer remain with their dedicated owners and are not silently copied
+through this text transaction. Selection uses the format-neutral, zero-based
+`litchi_core::Position`; resolving it against a source collection reports a
+typed not-found refusal.
 
 Format-neutral OfficeArt image discovery lives in `litchi-odraw`; optional
 codec operations are provided by the separate `litchi-imgconv::Convert`

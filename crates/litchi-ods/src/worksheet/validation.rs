@@ -244,7 +244,7 @@ mod sparse_accounting_tests {
             cells: vec![cell],
             style_name: None,
             default_cell_style_name: None,
-            repeat: NonZeroUsize::new(repeat).unwrap(),
+            repeat: NonZeroUsize::new(repeat).expect("test fixture or operation should succeed"),
         }
     }
 
@@ -258,8 +258,8 @@ mod sparse_accounting_tests {
 
     #[test]
     fn meaningful_cells_accept_exact_limit_and_reject_one_more() {
-        let cell =
-            Cell::repeated(CellValue::Text("x".to_string()), "x", MAX_LOGICAL_COLUMNS).unwrap();
+        let cell = Cell::repeated(CellValue::Text("x".to_string()), "x", MAX_LOGICAL_COLUMNS)
+            .expect("test fixture or operation should succeed");
         let exact_rows = MAX_LOGICAL_CELLS / MAX_LOGICAL_COLUMNS;
         let exact = row(cell, exact_rows);
         assert!(validate_sheet(&sheet(vec![exact.clone()])).is_ok());
@@ -271,7 +271,8 @@ mod sparse_accounting_tests {
     #[test]
     fn trailing_empty_repeated_grid_padding_is_sparse() {
         let mut padding = row(
-            Cell::repeated(CellValue::Empty, "", 7).unwrap(),
+            Cell::repeated(CellValue::Empty, "", 7)
+                .expect("test fixture or operation should succeed"),
             MAX_LOGICAL_ROWS,
         );
         padding.style_name = Some("row-style".to_string());
@@ -281,20 +282,23 @@ mod sparse_accounting_tests {
     #[test]
     fn cell_formatting_and_coverage_still_consume_the_budget() {
         let mut styled = row(
-            Cell::repeated(CellValue::Empty, "", MAX_LOGICAL_COLUMNS).unwrap(),
+            Cell::repeated(CellValue::Empty, "", MAX_LOGICAL_COLUMNS)
+                .expect("test fixture or operation should succeed"),
             5,
         );
         styled.default_cell_style_name = Some("Default".to_string());
         assert!(validate_sheet(&sheet(vec![styled])).is_err());
 
-        let mut covered = Cell::repeated(CellValue::Empty, "", MAX_LOGICAL_COLUMNS).unwrap();
+        let mut covered = Cell::repeated(CellValue::Empty, "", MAX_LOGICAL_COLUMNS)
+            .expect("test fixture or operation should succeed");
         covered.merge = Merge::Covered;
         assert!(validate_sheet(&sheet(vec![row(covered, 5)])).is_err());
 
         let mut span = Cell::empty();
         span.merge = Merge::Span {
-            rows: NonZeroUsize::new(MAX_LOGICAL_ROWS).unwrap(),
-            columns: NonZeroUsize::new(5).unwrap(),
+            rows: NonZeroUsize::new(MAX_LOGICAL_ROWS)
+                .expect("test fixture or operation should succeed"),
+            columns: NonZeroUsize::new(5).expect("test fixture or operation should succeed"),
         };
         assert!(validate_sheet(&sheet(vec![row(span, 1)])).is_err());
     }

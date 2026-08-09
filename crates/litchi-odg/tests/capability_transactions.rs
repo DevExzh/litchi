@@ -122,3 +122,116 @@ fn removals_are_checked_and_group_subtrees_are_owned() {
             .all(|shape| shape.name() != Some("Child") && shape.name() != Some("Group"))
     );
 }
+
+#[test]
+fn cross_drawing_group_transfer_carries_layers_resources_and_durable_inverse() {
+    const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Source"><draw:layer-set><draw:layer draw:name="media"/></draw:layer-set><draw:g draw:name="Transferred" draw:layer="media"><draw:frame draw:name="Picture" draw:layer="media"><draw:image xlink:href="Pictures/transfer.bin" xlink:type="simple"/></draw:frame></draw:g></draw:page></office:drawing></office:body></office:document-content>"#;
+    const DESTINATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Destination"/></office:drawing></office:body></office:document-content>"#;
+
+    let source = drawing_with_resource(SOURCE, Some(b"transfer bytes"));
+    let destination = drawing_with_resource(DESTINATION, None);
+    let transfer = source.snapshot().prepare_shape_transfer(0, 0).unwrap();
+    assert_eq!(transfer.shape().kind(), ShapeKind::Group);
+    assert_eq!(transfer.layers()[0].name(), "media");
+    assert_eq!(transfer.resources()[0].path(), "Pictures/transfer.bin");
+
+    let mut edit = destination.edit();
+    edit.insert_shape_transfer(0, 0, &transfer).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().pages()[0].layers()[0].name(), "media");
+    assert_eq!(commit.snapshot().pages()[0].shapes().len(), 2);
+    assert_eq!(
+        commit.snapshot().resource_bytes(0).unwrap().as_deref(),
+        Some(&b"transfer bytes"[..])
+    );
+    let durable = commit.patch().durable().unwrap();
+    assert_eq!(
+        durable.apply(destination.snapshot()).unwrap().as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+    assert_eq!(
+        durable
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        destination.as_bytes()
+    );
+
+    let limits = litchi_core::CompositionLimits::new(4, 4, 8, 8);
+    let mut competing_edit = destination.edit();
+    competing_edit
+        .add_page(Page::new("Competing page"))
+        .unwrap();
+    let competing = competing_edit.commit().unwrap();
+    let mut joined = destination.joined_edits(limits);
+    joined
+        .join(commit.patch().prepare("transfer", limits).unwrap())
+        .unwrap();
+    assert!(
+        joined
+            .join(competing.patch().prepare("structure", limits).unwrap())
+            .is_err()
+    );
+
+    let collision = drawing_with_resource(DESTINATION, Some(b"different"));
+    let mut refused = collision.edit();
+    assert!(refused.insert_shape_transfer(0, 0, &transfer).is_err());
+}
+
+#[test]
+fn unreferenced_resource_add_remove_is_safe_and_exactly_reversible() {
+    let source = Drawing::from_bytes(package()).unwrap();
+    let mut addition = source.edit();
+    addition
+        .add_resource("Media/sound.bin", "audio/basic", b"sound".to_vec())
+        .unwrap();
+    assert!(
+        addition
+            .add_resource("../escape.bin", "audio/basic", Vec::new())
+            .is_err()
+    );
+    let added = addition.commit().unwrap();
+    assert!(
+        added
+            .snapshot()
+            .files()
+            .unwrap()
+            .contains(&"Media/sound.bin".to_string())
+    );
+    let restored = added
+        .patch()
+        .durable()
+        .unwrap()
+        .inverse()
+        .apply(added.snapshot())
+        .unwrap();
+    assert_eq!(restored.as_bytes(), source.as_bytes());
+
+    let mut removal = added.snapshot().edit();
+    removal
+        .remove_unreferenced_resource("Media/sound.bin")
+        .unwrap();
+    let removed = removal.commit().unwrap();
+    assert!(
+        !removed
+            .snapshot()
+            .files()
+            .unwrap()
+            .contains(&"Media/sound.bin".to_string())
+    );
+}
+
+fn drawing_with_resource(content: &str, resource: Option<&[u8]>) -> Drawing {
+    let mut writer = PackageWriter::new();
+    writer
+        .set_mimetype("application/vnd.oasis.opendocument.graphics")
+        .unwrap();
+    writer.add_file("content.xml", content.as_bytes()).unwrap();
+    if let Some(bytes) = resource {
+        writer
+            .add_file_with_media_type("Pictures/transfer.bin", bytes, "application/octet-stream")
+            .unwrap();
+    }
+    Drawing::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+}

@@ -7,6 +7,9 @@ pub enum SignaturePolicy {
     /// Preserve exact no-ops and refuse every changed publication.
     #[default]
     PreserveExactOnly,
+    /// Publish changed XML while deliberately removing invalidated signature
+    /// members through the shared ODF package writer.
+    RemoveInvalidated,
 }
 
 /// Policy for a source package carrying encrypted entries.
@@ -35,6 +38,20 @@ impl EditPolicy {
         }
     }
 
+    /// Selects the signature lifecycle for a changed publication.
+    #[must_use]
+    pub const fn with_signature(mut self, value: SignaturePolicy) -> Self {
+        self.signature = value;
+        self
+    }
+
+    /// Selects the encryption lifecycle for a changed publication.
+    #[must_use]
+    pub const fn with_encryption(mut self, value: EncryptionPolicy) -> Self {
+        self.encryption = value;
+        self
+    }
+
     /// Returns the configured signature policy.
     #[must_use]
     pub const fn signature(self) -> SignaturePolicy {
@@ -55,14 +72,22 @@ pub struct ProtectionStatus {
     encrypted: bool,
 }
 
+/// Protection inventory before and after one committed publication.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProtectionTransition {
+    before: ProtectionStatus,
+    after: ProtectionStatus,
+}
+
 /// Explicit handling for modeled objects that depend on a removed owner.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum DependencyDisposition {
-    /// Refuse while any modeled incoming or nested dependency would orphan.
+    /// Refuse removal or transfer while a modeled dependency would orphan.
     #[default]
     Refuse,
-    /// Remove the selected owner and the modeled dependent key/index owners.
+    /// Remove modeled dependents during deletion or recursively copy missing
+    /// modeled dependencies during transfer.
     Cascade,
 }
 
@@ -81,5 +106,29 @@ impl ProtectionStatus {
     #[must_use]
     pub const fn is_encrypted(self) -> bool {
         self.encrypted
+    }
+}
+
+impl ProtectionTransition {
+    pub(crate) const fn new(before: ProtectionStatus, after: ProtectionStatus) -> Self {
+        Self { before, after }
+    }
+
+    /// Returns the source-package inventory.
+    #[must_use]
+    pub const fn before(self) -> ProtectionStatus {
+        self.before
+    }
+
+    /// Returns the committed-package inventory.
+    #[must_use]
+    pub const fn after(self) -> ProtectionStatus {
+        self.after
+    }
+
+    /// Whether a source signature was deliberately removed after mutation.
+    #[must_use]
+    pub const fn signature_was_removed(self) -> bool {
+        self.before.signed && !self.after.signed
     }
 }

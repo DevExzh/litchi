@@ -20,7 +20,8 @@ enum AddressKind {
 ///
 /// Returns an invalid-format error for an empty, over-limit, or malformed list.
 pub fn validate_range_list(value: &str) -> Result<()> {
-    validate_range_list_with_limit(value, Limits::default().max_scalar_bytes())
+    let limits = Limits::default();
+    validate_range_list_with_limits(value, limits.max_scalar_bytes(), limits.max_range_items())
 }
 
 /// Validate the inert lexical grammar of an `OpenDocument` formula.
@@ -38,6 +39,7 @@ pub fn validate_formula(value: &str) -> Result<()> {
 
 pub(crate) fn validate_definition(definition: &Definition, limits: Limits) -> Result<()> {
     definition.validate()?;
+    validate_definition_scalars(definition, limits.max_scalar_bytes())?;
     if definition.plot_area.axes.len() > limits.max_axes() {
         return invalid("ODC axis count exceeds the caller-selected limit");
     }
@@ -48,20 +50,32 @@ pub(crate) fn validate_definition(definition: &Definition, limits: Limits) -> Re
         .into_iter()
         .flatten()
     {
-        validate_range_list_with_limit(value, limits.max_scalar_bytes())?;
+        validate_range_list_with_limits(
+            value,
+            limits.max_scalar_bytes(),
+            limits.max_range_items(),
+        )?;
     }
     for text in [&definition.title, &definition.subtitle, &definition.footer]
         .into_iter()
         .flatten()
     {
         if let Some(value) = text.cell_range.as_deref() {
-            validate_range_list_with_limit(value, limits.max_scalar_bytes())?;
+            validate_range_list_with_limits(
+                value,
+                limits.max_scalar_bytes(),
+                limits.max_range_items(),
+            )?;
         }
     }
     let mut expanded_points = 0usize;
     for axis in &definition.plot_area.axes {
         if let Some(value) = axis.categories_cell_range_address.as_deref() {
-            validate_range_list_with_limit(value, limits.max_scalar_bytes())?;
+            validate_range_list_with_limits(
+                value,
+                limits.max_scalar_bytes(),
+                limits.max_range_items(),
+            )?;
         }
     }
     for series in &definition.plot_area.series {
@@ -72,10 +86,18 @@ pub(crate) fn validate_definition(definition: &Definition, limits: Limits) -> Re
         .into_iter()
         .flatten()
         {
-            validate_range_list_with_limit(value, limits.max_scalar_bytes())?;
+            validate_range_list_with_limits(
+                value,
+                limits.max_scalar_bytes(),
+                limits.max_range_items(),
+            )?;
         }
         for domain in &series.domains {
-            validate_range_list_with_limit(&domain.cell_range_address, limits.max_scalar_bytes())?;
+            validate_range_list_with_limits(
+                &domain.cell_range_address,
+                limits.max_scalar_bytes(),
+                limits.max_range_items(),
+            )?;
         }
         for point in &series.data_points {
             let repeated = usize::try_from(point.repeated).map_err(|error| {
@@ -92,18 +114,54 @@ pub(crate) fn validate_definition(definition: &Definition, limits: Limits) -> Re
         }
     }
     if let Some(table) = &definition.cached_table {
+        let mut expanded_rows = 0usize;
+        let mut expanded_cells = 0usize;
         for row in table.header_rows.iter().chain(&table.rows) {
+            let row_repeat = usize::try_from(row.repeated).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "ODC cached-row repeat count exceeds this platform: {error}"
+                ))
+            })?;
+            expanded_rows = expanded_rows
+                .checked_add(row_repeat)
+                .ok_or_else(|| Error::InvalidFormat("ODC cached-row count overflow".into()))?;
+            if expanded_rows > limits.max_cached_rows() {
+                return invalid("ODC cached-row count exceeds the caller-selected limit");
+            }
+            let mut row_cells = 0usize;
             for cell in &row.cells {
+                let cell_repeat = usize::try_from(cell.repeated).map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "ODC cached-cell repeat count exceeds this platform: {error}"
+                    ))
+                })?;
+                row_cells = row_cells
+                    .checked_add(cell_repeat)
+                    .ok_or_else(|| Error::InvalidFormat("ODC cached-cell count overflow".into()))?;
                 if let Some(formula) = cell.formula.as_deref() {
                     validate_formula_with_limit(formula, limits.max_scalar_bytes())?;
                 }
+            }
+            expanded_cells = expanded_cells
+                .checked_add(row_cells.checked_mul(row_repeat).ok_or_else(|| {
+                    Error::InvalidFormat("ODC expanded cached-cell count overflow".into())
+                })?)
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODC expanded cached-cell count overflow".into())
+                })?;
+            if expanded_cells > limits.max_cached_cells() {
+                return invalid("ODC cached-cell count exceeds the caller-selected limit");
             }
         }
     }
     Ok(())
 }
 
-fn validate_range_list_with_limit(value: &str, max_bytes: usize) -> Result<()> {
+pub(crate) fn validate_range_list_with_limits(
+    value: &str,
+    max_bytes: usize,
+    max_items: usize,
+) -> Result<()> {
     if value.is_empty() || value.len() > max_bytes {
         return invalid("ODC cell range is empty or exceeds its byte limit");
     }
@@ -118,6 +176,9 @@ fn validate_range_list_with_limit(value: &str, max_bytes: usize) -> Result<()> {
             if start < index {
                 validate_range(&value[start..index])?;
                 count += 1;
+                if count > max_items {
+                    return invalid("ODC cell range list exceeds its item limit");
+                }
             }
             index += 1;
             while index < bytes.len() && bytes[index].is_ascii_whitespace() {
@@ -137,6 +198,123 @@ fn validate_range_list_with_limit(value: &str, max_bytes: usize) -> Result<()> {
     }
     if quoted || count == 0 {
         return invalid("ODC cell range contains an unterminated quoted table name");
+    }
+    Ok(())
+}
+
+fn validate_definition_scalars(definition: &Definition, max_bytes: usize) -> Result<()> {
+    for value in [
+        definition.style_name.as_deref(),
+        definition.width.as_deref(),
+        definition.height.as_deref(),
+        definition.plot_area.cell_range_address.as_deref(),
+        definition.plot_area.style_name.as_deref(),
+        definition.plot_area.x.as_deref(),
+        definition.plot_area.y.as_deref(),
+        definition.plot_area.width.as_deref(),
+        definition.plot_area.height.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        validate_scalar_bytes(value, max_bytes)?;
+    }
+    for text in [&definition.title, &definition.subtitle, &definition.footer]
+        .into_iter()
+        .flatten()
+    {
+        for value in [
+            Some(text.text.as_str()),
+            text.cell_range.as_deref(),
+            text.style_name.as_deref(),
+            text.x.as_deref(),
+            text.y.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            validate_scalar_bytes(value, max_bytes)?;
+        }
+    }
+    if let Some(legend) = &definition.legend {
+        for value in [
+            legend.style_name.as_deref(),
+            legend.title.as_deref(),
+            legend.x.as_deref(),
+            legend.y.as_deref(),
+            legend.expansion.as_deref(),
+            legend.expansion_aspect_ratio.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            validate_scalar_bytes(value, max_bytes)?;
+        }
+    }
+    for axis in &definition.plot_area.axes {
+        for value in [
+            axis.name.as_deref(),
+            axis.style_name.as_deref(),
+            axis.categories_cell_range_address.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            validate_scalar_bytes(value, max_bytes)?;
+        }
+    }
+    for series in &definition.plot_area.series {
+        for value in [
+            series.xml_id.as_deref(),
+            series.values_cell_range_address.as_deref(),
+            series.label_cell_address.as_deref(),
+            series.attached_axis.as_deref(),
+            series.style_name.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            validate_scalar_bytes(value, max_bytes)?;
+        }
+        for domain in &series.domains {
+            validate_scalar_bytes(&domain.cell_range_address, max_bytes)?;
+        }
+        for point in &series.data_points {
+            if let Some(style) = point.style_name.as_deref() {
+                validate_scalar_bytes(style, max_bytes)?;
+            }
+        }
+    }
+    if let Some(table) = &definition.cached_table {
+        validate_scalar_bytes(&table.name, max_bytes)?;
+        for row in table.header_rows.iter().chain(&table.rows) {
+            for cell in &row.cells {
+                if let Some(formula) = cell.formula.as_deref() {
+                    validate_scalar_bytes(formula, max_bytes)?;
+                }
+                match &cell.value {
+                    crate::CachedValue::Currency { currency, .. } => {
+                        validate_scalar_bytes(currency, max_bytes)?;
+                    },
+                    crate::CachedValue::Date(value)
+                    | crate::CachedValue::Time(value)
+                    | crate::CachedValue::String(value) => {
+                        validate_scalar_bytes(value, max_bytes)?;
+                    },
+                    crate::CachedValue::Empty
+                    | crate::CachedValue::Float(_)
+                    | crate::CachedValue::Percentage(_)
+                    | crate::CachedValue::Boolean(_) => {},
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_scalar_bytes(value: &str, max_bytes: usize) -> Result<()> {
+    if value.len() > max_bytes {
+        return invalid("ODC scalar exceeds the caller-selected byte limit");
     }
     Ok(())
 }
@@ -232,7 +410,7 @@ fn validate_cell(value: &str) -> Result<AddressKind> {
     Ok(AddressKind::Cell)
 }
 
-fn validate_formula_with_limit(value: &str, max_bytes: usize) -> Result<()> {
+pub(crate) fn validate_formula_with_limit(value: &str, max_bytes: usize) -> Result<()> {
     if value.is_empty() || value.len() > max_bytes {
         return invalid("ODC formula is empty or exceeds its byte limit");
     }

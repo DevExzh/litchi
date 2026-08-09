@@ -1,5 +1,13 @@
 //! Unified, source-bound ODS package transactions and durable patches.
 
+#![deny(
+    clippy::cast_possible_truncation,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::unwrap_used
+)]
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -16,6 +24,8 @@ use litchi_odf_common::package::{Addition, rebuild_package};
 use serde_json::{Value, json};
 
 use crate::package::Package;
+
+pub use crate::advanced::{CellStyle, Drawing, FormControl, RichRun, RichText};
 
 const FORMAT: &str = "litchi.ods.document";
 const MAX_PATH_BYTES: usize = 4_096;
@@ -218,6 +228,7 @@ impl Snapshot {
             before: self.clone(),
             candidate: self.source.as_ref().to_vec(),
             steps: Vec::new(),
+            spliced_parts: BTreeSet::new(),
         }
     }
 }
@@ -310,6 +321,7 @@ pub struct Edit {
     before: Snapshot,
     candidate: Vec<u8>,
     steps: Vec<Step>,
+    spliced_parts: BTreeSet<String>,
 }
 
 impl Edit {
@@ -502,6 +514,336 @@ impl Edit {
         )
     }
 
+    /// Replace one existing non-repeated cell body with checked rich paragraphs and inline runs.
+    ///
+    /// The splice is provenance-bound to the exact `content.xml`; untouched producer formatting
+    /// stays byte-exact while the replacement cell is compact authored XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/repeated cell, invalid rich text, unsafe hyperlink, package
+    /// bound, compactness failure, or complete readback failure.
+    pub fn set_rich_cell_text(
+        &mut self,
+        sheet: &str,
+        row: usize,
+        column: usize,
+        rich: &RichText,
+    ) -> Result<()> {
+        let bytes = crate::advanced::set_rich_text(
+            &self.candidate,
+            sheet,
+            row,
+            column,
+            rich,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("cell.rich-text", &format!("{sheet}!R{row}C{column}"), bytes)
+    }
+
+    /// Set one inert formula through a fine-grained provenance splice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/repeated cell, invalid formula, package bound, compactness,
+    /// or complete readback failure.
+    pub fn set_cell_formula(
+        &mut self,
+        sheet: &str,
+        row: usize,
+        column: usize,
+        formula: &str,
+    ) -> Result<()> {
+        let bytes = crate::advanced::set_cell_formula(
+            &self.candidate,
+            sheet,
+            row,
+            column,
+            formula,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("cell.formula", &format!("{sheet}!R{row}C{column}"), bytes)
+    }
+
+    /// Set a direct cell style reference through a fine-grained provenance splice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/repeated cell, invalid style name, package bound,
+    /// compactness, or complete readback failure.
+    pub fn set_cell_style(
+        &mut self,
+        sheet: &str,
+        row: usize,
+        column: usize,
+        style_name: &str,
+    ) -> Result<()> {
+        let bytes = crate::advanced::set_cell_style(
+            &self.candidate,
+            sheet,
+            row,
+            column,
+            style_name,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("cell.style", &format!("{sheet}!R{row}C{column}"), bytes)
+    }
+
+    /// Append one compact row without rewriting existing Calc XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unknown sheet, invalid row, package bound, or splice failure.
+    pub fn append_row(&mut self, sheet: &str, row: &crate::Row) -> Result<()> {
+        let bytes = crate::advanced::append_row(
+            &self.candidate,
+            sheet,
+            row,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("row.insert", sheet, bytes)
+    }
+
+    /// Remove one checked physical non-repeated row.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unknown sheet, out-of-range/repeated row, or splice failure.
+    pub fn remove_row(&mut self, sheet: &str, physical_position: usize) -> Result<()> {
+        let bytes = crate::advanced::remove_row(
+            &self.candidate,
+            sheet,
+            physical_position,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("row.remove", &format!("{sheet}#{physical_position}"), bytes)
+    }
+
+    /// Append one compact structural column declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unknown sheet, invalid column, package bound, or splice failure.
+    pub fn append_column(
+        &mut self,
+        sheet: &str,
+        column: &crate::model::structure::Column,
+    ) -> Result<()> {
+        let bytes = crate::advanced::append_column(
+            &self.candidate,
+            sheet,
+            column,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("column.insert", sheet, bytes)
+    }
+
+    /// Remove one checked physical non-repeated column declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unknown sheet, out-of-range/repeated column, or splice failure.
+    pub fn remove_column(&mut self, sheet: &str, physical_position: usize) -> Result<()> {
+        let bytes = crate::advanced::remove_column(
+            &self.candidate,
+            sheet,
+            physical_position,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced(
+            "column.remove",
+            &format!("{sheet}#{physical_position}"),
+            bytes,
+        )
+    }
+
+    /// Append one checked compact worksheet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid sheet, package bound, or provenance splice failure.
+    pub fn append_sheet(&mut self, sheet: &crate::Sheet) -> Result<()> {
+        let bytes = crate::advanced::append_sheet(
+            &self.candidate,
+            sheet,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("sheet.insert", &sheet.name, bytes)
+    }
+
+    /// Remove one worksheet by exact name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous sheet or provenance splice failure.
+    pub fn remove_sheet(&mut self, sheet: &str) -> Result<()> {
+        let bytes = crate::advanced::remove_sheet(
+            &self.candidate,
+            sheet,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("sheet.remove", sheet, bytes)
+    }
+
+    /// Add one compact automatic table-cell style to `content.xml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid/duplicate style, color, package bound, or splice failure.
+    pub fn put_cell_style(&mut self, style: &CellStyle) -> Result<()> {
+        let bytes = crate::advanced::put_cell_style(
+            &self.candidate,
+            style,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("style.put", &style.name, bytes)
+    }
+
+    /// Replace or remove the typed conditional-format catalog of one sheet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid rules/ranges, an unknown sheet, bounds, or splice failure.
+    pub fn set_conditional_formats(
+        &mut self,
+        sheet: &str,
+        formats: &[crate::model::conditional_format::Format],
+    ) -> Result<()> {
+        let bytes = crate::advanced::set_conditional_formats(
+            &self.candidate,
+            sheet,
+            formats,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("conditional-format.edit", sheet, bytes)
+    }
+
+    /// Replace or remove the typed sparkline-group catalog of one sheet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid groups/ranges, an unknown sheet, bounds, or splice failure.
+    pub fn set_sparkline_groups(
+        &mut self,
+        sheet: &str,
+        groups: &[crate::model::sparkline::Group],
+    ) -> Result<()> {
+        let bytes = crate::advanced::set_sparkline_groups(
+            &self.candidate,
+            sheet,
+            groups,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("sparkline.edit", sheet, bytes)
+    }
+
+    /// Replace or remove the inert spreadsheet form-button catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid controls, duplicate containers, bounds, or splice failure.
+    pub fn set_form_controls(&mut self, controls: &[FormControl]) -> Result<()> {
+        let bytes = crate::advanced::set_forms(
+            &self.candidate,
+            controls,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("form.edit", "forms", bytes)
+    }
+
+    /// Atomically add a drawing frame and its exact package dependency.
+    ///
+    /// The detached resource path must equal the drawing reference. Both staged changes roll back
+    /// if either collision policy or XML publication fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for dependency mismatch, collision, invalid drawing, bounds, or splice
+    /// failure.
+    pub fn put_drawing_with_resource(
+        &mut self,
+        sheet: &str,
+        drawing: &Drawing,
+        resource: Resource,
+        collision: Collision,
+    ) -> Result<TransferDisposition> {
+        if drawing.resource_path != resource.path {
+            return invalid("ODS drawing dependency path differs from its resource");
+        }
+        let mut candidate = self.clone();
+        let disposition = candidate.put_resource(resource, collision)?;
+        let bytes = crate::advanced::put_drawing(
+            &candidate.candidate,
+            sheet,
+            drawing,
+            candidate.before.limits.package_bytes,
+        )?;
+        candidate.stage_spliced("drawing.put", &drawing.name, bytes)?;
+        *self = candidate;
+        Ok(disposition)
+    }
+
+    /// Transfer one resource dependency and author a destination drawing reference atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing source, unsafe destination, collision, bounds, or splice
+    /// failure.
+    pub fn transfer_drawing(
+        &mut self,
+        source: &Snapshot,
+        source_path: &str,
+        sheet: &str,
+        drawing_name: &str,
+        destination_path: &str,
+        collision: Collision,
+    ) -> Result<TransferDisposition> {
+        let source_resource = source.resource(source_path)?.ok_or_else(|| {
+            invalid_error(format!(
+                "ODS drawing resource '{source_path}' was not found"
+            ))
+        })?;
+        let resource = Resource::new(
+            destination_path,
+            source_resource.media_type,
+            source_resource.bytes.as_ref().to_vec(),
+        )?;
+        self.put_drawing_with_resource(
+            sheet,
+            &Drawing {
+                name: drawing_name.to_string(),
+                resource_path: destination_path.to_string(),
+            },
+            resource,
+            collision,
+        )
+    }
+
+    /// Atomically remove a drawing reference and its now-unreferenced resource dependency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing drawing/resource, retained reference, bounds, or splice
+    /// failure.
+    pub fn remove_drawing_with_resource(
+        &mut self,
+        sheet: &str,
+        drawing_name: &str,
+        resource_path: &str,
+    ) -> Result<()> {
+        let mut candidate = self.clone();
+        let bytes = crate::advanced::remove_drawing(
+            &candidate.candidate,
+            sheet,
+            drawing_name,
+            candidate.before.limits.package_bytes,
+        )?;
+        candidate.stage_spliced("drawing.remove", drawing_name, bytes)?;
+        candidate.remove_resource(resource_path)?;
+        *self = candidate;
+        Ok(())
+    }
+
     /// Add, reuse, or explicitly replace one bounded auxiliary resource.
     ///
     /// # Errors
@@ -598,6 +940,7 @@ impl Edit {
     pub fn rollback(&mut self) {
         self.candidate = self.before.source.as_ref().to_vec();
         self.steps.clear();
+        self.spliced_parts.clear();
     }
 
     /// Validate security policy, reopen the complete candidate, and publish one durable patch.
@@ -624,7 +967,7 @@ impl Edit {
         }
         refuse_unsafe_edit(&self.before)?;
         validate_package_size(self.candidate.len(), self.before.limits)?;
-        validate_authored_parts(&self.before.source, &self.candidate)?;
+        validate_authored_parts(&self.before.source, &self.candidate, &self.spliced_parts)?;
         let snapshot = Snapshot::from_bytes_with(self.candidate, self.before.limits)?;
         let patch = Patch::build(
             self.before.source,
@@ -641,6 +984,11 @@ impl Edit {
         if effects.is_empty() {
             return Ok(());
         }
+        for effect in &effects {
+            if let Some(path) = effect.strip_prefix("part:") {
+                self.spliced_parts.remove(path);
+            }
+        }
         let _candidate = Package::from_bytes(candidate.clone())?;
         self.candidate = candidate;
         self.steps.push(Step {
@@ -648,6 +996,12 @@ impl Edit {
             target: target.to_string(),
             effects,
         });
+        Ok(())
+    }
+
+    fn stage_spliced(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<()> {
+        self.stage(op, target, candidate)?;
+        self.spliced_parts.insert("content.xml".to_string());
         Ok(())
     }
 }
@@ -1355,6 +1709,21 @@ fn known_operation(operation: &str) -> bool {
             | "chart.edit"
             | "resource.put"
             | "resource.remove"
+            | "cell.rich-text"
+            | "cell.formula"
+            | "cell.style"
+            | "row.insert"
+            | "row.remove"
+            | "column.insert"
+            | "column.remove"
+            | "sheet.insert"
+            | "sheet.remove"
+            | "style.put"
+            | "conditional-format.edit"
+            | "sparkline.edit"
+            | "drawing.put"
+            | "drawing.remove"
+            | "form.edit"
     )
 }
 
@@ -1512,11 +1881,18 @@ fn semantic_operation(
     .map_err(patch_error)
 }
 
-fn validate_authored_parts(source: &[u8], target: &[u8]) -> Result<()> {
+fn validate_authored_parts(
+    source: &[u8],
+    target: &[u8],
+    provenance_spliced: &BTreeSet<String>,
+) -> Result<()> {
     let source_files = package_files(source)?;
     let target_files = package_files(target)?;
     for (path, file) in &target_files {
-        if source_files.get(path) != Some(file) && is_xml_media_type(&file.media_type) {
+        if source_files.get(path) != Some(file)
+            && is_xml_media_type(&file.media_type)
+            && !provenance_spliced.contains(path)
+        {
             litchi_odf_common::compact_xml::validate(&file.bytes).map_err(Error::from)?;
         }
     }
@@ -1583,6 +1959,10 @@ fn validate_resource_path(path: &str) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+pub(crate) fn validate_detached_resource_path(path: &str) -> Result<()> {
+    validate_resource_path(path)
 }
 
 fn validate_resource_size(length: usize, limits: Limits) -> Result<()> {

@@ -11,8 +11,16 @@ use litchi_pptx::font;
 use litchi_pptx::font::Style;
 use litchi_pptx::{Error, Package};
 
-const PRESENTATION_XML: &[u8] =
-    include_bytes!("../../../test-data/ooxml/pptx/embedded-fonts/presentation.xml");
+// This fixture is published through the normal OPC writer by the negative
+// relationship test, so unrelated formatting whitespace must not be present.
+const PRESENTATION_XML: &[u8] = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+    r#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
+    r#"<p:embeddedFontLst><p:embeddedFont><p:font typeface="Example Sans"/>"#,
+    r#"<p:regular r:id="rIdFontRegular"/></p:embeddedFont></p:embeddedFontLst>"#,
+    r#"</p:presentation>"#,
+)
+.as_bytes();
 const FONT_DATA: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/embedded-fonts/example.odttf");
 const FONT_CONTENT_TYPE: &str = "application/x-fontdata";

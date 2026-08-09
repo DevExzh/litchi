@@ -13,7 +13,8 @@ pub use composition::{
 };
 pub use durable::{DurablePatch, SealedPatch};
 pub use policy::{
-    DependencyDisposition, EditPolicy, EncryptionPolicy, ProtectionStatus, SignaturePolicy,
+    DependencyDisposition, EditPolicy, EncryptionPolicy, ProtectionStatus, ProtectionTransition,
+    SignaturePolicy,
 };
 pub(crate) use transaction::producer_extensions;
 pub use transaction::{Change, ChangeAction, ChangeKind, Commit, Edit, Patch, QueryChange};

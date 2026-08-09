@@ -9,7 +9,6 @@
 
 use std::ops::Range;
 
-use quick_xml::Writer;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -150,7 +149,7 @@ pub fn replace(xml: &[u8], value: &PageBreaks) -> Result<Vec<u8>> {
         cursor = insertion;
     }
     output.extend_from_slice(&xml[cursor..]);
-    compact_changed_xml(&output)
+    crate::raw::compact::changed(&output, "compact page-break worksheet output")
 }
 
 #[derive(Debug)]
@@ -657,63 +656,6 @@ fn copy_bytes(input: &[u8]) -> Result<Vec<u8>> {
         .map_err(|source| allocation("page-break worksheet output", source))?;
     output.extend_from_slice(input);
     Ok(output)
-}
-
-fn compact_changed_xml(input: &[u8]) -> Result<Vec<u8>> {
-    let mut reader = NsReader::from_reader(input);
-    reader.config_mut().trim_text(false);
-    reader.config_mut().check_end_names = true;
-    let mut bytes = Vec::new();
-    bytes
-        .try_reserve_exact(input.len())
-        .map_err(|source| allocation("compact page-break worksheet output", source))?;
-    let mut writer = Writer::new(bytes);
-    let mut preserve = Vec::new();
-    loop {
-        let event = reader.read_event().map_err(xml_error)?.into_owned();
-        match &event {
-            Event::Start(element) => {
-                let local = element.local_name();
-                let explicit = element.attributes().with_checks(true).any(|attribute| {
-                    attribute.is_ok_and(|attribute| {
-                        attribute.key.as_ref() == b"xml:space"
-                            && attribute.value.as_ref() == b"preserve"
-                    })
-                });
-                preserve.push(explicit || text_bearing(local.as_ref()));
-                writer.write_event(event).map_err(xml_error)?;
-            },
-            Event::End(_) => {
-                let _ = preserve.pop();
-                writer.write_event(event).map_err(xml_error)?;
-            },
-            Event::Text(text)
-                if text.as_ref().iter().all(u8::is_ascii_whitespace)
-                    && !preserve.last().copied().unwrap_or(false) => {},
-            Event::Eof => break,
-            _ => writer.write_event(event).map_err(xml_error)?,
-        }
-    }
-    Ok(writer.into_inner())
-}
-
-fn text_bearing(local: &[u8]) -> bool {
-    matches!(
-        local,
-        b"t" | b"f"
-            | b"v"
-            | b"text"
-            | b"formula"
-            | b"formula1"
-            | b"formula2"
-            | b"sqref"
-            | b"oddHeader"
-            | b"oddFooter"
-            | b"evenHeader"
-            | b"evenFooter"
-            | b"firstHeader"
-            | b"firstFooter"
-    )
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {

@@ -36,7 +36,8 @@ fn real_calc_packages_parse_and_expose_typed_content() {
         let _ = spreadsheet.metadata();
     }
 
-    let spreadsheet = Spreadsheet::open(corpus().join("calc-formulas.ods")).unwrap();
+    let spreadsheet = Spreadsheet::open(corpus().join("calc-formulas.ods"))
+        .expect("test fixture or operation should succeed");
     assert!(
         spreadsheet
             .sheets()

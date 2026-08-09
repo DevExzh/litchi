@@ -19,14 +19,17 @@ pub use facade::{
     GeometryChange as PackageGeometryChange, History as PackageHistory,
     HistoryLimits as PackageHistoryLimits, JoinedEdits as PackageJoinedEdits,
     LayerChange as PackageLayerChange, Lineage as PackageLineage, MergePlan as PackageMergePlan,
-    NameChange as PackageNameChange, Patch as PackagePatch, PathChange as PackagePathChange,
-    PreparedEdit as PackagePreparedEdit, ResourceChange as PackageResourceChange,
-    Snapshot as PackageSnapshot, StructureChange as PackageStructureChange,
-    StyleChange as PackageStyleChange, TextChange as PackageTextChange,
-    Transaction as PackageTransaction,
+    NameChange as PackageNameChange, PageNameChange as PackagePageNameChange,
+    PageStyleChange as PackagePageStyleChange, Patch as PackagePatch,
+    PathChange as PackagePathChange, PreparedEdit as PackagePreparedEdit,
+    ResourceChange as PackageResourceChange, SecurityStatus as PackageSecurityStatus,
+    ShapeTransfer as PackageShapeTransfer, Snapshot as PackageSnapshot,
+    StructureChange as PackageStructureChange, StyleChange as PackageStyleChange,
+    TextChange as PackageTextChange, Transaction as PackageTransaction,
+    TransferResource as PackageTransferResource,
 };
 pub use flat::{
     FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,
     TextChange,
 };
-pub use model::{layer, page, resource, shape};
+pub use model::{FormControl, form, layer, page, resource, shape};

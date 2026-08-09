@@ -31,21 +31,34 @@ fn named(name: &str, text: &str) -> Annotation {
 
 #[test]
 fn parses_rich_annotation_with_contextual_cell_selection() {
-    let snapshot = Snapshot::parse(XML).unwrap();
+    let snapshot = Snapshot::parse(XML).expect("test fixture or operation should succeed");
     assert_eq!(snapshot.entries().len(), 1);
-    let entry = snapshot.cell("Data", 0, 0).unwrap().unwrap();
+    let entry = snapshot
+        .cell("Data", 0, 0)
+        .expect("test fixture or operation should succeed")
+        .expect("test fixture or operation should succeed");
     assert_eq!(entry.cell().sheet(), "Data");
     assert_eq!(entry.cell().row(), 0);
     assert_eq!(entry.cell().column(), 0);
     assert_eq!(entry.annotation().creator().as_deref(), Some("Ada"));
     assert_eq!(entry.annotation().text(), "hello rich");
-    assert_eq!(snapshot.named("first").unwrap().unwrap().index(), 0);
+    assert_eq!(
+        snapshot
+            .named("first")
+            .expect("test fixture or operation should succeed")
+            .expect("test fixture or operation should succeed")
+            .index(),
+        0
+    );
 }
 
 #[test]
 fn no_op_commit_keeps_exact_content_xml_and_empty_patch() {
-    let snapshot = Snapshot::parse(XML).unwrap();
-    let commit = snapshot.edit().commit().unwrap();
+    let snapshot = Snapshot::parse(XML).expect("test fixture or operation should succeed");
+    let commit = snapshot
+        .edit()
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(!commit.changed());
     assert_eq!(commit.content_xml(), XML);
     assert!(commit.patch().is_empty());
@@ -53,12 +66,17 @@ fn no_op_commit_keeps_exact_content_xml_and_empty_patch() {
 
 #[test]
 fn add_replace_remove_preserve_unrelated_xml() {
-    let snapshot = Snapshot::parse(XML).unwrap();
+    let snapshot = Snapshot::parse(XML).expect("test fixture or operation should succeed");
     let mut transaction = snapshot.edit();
     transaction
-        .add_at(Cell::new("Data", 0, 1).unwrap(), named("second", "added"))
-        .unwrap();
-    let added = transaction.commit().unwrap();
+        .add_at(
+            Cell::new("Data", 0, 1).expect("test fixture or operation should succeed"),
+            named("second", "added"),
+        )
+        .expect("test fixture or operation should succeed");
+    let added = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(added.changed());
     assert!(added.content_xml().contains("vendor:before value=\"keep\""));
     assert!(added.content_xml().contains("vendor:after value=\"keep\""));
@@ -66,16 +84,20 @@ fn add_replace_remove_preserve_unrelated_xml() {
         added
             .snapshot()
             .cell("Data", 0, 1)
-            .unwrap()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
+            .expect("test fixture or operation should succeed")
             .annotation()
             .text(),
         "added"
     );
 
     let mut transaction = added.snapshot().edit();
-    transaction.replace(0, named("renamed", "changed")).unwrap();
-    let replaced = transaction.commit().unwrap();
+    transaction
+        .replace(0, named("renamed", "changed"))
+        .expect("test fixture or operation should succeed");
+    let replaced = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(replaced.content_xml().contains("office:name=\"renamed\""));
     assert!(
         replaced
@@ -84,9 +106,23 @@ fn add_replace_remove_preserve_unrelated_xml() {
     );
 
     let mut transaction = replaced.snapshot().edit();
-    assert_eq!(transaction.remove(0).unwrap().text(), "changed");
-    let removed = transaction.commit().unwrap();
-    assert!(removed.snapshot().cell("Data", 0, 0).unwrap().is_none());
+    assert_eq!(
+        transaction
+            .remove(0)
+            .expect("test fixture or operation should succeed")
+            .text(),
+        "changed"
+    );
+    let removed = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
+    assert!(
+        removed
+            .snapshot()
+            .cell("Data", 0, 0)
+            .expect("test fixture or operation should succeed")
+            .is_none()
+    );
     assert!(
         removed
             .content_xml()
@@ -96,7 +132,7 @@ fn add_replace_remove_preserve_unrelated_xml() {
 
 #[test]
 fn duplicate_names_and_invalid_coordinates_are_failure_atomic() {
-    let snapshot = Snapshot::parse(XML).unwrap();
+    let snapshot = Snapshot::parse(XML).expect("test fixture or operation should succeed");
     let mut transaction = snapshot.edit();
     let before = transaction.snapshot().source_xml().to_owned();
     assert!(
@@ -111,21 +147,39 @@ fn duplicate_names_and_invalid_coordinates_are_failure_atomic() {
             .is_err()
     );
     assert_eq!(transaction.snapshot().source_xml(), before);
-    assert!(Snapshot::parse(XML).unwrap().cell("Data", 1, 0).is_ok());
+    assert!(
+        Snapshot::parse(XML)
+            .expect("test fixture or operation should succeed")
+            .cell("Data", 1, 0)
+            .is_ok()
+    );
 }
 
 #[test]
 fn patch_is_source_checked_and_reversible_semantically() {
-    let snapshot = Snapshot::parse(XML).unwrap();
+    let snapshot = Snapshot::parse(XML).expect("test fixture or operation should succeed");
     let mut transaction = snapshot.edit();
     transaction
         .add("Data", 0, 1, named("second", "added"))
-        .unwrap();
-    let commit = transaction.commit().unwrap();
-    let applied = commit.patch().apply(&snapshot).unwrap();
+        .expect("test fixture or operation should succeed");
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
+    let applied = commit
+        .patch()
+        .apply(&snapshot)
+        .expect("test fixture or operation should succeed");
     assert_eq!(applied.content_xml(), commit.content_xml());
 
     let inverse = commit.patch().inverse();
-    let restored = inverse.apply(commit.snapshot()).unwrap();
-    assert!(restored.snapshot().cell("Data", 0, 1).unwrap().is_none());
+    let restored = inverse
+        .apply(commit.snapshot())
+        .expect("test fixture or operation should succeed");
+    assert!(
+        restored
+            .snapshot()
+            .cell("Data", 0, 1)
+            .expect("test fixture or operation should succeed")
+            .is_none()
+    );
 }

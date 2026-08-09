@@ -133,7 +133,9 @@ fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<
                     &mut node_count,
                     limits,
                 )?;
-                super::validation::validate_element(&node)?;
+                if !inside_annotation_xml(&stack) {
+                    super::validation::validate_element(&node)?;
+                }
                 let parent = stack.last_mut().ok_or_else(|| {
                     Error::InvalidFormat("MathML parent stack is empty".to_string())
                 })?;
@@ -143,7 +145,9 @@ fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<
                 let node = stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("MathML element stack underflow".to_string())
                 })?;
-                super::validation::validate_element(&node)?;
+                if !inside_annotation_xml(&stack) {
+                    super::validation::validate_element(&node)?;
+                }
                 if let Some(parent) = stack.last_mut() {
                     parent.content_mut().push(Content::Element(node));
                 } else {
@@ -207,6 +211,13 @@ fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<
         ));
     }
     root.ok_or_else(|| Error::InvalidFormat("formula has no MathML root".to_string()))
+}
+
+fn inside_annotation_xml(stack: &[Element]) -> bool {
+    stack.iter().any(|element| {
+        element.namespace_uri() == Some(MATHML_NAMESPACE)
+            && element.local_name() == "annotation-xml"
+    })
 }
 
 fn make_element(

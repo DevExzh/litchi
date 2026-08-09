@@ -19,23 +19,34 @@ const MAX_RESOURCE_BYTES: usize = 64 * 1024 * 1024;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SecurityPolicy {
     allow_external_targets: bool,
+    allow_missing_package_targets: bool,
     max_resource_bytes: usize,
 }
 
 impl SecurityPolicy {
-    /// Returns a restrictive policy which refuses newly staged external links.
+    /// Returns a restrictive final-graph policy.
+    ///
+    /// External links and unresolved package targets are refused.
     #[must_use]
     pub const fn strict() -> Self {
         Self {
             allow_external_targets: false,
+            allow_missing_package_targets: false,
             max_resource_bytes: MAX_RESOURCE_BYTES,
         }
     }
 
-    /// Configures whether newly staged external link targets remain permitted.
+    /// Configures whether the final package may contain external link targets.
     #[must_use]
     pub const fn with_external_targets(mut self, allow: bool) -> Self {
         self.allow_external_targets = allow;
+        self
+    }
+
+    /// Configures whether the final package may contain unresolved package targets.
+    #[must_use]
+    pub const fn with_missing_package_targets(mut self, allow: bool) -> Self {
+        self.allow_missing_package_targets = allow;
         self
     }
 
@@ -50,6 +61,10 @@ impl SecurityPolicy {
         self.allow_external_targets
     }
 
+    pub(crate) const fn allows_missing_package_targets(self) -> bool {
+        self.allow_missing_package_targets
+    }
+
     pub(crate) const fn max_resource_bytes(self) -> usize {
         self.max_resource_bytes
     }
@@ -59,8 +74,77 @@ impl Default for SecurityPolicy {
     fn default() -> Self {
         Self {
             allow_external_targets: true,
+            allow_missing_package_targets: true,
             max_resource_bytes: MAX_RESOURCE_BYTES,
         }
+    }
+}
+
+/// A detached inert subdocument reference for a new master section.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SubdocumentSpec {
+    href: String,
+    source_section: Option<String>,
+    filter_name: Option<String>,
+}
+
+impl SubdocumentSpec {
+    /// Creates a package or inert external subdocument reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty, excessive, or invalid XML target.
+    pub fn new(href: impl Into<String>) -> Result<Self> {
+        let href = href.into();
+        validate_value(&href, "ODM subdocument target", false)?;
+        crate::link::validate_href(&href)?;
+        Ok(Self {
+            href,
+            source_section: None,
+            filter_name: None,
+        })
+    }
+
+    /// Selects a named section within the referenced subdocument.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty, excessive, or invalid XML value.
+    pub fn with_source_section(mut self, name: impl Into<String>) -> Result<Self> {
+        let name = name.into();
+        validate_value(&name, "ODM source section name", false)?;
+        self.source_section = Some(name);
+        Ok(self)
+    }
+
+    /// Retains the producer filter name for the referenced subdocument.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty, excessive, or invalid XML value.
+    pub fn with_filter_name(mut self, name: impl Into<String>) -> Result<Self> {
+        let name = name.into();
+        validate_value(&name, "ODM source filter name", false)?;
+        self.filter_name = Some(name);
+        Ok(self)
+    }
+
+    /// Returns the inert target text.
+    #[must_use]
+    pub fn href(&self) -> &str {
+        &self.href
+    }
+
+    /// Returns the source-section selector, when present.
+    #[must_use]
+    pub fn source_section(&self) -> Option<&str> {
+        self.source_section.as_deref()
+    }
+
+    /// Returns the producer filter name, when present.
+    #[must_use]
+    pub fn filter_name(&self) -> Option<&str> {
+        self.filter_name.as_deref()
     }
 }
 
@@ -69,6 +153,7 @@ impl Default for SecurityPolicy {
 pub struct SectionSpec {
     name: String,
     style_name: Option<String>,
+    subdocument: Option<SubdocumentSpec>,
 }
 
 impl SectionSpec {
@@ -83,6 +168,7 @@ impl SectionSpec {
         Ok(Self {
             name,
             style_name: None,
+            subdocument: None,
         })
     }
 
@@ -98,12 +184,23 @@ impl SectionSpec {
         Ok(self)
     }
 
+    /// Makes this section a linked section with the source as its first child.
+    #[must_use]
+    pub fn with_subdocument(mut self, subdocument: SubdocumentSpec) -> Self {
+        self.subdocument = Some(subdocument);
+        self
+    }
+
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
     pub(crate) fn style_name(&self) -> Option<&str> {
         self.style_name.as_deref()
+    }
+
+    pub(crate) const fn subdocument(&self) -> Option<&SubdocumentSpec> {
+        self.subdocument.as_ref()
     }
 }
 
@@ -206,16 +303,16 @@ impl ResourceSpec {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SectionChange {
+    /// Inserts a detached root section.
     Add(SectionSpec),
+    /// Renames an existing section and modeled local references.
     Rename {
         position: Position,
         before: String,
         after: String,
     },
-    Remove {
-        position: Position,
-        before: String,
-    },
+    /// Removes an existing section subtree.
+    Remove { position: Position, before: String },
 }
 
 /// One staged or committed style-catalog effect.
@@ -270,8 +367,15 @@ pub(crate) fn mutate_xml(
     for intent in sections {
         stage_section(source, intent, &mut content_edits)?;
     }
+    let removed_section_spans = removed_section_spans(source, sections)?;
     for intent in styles {
-        stage_style(source, intent, &mut content_edits, &mut styles_edits)?;
+        stage_style(
+            source,
+            intent,
+            &removed_section_spans,
+            &mut content_edits,
+            &mut styles_edits,
+        )?;
     }
     let mut content = apply_edits(source.content_xml(), content_edits)?;
     let mut styles_xml = source.styles_xml().map(str::to_owned);
@@ -356,19 +460,29 @@ fn stage_section(
             Ok(())
         },
         SectionChange::Remove { position, before } => {
-            if source
-                .local_section_references()
-                .iter()
-                .any(|(target, _span)| target == before)
-            {
-                return Err(invalid(
-                    "ODM section removal is blocked by a local section reference",
-                ));
-            }
             let node = source
                 .section_tree()
                 .get(*position)
                 .ok_or_else(|| invalid("ODM section selector is stale"))?;
+            if source
+                .local_section_references()
+                .iter()
+                .any(|(target, span)| {
+                    source.section_tree().sections().iter().any(|candidate| {
+                        node.source_span.start <= candidate.source_span.start
+                            && candidate.source_span.end <= node.source_span.end
+                            && candidate.name() == target
+                    }) && !(node.source_span.start <= span.start
+                        && span.end <= node.source_span.end)
+                })
+            {
+                return Err(invalid(
+                    "ODM section-subtree removal is blocked by an incoming local reference",
+                ));
+            }
+            if node.name() != before {
+                return Err(invalid("ODM removed section identity is stale"));
+            }
             edits.push((node.source_span.clone(), String::new()));
             Ok(())
         },
@@ -378,6 +492,7 @@ fn stage_section(
 fn stage_style(
     source: &Master,
     intent: &StyleChange,
+    removed_section_spans: &[Range<usize>],
     content_edits: &mut Vec<(Range<usize>, String)>,
     styles_edits: &mut Vec<(Range<usize>, String)>,
 ) -> Result<()> {
@@ -400,7 +515,7 @@ fn stage_style(
         Origin::Styles => &mut *styles_edits,
     };
     if remove {
-        if style_is_referenced(source, name)? {
+        if style_is_referenced(source, name, removed_section_spans)? {
             return Err(invalid(
                 "ODM style removal is blocked by an incoming reference",
             ));
@@ -408,7 +523,11 @@ fn stage_style(
         defining_edits.push((definition.source_span.clone(), String::new()));
     } else if let Some(after) = replacement {
         defining_edits.push((definition.name_span.clone(), escape(after)));
-        content_edits.extend(attribute_references(source.content_xml(), name, after)?);
+        content_edits.extend(
+            attribute_references(source.content_xml(), name, after)?
+                .into_iter()
+                .filter(|(span, _)| !span_is_removed(span, removed_section_spans)),
+        );
         if let Some(xml) = source.styles_xml() {
             styles_edits.extend(attribute_references(xml, name, after)?);
         }
@@ -416,8 +535,15 @@ fn stage_style(
     Ok(())
 }
 
-fn style_is_referenced(source: &Master, name: &str) -> Result<bool> {
-    if !attribute_references(source.content_xml(), name, name)?.is_empty() {
+fn style_is_referenced(
+    source: &Master,
+    name: &str,
+    removed_section_spans: &[Range<usize>],
+) -> Result<bool> {
+    if attribute_references(source.content_xml(), name, name)?
+        .iter()
+        .any(|(span, _)| !span_is_removed(span, removed_section_spans))
+    {
         return Ok(true);
     }
     source
@@ -425,6 +551,38 @@ fn style_is_referenced(source: &Master, name: &str) -> Result<bool> {
         .map(|xml| attribute_references(xml, name, name).map(|spans| !spans.is_empty()))
         .transpose()
         .map(Option::unwrap_or_default)
+}
+
+fn removed_section_spans(source: &Master, sections: &[SectionChange]) -> Result<Vec<Range<usize>>> {
+    let mut spans = Vec::new();
+    spans
+        .try_reserve(
+            sections
+                .iter()
+                .filter(|change| matches!(change, SectionChange::Remove { .. }))
+                .count(),
+        )
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODM removed section spans",
+            source: allocation_error,
+        })?;
+    for change in sections {
+        let SectionChange::Remove { position, .. } = change else {
+            continue;
+        };
+        let node = source
+            .section_tree()
+            .get(*position)
+            .ok_or_else(|| invalid("ODM removed section selector is stale"))?;
+        spans.push(node.source_span.clone());
+    }
+    Ok(spans)
+}
+
+fn span_is_removed(span: &Range<usize>, removed: &[Range<usize>]) -> bool {
+    removed
+        .iter()
+        .any(|owner| owner.start <= span.start && span.end <= owner.end)
 }
 
 fn attribute_references(
@@ -543,9 +701,32 @@ fn section_fragment(spec: &SectionSpec) -> String {
     let style = spec.style_name().map_or_else(String::new, |name| {
         format!(r#" text:style-name="{}""#, escape(name))
     });
+    let Some(subdocument) = spec.subdocument() else {
+        return format!(
+            r#"<text:section xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" text:name="{}"{style}/>"#,
+            escape(spec.name())
+        );
+    };
+    let source_section = subdocument
+        .source_section()
+        .map_or_else(String::new, |name| {
+            format!(r#" text:section-name="{}""#, escape(name))
+        });
+    let filter_name = subdocument.filter_name().map_or_else(String::new, |name| {
+        format!(r#" text:filter-name="{}""#, escape(name))
+    });
     format!(
-        r#"<text:section xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" text:name="{}"{style}/>"#,
-        escape(spec.name())
+        concat!(
+            r#"<text:section xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+            r#"xmlns:xlink="http://www.w3.org/1999/xlink" text:name="{}"{style}>"#,
+            r#"<text:section-source xlink:href="{}" xlink:type="simple" "#,
+            r#"xlink:show="embed"{source_section}{filter_name}/></text:section>"#,
+        ),
+        escape(spec.name()),
+        escape(subdocument.href()),
+        style = style,
+        source_section = source_section,
+        filter_name = filter_name,
     )
 }
 

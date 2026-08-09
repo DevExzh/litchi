@@ -635,7 +635,10 @@ pub fn process_markup_compatibility<'a>(
         report: rep,
     })
 }
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the MCE start event advances one bounded parser state tuple"
+)]
 fn start(
     e: &BytesStart<'_>,
     d: Decoder,
@@ -1136,7 +1139,10 @@ fn parse_qname_target(token: &str, ns: &Namespaces, wildcard: bool) -> R<NamePat
         local_name: local.into(),
     }))
 }
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the MCE writer emits one event against the complete bounded context"
+)]
 fn write_start(
     o: &mut BoundedOutput,
     q: &str,

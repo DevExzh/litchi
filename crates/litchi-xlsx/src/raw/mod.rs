@@ -4,6 +4,7 @@
 
 mod catalog;
 pub(crate) mod catalog_edit;
+pub(crate) mod compact;
 mod formula;
 pub mod namespace;
 pub(crate) mod properties_edit;

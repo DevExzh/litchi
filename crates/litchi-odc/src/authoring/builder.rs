@@ -127,6 +127,12 @@ fn package_content(
     }
     for resource in resources {
         validate_media_type(&resource.media_type)?;
+        crate::package::validate_authored_resource(
+            &resource.path,
+            &resource.media_type,
+            &resource.bytes,
+            compact_limits,
+        )?;
         writer.add_file_with_media_type(&resource.path, &resource.bytes, &resource.media_type)?;
     }
     let bytes = writer.finish_to_bounded_bytes()?;

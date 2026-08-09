@@ -1,6 +1,6 @@
 //! Immutable database package ownership.
 
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{Metadata, Result};
 use litchi_odf_common::core::family::Package;
 use std::{path::Path, sync::Arc};
 
@@ -22,6 +22,14 @@ impl Snapshot {
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODB").and_then(Self::validated)
+    }
+
+    pub(crate) fn from_bytes_with_password(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Package::from_bytes_with_password(bytes, password, MIMETYPE, BODY_MARKER, "ODB")
+            .and_then(Self::validated)
     }
 
     fn validated(package: Package) -> Result<Self> {
@@ -65,6 +73,18 @@ impl Snapshot {
         Ok(crate::ProtectionStatus::new(signed, encrypted))
     }
 
+    pub(crate) fn digital_signatures(
+        &self,
+    ) -> Result<litchi_odf_common::signature::DigitalSignatures> {
+        self.0.package.package().digital_signatures()
+    }
+
+    pub(crate) fn verify_document_signatures(
+        &self,
+    ) -> Result<Vec<litchi_odf_common::signature::SignatureVerification>> {
+        self.0.package.package().verify_document_signatures()
+    }
+
     pub(crate) fn into_bytes(self) -> Vec<u8> {
         match Arc::try_unwrap(self.0) {
             Ok(state) => state.package.into_bytes(),
@@ -73,17 +93,6 @@ impl Snapshot {
     }
 
     pub(crate) fn rebuild_with_content(&self, content: &str) -> Result<Self> {
-        let files = self.files()?;
-        if files.iter().any(|path| {
-            matches!(
-                path.as_str(),
-                "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
-            )
-        }) {
-            return Err(Error::InvalidFormat(
-                "ODB package edits refuse signed packages".to_string(),
-            ));
-        }
         // Opened producer documents are edited by byte-splicing only the
         // selected XML range.  Formatting whitespace in the unchanged source
         // is therefore lossless input, not generated output that needs the

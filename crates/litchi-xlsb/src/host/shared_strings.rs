@@ -1,7 +1,19 @@
 //! XLSB rich shared-string parsing.
 
+#![deny(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::checked_conversions,
+    clippy::float_cmp,
+    clippy::let_underscore_must_use,
+    reason = "shared-string authoring uses checked counts and exact wire indexes"
+)]
+
 use crate::package::error::{Error, Result};
 use crate::package::records::decode_string;
+use crate::raw::Writer;
 use litchi_core::binary;
 
 /// A font change within an XLSB shared string.
@@ -46,6 +58,15 @@ impl PhoneticType {
             _ => Self::NoConversion,
         }
     }
+
+    const fn bits(self) -> u16 {
+        match self {
+            Self::HalfWidthKatakana => 0,
+            Self::FullWidthKatakana => 1,
+            Self::Hiragana => 2,
+            Self::NoConversion => 3,
+        }
+    }
 }
 
 /// Horizontal alignment of phonetic text over its base string.
@@ -68,6 +89,15 @@ impl PhoneticAlignment {
             1 => Self::Left,
             2 => Self::Center,
             _ => Self::Distributed,
+        }
+    }
+
+    const fn bits(self) -> u16 {
+        match self {
+            Self::NoControl => 0,
+            Self::Left => 1,
+            Self::Center => 2,
+            Self::Distributed => 3,
         }
     }
 }
@@ -229,6 +259,113 @@ impl SharedString {
         })
     }
 
+    pub(crate) fn encode(&self) -> Result<Vec<u8>> {
+        self.validate()?;
+        let mut data = Vec::new();
+        let mut flags = 0_u8;
+        if !self.runs.is_empty() {
+            flags |= 1;
+        }
+        if self.phonetic.is_some() {
+            flags |= 2;
+        }
+        data.push(flags);
+        Writer::new(&mut data).write_wide_string(&self.text)?;
+        if !self.runs.is_empty() {
+            let count = u32::try_from(self.runs.len()).map_err(|_| {
+                Error::Encoding("shared-string formatting-run count overflow".to_string())
+            })?;
+            data.extend_from_slice(&count.to_le_bytes());
+            for run in &self.runs {
+                data.extend_from_slice(&run.character_index.to_le_bytes());
+                data.extend_from_slice(&run.font_id.to_le_bytes());
+            }
+        }
+        if let Some(phonetic) = &self.phonetic {
+            Writer::new(&mut data).write_wide_string(&phonetic.text)?;
+            let count = u32::try_from(phonetic.runs.len()).map_err(|_| {
+                Error::Encoding("shared-string phonetic-run count overflow".to_string())
+            })?;
+            data.extend_from_slice(&count.to_le_bytes());
+            for run in &phonetic.runs {
+                data.extend_from_slice(&run.phonetic_character_index.to_le_bytes());
+                data.extend_from_slice(&run.base_character_index.to_le_bytes());
+                data.extend_from_slice(&run.base_character_count.to_le_bytes());
+            }
+            data.extend_from_slice(&phonetic.font_id.to_le_bytes());
+            let phonetic_flags = phonetic.phonetic_type.bits() | (phonetic.alignment.bits() << 2);
+            data.extend_from_slice(&phonetic_flags.to_le_bytes());
+        }
+        Ok(data)
+    }
+
+    fn validate(&self) -> Result<()> {
+        let text_len = self.text.encode_utf16().count();
+        if text_len > 0x7FFF {
+            return Err(Error::Unrecognized {
+                typ: "RichStr text length".to_string(),
+                val: text_len.to_string(),
+            });
+        }
+        if self.runs.len() > 0x7FFF {
+            return Err(Error::Unrecognized {
+                typ: "StrRun count".to_string(),
+                val: self.runs.len().to_string(),
+            });
+        }
+        let mut previous = None;
+        for run in &self.runs {
+            if usize::from(run.character_index) >= text_len
+                || previous.is_some_and(|value| run.character_index <= value)
+            {
+                return Err(Error::Unrecognized {
+                    typ: "StrRun ich".to_string(),
+                    val: run.character_index.to_string(),
+                });
+            }
+            previous = Some(run.character_index);
+        }
+        if let Some(phonetic) = &self.phonetic {
+            self.validate_phonetic(phonetic, text_len)?;
+        }
+        Ok(())
+    }
+
+    fn validate_phonetic(&self, phonetic: &PhoneticString, text_len: usize) -> Result<()> {
+        let phonetic_len = phonetic.text.encode_utf16().count();
+        if phonetic_len > 0x7FFF || phonetic.runs.len() > 0x7FFF {
+            return Err(Error::Unrecognized {
+                typ: "PhRun count/text".to_string(),
+                val: format!("{}/{}", phonetic.runs.len(), phonetic_len),
+            });
+        }
+        let mut previous_phonetic = None;
+        let mut previous_base_end = None;
+        for run in &phonetic.runs {
+            let base_end = usize::from(run.base_character_index)
+                .checked_add(usize::from(run.base_character_count))
+                .ok_or_else(|| Error::Encoding("PhRun range overflow".to_string()))?;
+            if usize::from(run.phonetic_character_index) >= phonetic_len
+                || usize::from(run.base_character_index) >= text_len
+                || base_end > text_len
+                || previous_phonetic.is_some_and(|value| run.phonetic_character_index <= value)
+                || previous_base_end
+                    .is_some_and(|value| usize::from(run.base_character_index) < value)
+            {
+                return Err(Error::Unrecognized {
+                    typ: "PhRun index".to_string(),
+                    val: format!(
+                        "{}/{}",
+                        run.phonetic_character_index, run.base_character_index
+                    ),
+                });
+            }
+            previous_phonetic = Some(run.phonetic_character_index);
+            previous_base_end = Some(base_end);
+        }
+        Ok(())
+    }
+
     fn read_count(data: &[u8], offset: &mut usize, context: &str) -> Result<usize> {
         let end = offset
             .checked_add(4)
@@ -239,7 +376,11 @@ impl SharedString {
                 found: data.len(),
             });
         }
-        let count = binary::read_u32_le_at(data, *offset)? as usize;
+        let count = usize::try_from(binary::read_u32_le_at(data, *offset)?).map_err(|error| {
+            Error::Encoding(format!(
+                "{context} count does not fit this platform: {error}"
+            ))
+        })?;
         *offset = end;
         if count > 0x7FFF {
             return Err(Error::Unrecognized {
@@ -276,5 +417,35 @@ mod tests {
         assert_eq!(phonetic.runs[0].base_character_count, 2);
         assert_eq!(phonetic.font_id, 3);
         assert_eq!(phonetic.alignment, PhoneticAlignment::Left);
+    }
+
+    #[test]
+    fn rich_and_phonetic_string_encoding_is_an_exact_semantic_round_trip() {
+        let value = SharedString {
+            text: "AB".to_string(),
+            runs: vec![
+                SharedStringRun {
+                    character_index: 0,
+                    font_id: 1,
+                },
+                SharedStringRun {
+                    character_index: 1,
+                    font_id: 2,
+                },
+            ],
+            phonetic: Some(PhoneticString {
+                text: "ab".to_string(),
+                runs: vec![PhoneticRun {
+                    phonetic_character_index: 0,
+                    base_character_index: 0,
+                    base_character_count: 2,
+                }],
+                font_id: 3,
+                phonetic_type: PhoneticType::Hiragana,
+                alignment: PhoneticAlignment::Distributed,
+            }),
+        };
+        let encoded = value.encode().unwrap();
+        assert_eq!(SharedString::parse(&encoded).unwrap(), value);
     }
 }

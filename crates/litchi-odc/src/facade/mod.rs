@@ -608,11 +608,12 @@ impl Edit<'_> {
                     bytes: edit.after_bytes.as_deref(),
                 })
                 .collect::<Vec<_>>();
-            let package = self
-                .source
-                .0
-                .package
-                .rebuild(&content, styles, &replacements)?;
+            let package = self.source.0.package.rebuild(
+                &content,
+                replacement.is_none().then_some(content_commit.patch()),
+                styles,
+                &replacements,
+            )?;
             Chart::from_package(package)?
         };
         if let Some(definition) = replacement.as_ref() {
@@ -923,6 +924,29 @@ impl Patch {
         Ok(PackageMerge::new(Some(commit.patch().clone()), Vec::new()))
     }
 
+    /// Transfer this package patch onto another canonical chart snapshot.
+    ///
+    /// Typed chart data and style references, `styles.xml`, and inert package
+    /// resources are merged against this patch's source. Inputs remain
+    /// immutable and conflicts use stable semantic paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when reading resources or publishing a conflict-free
+    /// transferred package fails.
+    pub fn transfer_to(&self, destination: &Chart) -> Result<PackageMerge> {
+        let mut conflicts = Vec::new();
+        let mut edit = destination.edit();
+        transfer_package_content(self, destination, &mut edit, &mut conflicts)?;
+        transfer_package_styles(self, destination, &mut edit, &mut conflicts);
+        transfer_package_resources(self, destination, &mut edit, &mut conflicts)?;
+        if !conflicts.is_empty() {
+            return Ok(PackageMerge::new(None, conflicts));
+        }
+        let commit = edit.commit()?;
+        Ok(PackageMerge::new(Some(commit.patch().clone()), Vec::new()))
+    }
+
     /// Returns a patch that restores the exact source package.
     #[must_use]
     pub fn inverse(&self) -> Self {
@@ -1223,6 +1247,59 @@ fn merge_package_styles(
     }
 }
 
+fn transfer_package_content(
+    patch: &Patch,
+    destination: &Chart,
+    edit: &mut Edit<'_>,
+    conflicts: &mut Vec<crate::Conflict>,
+) -> Result<()> {
+    if patch.target.content_xml() == patch.source.content_xml() {
+        return Ok(());
+    }
+    let definitions = (
+        patch.source.definition(),
+        patch.target.definition(),
+        destination.definition(),
+    );
+    let (Ok(source_definition), Ok(target_definition), Ok(destination_definition)) = definitions
+    else {
+        conflicts.push(crate::Conflict::new("chart.content"));
+        return Ok(());
+    };
+    let source = crate::DefinitionSnapshot::new(source_definition, patch.source.limits())?;
+    let target = crate::DefinitionSnapshot::new(target_definition, patch.target.limits())?;
+    let destination_snapshot =
+        crate::DefinitionSnapshot::new(destination_definition, destination.limits())?;
+    let definition_patch = crate::DefinitionPatch {
+        source,
+        target,
+        changes: patch.definition_changes.clone(),
+    };
+    let transferred = definition_patch.transfer_to(&destination_snapshot);
+    conflicts.extend_from_slice(transferred.conflicts());
+    if let Some(transferred_patch) = transferred.patch() {
+        edit.replace_chart(transferred_patch.target.definition())?;
+    }
+    Ok(())
+}
+
+fn transfer_package_styles(
+    patch: &Patch,
+    destination: &Chart,
+    edit: &mut Edit<'_>,
+    conflicts: &mut Vec<crate::Conflict>,
+) {
+    let base = patch.source.styles_xml().map(str::to_owned);
+    let changed = patch.target.styles_xml().map(str::to_owned);
+    let destination_value = destination.styles_xml().map(str::to_owned);
+    match merge_package_value(&base, &changed, &destination_value) {
+        Some(value) if value == destination_value => {},
+        Some(Some(styles)) => edit.set_styles_xml(styles),
+        Some(None) => edit.remove_styles_xml(),
+        None => conflicts.push(crate::Conflict::new("package.styles")),
+    }
+}
+
 fn merge_package_resources(
     left: &Patch,
     right: &Patch,
@@ -1248,31 +1325,70 @@ fn merge_package_resources(
         if merged == base {
             continue;
         }
-        let source_index = left
-            .source
-            .resources()
-            .iter()
-            .position(|resource| resource.path() == path);
-        match (source_index, merged) {
-            (Some(index), Some((optional_media_type, bytes))) => {
-                let required_media_type = optional_media_type.ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "ODC merged resource '{path}' has no manifest media type"
-                    ))
-                })?;
-                edit.update_resource(index, required_media_type, bytes)?;
-            },
-            (Some(index), None) => edit.remove_resource(index)?,
-            (None, Some((optional_media_type, bytes))) => {
-                let required_media_type = optional_media_type.ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "ODC merged resource '{path}' has no manifest media type"
-                    ))
-                })?;
-                edit.add_resource(path, required_media_type, bytes)?;
-            },
-            (None, None) => {},
+        stage_resource(edit, &left.source, path, merged)?;
+    }
+    Ok(())
+}
+
+fn transfer_package_resources(
+    patch: &Patch,
+    destination: &Chart,
+    edit: &mut Edit<'_>,
+    conflicts: &mut Vec<crate::Conflict>,
+) -> Result<()> {
+    let paths = patch
+        .source
+        .resources()
+        .iter()
+        .chain(patch.target.resources())
+        .chain(destination.resources())
+        .map(crate::Resource::path)
+        .collect::<BTreeSet<_>>();
+    for path in paths {
+        let base = resource_state(&patch.source, path);
+        let changed = resource_state(&patch.target, path);
+        let destination_value = resource_state(destination, path);
+        let Some(merged) = merge_package_value(&base, &changed, &destination_value) else {
+            conflicts.push(crate::Conflict::new(format!("package.resource[{path}]")));
+            continue;
+        };
+        if merged == destination_value {
+            continue;
         }
+        stage_resource(edit, destination, path, merged)?;
+    }
+    Ok(())
+}
+
+fn stage_resource(
+    edit: &mut Edit<'_>,
+    source: &Chart,
+    path: &str,
+    value: Option<(Option<String>, Vec<u8>)>,
+) -> Result<()> {
+    let source_index = source
+        .resources()
+        .iter()
+        .position(|resource| resource.path() == path);
+    match (source_index, value) {
+        (Some(index), Some((optional_media_type, bytes))) => {
+            let required_media_type = optional_media_type.ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "ODC merged resource '{path}' has no manifest media type"
+                ))
+            })?;
+            edit.update_resource(index, required_media_type, bytes)?;
+        },
+        (Some(index), None) => edit.remove_resource(index)?,
+        (None, Some((optional_media_type, bytes))) => {
+            let required_media_type = optional_media_type.ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "ODC merged resource '{path}' has no manifest media type"
+                ))
+            })?;
+            edit.add_resource(path, required_media_type, bytes)?;
+        },
+        (None, None) => {},
     }
     Ok(())
 }
@@ -1304,15 +1420,16 @@ fn read_wire_length(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
 }
 
 fn patch_between(source: Chart, target: Chart) -> Patch {
-    let before_axes = axis_names(&source);
-    let after_axes = axis_names(&target);
+    let before_axes = axis_states(&source);
+    let after_axes = axis_states(&target);
     let changes = before_axes
         .iter()
         .zip(&after_axes)
         .enumerate()
         .filter(|(_, (before, after))| before != after)
         .map(|(index, (before, after))| {
-            crate::AxisChange::new(index, before.clone(), after.clone())
+            crate::AxisChange::new(index, before.0.clone(), after.0.clone())
+                .with_style(before.1.clone(), after.1.clone())
         })
         .collect();
     let style_change = (source.styles_xml() != target.styles_xml()).then(|| StylesChange {
@@ -1338,12 +1455,17 @@ fn patch_between(source: Chart, target: Chart) -> Patch {
     }
 }
 
-fn axis_names(chart: &Chart) -> Vec<Option<String>> {
+fn axis_states(chart: &Chart) -> Vec<(Option<String>, Option<String>)> {
     chart
         .plot_area()
         .map(|plot| {
             plot.axes()
-                .map(|axis| axis.name().map(str::to_owned))
+                .map(|axis| {
+                    (
+                        axis.name().map(str::to_owned),
+                        axis.style_name().map(str::to_owned),
+                    )
+                })
                 .collect()
         })
         .unwrap_or_default()

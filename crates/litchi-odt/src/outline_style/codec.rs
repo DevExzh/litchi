@@ -1,6 +1,9 @@
 //! Bounded XML codecs and snapshot-preserving edits for outline styles.
 
-use std::collections::HashSet;
+use std::{
+    collections::{BTreeSet, HashSet},
+    ops::Range,
+};
 
 use litchi_core::{Result, xml::escape_xml};
 use quick_xml::{
@@ -10,7 +13,10 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::list_label_alignment::{Alignment, FollowedBy, Length};
+use crate::{
+    core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication},
+    list_label_alignment::{Alignment, FollowedBy, Length},
+};
 
 use super::{
     FO, MAX_DEPTH, MAX_OUTLINE_LEVELS, MAX_STYLES, MAX_TOTAL_ATTRIBUTE_BYTES, MAX_VALUE_BYTES,
@@ -462,6 +468,143 @@ pub fn remove_outline_style_xml(xml: &str, name: &str) -> Result<(String, Option
     let updated = replace_span(xml, &target, "");
     parse_outline_styles(&updated)?;
     Ok((updated, Some(old)))
+}
+
+pub(crate) fn splice_publication(
+    package: &OwnedPackage,
+    candidate: &str,
+) -> Result<Option<XmlSplicePublication>> {
+    let source = XmlSourcePart::load(package, "styles.xml")?;
+    let source_xml = std::str::from_utf8(source.bytes())
+        .map_err(|error| invalid_error(format!("invalid UTF-8 in source styles.xml: {error}")))?;
+    let source_styles = parse_outline_styles(source_xml)?;
+    let candidate_styles = parse_outline_styles(candidate)?;
+    let names: BTreeSet<&str> = source_styles
+        .styles
+        .iter()
+        .chain(&candidate_styles.styles)
+        .map(|style| style.name.as_str())
+        .collect();
+    let mut changed = names
+        .into_iter()
+        .filter(|name| source_styles.get(name).cloned() != candidate_styles.get(name).cloned());
+    let Some(name) = changed.next() else {
+        return Ok(None);
+    };
+    if changed.next().is_some() {
+        return Ok(None);
+    }
+
+    let (source_parent, source_target) = scan_outline_spans(source_xml, name)?;
+    let (candidate_parent, candidate_target) = scan_outline_spans(candidate, name)?;
+    let expanded_parent = source_parent.empty && candidate_target.is_some();
+    let source_range = if expanded_parent {
+        source_parent.start..source_parent.end
+    } else {
+        source_target
+            .as_ref()
+            .map_or(source_parent.end_start..source_parent.end_start, |target| {
+                target.start..target.end
+            })
+    };
+    let candidate_range = if expanded_parent {
+        candidate_parent.start..candidate_parent.end
+    } else {
+        candidate_target.as_ref().map_or(
+            candidate_parent.end_start..candidate_parent.end_start,
+            |target| target.start..target.end,
+        )
+    };
+    if source_xml.get(..source_range.start) == candidate.get(..candidate_range.start)
+        && source_xml.get(source_range.end..) == candidate.get(candidate_range.end..)
+    {
+        return single_splice_publication(
+            source.clone(),
+            source_xml,
+            candidate,
+            source_range,
+            candidate_range,
+        )
+        .map(Some);
+    }
+
+    let (Some(source_target), Some(_candidate_target)) = (source_target, candidate_target) else {
+        return Ok(None);
+    };
+    let source_range = source_target.start..source_target.end;
+    if without_range(source_xml.as_bytes(), source_range.clone())?
+        != without_range(candidate.as_bytes(), candidate_range.clone())?
+    {
+        return Ok(None);
+    }
+    let source_insertion = if candidate_range.start < source_range.start {
+        candidate_range.start
+    } else {
+        candidate_range
+            .start
+            .checked_add(source_range.len())
+            .ok_or_else(|| invalid_error("outline splice offset overflow"))?
+    };
+    let expected = source_xml
+        .as_bytes()
+        .get(source_range.clone())
+        .ok_or_else(|| invalid_error("invalid source outline deletion range"))?;
+    let replacement = candidate
+        .as_bytes()
+        .get(candidate_range)
+        .ok_or_else(|| invalid_error("invalid candidate outline insertion range"))?;
+    let deletion = source.checked_range(source_range, expected)?;
+    let insertion = source.checked_range(source_insertion..source_insertion, b"")?;
+    let fragment = AuthoredXmlFragment::markup(replacement.to_vec())?;
+    let mut publication = XmlSplicePublication::new(source);
+    publication.replace(deletion, AuthoredXmlFragment::deletion())?;
+    publication.replace(insertion, fragment)?;
+    Ok(Some(publication))
+}
+
+fn single_splice_publication(
+    source: XmlSourcePart,
+    source_xml: &str,
+    candidate: &str,
+    source_range: Range<usize>,
+    candidate_range: Range<usize>,
+) -> Result<XmlSplicePublication> {
+    let expected = source_xml
+        .as_bytes()
+        .get(source_range.clone())
+        .ok_or_else(|| invalid_error("invalid source outline splice range"))?;
+    let replacement = candidate
+        .as_bytes()
+        .get(candidate_range)
+        .ok_or_else(|| invalid_error("invalid candidate outline splice range"))?;
+    let proof = source.checked_range(source_range, expected)?;
+    let fragment = if replacement.is_empty() {
+        AuthoredXmlFragment::deletion()
+    } else {
+        AuthoredXmlFragment::markup(replacement.to_vec())?
+    };
+    let mut publication = XmlSplicePublication::new(source);
+    publication.replace(proof, fragment)?;
+    Ok(publication)
+}
+
+fn without_range(bytes: &[u8], range: Range<usize>) -> Result<Vec<u8>> {
+    let prefix = bytes
+        .get(..range.start)
+        .ok_or_else(|| invalid_error("invalid outline prefix range"))?;
+    let suffix = bytes
+        .get(range.end..)
+        .ok_or_else(|| invalid_error("invalid outline suffix range"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(prefix.len().saturating_add(suffix.len()))
+        .map_err(|source| litchi_core::Error::Allocation {
+            resource: "outline XML splice comparison",
+            source,
+        })?;
+    output.extend_from_slice(prefix);
+    output.extend_from_slice(suffix);
+    Ok(output)
 }
 
 fn scan_outline_spans(xml: &str, name: &str) -> Result<(XmlSpan, Option<XmlSpan>)> {

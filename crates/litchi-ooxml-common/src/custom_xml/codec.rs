@@ -645,7 +645,7 @@ fn props_start(
             && supported_namespace
             && element.local_name == "datastoreItem" =>
         {
-            reject_attributes_except(element, &[(element.namespace.as_str(), "itemID")])?;
+            reject_attributes_except(element, &[(element.namespace.as_str(), "itemID")]);
             *id = Some(required_attr(element, &element.namespace, "itemID")?.into());
             *root_namespace = Some(element.namespace.clone());
             Ok(PropsContext::Item)
@@ -658,7 +658,7 @@ fn props_start(
                 return invalid("datastoreItem has multiple schemaRefs elements");
             }
             *seen_schemas = true;
-            reject_attributes_except(element, &[])?;
+            reject_attributes_except(element, &[]);
             Ok(PropsContext::Schemas)
         },
         Some(PropsContext::Schemas)
@@ -669,7 +669,7 @@ fn props_start(
                 limit("custom XML schema references", MAX_SCHEMA_REFS, usize::MAX)
             })?;
             require_at_most("custom XML schema references", next, MAX_SCHEMA_REFS)?;
-            reject_attributes_except(element, &[(element.namespace.as_str(), "uri")])?;
+            reject_attributes_except(element, &[(element.namespace.as_str(), "uri")]);
             schemas.push(required_attr(element, &element.namespace, "uri")?.into());
             Ok(PropsContext::Schema)
         },
@@ -686,12 +686,11 @@ fn props_start(
     }
 }
 
-fn reject_attributes_except(element: &ResolvedElement, allowed: &[(&str, &str)]) -> Result<()> {
+fn reject_attributes_except(element: &ResolvedElement, allowed: &[(&str, &str)]) {
     // Unknown attributes are opaque extension data. Known attributes are
     // still checked by `required_attr`; retaining this helper keeps the
     // semantic call sites explicit without discarding future markup.
     let _ = (element, allowed);
-    Ok(())
 }
 
 fn required_attr<'a>(
@@ -824,10 +823,9 @@ fn props_output_len(props: &Props, conformance: Conformance) -> Result<usize> {
 fn escaped_attr_len(value: &str) -> Result<usize> {
     value.chars().try_fold(0usize, |total, character| {
         let width = match character {
-            '&' => 5,
+            '&' | '\t' | '\n' | '\r' => 5,
             '<' | '>' => 4,
             '"' | '\'' => 6,
-            '\t' | '\n' | '\r' => 5,
             _ => character.len_utf8(),
         };
         total.checked_add(width).ok_or_else(|| {

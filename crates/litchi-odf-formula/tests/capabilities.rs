@@ -5,8 +5,8 @@
 
 use litchi_odf_formula::authoring::{self, Display};
 use litchi_odf_formula::{
-    ChangeKind, DependencyConflictKind, Formula, History, MAX_COMMIT_HISTORY, NodePath,
-    OpaqueStarMath, Patch, StarMathVersion, codec,
+    ChangeKind, DependencyConflictKind, Formula, History, MAX_COMMIT_HISTORY,
+    MAX_STARMATH_SOURCE_BYTES, NodePath, OpaqueStarMath, Patch, StarMathVersion, codec,
 };
 
 const NS: &str = "http://www.w3.org/1998/Math/MathML";
@@ -111,6 +111,16 @@ fn malformed_and_fuzz_like_inputs_fail_without_panics() {
         }
     }
 
+    for count in 0..64 {
+        let arguments = "<cn>1</cn>".repeat(count);
+        let xml = format!(r#"<math xmlns="{NS}"><apply><divide/>{arguments}</apply></math>"#);
+        if count == 2 {
+            assert!(Formula::create(xml).is_ok());
+        } else {
+            assert!(Formula::create(xml).is_err());
+        }
+    }
+
     let mut deep = authoring::identifier("x");
     for _index in 0..140 {
         deep = authoring::row(vec![deep]);
@@ -138,6 +148,15 @@ fn content_mathml_schema_corpus_has_checked_structure_and_values() {
         format!(
             r#"<math xmlns="{NS}"><ci><msub><mi>x</mi><mn>1</mn></msub></ci><csymbol>external</csymbol></math>"#
         ),
+        format!(
+            r#"<math xmlns="{NS}"><apply><divide/><cn>4</cn><cn>2</cn></apply><apply><root/><degree><cn>3</cn></degree><ci>x</ci></apply><apply><sum/><bvar><ci>i</ci></bvar><lowlimit><cn>0</cn></lowlimit><uplimit><ci>n</ci></uplimit><ci>i</ci></apply></math>"#
+        ),
+        format!(
+            r#"<math xmlns="{NS}"><reln><lt/><ci>x</ci><ci>y</ci></reln><list><bvar><ci>x</ci></bvar><condition><apply><gt/><ci>x</ci><cn>0</cn></apply></condition><ci>x</ci></list><matrix><ci>x</ci></matrix></math>"#
+        ),
+        format!(
+            r#"<math xmlns="{NS}"><semantics><ci>x</ci><annotation-xml encoding="application/xml"><unknown><apply/></unknown></annotation-xml></semantics></math>"#
+        ),
     ];
     for xml in valid {
         assert!(Formula::create(xml).is_ok());
@@ -160,7 +179,7 @@ fn content_mathml_schema_corpus_has_checked_structure_and_values() {
         format!(
             r#"<math xmlns="{NS}"><piecewise><otherwise><cn>0</cn></otherwise><piece><cn>1</cn><true/></piece></piecewise></math>"#
         ),
-        format!(r#"<math xmlns="{NS}"><matrix><ci>x</ci></matrix></math>"#),
+        format!(r#"<math xmlns="{NS}"><matrix><matrixrow/><ci>x</ci></matrix></math>"#),
         format!(r#"<math xmlns="{NS}"><matrix><matrixrow><mi>x</mi></matrixrow></matrix></math>"#),
         format!(r#"<math xmlns="{NS}"><declare><cn>1</cn></declare></math>"#),
         format!(r#"<math xmlns="{NS}"><declare><ci>x</ci><cn>1</cn></declare></math>"#),
@@ -171,6 +190,15 @@ fn content_mathml_schema_corpus_has_checked_structure_and_values() {
         format!(
             r#"<math xmlns="{NS}"><mi><mglyph alt="glyph" fontfamily="serif" index="-1"/></mi></math>"#
         ),
+        format!(r#"<math xmlns="{NS}"><apply><pi/><cn>1</cn></apply></math>"#),
+        format!(r#"<math xmlns="{NS}"><apply><factorial/><cn>1</cn><cn>2</cn></apply></math>"#),
+        format!(r#"<math xmlns="{NS}"><apply><divide/><cn>1</cn></apply></math>"#),
+        format!(
+            r#"<math xmlns="{NS}"><apply><root/><ci>x</ci><degree><cn>3</cn></degree></apply></math>"#
+        ),
+        format!(r#"<math xmlns="{NS}"><reln><in/><ci>x</ci></reln></math>"#),
+        format!(r#"<math xmlns="{NS}"><list><bvar><ci>x</ci></bvar><ci>x</ci></list></math>"#),
+        format!(r#"<math xmlns="{NS}"><condition><ci>x</ci></condition></math>"#),
     ];
     for xml in malformed {
         assert!(
@@ -187,6 +215,9 @@ fn opaque_starmath_boundary_is_versioned_bounded_and_publishable() {
     ))
     .expect("source");
     assert!(OpaqueStarMath::new(StarMathVersion::V6, "bad\0source").is_err());
+    let maximum = "x".repeat(MAX_STARMATH_SOURCE_BYTES);
+    assert!(OpaqueStarMath::new(StarMathVersion::V6, maximum.clone()).is_ok());
+    assert!(OpaqueStarMath::new(StarMathVersion::V6, format!("{maximum}x")).is_err());
 
     let opaque = OpaqueStarMath::new(StarMathVersion::V6, "x + 1").expect("opaque source");
     let mut edit = source.edit();

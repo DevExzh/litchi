@@ -4,6 +4,8 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod support;
+
 use litchi_opc::constants::{
     content_type::{OFC_OLE_OBJECT, OFC_PACKAGE},
     relationship_type::{OLE_OBJECT, PACKAGE},
@@ -147,6 +149,7 @@ fn package_with_local_ole_objects() -> Package {
 }
 
 fn install_local_ole_objects(package: &mut OpcPackage) {
+    let compact_objects = support::compact_xml_fixture(LOCAL_OLE_OBJECTS);
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let slide = package.get_part_mut(&slide_name).unwrap();
     let xml = std::str::from_utf8(slide.blob()).unwrap();
@@ -154,7 +157,7 @@ fn install_local_ole_objects(package: &mut OpcPackage) {
         "</p:spTree>",
         &format!(
             "{}{}",
-            std::str::from_utf8(LOCAL_OLE_OBJECTS).unwrap(),
+            std::str::from_utf8(&compact_objects).unwrap(),
             "</p:spTree>"
         ),
         1,

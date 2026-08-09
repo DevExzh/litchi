@@ -10,7 +10,7 @@ use litchi_odf_common::constants::ODF_FORMULA;
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
 use litchi_odf_formula::authoring::{self, Display};
 use litchi_odf_formula::codec;
-use litchi_odf_formula::{Formula, Limits};
+use litchi_odf_formula::{Formula, Limits, NodePath, StarMathVersion};
 
 const MATHML: &str = r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>"#;
 
@@ -89,6 +89,58 @@ fn transaction_preserves_auxiliary_members() {
             .expect("auxiliary member"),
         b"<config/>"
     );
+}
+
+#[test]
+fn changed_libreoffice_formula_reopens_with_non_content_members_exact() {
+    let bytes =
+        include_bytes!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf151842.odf");
+    let source = Formula::from_bytes(bytes.to_vec()).expect("LibreOffice source");
+    let original = OwnedPackage::from_bytes(bytes.to_vec()).expect("raw source package");
+    let mut token_edit = source.edit();
+    token_edit
+        .set_text(&NodePath::new([0, 0]), "changed")
+        .expect("stage token");
+    let mut starmath_edit = source.edit();
+    starmath_edit
+        .set_starmath_source(StarMathVersion::V6, "changed + 1")
+        .expect("stage StarMath");
+    token_edit
+        .join(&starmath_edit)
+        .expect("join producer edits");
+    let commit = token_edit.commit().expect("publish");
+    assert!(commit.diagnostics().candidate_reopened());
+    assert_eq!(commit.record().expect("commit record").changes().len(), 2);
+    let published = commit.formula();
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(published)
+            .expect("inverse")
+            .as_bytes(),
+        source.as_bytes()
+    );
+    let reopened = Formula::from_bytes(published.to_bytes()).expect("full Formula reopen");
+    assert_eq!(reopened.starmath_source().as_deref(), Some("changed + 1"));
+
+    let changed = OwnedPackage::from_bytes(reopened.to_bytes()).expect("raw changed package");
+    let mut original_names = original.files().expect("source members");
+    let mut changed_names = changed.files().expect("changed members");
+    original_names.retain(|name| !name.ends_with('/'));
+    changed_names.retain(|name| !name.ends_with('/'));
+    original_names.sort_unstable();
+    changed_names.sort_unstable();
+    assert_eq!(changed_names, original_names);
+    for name in original_names {
+        if !matches!(name.as_str(), "content.xml" | "META-INF/manifest.xml") {
+            assert_eq!(
+                changed.get_file(&name).expect("changed member"),
+                original.get_file(&name).expect("source member"),
+                "member {name} changed"
+            );
+        }
+    }
 }
 
 #[test]

@@ -877,7 +877,10 @@ impl<'a> RtfDocument<'a> {
         &mut self.tables
     }
 
-    fn table_cell_mut(&mut self, path: &crate::TableCellPath) -> RtfResult<&mut crate::Cell<'a>> {
+    pub(crate) fn table_cell_mut(
+        &mut self,
+        path: &crate::TableCellPath,
+    ) -> RtfResult<&mut crate::Cell<'a>> {
         let root = path.root;
         let mut cell = self
             .tables
@@ -3866,6 +3869,11 @@ impl<'a> RtfDocument<'a> {
     #[must_use]
     pub fn sections(&self) -> &[super::super::section::Section<'_>] {
         &self.sections
+    }
+
+    /// Mutably access sections from the crate-owned immutable transaction adapter.
+    pub(crate) fn sections_mut(&mut self) -> &mut [super::super::section::Section<'a>] {
+        &mut self.sections
     }
 
     /// Get the bookmark table.

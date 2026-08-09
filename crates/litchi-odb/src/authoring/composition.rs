@@ -139,7 +139,7 @@ fn effect_keys(changes: &[Change]) -> Vec<String> {
         .map(|change| match change.kind() {
             ChangeKind::Table => format!("table/{}", change.target()),
             ChangeKind::Column | ChangeKind::Key | ChangeKind::Index => {
-                let table = change.target().split('/').next().unwrap_or(change.target());
+                let table = semantic_owner(change.target()).unwrap_or(change.target());
                 format!("table/{table}")
             },
             ChangeKind::Query => format!("query/{}", change.target()),
@@ -150,6 +150,12 @@ fn effect_keys(changes: &[Change]) -> Vec<String> {
             },
         })
         .collect()
+}
+
+fn semantic_owner(target: &str) -> Option<&str> {
+    let (length, value) = target.split_once(':')?;
+    let length = length.parse::<usize>().ok()?;
+    value.get(..length)
 }
 
 fn difference(base: &str, candidate: &str, ordinal: usize) -> Option<Hunk> {

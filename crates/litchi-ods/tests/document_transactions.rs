@@ -285,6 +285,9 @@ fn signed_and_protected_sources_refuse_changed_publication() -> Result<()> {
     ]);
     let signed = Snapshot::from_bytes(signed_bytes)?;
     assert!(!signed.edit().commit()?.changed());
+    let mut changed_signed_cell = signed.edit();
+    changed_signed_cell.set_cell_formula("Data", 0, 0, "of:=2")?;
+    assert!(changed_signed_cell.commit().is_err());
     let mut changed_signed = signed.edit();
     let _disposition = changed_signed.put_resource(
         Resource::new("Data/new.bin", "application/octet-stream", vec![1])?,

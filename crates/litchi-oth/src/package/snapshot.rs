@@ -1,7 +1,9 @@
 //! Immutable web-template package ownership and bounded content replacement.
 
 use litchi_core::{Error, Metadata, Result};
-use litchi_odf_common::core::{PackageWriter, family::Package};
+use litchi_odf_common::core::{
+    PackageWriter, XmlSourcePart, XmlSplicePublication, family::Package,
+};
 use std::{path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-web";
@@ -228,8 +230,8 @@ impl Snapshot {
     pub(crate) fn rebuild_with_parts(
         &self,
         content: &str,
-        meta_override: Option<&str>,
-        styles_override: Option<&str>,
+        metadata: &crate::facade::PartChange,
+        styles: &crate::facade::PartChange,
     ) -> Result<Self> {
         let files = self.files()?;
         if files.iter().any(|path| {
@@ -245,20 +247,17 @@ impl Snapshot {
         let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content.as_bytes())?;
-        for (path, replacement) in [("meta.xml", meta_override), ("styles.xml", styles_override)] {
-            let source_xml = match replacement {
-                Some(xml) => Some(xml.to_owned()),
-                None if self.0.package.package().has_file(path)? => {
-                    let bytes = self.0.package.package().get_file(path)?;
-                    Some(String::from_utf8(bytes).map_err(|error| {
-                        Error::InvalidFormat(format!("invalid OTH {path} UTF-8: {error}"))
-                    })?)
+        for (path, change) in [("meta.xml", metadata), ("styles.xml", styles)] {
+            match change {
+                crate::facade::PartChange::Set(xml) => {
+                    let compact = crate::codec::compact_for_publication(xml)?;
+                    writer.add_file(path, compact.as_bytes())?;
                 },
-                None => None,
-            };
-            if let Some(xml) = source_xml {
-                let compact = crate::codec::compact_for_publication(&xml)?;
-                writer.add_file(path, compact.as_bytes())?;
+                crate::facade::PartChange::Keep if self.0.package.package().has_file(path)? => {
+                    let source = XmlSourcePart::load(self.0.package.package(), path)?;
+                    XmlSplicePublication::new(source).publish(&mut writer)?;
+                },
+                crate::facade::PartChange::Keep | crate::facade::PartChange::Remove => {},
             }
         }
         let excluded_paths = [

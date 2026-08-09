@@ -11,7 +11,16 @@ use litchi_pptx::presentation::embedded::ink::{self, CONTENT_TYPE};
 use litchi_pptx::{Error, Package};
 use tempfile::NamedTempFile;
 
-const LOCAL_INK: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/ink/basic_ink.xml");
+// The negative cases republish this positive InkML fixture before corrupting
+// it, so keep it inside the production writer's compact XML contract.
+const LOCAL_INK: &[u8] = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+    r#"<inkml:ink xmlns:inkml="http://www.w3.org/2003/InkML"><inkml:traceGroup>"#,
+    r#"<inkml:trace>0 0, 10 10</inkml:trace>"#,
+    r#"<inkml:trace>10 10, 20 20</inkml:trace>"#,
+    r#"</inkml:traceGroup></inkml:ink>"#,
+)
+.as_bytes();
 
 #[test]
 fn package_inventory_reports_local_ink_content_parts() {

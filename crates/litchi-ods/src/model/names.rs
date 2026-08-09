@@ -669,9 +669,9 @@ mod tests {
     #[test]
     fn writes_all_range_usages_and_escapes_attributes() {
         let range = Range::new("Revenue&Tax", "$'Sales & Tax'.$A$1:.$B$2", Scope::Global)
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .with_base_cell("$'Sales & Tax'.$A$1")
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .with_usage(Usage::PrintRange)
             .with_usage(Usage::Filter)
             .with_usage(Usage::Filter);
@@ -698,7 +698,7 @@ mod tests {
             "urn:example:calc&formula",
             Scope::Global,
         )
-        .unwrap();
+        .expect("test fixture or operation should succeed");
         let mut xml = String::new();
         expression.write_xml(&mut xml);
         assert!(xml.contains("xmlns:calc=\"urn:example:calc&amp;formula\""));

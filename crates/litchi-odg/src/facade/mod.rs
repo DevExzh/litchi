@@ -1,13 +1,14 @@
 //! Concise family entry points.
 
-use litchi_core::{Metadata, Result};
+use litchi_core::{CompositionLimits, Metadata, Result};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
 pub use crate::package::{
     Change, Commit, ControlReferenceChange, DurablePatch, GeometryChange, History, HistoryLimits,
-    JoinedEdits, LayerChange, Lineage, MergePlan, NameChange, Patch, PathChange, PreparedEdit,
-    ResourceChange, Snapshot, StructureChange, StyleChange, TextChange, Transaction,
+    JoinedEdits, LayerChange, Lineage, MergePlan, NameChange, PageNameChange, PageStyleChange,
+    Patch, PathChange, PreparedEdit, ResourceChange, SecurityStatus, ShapeTransfer, Snapshot,
+    StructureChange, StyleChange, TextChange, Transaction, TransferResource,
 };
 
 /// Immutable source-owning drawing facade.
@@ -41,6 +42,24 @@ impl Drawing {
     /// Returns an error when the package is not a structurally valid ODG.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Snapshot::from_bytes(bytes).map(|package| Self { package })
+    }
+
+    /// Opens password-protected ODG bytes for inert inspection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid encryption metadata, a bad password, or invalid ODG content.
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        Snapshot::from_bytes_with_password(bytes, password).map(|package| Self { package })
+    }
+
+    /// Opens a password-protected ODG file for inert inspection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for filesystem, password, encryption, or ODG validation failures.
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        Snapshot::open_with_password(path, password).map(|package| Self { package })
     }
 
     /// Opens an OTG drawing template from in-memory bytes.
@@ -106,6 +125,12 @@ impl Drawing {
         self.package.is_template()
     }
 
+    /// Inert signature/encryption state and rewrite policy.
+    #[must_use]
+    pub fn security(&self) -> SecurityStatus {
+        self.package.security()
+    }
+
     /// Lists safe package member names.
     ///
     /// # Errors
@@ -121,6 +146,12 @@ impl Drawing {
         self.package.resources()
     }
 
+    /// Returns inert form elements carrying `form:id` in source order.
+    #[must_use]
+    pub fn form_controls(&self) -> &[crate::FormControl] {
+        self.package.form_controls()
+    }
+
     /// Reads one package-local resource without activating it.
     ///
     /// # Errors
@@ -134,6 +165,38 @@ impl Drawing {
     #[must_use]
     pub fn edit(&self) -> Transaction {
         self.package.edit()
+    }
+
+    /// Prepares a provenance-bound shape or complete group subtree for cross-drawing transfer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid selectors, noncompact source, or unreadable dependencies.
+    pub fn prepare_shape_transfer(&self, page: usize, shape: usize) -> Result<ShapeTransfer> {
+        self.package.prepare_shape_transfer(page, shape)
+    }
+
+    /// Starts deterministic exact-lineage sub-edit composition.
+    #[must_use]
+    pub fn joined_edits(&self, limits: CompositionLimits) -> JoinedEdits {
+        self.package.joined_edits(limits)
+    }
+
+    /// Applies joined disjoint work atomically and returns a new drawing facade.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale lineage, conflicts, policy refusal, or failed full reopen.
+    pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Self> {
+        self.package
+            .apply_joined(joined)
+            .map(|package| Self { package })
+    }
+
+    /// Starts explicit bounded undo/redo history at this drawing snapshot.
+    #[must_use]
+    pub fn history(&self, limits: HistoryLimits) -> History {
+        self.package.history(limits)
     }
 
     /// Returns the source-owning package snapshot.

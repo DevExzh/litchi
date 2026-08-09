@@ -147,6 +147,41 @@ fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
     );
 }
 
+#[test]
+fn multiple_real_fixtures_rename_and_fully_reopen() {
+    for (name, replacement) in [
+        ("44010-TwoCharts.xls", "Chart Data Renamed"),
+        ("unicodeNameRecord.xls", "Unicode Renamed"),
+    ] {
+        let source = Snapshot::from_bytes(std::fs::read(fixture(name)).expect("read real fixture"))
+            .expect("open real fixture transaction");
+        let position = source
+            .worksheets()
+            .next()
+            .expect("fixture has a worksheet")
+            .position();
+        let mut transaction = source.transaction();
+        transaction
+            .rename_sheet(Selector::Position(position), replacement)
+            .expect("stage real-fixture rename");
+        let commit = transaction
+            .commit()
+            .expect("commit and reopen real fixture");
+        assert_eq!(
+            commit
+                .snapshot()
+                .worksheet(Selector::Position(position))
+                .expect("resolve reopened worksheet")
+                .expect("reopened worksheet exists")
+                .name(),
+            replacement
+        );
+        assert_other_streams_equal(source.bytes(), commit.snapshot().bytes());
+        Workbook::new(Cursor::new(commit.snapshot().bytes()))
+            .expect("renamed real fixture fully reopens");
+    }
+}
+
 fn assert_other_streams_equal(before: &[u8], after: &[u8]) {
     let mut source_ole = OleFile::open(Cursor::new(before)).expect("source CFB");
     let mut target_ole = OleFile::open(Cursor::new(after)).expect("target CFB");

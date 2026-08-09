@@ -424,12 +424,53 @@ impl MutableDocument {
             generated_content_xml = self.generate_content_xml();
             &generated_content_xml
         };
-        writer.add_file("content.xml", content_xml.as_bytes())?;
+        let content_splice = self
+            .source_package
+            .as_ref()
+            .map(|source| {
+                crate::font_face::content_font_face_splice_publication(source, content_xml)
+            })
+            .transpose()?
+            .flatten();
+        if let Some(publication) = content_splice {
+            publication.publish(&mut writer)?;
+        } else {
+            writer.add_file("content.xml", content_xml.as_bytes())?;
+        }
 
         // Add styles.xml (preserved or default)
         let default_styles = Structure::default_styles_xml();
         let styles_xml = self.styles_xml.as_deref().unwrap_or(&default_styles);
-        writer.add_file("styles.xml", styles_xml.as_bytes())?;
+        let styles_splice = if self.source_package.as_ref().is_some_and(|source| {
+            source
+                .package()
+                .is_ok_and(|package| package.has_file("styles.xml"))
+        }) {
+            let font_face = self
+                .source_package
+                .as_ref()
+                .map(|source| {
+                    crate::font_face::styles_font_face_splice_publication(source, styles_xml)
+                })
+                .transpose()?
+                .flatten();
+            if font_face.is_some() {
+                font_face
+            } else {
+                self.source_package
+                    .as_ref()
+                    .map(|source| crate::outline_style::splice_publication(source, styles_xml))
+                    .transpose()?
+                    .flatten()
+            }
+        } else {
+            None
+        };
+        if let Some(publication) = styles_splice {
+            publication.publish(&mut writer)?;
+        } else {
+            writer.add_file("styles.xml", styles_xml.as_bytes())?;
+        }
 
         // Add meta.xml (patched from the source or regenerated with current metadata)
         let meta_xml = self.generate_meta_xml()?;

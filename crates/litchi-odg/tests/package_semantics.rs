@@ -5,7 +5,11 @@ use litchi_odf_common::{
     compact_xml,
     core::{OwnedPackage, PackageWriter},
 };
-use litchi_odg::{Drawing, PackageDurablePatch, PackageMergePlan, page::Page, shape::ShapeKind};
+use litchi_odg::{
+    Drawing, FormControl, PackageDurablePatch, PackageMergePlan,
+    page::Page,
+    shape::{Shape, ShapeKind},
+};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3"><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1" draw:master-page-name="Default" xml:id="page1"><draw:layer-set><draw:layer draw:name="Foreground" draw:display="always" draw:protected="false"/><draw:layer draw:name="Background"/></draw:layer-set><draw:rect draw:name="Label" draw:layer="Foreground" draw:style-name="gr1" draw:text-style-name="P1" draw:z-index="7" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><svg:title>Label title</svg:title><svg:desc>Label description</svg:desc><text:p>Old label</text:p></draw:rect><draw:frame draw:name="Photo" draw:layer="Background" svg:width="2cm" svg:height="1cm"><svg:title>Photo title</svg:title><svg:desc>Photo description</svg:desc></draw:frame></draw:page></office:drawing></office:body></office:document-content>"#;
@@ -30,6 +34,40 @@ fn raw_negative_fixture_package(content: &str) -> Vec<u8> {
     archive
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
+    archive.finish_to_bytes().unwrap()
+}
+
+fn raw_security_fixture(encrypted: bool, signed: bool) -> Vec<u8> {
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.graphics";
+    let encrypted_entry = if encrypted {
+        r#"<manifest:file-entry manifest:full-path="Pictures/protected.bin" manifest:media-type="application/octet-stream" manifest:size="1"><manifest:encryption-data manifest:checksum-type="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0#sha256-1k" manifest:checksum="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="><manifest:algorithm manifest:algorithm-name="http://www.w3.org/2001/04/xmlenc#aes256-cbc" manifest:initialisation-vector="AAAAAAAAAAAAAAAAAAAAAA=="/><manifest:start-key-generation manifest:start-key-generation-name="http://www.w3.org/2000/09/xmldsig#sha256" manifest:key-size="32"/><manifest:key-derivation manifest:key-derivation-name="PBKDF2" manifest:salt="AAAAAAAAAAAAAAAAAAAAAA==" manifest:iteration-count="1000" manifest:key-size="32"/></manifest:encryption-data></manifest:file-entry>"#
+    } else {
+        ""
+    };
+    let manifest = format!(
+        r#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.graphics"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>{encrypted_entry}</manifest:manifest>"#
+    );
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIMETYPE).unwrap();
+    archive
+        .write_deflated("content.xml", CONTENT.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
+        .unwrap();
+    if encrypted {
+        archive
+            .write_stored("Pictures/protected.bin", b"x")
+            .unwrap();
+    }
+    if signed {
+        archive
+            .write_deflated(
+                "META-INF/documentsignatures.xml",
+                br"<document-signatures/>",
+            )
+            .unwrap();
+    }
     archive.finish_to_bytes().unwrap()
 }
 
@@ -171,6 +209,61 @@ fn package_shape_name_edit_is_source_checked_reversible_and_compact() {
 }
 
 #[test]
+fn page_rename_is_durable_unique_and_dependency_checked() {
+    let drawing = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let mut edit = drawing.edit();
+    edit.set_page_name(0, "Renamed page").unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().pages()[0].name(), Some("Renamed page"));
+    let durable = commit.patch().durable().unwrap();
+    assert_eq!(durable.operations()[0].op, "page.name.set");
+    assert_eq!(
+        durable.apply(drawing.snapshot()).unwrap().as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+
+    let referenced = CONTENT.replace(
+        "</draw:page></office:drawing>",
+        r#"</draw:page><draw:page draw:name="Reference"><draw:page-thumbnail draw:page-name="Page 1"/></draw:page></office:drawing>"#,
+    );
+    let referenced_drawing = Drawing::from_bytes(package(&referenced)).unwrap();
+    let mut refused = referenced_drawing.edit();
+    assert!(refused.set_page_name(0, "Unsafe rename").is_err());
+    let mut removal = referenced_drawing.edit();
+    assert!(removal.remove_page(0usize).is_err());
+}
+
+#[test]
+fn page_style_change_requires_a_declared_style_and_roundtrips() {
+    let styled = CONTENT
+        .replace(
+            r#"xmlns:xml="http://www.w3.org/XML/1998/namespace""#,
+            r#"xmlns:xml="http://www.w3.org/XML/1998/namespace" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0""#,
+        )
+        .replace(
+            "<office:body>",
+            r#"<office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"/><style:style style:name="dp2" style:family="drawing-page"/></office:automatic-styles><office:body>"#,
+        );
+    let drawing = Drawing::from_bytes(package(&styled)).unwrap();
+    let mut edit = drawing.edit();
+    edit.set_page_style_name(0, "dp2").unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().pages()[0].style_name(), Some("dp2"));
+    let durable = commit.patch().durable().unwrap();
+    assert_eq!(
+        durable
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        drawing.as_bytes()
+    );
+
+    let mut missing = drawing.edit();
+    assert!(missing.set_page_style_name(0, "missing").is_err());
+}
+
+#[test]
 fn package_layer_edit_is_declared_source_checked_and_reversible() {
     let drawing = Drawing::from_bytes(package(CONTENT)).unwrap();
     let mut transaction = drawing.edit();
@@ -207,15 +300,82 @@ fn ended_page_scope_does_not_capture_shapes_outside_a_page() {
 }
 
 #[test]
-fn dtd_and_noncompact_rewrite_are_refused_without_execution() {
+fn dtd_is_refused_and_noncompact_source_requires_checked_splices() {
     let dtd = CONTENT.replacen("<office:body>", "<!DOCTYPE drawing><office:body>", 1);
     assert!(Drawing::from_bytes(raw_negative_fixture_package(&dtd)).is_err());
 
     let noncompact = CONTENT.replacen("<office:body>", "\n<office:body>", 1);
     let drawing = Drawing::from_bytes(raw_negative_fixture_package(&noncompact)).unwrap();
-    let mut transaction = drawing.edit();
-    transaction.set_shape_text(0, 0, "New label").unwrap();
-    assert!(transaction.commit().is_err());
+    let mut checked_splice = drawing.edit();
+    checked_splice.set_shape_text(0, 0, "New label").unwrap();
+    let commit = checked_splice.commit().unwrap();
+    assert_eq!(
+        commit.snapshot().content_xml(),
+        noncompact.replace("Old label", "New label")
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        drawing.as_bytes()
+    );
+
+    let mut whole_source_rewrite = drawing.edit();
+    whole_source_rewrite.add_page(Page::new("Page 2")).unwrap();
+    assert!(whole_source_rewrite.commit().is_err());
+}
+
+#[test]
+fn signed_and_encrypted_security_state_is_inert_and_rewrite_is_refused() {
+    for (encrypted, signed) in [(true, false), (false, true), (true, true)] {
+        let drawing = Drawing::from_bytes(raw_security_fixture(encrypted, signed)).unwrap();
+        assert_eq!(drawing.security().is_encrypted(), encrypted);
+        assert_eq!(drawing.security().is_signed(), signed);
+        assert!(!drawing.security().allows_rewrite());
+        let mut edit = drawing.edit();
+        edit.set_shape_text(0, 0, "must refuse").unwrap();
+        assert!(edit.commit().is_err());
+    }
+}
+
+#[test]
+fn hostile_raw_package_corpus_is_bounded_and_never_partially_opened() {
+    let duplicate_drawing = CONTENT.replace(
+        "</office:body>",
+        "<office:drawing></office:drawing></office:body>",
+    );
+    let nested_page = CONTENT.replace(
+        "</draw:page>",
+        "<draw:page draw:name=\"nested\"/></draw:page>",
+    );
+    let layer_outside_page = CONTENT.replace(
+        "</office:drawing>",
+        "<draw:layer-set><draw:layer draw:name=\"outside\"/></draw:layer-set></office:drawing>",
+    );
+    for malformed in [duplicate_drawing, nested_page, layer_outside_page] {
+        assert!(Drawing::from_bytes(raw_negative_fixture_package(&malformed)).is_err());
+    }
+
+    let prefix = CONTENT.replace("</draw:page>", "");
+    let deep = format!(
+        "{}{}{}{}",
+        prefix.trim_end_matches("</office:drawing></office:body></office:document-content>"),
+        "<draw:g>".repeat(300),
+        "</draw:g>".repeat(300),
+        "</draw:page></office:drawing></office:body></office:document-content>"
+    );
+    assert!(Drawing::from_bytes(raw_negative_fixture_package(&deep)).is_err());
+
+    let valid_raw = raw_negative_fixture_package(CONTENT);
+    let step = (valid_raw.len() / 64).max(1);
+    for end in (0..valid_raw.len()).step_by(step) {
+        assert!(Drawing::from_bytes(valid_raw[..end].to_vec()).is_err());
+    }
 }
 
 #[test]
@@ -327,6 +487,41 @@ fn form_controls_remain_inert_but_their_references_are_editable() {
         durable.apply(source.snapshot()).unwrap().as_bytes(),
         commit.snapshot().as_bytes()
     );
+}
+
+#[test]
+fn form_model_crud_is_inert_dependency_checked_and_durable() {
+    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let mut edit = source.edit();
+    edit.add_form_control(&FormControl::new("control1").with_name("Button"))
+        .unwrap();
+    edit.add_shape(
+        0,
+        Shape::new(ShapeKind::Control)
+            .with_name("Button shape")
+            .with_control_reference("control1"),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().form_controls()[0].id(), "control1");
+    assert_eq!(
+        commit.snapshot().pages()[0].shapes()[2].control_reference(),
+        Some("control1")
+    );
+    let durable = commit.patch().durable().unwrap();
+    assert_eq!(
+        durable.apply(source.snapshot()).unwrap().as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+
+    let mut blocked = commit.snapshot().edit();
+    assert!(blocked.remove_form_control("control1").is_err());
+
+    let mut removal = commit.snapshot().edit();
+    removal.remove_shape(0, 2).unwrap();
+    removal.remove_form_control("control1").unwrap();
+    let removed = removal.commit().unwrap();
+    assert!(removed.snapshot().form_controls().is_empty());
 }
 
 #[test]

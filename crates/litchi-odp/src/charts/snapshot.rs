@@ -393,11 +393,6 @@ pub(super) fn validate_compact_package(bytes: &[u8]) -> Result<()> {
             continue;
         }
         let payload = package.get_file(&path)?;
-        if payload.windows(3).any(|window| window == b"> <") {
-            return Err(Error::Unsupported(format!(
-                "ODP chart XML part '{path}' contains inter-element spacing"
-            )));
-        }
         part_count = part_count
             .checked_add(1)
             .ok_or_else(|| invalid_error("ODP chart XML part count overflow"))?;

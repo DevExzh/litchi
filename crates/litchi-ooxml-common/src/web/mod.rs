@@ -9,7 +9,10 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "the private web facade retains protocol constants for sibling owners"
+)]
 pub(in crate::web) use semantic::{
     DRAWINGML_NAMESPACE, IMAGE_RELATIONSHIP_TYPE, STANDARD_DEPTH, STANDARD_IMAGE_BYTES,
     STANDARD_ITEMS, STANDARD_NODES, STANDARD_PACKAGE_PARTS, STANDARD_PACKAGE_RELATIONSHIPS,

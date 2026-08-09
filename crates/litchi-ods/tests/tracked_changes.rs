@@ -119,7 +119,7 @@ fn assert_in_order(haystack: &str, needles: &[&str]) {
 fn ids(snapshot: &Snapshot) -> Vec<&str> {
     snapshot
         .changes()
-        .unwrap()
+        .expect("test fixture or operation should succeed")
         .changes
         .iter()
         .map(|change| change.metadata().id.as_str())
@@ -128,7 +128,8 @@ fn ids(snapshot: &Snapshot) -> Vec<&str> {
 
 #[test]
 fn distinguishes_absent_empty_and_all_tracking_attribute_states() {
-    let absent = Snapshot::parse(Arc::<str>::from(content(""))).unwrap();
+    let absent = Snapshot::parse(Arc::<str>::from(content("")))
+        .expect("test fixture or operation should succeed");
     assert!(absent.changes().is_none());
     assert_eq!(absent.tracking(), None);
 
@@ -144,19 +145,35 @@ fn distinguishes_absent_empty_and_all_tracking_attribute_states() {
         ),
     ] {
         let source = content(owner);
-        let snapshot = Snapshot::parse(Arc::<str>::from(source.clone())).unwrap();
+        let snapshot = Snapshot::parse(Arc::<str>::from(source.clone()))
+            .expect("test fixture or operation should succeed");
         assert!(snapshot.changes().is_some());
-        assert!(snapshot.changes().unwrap().changes.is_empty());
+        assert!(
+            snapshot
+                .changes()
+                .expect("test fixture or operation should succeed")
+                .changes
+                .is_empty()
+        );
         assert_eq!(snapshot.tracking(), expected);
-        let commit = snapshot.transaction().unwrap().commit().unwrap();
+        let commit = snapshot
+            .transaction()
+            .expect("test fixture or operation should succeed")
+            .commit()
+            .expect("test fixture or operation should succeed");
         assert!(!commit.changed());
         assert_eq!(commit.content_xml(), source);
     }
 
-    let empty = Snapshot::parse(content("<table:tracked-changes/>")).unwrap();
-    let mut transaction = empty.transaction().unwrap();
+    let empty = Snapshot::parse(content("<table:tracked-changes/>"))
+        .expect("test fixture or operation should succeed");
+    let mut transaction = empty
+        .transaction()
+        .expect("test fixture or operation should succeed");
     transaction.remove_owner();
-    let removed = transaction.commit().unwrap();
+    let removed = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(removed.changed());
     assert!(removed.snapshot().changes().is_none());
 }
@@ -170,8 +187,10 @@ fn reads_all_four_families_and_authors_odf_14_order_with_schema_prefixes() {
         movement("m"),
         content_change("c")
     )))
-    .unwrap();
-    let families = original.changes().unwrap();
+    .expect("test fixture or operation should succeed");
+    let families = original
+        .changes()
+        .expect("test fixture or operation should succeed");
     assert!(matches!(families.changes[0], Change::Insertion(_)));
     assert!(matches!(families.changes[1], Change::Deletion(_)));
     assert!(matches!(families.changes[2], Change::Movement(_)));
@@ -186,18 +205,29 @@ fn reads_all_four_families_and_authors_odf_14_order_with_schema_prefixes() {
     )));
 
     let semantic = families.clone();
-    let canonical_owner = semantic.to_xml_fragment().unwrap();
-    let canonical = Snapshot::parse(content(&canonical_owner)).unwrap();
+    let canonical_owner = semantic
+        .to_xml_fragment()
+        .expect("test fixture or operation should succeed");
+    let canonical = Snapshot::parse(content(&canonical_owner))
+        .expect("test fixture or operation should succeed");
     assert_eq!(
         canonical.changes(),
         Some(&semantic),
         "canonical semantic drift; owner={canonical_owner}"
     );
-    let absent = Snapshot::parse(content("")).unwrap();
-    let mut transaction = absent.transaction().unwrap();
-    transaction.replace_all(Some(semantic)).unwrap();
-    transaction.set_tracking(Some(true)).unwrap();
-    let authored = transaction.commit().unwrap();
+    let absent = Snapshot::parse(content("")).expect("test fixture or operation should succeed");
+    let mut transaction = absent
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .replace_all(Some(semantic))
+        .expect("test fixture or operation should succeed");
+    transaction
+        .set_tracking(Some(true))
+        .expect("test fixture or operation should succeed");
+    let authored = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     let xml = authored.content_xml();
     assert!(xml.contains(&format!(r#"xmlns:table="{TABLE}""#)));
     assert!(xml.contains(&format!(r#"xmlns:office="{OFFICE}""#)));
@@ -225,7 +255,8 @@ fn reads_all_four_families_and_authors_odf_14_order_with_schema_prefixes() {
         ],
     );
     assert_eq!(
-        ids(&Snapshot::parse(authored.source_arc()).unwrap()),
+        ids(&Snapshot::parse(authored.source_arc())
+            .expect("test fixture or operation should succeed")),
         ["i", "d", "m", "c"]
     );
 }
@@ -258,14 +289,23 @@ fn rejects_wrong_child_order_for_each_family() {
 
 #[test]
 fn transaction_crud_reorder_acceptance_reopen_and_rollback_are_atomic() {
-    let snapshot = Snapshot::parse(content(&independent_owner(Some(true)))).unwrap();
+    let snapshot = Snapshot::parse(content(&independent_owner(Some(true))))
+        .expect("test fixture or operation should succeed");
     let donor = Snapshot::parse(content(&format!(
         "<table:tracked-changes>{}</table:tracked-changes>",
         insertion("x")
     )))
-    .unwrap();
-    let added = donor.changes().unwrap().changes[0].clone();
-    let mut replacement = snapshot.changes().unwrap().changes[2].clone();
+    .expect("test fixture or operation should succeed");
+    let added = donor
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .changes[0]
+        .clone();
+    let mut replacement = snapshot
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .changes[2]
+        .clone();
     let Change::Movement(movement) = &mut replacement else {
         unreachable!()
     };
@@ -276,11 +316,21 @@ fn transaction_crud_reorder_acceptance_reopen_and_rollback_are_atomic() {
             row: 9.into(),
         });
 
-    let mut transaction = snapshot.transaction().unwrap();
-    transaction.append(added).unwrap();
-    transaction.replace("m", replacement).unwrap();
-    transaction.remove("i").unwrap();
-    transaction.move_to("c", 0).unwrap();
+    let mut transaction = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .append(added)
+        .expect("test fixture or operation should succeed");
+    transaction
+        .replace("m", replacement)
+        .expect("test fixture or operation should succeed");
+    transaction
+        .remove("i")
+        .expect("test fixture or operation should succeed");
+    transaction
+        .move_to("c", 0)
+        .expect("test fixture or operation should succeed");
     transaction
         .reorder(&[
             "c".to_string(),
@@ -288,38 +338,63 @@ fn transaction_crud_reorder_acceptance_reopen_and_rollback_are_atomic() {
             "m".to_string(),
             "x".to_string(),
         ])
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     transaction
         .set_acceptance("d", Some(Acceptance::Accepted))
-        .unwrap();
-    transaction.set_tracking(Some(false)).unwrap();
-    let commit = transaction.commit().unwrap();
+        .expect("test fixture or operation should succeed");
+    transaction
+        .set_tracking(Some(false))
+        .expect("test fixture or operation should succeed");
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(commit.changed());
     assert_eq!(ids(commit.snapshot()), ["c", "d", "m", "x"]);
     assert_eq!(commit.snapshot().tracking(), Some(false));
     assert_eq!(
-        commit.snapshot().acceptance("d").unwrap(),
+        commit
+            .snapshot()
+            .acceptance("d")
+            .expect("test fixture or operation should succeed"),
         Some(Acceptance::Accepted)
     );
-    let reopened = Snapshot::parse(commit.source_arc()).unwrap();
+    let reopened =
+        Snapshot::parse(commit.source_arc()).expect("test fixture or operation should succeed");
     assert_eq!(ids(&reopened), ["c", "d", "m", "x"]);
 
-    let mut rollback = reopened.transaction().unwrap();
-    rollback.remove("x").unwrap();
-    rollback.set_tracking(Some(true)).unwrap();
-    rollback.rollback().unwrap();
-    let rolled_back = rollback.commit().unwrap();
+    let mut rollback = reopened
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    rollback
+        .remove("x")
+        .expect("test fixture or operation should succeed");
+    rollback
+        .set_tracking(Some(true))
+        .expect("test fixture or operation should succeed");
+    rollback
+        .rollback()
+        .expect("test fixture or operation should succeed");
+    let rolled_back = rollback
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(!rolled_back.changed());
     assert_eq!(rolled_back.content_xml(), reopened.source_xml());
 
-    let mut reverted = reopened.transaction().unwrap();
+    let mut reverted = reopened
+        .transaction()
+        .expect("test fixture or operation should succeed");
     reverted
         .set_acceptance("d", Some(Acceptance::Rejected))
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     reverted
         .set_acceptance("d", Some(Acceptance::Accepted))
-        .unwrap();
-    assert!(!reverted.commit().unwrap().changed());
+        .expect("test fixture or operation should succeed");
+    assert!(
+        !reverted
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 }
 
 #[test]
@@ -329,8 +404,11 @@ fn invalid_reorder_preserves_the_complete_draft_and_commits_an_exact_noop() {
         insertion("i"),
         deletion("d")
     ));
-    let snapshot = Snapshot::parse(source.clone()).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
+    let snapshot =
+        Snapshot::parse(source.clone()).expect("test fixture or operation should succeed");
+    let mut transaction = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     let before = transaction.changes().cloned();
     assert!(!transaction.is_changed());
 
@@ -342,7 +420,9 @@ fn invalid_reorder_preserves_the_complete_draft_and_commits_an_exact_noop() {
     assert_eq!(transaction.changes(), before.as_ref());
     assert!(!transaction.is_changed());
 
-    let commit = transaction.commit().unwrap();
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(!commit.changed());
     assert_eq!(commit.content_xml(), source);
     assert_eq!(commit.snapshot().source_xml(), snapshot.source_xml());
@@ -354,55 +434,77 @@ fn direct_insert_succeeds_in_bounds_and_is_atomic_out_of_bounds() {
         "<table:tracked-changes>{}</table:tracked-changes>",
         insertion("i")
     ));
-    let snapshot = Snapshot::parse(source.clone()).unwrap();
+    let snapshot =
+        Snapshot::parse(source.clone()).expect("test fixture or operation should succeed");
     let deletion = Snapshot::parse(content(&format!(
         r#"<table:tracked-changes>{}{}</table:tracked-changes>"#,
         insertion("i"),
         deletion("d")
     )))
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes()
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes[1]
         .clone();
 
-    let mut inserted = snapshot.transaction().unwrap();
-    inserted.insert(1, deletion).unwrap();
-    let commit = inserted.commit().unwrap();
+    let mut inserted = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    inserted
+        .insert(1, deletion)
+        .expect("test fixture or operation should succeed");
+    let commit = inserted
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert_eq!(ids(commit.snapshot()), ["i", "d"]);
 
     let donor = Snapshot::parse(content(&format!(
         "<table:tracked-changes>{}</table:tracked-changes>",
         insertion("x")
     )))
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes()
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes[0]
         .clone();
-    let mut out_of_bounds = snapshot.transaction().unwrap();
+    let mut out_of_bounds = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     let before = out_of_bounds.changes().cloned();
     assert!(out_of_bounds.insert(2, donor).is_err());
     assert_eq!(out_of_bounds.changes(), before.as_ref());
     assert!(!out_of_bounds.is_changed());
-    let noop = out_of_bounds.commit().unwrap();
+    let noop = out_of_bounds
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(!noop.changed());
     assert_eq!(noop.content_xml(), source);
 }
 
 #[test]
 fn patches_are_exact_source_bound_reversible_and_reject_stale_sources() {
-    let before = Snapshot::parse(content(&independent_owner(None))).unwrap();
-    let mut transaction = before.transaction().unwrap();
-    transaction.set_tracking(Some(true)).unwrap();
-    let commit = transaction.commit().unwrap();
+    let before = Snapshot::parse(content(&independent_owner(None)))
+        .expect("test fixture or operation should succeed");
+    let mut transaction = before
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .set_tracking(Some(true))
+        .expect("test fixture or operation should succeed");
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     let patch = commit.patch().clone();
     assert!(!patch.is_empty());
 
-    let replay = patch.apply(&before).unwrap();
+    let replay = patch
+        .apply(&before)
+        .expect("test fixture or operation should succeed");
     assert_eq!(replay.content_xml(), commit.content_xml());
     let inverse = patch.inverse();
-    let restored = inverse.apply(commit.snapshot()).unwrap();
+    let restored = inverse
+        .apply(commit.snapshot())
+        .expect("test fixture or operation should succeed");
     assert_eq!(restored.content_xml(), before.source_xml());
 
     let stale = Snapshot::parse(
@@ -410,7 +512,7 @@ fn patches_are_exact_source_bound_reversible_and_reject_stale_sources() {
             .source_xml()
             .replace("  <office:body>", "<office:body>"),
     )
-    .unwrap();
+    .expect("test fixture or operation should succeed");
     assert!(patch.apply(&stale).is_err());
     assert!(inverse.apply(&before).is_err());
 }
@@ -464,13 +566,17 @@ fn dtd_is_rejected_but_pi_foreign_records_and_unrelated_rebinding_are_preserved(
         "<table:tracked-changes>{}{extensions}</table:tracked-changes>",
         insertion("i")
     ));
-    let snapshot = Snapshot::parse(extended).unwrap();
+    let snapshot = Snapshot::parse(extended).expect("test fixture or operation should succeed");
     assert_eq!(ids(&snapshot), ["i"]);
-    let mut transaction = snapshot.transaction().unwrap();
+    let mut transaction = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     transaction
         .set_acceptance("i", Some(Acceptance::Accepted))
-        .unwrap();
-    let committed = transaction.commit().unwrap();
+        .expect("test fixture or operation should succeed");
+    let committed = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(committed.content_xml().contains(extensions));
 }
 
@@ -501,28 +607,44 @@ fn reserved_odf_markup_rejects_while_no_namespace_extensions_remain_opaque() {
         "<table:tracked-changes>{}{opaque}</table:tracked-changes>",
         insertion("i")
     );
-    let extended = Snapshot::parse(content(&extended_owner)).unwrap();
+    let extended = Snapshot::parse(content(&extended_owner))
+        .expect("test fixture or operation should succeed");
     assert_eq!(ids(&extended), ["i"]);
 
-    let mut surgical = extended.transaction().unwrap();
+    let mut surgical = extended
+        .transaction()
+        .expect("test fixture or operation should succeed");
     surgical
         .set_acceptance("i", Some(Acceptance::Accepted))
-        .unwrap();
-    assert!(surgical.commit().unwrap().content_xml().contains(opaque));
+        .expect("test fixture or operation should succeed");
+    assert!(
+        surgical
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .content_xml()
+            .contains(opaque)
+    );
 
     let donor = Snapshot::parse(content(&format!(
         "<table:tracked-changes>{}</table:tracked-changes>",
         insertion("x")
     )))
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes()
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes[0]
         .clone();
-    let mut replacement = extended.changes().unwrap().clone();
+    let mut replacement = extended
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .clone();
     replacement.changes.push(donor);
-    let mut regenerate = extended.transaction().unwrap();
-    regenerate.replace_all(Some(replacement)).unwrap();
+    let mut regenerate = extended
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    regenerate
+        .replace_all(Some(replacement))
+        .expect("test fixture or operation should succeed");
     assert!(regenerate.commit().is_err());
 }
 
@@ -538,8 +660,13 @@ fn multi_deletion_span_requires_an_immediate_matching_sequence() {
     let first = deletion_record("d1", "row", 3, r#" table:multi-deletion-spanned="2""#);
     let follower = deletion_record("d2", "row", 3, "");
     let valid_owner = format!("<table:tracked-changes>{first}{follower}</table:tracked-changes>");
-    let valid = Snapshot::parse(content(&valid_owner)).unwrap();
-    let Change::Deletion(deletion) = &valid.changes().unwrap().changes[0] else {
+    let valid =
+        Snapshot::parse(content(&valid_owner)).expect("test fixture or operation should succeed");
+    let Change::Deletion(deletion) = &valid
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .changes[0]
+    else {
         unreachable!()
     };
     assert_eq!(
@@ -643,15 +770,18 @@ fn rich_neighbor_bytes_are_preserved_while_unknown_records_and_regeneration_are_
         "<table:tracked-changes>{}{opaque}</table:tracked-changes>",
         insertion("plain")
     );
-    let unknown = Snapshot::parse(content(&unknown_owner)).unwrap();
-    let mut unknown_neighbor = unknown.transaction().unwrap();
+    let unknown =
+        Snapshot::parse(content(&unknown_owner)).expect("test fixture or operation should succeed");
+    let mut unknown_neighbor = unknown
+        .transaction()
+        .expect("test fixture or operation should succeed");
     unknown_neighbor
         .set_acceptance("plain", Some(Acceptance::Accepted))
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     assert!(
         unknown_neighbor
             .commit()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .content_xml()
             .contains(opaque)
     );
@@ -660,22 +790,35 @@ fn rich_neighbor_bytes_are_preserved_while_unknown_records_and_regeneration_are_
         "<table:tracked-changes>{rich}{}</table:tracked-changes>",
         insertion("plain")
     );
-    let snapshot = Snapshot::parse(content(&owner)).unwrap();
+    let snapshot =
+        Snapshot::parse(content(&owner)).expect("test fixture or operation should succeed");
 
-    let mut neighbor = snapshot.transaction().unwrap();
+    let mut neighbor = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     neighbor
         .set_acceptance("plain", Some(Acceptance::Accepted))
-        .unwrap();
-    let edited = neighbor.commit().unwrap();
+        .expect("test fixture or operation should succeed");
+    let edited = neighbor
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(edited.content_xml().contains(&rich));
 
-    let mut rich_edit = snapshot.transaction().unwrap();
-    let mut replacement = snapshot.changes().unwrap().changes[0].clone();
+    let mut rich_edit = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    let mut replacement = snapshot
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .changes[0]
+        .clone();
     let Change::Insertion(insertion) = &mut replacement else {
         unreachable!()
     };
     insertion.position = 9.into();
-    rich_edit.replace("rich", replacement).unwrap();
+    rich_edit
+        .replace("rich", replacement)
+        .expect("test fixture or operation should succeed");
     assert!(rich_edit.commit().is_err());
 }
 
@@ -683,21 +826,26 @@ fn rich_neighbor_bytes_are_preserved_while_unknown_records_and_regeneration_are_
 fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
     let source_xml = content(&independent_owner(None));
     let bytes = package(&source_xml, false);
-    let mut mutable = Spreadsheet::from_bytes(bytes).unwrap();
+    let mut mutable =
+        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
     mutable
         .update_tracked_changes(|transaction| {
             transaction.set_tracking(Some(true))?;
             transaction.set_acceptance("c", Some(Acceptance::Rejected))?;
             Ok(())
         })
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     let output = mutable.into_bytes();
-    let archive = OwnedPackage::from_bytes(output.clone()).unwrap();
+    let archive =
+        OwnedPackage::from_bytes(output.clone()).expect("test fixture or operation should succeed");
     assert_eq!(
-        archive.get_file("Thumbnails/thumbnail.png").unwrap(),
+        archive
+            .get_file("Thumbnails/thumbnail.png")
+            .expect("test fixture or operation should succeed"),
         b"inert auxiliary bytes"
     );
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    let reopened =
+        Spreadsheet::from_bytes(output).expect("test fixture or operation should succeed");
     assert!(
         reopened
             .tracked_changes_with(Limits::new().with_max_changes(4))
@@ -708,9 +856,16 @@ fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
             .tracked_changes_with(Limits::new().with_max_changes(3))
             .is_err()
     );
-    let tracked = reopened.tracked_changes().unwrap();
+    let tracked = reopened
+        .tracked_changes()
+        .expect("test fixture or operation should succeed");
     assert_eq!(tracked.tracking(), Some(true));
-    assert_eq!(tracked.acceptance("c").unwrap(), Some(Acceptance::Rejected));
+    assert_eq!(
+        tracked
+            .acceptance("c")
+            .expect("test fixture or operation should succeed"),
+        Some(Acceptance::Rejected)
+    );
     assert!(
         reopened
             .content_xml()
@@ -728,22 +883,36 @@ fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
 fn signed_exact_noop_is_byte_exact_but_changed_publication_drops_signatures() {
     let bytes = package(&content(&independent_owner(None)), true);
 
-    let mut noop = Spreadsheet::from_bytes(bytes.clone()).unwrap();
-    noop.update_tracked_changes(|_| Ok(())).unwrap();
+    let mut noop =
+        Spreadsheet::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
+    noop.update_tracked_changes(|_| Ok(()))
+        .expect("test fixture or operation should succeed");
     assert_eq!(noop.into_bytes(), bytes);
 
-    let mut changed = Spreadsheet::from_bytes(bytes).unwrap();
+    let mut changed =
+        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
     changed
         .update_tracked_changes(|transaction| {
             transaction.set_tracking(Some(true))?;
             Ok(())
         })
-        .unwrap();
-    let archive = OwnedPackage::from_bytes(changed.into_bytes()).unwrap();
-    assert!(!archive.has_file("META-INF/documentsignatures.xml").unwrap());
-    assert!(!archive.has_file("META-INF/macrosignatures.xml").unwrap());
+        .expect("test fixture or operation should succeed");
+    let archive = OwnedPackage::from_bytes(changed.into_bytes())
+        .expect("test fixture or operation should succeed");
+    assert!(
+        !archive
+            .has_file("META-INF/documentsignatures.xml")
+            .expect("test fixture or operation should succeed")
+    );
+    assert!(
+        !archive
+            .has_file("META-INF/macrosignatures.xml")
+            .expect("test fixture or operation should succeed")
+    );
     assert_eq!(
-        archive.get_file("Thumbnails/thumbnail.png").unwrap(),
+        archive
+            .get_file("Thumbnails/thumbnail.png")
+            .expect("test fixture or operation should succeed"),
         b"inert auxiliary bytes"
     );
 }
@@ -751,18 +920,22 @@ fn signed_exact_noop_is_byte_exact_but_changed_publication_drops_signatures() {
 #[test]
 fn encrypted_content_is_refused_before_a_tracked_change_transaction_can_begin() {
     let mut writer = PackageWriter::new();
-    writer.set_mimetype(MIMETYPE).unwrap();
+    writer
+        .set_mimetype(MIMETYPE)
+        .expect("test fixture or operation should succeed");
     writer
         .set_encryption("tracked-change-password", Profile::compatible())
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     let compact_content = content(&independent_owner(None))
         .lines()
         .map(str::trim)
         .collect::<String>();
     writer
         .add_file("content.xml", compact_content.as_bytes())
-        .unwrap();
-    let encrypted = writer.finish_to_bytes().unwrap();
+        .expect("test fixture or operation should succeed");
+    let encrypted = writer
+        .finish_to_bytes()
+        .expect("test fixture or operation should succeed");
 
     assert!(Spreadsheet::from_bytes(encrypted).is_err());
 }
@@ -790,8 +963,11 @@ fn authors_table_dimension_and_all_remaining_historical_scalar_families() {
         info("nan")
     );
     let owner = format!("<table:tracked-changes>{records}</table:tracked-changes>");
-    let snapshot = Snapshot::parse(content(&owner)).unwrap();
-    let changes = snapshot.changes().unwrap();
+    let snapshot =
+        Snapshot::parse(content(&owner)).expect("test fixture or operation should succeed");
+    let changes = snapshot
+        .changes()
+        .expect("test fixture or operation should succeed");
     let Change::Insertion(table) = &changes.changes[0] else {
         unreachable!()
     };
@@ -817,11 +993,18 @@ fn authors_table_dimension_and_all_remaining_historical_scalar_families() {
     );
 
     let semantic = changes.clone();
-    let absent = Snapshot::parse(content("")).unwrap();
-    let mut transaction = absent.transaction().unwrap();
-    transaction.replace_all(Some(semantic.clone())).unwrap();
-    let commit = transaction.commit().unwrap();
-    let reopened = Snapshot::parse(commit.source_arc()).unwrap();
+    let absent = Snapshot::parse(content("")).expect("test fixture or operation should succeed");
+    let mut transaction = absent
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .replace_all(Some(semantic.clone()))
+        .expect("test fixture or operation should succeed");
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
+    let reopened =
+        Snapshot::parse(commit.source_arc()).expect("test fixture or operation should succeed");
     assert_eq!(reopened.changes(), Some(&semantic));
 }
 
@@ -830,38 +1013,44 @@ fn self_closing_spreadsheet_creates_owner_and_repeated_end_inserts_keep_indices(
     let source = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}" xmlns:dc="{DC}"><office:body><office:spreadsheet/></office:body></office:document-content>"#
     );
-    let snapshot = Snapshot::parse(source).unwrap();
+    let snapshot = Snapshot::parse(source).expect("test fixture or operation should succeed");
     assert!(snapshot.changes().is_none());
     let donor = Snapshot::parse(content(&format!(
         "<table:tracked-changes>{}</table:tracked-changes>",
         insertion("donor")
     )))
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes()
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes[0]
         .clone();
-    let mut transaction = snapshot.transaction().unwrap();
+    let mut transaction = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     for (index, id) in ["a", "b", "c"].into_iter().enumerate() {
         let mut change = donor.clone();
         let Change::Insertion(insertion) = &mut change else {
             unreachable!()
         };
         insertion.metadata.id = id.to_string();
-        transaction.insert(index, change).unwrap();
+        transaction
+            .insert(index, change)
+            .expect("test fixture or operation should succeed");
         assert_eq!(
             transaction
                 .changes()
-                .unwrap()
+                .expect("test fixture or operation should succeed")
                 .changes
                 .get(index)
-                .unwrap()
+                .expect("test fixture or operation should succeed")
                 .metadata()
                 .id,
             id
         );
     }
-    let commit = transaction.commit().unwrap();
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert_eq!(ids(commit.snapshot()), ["a", "b", "c"]);
     assert!(commit.content_xml().contains("<office:spreadsheet>"));
     assert!(commit.content_xml().contains("<table:tracked-changes"));
@@ -881,14 +1070,27 @@ fn xsd_whitespace_collapses_and_writers_emit_canonical_atomic_lexicals() {
 <table:cell-content-change table:id="duration"><table:cell-address table:table="0" table:column="2" table:row="0"/>{collapsed_info}<table:previous><table:change-track-table-cell office:value-type=" time " office:time-value=" PT1H2M3S "/></table:previous></table:cell-content-change>
 </table:tracked-changes>"#
     );
-    let parsed = Snapshot::parse(content(&owner)).unwrap();
+    let parsed =
+        Snapshot::parse(content(&owner)).expect("test fixture or operation should succeed");
     assert_eq!(parsed.tracking(), Some(true));
-    let semantic = parsed.changes().unwrap().clone();
-    let absent = Snapshot::parse(content("")).unwrap();
-    let mut transaction = absent.transaction().unwrap();
-    transaction.replace_all(Some(semantic)).unwrap();
-    transaction.set_tracking(Some(true)).unwrap();
-    let xml = transaction.commit().unwrap().into_source();
+    let semantic = parsed
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .clone();
+    let absent = Snapshot::parse(content("")).expect("test fixture or operation should succeed");
+    let mut transaction = absent
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .replace_all(Some(semantic))
+        .expect("test fixture or operation should succeed");
+    transaction
+        .set_tracking(Some(true))
+        .expect("test fixture or operation should succeed");
+    let xml = transaction
+        .commit()
+        .expect("test fixture or operation should succeed")
+        .into_source();
     for canonical in [
         r#"table:track-changes="true""#,
         r#"table:type="row""#,
@@ -924,23 +1126,39 @@ fn arbitrary_precision_integers_round_trip_and_canonicalize_above_machine_sizes(
         info("big movement"),
         info("big cell")
     );
-    let parsed = Snapshot::parse(content(&owner)).unwrap();
-    let Change::Insertion(insertion) = &parsed.changes().unwrap().changes[0] else {
+    let parsed =
+        Snapshot::parse(content(&owner)).expect("test fixture or operation should succeed");
+    let Change::Insertion(insertion) = &parsed
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .changes[0]
+    else {
         unreachable!()
     };
     assert_eq!(insertion.position.as_str(), huge);
     assert_eq!(insertion.position.digit_count(), 200);
     assert_eq!(insertion.count.as_str(), huge);
     assert_eq!(
-        Integer::parse(&format!("+000{huge}")).unwrap().as_str(),
+        Integer::parse(&format!("+000{huge}"))
+            .expect("test fixture or operation should succeed")
+            .as_str(),
         huge
     );
 
-    let semantic = parsed.changes().unwrap().clone();
-    let absent = Snapshot::parse(content("")).unwrap();
-    let mut transaction = absent.transaction().unwrap();
-    transaction.replace_all(Some(semantic.clone())).unwrap();
-    let commit = transaction.commit().unwrap();
+    let semantic = parsed
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .clone();
+    let absent = Snapshot::parse(content("")).expect("test fixture or operation should succeed");
+    let mut transaction = absent
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .replace_all(Some(semantic.clone()))
+        .expect("test fixture or operation should succeed");
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(
         commit
             .content_xml()
@@ -958,7 +1176,9 @@ fn arbitrary_precision_integers_round_trip_and_canonicalize_above_machine_sizes(
     );
     assert!(!commit.content_xml().contains("+000"));
     assert_eq!(
-        Snapshot::parse(commit.source_arc()).unwrap().changes(),
+        Snapshot::parse(commit.source_arc())
+            .expect("test fixture or operation should succeed")
+            .changes(),
         Some(&semantic)
     );
 }
@@ -969,13 +1189,17 @@ fn alternate_odf_prefixes_ignore_unused_vendor_canonical_bindings_and_preserve_s
     let source = format!(
         r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}" xmlns:x="{TEXT}" xmlns:d="{DC}" xmlns:v="urn:vendor" xmlns:office="urn:vendor:office" xmlns:table="urn:vendor:table" xmlns:text="urn:vendor:text" xmlns:dc="urn:vendor:dc"><o:body><o:spreadsheet><t:tracked-changes><t:insertion t:id="i" t:type="row" t:position="0"><o:change-info><d:creator>Alias</d:creator><d:date>2026-08-08T00:00:00Z</d:date><x:p>alias</x:p></o:change-info></t:insertion>{opaque}</t:tracked-changes></o:spreadsheet></o:body></o:document-content>"#
     );
-    let snapshot = Snapshot::parse(source).unwrap();
+    let snapshot = Snapshot::parse(source).expect("test fixture or operation should succeed");
     assert_eq!(ids(&snapshot), ["i"]);
-    let mut transaction = snapshot.transaction().unwrap();
+    let mut transaction = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     transaction
         .set_acceptance("i", Some(Acceptance::Accepted))
-        .unwrap();
-    let commit = transaction.commit().unwrap();
+        .expect("test fixture or operation should succeed");
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(commit.content_xml().contains(opaque));
     assert!(
         commit
@@ -988,7 +1212,10 @@ fn alternate_odf_prefixes_ignore_unused_vendor_canonical_bindings_and_preserve_s
             .contains(r#"xmlns:table="urn:vendor:table""#)
     );
     assert_eq!(
-        commit.snapshot().acceptance("i").unwrap(),
+        commit
+            .snapshot()
+            .acceptance("i")
+            .expect("test fixture or operation should succeed"),
         Some(Acceptance::Accepted)
     );
 }
@@ -999,8 +1226,12 @@ fn invalid_cross_record_operations_fail_immediately_without_draft_mutation() {
         "<table:tracked-changes>{}</table:tracked-changes>",
         insertion("i")
     )))
-    .unwrap();
-    let mut invalid = one.changes().unwrap().changes[0].clone();
+    .expect("test fixture or operation should succeed");
+    let mut invalid = one
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .changes[0]
+        .clone();
     let Change::Insertion(invalid_insertion) = &mut invalid else {
         unreachable!()
     };
@@ -1009,43 +1240,64 @@ fn invalid_cross_record_operations_fail_immediately_without_draft_mutation() {
         .metadata
         .dependencies
         .push("missing".to_string());
-    let mut transaction = one.transaction().unwrap();
+    let mut transaction = one
+        .transaction()
+        .expect("test fixture or operation should succeed");
     let before = transaction.changes().cloned();
     assert!(transaction.insert(1, invalid).is_err());
     assert_eq!(transaction.changes(), before.as_ref());
     assert!(!transaction.is_changed());
-    assert!(!transaction.commit().unwrap().changed());
+    assert!(
+        !transaction
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 
     let cutoff = Snapshot::parse(content(&format!(
         "<table:tracked-changes>{}{}</table:tracked-changes>",
         insertion("i"),
         deletion("d")
     )))
-    .unwrap();
+    .expect("test fixture or operation should succeed");
     let movement_source = Snapshot::parse(content(&format!(
         "<table:tracked-changes>{}</table:tracked-changes>",
         movement("m")
     )))
-    .unwrap();
-    let mut movement_replacement = movement_source.changes().unwrap().changes[0].clone();
+    .expect("test fixture or operation should succeed");
+    let mut movement_replacement = movement_source
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .changes[0]
+        .clone();
     let Change::Movement(movement) = &mut movement_replacement else {
         unreachable!()
     };
     movement.metadata.id = "i".to_string();
-    let mut transaction = cutoff.transaction().unwrap();
+    let mut transaction = cutoff
+        .transaction()
+        .expect("test fixture or operation should succeed");
     let before = transaction.changes().cloned();
     assert!(transaction.replace("i", movement_replacement).is_err());
     assert_eq!(transaction.changes(), before.as_ref());
     assert!(!transaction.is_changed());
-    assert!(!transaction.commit().unwrap().changed());
+    assert!(
+        !transaction
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 
     let rejecting = format!(
         r#"<table:tracked-changes><table:insertion table:id="r" table:acceptance-state="rejected" table:type="row" table:position="0">{}</table:insertion><table:insertion table:id="a" table:rejecting-change-id="r" table:type="row" table:position="1">{}</table:insertion></table:tracked-changes>"#,
         info("rejected"),
         info("rejecting")
     );
-    let rejecting = Snapshot::parse(content(&rejecting)).unwrap();
-    let mut transaction = rejecting.transaction().unwrap();
+    let rejecting =
+        Snapshot::parse(content(&rejecting)).expect("test fixture or operation should succeed");
+    let mut transaction = rejecting
+        .transaction()
+        .expect("test fixture or operation should succeed");
     let before = transaction.changes().cloned();
     assert!(
         transaction
@@ -1054,7 +1306,12 @@ fn invalid_cross_record_operations_fail_immediately_without_draft_mutation() {
     );
     assert_eq!(transaction.changes(), before.as_ref());
     assert!(!transaction.is_changed());
-    assert!(!transaction.commit().unwrap().changed());
+    assert!(
+        !transaction
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 
     let forward = format!(
         r#"<table:tracked-changes><table:insertion table:id="a" table:type="row" table:position="0">{}<table:dependencies><table:dependency table:id="b"/></table:dependencies></table:insertion>{}</table:tracked-changes>"#,
@@ -1070,40 +1327,78 @@ fn asymmetric_input_output_limits_keep_commits_and_patch_results_reeditable() {
     let limits = Limits::new()
         .with_max_input_bytes(source.len())
         .with_max_output_bytes(source.len() + 16_384);
-    let initial = Snapshot::parse_with_limits(source.clone(), limits).unwrap();
+    let initial = Snapshot::parse_with_limits(source.clone(), limits)
+        .expect("test fixture or operation should succeed");
     let donor = Snapshot::parse(content(&format!(
         "<table:tracked-changes>{}</table:tracked-changes>",
         insertion("i")
     )))
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes()
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes[0]
         .clone();
 
-    let mut transaction = initial.transaction().unwrap();
-    transaction.insert(0, donor.clone()).unwrap();
-    let committed = transaction.commit().unwrap();
+    let mut transaction = initial
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .insert(0, donor.clone())
+        .expect("test fixture or operation should succeed");
+    let committed = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(committed.content_xml().len() > limits.max_input_bytes());
     let patch = committed.patch().clone();
 
-    let mut second = committed.snapshot().transaction().unwrap();
+    let mut second = committed
+        .snapshot()
+        .transaction()
+        .expect("test fixture or operation should succeed");
     second
         .set_acceptance("i", Some(Acceptance::Accepted))
-        .unwrap();
-    assert!(second.commit().unwrap().changed());
+        .expect("test fixture or operation should succeed");
+    assert!(
+        second
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 
-    let replayed = patch.apply(&initial).unwrap();
-    let mut replay_edit = replayed.snapshot().transaction().unwrap();
+    let replayed = patch
+        .apply(&initial)
+        .expect("test fixture or operation should succeed");
+    let mut replay_edit = replayed
+        .snapshot()
+        .transaction()
+        .expect("test fixture or operation should succeed");
     replay_edit
         .set_acceptance("i", Some(Acceptance::Rejected))
-        .unwrap();
-    assert!(replay_edit.commit().unwrap().changed());
+        .expect("test fixture or operation should succeed");
+    assert!(
+        replay_edit
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 
-    let restored = patch.inverse().apply(committed.snapshot()).unwrap();
-    let mut inverse_edit = restored.snapshot().transaction().unwrap();
-    inverse_edit.insert(0, donor).unwrap();
-    assert!(inverse_edit.commit().unwrap().changed());
+    let restored = patch
+        .inverse()
+        .apply(committed.snapshot())
+        .expect("test fixture or operation should succeed");
+    let mut inverse_edit = restored
+        .snapshot()
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    inverse_edit
+        .insert(0, donor)
+        .expect("test fixture or operation should succeed");
+    assert!(
+        inverse_edit
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 }
 
 #[test]
@@ -1118,42 +1413,52 @@ fn bulk_acceptance_and_replace_keep_many_inbound_rejecting_edges_consistent() {
         ));
     }
     let owner = format!("<table:tracked-changes>{records}</table:tracked-changes>");
-    let snapshot = Snapshot::parse(content(&owner)).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
+    let snapshot =
+        Snapshot::parse(content(&owner)).expect("test fixture or operation should succeed");
+    let mut transaction = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     for index in 0..16 {
         let target_id = format!("r{index}");
         let mut replacement = snapshot
             .changes()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .changes
             .iter()
             .find(|change| change.metadata().id == target_id)
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .clone();
         let Change::Insertion(insertion) = &mut replacement else {
             unreachable!()
         };
         insertion.position = (index + 100).into();
-        transaction.replace(&target_id, replacement).unwrap();
+        transaction
+            .replace(&target_id, replacement)
+            .expect("test fixture or operation should succeed");
         transaction
             .set_acceptance(&format!("a{index}"), Some(Acceptance::Accepted))
-            .unwrap();
+            .expect("test fixture or operation should succeed");
     }
-    let commit = transaction.commit().unwrap();
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     for index in 0..16 {
         assert_eq!(
-            commit.snapshot().acceptance(&format!("a{index}")).unwrap(),
+            commit
+                .snapshot()
+                .acceptance(&format!("a{index}"))
+                .expect("test fixture or operation should succeed"),
             Some(Acceptance::Accepted)
         );
         let target_id = format!("r{index}");
         let target = commit
             .snapshot()
             .changes()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .changes
             .iter()
             .find(|change| change.metadata().id == target_id)
-            .unwrap();
+            .expect("test fixture or operation should succeed");
         let Change::Insertion(insertion) = target else {
             unreachable!()
         };
@@ -1168,63 +1473,108 @@ fn multi_deletion_run_breaking_mutations_fail_immediately_and_atomically() {
         info("multi first"),
         info("multi follower")
     );
-    let snapshot = Snapshot::parse(content(&multi)).unwrap();
+    let snapshot =
+        Snapshot::parse(content(&multi)).expect("test fixture or operation should succeed");
     let donor = Snapshot::parse(content(&format!(
         "<table:tracked-changes>{}</table:tracked-changes>",
         insertion("x")
     )))
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes()
-    .unwrap()
+    .expect("test fixture or operation should succeed")
     .changes[0]
         .clone();
 
-    let mut insert = snapshot.transaction().unwrap();
+    let mut insert = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     let before = insert.changes().cloned();
     assert!(insert.insert(1, donor).is_err());
     assert_eq!(insert.changes(), before.as_ref());
     assert!(!insert.is_changed());
-    assert!(!insert.commit().unwrap().changed());
+    assert!(
+        !insert
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 
-    let mut remove = snapshot.transaction().unwrap();
+    let mut remove = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     let before = remove.changes().cloned();
     assert!(remove.remove("d2").is_err());
     assert_eq!(remove.changes(), before.as_ref());
     assert!(!remove.is_changed());
-    assert!(!remove.commit().unwrap().changed());
+    assert!(
+        !remove
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 
-    let mut mismatch = snapshot.changes().unwrap().changes[1].clone();
+    let mut mismatch = snapshot
+        .changes()
+        .expect("test fixture or operation should succeed")
+        .changes[1]
+        .clone();
     let Change::Deletion(deletion) = &mut mismatch else {
         unreachable!()
     };
     deletion.position = 4.into();
-    let mut replace = snapshot.transaction().unwrap();
+    let mut replace = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     let before = replace.changes().cloned();
     assert!(replace.replace("d2", mismatch).is_err());
     assert_eq!(replace.changes(), before.as_ref());
     assert!(!replace.is_changed());
-    assert!(!replace.commit().unwrap().changed());
+    assert!(
+        !replace
+            .commit()
+            .expect("test fixture or operation should succeed")
+            .changed()
+    );
 }
 
 #[test]
 fn package_patch_application_is_source_checked_and_inverse_restores_exact_content() {
     let bytes = package(&content(&independent_owner(None)), false);
     let before = Spreadsheet::from_bytes(bytes.clone())
-        .unwrap()
+        .expect("test fixture or operation should succeed")
         .tracked_changes()
-        .unwrap();
-    let mut transaction = before.transaction().unwrap();
-    transaction.set_tracking(Some(true)).unwrap();
-    let patch: Patch = transaction.commit().unwrap().into_patch();
+        .expect("test fixture or operation should succeed");
+    let mut transaction = before
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .set_tracking(Some(true))
+        .expect("test fixture or operation should succeed");
+    let patch: Patch = transaction
+        .commit()
+        .expect("test fixture or operation should succeed")
+        .into_patch();
 
-    let mut mutable = Spreadsheet::from_bytes(bytes).unwrap();
-    mutable.apply_tracked_changes_patch(&patch).unwrap();
-    assert_eq!(mutable.tracked_changes().unwrap().tracking(), Some(true));
+    let mut mutable =
+        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    mutable
+        .apply_tracked_changes_patch(&patch)
+        .expect("test fixture or operation should succeed");
+    assert_eq!(
+        mutable
+            .tracked_changes()
+            .expect("test fixture or operation should succeed")
+            .tracking(),
+        Some(true)
+    );
     mutable
         .apply_tracked_changes_patch(&patch.inverse())
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     assert_eq!(
-        mutable.tracked_changes().unwrap().source_xml(),
+        mutable
+            .tracked_changes()
+            .expect("test fixture or operation should succeed")
+            .source_xml(),
         before.source_xml()
     );
     assert!(

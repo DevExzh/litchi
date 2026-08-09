@@ -1,14 +1,16 @@
 use litchi_odc::{
-    AxisSpec, Chart, ChartClass, DataPointSpec, Definition, DefinitionSnapshot, History, Limits,
-    Patch, SeriesSpec, StyleTarget, Text, chart::Dimension, validate_range_list,
+    AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, Chart, ChartClass,
+    DataPointSpec, Definition, DefinitionSnapshot, History, Limits, Patch, SeriesSpec, StyleTarget,
+    Text, chart::Dimension, validate_range_list,
 };
 use litchi_odf_common::core::{PackageWriter, Profile};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
-use std::error::Error;
-
-type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+use std::{error::Error, fmt::Write as _};
 
 const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.4"><office:styles/></office:document-styles>"#;
+const RAW_MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.chart"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 fn definition() -> Definition {
     let mut value = Definition::new(ChartClass::bar());
@@ -33,9 +35,10 @@ fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> TestResult<Vec<u8
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><manifest:manifest xmlns:manifest=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" manifest:version=\"1.4\"><manifest:file-entry manifest:full-path=\"/\" manifest:media-type=\"application/vnd.oasis.opendocument.chart\"/><manifest:file-entry manifest:full-path=\"content.xml\" manifest:media-type=\"text/xml\"/>",
     );
     if let Some((path, bytes)) = auxiliary {
-        manifest.push_str(&format!(
+        write!(
+            &mut manifest,
             "<manifest:file-entry manifest:full-path=\"{path}\" manifest:media-type=\"application/octet-stream\"/>"
-        ));
+        )?;
         let mut archive = StreamingArchiveWriter::new();
         archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
         archive.write_deflated("content.xml", content.as_bytes())?;
@@ -73,6 +76,14 @@ fn encrypted_envelope(content: &str) -> TestResult<Vec<u8>> {
     Ok(archive.finish_to_bytes()?)
 }
 
+fn raw_negative_package(content: &str) -> TestResult<Vec<u8>> {
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
+    archive.write_deflated("content.xml", content.as_bytes())?;
+    archive.write_deflated("META-INF/manifest.xml", RAW_MANIFEST)?;
+    Ok(archive.finish_to_bytes()?)
+}
+
 #[test]
 fn opened_canonical_definition_edits_are_atomic_and_reversible() -> TestResult<()> {
     let source_definition = definition();
@@ -105,11 +116,25 @@ fn opened_canonical_definition_edits_are_atomic_and_reversible() -> TestResult<(
 fn opened_projection_refuses_noncanonical_xml_without_mutation() -> TestResult<()> {
     let canonical = litchi_odc::serialize_content(&definition())?;
     let noncanonical = canonical.replacen("><", ">\n<", 1);
-    let chart = Chart::from_bytes(package(&noncanonical, None)?)?;
+    let chart = Chart::from_bytes(raw_negative_package(&noncanonical)?)?;
     let original = chart.as_bytes().to_vec();
     assert!(chart.definition().is_err());
     let mut edit = chart.edit();
     assert!(edit.insert_axis(0, AxisSpec::new(Dimension::X)).is_err());
+    edit.update_axis(0, litchi_odc::AxisUpdate::styled("exact-style"))?;
+    let committed = edit.commit()?;
+    assert!(committed.chart().content_xml().contains(">\n<"));
+    assert_eq!(
+        committed
+            .chart()
+            .plot_area()
+            .ok_or("missing plot area")?
+            .axes()
+            .next()
+            .ok_or("missing axis")?
+            .style_name(),
+        Some("exact-style")
+    );
     assert_eq!(chart.as_bytes(), original);
     Ok(())
 }
@@ -253,6 +278,75 @@ fn durable_package_patches_join_and_history_are_exact() -> TestResult<()> {
 }
 
 #[test]
+fn package_transfer_closes_chart_style_data_and_resource_dependencies() -> TestResult<()> {
+    let source = Chart::from_definition(definition())?;
+    let mut changed_edit = source.edit();
+    changed_edit.set_style(StyleTarget::Chart, Some("transferred".into()))?;
+    let mut table = CachedTable::new("Data", 1);
+    table
+        .rows
+        .push(CachedRow::new(vec![CachedCell::new(CachedValue::String(
+            "value".into(),
+        ))]));
+    changed_edit.set_cached_table(Some(table))?;
+    changed_edit.set_styles_xml(STYLES);
+    changed_edit.add_resource(
+        "Pictures/transferred.bin",
+        "application/octet-stream",
+        b"transferred",
+    )?;
+    let changed = changed_edit.commit()?;
+
+    let mut destination_definition = definition();
+    destination_definition.title = Some(Text::new("destination"));
+    let plain_destination = Chart::from_definition(destination_definition)?;
+    let mut destination_edit = plain_destination.edit();
+    destination_edit.add_resource(
+        "Pictures/existing.bin",
+        "application/octet-stream",
+        b"existing",
+    )?;
+    let destination = destination_edit.commit()?.into_chart();
+
+    let transfer = changed.patch().transfer_to(&destination)?;
+    assert!(transfer.is_merged());
+    let transferred = transfer
+        .patch()
+        .ok_or("missing transferred package patch")?
+        .apply(&destination)?;
+    let reopened = Chart::from_bytes(transferred.as_bytes().to_vec())?;
+    let projected = reopened.definition()?;
+    assert_eq!(projected.style_name.as_deref(), Some("transferred"));
+    assert_eq!(
+        projected.title.as_ref().map(|value| value.text.as_str()),
+        Some("destination")
+    );
+    assert_eq!(
+        projected
+            .cached_table
+            .as_ref()
+            .map(|value| value.name.as_str()),
+        Some("Data")
+    );
+    assert_eq!(reopened.styles_xml(), Some(STYLES));
+    assert_eq!(reopened.resources().len(), 2);
+
+    let mut conflict_edit = plain_destination.edit();
+    conflict_edit.add_resource(
+        "Pictures/transferred.bin",
+        "application/octet-stream",
+        b"destination",
+    )?;
+    let conflict_destination = conflict_edit.commit()?.into_chart();
+    let conflict = changed.patch().transfer_to(&conflict_destination)?;
+    assert_eq!(
+        conflict.conflicts()[0].path(),
+        "package.resource[Pictures/transferred.bin]"
+    );
+    Ok(())
+}
+
+#[test]
 fn row_column_ranges_styles_and_security_policy_are_enforced() -> TestResult<()> {
     validate_range_list("Data.$A:.$C Data.$1:.$9")?;
     assert!(validate_range_list("Data.$A:.$9").is_err());
@@ -266,9 +360,25 @@ fn row_column_ranges_styles_and_security_policy_are_enforced() -> TestResult<()>
     let mut scripts = source.edit();
     scripts.set_styles_xml(r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:scripts/></office:document-styles>"#);
     assert!(scripts.commit().is_err());
+    let mut missing_family = source.edit();
+    missing_family.set_styles_xml(r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:styles><style:style style:name="dangling"/></office:styles></office:document-styles>"#);
+    assert!(missing_family.commit().is_err());
     let mut valid = source.edit();
     valid.set_styles_xml(STYLES);
     assert_eq!(valid.commit()?.chart().styles_xml(), Some(STYLES));
+    let mut noncompact_resource = source.edit();
+    noncompact_resource.add_resource(
+        "Object.xml",
+        "application/xml",
+        b"<root>\n<child/></root>",
+    )?;
+    assert!(noncompact_resource.commit().is_err());
+    assert!(
+        Builder::new()
+            .with_resource("Object.xml", "application/xml", b"<root>\n<child/></root>")
+            .build()
+            .is_err()
+    );
 
     let content = source.content_xml();
     let signed = Chart::from_bytes(package(
@@ -285,5 +395,31 @@ fn row_column_ranges_styles_and_security_policy_are_enforced() -> TestResult<()>
     let mut encrypted_edit = encrypted.edit();
     encrypted_edit.set_style(StyleTarget::Chart, Some("blocked".into()))?;
     assert!(encrypted_edit.commit().is_err());
+
+    let mut repeated_data = definition();
+    let mut repeated_table = CachedTable::new("Data", 1);
+    let mut repeated_row = CachedRow::new(vec![CachedCell::new(CachedValue::Boolean(true))]);
+    repeated_row.repeated = 2;
+    repeated_table.rows.push(repeated_row);
+    repeated_data.cached_table = Some(repeated_table);
+    let malformed_boolean = litchi_odc::serialize_content(&repeated_data)?.replace(
+        "office:boolean-value=\"true\"",
+        "office:boolean-value=\"maybe\"",
+    );
+    assert!(Chart::from_bytes(raw_negative_package(&malformed_boolean)?).is_err());
+    let row_limits = Limits::new().with_cached_rows(1)?;
+    assert!(Chart::from_definition_with_limits(repeated_data, row_limits).is_err());
+
+    let duplicate_plot = source.content_xml().replacen(
+        "</chart:plot-area>",
+        "</chart:plot-area><chart:plot-area/>",
+        1,
+    );
+    assert!(Chart::from_bytes(raw_negative_package(&duplicate_plot)?).is_err());
+
+    let mut too_many_ranges = definition();
+    too_many_ranges.plot_area.cell_range_address = Some("Data.A1 Data.B1".into());
+    let range_limits = Limits::new().with_range_items(1)?;
+    assert!(Chart::from_definition_with_limits(too_many_ranges, range_limits).is_err());
     Ok(())
 }

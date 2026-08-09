@@ -1,15 +1,18 @@
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, TargetMode};
 use litchi_xlsx::calculation_properties::{
     Feature, Features, Mode, Patch as CalculationPatch, Properties,
 };
 use litchi_xlsx::formula::Formula;
 use litchi_xlsx::{Error, Package, Workbook};
+use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const CALC_CHAIN_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
 const SIGNATURE_REL: &str =
     "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature";
+const ORIGIN_BYTES: &[u8] = b"origin";
+const SIGNATURE_BYTES: &[u8] = b"signature";
 
 fn calculation_source() -> Workbook {
     let seed = Workbook::create().expect("seed workbook");
@@ -291,38 +294,100 @@ fn empty_and_effective_no_op_patches_preserve_exact_workbook_bytes() {
     assert!(has_calculation_chain(replayed_no_op.workbook()));
 }
 
-fn add_inert_signature(mut raw: OpcPackage) -> OpcPackage {
+fn append_before_closing(xml: Vec<u8>, closing: &str, addition: &str) -> Vec<u8> {
+    let mut xml = String::from_utf8(xml).expect("fixture XML is UTF-8");
+    let position = xml.rfind(closing).expect("fixture XML closing element");
+    xml.insert_str(position, addition);
+    xml.into_bytes()
+}
+
+fn assert_inert_signature_graph(package: &Package) {
+    let raw = package.clone().into_plain_opc();
     let origin_uri = PackURI::new("/_xmlsignatures/origin.sigs").expect("origin URI");
-    let mut origin = BlobPart::new(
-        origin_uri,
-        ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-        b"origin".to_vec(),
-    );
-    origin
-        .rels_mut()
-        .try_add_relationship(
-            SIGNATURE_REL.to_owned(),
-            "sig1.xml".to_owned(),
-            "rIdSignature".to_owned(),
-            TargetMode::Internal,
-        )
-        .expect("signature relationship");
-    raw.try_add_part(Box::new(origin)).expect("origin part");
-    raw.try_add_part(Box::new(BlobPart::new(
-        PackURI::new("/_xmlsignatures/sig1.xml").expect("signature URI"),
-        ct::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE.to_owned(),
-        b"signature".to_vec(),
-    )))
-    .expect("signature part");
-    raw.rels_mut()
-        .try_add_relationship(
-            rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-            "_xmlsignatures/origin.sigs".to_owned(),
-            "rIdSignatureOrigin".to_owned(),
-            TargetMode::Internal,
-        )
+    let signature_uri = PackURI::new("/_xmlsignatures/sig1.xml").expect("signature URI");
+    let root = raw
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == rt::DIGITAL_SIGNATURE_ORIGIN)
         .expect("signature-origin relationship");
-    raw
+    assert_eq!(root.target_ref(), "_xmlsignatures/origin.sigs");
+    assert_eq!(root.target_mode(), TargetMode::Internal);
+
+    let origin = raw.get_part(&origin_uri).expect("signature-origin part");
+    assert_eq!(origin.content_type(), ct::OPC_DIGITAL_SIGNATURE_ORIGIN);
+    assert_eq!(origin.blob(), ORIGIN_BYTES);
+    let signature_relationship = origin
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == SIGNATURE_REL)
+        .expect("signature relationship");
+    assert_eq!(signature_relationship.target_ref(), "sig1.xml");
+    assert_eq!(signature_relationship.target_mode(), TargetMode::Internal);
+
+    let signature = raw.get_part(&signature_uri).expect("signature part");
+    assert_eq!(
+        signature.content_type(),
+        ct::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE
+    );
+    assert_eq!(signature.blob(), SIGNATURE_BYTES);
+}
+
+fn inert_signed_fixture(source: &[u8]) -> Package {
+    let reader = ArchiveReader::new(source).expect("source ZIP");
+    let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
+    assert!(!names.iter().any(|name| name.starts_with("_xmlsignatures/")));
+
+    let content_types = format!(
+        r#"<Override PartName="/_xmlsignatures/origin.sigs" ContentType="{}"/><Override PartName="/_xmlsignatures/sig1.xml" ContentType="{}"/>"#,
+        ct::OPC_DIGITAL_SIGNATURE_ORIGIN,
+        ct::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE,
+    );
+    let root_relationship = format!(
+        r#"<Relationship Id="rIdSignatureOrigin" Type="{}" Target="_xmlsignatures/origin.sigs"/>"#,
+        rt::DIGITAL_SIGNATURE_ORIGIN,
+    );
+    let origin_relationships = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdSignature" Type="{SIGNATURE_REL}" Target="sig1.xml"/></Relationships>"#,
+    );
+
+    let mut writer = StreamingArchiveWriter::new();
+    let mut saw_content_types = false;
+    let mut saw_root_relationships = false;
+    for name in names {
+        let bytes = reader.read(&name).expect("source ZIP member");
+        let bytes = match name.as_str() {
+            "[Content_Types].xml" => {
+                saw_content_types = true;
+                append_before_closing(bytes, "</Types>", &content_types)
+            },
+            "_rels/.rels" => {
+                saw_root_relationships = true;
+                append_before_closing(bytes, "</Relationships>", &root_relationship)
+            },
+            _ => bytes,
+        };
+        writer
+            .write_deflated(&name, &bytes)
+            .expect("copy source ZIP member");
+    }
+    assert!(saw_content_types);
+    assert!(saw_root_relationships);
+    writer
+        .write_deflated("_xmlsignatures/origin.sigs", ORIGIN_BYTES)
+        .expect("raw signature-origin member");
+    writer
+        .write_deflated(
+            "_xmlsignatures/_rels/origin.sigs.rels",
+            origin_relationships.as_bytes(),
+        )
+        .expect("raw signature relationship member");
+    writer
+        .write_deflated("_xmlsignatures/sig1.xml", SIGNATURE_BYTES)
+        .expect("raw malformed signature member");
+    let bytes = writer.finish_to_bytes().expect("signed fixture ZIP");
+    let package = Package::from_bytes(bytes).expect("signed fixture package");
+    assert_inert_signature_graph(&package);
+    package
 }
 
 #[test]
@@ -338,8 +403,7 @@ fn changed_public_patch_is_refused_on_workbook_from_signed_package() {
     let patch = edit.commit().expect("patch commit").patch().clone();
     assert!(!patch.is_empty());
 
-    let raw = OpcPackage::from_bytes(&source_bytes).expect("source OPC");
-    let signed_package = Package::from_opc(add_inert_signature(raw)).expect("signed Package");
+    let signed_package = inert_signed_fixture(&source_bytes);
     let signed = signed_package.workbook().expect("signed workbook facade");
     let signed_before = signed.to_plain_bytes().expect("signed bytes");
     assert!(matches!(signed.apply(&patch), Err(Error::Signed)));
@@ -350,8 +414,8 @@ fn changed_public_patch_is_refused_on_workbook_from_signed_package() {
 #[test]
 fn calculation_metadata_patch_no_op_is_exact_but_change_is_refused_on_signed_package() {
     let (baseline, no_op, changed) = calculation_metadata_patches();
-    let mut signed =
-        Package::from_opc(add_inert_signature(baseline.into_plain_opc())).expect("signed Package");
+    let baseline_bytes = baseline.to_plain_bytes().expect("baseline bytes");
+    let mut signed = inert_signed_fixture(&baseline_bytes);
     let before = signed.to_plain_bytes().expect("signed source bytes");
 
     signed

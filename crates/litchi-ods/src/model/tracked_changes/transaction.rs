@@ -1972,7 +1972,8 @@ mod cache_regressions {
             metadata: metadata(id, dependencies),
             dimension: Dimension::Row,
             position: 0.into(),
-            count: PositiveInteger::try_from(1usize).unwrap(),
+            count: PositiveInteger::try_from(1usize)
+                .expect("test fixture or operation should succeed"),
             table: None,
         })
     }
@@ -1992,9 +1993,9 @@ mod cache_regressions {
         Snapshot::parse(
             r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:tracked-changes/></office:spreadsheet></office:body></office:document-content>"#,
         )
-        .unwrap()
+        .expect("test fixture or operation should succeed")
         .transaction()
-        .unwrap()
+        .expect("test fixture or operation should succeed")
     }
 
     #[test]
@@ -2005,24 +2006,39 @@ mod cache_regressions {
             let candidate = insertion(format!("rejected-{index}"), vec![missing]);
             assert!(transaction.append(candidate).is_err());
             assert!(transaction.inbound.is_empty());
-            assert!(transaction.changes().unwrap().changes.is_empty());
+            assert!(
+                transaction
+                    .changes()
+                    .expect("test fixture or operation should succeed")
+                    .changes
+                    .is_empty()
+            );
         }
 
         transaction
             .append(insertion("base".to_string(), Vec::new()))
-            .unwrap();
+            .expect("test fixture or operation should succeed");
         for index in 0..128 {
             let missing = format!("replacement-missing-{index}");
             let candidate = insertion("base".to_string(), vec![missing]);
             assert!(transaction.replace("base", candidate).is_err());
             assert!(transaction.inbound.is_empty());
-            assert_eq!(transaction.changes().unwrap().changes.len(), 1);
+            assert_eq!(
+                transaction
+                    .changes()
+                    .expect("test fixture or operation should succeed")
+                    .changes
+                    .len(),
+                1
+            );
         }
-        transaction.remove("base").unwrap();
+        transaction
+            .remove("base")
+            .expect("test fixture or operation should succeed");
 
         transaction
             .append(insertion("hot".to_string(), Vec::new()))
-            .unwrap();
+            .expect("test fixture or operation should succeed");
         for index in 0..128 {
             let id = format!("hot-source-{index}");
             let mut candidate = insertion(id, vec!["hot".to_string()]);
@@ -2034,34 +2050,48 @@ mod cache_regressions {
                     change_id: Some("hot".to_string()),
                 });
             }
-            transaction.append(candidate).unwrap();
+            transaction
+                .append(candidate)
+                .expect("test fixture or operation should succeed");
         }
         assert_eq!(transaction.inbound["hot"].sources.len(), 128);
         for index in (0..128).rev() {
-            transaction.remove(&format!("hot-source-{index}")).unwrap();
+            transaction
+                .remove(&format!("hot-source-{index}"))
+                .expect("test fixture or operation should succeed");
         }
         assert!(!transaction.inbound.contains_key("hot"));
-        transaction.remove("hot").unwrap();
+        transaction
+            .remove("hot")
+            .expect("test fixture or operation should succeed");
 
         let targets: Vec<String> = (0..64).map(|index| format!("target-{index}")).collect();
         for target in &targets {
             transaction
                 .append(insertion(target.clone(), Vec::new()))
-                .unwrap();
+                .expect("test fixture or operation should succeed");
         }
         let long_source_id = "source".repeat(512);
         transaction
             .append(insertion(long_source_id.clone(), targets.clone()))
-            .unwrap();
-        let source_token = transaction.records.last().unwrap().token;
+            .expect("test fixture or operation should succeed");
+        let source_token = transaction
+            .records
+            .last()
+            .expect("test fixture or operation should succeed")
+            .token;
         for target in &targets {
             let bucket = &transaction.inbound[target];
             assert_eq!(bucket.sources.len(), 1);
             assert!(bucket.sources.contains_key(&source_token));
         }
-        transaction.remove(&long_source_id).unwrap();
+        transaction
+            .remove(&long_source_id)
+            .expect("test fixture or operation should succeed");
         for target in targets.into_iter().rev() {
-            transaction.remove(&target).unwrap();
+            transaction
+                .remove(&target)
+                .expect("test fixture or operation should succeed");
         }
         assert!(transaction.inbound.is_empty());
 
@@ -2070,12 +2100,12 @@ mod cache_regressions {
                 enabled: false,
                 changes: vec![deletion("d1", Some(2)), deletion("d2", None)],
             }))
-            .unwrap();
+            .expect("test fixture or operation should succeed");
         let completed = transaction.multi_deletion_groups.clone();
         for index in 0..128 {
             transaction
                 .append(insertion(format!("valid-{index}"), Vec::new()))
-                .unwrap();
+                .expect("test fixture or operation should succeed");
             assert_eq!(transaction.multi_deletion_groups, completed);
         }
         assert!(transaction.inbound.is_empty());

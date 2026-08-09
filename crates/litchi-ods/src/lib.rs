@@ -56,6 +56,7 @@
     reason = "ODF codec declarations follow document order and retain explicit schema branches for reviewability"
 )]
 
+pub mod advanced;
 pub mod annotations;
 pub mod authoring;
 pub mod charts;

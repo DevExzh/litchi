@@ -401,7 +401,8 @@ mod tests {
     #[test]
     fn parses_and_writes_standard_and_libreoffice_protection() {
         let xml = r#"<o:spreadsheet xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:l="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" t:structure-protected="true" t:protection-key="abc&amp;=" t:protection-key-digest-algorithm="urn:sha256" l:protection-key-digest-algorithm-2="urn:sha1"><t:table t:name="Sheet1" t:protected="true" t:protection-key="sheet" t:protection-key-digest-algorithm="urn:sha1"><l:table-protection l:select-protected-cells="true" l:insert-rows="false" l:use-autofilter="true"/></t:table></o:spreadsheet>"#;
-        let (spreadsheet, sheets) = parse_protection(xml).unwrap();
+        let (spreadsheet, sheets) =
+            parse_protection(xml).expect("test fixture or operation should succeed");
         assert_eq!(spreadsheet.structure_protected, Some(true));
         assert_eq!(spreadsheet.key.value.as_deref(), Some("abc&="));
         assert_eq!(sheets.len(), 1);
@@ -422,7 +423,13 @@ mod tests {
         let invalid = r#"<o:spreadsheet xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" t:structure-protected="yes"/>"#;
         assert!(parse_protection(invalid).is_err());
         let nested = r#"<o:spreadsheet xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:table><t:table/></t:table></o:spreadsheet>"#;
-        assert_eq!(parse_protection(nested).unwrap().1.len(), 1);
+        assert_eq!(
+            parse_protection(nested)
+                .expect("test fixture or operation should succeed")
+                .1
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -437,7 +444,7 @@ mod tests {
           <t:table t:name="Visible" t:protected="false"/>
         </o:spreadsheet>"#;
 
-        let (_, sheets) = parse_protection(xml).unwrap();
+        let (_, sheets) = parse_protection(xml).expect("test fixture or operation should succeed");
         assert_eq!(sheets.len(), 1);
         assert_eq!(sheets[0].protected, Some(false));
     }

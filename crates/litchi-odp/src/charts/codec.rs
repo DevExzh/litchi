@@ -282,9 +282,10 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<ObjectSpan>> {
     let mut depth = 0usize;
     let mut active = None;
     let mut spans = Vec::new();
+    let position_offset = utf8_bom_len(xml);
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, position_offset)?;
         let token = {
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
@@ -320,7 +321,7 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<ObjectSpan>> {
                 | Event::GeneralRef(_) => Token::Other,
             }
         };
-        let end = position(&reader)?;
+        let end = position(&reader, position_offset)?;
         match token {
             Token::Start { object, document } => {
                 if object {
@@ -418,8 +419,9 @@ pub(crate) fn locate_pages(xml: &str) -> Result<Vec<PageSpan>> {
     let mut depth = 0usize;
     let mut active = None;
     let mut pages = Vec::new();
+    let position_offset = utf8_bom_len(xml);
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, position_offset)?;
         let token = {
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
@@ -694,9 +696,19 @@ fn is_object_name(local: &[u8]) -> bool {
     )
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
+fn position(reader: &NsReader<&[u8]>, offset: usize) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid_error("ODP XML position exceeds platform limits"))
+        .map_err(|_err| invalid_error("ODP XML position exceeds platform limits"))?
+        .checked_add(offset)
+        .ok_or_else(|| invalid_error("ODP XML position offset overflow"))
+}
+
+fn utf8_bom_len(xml: &str) -> usize {
+    if xml.as_bytes().starts_with(b"\xEF\xBB\xBF") {
+        3
+    } else {
+        0
+    }
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {

@@ -1,6 +1,7 @@
 //! Source-bound worksheet-cell snapshots and structural edits.
 
 use crate::package::error::{Error, Result};
+use crate::package::shared_strings::SharedString;
 use crate::raw::{Cursor, Header, Limits as RawLimits, Records, Writer, kind};
 use litchi_core::binary;
 use std::collections::{BTreeMap, BTreeSet};
@@ -338,6 +339,8 @@ pub enum Value {
     InlineString(String),
     /// `BrtCellIsst` shared-string table index.
     SharedStringIndex(u32),
+    /// Inline rich/phonetic `BrtCellRString` value.
+    RichString(SharedString),
     /// Cached string in `BrtFmlaString`.
     FormulaStringCache(String),
     /// Cached number in `BrtFmlaNum`.
@@ -378,6 +381,7 @@ impl PartialEq for Value {
             (Self::InlineString(left), Self::InlineString(right))
             | (Self::FormulaStringCache(left), Self::FormulaStringCache(right)) => left == right,
             (Self::SharedStringIndex(left), Self::SharedStringIndex(right)) => left == right,
+            (Self::RichString(left), Self::RichString(right)) => left == right,
             _ => false,
         }
     }
@@ -625,6 +629,7 @@ impl Snapshot {
             | Value::Boolean(_)
             | Value::InlineString(_)
             | Value::SharedStringIndex(_)
+            | Value::RichString(_)
             | Value::FormulaStringCache(_)
             | Value::FormulaNumberCache(_)
             | Value::FormulaBooleanCache(_)
@@ -748,6 +753,7 @@ impl Edit {
             | Value::Boolean(_)
             | Value::InlineString(_)
             | Value::SharedStringIndex(_)
+            | Value::RichString(_)
             | Value::FormulaStringCache(_)
             | Value::FormulaNumberCache(_)
             | Value::FormulaBooleanCache(_)
@@ -796,6 +802,16 @@ impl Edit {
     /// Returns an error for an absent/duplicate cell or another storage family.
     pub fn set_shared_string_index(&mut self, reference: Reference, index: u32) -> Result<()> {
         self.set_value(reference, Value::SharedStringIndex(index))
+    }
+
+    /// Replace one existing inline rich/phonetic string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid run metadata, an absent/duplicate cell, or
+    /// another storage family.
+    pub fn set_rich_string(&mut self, reference: Reference, value: SharedString) -> Result<()> {
+        self.set_value(reference, Value::RichString(value))
     }
 
     /// Set the cached numeric result of an existing `BrtFmlaNum` record.
@@ -856,6 +872,22 @@ impl Edit {
         self.removed.remove(&reference);
         let index = required_index(&self.entries, reference)?;
         self.entries[index].cell.style = style;
+        Ok(())
+    }
+
+    /// Change the phonetic-display bit in an existing cell header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an absent or duplicate cell.
+    pub fn set_show_phonetic(&mut self, reference: Reference, show: bool) -> Result<()> {
+        if let Some(cell) = self.inserted.get_mut(&reference) {
+            cell.show_phonetic = show;
+            return Ok(());
+        }
+        self.removed.remove(&reference);
+        let index = required_index(&self.entries, reference)?;
+        self.entries[index].cell.show_phonetic = show;
         Ok(())
     }
 
@@ -1694,6 +1726,10 @@ fn parse_value(
                 None,
             ))
         },
+        kind::CELL_R_STRING => {
+            require_at_least(payload, 13)?;
+            Ok((Value::RichString(SharedString::parse(&payload[8..])?), None))
+        },
         kind::FMLA_STRING => parse_string_value(payload, limits, true),
         kind::FMLA_NUM => {
             require_at_least(payload, 26)?;
@@ -1798,6 +1834,7 @@ fn is_supported_cell(kind_value: crate::raw::Kind) -> bool {
             | kind::CELL_REAL
             | kind::CELL_ST
             | kind::CELL_ISST
+            | kind::CELL_R_STRING
             | kind::FMLA_STRING
             | kind::FMLA_NUM
             | kind::FMLA_BOOL
@@ -1814,6 +1851,7 @@ fn cell_kind_name(kind_value: crate::raw::Kind) -> &'static str {
         kind::CELL_REAL => "BrtCellReal",
         kind::CELL_ST => "BrtCellSt",
         kind::CELL_ISST => "BrtCellIsst",
+        kind::CELL_R_STRING => "BrtCellRString",
         kind::FMLA_STRING => "BrtFmlaString",
         kind::FMLA_NUM => "BrtFmlaNum",
         kind::FMLA_BOOL => "BrtFmlaBool",
@@ -1868,6 +1906,7 @@ fn same_storage_family(left: &Value, right: &Value) -> bool {
             | (Value::Number(_), Value::Number(_))
             | (Value::InlineString(_), Value::InlineString(_))
             | (Value::SharedStringIndex(_), Value::SharedStringIndex(_))
+            | (Value::RichString(_), Value::RichString(_))
             | (Value::FormulaStringCache(_), Value::FormulaStringCache(_))
             | (Value::FormulaNumberCache(_), Value::FormulaNumberCache(_))
             | (Value::FormulaBooleanCache(_), Value::FormulaBooleanCache(_))
@@ -1888,6 +1927,10 @@ fn validate_value(value: &Value) -> Result<()> {
                     found: units,
                 });
             }
+            Ok(())
+        },
+        Value::RichString(string) => {
+            let _ = string.encode()?;
             Ok(())
         },
         Value::Blank
@@ -2356,6 +2399,7 @@ fn encode_value_into(output: &mut Vec<u8>, value: &Value) -> Result<()> {
             Writer::new(output).write_wide_string(string)?;
         },
         Value::SharedStringIndex(index) => output.extend_from_slice(&index.to_le_bytes()),
+        Value::RichString(string) => output.extend_from_slice(&string.encode()?),
     }
     Ok(())
 }
@@ -2385,6 +2429,7 @@ fn value_kind(value: &Value) -> crate::raw::Kind {
         Value::Number(_) => kind::CELL_REAL,
         Value::InlineString(_) => kind::CELL_ST,
         Value::SharedStringIndex(_) => kind::CELL_ISST,
+        Value::RichString(_) => kind::CELL_R_STRING,
         Value::FormulaStringCache(_) => kind::FMLA_STRING,
         Value::FormulaNumberCache(_) => kind::FMLA_NUM,
         Value::FormulaBooleanCache(_) => kind::FMLA_BOOL,
@@ -2464,7 +2509,7 @@ fn record_total_len(source: &[u8], offset: usize, limits: RawLimits) -> Result<u
 }
 
 fn is_any_cell(kind_value: crate::raw::Kind) -> bool {
-    is_supported_cell(kind_value) || kind_value == kind::CELL_R_STRING
+    is_supported_cell(kind_value)
 }
 
 fn any_cell_at(source: &[u8], limits: Limits, reference: Reference) -> Result<bool> {
@@ -2872,6 +2917,21 @@ mod tests {
         writer
             .write_record(kind::FMLA_STRING, &formula_string)
             .expect("formula string");
+
+        let rich_value = SharedString {
+            text: "Rich".to_string(),
+            runs: vec![crate::package::SharedStringRun {
+                character_index: 0,
+                font_id: 0,
+            }],
+            phonetic: None,
+        };
+        let mut rich = vec![0; 8];
+        rich[..4].copy_from_slice(&12_u32.to_le_bytes());
+        rich.extend_from_slice(&rich_value.encode().expect("rich string"));
+        writer
+            .write_record(kind::CELL_R_STRING, &rich)
+            .expect("rich string cell");
         writer.write_record(kind::END_SHEET_DATA, &[]).expect("end");
         bytes
     }
@@ -2880,7 +2940,7 @@ mod tests {
     fn edits_all_bounded_scalar_families_and_round_trips_patch() {
         let before = stream();
         let snapshot = read(&before).expect("snapshot");
-        assert_eq!(snapshot.cells().len(), 10);
+        assert_eq!(snapshot.cells().len(), 11);
 
         let real_ref = Reference::new(3, 2).expect("real reference");
         let bool_ref = Reference::new(3, 3).expect("bool reference");
@@ -2892,6 +2952,7 @@ mod tests {
         let formula_bool_ref = Reference::new(3, 9).expect("formula Boolean reference");
         let formula_error_ref = Reference::new(3, 10).expect("formula error reference");
         let formula_string_ref = Reference::new(3, 11).expect("formula string reference");
+        let rich_string_ref = Reference::new(3, 12).expect("rich string reference");
         let mut edit = snapshot.edit();
         edit.set_number(real_ref, 9.25).expect("set real");
         edit.set_boolean(bool_ref, true).expect("set bool");
@@ -2910,6 +2971,18 @@ mod tests {
             .expect("set formula error");
         edit.set_formula_string_cache(formula_string_ref, "ZZ".to_string())
             .expect("set formula string");
+        edit.set_rich_string(
+            rich_string_ref,
+            SharedString {
+                text: "Longer rich text".to_string(),
+                runs: vec![crate::package::SharedStringRun {
+                    character_index: 0,
+                    font_id: 0,
+                }],
+                phonetic: None,
+            },
+        )
+        .expect("set rich string");
         edit.set_style(real_ref, StyleIndex::new(1).expect("style"))
             .expect("set style");
         let commit = edit.commit().expect("commit");
@@ -3013,6 +3086,22 @@ mod tests {
             &Value::FormulaStringCache("ZZ".to_string())
         );
         assert_eq!(
+            commit
+                .snapshot()
+                .cell(rich_string_ref)
+                .expect("lookup")
+                .expect("rich string")
+                .value(),
+            &Value::RichString(SharedString {
+                text: "Longer rich text".to_string(),
+                runs: vec![crate::package::SharedStringRun {
+                    character_index: 0,
+                    font_id: 0,
+                }],
+                phonetic: None,
+            })
+        );
+        assert_eq!(
             commit.patch().inverse().apply(&after).expect("revert"),
             before
         );
@@ -3049,7 +3138,7 @@ mod tests {
         let before = stream();
         let snapshot = read(&before).expect("snapshot");
         let removed = Reference::new(3, 3).expect("removed");
-        let inserted_same_row = Reference::new(3, 12).expect("same row");
+        let inserted_same_row = Reference::new(3, 13).expect("same row");
         let inserted_new_row = Reference::new(8, 1).expect("new row");
         let formula_ref = Reference::new(3, 6).expect("formula");
         let mut edit = snapshot.edit();

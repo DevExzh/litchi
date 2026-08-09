@@ -14,6 +14,7 @@ mod transaction;
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use transaction::{
     Commit, Composition, CompositionLimits, Diagnostics, Edit, History, HistoryLimits, JoinError,
-    Operation, Patch, PreparedEdit, Refusal, Snapshot, SubEditJoinFailure, TransactionError,
-    TransactionResult,
+    MergeChoice, Operation, ParagraphTransfer, Patch, PreparedEdit, Refusal, RevisionKind,
+    Snapshot, SubEditConflict, SubEditJoinFailure, ThreeWayError, ThreeWayMergeFailure,
+    ThreeWayPlan, TransactionError, TransactionResult, TransferRefusal,
 };

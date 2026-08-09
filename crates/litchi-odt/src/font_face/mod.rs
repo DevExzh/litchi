@@ -46,7 +46,8 @@ pub use model::{
     Variant, Weight,
 };
 pub(crate) use package::{
-    parse_content_font_face_declarations, parse_styles_font_face_declarations,
-    remove_content_font_face_declarations_xml, remove_styles_font_face_declarations_xml,
-    set_content_font_face_declarations_xml, set_styles_font_face_declarations_xml,
+    content_font_face_splice_publication, parse_content_font_face_declarations,
+    parse_styles_font_face_declarations, remove_content_font_face_declarations_xml,
+    remove_styles_font_face_declarations_xml, set_content_font_face_declarations_xml,
+    set_styles_font_face_declarations_xml, styles_font_face_splice_publication,
 };

@@ -1,11 +1,12 @@
-//! Source-checked slide ordering for opened legacy PPT presentations.
+//! Unified source-checked editing for opened legacy PPT presentations.
 //!
 //! `[MS-PPT]` 2.4.14.3 defines presentation order by the sequence of
 //! `SlidePersistAtom` records in `SlideListWithTextContainer`. This owner moves
 //! each complete slide group, including the outline-text records following its
 //! persist atom, and publishes the changed live `DocumentContainer` through a
-//! new append-only PPT user edit. Slide payload records and unrelated CFB
-//! streams remain exact.
+//! new append-only PPT user edit. The same root composes checked shape text
+//! and complete PowerPoint client-anchor geometry formatting. Slide payload
+//! records and unrelated CFB streams remain exact unless selected explicitly.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -242,6 +243,17 @@ impl Snapshot {
         self.document.slides().len()
     }
 
+    /// Returns the checked complete host anchor for one existing shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the target is absent, ambiguous, or does
+    /// not own exactly one supported `PowerPoint` client anchor.
+    pub fn shape_anchor(&self, target: crate::text_edit::Target) -> Result<crate::Anchor> {
+        self.require_position(target.slide())?;
+        crate::text_edit::inspect_shape_anchor(self.bytes(), target).map_err(Error::from)
+    }
+
     /// Resource bounds retained for commits and patch application.
     #[must_use]
     pub const fn limits(&self) -> RecordLimits {
@@ -263,6 +275,8 @@ impl Snapshot {
             changes: Vec::new(),
             structural: Vec::new(),
             text_changes: Vec::new(),
+            anchor_changes: Vec::new(),
+            formatting: Vec::new(),
             inserted_records: BTreeMap::new(),
         })
     }
@@ -381,16 +395,23 @@ impl Snapshot {
         let operations = patch.operations();
         let mut index = 0usize;
         while index < operations.len() {
-            if operations[index].op == "presentation.shape-text.set" {
-                current = apply_durable_text(&current, &operations[index])?;
+            if is_formatting_operation(&operations[index].op) {
+                current = match operations[index].op.as_str() {
+                    "presentation.shape-text.set" => {
+                        apply_durable_text(&current, &operations[index])?
+                    },
+                    "presentation.shape-anchor.set" => {
+                        apply_durable_anchor(&current, &operations[index])?
+                    },
+                    _ => unreachable!("formatting vocabulary is checked by its predicate"),
+                };
                 index += 1;
                 continue;
             }
 
             let structural_artifact = artifact_hash(current.bytes());
             let mut transaction = current.edit()?;
-            while index < operations.len() && operations[index].op != "presentation.shape-text.set"
-            {
+            while index < operations.len() && !is_formatting_operation(&operations[index].op) {
                 apply_durable_structural(
                     &mut transaction,
                     &operations[index],
@@ -492,6 +513,40 @@ impl ShapeTextChange {
     }
 }
 
+/// One checked shape-geometry formatting replacement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShapeAnchorChange {
+    target: crate::text_edit::Target,
+    before: crate::Anchor,
+    after: crate::Anchor,
+}
+
+impl ShapeAnchorChange {
+    /// Semantic source-order shape target.
+    #[must_use]
+    pub const fn target(self) -> crate::text_edit::Target {
+        self.target
+    }
+
+    /// Anchor required before the replacement.
+    #[must_use]
+    pub const fn before(self) -> crate::Anchor {
+        self.before
+    }
+
+    /// Replacement anchor.
+    #[must_use]
+    pub const fn after(self) -> crate::Anchor {
+        self.after
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum FormattingChange {
+    Text(ShapeTextChange),
+    Anchor(ShapeAnchorChange),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SlidePayload {
     group: Vec<crate::records::Record>,
@@ -587,6 +642,8 @@ pub struct Transaction {
     changes: Vec<Change>,
     structural: Vec<StructuralChange>,
     text_changes: Vec<ShapeTextChange>,
+    anchor_changes: Vec<ShapeAnchorChange>,
+    formatting: Vec<FormattingChange>,
     inserted_records: BTreeMap<u32, Vec<u8>>,
 }
 
@@ -615,6 +672,12 @@ impl Transaction {
     #[must_use]
     pub fn shape_text_changes(&self) -> &[ShapeTextChange] {
         &self.text_changes
+    }
+
+    /// Checked shape-anchor formatting replacements staged in this root.
+    #[must_use]
+    pub fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
+        &self.anchor_changes
     }
 
     /// Moves a slide to a final zero-based position in the current projected
@@ -686,11 +749,53 @@ impl Transaction {
             commit.snapshot().bytes().to_vec(),
             self.source.limits,
         )?;
-        self.text_changes.push(ShapeTextChange {
+        let change = ShapeTextChange {
             target: source_target,
             before,
             after,
-        });
+        };
+        self.text_changes.push(change.clone());
+        self.formatting.push(FormattingChange::Text(change));
+        Ok(())
+    }
+
+    /// Replaces an existing shape's complete checked `PowerPoint` client anchor.
+    /// Every other `OfficeArt` record and CFB stream remains exact.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the semantic target is missing,
+    /// ambiguous, newly inserted, or lacks exactly one supported host anchor.
+    pub fn set_shape_anchor(
+        &mut self,
+        target: crate::text_edit::Target,
+        anchor: crate::Anchor,
+    ) -> Result<()> {
+        self.require_position(target.slide())?;
+        let projected = self.document.slides()?;
+        let persist_id = projected[target.slide().get()].persist_id();
+        let source_position = self
+            .source
+            .document
+            .slides()
+            .iter()
+            .position(|slide| slide.persist_id() == persist_id)
+            .map(Position::new)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let source_target = crate::text_edit::Target::new(source_position, target.shape());
+        let rewritten =
+            crate::text_edit::replace_shape_anchor(self.working.bytes(), source_target, anchor)?;
+        if rewritten.before == rewritten.after {
+            return Ok(());
+        }
+        self.working = Snapshot::from_bytes_with_limits(rewritten.bytes, self.source.limits)?;
+        let change = ShapeAnchorChange {
+            target: source_target,
+            before: rewritten.before,
+            after: rewritten.after,
+        };
+        self.anchor_changes.push(change);
+        self.formatting.push(FormattingChange::Anchor(change));
         Ok(())
     }
 
@@ -777,6 +882,9 @@ impl Transaction {
                 self.changes,
                 self.structural,
                 self.text_changes,
+                self.anchor_changes,
+                self.formatting,
+                true,
                 artifact_hash(working.bytes()),
                 artifact_hash(working.bytes()),
             );
@@ -832,6 +940,9 @@ impl Transaction {
             self.changes,
             self.structural,
             self.text_changes,
+            self.anchor_changes,
+            self.formatting,
+            true,
             artifact_hash(working.bytes()),
             artifact_hash(snapshot.bytes()),
         );
@@ -891,6 +1002,9 @@ pub struct Patch {
     changes: Vec<Change>,
     structural: Vec<StructuralChange>,
     text_changes: Vec<ShapeTextChange>,
+    anchor_changes: Vec<ShapeAnchorChange>,
+    formatting: Vec<FormattingChange>,
+    formatting_first: bool,
     structural_before_artifact: String,
     structural_after_artifact: String,
 }
@@ -902,6 +1016,9 @@ impl Patch {
         changes: Vec<Change>,
         structural: Vec<StructuralChange>,
         text_changes: Vec<ShapeTextChange>,
+        anchor_changes: Vec<ShapeAnchorChange>,
+        formatting: Vec<FormattingChange>,
+        formatting_first: bool,
         structural_before_artifact: String,
         structural_after_artifact: String,
     ) -> Self {
@@ -911,6 +1028,9 @@ impl Patch {
             changes,
             structural,
             text_changes,
+            anchor_changes,
+            formatting,
+            formatting_first,
             structural_before_artifact,
             structural_after_artifact,
         }
@@ -926,6 +1046,12 @@ impl Patch {
     #[must_use]
     pub fn shape_text_changes(&self) -> &[ShapeTextChange] {
         &self.text_changes
+    }
+
+    /// Shape-anchor formatting replacements composed into this root patch.
+    #[must_use]
+    pub fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
+        &self.anchor_changes
     }
 
     /// Whether this patch changes no artifact bytes.
@@ -987,6 +1113,36 @@ impl Patch {
                     after: change.before.clone(),
                 })
                 .collect(),
+            self.anchor_changes
+                .iter()
+                .rev()
+                .map(|change| ShapeAnchorChange {
+                    target: change.target,
+                    before: change.after,
+                    after: change.before,
+                })
+                .collect(),
+            self.formatting
+                .iter()
+                .rev()
+                .map(|change| match change {
+                    FormattingChange::Text(text_change) => {
+                        FormattingChange::Text(ShapeTextChange {
+                            target: text_change.target,
+                            before: text_change.after.clone(),
+                            after: text_change.before.clone(),
+                        })
+                    },
+                    FormattingChange::Anchor(anchor_change) => {
+                        FormattingChange::Anchor(ShapeAnchorChange {
+                            target: anchor_change.target,
+                            before: anchor_change.after,
+                            after: anchor_change.before,
+                        })
+                    },
+                })
+                .collect(),
+            !self.formatting_first,
             self.structural_after_artifact.clone(),
             self.structural_before_artifact.clone(),
         )
@@ -1013,13 +1169,41 @@ impl Patch {
 
         let mut forward_blobs = BlobBundle::new(limits.blobs());
         let mut reverse_blobs = BlobBundle::new(limits.blobs());
-        let mut operations = Vec::new();
-        for change in &self.text_changes {
-            operations.push(ReversibleOperation::new(
-                durable_text_operation(limits, change.target, &change.before, &change.after)?,
-                durable_text_operation(limits, change.target, &change.after, &change.before)?,
-            ));
+        let mut formatting_operations = Vec::new();
+        for change in &self.formatting {
+            let pair = match change {
+                FormattingChange::Text(text_change) => ReversibleOperation::new(
+                    durable_text_operation(
+                        limits,
+                        text_change.target,
+                        &text_change.before,
+                        &text_change.after,
+                    )?,
+                    durable_text_operation(
+                        limits,
+                        text_change.target,
+                        &text_change.after,
+                        &text_change.before,
+                    )?,
+                ),
+                FormattingChange::Anchor(anchor_change) => ReversibleOperation::new(
+                    durable_anchor_operation(
+                        limits,
+                        anchor_change.target,
+                        anchor_change.before,
+                        anchor_change.after,
+                    )?,
+                    durable_anchor_operation(
+                        limits,
+                        anchor_change.target,
+                        anchor_change.after,
+                        anchor_change.before,
+                    )?,
+                ),
+            };
+            formatting_operations.push(pair);
         }
+        let mut structural_operations = Vec::new();
         for structural_change in &self.structural {
             let (forward, inverse) = match structural_change {
                 StructuralChange::Move(move_change) => (
@@ -1083,7 +1267,19 @@ impl Patch {
                     )
                 },
             };
-            operations.push(ReversibleOperation::new(forward, inverse));
+            structural_operations.push(ReversibleOperation::new(forward, inverse));
+        }
+        let mut operations = Vec::with_capacity(
+            formatting_operations
+                .len()
+                .saturating_add(structural_operations.len()),
+        );
+        if self.formatting_first {
+            operations.extend(formatting_operations);
+            operations.extend(structural_operations);
+        } else {
+            operations.extend(structural_operations);
+            operations.extend(formatting_operations);
         }
         litchi_core::patch::Patch::<litchi_core::patch::Reversible>::new(
             limits,
@@ -1305,6 +1501,41 @@ fn durable_text_operation(
     )
 }
 
+fn durable_anchor_operation(
+    limits: litchi_core::patch::PatchLimits,
+    target: crate::text_edit::Target,
+    before: crate::Anchor,
+    after: crate::Anchor,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "anchor_sha256".to_string(),
+        serde_json::Value::String(artifact_hash(&before.to_bytes())),
+    );
+    let encoding = match after.encoding() {
+        crate::client_anchor::Encoding::Small => "small",
+        crate::client_anchor::Encoding::Full => "full",
+    };
+    let value = serde_json::json!({
+        "encoding": encoding,
+        "left": after.left(),
+        "top": after.top(),
+        "right": after.right(),
+        "bottom": after.bottom(),
+    });
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "presentation.shape-anchor.set",
+        format!(
+            "slide:{}/shape:{}",
+            target.slide().get(),
+            target.shape().get()
+        ),
+        preconditions,
+        value,
+    )
+}
+
 fn durable_remove_operation(
     limits: litchi_core::patch::PatchLimits,
     change: &ListChange,
@@ -1392,6 +1623,75 @@ fn apply_durable_text(
     edit.set_text(replacement)?;
     let committed = edit.commit()?;
     Snapshot::from_bytes_with_limits(committed.snapshot().bytes().to_vec(), snapshot.limits)
+}
+
+fn is_formatting_operation(operation: &str) -> bool {
+    matches!(
+        operation,
+        "presentation.shape-text.set" | "presentation.shape-anchor.set"
+    )
+}
+
+fn apply_durable_anchor(
+    snapshot: &Snapshot,
+    operation: &litchi_core::patch::PatchOperation,
+) -> Result<Snapshot> {
+    if operation.preconditions.len() != 1 {
+        return Err(invalid_durable_patch(
+            "shape-anchor operation has unexpected preconditions",
+        ));
+    }
+    let target = parse_shape_target(&operation.target)?;
+    let expected = operation
+        .preconditions
+        .get("anchor_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_durable_patch("missing shape-anchor precondition"))?;
+    let current = crate::text_edit::inspect_shape_anchor(snapshot.bytes(), target)?;
+    if artifact_hash(&current.to_bytes()) != expected {
+        return Err(PackageError::InvalidFormat(
+            "PPT durable shape-anchor semantic precondition does not match".into(),
+        )
+        .into());
+    }
+    let replacement = parse_anchor_value(&operation.value)?;
+    let rewritten = crate::text_edit::replace_shape_anchor(snapshot.bytes(), target, replacement)?;
+    Snapshot::from_bytes_with_limits(rewritten.bytes, snapshot.limits)
+}
+
+fn parse_anchor_value(value: &serde_json::Value) -> Result<crate::Anchor> {
+    let object = value
+        .as_object()
+        .filter(|object| object.len() == 5)
+        .ok_or_else(|| invalid_durable_patch("shape-anchor value must have exactly five fields"))?;
+    let coordinate = |name: &str| {
+        object
+            .get(name)
+            .and_then(serde_json::Value::as_i64)
+            .and_then(|coordinate_value| i32::try_from(coordinate_value).ok())
+            .ok_or_else(|| invalid_durable_patch("shape-anchor coordinate is invalid"))
+    };
+    let left = coordinate("left")?;
+    let top = coordinate("top")?;
+    let right = coordinate("right")?;
+    let bottom = coordinate("bottom")?;
+    match object.get("encoding").and_then(serde_json::Value::as_str) {
+        Some("small") => crate::Anchor::small(
+            i16::try_from(left)
+                .map_err(|_error| invalid_durable_patch("small anchor left is out of range"))?,
+            i16::try_from(top)
+                .map_err(|_error| invalid_durable_patch("small anchor top is out of range"))?,
+            i16::try_from(right)
+                .map_err(|_error| invalid_durable_patch("small anchor right is out of range"))?,
+            i16::try_from(bottom)
+                .map_err(|_error| invalid_durable_patch("small anchor bottom is out of range"))?,
+        )
+        .map_err(Error::from),
+        Some("full") => crate::Anchor::full(left, top, right, bottom).map_err(Error::from),
+        _ => Err(invalid_durable_patch(
+            "shape-anchor encoding must be small or full",
+        )),
+    }
 }
 
 fn apply_durable_structural(
@@ -1717,6 +2017,18 @@ fn require_portable_slide(target: &Snapshot, record: &[u8]) -> Result<()> {
             dependency: "speaker-notes",
         }));
     }
+    if !crate::comments::parse_slide_comments(&root)?.is_empty() {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: "comment-author-catalog",
+        }));
+    }
+    if contains_record_type(&root, crate::RecordType::InteractiveInfo)
+        || contains_record_type(&root, crate::RecordType::TextInteractiveInfoAtom)
+    {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: "hyperlink-action",
+        }));
+    }
     let has_drawing = contains_record_type(&root, crate::RecordType::PPDrawing);
     let has_external = contains_record_type(&root, crate::RecordType::ExternalObjectRefAtom);
     if has_drawing || has_external {
@@ -1803,6 +2115,13 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
     for change in &patch.text_changes {
         effects.insert(format!(
             "slide:{}/shape:{}/text",
+            change.target.slide().get(),
+            change.target.shape().get()
+        ));
+    }
+    for change in &patch.anchor_changes {
+        effects.insert(format!(
+            "slide:{}/shape:{}/anchor",
             change.target.slide().get(),
             change.target.shape().get()
         ));
@@ -1976,6 +2295,31 @@ mod tests {
         output.into_inner()
     }
 
+    fn authored_table_fixture() -> Vec<u8> {
+        let mut writer = crate::writer::Writer::new();
+        let slide = writer.add_slide().unwrap();
+        let mut table = crate::writer::Table::new(2, 2).unwrap();
+        table.set_cell_text(0, 0, "A1").unwrap();
+        table.set_cell_text(1, 1, "B2").unwrap();
+        writer.add_table(slide, 50, 60, table).unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    fn anchor_target(snapshot: &Snapshot) -> crate::text_edit::Target {
+        (0..snapshot.slide_count())
+            .flat_map(|slide| {
+                (0..64).map(move |shape| {
+                    crate::text_edit::Target::new(Position::new(slide), Position::new(shape))
+                })
+            })
+            .find(|target| {
+                crate::text_edit::inspect_shape_anchor(snapshot.bytes(), *target).is_ok()
+            })
+            .expect("fixture must expose one anchored shape")
+    }
+
     fn patch_limits() -> litchi_core::patch::PatchLimits {
         litchi_core::patch::PatchLimits::new(
             litchi_core::patch::BlobLimits::new(0, 0, 0),
@@ -2108,17 +2452,34 @@ mod tests {
         let mut edit = source.edit().unwrap();
         edit.set_shape_text(target, "root transaction text")
             .unwrap();
+        let anchor = crate::Anchor::small(20, 30, 300, 200).unwrap();
+        edit.set_shape_anchor(target, anchor).unwrap();
         edit.move_slide(Position::new(0), Position::new(1)).unwrap();
         let commit = edit.commit().unwrap();
         let text = slide_texts(commit.snapshot().bytes());
         assert!(text[1].contains("root transaction text"));
         assert_eq!(commit.patch().shape_text_changes().len(), 1);
+        assert_eq!(commit.patch().shape_anchor_changes().len(), 1);
+        assert_eq!(
+            crate::text_edit::inspect_shape_anchor(
+                commit.snapshot().bytes(),
+                crate::text_edit::Target::new(Position::new(1), Position::new(0)),
+            )
+            .unwrap(),
+            anchor
+        );
 
         let durable = commit.patch().to_durable(patch_limits()).unwrap();
         let applied = source.apply_durable(&durable).unwrap();
         assert_eq!(slide_texts(applied.bytes()), text);
         let restored = applied.apply_durable(&durable.inverse()).unwrap();
         assert_eq!(slide_texts(restored.bytes()), slide_texts(source.bytes()));
+        let inverse_patch = commit.patch().inverse().to_durable(patch_limits()).unwrap();
+        let inverse_restored = commit.snapshot().apply_durable(&inverse_patch).unwrap();
+        assert_eq!(
+            slide_texts(inverse_restored.bytes()),
+            slide_texts(source.bytes())
+        );
 
         let mut same_target = source.edit().unwrap();
         same_target
@@ -2131,14 +2492,14 @@ mod tests {
         assert!(!conflicts.is_clean());
         assert_eq!(conflicts.conflicts().len(), 1);
 
-        let mut disjoint = source.edit().unwrap();
-        disjoint
+        let mut disjoint_edit = source.edit().unwrap();
+        disjoint_edit
             .set_shape_text(
                 crate::text_edit::Target::new(Position::new(1), Position::new(0)),
                 "disjoint text",
             )
             .unwrap();
-        let disjoint = disjoint.commit().unwrap();
+        let disjoint = disjoint_edit.commit().unwrap();
         assert!(
             source
                 .plan_three_way(competing.patch(), disjoint.patch())
@@ -2146,7 +2507,6 @@ mod tests {
                 .is_clean()
         );
     }
-
     #[test]
     fn real_fixture_remove_is_reversible_on_the_semantic_wire() {
         let source = Snapshot::from_bytes(fixture("basic_test_ppt_file.ppt")).unwrap();
@@ -2182,8 +2542,80 @@ mod tests {
     }
 
     #[test]
+    fn real_fixture_shape_anchor_reopens_reverses_and_detects_conflicts() {
+        let source = Snapshot::from_bytes(fixture("basic_test_ppt_file.ppt")).unwrap();
+        let target = anchor_target(&source);
+        let before = crate::text_edit::inspect_shape_anchor(source.bytes(), target).unwrap();
+        let replacement = crate::Anchor::small(40, 50, 440, 350).unwrap();
+        assert_ne!(before, replacement);
+
+        let mut edit = source.edit().unwrap();
+        edit.set_shape_anchor(target, replacement).unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(
+            crate::text_edit::inspect_shape_anchor(commit.snapshot().bytes(), target).unwrap(),
+            replacement
+        );
+        let mut reopened = Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+        assert_eq!(
+            reopened.presentation().unwrap().slide_count(),
+            source.slide_count()
+        );
+
+        let durable = commit.patch().to_durable(patch_limits()).unwrap();
+        let applied = source.apply_durable(&durable).unwrap();
+        let restored = applied.apply_durable(&durable.inverse()).unwrap();
+        assert_eq!(
+            crate::text_edit::inspect_shape_anchor(restored.bytes(), target).unwrap(),
+            before
+        );
+
+        let mut competing_edit = source.edit().unwrap();
+        competing_edit
+            .set_shape_anchor(target, crate::Anchor::small(60, 70, 460, 370).unwrap())
+            .unwrap();
+        let competing = competing_edit.commit().unwrap();
+        assert!(
+            !source
+                .plan_three_way(commit.patch(), competing.patch())
+                .unwrap()
+                .is_clean()
+        );
+        assert!(competing.snapshot().apply_durable(&durable).is_err());
+    }
+
+    #[test]
+    fn table_shape_geometry_uses_the_same_checked_root_operation() {
+        let source = Snapshot::from_bytes(authored_table_fixture()).unwrap();
+        let target = anchor_target(&source);
+        let replacement = crate::Anchor::small(80, 90, 880, 590).unwrap();
+        let mut edit = source.edit().unwrap();
+        edit.set_shape_anchor(target, replacement).unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.snapshot().shape_anchor(target).unwrap(), replacement);
+        let durable = commit.patch().to_durable(patch_limits()).unwrap();
+        assert_eq!(
+            source
+                .apply_durable(&durable)
+                .unwrap()
+                .shape_anchor(target)
+                .unwrap(),
+            replacement
+        );
+    }
+
+    #[test]
     fn transfer_planning_closes_simple_dependencies_and_refuses_drawings() {
-        let donor = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let base = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let transferred_anchor = crate::Anchor::small(25, 35, 325, 235).unwrap();
+        let mut format = base.edit().unwrap();
+        format
+            .set_shape_anchor(
+                crate::text_edit::Target::new(Position::new(0), Position::new(0)),
+                transferred_anchor,
+            )
+            .unwrap();
+        let donor = format.commit().unwrap().snapshot().clone();
         let mut remove = donor.edit().unwrap();
         remove.remove_slide(Position::new(0)).unwrap();
         let receiver = remove.commit().unwrap().snapshot().clone();
@@ -2198,6 +2630,16 @@ mod tests {
             slide_texts(commit.snapshot().bytes()),
             slide_texts(donor.bytes())
         );
+        assert_eq!(
+            commit
+                .snapshot()
+                .shape_anchor(crate::text_edit::Target::new(
+                    Position::new(0),
+                    Position::new(0),
+                ))
+                .unwrap(),
+            transferred_anchor
+        );
 
         let durable = commit.patch().to_durable(transfer_patch_limits()).unwrap();
         assert_eq!(
@@ -2210,6 +2652,14 @@ mod tests {
             drawing.plan_transfer_from(&drawing, Position::new(0)),
             Err(Error::Refused(Refusal::UnsupportedSlideDependency {
                 dependency: "drawing-group"
+            }))
+        ));
+
+        let comments = Snapshot::from_bytes(fixture("WithComments.ppt")).unwrap();
+        assert!(matches!(
+            comments.plan_transfer_from(&comments, Position::new(0)),
+            Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: "comment-author-catalog"
             }))
         ));
     }

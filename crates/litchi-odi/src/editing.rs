@@ -13,6 +13,24 @@ pub trait FrameEditor {
     fn set_frame_name(&mut self, frame: usize, value: Option<String>) -> Result<()>;
     /// Replaces one linked URI or inline byte payload without changing representation.
     fn set_source(&mut self, frame: usize, value: Source) -> Result<()>;
+    /// Replaces the optional stable XML identifier on `draw:frame`.
+    fn set_frame_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the optional accessible frame title.
+    fn set_frame_title(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the optional accessible frame description.
+    fn set_frame_description(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the optional declared image media type.
+    fn set_image_media_type(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the optional stable XML identifier on `draw:image`.
+    fn set_image_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the optional inert producer filter hint.
+    fn set_filter_name(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the optional image `XLink` type.
+    fn set_link_type(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the optional image `XLink` presentation behavior.
+    fn set_show(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the optional image `XLink` activation behavior.
+    fn set_actuate(&mut self, frame: usize, value: Option<String>) -> Result<()>;
     /// Replaces one optional graphic style reference.
     fn set_style_name(&mut self, frame: usize, value: Option<String>) -> Result<()>;
     /// Replaces one optional text style reference.
@@ -55,6 +73,8 @@ pub trait FrameEditor {
     fn set_relative_width(&mut self, frame: usize, value: Option<String>) -> Result<()>;
     /// Replaces the lexical relative height.
     fn set_relative_height(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the optional `draw:copy-of` frame reference.
+    fn set_copy_of(&mut self, frame: usize, value: Option<String>) -> Result<()>;
 }
 
 macro_rules! impl_frame_editor {
@@ -65,6 +85,33 @@ macro_rules! impl_frame_editor {
             }
             fn set_source(&mut self, frame: usize, value: Source) -> Result<()> {
                 <$type>::set_source(self, frame, value)
+            }
+            fn set_frame_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_frame_xml_id(self, frame, value)
+            }
+            fn set_frame_title(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_frame_title(self, frame, value)
+            }
+            fn set_frame_description(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_frame_description(self, frame, value)
+            }
+            fn set_image_media_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_image_media_type(self, frame, value)
+            }
+            fn set_image_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_image_xml_id(self, frame, value)
+            }
+            fn set_filter_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_filter_name(self, frame, value)
+            }
+            fn set_link_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_link_type(self, frame, value)
+            }
+            fn set_show(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_show(self, frame, value)
+            }
+            fn set_actuate(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_actuate(self, frame, value)
             }
             fn set_style_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
                 <$type>::set_style_name(self, frame, value)
@@ -122,6 +169,9 @@ macro_rules! impl_frame_editor {
             }
             fn set_relative_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
                 <$type>::set_relative_height(self, frame, value)
+            }
+            fn set_copy_of(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_copy_of(self, frame, value)
             }
         }
     };

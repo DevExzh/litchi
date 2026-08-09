@@ -7,8 +7,9 @@
 //! publication. Text and direct-bold changes share one immutable
 //! multi-operation transaction.
 
+use crate::DateTime;
 use crate::package::Error as PackageError;
-use crate::tracked_revision::{Limits, RevisionEditor, RevisionKind};
+use crate::tracked_revision::{Limits, Revision, RevisionEditor, RevisionKind, RevisionMetadata};
 use litchi_core::Position;
 use litchi_core::patch::{
     BlobBundle, BlobId, CompositionError, JoinedSubEdits, PatchError, PatchLimits, PatchOperation,
@@ -82,6 +83,110 @@ pub enum Projection {
     Rejected,
 }
 
+/// One of the seven text stories represented by `FibRgLw97` character counts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Story {
+    Main,
+    Footnote,
+    Header,
+    Comment,
+    Endnote,
+    Textbox,
+    HeaderTextbox,
+}
+
+impl Story {
+    const fn index(self) -> usize {
+        match self {
+            Self::Main => 0,
+            Self::Footnote => 1,
+            Self::Header => 2,
+            Self::Comment => 3,
+            Self::Endnote => 4,
+            Self::Textbox => 5,
+            Self::HeaderTextbox => 6,
+        }
+    }
+
+    const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Main => "main",
+            Self::Footnote => "footnote",
+            Self::Header => "header",
+            Self::Comment => "comment",
+            Self::Endnote => "endnote",
+            Self::Textbox => "textbox",
+            Self::HeaderTextbox => "header-textbox",
+        }
+    }
+}
+
+/// A semantic text range owned by the opened DOC transaction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TextTarget {
+    /// Ordinary paragraph in one DOC story.
+    StoryParagraph { story: Story, position: Position },
+    /// Simple main-story table cell, excluding its paragraph/cell marks.
+    TableCell(Position),
+    /// Cached result of one simple, non-nested main-story field.
+    FieldResult(Position),
+}
+
+impl TextTarget {
+    /// Convenience constructor for an ordinary main-body paragraph.
+    #[must_use]
+    pub const fn body_paragraph(position: Position) -> Self {
+        Self::StoryParagraph {
+            story: Story::Main,
+            position,
+        }
+    }
+}
+
+/// One inert text item and its checked semantic selector.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TextItem {
+    target: TextTarget,
+    text: String,
+}
+
+impl TextItem {
+    #[must_use]
+    pub const fn target(&self) -> TextTarget {
+        self.target
+    }
+
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+}
+
+/// Direct character property supported without style-table resource creation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CharacterProperty {
+    Bold,
+    Italic,
+    Underline,
+}
+
+/// Non-destructive tracked-mark disposition supported by the root transaction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum RevisionDisposition {
+    Accept,
+    Reject,
+}
+
+impl CharacterProperty {
+    const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Bold => "bold",
+            Self::Italic => "italic",
+            Self::Underline => "underline",
+        }
+    }
+}
+
 /// A visible ordinary paragraph in the main document story.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Paragraph {
@@ -134,6 +239,22 @@ pub enum Refusal {
     FormattingDependency,
     /// A known CP-indexed table has coupled records outside the resize model.
     PositionDependency { fib_index: usize },
+    /// Non-main stories currently permit exact-length replacement only.
+    StoryLengthChange {
+        story: Story,
+        expected: usize,
+        actual: usize,
+    },
+    /// The requested field is nested or lacks one balanced separator/result.
+    ComplexField,
+    /// The requested table cell has multiple paragraphs or structural content.
+    ComplexTableCell,
+    /// A semantic target is absent from the selected collection.
+    TargetNotFound,
+    /// Cross-document transfer is limited to inert text with no resource edges.
+    TransferDependency { dependency: &'static str },
+    /// This disposition would delete text or require restoring prior formatting.
+    DestructiveRevisionDisposition { kind: RevisionKind },
     /// The configured operation count was exhausted.
     OperationLimit { observed: usize, limit: usize },
     /// One or all replacement payloads exceed the configured UTF-16 bound.
@@ -175,6 +296,29 @@ impl std::fmt::Display for Refusal {
             Self::PositionDependency { fib_index } => write!(
                 formatter,
                 "body length change depends on unmodeled CP-indexed FIB table {fib_index}"
+            ),
+            Self::StoryLengthChange {
+                story,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "{story:?} story replacement changes UTF-16 length from {expected} to {actual}"
+            ),
+            Self::ComplexField => formatter.write_str(
+                "field result is nested, unbalanced, or otherwise outside the simple field model",
+            ),
+            Self::ComplexTableCell => formatter.write_str(
+                "table cell has multiple paragraphs or structural content outside the simple cell model",
+            ),
+            Self::TargetNotFound => formatter.write_str("DOC semantic text target is out of range"),
+            Self::TransferDependency { dependency } => write!(
+                formatter,
+                "DOC transfer has an unsupported {dependency} dependency"
+            ),
+            Self::DestructiveRevisionDisposition { kind } => write!(
+                formatter,
+                "{kind:?} revision disposition is destructive and outside reversible mark editing"
             ),
             Self::OperationLimit { observed, limit } => write!(
                 formatter,
@@ -334,6 +478,32 @@ impl Snapshot {
         projected_paragraphs(&editor, projection)
     }
 
+    /// Lists ordinary paragraphs from any DOC story. Main-story review
+    /// projection remains available through [`Self::paragraphs`]; non-main
+    /// stories expose their exact stored text.
+    pub fn story_paragraphs(&self, story: Story) -> Result<Vec<TextItem>> {
+        let editor = self.editor()?;
+        target_spans(&editor, TargetCollection::Story(story)).map(items_from_spans)
+    }
+
+    /// Lists simple main-story table cells that can be edited without changing
+    /// table marks or PAPX/TAP structure.
+    pub fn table_cells(&self) -> Result<Vec<TextItem>> {
+        let editor = self.editor()?;
+        target_spans(&editor, TargetCollection::TableCells).map(items_from_spans)
+    }
+
+    /// Lists cached results of balanced, non-nested main-story fields.
+    pub fn field_results(&self) -> Result<Vec<TextItem>> {
+        let editor = self.editor()?;
+        target_spans(&editor, TargetCollection::FieldResults).map(items_from_spans)
+    }
+
+    /// Lists tracked main-story ranges in stable CP/kind order.
+    pub fn revisions(&self) -> Result<Vec<Revision>> {
+        self.editor()?.revisions().map_err(Error::Invalid)
+    }
+
     /// Starts a staged bounded body text-and-formatting transaction.
     ///
     /// # Errors
@@ -383,13 +553,14 @@ impl Snapshot {
     ) -> Result<PreparedEdit> {
         let replacement = replacement.into();
         let mut validation = self.edit()?;
-        validation.replace_paragraph(position, &replacement)?;
+        let target = TextTarget::body_paragraph(position);
+        validation.replace_text(target, &replacement)?;
         PreparedEdit::new(
             self.lineage(),
             limits,
             identifier,
             PreparedOperation::Text {
-                position,
+                target,
                 replacement,
             },
         )
@@ -409,12 +580,62 @@ impl Snapshot {
         enabled: bool,
     ) -> Result<PreparedEdit> {
         let mut validation = self.edit()?;
-        validation.set_paragraph_bold(position, enabled)?;
+        let target = TextTarget::body_paragraph(position);
+        validation.set_character_property(target, CharacterProperty::Bold, enabled)?;
         PreparedEdit::new(
             self.lineage(),
             limits,
             identifier,
-            PreparedOperation::Bold { position, enabled },
+            PreparedOperation::Format {
+                target,
+                property: CharacterProperty::Bold,
+                enabled,
+            },
+        )
+    }
+
+    /// Prepares one independently composable semantic text replacement.
+    pub fn prepare_text(
+        &self,
+        limits: CompositionLimits,
+        identifier: impl Into<String>,
+        target: TextTarget,
+        replacement: impl Into<String>,
+    ) -> Result<PreparedEdit> {
+        let replacement = replacement.into();
+        let mut validation = self.edit()?;
+        validation.replace_text(target, &replacement)?;
+        PreparedEdit::new(
+            self.lineage(),
+            limits,
+            identifier,
+            PreparedOperation::Text {
+                target,
+                replacement,
+            },
+        )
+    }
+
+    /// Prepares one independently composable direct-format mutation.
+    pub fn prepare_format(
+        &self,
+        limits: CompositionLimits,
+        identifier: impl Into<String>,
+        target: TextTarget,
+        property: CharacterProperty,
+        enabled: bool,
+    ) -> Result<PreparedEdit> {
+        let mut validation = self.edit()?;
+        validation.set_character_property(target, property, enabled)?;
+        PreparedEdit::new(
+            self.lineage(),
+            limits,
+            identifier,
+            PreparedOperation::Format {
+                target,
+                property,
+                enabled,
+            },
         )
     }
 
@@ -448,53 +669,83 @@ impl Snapshot {
             if artifact != expected_artifact {
                 return Err(Error::Conflict);
             }
-            let position = parse_durable_target(&operation.target)?;
+            if operation.op == "revision-mark.set" {
+                apply_durable_revision(&mut edit, operation)?;
+                continue;
+            }
+            if operation.op == "embedded-display.set" {
+                apply_durable_embedded_display(&mut edit, operation)?;
+                continue;
+            }
+            let target = parse_durable_target(&operation.target)?;
             match operation.op.as_str() {
-                "body-text.set" => {
+                "text.set" | "body-text.set" => {
                     let expected = operation
                         .preconditions
                         .get("text")
                         .and_then(serde_json::Value::as_str)
                         .ok_or_else(|| invalid_durable_patch("missing text precondition"))?;
-                    let paragraphs = source_paragraphs(&edit.editor)?;
-                    let paragraph = paragraphs
-                        .get(position.get())
-                        .ok_or(Error::Refused(Refusal::ParagraphNotFound))?;
-                    if paragraph.text != expected {
+                    let span = resolve_target(&edit.editor, target)?;
+                    if span.text != expected {
                         return Err(Error::Conflict);
                     }
                     let replacement = operation
                         .value
                         .as_str()
                         .ok_or_else(|| invalid_durable_patch("body text value is not a string"))?;
-                    edit.replace_paragraph(position, replacement)?;
+                    edit.replace_text(target, replacement)?;
                 },
-                "body-bold.set" => {
-                    let expected = parse_optional_bool(
-                        operation
-                            .preconditions
-                            .get("bold")
-                            .ok_or_else(|| invalid_durable_patch("missing bold precondition"))?,
+                "character-bold.set" | "body-bold.set" => {
+                    apply_durable_format(&mut edit, target, CharacterProperty::Bold, operation)?;
+                },
+                "character-italic.set" => {
+                    apply_durable_format(&mut edit, target, CharacterProperty::Italic, operation)?;
+                },
+                "character-underline.set" => {
+                    apply_durable_format(
+                        &mut edit,
+                        target,
+                        CharacterProperty::Underline,
+                        operation,
                     )?;
-                    let paragraphs = source_paragraphs(&edit.editor)?;
-                    let paragraph = paragraphs
-                        .get(position.get())
-                        .ok_or(Error::Refused(Refusal::ParagraphNotFound))?;
-                    let actual = edit
-                        .editor
-                        .uniform_bold_override(paragraph.start_cp, paragraph.end_cp)
-                        .map_err(Error::Invalid)?
-                        .ok_or(Error::Refused(Refusal::FormattingDependency))?;
-                    if actual != expected {
-                        return Err(Error::Conflict);
-                    }
-                    let value = parse_optional_bool(&operation.value)?;
-                    edit.set_paragraph_bold_override(position, value)?;
                 },
                 _ => return Err(invalid_durable_patch("unsupported operation vocabulary")),
             }
         }
         edit.commit().map(|commit| commit.snapshot)
+    }
+
+    /// Plans an inert text transfer while proving the receiving selector and
+    /// exact target artifact. Text carries no DOC style, drawing, or resource
+    /// identifiers, so its dependency closure is empty.
+    pub fn plan_text_transfer_from(
+        &self,
+        donor: &Self,
+        source: TextTarget,
+        destination: TextTarget,
+    ) -> Result<TransferPlan> {
+        let donor_editor = donor.editor()?;
+        let value = resolve_target(&donor_editor, source)?.text;
+        if has_structural_content(&value) {
+            return Err(Error::Refused(Refusal::TransferDependency {
+                dependency: "structural text",
+            }));
+        }
+        let mut validation = self.edit()?;
+        validation.replace_text(destination, &value)?;
+        Ok(TransferPlan {
+            target: self.lineage(),
+            destination,
+            value,
+        })
+    }
+
+    /// Non-mutating three-way plan for two patches based on this exact source.
+    pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
+        if left.before != *self || right.before != *self {
+            return Err(Error::Conflict);
+        }
+        Ok(ThreeWayPlan::new(self.clone(), left, right))
     }
 
     /// Exact source bytes. A snapshot has no implicit serialization step.
@@ -573,11 +824,21 @@ impl Edit {
     /// bounded dependency closure and [`Error::Invalid`] for a failed package
     /// update.
     pub fn replace_paragraph(&mut self, position: Position, replacement: &str) -> Result<()> {
-        let paragraphs = source_paragraphs(&self.editor)?;
-        let paragraph = paragraphs
-            .get(position.get())
-            .ok_or(Error::Refused(Refusal::ParagraphNotFound))?;
-        if has_structural_content(&paragraph.text) {
+        self.replace_text(TextTarget::body_paragraph(position), replacement)
+            .map_err(|error| match error {
+                Error::Refused(Refusal::TargetNotFound) => {
+                    Error::Refused(Refusal::ParagraphNotFound)
+                },
+                other => other,
+            })
+    }
+
+    /// Replaces one checked ordinary paragraph, simple table-cell value, or
+    /// simple field cached result. Main-story targets may change length;
+    /// non-main story paragraphs require equal UTF-16 length.
+    pub fn replace_text(&mut self, target: TextTarget, replacement: &str) -> Result<()> {
+        let span = resolve_target(&self.editor, target)?;
+        if has_structural_content(&span.text) {
             return Err(Error::Refused(Refusal::StructuralContent));
         }
         if has_structural_content(replacement) {
@@ -587,16 +848,28 @@ impl Edit {
         }
         let actual = replacement.encode_utf16().count();
         self.ensure_replacement_capacity(actual)?;
-        if paragraph.start_cp == paragraph.end_cp {
+        if span.start_cp == span.end_cp {
             return Err(Error::Refused(Refusal::EmptyParagraph));
         }
-        if text_revision_intersects(&self.editor, paragraph.start_cp, paragraph.end_cp)? {
+        if text_revision_intersects(&self.editor, span.start_cp, span.end_cp)? {
             return Err(Error::Refused(Refusal::TrackedText));
         }
-        if paragraph.text == replacement {
+        if span.text == replacement {
             return Ok(());
         }
-        if actual != paragraph.text.encode_utf16().count()
+        let expected = span.text.encode_utf16().count();
+        let story = target_story(target);
+        if story != Story::Main && actual != expected {
+            return Err(Error::Refused(Refusal::StoryLengthChange {
+                story,
+                expected,
+                actual,
+            }));
+        }
+        if story != Story::Main && !self.editor.is_unicode_range(span.start_cp, span.end_cp) {
+            return Err(Error::Refused(Refusal::CompressedPiece));
+        }
+        if actual != expected
             && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
         {
             return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
@@ -604,18 +877,24 @@ impl Edit {
         self.ensure_operation_capacity()?;
         if !self
             .editor
-            .has_uniform_character_format(paragraph.start_cp, paragraph.end_cp)
+            .has_uniform_character_format(span.start_cp, span.end_cp)
             .map_err(Error::Invalid)?
         {
             return Err(Error::Refused(Refusal::FormattingDependency));
         }
-        let before = paragraph.text.clone();
-        self.editor
-            .replace_plain_text(paragraph.start_cp, paragraph.end_cp, replacement)
-            .map_err(Error::Invalid)?;
+        let before = span.text;
+        if story == Story::Main {
+            self.editor
+                .replace_plain_text(span.start_cp, span.end_cp, replacement)
+                .map_err(Error::Invalid)?;
+        } else {
+            self.editor
+                .replace_unicode_text_same_length(span.start_cp, span.end_cp, replacement)
+                .map_err(Error::Invalid)?;
+        }
         self.replacement_units = self.replacement_units.saturating_add(actual);
         self.changes.push(Change::Text {
-            position,
+            target,
             before,
             after: replacement.to_string(),
         });
@@ -630,7 +909,105 @@ impl Edit {
     /// Returns a typed refusal when the paragraph is absent, empty,
     /// structural, tracked, or has non-uniform direct bold semantics.
     pub fn set_paragraph_bold(&mut self, position: Position, enabled: bool) -> Result<()> {
-        self.set_paragraph_bold_override(position, Some(enabled))
+        self.set_character_property(
+            TextTarget::body_paragraph(position),
+            CharacterProperty::Bold,
+            enabled,
+        )
+    }
+
+    /// Sets a direct bold, italic, or single-underline override on one semantic
+    /// text target without creating or rewriting style-table resources.
+    pub fn set_character_property(
+        &mut self,
+        target: TextTarget,
+        property: CharacterProperty,
+        enabled: bool,
+    ) -> Result<()> {
+        self.set_character_property_override(target, property, Some(enabled))
+    }
+
+    /// Applies a dependency-checked text transfer prepared for this exact
+    /// receiving artifact.
+    pub fn apply_transfer(&mut self, plan: &TransferPlan) -> Result<()> {
+        if plan.target != self.source.lineage() {
+            return Err(Error::Conflict);
+        }
+        self.replace_text(plan.destination, &plan.value)
+    }
+
+    /// Accepts an insertion/move-to mark or rejects a deletion/move-from mark
+    /// while retaining the stored text. Destructive dispositions and property
+    /// revision restoration are explicitly refused.
+    pub fn dispose_revision(
+        &mut self,
+        position: Position,
+        disposition: RevisionDisposition,
+    ) -> Result<()> {
+        let revisions = self.editor.revisions().map_err(Error::Invalid)?;
+        let revision = revisions
+            .get(position.get())
+            .cloned()
+            .ok_or(Error::Refused(Refusal::TargetNotFound))?;
+        let safe = matches!(
+            (disposition, revision.kind),
+            (
+                RevisionDisposition::Accept,
+                RevisionKind::Insertion | RevisionKind::MoveTo
+            ) | (
+                RevisionDisposition::Reject,
+                RevisionKind::Deletion | RevisionKind::MoveFrom
+            )
+        );
+        if !safe {
+            return Err(Error::Refused(Refusal::DestructiveRevisionDisposition {
+                kind: revision.kind,
+            }));
+        }
+        self.ensure_operation_capacity()?;
+        let before = RevisionSpec::from_revision(&revision);
+        self.editor.remove(position.get()).map_err(Error::Invalid)?;
+        self.changes.push(Change::RevisionMark {
+            identity: before.identity(),
+            before: Some(before),
+            after: None,
+        });
+        Ok(())
+    }
+
+    /// Changes the passive display-as-icon bit of one existing managed
+    /// embedded object through the dedicated `ObjectPool` owner, then reopens the
+    /// complete candidate into this root transaction.
+    pub fn set_embedded_display_as_icon(&mut self, storage_id: u32, enabled: bool) -> Result<()> {
+        let bytes = self.editor.clone().finish().map_err(Error::Invalid)?;
+        let snapshot = crate::embedded_object::Snapshot::open(bytes, self.source.limits)
+            .map_err(Error::Invalid)?;
+        let inventory = snapshot.inventory().map_err(Error::Invalid)?;
+        let before = inventory
+            .get(storage_id)
+            .and_then(|entry| entry.metadata().obj_info())
+            .map(|info| info.display_as_icon)
+            .ok_or(Error::Refused(Refusal::TargetNotFound))?;
+        if before == enabled {
+            return Ok(());
+        }
+        self.ensure_operation_capacity()?;
+        let mut transaction = snapshot.edit();
+        transaction
+            .update_info(storage_id, |info| info.display_as_icon = enabled)
+            .map_err(|error| Error::Invalid(error.into()))?;
+        let bytes = transaction
+            .commit()
+            .map_err(|error| Error::Invalid(error.into()))?
+            .snapshot()
+            .finish();
+        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        self.changes.push(Change::EmbeddedDisplay {
+            storage_id,
+            before,
+            after: enabled,
+        });
+        Ok(())
     }
 
     /// Discards staged changes and returns the original immutable snapshot.
@@ -685,38 +1062,40 @@ impl Edit {
         Ok(())
     }
 
-    fn set_paragraph_bold_override(
+    fn set_character_property_override(
         &mut self,
-        position: Position,
+        target: TextTarget,
+        property: CharacterProperty,
         value: Option<bool>,
     ) -> Result<()> {
-        let paragraphs = source_paragraphs(&self.editor)?;
-        let paragraph = paragraphs
-            .get(position.get())
-            .ok_or(Error::Refused(Refusal::ParagraphNotFound))?;
-        if paragraph.start_cp == paragraph.end_cp {
+        let span = resolve_target(&self.editor, target)?;
+        if span.start_cp == span.end_cp {
             return Err(Error::Refused(Refusal::EmptyParagraph));
         }
-        if has_structural_content(&paragraph.text) {
+        if has_structural_content(&span.text) {
             return Err(Error::Refused(Refusal::StructuralContent));
         }
-        if text_revision_intersects(&self.editor, paragraph.start_cp, paragraph.end_cp)? {
+        if text_revision_intersects(&self.editor, span.start_cp, span.end_cp)? {
             return Err(Error::Refused(Refusal::TrackedText));
         }
-        let before = self
-            .editor
-            .uniform_bold_override(paragraph.start_cp, paragraph.end_cp)
+        let before = uniform_property_override(&self.editor, span.start_cp, span.end_cp, property)
             .map_err(Error::Invalid)?
             .ok_or(Error::Refused(Refusal::FormattingDependency))?;
         if before == value {
             return Ok(());
         }
         self.ensure_operation_capacity()?;
-        self.editor
-            .set_character_bold_override(paragraph.start_cp, paragraph.end_cp, value)
-            .map_err(Error::Invalid)?;
-        self.changes.push(Change::Bold {
-            position,
+        set_property_override(
+            &mut self.editor,
+            span.start_cp,
+            span.end_cp,
+            property,
+            value,
+        )
+        .map_err(Error::Invalid)?;
+        self.changes.push(Change::Format {
+            target,
+            property,
             before,
             after: value,
         });
@@ -880,52 +1259,211 @@ impl Patch {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ChangeRef<'a> {
-    /// One ordinary paragraph text replacement.
+    /// One semantic text replacement.
     Text {
-        position: Position,
+        target: TextTarget,
         before: &'a str,
         after: &'a str,
     },
-    /// One direct bold-override mutation.
-    Bold {
-        position: Position,
+    /// One direct character-property mutation.
+    Format {
+        target: TextTarget,
+        property: CharacterProperty,
         before: Option<bool>,
         after: Option<bool>,
     },
+    /// One reversible tracked-mark presence change.
+    RevisionMark {
+        kind: RevisionKind,
+        start_cp: u32,
+        end_cp: u32,
+        before_present: bool,
+        after_present: bool,
+    },
+    /// One passive embedded-object presentation flag mutation.
+    EmbeddedDisplay {
+        storage_id: u32,
+        before: bool,
+        after: bool,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RevisionSpec {
+    kind: RevisionKind,
+    start_cp: u32,
+    end_cp: u32,
+    metadata: RevisionMetadata,
+}
+
+impl RevisionSpec {
+    fn from_revision(revision: &Revision) -> Self {
+        Self {
+            kind: revision.kind,
+            start_cp: revision.start_cp,
+            end_cp: revision.end_cp,
+            metadata: RevisionMetadata {
+                author: revision.author.clone(),
+                timestamp: revision.timestamp,
+                reason: revision.reason,
+                revision_save_id: revision.revision_save_id,
+            },
+        }
+    }
+
+    fn identity(&self) -> String {
+        format!(
+            "revision/{}:{}:{}",
+            revision_kind_name(self.kind),
+            self.start_cp,
+            self.end_cp
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Change {
     Text {
-        position: Position,
+        target: TextTarget,
         before: String,
         after: String,
     },
-    Bold {
-        position: Position,
+    Format {
+        target: TextTarget,
+        property: CharacterProperty,
         before: Option<bool>,
         after: Option<bool>,
+    },
+    RevisionMark {
+        identity: String,
+        before: Option<RevisionSpec>,
+        after: Option<RevisionSpec>,
+    },
+    EmbeddedDisplay {
+        storage_id: u32,
+        before: bool,
+        after: bool,
     },
 }
 
 impl Change {
+    fn effect(&self) -> String {
+        match self {
+            Self::Text { target, .. } => format!("{}/text", durable_target(*target)),
+            Self::Format {
+                target, property, ..
+            } => format!("{}/{}", durable_target(*target), property.wire_name()),
+            Self::RevisionMark { identity, .. } => identity.clone(),
+            Self::EmbeddedDisplay { storage_id, .. } => {
+                format!("resource/embedded:{storage_id}/display-as-icon")
+            },
+        }
+    }
+
+    fn same_after(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Text {
+                    target: left_target,
+                    after: left_after,
+                    ..
+                },
+                Self::Text {
+                    target: right_target,
+                    after: right_after,
+                    ..
+                },
+            ) => left_target == right_target && left_after == right_after,
+            (
+                Self::Format {
+                    target: left_target,
+                    property: left_property,
+                    after: left_after,
+                    ..
+                },
+                Self::Format {
+                    target: right_target,
+                    property: right_property,
+                    after: right_after,
+                    ..
+                },
+            ) => {
+                left_target == right_target
+                    && left_property == right_property
+                    && left_after == right_after
+            },
+            (
+                Self::RevisionMark {
+                    identity: left_identity,
+                    after: left_after,
+                    ..
+                },
+                Self::RevisionMark {
+                    identity: right_identity,
+                    after: right_after,
+                    ..
+                },
+            ) => left_identity == right_identity && left_after == right_after,
+            (
+                Self::EmbeddedDisplay {
+                    storage_id: left_id,
+                    after: left_after,
+                    ..
+                },
+                Self::EmbeddedDisplay {
+                    storage_id: right_id,
+                    after: right_after,
+                    ..
+                },
+            ) => left_id == right_id && left_after == right_after,
+            _ => false,
+        }
+    }
+
     fn as_ref(&self) -> ChangeRef<'_> {
         match self {
             Self::Text {
-                position,
+                target,
                 before,
                 after,
             } => ChangeRef::Text {
-                position: *position,
+                target: *target,
                 before,
                 after,
             },
-            Self::Bold {
-                position,
+            Self::Format {
+                target,
+                property,
                 before,
                 after,
-            } => ChangeRef::Bold {
-                position: *position,
+            } => ChangeRef::Format {
+                target: *target,
+                property: *property,
+                before: *before,
+                after: *after,
+            },
+            Self::RevisionMark { before, after, .. } => ChangeRef::RevisionMark {
+                kind: before
+                    .as_ref()
+                    .or(after.as_ref())
+                    .map_or(RevisionKind::Insertion, |spec| spec.kind),
+                start_cp: before
+                    .as_ref()
+                    .or(after.as_ref())
+                    .map_or(0, |spec| spec.start_cp),
+                end_cp: before
+                    .as_ref()
+                    .or(after.as_ref())
+                    .map_or(0, |spec| spec.end_cp),
+                before_present: before.is_some(),
+                after_present: after.is_some(),
+            },
+            Self::EmbeddedDisplay {
+                storage_id,
+                before,
+                after,
+            } => ChangeRef::EmbeddedDisplay {
+                storage_id: *storage_id,
                 before: *before,
                 after: *after,
             },
@@ -935,20 +1473,40 @@ impl Change {
     fn inverse(&self) -> Self {
         match self {
             Self::Text {
-                position,
+                target,
                 before,
                 after,
             } => Self::Text {
-                position: *position,
+                target: *target,
                 before: after.clone(),
                 after: before.clone(),
             },
-            Self::Bold {
-                position,
+            Self::Format {
+                target,
+                property,
                 before,
                 after,
-            } => Self::Bold {
-                position: *position,
+            } => Self::Format {
+                target: *target,
+                property: *property,
+                before: *after,
+                after: *before,
+            },
+            Self::RevisionMark {
+                identity,
+                before,
+                after,
+            } => Self::RevisionMark {
+                identity: identity.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::EmbeddedDisplay {
+                storage_id,
+                before,
+                after,
+            } => Self::EmbeddedDisplay {
+                storage_id: *storage_id,
                 before: *after,
                 after: *before,
             },
@@ -956,34 +1514,35 @@ impl Change {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Lineage(Arc<[u8]>);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum PreparedOperation {
     Text {
-        position: Position,
+        target: TextTarget,
         replacement: String,
     },
-    Bold {
-        position: Position,
+    Format {
+        target: TextTarget,
+        property: CharacterProperty,
         enabled: bool,
     },
 }
 
 impl PreparedOperation {
-    fn position(&self) -> Position {
+    fn target(&self) -> TextTarget {
         match self {
-            Self::Text { position, .. } | Self::Bold { position, .. } => *position,
+            Self::Text { target, .. } | Self::Format { target, .. } => *target,
         }
     }
 
     fn effect(&self) -> String {
         let facet = match self {
             Self::Text { .. } => "text",
-            Self::Bold { .. } => "bold",
+            Self::Format { property, .. } => property.wire_name(),
         };
-        format!("body/paragraph:{}/{facet}", self.position().get())
+        format!("{}/{facet}", durable_target(self.target()))
     }
 }
 
@@ -1017,10 +1576,10 @@ impl PreparedEdit {
         self.inner.id()
     }
 
-    /// Target paragraph position in the immutable source collection.
+    /// Semantic target in the immutable source collection.
     #[must_use]
-    pub fn position(&self) -> Position {
-        self.inner.payload().position()
+    pub fn target(&self) -> TextTarget {
+        self.inner.payload().target()
     }
 }
 
@@ -1029,7 +1588,7 @@ impl std::fmt::Debug for PreparedEdit {
         formatter
             .debug_struct("PreparedEdit")
             .field("identifier", &self.identifier())
-            .field("position", &self.position())
+            .field("target", &self.target())
             .finish_non_exhaustive()
     }
 }
@@ -1116,11 +1675,15 @@ impl Composition {
         for prepared in self.joined.into_sub_edits() {
             match prepared.into_payload() {
                 PreparedOperation::Text {
-                    position,
+                    target,
                     replacement,
-                } => edit.replace_paragraph(position, &replacement)?,
-                PreparedOperation::Bold { position, enabled } => {
-                    edit.set_paragraph_bold(position, enabled)?;
+                } => edit.replace_text(target, &replacement)?,
+                PreparedOperation::Format {
+                    target,
+                    property,
+                    enabled,
+                } => {
+                    edit.set_character_property(target, property, enabled)?;
                 },
             }
         }
@@ -1137,6 +1700,92 @@ impl std::fmt::Debug for Composition {
     }
 }
 
+/// Dependency-closed inert text transfer prepared for one exact receiver.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TransferPlan {
+    target: Lineage,
+    destination: TextTarget,
+    value: String,
+}
+
+impl TransferPlan {
+    #[must_use]
+    pub const fn destination(&self) -> TextTarget {
+        self.destination
+    }
+
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.value
+    }
+}
+
+/// One semantic facet changed differently by both sides of a three-way plan.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ThreeWayConflict {
+    effect: String,
+}
+
+impl ThreeWayConflict {
+    #[must_use]
+    pub fn effect(&self) -> &str {
+        &self.effect
+    }
+}
+
+/// Non-mutating three-way merge plan over one exact immutable DOC source.
+#[derive(Clone, Debug)]
+pub struct ThreeWayPlan {
+    source: Snapshot,
+    changes: Vec<Change>,
+    conflicts: Vec<ThreeWayConflict>,
+}
+
+impl ThreeWayPlan {
+    fn new(source: Snapshot, left: &Patch, right: &Patch) -> Self {
+        let mut changes = left.changes.clone();
+        let mut conflicts = Vec::new();
+        for incoming in &right.changes {
+            let effect = incoming.effect();
+            if let Some(existing) = changes.iter().find(|change| change.effect() == effect) {
+                if !existing.same_after(incoming) {
+                    conflicts.push(ThreeWayConflict { effect });
+                }
+            } else {
+                changes.push(incoming.clone());
+            }
+        }
+        Self {
+            source,
+            changes,
+            conflicts,
+        }
+    }
+
+    #[must_use]
+    pub fn conflicts(&self) -> &[ThreeWayConflict] {
+        &self.conflicts
+    }
+
+    #[must_use]
+    pub fn is_conflict_free(&self) -> bool {
+        self.conflicts.is_empty()
+    }
+
+    /// Publishes the conflict-free combined plan through the ordinary bounded
+    /// transaction and full reopen boundary.
+    pub fn commit(self) -> Result<Commit> {
+        if !self.conflicts.is_empty() {
+            return Err(Error::Conflict);
+        }
+        let mut edit = self.source.edit()?;
+        for change in &self.changes {
+            apply_change_after(&mut edit, change)?;
+        }
+        edit.commit()
+    }
+}
+
 fn durable_operation(
     limits: PatchLimits,
     change: &Change,
@@ -1147,9 +1796,9 @@ fn durable_operation(
         "artifact_sha256".to_string(),
         serde_json::Value::String(artifact.to_string()),
     );
-    let (op, position, value) = match change {
+    let (op, target, value) = match change {
         Change::Text {
-            position,
+            target,
             before,
             after,
         } => {
@@ -1158,31 +1807,424 @@ fn durable_operation(
                 serde_json::Value::String(before.clone()),
             );
             (
-                "body-text.set",
-                *position,
+                "text.set".to_string(),
+                durable_target(*target),
                 serde_json::Value::String(after.clone()),
             )
         },
-        Change::Bold {
-            position,
+        Change::Format {
+            target,
+            property,
             before,
             after,
         } => {
-            preconditions.insert("bold".to_string(), optional_bool_value(*before));
-            ("body-bold.set", *position, optional_bool_value(*after))
+            preconditions.insert(
+                property.wire_name().to_string(),
+                optional_bool_value(*before),
+            );
+            (
+                format!("character-{}.set", property.wire_name()),
+                durable_target(*target),
+                optional_bool_value(*after),
+            )
+        },
+        Change::RevisionMark {
+            identity,
+            before,
+            after,
+        } => {
+            preconditions.insert("revision".to_string(), revision_spec_value(before.as_ref()));
+            (
+                "revision-mark.set".to_string(),
+                identity.clone(),
+                revision_spec_value(after.as_ref()),
+            )
+        },
+        Change::EmbeddedDisplay {
+            storage_id,
+            before,
+            after,
+        } => {
+            preconditions.insert("display_as_icon".to_string(), (*before).into());
+            (
+                "embedded-display.set".to_string(),
+                format!("resource/embedded:{storage_id}"),
+                (*after).into(),
+            )
         },
     };
-    PatchOperation::new(
-        limits,
-        op,
-        format!("body/paragraph:{}", position.get()),
-        preconditions,
-        value,
-    )
+    PatchOperation::new(limits, op, target, preconditions, value)
 }
 
 fn optional_bool_value(value: Option<bool>) -> serde_json::Value {
     value.map_or(serde_json::Value::Null, serde_json::Value::Bool)
+}
+
+fn apply_durable_format(
+    edit: &mut Edit,
+    target: TextTarget,
+    property: CharacterProperty,
+    operation: &PatchOperation,
+) -> Result<()> {
+    let expected = parse_optional_bool(
+        operation
+            .preconditions
+            .get(property.wire_name())
+            .ok_or_else(|| invalid_durable_patch("missing character-format precondition"))?,
+    )?;
+    let span = resolve_target(&edit.editor, target)?;
+    let actual = uniform_property_override(&edit.editor, span.start_cp, span.end_cp, property)
+        .map_err(Error::Invalid)?
+        .ok_or(Error::Refused(Refusal::FormattingDependency))?;
+    if actual != expected {
+        return Err(Error::Conflict);
+    }
+    let value = parse_optional_bool(&operation.value)?;
+    edit.set_character_property_override(target, property, value)
+}
+
+fn revision_spec_value(spec: Option<&RevisionSpec>) -> serde_json::Value {
+    let Some(spec) = spec else {
+        return serde_json::Value::Null;
+    };
+    let mut value = serde_json::Map::new();
+    value.insert(
+        "kind".to_string(),
+        serde_json::Value::String(revision_kind_name(spec.kind).to_string()),
+    );
+    value.insert("start_cp".to_string(), spec.start_cp.into());
+    value.insert("end_cp".to_string(), spec.end_cp.into());
+    value.insert(
+        "author".to_string(),
+        serde_json::Value::String(spec.metadata.author.clone()),
+    );
+    value.insert(
+        "timestamp".to_string(),
+        spec.metadata
+            .timestamp
+            .map_or(serde_json::Value::Null, timestamp_value),
+    );
+    value.insert(
+        "reason".to_string(),
+        spec.metadata
+            .reason
+            .map_or(serde_json::Value::Null, Into::into),
+    );
+    value.insert(
+        "revision_save_id".to_string(),
+        spec.metadata
+            .revision_save_id
+            .map_or(serde_json::Value::Null, Into::into),
+    );
+    serde_json::Value::Object(value)
+}
+
+fn timestamp_value(timestamp: DateTime) -> serde_json::Value {
+    let mut value = serde_json::Map::new();
+    for (key, number) in [
+        ("year", u64::from(timestamp.year)),
+        ("month", u64::from(timestamp.month)),
+        ("day", u64::from(timestamp.day)),
+        ("hour", u64::from(timestamp.hour)),
+        ("minute", u64::from(timestamp.minute)),
+        ("weekday", u64::from(timestamp.weekday)),
+    ] {
+        value.insert(key.to_string(), number.into());
+    }
+    serde_json::Value::Object(value)
+}
+
+fn parse_revision_spec(value: &serde_json::Value) -> Result<Option<RevisionSpec>> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let object = value
+        .as_object()
+        .filter(|object| object.len() == 7)
+        .ok_or_else(|| invalid_durable_patch("revision mark value has invalid fields"))?;
+    let kind = parse_revision_kind(required_string(object, "kind")?)?;
+    let start_cp = required_u32(object, "start_cp")?;
+    let end_cp = required_u32(object, "end_cp")?;
+    let author = required_string(object, "author")?.to_string();
+    let timestamp = parse_timestamp(
+        object
+            .get("timestamp")
+            .ok_or_else(|| invalid_durable_patch("revision timestamp is missing"))?,
+    )?;
+    let reason = optional_u16(
+        object
+            .get("reason")
+            .ok_or_else(|| invalid_durable_patch("revision reason is missing"))?,
+    )?;
+    let revision_save_id = optional_u32(
+        object
+            .get("revision_save_id")
+            .ok_or_else(|| invalid_durable_patch("revision save ID is missing"))?,
+    )?;
+    Ok(Some(RevisionSpec {
+        kind,
+        start_cp,
+        end_cp,
+        metadata: RevisionMetadata {
+            author,
+            timestamp,
+            reason,
+            revision_save_id,
+        },
+    }))
+}
+
+fn required_string<'a>(
+    object: &'a serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<&'a str> {
+    object
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_durable_patch("revision string field is invalid"))
+}
+
+fn required_u32(object: &serde_json::Map<String, serde_json::Value>, key: &str) -> Result<u32> {
+    object
+        .get(key)
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .ok_or_else(|| invalid_durable_patch("revision integer field is invalid"))
+}
+
+fn optional_u16(value: &serde_json::Value) -> Result<Option<u16>> {
+    if value.is_null() {
+        Ok(None)
+    } else {
+        value
+            .as_u64()
+            .and_then(|value| u16::try_from(value).ok())
+            .map(Some)
+            .ok_or_else(|| invalid_durable_patch("revision reason is invalid"))
+    }
+}
+
+fn optional_u32(value: &serde_json::Value) -> Result<Option<u32>> {
+    if value.is_null() {
+        Ok(None)
+    } else {
+        value
+            .as_u64()
+            .and_then(|value| u32::try_from(value).ok())
+            .map(Some)
+            .ok_or_else(|| invalid_durable_patch("revision save ID is invalid"))
+    }
+}
+
+fn parse_timestamp(value: &serde_json::Value) -> Result<Option<DateTime>> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let object = value
+        .as_object()
+        .filter(|object| object.len() == 6)
+        .ok_or_else(|| invalid_durable_patch("revision timestamp has invalid fields"))?;
+    Ok(Some(DateTime {
+        year: required_u32(object, "year")?
+            .try_into()
+            .map_err(|_error| invalid_durable_patch("revision year exceeds u16"))?,
+        month: required_u32(object, "month")?
+            .try_into()
+            .map_err(|_error| invalid_durable_patch("revision month exceeds u8"))?,
+        day: required_u32(object, "day")?
+            .try_into()
+            .map_err(|_error| invalid_durable_patch("revision day exceeds u8"))?,
+        hour: required_u32(object, "hour")?
+            .try_into()
+            .map_err(|_error| invalid_durable_patch("revision hour exceeds u8"))?,
+        minute: required_u32(object, "minute")?
+            .try_into()
+            .map_err(|_error| invalid_durable_patch("revision minute exceeds u8"))?,
+        weekday: required_u32(object, "weekday")?
+            .try_into()
+            .map_err(|_error| invalid_durable_patch("revision weekday exceeds u8"))?,
+    }))
+}
+
+fn revision_kind_name(kind: RevisionKind) -> &'static str {
+    match kind {
+        RevisionKind::Insertion => "insertion",
+        RevisionKind::Deletion => "deletion",
+        RevisionKind::MoveFrom => "move-from",
+        RevisionKind::MoveTo => "move-to",
+        RevisionKind::CharacterFormatting => "character-formatting",
+        RevisionKind::ParagraphFormatting => "paragraph-formatting",
+        RevisionKind::TableRowFormatting => "table-row-formatting",
+    }
+}
+
+fn parse_revision_kind(value: &str) -> Result<RevisionKind> {
+    Ok(match value {
+        "insertion" => RevisionKind::Insertion,
+        "deletion" => RevisionKind::Deletion,
+        "move-from" => RevisionKind::MoveFrom,
+        "move-to" => RevisionKind::MoveTo,
+        "character-formatting" => RevisionKind::CharacterFormatting,
+        "paragraph-formatting" => RevisionKind::ParagraphFormatting,
+        "table-row-formatting" => RevisionKind::TableRowFormatting,
+        _ => return Err(invalid_durable_patch("unknown revision kind")),
+    })
+}
+
+fn apply_durable_revision(edit: &mut Edit, operation: &PatchOperation) -> Result<()> {
+    let expected = parse_revision_spec(
+        operation
+            .preconditions
+            .get("revision")
+            .ok_or_else(|| invalid_durable_patch("revision precondition is missing"))?,
+    )?;
+    let value = parse_revision_spec(&operation.value)?;
+    set_revision_mark(edit, &operation.target, expected, value)
+}
+
+fn apply_durable_embedded_display(edit: &mut Edit, operation: &PatchOperation) -> Result<()> {
+    let storage_id = operation
+        .target
+        .strip_prefix("resource/embedded:")
+        .and_then(|value| value.parse::<u32>().ok())
+        .ok_or_else(|| invalid_durable_patch("invalid embedded-resource target"))?;
+    let expected = operation
+        .preconditions
+        .get("display_as_icon")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| invalid_durable_patch("embedded display precondition is invalid"))?;
+    if embedded_display_value(edit, storage_id)? != expected {
+        return Err(Error::Conflict);
+    }
+    let enabled = operation
+        .value
+        .as_bool()
+        .ok_or_else(|| invalid_durable_patch("embedded display value is invalid"))?;
+    edit.set_embedded_display_as_icon(storage_id, enabled)
+}
+
+fn embedded_display_value(edit: &Edit, storage_id: u32) -> Result<bool> {
+    let bytes = edit.editor.clone().finish().map_err(Error::Invalid)?;
+    let snapshot = crate::embedded_object::Snapshot::open(bytes, edit.source.limits)
+        .map_err(Error::Invalid)?;
+    snapshot
+        .inventory()
+        .map_err(Error::Invalid)?
+        .get(storage_id)
+        .and_then(|entry| entry.metadata().obj_info())
+        .map(|info| info.display_as_icon)
+        .ok_or(Error::Refused(Refusal::TargetNotFound))
+}
+
+fn uniform_property_override(
+    editor: &RevisionEditor,
+    start: u32,
+    end: u32,
+    property: CharacterProperty,
+) -> crate::package::Result<Option<Option<bool>>> {
+    match property {
+        CharacterProperty::Bold => editor.uniform_bold_override(start, end),
+        CharacterProperty::Italic => editor.uniform_italic_override(start, end),
+        CharacterProperty::Underline => editor.uniform_underline_override(start, end),
+    }
+}
+
+fn set_property_override(
+    editor: &mut RevisionEditor,
+    start: u32,
+    end: u32,
+    property: CharacterProperty,
+    value: Option<bool>,
+) -> crate::package::Result<()> {
+    match property {
+        CharacterProperty::Bold => editor.set_character_bold_override(start, end, value),
+        CharacterProperty::Italic => editor.set_character_italic_override(start, end, value),
+        CharacterProperty::Underline => editor.set_character_underline_override(start, end, value),
+    }
+}
+
+fn apply_change_after(edit: &mut Edit, change: &Change) -> Result<()> {
+    match change {
+        Change::Text { target, after, .. } => edit.replace_text(*target, after),
+        Change::Format {
+            target,
+            property,
+            after,
+            ..
+        } => edit.set_character_property_override(*target, *property, *after),
+        Change::RevisionMark {
+            identity,
+            before,
+            after,
+        } => set_revision_mark(edit, identity, before.clone(), after.clone()),
+        Change::EmbeddedDisplay {
+            storage_id, after, ..
+        } => edit.set_embedded_display_as_icon(*storage_id, *after),
+    }
+}
+
+fn set_revision_mark(
+    edit: &mut Edit,
+    identity: &str,
+    expected: Option<RevisionSpec>,
+    value: Option<RevisionSpec>,
+) -> Result<()> {
+    if expected
+        .as_ref()
+        .is_some_and(|spec| spec.identity() != identity)
+        || value
+            .as_ref()
+            .is_some_and(|spec| spec.identity() != identity)
+    {
+        return Err(invalid_durable_patch(
+            "revision target does not match its semantic value",
+        ));
+    }
+    let revisions = edit.editor.revisions().map_err(Error::Invalid)?;
+    let matches = revisions
+        .iter()
+        .enumerate()
+        .filter_map(|(index, revision)| {
+            let spec = RevisionSpec::from_revision(revision);
+            (spec.identity() == identity).then_some((index, spec))
+        })
+        .collect::<Vec<_>>();
+    if matches.len() > 1 {
+        return Err(Error::Conflict);
+    }
+    let actual = matches.first().map(|(_index, spec)| spec.clone());
+    if actual != expected {
+        return Err(Error::Conflict);
+    }
+    if expected == value {
+        return Ok(());
+    }
+    edit.ensure_operation_capacity()?;
+    match (&expected, &value) {
+        (Some(_), None) => {
+            let index = matches
+                .first()
+                .map(|(index, _spec)| *index)
+                .ok_or(Error::Conflict)?;
+            edit.editor.remove(index).map_err(Error::Invalid)?;
+        },
+        (None, Some(spec)) => {
+            edit.editor
+                .add(spec.start_cp, spec.end_cp, spec.kind, spec.metadata.clone())
+                .map_err(Error::Invalid)?;
+        },
+        _ => {
+            return Err(invalid_durable_patch(
+                "revision mark transition must add or remove one mark",
+            ));
+        },
+    }
+    edit.changes.push(Change::RevisionMark {
+        identity: identity.to_string(),
+        before: expected,
+        after: value,
+    });
+    Ok(())
 }
 
 fn parse_optional_bool(value: &serde_json::Value) -> Result<Option<bool>> {
@@ -1195,19 +2237,56 @@ fn parse_optional_bool(value: &serde_json::Value) -> Result<Option<bool>> {
     }
 }
 
-fn parse_durable_target(target: &str) -> Result<Position> {
-    let position = target
-        .strip_prefix("body/paragraph:")
-        .filter(|value| {
-            !value.is_empty()
-                && value.bytes().all(|byte| byte.is_ascii_digit())
-                && (*value == "0" || !value.starts_with('0'))
-        })
-        .ok_or_else(|| invalid_durable_patch("invalid body paragraph target"))?;
-    position
+fn durable_target(target: TextTarget) -> String {
+    match target {
+        TextTarget::StoryParagraph { story, position } => {
+            format!("story/{}/paragraph:{}", story.wire_name(), position.get())
+        },
+        TextTarget::TableCell(position) => format!("body/table-cell:{}", position.get()),
+        TextTarget::FieldResult(position) => format!("body/field-result:{}", position.get()),
+    }
+}
+
+fn parse_durable_target(target: &str) -> Result<TextTarget> {
+    if let Some(position) = target.strip_prefix("body/table-cell:") {
+        return parse_position(position).map(TextTarget::TableCell);
+    }
+    if let Some(position) = target.strip_prefix("body/field-result:") {
+        return parse_position(position).map(TextTarget::FieldResult);
+    }
+    if let Some(position) = target.strip_prefix("body/paragraph:") {
+        return parse_position(position).map(TextTarget::body_paragraph);
+    }
+    let remainder = target
+        .strip_prefix("story/")
+        .ok_or_else(|| invalid_durable_patch("invalid DOC text target"))?;
+    let (story_name, position) = remainder
+        .split_once("/paragraph:")
+        .ok_or_else(|| invalid_durable_patch("invalid DOC story paragraph target"))?;
+    let story = match story_name {
+        "main" => Story::Main,
+        "footnote" => Story::Footnote,
+        "header" => Story::Header,
+        "comment" => Story::Comment,
+        "endnote" => Story::Endnote,
+        "textbox" => Story::Textbox,
+        "header-textbox" => Story::HeaderTextbox,
+        _ => return Err(invalid_durable_patch("unknown DOC story target")),
+    };
+    parse_position(position).map(|position| TextTarget::StoryParagraph { story, position })
+}
+
+fn parse_position(value: &str) -> Result<Position> {
+    if value.is_empty()
+        || !value.bytes().all(|byte| byte.is_ascii_digit())
+        || (value != "0" && value.starts_with('0'))
+    {
+        return Err(invalid_durable_patch("invalid canonical DOC position"));
+    }
+    value
         .parse::<usize>()
         .map(Position::new)
-        .map_err(|_error| invalid_durable_patch("body paragraph position exceeds this platform"))
+        .map_err(|_error| invalid_durable_patch("DOC position exceeds this platform"))
 }
 
 fn invalid_durable_patch(message: &str) -> Error {
@@ -1223,6 +2302,217 @@ struct SourceParagraph {
     start_cp: u32,
     end_cp: u32,
     text: String,
+}
+
+#[derive(Clone)]
+struct SourceSpan {
+    target: TextTarget,
+    start_cp: u32,
+    end_cp: u32,
+    text: String,
+}
+
+#[derive(Clone, Copy)]
+enum TargetCollection {
+    Story(Story),
+    TableCells,
+    FieldResults,
+}
+
+fn target_story(target: TextTarget) -> Story {
+    match target {
+        TextTarget::StoryParagraph { story, .. } => story,
+        TextTarget::TableCell(_) | TextTarget::FieldResult(_) => Story::Main,
+    }
+}
+
+fn resolve_target(editor: &RevisionEditor, target: TextTarget) -> Result<SourceSpan> {
+    let spans = match target {
+        TextTarget::StoryParagraph { story, .. } => {
+            target_spans(editor, TargetCollection::Story(story))?
+        },
+        TextTarget::TableCell(_) => target_spans(editor, TargetCollection::TableCells)?,
+        TextTarget::FieldResult(_) => target_spans(editor, TargetCollection::FieldResults)?,
+    };
+    let position = match target {
+        TextTarget::StoryParagraph { position, .. }
+        | TextTarget::TableCell(position)
+        | TextTarget::FieldResult(position) => position,
+    };
+    spans
+        .get(position.get())
+        .cloned()
+        .ok_or(Error::Refused(Refusal::TargetNotFound))
+}
+
+fn target_spans(editor: &RevisionEditor, collection: TargetCollection) -> Result<Vec<SourceSpan>> {
+    match collection {
+        TargetCollection::Story(Story::Main) => source_paragraphs(editor).map(|paragraphs| {
+            paragraphs
+                .into_iter()
+                .enumerate()
+                .map(|(position, paragraph)| SourceSpan {
+                    target: TextTarget::body_paragraph(Position::new(position)),
+                    start_cp: paragraph.start_cp,
+                    end_cp: paragraph.end_cp,
+                    text: paragraph.text,
+                })
+                .collect()
+        }),
+        TargetCollection::Story(story) => story_paragraph_spans(editor, story),
+        TargetCollection::TableCells => simple_table_cell_spans(editor),
+        TargetCollection::FieldResults => simple_field_result_spans(editor),
+    }
+}
+
+fn items_from_spans(spans: Vec<SourceSpan>) -> Vec<TextItem> {
+    spans
+        .into_iter()
+        .map(|span| TextItem {
+            target: span.target,
+            text: span.text,
+        })
+        .collect()
+}
+
+fn story_paragraph_spans(editor: &RevisionEditor, story: Story) -> Result<Vec<SourceSpan>> {
+    let (origin, text) = editor.story_text(story.index()).map_err(Error::Invalid)?;
+    let mut output = Vec::new();
+    let mut start_cp = origin;
+    let mut start_byte = 0usize;
+    let mut cp = origin;
+    for (byte, character) in text.char_indices() {
+        let width = character.len_utf16() as u32;
+        let next_cp = cp.checked_add(width).ok_or_else(cp_overflow)?;
+        if character == '\r' {
+            output.push(SourceSpan {
+                target: TextTarget::StoryParagraph {
+                    story,
+                    position: Position::new(output.len()),
+                },
+                start_cp,
+                end_cp: cp,
+                text: text[start_byte..byte].to_string(),
+            });
+            start_cp = next_cp;
+            start_byte = byte + character.len_utf8();
+        } else if character == '\u{7}' {
+            start_cp = next_cp;
+            start_byte = byte + character.len_utf8();
+        }
+        cp = next_cp;
+    }
+    Ok(output)
+}
+
+fn simple_table_cell_spans(editor: &RevisionEditor) -> Result<Vec<SourceSpan>> {
+    let text = editor.main_story_text().map_err(Error::Invalid)?;
+    let mut output = Vec::new();
+    let mut segment_cp = 0u32;
+    let mut segment_byte = 0usize;
+    let mut pending: Option<(u32, u32, usize, usize)> = None;
+    let mut cp = 0u32;
+    for (byte, character) in text.char_indices() {
+        let width = character.len_utf16() as u32;
+        let next_cp = cp.checked_add(width).ok_or_else(cp_overflow)?;
+        if character == '\r' {
+            if editor.is_in_table_at_cp(cp).map_err(Error::Invalid)? {
+                if pending.is_some() {
+                    return Err(Error::Refused(Refusal::ComplexTableCell));
+                }
+                pending = Some((segment_cp, cp, segment_byte, byte));
+            } else {
+                pending = None;
+            }
+            segment_cp = next_cp;
+            segment_byte = byte + character.len_utf8();
+        } else if character == '\u{7}' {
+            if editor.is_in_table_at_cp(cp).map_err(Error::Invalid)? {
+                let (start_cp, end_cp, start_byte, end_byte) = match pending.take() {
+                    Some(span) if segment_cp == cp => span,
+                    Some(_) => return Err(Error::Refused(Refusal::ComplexTableCell)),
+                    None => (segment_cp, cp, segment_byte, byte),
+                };
+                output.push(SourceSpan {
+                    target: TextTarget::TableCell(Position::new(output.len())),
+                    start_cp,
+                    end_cp,
+                    text: text[start_byte..end_byte].to_string(),
+                });
+            }
+            pending = None;
+            segment_cp = next_cp;
+            segment_byte = byte + character.len_utf8();
+        }
+        cp = next_cp;
+    }
+    Ok(output)
+}
+
+struct FieldFrame {
+    separator: Option<(u32, usize)>,
+    complex: bool,
+}
+
+fn simple_field_result_spans(editor: &RevisionEditor) -> Result<Vec<SourceSpan>> {
+    let text = editor.main_story_text().map_err(Error::Invalid)?;
+    let mut output = Vec::new();
+    let mut stack = Vec::<FieldFrame>::new();
+    let mut cp = 0u32;
+    for (byte, character) in text.char_indices() {
+        let width = character.len_utf16() as u32;
+        let next_cp = cp.checked_add(width).ok_or_else(cp_overflow)?;
+        match character {
+            '\u{13}' => {
+                if let Some(parent) = stack.last_mut() {
+                    parent.complex = true;
+                }
+                stack.push(FieldFrame {
+                    separator: None,
+                    complex: false,
+                });
+            },
+            '\u{14}' => {
+                let frame = stack
+                    .last_mut()
+                    .ok_or(Error::Refused(Refusal::ComplexField))?;
+                if frame
+                    .separator
+                    .replace((next_cp, byte + character.len_utf8()))
+                    .is_some()
+                {
+                    return Err(Error::Refused(Refusal::ComplexField));
+                }
+            },
+            '\u{15}' => {
+                let frame = stack.pop().ok_or(Error::Refused(Refusal::ComplexField))?;
+                if stack.is_empty() {
+                    let (start_cp, start_byte) = frame
+                        .separator
+                        .filter(|_| !frame.complex)
+                        .ok_or(Error::Refused(Refusal::ComplexField))?;
+                    output.push(SourceSpan {
+                        target: TextTarget::FieldResult(Position::new(output.len())),
+                        start_cp,
+                        end_cp: cp,
+                        text: text[start_byte..byte].to_string(),
+                    });
+                }
+            },
+            _ => {},
+        }
+        cp = next_cp;
+    }
+    if !stack.is_empty() {
+        return Err(Error::Refused(Refusal::ComplexField));
+    }
+    Ok(output)
+}
+
+fn cp_overflow() -> Error {
+    Error::Invalid(PackageError::Corrupted(
+        "DOC semantic target CP overflow".to_string(),
+    ))
 }
 
 fn source_paragraphs(editor: &RevisionEditor) -> Result<Vec<SourceParagraph>> {
@@ -1367,9 +2657,13 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, Projection, Refusal, Snapshot, TransactionLimits};
+    use super::{
+        CharacterProperty, Error, Projection, Refusal, RevisionDisposition, Snapshot, Story,
+        TextTarget, TransactionLimits,
+    };
     use crate::tracked_revision::Limits;
     use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
+    use litchi_cfb::OleWriter;
     use litchi_core::Position;
     use litchi_core::patch::{
         BlobLimits, CompositionLimits, HistoryLimits, Patch, PatchLimits, Reversible,
@@ -1392,6 +2686,64 @@ mod tests {
             .write_to(&mut output)
             .expect("fixture DOC must serialize");
         output.into_inner()
+    }
+
+    fn structured_doc() -> Vec<u8> {
+        let mut writer = Writer::new();
+        writer.add_paragraph("Body").expect("body paragraph");
+        let table = writer.add_table(1, 1).expect("table");
+        writer
+            .set_table_cell_text(table, 0, 0, "Cell")
+            .expect("cell text");
+        writer
+            .add_hyperlink(
+                "Link",
+                "https://example.invalid",
+                ParagraphFormatting::default(),
+            )
+            .expect("hyperlink field");
+        writer.set_odd_header("Header");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("structured DOC");
+        output.into_inner()
+    }
+
+    fn embedded_doc() -> Vec<u8> {
+        let mut object = OleWriter::new();
+        object
+            .create_stream(
+                &["\u{1}CompObj"],
+                &crate::writer::ole_metadata::generate_compobj_stream(),
+            )
+            .expect("CompObj stream");
+        object
+            .create_stream(
+                &["\u{1}Ole"],
+                &crate::writer::ole_metadata::generate_ole_stream(),
+            )
+            .expect("Ole stream");
+        object
+            .create_stream(&["\u{3}ObjInfo"], &[0x00, 0x00, 0x03, 0x00, 0x00, 0x00])
+            .expect("ObjInfo stream");
+        let mut object_output = Cursor::new(Vec::new());
+        object
+            .write_to(&mut object_output)
+            .expect("object CFB serialization");
+
+        let mut picture = 12u32.to_le_bytes().to_vec();
+        picture.extend_from_slice(&77u32.to_le_bytes());
+        picture.extend_from_slice(&[0; 4]);
+        let mut editor =
+            crate::embedded_object::Editor::open(doc(&["embedded"]), Limits::default())
+                .expect("embedded-object editor");
+        editor
+            .add(crate::embedded_object::WriteOptions::new(
+                77,
+                object_output.into_inner(),
+                picture,
+            ))
+            .expect("embedded object");
+        editor.finish().expect("embedded DOC serialization")
     }
 
     fn patch_limits() -> PatchLimits {
@@ -1651,5 +3003,257 @@ mod tests {
             edit.set_paragraph_bold(Position::new(1), true),
             Err(Error::Refused(Refusal::OperationLimit { .. }))
         ));
+    }
+
+    #[test]
+    fn stories_cells_fields_format_merge_transfer_and_durable_reopen() {
+        let source = Snapshot::parse(&structured_doc()).expect("structured snapshot");
+        let header = source
+            .story_paragraphs(Story::Header)
+            .expect("header paragraphs")
+            .into_iter()
+            .find(|item| item.text() == "Header")
+            .expect("odd header");
+        let cell = source
+            .table_cells()
+            .expect("table cells")
+            .into_iter()
+            .find(|item| item.text() == "Cell")
+            .expect("simple cell");
+        let field = source
+            .field_results()
+            .expect("field results")
+            .into_iter()
+            .find(|item| item.text() == "Link")
+            .expect("simple field result");
+
+        let mut refused_story_resize = source.edit().expect("story resize refusal");
+        assert!(matches!(
+            refused_story_resize.replace_text(header.target(), "Longer header"),
+            Err(Error::Refused(Refusal::StoryLengthChange {
+                story: Story::Header,
+                ..
+            }))
+        ));
+
+        let mut edit = source.edit().expect("edit");
+        edit.replace_text(header.target(), "Banner")
+            .expect("same-length header edit");
+        edit.replace_text(cell.target(), "Cell expanded")
+            .expect("length-changing cell edit");
+        edit.replace_text(field.target(), "Result")
+            .expect("length-changing field-result edit");
+        edit.set_character_property(cell.target(), CharacterProperty::Italic, true)
+            .expect("cell italic");
+        edit.set_character_property(field.target(), CharacterProperty::Underline, true)
+            .expect("field underline");
+        let commit = edit.commit().expect("full reopen commit");
+        assert_eq!(
+            commit
+                .snapshot()
+                .story_paragraphs(Story::Header)
+                .expect("changed header")
+                .into_iter()
+                .find(|item| item.target() == header.target())
+                .expect("same header selector")
+                .text(),
+            "Banner"
+        );
+        assert_eq!(
+            commit.snapshot().table_cells().expect("changed cells")[0].text(),
+            "Cell expanded"
+        );
+        assert_eq!(
+            commit.snapshot().field_results().expect("changed fields")[0].text(),
+            "Result"
+        );
+        let durable = commit
+            .patch()
+            .to_durable(patch_limits())
+            .expect("durable patch");
+        let replay = source.apply_durable(&durable).expect("durable replay");
+        assert_eq!(replay, *commit.snapshot());
+        let inverse = replay
+            .apply_durable(&durable.inverse())
+            .expect("durable inverse");
+        assert_eq!(
+            inverse.table_cells().expect("inverse cells")[0].text(),
+            "Cell"
+        );
+
+        let mut left = source.edit().expect("left");
+        left.replace_text(cell.target(), "Left cell")
+            .expect("left edit");
+        let left = left.commit().expect("left commit");
+        let mut right = source.edit().expect("right");
+        right
+            .replace_text(field.target(), "Right result")
+            .expect("right edit");
+        let right = right.commit().expect("right commit");
+        let merged = source
+            .plan_three_way(left.patch(), right.patch())
+            .expect("three-way plan");
+        assert!(merged.is_conflict_free());
+        let merged = merged.commit().expect("merged commit");
+        assert_eq!(
+            merged.snapshot().table_cells().expect("merged cells")[0].text(),
+            "Left cell"
+        );
+        assert_eq!(
+            merged.snapshot().field_results().expect("merged fields")[0].text(),
+            "Right result"
+        );
+
+        let mut competing = source.edit().expect("competing");
+        competing
+            .replace_text(cell.target(), "Competing cell")
+            .expect("competing edit");
+        let competing = competing.commit().expect("competing commit");
+        let conflicted = source
+            .plan_three_way(left.patch(), competing.patch())
+            .expect("conflict plan");
+        assert_eq!(conflicted.conflicts().len(), 1);
+        assert!(matches!(conflicted.commit(), Err(Error::Conflict)));
+
+        let donor = Snapshot::parse(&doc(&["Donor"])).expect("donor");
+        let transfer = source
+            .plan_text_transfer_from(
+                &donor,
+                TextTarget::body_paragraph(Position::new(0)),
+                TextTarget::body_paragraph(Position::new(0)),
+            )
+            .expect("text transfer plan");
+        let mut transfer_edit = source.edit().expect("transfer edit");
+        transfer_edit
+            .apply_transfer(&transfer)
+            .expect("apply transfer");
+        assert_eq!(
+            transfer_edit
+                .commit()
+                .expect("transfer commit")
+                .snapshot()
+                .paragraphs(Projection::All)
+                .expect("transferred body")[0]
+                .text(),
+            "Donor"
+        );
+        let mut stale_receiver = Snapshot::parse(&doc(&["different"]))
+            .expect("stale receiver")
+            .edit()
+            .expect("stale edit");
+        assert!(matches!(
+            stale_receiver.apply_transfer(&transfer),
+            Err(Error::Conflict)
+        ));
+    }
+
+    #[test]
+    fn embedded_display_metadata_uses_root_patch_and_durable_inverse() {
+        let source = Snapshot::parse(&embedded_doc()).expect("embedded snapshot");
+        let before = crate::embedded_object::Snapshot::open(source.finish(), Limits::default())
+            .expect("embedded owner snapshot")
+            .inventory()
+            .expect("embedded inventory")
+            .get(77)
+            .and_then(|entry| entry.metadata().obj_info())
+            .expect("typed ObjInfo")
+            .display_as_icon;
+
+        let mut edit = source.edit().expect("root edit");
+        edit.set_embedded_display_as_icon(77, !before)
+            .expect("resource metadata edit");
+        let commit = edit.commit().expect("resource root commit");
+        let mut package = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+            .expect("resource CFB reopens");
+        package.document().expect("resource DOC reopens");
+        let changed =
+            crate::embedded_object::Snapshot::open(commit.snapshot().finish(), Limits::default())
+                .expect("changed embedded owner snapshot")
+                .inventory()
+                .expect("changed embedded inventory")
+                .get(77)
+                .and_then(|entry| entry.metadata().obj_info())
+                .expect("changed typed ObjInfo")
+                .display_as_icon;
+        assert_eq!(changed, !before);
+        let durable = commit
+            .patch()
+            .to_durable(patch_limits())
+            .expect("resource durable patch");
+        assert_eq!(
+            source.apply_durable(&durable).expect("resource replay"),
+            *commit.snapshot()
+        );
+        assert_eq!(
+            commit
+                .snapshot()
+                .apply_durable(&durable.inverse())
+                .expect("resource inverse"),
+            source
+        );
+    }
+
+    #[test]
+    fn non_destructive_revision_disposition_is_durable_and_reversible() {
+        let mut writer = Writer::new();
+        writer
+            .add_paragraph_runs(
+                vec![(
+                    "deleted".to_string(),
+                    CharacterFormatting {
+                        deletion_revision: Some(TextRevision::new("Reviewer")),
+                        ..CharacterFormatting::default()
+                    },
+                )],
+                ParagraphFormatting::default(),
+            )
+            .expect("revision paragraph");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("revision DOC");
+        let source = Snapshot::parse(&output.into_inner()).expect("revision snapshot");
+        let position = source
+            .revisions()
+            .expect("revisions")
+            .iter()
+            .position(|revision| revision.kind == crate::tracked_revision::RevisionKind::Deletion)
+            .map(Position::new)
+            .expect("deletion revision");
+
+        let mut destructive = source.edit().expect("destructive edit");
+        assert!(matches!(
+            destructive.dispose_revision(position, RevisionDisposition::Accept),
+            Err(Error::Refused(
+                Refusal::DestructiveRevisionDisposition { .. }
+            ))
+        ));
+
+        let mut edit = source.edit().expect("revision edit");
+        edit.dispose_revision(position, RevisionDisposition::Reject)
+            .expect("reject deletion mark without deleting text");
+        let commit = edit.commit().expect("revision commit");
+        assert!(
+            commit
+                .snapshot()
+                .revisions()
+                .expect("changed revisions")
+                .is_empty()
+        );
+        let durable = commit
+            .patch()
+            .to_durable(patch_limits())
+            .expect("revision durable patch");
+        assert!(
+            source
+                .apply_durable(&durable)
+                .expect("revision durable replay")
+                .revisions()
+                .expect("replayed revisions")
+                .is_empty()
+        );
+        let restored = commit
+            .snapshot()
+            .apply_durable(&durable.inverse())
+            .expect("revision durable inverse");
+        assert_eq!(restored.revisions().expect("restored revisions").len(), 1);
     }
 }

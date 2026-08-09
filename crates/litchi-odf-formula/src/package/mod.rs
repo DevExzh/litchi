@@ -1,8 +1,9 @@
 //! Formula-family package ownership and ODF ZIP orchestration.
 
 use litchi_core::{Error, Result};
-use litchi_odf_common::constants::{ODF_CONTENT, ODF_FORMULA, ODF_FORMULA_TEMPLATE, ODF_META};
+use litchi_odf_common::constants::{ODF_CONTENT, ODF_FORMULA, ODF_FORMULA_TEMPLATE};
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+use litchi_odf_common::package::rebuild_package;
 use std::io::Read;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,14 +137,16 @@ impl Package {
 
     /// Replace `content.xml` while preserving non-core package members.
     pub(crate) fn replace_content(&self, content: &[u8]) -> Result<Self> {
-        let mut writer = PackageWriter::new();
-        writer.set_mimetype(self.mimetype())?;
-        writer.add_file(ODF_CONTENT, content)?;
-        if self.owned.has_file(ODF_META)? {
-            let metadata = self.owned.get_file(ODF_META)?;
-            writer.add_file(ODF_META, &metadata)?;
-        }
-        writer.copy_auxiliary_files_from(&self.owned)?;
-        Self::from_bytes(writer.finish_to_bytes()?)
+        let content_xml = std::str::from_utf8(content).map_err(|_encoding_error| {
+            Error::InvalidFormat("Formula content.xml is not valid UTF-8".to_string())
+        })?;
+        Self::from_bytes(rebuild_package(
+            &self.owned,
+            content_xml,
+            Vec::new(),
+            Vec::new(),
+            [],
+            [],
+        )?)
     }
 }

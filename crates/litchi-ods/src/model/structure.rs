@@ -544,7 +544,7 @@ mod tests {
         let ranges = split_cell_range_addresses(
             "$Sheet1.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4 'Bob''s Sheet'.$E$5:$F$6",
         )
-        .unwrap();
+        .expect("test fixture or operation should succeed");
         assert_eq!(
             ranges,
             [
@@ -567,9 +567,11 @@ mod tests {
                 ..StyleUsage::default()
             },
         };
-        let print = PrintSettings::new(false, vec!["'Q1 Sales'.$A$1:$B$2".to_string()]).unwrap();
+        let print = PrintSettings::new(false, vec!["'Q1 Sales'.$A$1:$B$2".to_string()])
+            .expect("test fixture or operation should succeed");
         let mut xml = String::new();
-        write_sheet_formatting_attributes(&mut xml, &style, &print).unwrap();
+        write_sheet_formatting_attributes(&mut xml, &style, &print)
+            .expect("test fixture or operation should succeed");
         assert!(xml.contains(r#"table:style-name="Sheet&amp;Style""#));
         assert!(xml.contains(r#"table:template-name="Template&quot;One""#));
         assert!(xml.contains(r#"table:use-first-row-styles="true""#));

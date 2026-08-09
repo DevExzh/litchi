@@ -4,6 +4,9 @@ use super::mutable::MutablePresentation;
 use crate::core::OwnedPackage;
 use crate::{Presentation, Reference, Shape, Slide};
 use litchi_core::{Error, Result};
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -17,6 +20,10 @@ const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_XML_PARTS: usize = 65_536;
 const DURABLE_PATCH_MAGIC: &[u8; 16] = b"LITCHI-ODP-PATCH";
 const DURABLE_PATCH_VERSION: u16 = 1;
+const DURABLE_HISTORY_MAGIC: &[u8; 16] = b"LITCHI-ODP-HIST\0";
+const DURABLE_HISTORY_VERSION: u16 = 1;
+const MAX_DURABLE_HISTORY_BYTES: usize = 512 * 1024 * 1024;
+const XLINK_NS: &[u8] = b"http://www.w3.org/1999/xlink";
 
 /// Semantic dependency domain touched by a root package patch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -768,6 +775,25 @@ impl Transaction {
         )
     }
 
+    /// Replace one chart from the complete typed ODF chart authoring model.
+    ///
+    /// This is the unified-root entry point for cached tables, typed series,
+    /// axes, legends, plot-area details, and chart-local styles.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid definition, missing or ambiguous selector, or limit.
+    pub fn replace_chart_definition<'a, S>(
+        &mut self,
+        selector: S,
+        definition: &crate::charts::Definition,
+    ) -> Result<()>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+    {
+        self.replace_chart(selector, crate::charts::Part::from_definition(definition)?)
+    }
+
     /// Remove one embedded chart selected by exact name or checked position.
     ///
     /// # Errors
@@ -830,6 +856,69 @@ impl Transaction {
             },
         )?;
         Ok(index)
+    }
+
+    /// Add a chart from the complete typed ODF chart authoring model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid definition, page selector, name, or resource limit.
+    pub fn add_chart_definition<'a, P>(
+        &mut self,
+        page: P,
+        name: impl Into<String>,
+        storage: crate::charts::Storage,
+        definition: &crate::charts::Definition,
+    ) -> Result<usize>
+    where
+        P: Into<crate::charts::Page<'a>>,
+    {
+        self.add_chart(
+            page,
+            name,
+            storage,
+            crate::charts::Part::from_definition(definition)?,
+        )
+    }
+
+    /// Copy one dependency-closed chart from another immutable presentation snapshot.
+    ///
+    /// The chart's complete typed part, including chart-local styles and cached data, is
+    /// detached from the source. Parts with `xlink:href` dependencies are refused because
+    /// this bounded operation cannot prove that their referenced package resources are owned
+    /// exclusively by the selected chart. The destination always receives a fresh occurrence
+    /// (and, for subdocument storage, a fresh collision-free package path).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or ambiguous source chart, a dependent chart part,
+    /// invalid destination selectors, identity collisions, or resource-limit violations.
+    pub fn transfer_chart_from<'a, 'b, S, P>(
+        &mut self,
+        source: &Snapshot,
+        source_chart: S,
+        destination_page: P,
+        destination_name: impl Into<String>,
+        storage: crate::charts::Storage,
+    ) -> Result<usize>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+        P: Into<crate::charts::Page<'b>>,
+    {
+        let inventory = crate::charts::Snapshot::from_shared_bytes(
+            Arc::clone(&source.bytes),
+            crate::charts::Limits::default(),
+        )?;
+        let selected = inventory
+            .get(source_chart)?
+            .ok_or_else(|| invalid_error("ODP source chart selector did not match"))?;
+        ensure_chart_transfer_closed(selected.part().xml())?;
+        self.add_chart(
+            destination_page,
+            destination_name,
+            storage,
+            selected.part().clone(),
+        )
     }
 
     /// Inspect named presentation page layouts in the current package draft.
@@ -1272,11 +1361,25 @@ impl Transaction {
 
     fn chart_snapshot(&mut self) -> Result<crate::charts::Snapshot> {
         self.ensure_charts()?;
-        let draft = self
+        let (current_bytes, limits, operations) = self
             .charts
             .as_ref()
+            .map(|draft| {
+                (
+                    Arc::clone(&draft.bytes),
+                    draft.limits,
+                    draft.operations.clone(),
+                )
+            })
             .ok_or_else(|| invalid_error("ODP chart draft initialization failed"))?;
-        crate::charts::Snapshot::from_shared_bytes(Arc::clone(&draft.bytes), draft.limits)
+        if !self.changed {
+            return crate::charts::Snapshot::from_shared_bytes(current_bytes, limits);
+        }
+        let mut bytes = Arc::new(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?);
+        for operation in &operations {
+            bytes = Arc::new(apply_chart_operation(bytes, limits, operation)?);
+        }
+        crate::charts::Snapshot::from_shared_bytes(bytes, limits)
     }
 
     fn stage_chart(
@@ -1616,6 +1719,40 @@ impl Patch {
         self.plan_join(other)
     }
 
+    /// Materialize two patch intents when the semantic planner proves them independent.
+    ///
+    /// The current compositor has one deliberately narrow safe case: an RDF-only patch can
+    /// be replayed over a patch that leaves RDF untouched. Content-coupled domains continue
+    /// to be refused rather than selecting one complete target archive as an accidental winner.
+    /// Durable patches retain enough source and target state for this operation after reload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for different sources, a reported conflict, or an RDF delta that cannot
+    /// be replayed and verified over the other target.
+    pub fn join_snapshot(&self, other: &Self) -> Result<Snapshot> {
+        let plan = self.plan_join(other)?;
+        if !plan.is_independent() {
+            return unsupported("ODP patch join requires resolution of semantic conflicts");
+        }
+        if self.is_noop() {
+            return Ok(other.after.clone());
+        }
+        if other.is_noop() {
+            return Ok(self.after.clone());
+        }
+        let (rdf_patch, target_patch) = if self.domains.as_ref() == [Domain::Rdf]
+            && !other.domains.contains(&Domain::Rdf)
+        {
+            (self, other)
+        } else if other.domains.as_ref() == [Domain::Rdf] && !self.domains.contains(&Domain::Rdf) {
+            (other, self)
+        } else {
+            return unsupported("ODP independent join has no bounded semantic compositor");
+        };
+        materialize_rdf_join(rdf_patch, target_patch)
+    }
+
     /// Plan a conservative three-way merge rooted at an exact base snapshot.
     ///
     /// # Errors
@@ -1635,6 +1772,18 @@ impl Patch {
     /// Returns an error when either side was not authored against `base`.
     pub fn three_way(base: &Snapshot, left: &Self, right: &Self) -> Result<MergePlan> {
         Self::plan_three_way(base, left, right)
+    }
+
+    /// Materialize a checked three-way merge for the independent cases supported by
+    /// [`Self::join_snapshot`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either patch is not rooted at `base`, the planner reports a
+    /// conflict, or the bounded semantic compositor cannot verify the merged package.
+    pub fn three_way_snapshot(base: &Snapshot, left: &Self, right: &Self) -> Result<Snapshot> {
+        Self::plan_three_way(base, left, right)?;
+        left.join_snapshot(right)
     }
 
     /// Serialize this exact reversible patch into a deterministic bounded binary envelope.
@@ -1835,6 +1984,115 @@ impl History {
     pub const fn retained_bytes(&self) -> usize {
         self.retained_bytes
     }
+
+    /// Serialize the complete bounded undo/redo timeline into a deterministic envelope.
+    ///
+    /// Every retained package is included so cursor position, redo state, and exact package
+    /// bytes survive a process boundary. The envelope is independently capped at 512 MiB.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained history exceeds the durable bound or a native limit
+    /// cannot be represented in the envelope.
+    pub fn to_durable_bytes(&self) -> Result<Vec<u8>> {
+        let header_len = DURABLE_HISTORY_MAGIC.len() + 2 + (8 * 4);
+        let capacity = self.entries.iter().try_fold(header_len, |size, snapshot| {
+            size.checked_add(8)
+                .and_then(|value| value.checked_add(snapshot.bytes().len()))
+                .ok_or_else(|| invalid_error("ODP durable history size overflow"))
+        })?;
+        if capacity > MAX_DURABLE_HISTORY_BYTES {
+            return invalid("ODP durable history exceeds the 512 MiB envelope limit");
+        }
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "ODP durable history envelope",
+                source,
+            })?;
+        output.extend_from_slice(DURABLE_HISTORY_MAGIC);
+        output.extend_from_slice(&DURABLE_HISTORY_VERSION.to_le_bytes());
+        write_len(&mut output, self.max_entries)?;
+        write_len(&mut output, self.max_bytes)?;
+        write_len(&mut output, self.cursor)?;
+        write_len(&mut output, self.entries.len())?;
+        for snapshot in &self.entries {
+            write_len(&mut output, snapshot.bytes().len())?;
+            output.extend_from_slice(snapshot.bytes());
+        }
+        Ok(output)
+    }
+
+    /// Rehydrate a bounded undo/redo timeline with full package validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed bounds, cursor/count inconsistencies, trailing bytes,
+    /// oversized packages, budget violations, or invalid retained ODP artifacts.
+    pub fn from_durable_bytes(bytes: &[u8]) -> Result<Self> {
+        let header_len = DURABLE_HISTORY_MAGIC.len() + 2 + (8 * 4);
+        if bytes.len() < header_len
+            || bytes.len() > MAX_DURABLE_HISTORY_BYTES
+            || &bytes[..DURABLE_HISTORY_MAGIC.len()] != DURABLE_HISTORY_MAGIC
+        {
+            return invalid("invalid ODP durable history magic, size, or truncated header");
+        }
+        let mut offset = DURABLE_HISTORY_MAGIC.len();
+        let version = read_u16(bytes, &mut offset)?;
+        if version != DURABLE_HISTORY_VERSION {
+            return invalid(format!("unsupported ODP durable history version {version}"));
+        }
+        let max_entries = read_len(bytes, &mut offset)?;
+        let max_bytes = read_len(bytes, &mut offset)?;
+        let cursor = read_len(bytes, &mut offset)?;
+        let count = read_len(bytes, &mut offset)?;
+        if max_entries == 0
+            || max_bytes == 0
+            || count == 0
+            || count > max_entries
+            || cursor >= count
+        {
+            return invalid("ODP durable history contains inconsistent bounds or cursor state");
+        }
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(count)
+            .map_err(|source| Error::Allocation {
+                resource: "ODP durable history entries",
+                source,
+            })?;
+        let mut retained_bytes = 0usize;
+        for _ in 0..count {
+            let length = read_len(bytes, &mut offset)?;
+            if length > MAX_PACKAGE_BYTES {
+                return invalid("ODP durable history contains an oversized package");
+            }
+            let end = offset
+                .checked_add(length)
+                .ok_or_else(|| invalid_error("ODP durable history package offset overflow"))?;
+            let package = bytes
+                .get(offset..end)
+                .ok_or_else(|| invalid_error("truncated ODP durable history package"))?;
+            entries.push(Snapshot::from_bytes(package.to_vec())?);
+            retained_bytes = retained_bytes
+                .checked_add(length)
+                .ok_or_else(|| invalid_error("ODP durable history byte count overflow"))?;
+            offset = end;
+        }
+        if offset != bytes.len() || retained_bytes > max_bytes {
+            return invalid(
+                "ODP durable history length or byte budget does not match its envelope",
+            );
+        }
+        Ok(Self {
+            entries,
+            cursor,
+            max_entries,
+            max_bytes,
+            retained_bytes,
+        })
+    }
 }
 
 fn select(slides: &[Slide], selector: Selector<'_>) -> Result<Option<usize>> {
@@ -1917,6 +2175,16 @@ fn read_len(bytes: &[u8], offset: &mut usize) -> Result<usize> {
         .map_err(|error| invalid_error(format!("ODP durable patch length is not native: {error}")))
 }
 
+fn write_len(output: &mut Vec<u8>, value: usize) -> Result<()> {
+    let encoded = u64::try_from(value).map_err(|source| {
+        invalid_error(format!(
+            "ODP durable envelope length is not representable: {source}"
+        ))
+    })?;
+    output.extend_from_slice(&encoded.to_le_bytes());
+    Ok(())
+}
+
 fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
     let archive = package.package()?;
     if archive.manifest().has_encrypted_entries() {
@@ -1930,6 +2198,118 @@ fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
         return unsupported(
             "ODP package transactions refuse signed packages because mutation would invalidate their signatures",
         );
+    }
+    Ok(())
+}
+
+fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snapshot> {
+    let base_package = OwnedPackage::from_shared_bytes(Arc::clone(&rdf_patch.before.bytes))?;
+    let rdf_target_package = OwnedPackage::from_shared_bytes(Arc::clone(&rdf_patch.after.bytes))?;
+    let base_graphs = crate::rdf::graphs(&base_package)?;
+    let expected_graphs = crate::rdf::graphs(&rdf_target_package)?;
+    let mut bytes = Arc::clone(&target_patch.after.bytes);
+
+    for expected in &expected_graphs {
+        let Some(before) = base_graphs.iter().find(|graph| graph.path == expected.path) else {
+            continue;
+        };
+        if before != expected {
+            let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
+            bytes = Arc::new(crate::rdf::replace_graph(
+                &package,
+                &expected.path,
+                &expected.triples,
+            )?);
+        }
+    }
+
+    let mut removals = base_graphs
+        .iter()
+        .filter(|graph| {
+            !expected_graphs
+                .iter()
+                .any(|expected| expected.path == graph.path)
+        })
+        .map(|graph| graph.path.clone())
+        .collect::<Vec<_>>();
+    while !removals.is_empty() {
+        let mut progress = false;
+        let mut retained = Vec::new();
+        for path in removals {
+            let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
+            match crate::rdf::remove_graph(&package, &path) {
+                Ok(updated) => {
+                    bytes = Arc::new(updated);
+                    progress = true;
+                },
+                Err(_error) => retained.push(path),
+            }
+        }
+        if !progress {
+            return unsupported("ODP RDF join cannot close graph-removal dependencies");
+        }
+        removals = retained;
+    }
+
+    for expected in &expected_graphs {
+        if base_graphs.iter().any(|graph| graph.path == expected.path) {
+            continue;
+        }
+        let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
+        let (updated, actual_path) =
+            crate::rdf::add_graph(&package, Some(&expected.path), &expected.triples)?;
+        if actual_path != expected.path {
+            return invalid("ODP RDF join resolved a different metadata graph path");
+        }
+        bytes = Arc::new(updated);
+    }
+
+    if bytes.len() > MAX_PACKAGE_BYTES {
+        return invalid("ODP joined package exceeds the 128 MiB package limit");
+    }
+    let joined = Snapshot::from_shared_bytes(bytes)?;
+    let joined_package = OwnedPackage::from_shared_bytes(Arc::clone(&joined.bytes))?;
+    if crate::rdf::graphs(&joined_package)? != expected_graphs {
+        return invalid("ODP joined package RDF readback differs from the expected graph model");
+    }
+    Ok(joined)
+}
+
+fn ensure_chart_transfer_closed(xml: &str) -> Result<()> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    loop {
+        match reader
+            .read_event_into(&mut buffer)
+            .map_err(|source| invalid_error(format!("invalid ODP chart transfer XML: {source}")))?
+        {
+            Event::Start(element) | Event::Empty(element) => {
+                for raw_attribute in element.attributes() {
+                    let attribute = raw_attribute.map_err(|source| {
+                        invalid_error(format!("invalid ODP chart transfer attribute: {source}"))
+                    })?;
+                    let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+                    if matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == *XLINK_NS)
+                        && local.as_ref() == b"href"
+                    {
+                        return unsupported(
+                            "ODP chart transfer refuses unresolved xlink:href dependencies",
+                        );
+                    }
+                }
+            },
+            Event::Eof => break,
+            Event::DocType(_) => return invalid("ODP chart transfer refuses document types"),
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::End(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
     }
     Ok(())
 }

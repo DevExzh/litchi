@@ -1,6 +1,7 @@
 //! Immutable ODG package snapshots and lossless semantic shape edits.
 
 use crate::model::{
+    FormControl,
     layer::Layer,
     page::Page,
     resource::Resource,
@@ -13,7 +14,9 @@ use litchi_core::{
 };
 use litchi_odf_common::{
     compact_xml,
-    core::{PackageWriter, family::Package},
+    core::{
+        AuthoredXmlFragment, PackageWriter, XmlSourcePart, XmlSplicePublication, family::Package,
+    },
     drawing::Frame,
     media,
 };
@@ -23,7 +26,7 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{collections::BTreeMap, ops::Range, path::Path, sync::Arc};
+use std::{collections::BTreeMap, fs, ops::Range, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.graphics";
 pub(crate) const TEMPLATE_MIMETYPE: &str = "application/vnd.oasis.opendocument.graphics-template";
@@ -32,10 +35,14 @@ const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const SVG: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
+const STYLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const FORM: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:form:1.0";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MAX_DEPTH: usize = 256;
 const MAX_PAGES: usize = 16_384;
 const MAX_LAYERS: usize = 16_384;
+const MAX_FORM_CONTROLS: usize = 65_536;
+const MAX_TRANSFER_RESOURCES: usize = 4_096;
 const MAX_SHAPES: usize = 1_000_000;
 const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
@@ -47,6 +54,7 @@ enum NamespaceKind {
     Draw,
     Svg,
     Text,
+    Form,
     Other,
 }
 
@@ -56,13 +64,43 @@ type LayerSpans = Vec<Vec<Option<Range<usize>>>>;
 type GeometrySpans = Vec<Vec<[Option<Range<usize>>; 4]>>;
 type PathSpans = Vec<Vec<Option<Range<usize>>>>;
 type ControlSpans = Vec<Vec<Option<Range<usize>>>>;
+type PageAttributeSpans = Vec<[Option<Range<usize>>; 2]>;
 
 struct State {
     package: Package,
     mimetype: &'static str,
+    security: SecurityStatus,
     pages: Vec<Page>,
     layers: Vec<Layer>,
     resources: Vec<Resource>,
+    form_controls: Vec<FormControl>,
+}
+
+/// Inert package security state and mutation policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SecurityStatus {
+    signed: bool,
+    encrypted: bool,
+}
+
+impl SecurityStatus {
+    /// Whether document or macro signature metadata is present.
+    #[must_use]
+    pub const fn is_signed(self) -> bool {
+        self.signed
+    }
+
+    /// Whether any manifest member has encryption metadata.
+    #[must_use]
+    pub const fn is_encrypted(self) -> bool {
+        self.encrypted
+    }
+
+    /// Whether ordinary semantic rewrite is allowed without changing security lifecycle.
+    #[must_use]
+    pub const fn allows_rewrite(self) -> bool {
+        !self.signed && !self.encrypted
+    }
 }
 
 /// An immutable, source-owning ODG package snapshot.
@@ -107,6 +145,30 @@ impl Snapshot {
         )
     }
 
+    /// Opens password-protected ODG bytes for inert inspection.
+    ///
+    /// Encrypted snapshots remain read-only: semantic commit and durable application refuse to
+    /// strip or silently re-encrypt protected entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid package, unsupported encryption metadata, or bad password.
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        Self::from_package(
+            Package::from_bytes_with_password(bytes, password, MIMETYPE, BODY_MARKER, "ODG")?,
+            MIMETYPE,
+        )
+    }
+
+    /// Opens a password-protected ODG file for inert inspection.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_bytes_with_password`] plus filesystem errors.
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        Self::from_bytes_with_password(fs::read(path)?, password)
+    }
+
     /// Opens an `OpenDocument` drawing template from owned bytes.
     ///
     /// # Errors
@@ -120,6 +182,12 @@ impl Snapshot {
     }
 
     fn from_package(package: Package, mimetype: &'static str) -> Result<Self> {
+        let archive = package.package().package()?;
+        let security = SecurityStatus {
+            encrypted: archive.manifest().has_encrypted_entries(),
+            signed: archive.has_file("META-INF/documentsignatures.xml")
+                || archive.has_file("META-INF/macrosignatures.xml"),
+        };
         let parsed = parse_content(package.content_xml())?;
         let layers = package
             .styles_xml()
@@ -133,7 +201,9 @@ impl Snapshot {
         Ok(Self(Arc::new(State {
             package,
             mimetype,
+            security,
             pages: parsed.pages,
+            form_controls: parsed.form_controls,
             layers,
             resources,
         })))
@@ -209,6 +279,12 @@ impl Snapshot {
         self.0.mimetype == TEMPLATE_MIMETYPE
     }
 
+    /// Inert signature/encryption state and rewrite policy for this snapshot.
+    #[must_use]
+    pub fn security(&self) -> SecurityStatus {
+        self.0.security
+    }
+
     /// Lists safe package entry names.
     ///
     /// # Errors
@@ -222,6 +298,12 @@ impl Snapshot {
     #[must_use]
     pub fn resources(&self) -> &[Resource] {
         &self.0.resources
+    }
+
+    /// Returns inert form elements carrying `form:id` in source order.
+    #[must_use]
+    pub fn form_controls(&self) -> &[FormControl] {
+        &self.0.form_controls
     }
 
     /// Reads one inventoried package-local resource without activating it.
@@ -245,6 +327,7 @@ impl Snapshot {
         Transaction {
             source: self.clone(),
             content: self.content_xml().to_string(),
+            content_splices: Some(Vec::new()),
             changes: Vec::new(),
             resource_edits: Vec::new(),
         }
@@ -279,6 +362,125 @@ impl Snapshot {
         History::new(self.clone(), limits)
     }
 
+    /// Prepares one compact shape or complete group subtree for checked cross-drawing transfer.
+    ///
+    /// The plan retains exact source provenance, the referenced local layer declaration, and
+    /// package-local resource bytes. It never evaluates embedded or linked content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid selectors, noncompact source XML, unreadable resources, or
+    /// unresolved source dependencies.
+    pub fn prepare_shape_transfer(&self, page: usize, shape: usize) -> Result<ShapeTransfer> {
+        ensure_compact_rewrite_source(self)?;
+        let parsed = parse_content(self.content_xml())?;
+        let selected_page = parsed.pages.get(page).ok_or_else(|| {
+            Error::InvalidFormat("ODG transfer page selector is out of bounds".into())
+        })?;
+        let selected_shape = selected_page.shapes().get(shape).cloned().ok_or_else(|| {
+            Error::InvalidFormat("ODG transfer shape selector is out of bounds".into())
+        })?;
+        let span = parsed.shape_spans[page][shape]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG transfer shape span is missing".into()))?;
+        let xml = self
+            .content_xml()
+            .get(span.clone())
+            .ok_or_else(|| Error::InvalidFormat("ODG transfer shape span is invalid".into()))?
+            .to_owned();
+        let dependency_shapes = selected_page
+            .shapes()
+            .iter()
+            .enumerate()
+            .filter(|(index, _shape)| {
+                parsed.shape_spans[page][*index]
+                    .as_ref()
+                    .is_some_and(|candidate| {
+                        candidate.start >= span.start && candidate.end <= span.end
+                    })
+            })
+            .map(|(_index, shape_value)| shape_value)
+            .collect::<Vec<_>>();
+        let mut layers = dependency_shapes
+            .iter()
+            .filter_map(|shape_value| shape_value.layer())
+            .map(|name| resolve_transfer_layer(self, selected_page, name))
+            .collect::<Result<Vec<_>>>()?;
+        layers.sort_unstable_by(|left, right| left.name().cmp(right.name()));
+        layers.dedup_by(|left, right| left.name() == right.name());
+        let mut styles = dependency_shapes
+            .iter()
+            .flat_map(|shape_value| [shape_value.style_name(), shape_value.text_style_name()])
+            .flatten()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        styles.sort_unstable();
+        styles.dedup();
+        let mut controls = dependency_shapes
+            .iter()
+            .filter_map(|shape_value| shape_value.control_reference())
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        controls.sort_unstable();
+        controls.dedup();
+        for style in &styles {
+            if !declares_style(self, style)? {
+                return Err(Error::Unsupported(format!(
+                    "ODG transfer source has unresolved style '{style}'"
+                )));
+            }
+        }
+        for control in &controls {
+            if !self
+                .form_controls()
+                .iter()
+                .any(|declared| declared.id() == control)
+            {
+                return Err(Error::Unsupported(format!(
+                    "ODG transfer source has unresolved form control '{control}'"
+                )));
+            }
+        }
+        let mut resources = Vec::new();
+        let mut resource_bytes = 0usize;
+        for (resource_index, resource) in self
+            .resources()
+            .iter()
+            .enumerate()
+            .filter(|(_index, resource)| transfer_xml_references(&xml, resource.href()))
+        {
+            if resources.len() >= MAX_TRANSFER_RESOURCES {
+                return invalid("ODG transfer resource count exceeds the limit");
+            }
+            let bytes = self.resource_bytes(resource_index)?.ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "ODG transfer resource '{}' is missing",
+                    resource.path()
+                ))
+            })?;
+            resource_bytes = resource_bytes.checked_add(bytes.len()).ok_or_else(|| {
+                Error::InvalidFormat("ODG transfer resource size overflow".to_string())
+            })?;
+            if resource_bytes > MAX_OUTPUT_BYTES {
+                return invalid("ODG transfer resources exceed the byte limit");
+            }
+            resources.push(TransferResource {
+                path: resource.path().to_owned(),
+                media_type: resource.media_type().map(str::to_owned),
+                bytes: Some(bytes),
+            });
+        }
+        Ok(ShapeTransfer {
+            source: Lineage::new(self),
+            shape: selected_shape,
+            xml,
+            layers,
+            styles,
+            controls,
+            resources,
+        })
+    }
+
     /// Consumes the snapshot and returns its source bytes.
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
@@ -293,11 +495,145 @@ impl Snapshot {
 pub struct Transaction {
     source: Snapshot,
     content: String,
+    content_splices: Option<Vec<ContentSplice>>,
     changes: Vec<Change>,
     resource_edits: Vec<ResourceEdit>,
 }
 
+#[derive(Debug)]
+struct ContentSplice {
+    source_range: Range<usize>,
+    current_range: Range<usize>,
+    expected: Vec<u8>,
+    replacement: Vec<u8>,
+}
+
 impl Transaction {
+    fn replace_content_value(&mut self, span: &Range<usize>, replacement: &str) -> Result<()> {
+        let escaped = quick_xml::escape::escape(replacement).into_owned();
+        let next = replace_xml_value(&self.content, span, replacement)?;
+        if let Some(splices) = &mut self.content_splices {
+            stage_content_splice(
+                self.source.content_xml().as_bytes(),
+                self.content.as_bytes(),
+                splices,
+                span,
+                escaped.as_bytes(),
+            )?;
+        }
+        self.content = next;
+        Ok(())
+    }
+
+    fn replace_content_values(
+        &mut self,
+        spans: &[&Range<usize>],
+        replacements: &[String; 4],
+    ) -> Result<()> {
+        let mut edits = spans
+            .iter()
+            .zip(replacements)
+            .map(|(span, value)| ((*span).clone(), value.as_str()))
+            .collect::<Vec<_>>();
+        edits.sort_unstable_by_key(|(span, _)| std::cmp::Reverse(span.start));
+        for (span, replacement) in edits {
+            self.replace_content_value(&span, replacement)?;
+        }
+        Ok(())
+    }
+
+    fn invalidate_content_splices(&mut self) {
+        self.content_splices = None;
+    }
+
+    /// Renames a page through its existing `draw:name` attribute.
+    ///
+    /// Page-name references elsewhere in the drawing are dependency checked and cause refusal;
+    /// callers must update those owners explicitly rather than leaving dangling references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, duplicate name, referenced old name, absent
+    /// source attribute, or size limit.
+    pub fn set_page_name(&mut self, page: usize, name: impl Into<String>) -> Result<()> {
+        let after = name.into();
+        validate_bounded_value(&after, "ODG page name")?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        let before = selected.name().ok_or_else(|| {
+            Error::Unsupported("ODG page rename requires an existing draw:name".into())
+        })?;
+        if parsed
+            .pages
+            .iter()
+            .enumerate()
+            .any(|(index, value)| index != page && value.name() == Some(after.as_str()))
+        {
+            return invalid("ODG page rename would create a duplicate name");
+        }
+        if before == after {
+            return Ok(());
+        }
+        if xml_has_attribute(&self.content, DRAW, b"page-name", before)? {
+            return Err(Error::Unsupported(
+                "ODG page rename is blocked by a draw:page-name dependency".into(),
+            ));
+        }
+        let span = parsed.page_attribute_spans[page][0]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG page name source span is missing".into()))?;
+        let before_owned = before.to_owned();
+        self.replace_content_value(span, &after)?;
+        self.changes.push(Change::PageName(PageNameChange {
+            page,
+            before: before_owned,
+            after,
+        }));
+        Ok(())
+    }
+
+    /// Changes a page's existing drawing-page style reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid selectors, missing source/style declarations, or limits.
+    pub fn set_page_style_name(
+        &mut self,
+        page: usize,
+        style_name: impl Into<String>,
+    ) -> Result<()> {
+        let after = style_name.into();
+        validate_bounded_value(&after, "ODG page style name")?;
+        if !declares_style(&self.source, &after)? {
+            return invalid("ODG destination page style is not declared");
+        }
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        let before = selected.style_name().ok_or_else(|| {
+            Error::Unsupported("ODG page style edit requires an existing draw:style-name".into())
+        })?;
+        if before == after {
+            return Ok(());
+        }
+        let span = parsed.page_attribute_spans[page][1]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG page style source span is missing".into()))?;
+        let before_owned = before.to_owned();
+        self.replace_content_value(span, &after)?;
+        self.changes.push(Change::PageStyle(PageStyleChange {
+            page,
+            before: before_owned,
+            after,
+        }));
+        Ok(())
+    }
+
     /// Replaces one shape's sole plain paragraph character-data span.
     ///
     /// Split, mixed, CDATA, and entity-reference text is refused rather than
@@ -340,7 +676,7 @@ impl Transaction {
             Error::InvalidFormat("ODG shape text source span is missing".to_string())
         })?;
         let before = selected.text().to_string();
-        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.replace_content_value(span, &after)?;
         self.changes.push(Change::Text(TextChange {
             page,
             shape,
@@ -397,7 +733,7 @@ impl Transaction {
             return Ok(());
         }
         let before_owned = before.to_string();
-        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.replace_content_value(span, &after)?;
         self.changes.push(Change::Name(NameChange {
             page,
             shape,
@@ -463,7 +799,7 @@ impl Transaction {
             return Ok(());
         }
         let before_owned = before.to_string();
-        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.replace_content_value(span, &after)?;
         self.changes.push(Change::Layer(LayerChange {
             page,
             shape,
@@ -528,7 +864,7 @@ impl Transaction {
         {
             return Ok(());
         }
-        self.content = replace_xml_values(&self.content, &ranges, &after)?;
+        self.replace_content_values(&ranges, &after)?;
         self.changes.push(Change::Geometry(GeometryChange {
             page,
             shape,
@@ -570,7 +906,7 @@ impl Transaction {
             return Ok(());
         }
         let before_owned = before.to_owned();
-        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.replace_content_value(span, &after)?;
         self.changes.push(Change::Style(StyleChange {
             page,
             shape,
@@ -618,7 +954,7 @@ impl Transaction {
             return Ok(());
         }
         let before_owned = before.to_owned();
-        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.replace_content_value(span, &after)?;
         self.changes.push(Change::Path(PathChange {
             page,
             shape,
@@ -668,7 +1004,7 @@ impl Transaction {
             return Ok(());
         }
         let before_owned = before.to_owned();
-        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.replace_content_value(span, &after)?;
         self.changes
             .push(Change::ControlReference(ControlReferenceChange {
                 page,
@@ -710,7 +1046,9 @@ impl Transaction {
                 .start
         };
         let xml = serialize_page(&page)?;
-        self.content = insert_child_xml(&self.content, at, &xml)?;
+        let content = insert_child_xml(&self.content, at, &xml)?;
+        self.invalidate_content_splices();
+        self.content = content;
         self.changes
             .push(Change::Structure(StructureChange::PageInserted {
                 position,
@@ -744,7 +1082,16 @@ impl Transaction {
         let span = parsed.page_spans[position]
             .as_ref()
             .ok_or_else(|| Error::InvalidFormat("ODG page span is missing".into()))?;
-        self.content = remove_xml(&self.content, span)?;
+        let content = remove_xml(&self.content, span)?;
+        if let Some(name) = page.name()
+            && xml_has_attribute(&content, DRAW, b"page-name", name)?
+        {
+            return Err(Error::Unsupported(
+                "ODG page removal is blocked by a draw:page-name dependency".into(),
+            ));
+        }
+        self.invalidate_content_splices();
+        self.content = content;
         self.changes
             .push(Change::Structure(StructureChange::PageRemoved {
                 position,
@@ -791,7 +1138,9 @@ impl Transaction {
                 .start
         };
         let xml = serialize_shape(&shape)?;
-        self.content = insert_child_xml(&self.content, at, &xml)?;
+        let content = insert_child_xml(&self.content, at, &xml)?;
+        self.invalidate_content_splices();
+        self.content = content;
         self.changes
             .push(Change::Structure(StructureChange::ShapeInserted {
                 page,
@@ -825,6 +1174,191 @@ impl Transaction {
         self.add_shape(page, Shape::new(ShapeKind::Group).with_name(name))
     }
 
+    /// Adds an inert form-control declaration without activating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for duplicate/invalid identifiers or output limits.
+    pub fn add_form_control(&mut self, control: &FormControl) -> Result<()> {
+        validate_bounded_value(control.id(), "ODG form-control identifier")?;
+        if let Some(name) = control.name() {
+            validate_bounded_value(name, "ODG form-control name")?;
+        }
+        let parsed = parse_content(&self.content)?;
+        if parsed.form_controls.len() >= MAX_FORM_CONTROLS {
+            return invalid("ODG form-control count exceeds the limit");
+        }
+        if parsed
+            .form_controls
+            .iter()
+            .any(|value| value.id() == control.id())
+        {
+            return invalid("ODG form-control identifier is already present");
+        }
+        let control_xml = serialize_form_control(control)?;
+        let content = if let Some(at) = parsed.forms_insert_position {
+            let form_xml = format!(
+                "<form:form xmlns:form=\"{}\" form:name=\"Litchi\">{control_xml}</form:form>",
+                std::str::from_utf8(FORM).unwrap_or_default()
+            );
+            insert_child_xml(&self.content, at, &form_xml)?
+        } else {
+            let forms_xml = format!(
+                "<office:forms xmlns:office=\"{}\" xmlns:form=\"{}\"><form:form form:name=\"Litchi\">{control_xml}</form:form></office:forms>",
+                std::str::from_utf8(OFFICE).unwrap_or_default(),
+                std::str::from_utf8(FORM).unwrap_or_default()
+            );
+            insert_xml(&self.content, parsed.drawing_start_position, &forms_xml)?
+        };
+        self.invalidate_content_splices();
+        self.content = content;
+        parse_content(&self.content)?;
+        self.changes
+            .push(Change::Structure(StructureChange::FormControlInserted {
+                id: control.id().to_owned(),
+            }));
+        Ok(())
+    }
+
+    /// Removes an inert form declaration only when no drawing shape references it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for absent/ambiguous identifiers or a live `draw:control` dependency.
+    pub fn remove_form_control(&mut self, identifier: &str) -> Result<FormControl> {
+        let parsed = parse_content(&self.content)?;
+        if parsed.pages.iter().any(|page| {
+            page.shapes()
+                .iter()
+                .any(|shape| shape.control_reference() == Some(identifier))
+        }) {
+            return Err(Error::Unsupported(
+                "ODG form-control removal is blocked by a drawing shape".into(),
+            ));
+        }
+        let mut matches = parsed
+            .form_controls
+            .iter()
+            .enumerate()
+            .filter(|(_index, control)| control.id() == identifier);
+        let (position, control) = matches.next().ok_or_else(|| {
+            Error::InvalidFormat("ODG form-control selector did not match".into())
+        })?;
+        if matches.next().is_some() {
+            return invalid("ODG form-control identifier is ambiguous");
+        }
+        let removed = control.clone();
+        let span = parsed.form_control_spans[position]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG form-control span is missing".into()))?;
+        let content = remove_xml(&self.content, span)?;
+        self.invalidate_content_splices();
+        self.content = content;
+        self.changes
+            .push(Change::Structure(StructureChange::FormControlRemoved {
+                id: identifier.to_owned(),
+            }));
+        Ok(removed)
+    }
+
+    /// Inserts a prepared cross-drawing shape/group and its dependency closure.
+    ///
+    /// Missing page-local layers and noncolliding package resources are copied. Graphic/text
+    /// styles and form controls must already exist in the destination; unresolved dependencies
+    /// and differing resource-path collisions are refused before publication.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid selectors, unresolved dependencies, collisions, source
+    /// policy violations, or output limits.
+    pub fn insert_shape_transfer(
+        &mut self,
+        page: usize,
+        position: usize,
+        transfer: &ShapeTransfer,
+    ) -> Result<()> {
+        transfer.validate_destination(&self.source, &self.content, page)?;
+        let initial = parse_content(&self.content)?;
+        let initial_page = initial.pages.get(page).ok_or_else(|| {
+            Error::InvalidFormat("ODG transfer page selector is out of bounds".into())
+        })?;
+        let needs_local_layer_set = !initial_page.has_layer_set()
+            && transfer.layers.iter().any(|required| {
+                !self
+                    .source
+                    .layers()
+                    .iter()
+                    .any(|global| global.name() == required.name())
+            });
+        if needs_local_layer_set {
+            let mut closure = initial_page
+                .shapes()
+                .iter()
+                .filter_map(|shape| shape.layer())
+                .map(|name| resolve_transfer_layer(&self.source, initial_page, name))
+                .collect::<Result<Vec<_>>>()?;
+            closure.extend(transfer.layers.iter().cloned());
+            closure.sort_unstable_by(|left, right| left.name().cmp(right.name()));
+            closure.dedup_by(|left, right| left.name() == right.name());
+            for layer in closure {
+                self.add_layer(page, layer)?;
+            }
+        }
+        for layer in &transfer.layers {
+            let parsed = parse_content(&self.content)?;
+            let destination_page = parsed.pages.get(page).ok_or_else(|| {
+                Error::InvalidFormat("ODG transfer page selector is out of bounds".into())
+            })?;
+            let visible = if destination_page.has_layer_set() {
+                destination_page.layers()
+            } else {
+                self.source.layers()
+            };
+            if !visible.iter().any(|value| value.name() == layer.name()) {
+                self.add_layer(page, layer.clone())?;
+            }
+        }
+        for resource in &transfer.resources {
+            self.stage_transferred_resource(resource)?;
+        }
+        let parsed = parse_content(&self.content)?;
+        let destination_page = parsed.pages.get(page).ok_or_else(|| {
+            Error::InvalidFormat("ODG transfer page selector is out of bounds".into())
+        })?;
+        if position > destination_page.shapes().len() {
+            return invalid("ODG transfer shape position is out of bounds");
+        }
+        if parsed
+            .pages
+            .iter()
+            .map(|value| value.shapes().len())
+            .sum::<usize>()
+            >= MAX_SHAPES
+        {
+            return invalid("ODG shape count exceeds the limit");
+        }
+        let at = if position == destination_page.shapes().len() {
+            parsed.page_insert_positions[page]
+                .ok_or_else(|| Error::InvalidFormat("ODG page insertion point is missing".into()))?
+        } else {
+            parsed.shape_spans[page][position]
+                .as_ref()
+                .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?
+                .start
+        };
+        let content = insert_child_xml(&self.content, at, &transfer.xml)?;
+        self.invalidate_content_splices();
+        self.content = content;
+        parse_content(&self.content)?;
+        self.changes
+            .push(Change::Structure(StructureChange::ShapeInserted {
+                page,
+                position,
+                kind: transfer.shape.kind(),
+            }));
+        Ok(())
+    }
+
     /// Removes one shape; removing a group owns and removes its complete subtree.
     ///
     /// # Errors
@@ -841,7 +1375,9 @@ impl Transaction {
         let span = parsed.shape_spans[page][shape]
             .as_ref()
             .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?;
-        self.content = remove_xml(&self.content, span)?;
+        let content = remove_xml(&self.content, span)?;
+        self.invalidate_content_splices();
+        self.content = content;
         self.changes
             .push(Change::Structure(StructureChange::ShapeRemoved {
                 page,
@@ -874,22 +1410,29 @@ impl Transaction {
             return invalid("ODG page-local layer name is already present");
         }
         let layer_xml = serialize_layer(&layer)?;
-        if selected.has_layer_set() {
+        let content = if selected.has_layer_set() {
             let at = parsed.layer_set_insert_positions[page].ok_or_else(|| {
                 Error::InvalidFormat("ODG page-local layer-set insertion point is missing".into())
             })?;
-            self.content = insert_child_xml(&self.content, at, &layer_xml)?;
+            insert_child_xml(&self.content, at, &layer_xml)?
         } else {
             let page_span = parsed.page_spans[page]
                 .as_ref()
                 .ok_or_else(|| Error::InvalidFormat("ODG page span is missing".into()))?;
-            let at = start_tag_end(&self.content, page_span.start)?;
             let xml = format!(
                 "<draw:layer-set xmlns:draw=\"{}\">{layer_xml}</draw:layer-set>",
                 std::str::from_utf8(DRAW).unwrap_or_default()
             );
-            self.content = insert_xml(&self.content, at, &xml)?;
-        }
+            let empty_at = page_span.end.saturating_sub(2);
+            if self.content.as_bytes().get(empty_at..page_span.end) == Some(b"/>") {
+                insert_child_xml(&self.content, empty_at, &xml)?
+            } else {
+                let at = start_tag_end(&self.content, page_span.start)?;
+                insert_xml(&self.content, at, &xml)?
+            }
+        };
+        self.invalidate_content_splices();
+        self.content = content;
         self.changes
             .push(Change::Structure(StructureChange::LayerInserted {
                 page,
@@ -933,7 +1476,9 @@ impl Transaction {
         let span = parsed.layer_element_spans[page][position]
             .as_ref()
             .ok_or_else(|| Error::InvalidFormat("ODG layer span is missing".into()))?;
-        self.content = remove_xml(&self.content, span)?;
+        let content = remove_xml(&self.content, span)?;
+        self.invalidate_content_splices();
+        self.content = content;
         self.changes
             .push(Change::Structure(StructureChange::LayerRemoved {
                 page,
@@ -959,6 +1504,87 @@ impl Transaction {
             return invalid("ODG resource exceeds the output limit");
         }
         self.stage_resource(resource, Some(target_media_type), Some(bytes))
+    }
+
+    /// Adds a noncolliding package-local media/resource member.
+    ///
+    /// The member remains inert until drawing XML references it. Existing paths and unsafe package
+    /// paths are refused rather than overwritten.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsafe/colliding paths, invalid media types, or size limits.
+    pub fn add_resource(
+        &mut self,
+        path: impl Into<String>,
+        media_type: impl Into<String>,
+        bytes: Vec<u8>,
+    ) -> Result<()> {
+        let owned_path = path.into();
+        let owned_media_type = media_type.into();
+        validate_resource_path(&owned_path)?;
+        validate_media_type(&owned_media_type)?;
+        if bytes.len() > MAX_OUTPUT_BYTES {
+            return invalid("ODG resource exceeds the output limit");
+        }
+        if self
+            .source
+            .files()?
+            .iter()
+            .any(|value| value == &owned_path)
+            || self
+                .resource_edits
+                .iter()
+                .any(|edit| edit.path == owned_path)
+        {
+            return invalid("ODG resource path is already present");
+        }
+        self.resource_edits.push(ResourceEdit {
+            resource: self
+                .source
+                .resources()
+                .len()
+                .saturating_add(self.resource_edits.len()),
+            path: owned_path,
+            before_media_type: None,
+            after_media_type: Some(owned_media_type),
+            before_bytes: None,
+            after_bytes: Some(bytes),
+        });
+        Ok(())
+    }
+
+    /// Removes a package member only when drawing XML has no live reference to its path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsafe/absent paths or a live drawing resource dependency.
+    pub fn remove_unreferenced_resource(&mut self, path: &str) -> Result<()> {
+        validate_resource_path(path)?;
+        if self
+            .source
+            .resources()
+            .iter()
+            .any(|resource| resource.path() == path)
+        {
+            return Err(Error::Unsupported(
+                "ODG resource removal is blocked by a drawing reference".into(),
+            ));
+        }
+        let archive = self.source.0.package.package();
+        if !archive.has_file(path)? {
+            return invalid("ODG resource path is absent");
+        }
+        let package = archive.package()?;
+        self.resource_edits.push(ResourceEdit {
+            resource: self.source.resources().len(),
+            path: path.to_owned(),
+            before_media_type: package.manifest().get_media_type(path).map(str::to_owned),
+            after_media_type: None,
+            before_bytes: Some(package.get_file(path)?),
+            after_bytes: None,
+        });
+        Ok(())
     }
 
     /// Removes one package-local resource while retaining its inert reference.
@@ -1005,6 +1631,59 @@ impl Transaction {
         Ok(())
     }
 
+    fn stage_transferred_resource(&mut self, resource: &TransferResource) -> Result<()> {
+        validate_resource_path(&resource.path)?;
+        let Some(bytes) = &resource.bytes else {
+            return Ok(());
+        };
+        if bytes.len() > MAX_OUTPUT_BYTES {
+            return invalid("ODG transferred resource exceeds the output limit");
+        }
+        if let Some(staged) = self
+            .resource_edits
+            .iter()
+            .find(|edit| edit.path == resource.path)
+        {
+            if staged.after_bytes.as_ref() == Some(bytes)
+                && staged.after_media_type == resource.media_type
+            {
+                return Ok(());
+            }
+            return invalid("ODG transferred resource conflicts with a staged package member");
+        }
+        let archive = self.source.0.package.package();
+        if archive.has_file(&resource.path)? {
+            let existing = archive.get_file(&resource.path)?;
+            let existing_media_type = archive
+                .package()?
+                .manifest()
+                .get_media_type(&resource.path)
+                .map(str::to_owned);
+            if existing != *bytes || existing_media_type != resource.media_type {
+                return invalid("ODG transferred resource path collides with differing content");
+            }
+            return Ok(());
+        }
+        let media_type = resource
+            .media_type
+            .clone()
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+        validate_media_type(&media_type)?;
+        self.resource_edits.push(ResourceEdit {
+            resource: self
+                .source
+                .resources()
+                .len()
+                .saturating_add(self.resource_edits.len()),
+            path: resource.path.clone(),
+            before_media_type: None,
+            after_media_type: Some(media_type),
+            before_bytes: None,
+            after_bytes: Some(bytes.clone()),
+        });
+        Ok(())
+    }
+
     /// Atomically validates, rebuilds, and publishes the edited package.
     ///
     /// # Errors
@@ -1014,8 +1693,7 @@ impl Transaction {
         if self.content == self.source.content_xml() && self.resource_edits.is_empty() {
             return Ok(Commit::unchanged(self.source));
         }
-        ensure_compact_rewrite_source(&self.source)?;
-        compact_xml::validate(self.content.as_bytes()).map_err(Error::from)?;
+        refuse_signed_package(&self.source)?;
         let replacements = self
             .resource_edits
             .iter()
@@ -1025,7 +1703,17 @@ impl Transaction {
                 bytes: edit.after_bytes.as_deref(),
             })
             .collect::<Vec<_>>();
-        let rebuilt = rebuild(&self.source, &self.content, &replacements)?;
+        let requires_package_projection;
+        let rebuilt = if let Some(splices) = &self.content_splices {
+            requires_package_projection = ensure_compact_rewrite_source(&self.source).is_err();
+            let publication = content_splice_publication(&self.source, splices)?;
+            rebuild_spliced(&self.source, publication, &replacements)?
+        } else {
+            requires_package_projection = false;
+            ensure_compact_rewrite_source(&self.source)?;
+            compact_xml::validate(self.content.as_bytes()).map_err(Error::from)?;
+            rebuild(&self.source, &self.content, &replacements)?
+        };
         let snapshot = if self.source.is_template() {
             Snapshot::from_template_bytes(rebuilt)?
         } else {
@@ -1035,11 +1723,8 @@ impl Transaction {
             return invalid("ODG package edit failed exact content readback");
         }
         for edit in &self.resource_edits {
-            let present = snapshot
-                .resources()
-                .iter()
-                .find(|resource| resource.path() == edit.path);
-            if present.and_then(Resource::media_type) != edit.after_media_type.as_deref() {
+            let archive = snapshot.0.package.package().package()?;
+            if archive.manifest().get_media_type(&edit.path) != edit.after_media_type.as_deref() {
                 return invalid("ODG resource edit failed manifest readback");
             }
             let actual = if snapshot.0.package.package().has_file(&edit.path)? {
@@ -1062,6 +1747,7 @@ impl Transaction {
                 target: snapshot.clone(),
                 changes: self.changes,
                 resource_changes,
+                requires_package_projection,
             },
             snapshot,
             changed: true,
@@ -1080,7 +1766,59 @@ pub enum Change {
     Geometry(GeometryChange),
     Style(StyleChange),
     Path(PathChange),
+    PageName(PageNameChange),
+    PageStyle(PageStyleChange),
     Structure(StructureChange),
+}
+
+/// One reversible page-name change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PageNameChange {
+    page: usize,
+    before: String,
+    after: String,
+}
+
+impl PageNameChange {
+    #[must_use]
+    pub const fn page(&self) -> usize {
+        self.page
+    }
+
+    #[must_use]
+    pub fn before(&self) -> &str {
+        &self.before
+    }
+
+    #[must_use]
+    pub fn after(&self) -> &str {
+        &self.after
+    }
+}
+
+/// One reversible drawing-page style-reference change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PageStyleChange {
+    page: usize,
+    before: String,
+    after: String,
+}
+
+impl PageStyleChange {
+    #[must_use]
+    pub const fn page(&self) -> usize {
+        self.page
+    }
+
+    #[must_use]
+    pub fn before(&self) -> &str {
+        &self.before
+    }
+
+    #[must_use]
+    pub fn after(&self) -> &str {
+        &self.after
+    }
 }
 
 /// One reversible inert form-control reference change.
@@ -1346,6 +2084,12 @@ pub enum StructureChange {
         position: usize,
         kind: ShapeKind,
     },
+    FormControlInserted {
+        id: String,
+    },
+    FormControlRemoved {
+        id: String,
+    },
 }
 
 /// One package-local resource replacement or removal.
@@ -1434,6 +2178,7 @@ impl Commit {
                 target: snapshot.clone(),
                 changes: Vec::new(),
                 resource_changes: Vec::new(),
+                requires_package_projection: false,
             },
             snapshot,
             changed: false,
@@ -1472,6 +2217,7 @@ pub struct Patch {
     target: Snapshot,
     changes: Vec<Change>,
     resource_changes: Vec<ResourceChange>,
+    requires_package_projection: bool,
 }
 
 impl Patch {
@@ -1504,6 +2250,8 @@ impl Patch {
             | Change::Geometry(_)
             | Change::Style(_)
             | Change::Path(_)
+            | Change::PageName(_)
+            | Change::PageStyle(_)
             | Change::Structure(_) => None,
         })
     }
@@ -1519,6 +2267,8 @@ impl Patch {
             | Change::Geometry(_)
             | Change::Style(_)
             | Change::Path(_)
+            | Change::PageName(_)
+            | Change::PageStyle(_)
             | Change::Structure(_) => None,
         })
     }
@@ -1534,6 +2284,8 @@ impl Patch {
             | Change::Geometry(_)
             | Change::Style(_)
             | Change::Path(_)
+            | Change::PageName(_)
+            | Change::PageStyle(_)
             | Change::Structure(_) => None,
         })
     }
@@ -1568,6 +2320,8 @@ impl Patch {
             target: next.target.clone(),
             changes,
             resource_changes,
+            requires_package_projection: self.requires_package_projection
+                || next.requires_package_projection,
         })
     }
 
@@ -1584,6 +2338,7 @@ impl Patch {
                 .rev()
                 .map(inverse_resource_change)
                 .collect(),
+            requires_package_projection: self.requires_package_projection,
         }
     }
 
@@ -1597,6 +2352,7 @@ impl Patch {
         let source = fingerprint(self.source.as_bytes());
         let target = fingerprint(self.target.as_bytes());
         if !self.resource_changes.is_empty()
+            || self.requires_package_projection
             || self
                 .changes
                 .iter()
@@ -1680,6 +2436,116 @@ pub type MergePlan = litchi_core::ThreeWayMergePlan<Lineage, DurablePatch>;
 
 /// Explicit bounded ODG undo/redo history.
 pub type SnapshotHistory = History<Snapshot>;
+
+/// A bounded, provenance-bound shape or complete group-subtree transfer plan.
+#[derive(Clone)]
+pub struct ShapeTransfer {
+    source: Lineage,
+    shape: Shape,
+    xml: String,
+    layers: Vec<Layer>,
+    styles: Vec<String>,
+    controls: Vec<String>,
+    resources: Vec<TransferResource>,
+}
+
+impl ShapeTransfer {
+    /// Root shape semantics retained by the transfer.
+    #[must_use]
+    pub const fn shape(&self) -> &Shape {
+        &self.shape
+    }
+
+    /// Required declared layers in stable name order.
+    #[must_use]
+    pub fn layers(&self) -> &[Layer] {
+        &self.layers
+    }
+
+    /// Required graphic/text style names in stable order.
+    #[must_use]
+    pub fn styles(&self) -> &[String] {
+        &self.styles
+    }
+
+    /// Required inert form-control identifiers in stable order.
+    #[must_use]
+    pub fn controls(&self) -> &[String] {
+        &self.controls
+    }
+
+    /// Package-local resource closure in source occurrence order.
+    #[must_use]
+    pub fn resources(&self) -> &[TransferResource] {
+        &self.resources
+    }
+
+    /// Content-free fingerprint of the exact source artifact.
+    #[must_use]
+    pub fn source_fingerprint(&self) -> String {
+        DiagnosticFingerprint::of(self.source.0.as_ref()).as_hex()
+    }
+
+    fn validate_destination(
+        &self,
+        destination: &Snapshot,
+        content: &str,
+        page: usize,
+    ) -> Result<()> {
+        if parse_content(content)?.pages.get(page).is_none() {
+            return invalid("ODG transfer destination page is out of bounds");
+        }
+        for style in &self.styles {
+            let declared_in_content = xml_has_attribute(content, STYLE, b"name", style)?;
+            let declared_in_styles = destination
+                .styles_xml()
+                .map(|xml| xml_has_attribute(xml, STYLE, b"name", style))
+                .transpose()?
+                .unwrap_or_default();
+            if !declared_in_content && !declared_in_styles {
+                return Err(Error::Unsupported(format!(
+                    "ODG transfer requires unresolved style '{style}'"
+                )));
+            }
+        }
+        for control in &self.controls {
+            if !declares_form_control(content, control)? {
+                return Err(Error::Unsupported(format!(
+                    "ODG transfer requires unresolved form control '{control}'"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// One inert package-local resource retained by a shape transfer plan.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TransferResource {
+    path: String,
+    media_type: Option<String>,
+    bytes: Option<Vec<u8>>,
+}
+
+impl TransferResource {
+    /// Safe package-member path.
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// Declared manifest media type, when present.
+    #[must_use]
+    pub fn media_type(&self) -> Option<&str> {
+        self.media_type.as_deref()
+    }
+
+    /// Retained inert bytes, or `None` for a missing source reference.
+    #[must_use]
+    pub fn bytes(&self) -> Option<&[u8]> {
+        self.bytes.as_deref()
+    }
+}
 
 /// A durable, versioned ODG semantic patch.
 #[derive(Clone)]
@@ -1787,53 +2653,58 @@ fn change_operation(
     source: &str,
     target: &str,
 ) -> Result<ReversibleOperation> {
-    let (name, page, shape, before, after) = match change {
+    let (name, semantic_target, before, after) = match change {
         Change::ControlReference(value) => (
             "shape.control.set",
-            value.page,
-            value.shape,
+            format!("page/{}/shape/{}", value.page, value.shape),
             serde_json::Value::String(value.before.clone()),
             serde_json::Value::String(value.after.clone()),
         ),
         Change::Text(value) => (
             "shape.text.set",
-            value.page,
-            value.shape,
+            format!("page/{}/shape/{}", value.page, value.shape),
             serde_json::Value::String(value.before.clone()),
             serde_json::Value::String(value.after.clone()),
         ),
         Change::Name(value) => (
             "shape.name.set",
-            value.page,
-            value.shape,
+            format!("page/{}/shape/{}", value.page, value.shape),
             serde_json::Value::String(value.before.clone()),
             serde_json::Value::String(value.after.clone()),
         ),
         Change::Layer(value) => (
             "shape.layer.set",
-            value.page,
-            value.shape,
+            format!("page/{}/shape/{}", value.page, value.shape),
             serde_json::Value::String(value.before.clone()),
             serde_json::Value::String(value.after.clone()),
         ),
         Change::Geometry(value) => (
             "shape.geometry.set",
-            value.page,
-            value.shape,
+            format!("page/{}/shape/{}", value.page, value.shape),
             serde_json::json!(value.before),
             serde_json::json!(value.after),
         ),
         Change::Style(value) => (
             "shape.style.set",
-            value.page,
-            value.shape,
+            format!("page/{}/shape/{}", value.page, value.shape),
             serde_json::Value::String(value.before.clone()),
             serde_json::Value::String(value.after.clone()),
         ),
         Change::Path(value) => (
             "shape.path.set",
-            value.page,
-            value.shape,
+            format!("page/{}/shape/{}", value.page, value.shape),
+            serde_json::Value::String(value.before.clone()),
+            serde_json::Value::String(value.after.clone()),
+        ),
+        Change::PageName(value) => (
+            "page.name.set",
+            format!("page/{}", value.page),
+            serde_json::Value::String(value.before.clone()),
+            serde_json::Value::String(value.after.clone()),
+        ),
+        Change::PageStyle(value) => (
+            "page.style.set",
+            format!("page/{}", value.page),
             serde_json::Value::String(value.before.clone()),
             serde_json::Value::String(value.after.clone()),
         ),
@@ -1844,7 +2715,7 @@ fn change_operation(
     reversible_operation(
         limits,
         name,
-        &format!("page/{page}/shape/{shape}"),
+        &semantic_target,
         source,
         target,
         before,
@@ -1932,7 +2803,6 @@ fn apply_durable_patch(
     let mut current = source.clone();
     for operation in patch.operations() {
         if operation.op == "package.replace" {
-            ensure_compact_rewrite_source(&current)?;
             refuse_signed_package(&current)?;
             let blob = durable_blob(patch, &operation.value)?;
             current = if current.is_template() {
@@ -1942,25 +2812,51 @@ fn apply_durable_patch(
             };
             continue;
         }
-        let (page, shape) = parse_shape_target(&operation.target)?;
         let mut edit = current.edit();
         match operation.op.as_str() {
+            "page.name.set" => {
+                edit.set_page_name(
+                    parse_page_target(&operation.target)?,
+                    string_value(operation)?,
+                )?;
+            },
+            "page.style.set" => {
+                edit.set_page_style_name(
+                    parse_page_target(&operation.target)?,
+                    string_value(operation)?,
+                )?;
+            },
             "shape.geometry.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
                 let values = geometry_value(&operation.value)?;
                 edit.set_shape_geometry(
                     page, shape, &values[0], &values[1], &values[2], &values[3],
                 )?;
             },
             "shape.control.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
                 edit.set_shape_control_reference(page, shape, string_value(operation)?)?;
             },
-            "shape.layer.set" => edit.set_shape_layer(page, shape, string_value(operation)?)?,
-            "shape.name.set" => edit.set_shape_name(page, shape, string_value(operation)?)?,
-            "shape.path.set" => edit.set_shape_path_data(page, shape, string_value(operation)?)?,
+            "shape.layer.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                edit.set_shape_layer(page, shape, string_value(operation)?)?;
+            },
+            "shape.name.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                edit.set_shape_name(page, shape, string_value(operation)?)?;
+            },
+            "shape.path.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                edit.set_shape_path_data(page, shape, string_value(operation)?)?;
+            },
             "shape.style.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
                 edit.set_shape_style_name(page, shape, string_value(operation)?)?;
             },
-            "shape.text.set" => edit.set_shape_text(page, shape, string_value(operation)?)?,
+            "shape.text.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                edit.set_shape_text(page, shape, string_value(operation)?)?;
+            },
             _ => return invalid("ODG durable patch operation is unsupported"),
         }
         current = edit.commit()?.into_snapshot();
@@ -2043,11 +2939,23 @@ fn parse_shape_target(target: &str) -> Result<(usize, usize)> {
     Ok((page, shape))
 }
 
+fn parse_page_target(target: &str) -> Result<usize> {
+    let page_text = target
+        .strip_prefix("page/")
+        .filter(|value| !value.contains('/'))
+        .ok_or_else(|| Error::InvalidFormat("ODG durable page target is invalid".to_string()))?;
+    page_text
+        .parse::<usize>()
+        .map_err(|_error| Error::InvalidFormat("ODG durable page target is invalid".to_string()))
+}
+
 fn validate_durable_patch(patch: &CorePatch<Reversible>) -> Result<()> {
     for operation in patch.operations() {
         if !matches!(
             operation.op.as_str(),
             "package.replace"
+                | "page.name.set"
+                | "page.style.set"
                 | "shape.geometry.set"
                 | "shape.control.set"
                 | "shape.layer.set"
@@ -2085,6 +2993,10 @@ fn validate_durable_patch(patch: &CorePatch<Reversible>) -> Result<()> {
                 parse_shape_target(&operation.target)?;
                 geometry_value(&operation.value)?;
             },
+            "page.name.set" | "page.style.set" => {
+                parse_page_target(&operation.target)?;
+                string_value(operation)?;
+            },
             _ => {
                 parse_shape_target(&operation.target)?;
                 string_value(operation)?;
@@ -2096,6 +3008,10 @@ fn validate_durable_patch(patch: &CorePatch<Reversible>) -> Result<()> {
 
 struct Parsed {
     control_spans: ControlSpans,
+    form_controls: Vec<FormControl>,
+    form_control_spans: Vec<Option<Range<usize>>>,
+    forms_insert_position: Option<usize>,
+    drawing_start_position: usize,
     pages: Vec<Page>,
     text_spans: TextSpans,
     name_spans: NameSpans,
@@ -2105,6 +3021,7 @@ struct Parsed {
     path_spans: PathSpans,
     style_name_spans: Vec<Vec<Option<Range<usize>>>>,
     page_spans: Vec<Option<Range<usize>>>,
+    page_attribute_spans: PageAttributeSpans,
     page_insert_positions: Vec<Option<usize>>,
     shape_spans: Vec<Vec<Option<Range<usize>>>>,
     layer_element_spans: Vec<Vec<Option<Range<usize>>>>,
@@ -2116,6 +3033,12 @@ struct ActiveShape {
     depth: usize,
     page: usize,
     shape: usize,
+    start: usize,
+}
+
+struct ActiveFormControl {
+    depth: usize,
+    control: usize,
     start: usize,
 }
 
@@ -2139,6 +3062,12 @@ struct Scanner {
     drawing_seen: bool,
     body_depth: Option<usize>,
     drawing_depth: Option<usize>,
+    drawing_start_position: Option<usize>,
+    forms_depth: Option<usize>,
+    forms_insert_position: Option<usize>,
+    form_controls: Vec<FormControl>,
+    form_control_spans: Vec<Option<Range<usize>>>,
+    active_form_controls: Vec<ActiveFormControl>,
     pages: Vec<Page>,
     page_depths: Vec<usize>,
     page_starts: Vec<usize>,
@@ -2157,6 +3086,7 @@ struct Scanner {
     shape_count: usize,
     text_bytes: usize,
     page_spans: Vec<Option<Range<usize>>>,
+    page_attribute_spans: PageAttributeSpans,
     page_insert_positions: Vec<Option<usize>>,
     shape_spans: Vec<Vec<Option<Range<usize>>>>,
     layer_element_spans: Vec<Vec<Option<Range<usize>>>>,
@@ -2175,6 +3105,12 @@ impl Scanner {
             drawing_seen: false,
             body_depth: None,
             drawing_depth: None,
+            drawing_start_position: None,
+            forms_depth: None,
+            forms_insert_position: None,
+            form_controls: Vec::new(),
+            form_control_spans: Vec::new(),
+            active_form_controls: Vec::new(),
             pages: Vec::new(),
             page_depths: Vec::new(),
             page_starts: Vec::new(),
@@ -2193,6 +3129,7 @@ impl Scanner {
             shape_count: 0,
             text_bytes: 0,
             page_spans: Vec::new(),
+            page_attribute_spans: Vec::new(),
             page_insert_positions: Vec::new(),
             shape_spans: Vec::new(),
             layer_element_spans: Vec::new(),
@@ -2256,15 +3193,63 @@ impl Scanner {
             self.body_depth = Some(self.depth);
             return Ok(());
         }
+        if namespace == NamespaceKind::Office && local == b"forms" {
+            if self.forms_depth.is_some()
+                || self.forms_insert_position.is_some()
+                || self.body_depth != Some(self.depth - 1)
+            {
+                return invalid("ODG office:forms is misplaced or duplicated");
+            }
+            if empty {
+                self.forms_insert_position = Some(tag_start + tag.len() - 2);
+            } else {
+                self.forms_depth = Some(self.depth);
+            }
+            return Ok(());
+        }
         if namespace == NamespaceKind::Office && local == b"drawing" {
             if self.drawing_seen || self.body_depth != Some(self.depth - 1) {
                 return invalid("ODG office:drawing is misplaced or duplicated");
             }
             self.drawing_seen = true;
+            self.drawing_start_position = Some(tag_start);
             if empty {
                 self.drawing_insert_position = Some(tag_start + tag.len() - 2);
             } else {
                 self.drawing_depth = Some(self.depth);
+            }
+            return Ok(());
+        }
+        if namespace == NamespaceKind::Form
+            && self
+                .forms_depth
+                .is_some_and(|forms_depth| self.depth > forms_depth)
+            && let Some(identifier) = attribute(reader, element, FORM, b"id")?
+        {
+            if self.form_controls.len() >= MAX_FORM_CONTROLS {
+                return invalid("ODG form-control count exceeds the limit");
+            }
+            if self
+                .form_controls
+                .iter()
+                .any(|control| control.id() == identifier)
+            {
+                return invalid("ODG form-control identifier is duplicated");
+            }
+            let control = self.form_controls.len();
+            self.form_controls.push(FormControl::parsed(
+                identifier,
+                attribute(reader, element, FORM, b"name")?,
+                String::from_utf8_lossy(local).into_owned(),
+            ));
+            self.form_control_spans
+                .push(empty.then_some(tag_start..tag_start + tag.len()));
+            if !empty {
+                self.active_form_controls.push(ActiveFormControl {
+                    depth: self.depth,
+                    control,
+                    start: tag_start,
+                });
             }
             return Ok(());
         }
@@ -2322,6 +3307,10 @@ impl Scanner {
             self.path_spans.push(Vec::new());
             self.style_name_spans.push(Vec::new());
             self.page_spans.push(None);
+            self.page_attribute_spans.push([
+                attribute_source_span(reader, element, tag, tag_start, DRAW, b"name")?,
+                attribute_source_span(reader, element, tag, tag_start, DRAW, b"style-name")?,
+            ]);
             self.page_insert_positions.push(None);
             self.shape_spans.push(Vec::new());
             self.layer_element_spans.push(Vec::new());
@@ -2505,6 +3494,16 @@ impl Scanner {
         tag_end: usize,
     ) -> Result<()> {
         if self
+            .active_form_controls
+            .last()
+            .is_some_and(|control| control.depth == self.depth)
+        {
+            let active = self.active_form_controls.pop().ok_or_else(|| {
+                Error::InvalidFormat("ODG active form control disappeared".into())
+            })?;
+            self.form_control_spans[active.control] = Some(active.start..tag_end);
+        }
+        if self
             .active_accessibility
             .as_ref()
             .is_some_and(|active| active.depth == self.depth)
@@ -2569,6 +3568,13 @@ impl Scanner {
             self.drawing_depth = None;
             self.drawing_insert_position = Some(tag_start);
         }
+        if namespace == NamespaceKind::Office
+            && local == b"forms"
+            && self.forms_depth == Some(self.depth)
+        {
+            self.forms_depth = None;
+            self.forms_insert_position = Some(tag_start);
+        }
         if self.body_depth == Some(self.depth) {
             self.body_depth = None;
         }
@@ -2593,14 +3599,22 @@ impl Scanner {
             || !self.drawing_seen
             || self.body_depth.is_some()
             || self.drawing_depth.is_some()
+            || self.forms_depth.is_some()
             || !self.page_depths.is_empty()
             || !self.layer_sets.is_empty()
+            || !self.active_form_controls.is_empty()
             || self.active_accessibility.is_some()
         {
             return invalid("ODG content.xml has an incomplete drawing structure");
         }
         Ok(Parsed {
             control_spans: self.control_spans,
+            form_controls: self.form_controls,
+            form_control_spans: self.form_control_spans,
+            forms_insert_position: self.forms_insert_position,
+            drawing_start_position: self.drawing_start_position.ok_or_else(|| {
+                Error::InvalidFormat("ODG drawing start position is missing".to_string())
+            })?,
             pages: self.pages,
             text_spans: self.text_spans,
             name_spans: self.name_spans,
@@ -2610,6 +3624,7 @@ impl Scanner {
             style_name_spans: self.style_name_spans,
             layer_count: self.layer_count,
             page_spans: self.page_spans,
+            page_attribute_spans: self.page_attribute_spans,
             page_insert_positions: self.page_insert_positions,
             shape_spans: self.shape_spans,
             layer_element_spans: self.layer_element_spans,
@@ -2825,6 +3840,56 @@ fn reference_value(reference: &quick_xml::events::BytesRef<'_>) -> Result<String
     }
 }
 
+fn content_splice_publication(
+    source: &Snapshot,
+    splices: &[ContentSplice],
+) -> Result<XmlSplicePublication> {
+    let source_part = XmlSourcePart::load(source.0.package.package(), "content.xml")?;
+    if source_part.bytes() != source.content_xml().as_bytes() {
+        return invalid("ODG content splice has different package provenance");
+    }
+    let mut publication = XmlSplicePublication::new(source_part.clone());
+    for splice in splices {
+        let proof = source_part.checked_range(splice.source_range.clone(), &splice.expected)?;
+        let fragment = if splice.replacement.is_empty() {
+            AuthoredXmlFragment::deletion()
+        } else {
+            AuthoredXmlFragment::text(splice.replacement.clone())?
+        };
+        publication.replace(proof, fragment)?;
+    }
+    Ok(publication)
+}
+
+fn rebuild_spliced(
+    source: &Snapshot,
+    content: XmlSplicePublication,
+    replacements: &[ResourceReplacement<'_>],
+) -> Result<Vec<u8>> {
+    refuse_signed_package(source)?;
+    let archive = source.0.package.package();
+    let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+    writer.set_mimetype(source.0.mimetype)?;
+    content.publish(&mut writer)?;
+    for path in ["styles.xml", "meta.xml", "settings.xml"] {
+        if archive.has_file(path)? {
+            XmlSplicePublication::new(XmlSourcePart::load(archive, path)?).publish(&mut writer)?;
+        }
+    }
+    let mut excluded = replacements
+        .iter()
+        .map(|replacement| replacement.path.to_owned())
+        .collect::<Vec<_>>();
+    excluded.push("settings.xml".to_string());
+    writer.copy_auxiliary_files_from_except(archive, &excluded, &[])?;
+    for replacement in replacements {
+        if let Some(bytes) = replacement.bytes {
+            writer.add_file_with_media_type(replacement.path, bytes, replacement.media_type)?;
+        }
+    }
+    writer.finish_to_bounded_bytes()
+}
+
 fn rebuild(
     source: &Snapshot,
     content: &str,
@@ -2840,10 +3905,11 @@ fn rebuild(
             writer.add_file(path, &archive.get_file(path)?)?;
         }
     }
-    let excluded = replacements
+    let mut excluded = replacements
         .iter()
         .map(|replacement| replacement.path.to_owned())
         .collect::<Vec<_>>();
+    excluded.push("settings.xml".to_string());
     writer.copy_auxiliary_files_from_except(archive, &excluded, &[])?;
     for replacement in replacements {
         if let Some(bytes) = replacement.bytes {
@@ -2854,13 +3920,11 @@ fn rebuild(
 }
 
 fn refuse_signed_package(source: &Snapshot) -> Result<()> {
-    if source.files()?.iter().any(|path| {
-        matches!(
-            path.as_str(),
-            "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
-        )
-    }) {
+    if source.security().is_signed() {
         return invalid("ODG package edits refuse signed packages");
+    }
+    if source.security().is_encrypted() {
+        return invalid("ODG package edits refuse encrypted packages");
     }
     Ok(())
 }
@@ -2904,22 +3968,111 @@ fn replace_xml_value(source: &str, span: &Range<usize>, replacement: &str) -> Re
     Ok(output)
 }
 
-fn replace_xml_values(
-    source: &str,
-    spans: &[&Range<usize>],
-    replacements: &[String; 4],
-) -> Result<String> {
-    let mut edits = spans
+fn stage_content_splice(
+    source: &[u8],
+    current: &[u8],
+    splices: &mut Vec<ContentSplice>,
+    range: &Range<usize>,
+    replacement: &[u8],
+) -> Result<()> {
+    let actual = current
+        .get(range.clone())
+        .ok_or_else(|| Error::InvalidFormat("ODG content splice range is invalid".into()))?;
+    if let Some(index) = splices
         .iter()
-        .zip(replacements)
-        .map(|(span, value)| ((*span).clone(), value.as_str()))
-        .collect::<Vec<_>>();
-    edits.sort_unstable_by_key(|(span, _)| std::cmp::Reverse(span.start));
-    let mut output = source.to_owned();
-    for (span, replacement) in edits {
-        output = replace_xml_value(&output, &span, replacement)?;
+        .position(|splice| ranges_overlap_or_conflict(&splice.current_range, range))
+    {
+        if splices[index].current_range != *range || actual != splices[index].replacement {
+            return invalid("ODG content splice overlaps an earlier semantic edit");
+        }
+        let old_end = splices[index].current_range.end;
+        let new_end = range
+            .start
+            .checked_add(replacement.len())
+            .ok_or_else(|| Error::InvalidFormat("ODG content splice size overflow".into()))?;
+        splices[index].current_range.end = new_end;
+        splices[index].replacement = replacement.to_vec();
+        shift_current_splices(splices, index, old_end, new_end)?;
+        return Ok(());
     }
-    Ok(output)
+
+    let (removed_before, added_before) = splices
+        .iter()
+        .filter(|splice| splice.current_range.end <= range.start)
+        .try_fold((0usize, 0usize), |(removed, added), splice| {
+            Ok::<_, Error>((
+                removed
+                    .checked_add(splice.source_range.len())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("ODG content splice size overflow".into())
+                    })?,
+                added
+                    .checked_add(splice.current_range.len())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("ODG content splice size overflow".into())
+                    })?,
+            ))
+        })?;
+    let source_start = range
+        .start
+        .checked_sub(added_before)
+        .and_then(|value| value.checked_add(removed_before))
+        .ok_or_else(|| Error::InvalidFormat("ODG content splice mapping is invalid".into()))?;
+    let source_end = source_start
+        .checked_add(range.len())
+        .ok_or_else(|| Error::InvalidFormat("ODG content splice size overflow".into()))?;
+    let source_range = source_start..source_end;
+    let expected = source
+        .get(source_range.clone())
+        .ok_or_else(|| Error::InvalidFormat("ODG content splice source range is invalid".into()))?;
+    if expected != actual {
+        return invalid("ODG content splice lost exact source provenance");
+    }
+    let new_end = range
+        .start
+        .checked_add(replacement.len())
+        .ok_or_else(|| Error::InvalidFormat("ODG content splice size overflow".into()))?;
+    let insertion_index = splices.len();
+    splices.push(ContentSplice {
+        source_range,
+        current_range: range.start..new_end,
+        expected: expected.to_vec(),
+        replacement: replacement.to_vec(),
+    });
+    shift_current_splices(splices, insertion_index, range.end, new_end)?;
+    splices.sort_unstable_by_key(|splice| splice.current_range.start);
+    Ok(())
+}
+
+fn shift_current_splices(
+    splices: &mut [ContentSplice],
+    changed: usize,
+    old_end: usize,
+    new_end: usize,
+) -> Result<()> {
+    for (index, splice) in splices.iter_mut().enumerate() {
+        if index == changed || splice.current_range.start < old_end {
+            continue;
+        }
+        splice.current_range.start = splice
+            .current_range
+            .start
+            .checked_sub(old_end)
+            .and_then(|offset| new_end.checked_add(offset))
+            .ok_or_else(|| Error::InvalidFormat("ODG content splice shift is invalid".into()))?;
+        splice.current_range.end = splice
+            .current_range
+            .end
+            .checked_sub(old_end)
+            .and_then(|offset| new_end.checked_add(offset))
+            .ok_or_else(|| Error::InvalidFormat("ODG content splice shift is invalid".into()))?;
+    }
+    Ok(())
+}
+
+fn ranges_overlap_or_conflict(left: &Range<usize>, right: &Range<usize>) -> bool {
+    left.start < right.end && right.start < left.end
+        || (left.start == left.end && right.start == right.end && left.start == right.start)
 }
 
 fn insert_xml(source: &str, at: usize, xml: &str) -> Result<String> {
@@ -3035,6 +4188,15 @@ fn serialize_layer(layer: &Layer) -> Result<String> {
     Ok(xml)
 }
 
+fn serialize_form_control(control: &FormControl) -> Result<String> {
+    validate_bounded_value(control.id(), "ODG form-control identifier")?;
+    let mut xml = String::from("<form:control");
+    push_attribute(&mut xml, "form:id", Some(control.id()))?;
+    push_attribute(&mut xml, "form:name", control.name())?;
+    xml.push_str("/>");
+    Ok(xml)
+}
+
 fn serialize_shape(shape: &Shape) -> Result<String> {
     let element = shape.kind().element_name();
     let mut xml = format!(
@@ -3144,6 +4306,70 @@ fn validate_shape_layer(page: &Page, global_layers: &[Layer], shape: &Shape) -> 
     Ok(())
 }
 
+fn resolve_transfer_layer(snapshot: &Snapshot, page: &Page, name: &str) -> Result<Layer> {
+    let visible = if page.has_layer_set() {
+        page.layers()
+    } else {
+        snapshot.layers()
+    };
+    visible
+        .iter()
+        .find(|layer| layer.name() == name)
+        .cloned()
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "ODG transfer shape references undeclared layer '{name}'"
+            ))
+        })
+}
+
+fn transfer_xml_references(xml: &str, href: &str) -> bool {
+    let escaped = quick_xml::escape::escape(href);
+    xml.contains(&format!("xlink:href=\"{escaped}\""))
+        || xml.contains(&format!("xlink:href='{escaped}'"))
+}
+
+fn declares_style(snapshot: &Snapshot, name: &str) -> Result<bool> {
+    if xml_has_attribute(snapshot.content_xml(), STYLE, b"name", name)? {
+        return Ok(true);
+    }
+    snapshot
+        .styles_xml()
+        .map(|xml| xml_has_attribute(xml, STYLE, b"name", name))
+        .transpose()
+        .map(Option::unwrap_or_default)
+}
+
+fn declares_form_control(xml: &str, identifier: &str) -> Result<bool> {
+    xml_has_attribute(xml, FORM, b"id", identifier)
+}
+
+fn xml_has_attribute(xml: &str, namespace: &[u8], local: &[u8], value: &str) -> Result<bool> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    loop {
+        let (_resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG dependency XML: {error}"))
+        })?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if attribute(&reader, &element, namespace, local)?.as_deref() == Some(value) {
+                    return Ok(true);
+                }
+            },
+            Event::DocType(_) | Event::GeneralRef(_) | Event::PI(_) => {
+                return invalid("active XML is prohibited in ODG dependencies");
+            },
+            Event::Eof => return Ok(false),
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::End(_)
+            | Event::Text(_) => {},
+        }
+    }
+}
+
 fn resolve_page_position(pages: &[Page], selector: crate::page::Selector<'_>) -> Result<usize> {
     match selector {
         crate::page::Selector::Position(position) => pages
@@ -3176,6 +4402,23 @@ fn validate_media_type(media_type: &str) -> Result<()> {
             .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
     {
         return invalid("ODG resource media type is invalid");
+    }
+    Ok(())
+}
+
+fn validate_resource_path(path: &str) -> Result<()> {
+    if path.is_empty()
+        || path.len() > 4_096
+        || path.starts_with('/')
+        || path.ends_with('/')
+        || path.contains('\\')
+        || path.contains(':')
+        || path
+            .split('/')
+            .any(|segment| segment.is_empty() || matches!(segment, "." | ".."))
+        || path.bytes().any(|byte| byte.is_ascii_control())
+    {
+        return invalid("ODG resource path is unsafe");
     }
     Ok(())
 }
@@ -3224,6 +4467,16 @@ fn inverse_change(change: &Change) -> Change {
             before: value.after.clone(),
             after: value.before.clone(),
         }),
+        Change::PageName(value) => Change::PageName(PageNameChange {
+            page: value.page,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        }),
+        Change::PageStyle(value) => Change::PageStyle(PageStyleChange {
+            page: value.page,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        }),
         Change::Structure(value) => Change::Structure(match value {
             StructureChange::PageInserted { position, name } => StructureChange::PageRemoved {
                 position: *position,
@@ -3258,6 +4511,12 @@ fn inverse_change(change: &Change) -> Change {
                 page: *page,
                 position: *position,
                 kind: *kind,
+            },
+            StructureChange::FormControlInserted { id } => {
+                StructureChange::FormControlRemoved { id: id.clone() }
+            },
+            StructureChange::FormControlRemoved { id } => {
+                StructureChange::FormControlInserted { id: id.clone() }
             },
         }),
     }
@@ -3487,6 +4746,7 @@ fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
         ResolveResult::Bound(Namespace(uri)) if *uri == DRAW => NamespaceKind::Draw,
         ResolveResult::Bound(Namespace(uri)) if *uri == TEXT => NamespaceKind::Text,
         ResolveResult::Bound(Namespace(uri)) if *uri == SVG => NamespaceKind::Svg,
+        ResolveResult::Bound(Namespace(uri)) if *uri == FORM => NamespaceKind::Form,
         ResolveResult::Bound(_) | ResolveResult::Unbound | ResolveResult::Unknown(_) => {
             NamespaceKind::Other
         },

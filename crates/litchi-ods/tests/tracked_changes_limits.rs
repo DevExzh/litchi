@@ -25,7 +25,8 @@ fn one_change(id: &str) -> Changes {
             },
             dimension: Dimension::Row,
             position: 0.into(),
-            count: PositiveInteger::try_from(1usize).unwrap(),
+            count: PositiveInteger::try_from(1usize)
+                .expect("test fixture or operation should succeed"),
             table: Some(0.into()),
         })],
     }
@@ -84,25 +85,42 @@ fn input_and_output_byte_limits_are_inclusive_boundaries() {
         .is_err()
     );
 
-    let baseline = Snapshot::parse(source.clone()).unwrap();
-    let mut authored = baseline.transaction().unwrap();
-    authored.set_tracking(Some(true)).unwrap();
-    let target_len = authored.commit().unwrap().content_xml().len();
+    let baseline =
+        Snapshot::parse(source.clone()).expect("test fixture or operation should succeed");
+    let mut authored = baseline
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    authored
+        .set_tracking(Some(true))
+        .expect("test fixture or operation should succeed");
+    let target_len = authored
+        .commit()
+        .expect("test fixture or operation should succeed")
+        .content_xml()
+        .len();
 
     let exact = Snapshot::parse_with_limits(
         source.clone(),
         Limits::new().with_max_output_bytes(target_len),
     )
-    .unwrap();
-    let mut transaction = exact.transaction().unwrap();
-    transaction.set_tracking(Some(true)).unwrap();
+    .expect("test fixture or operation should succeed");
+    let mut transaction = exact
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .set_tracking(Some(true))
+        .expect("test fixture or operation should succeed");
     assert!(transaction.commit().is_ok());
 
     let too_small =
         Snapshot::parse_with_limits(source, Limits::new().with_max_output_bytes(target_len - 1))
-            .unwrap();
-    let mut transaction = too_small.transaction().unwrap();
-    transaction.set_tracking(Some(true)).unwrap();
+            .expect("test fixture or operation should succeed");
+    let mut transaction = too_small
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .set_tracking(Some(true))
+        .expect("test fixture or operation should succeed");
     assert!(transaction.commit().is_err());
 }
 
@@ -115,25 +133,46 @@ fn repeated_inserts_reject_before_node_or_aggregate_draft_growth() {
         .with_max_changes(3)
         .with_max_nodes(12)
         .with_max_aggregate_bytes(74);
-    let snapshot = Snapshot::parse_with_limits(source.clone(), limits).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
+    let snapshot = Snapshot::parse_with_limits(source.clone(), limits)
+        .expect("test fixture or operation should succeed");
+    let mut transaction = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
 
     for (index, id) in ["a", "b"].into_iter().enumerate() {
-        let change = one_change(id).changes.pop().unwrap();
-        transaction.insert(index, change).unwrap();
+        let change = one_change(id)
+            .changes
+            .pop()
+            .expect("test fixture or operation should succeed");
+        transaction
+            .insert(index, change)
+            .expect("test fixture or operation should succeed");
     }
     let before_rejection = transaction.changes().cloned();
     assert!(transaction.is_changed());
 
-    let rejected = one_change("c").changes.pop().unwrap();
+    let rejected = one_change("c")
+        .changes
+        .pop()
+        .expect("test fixture or operation should succeed");
     assert!(transaction.insert(2, rejected).is_err());
     assert_eq!(transaction.changes(), before_rejection.as_ref());
     assert!(transaction.is_changed());
 
-    transaction.rollback().unwrap();
+    transaction
+        .rollback()
+        .expect("test fixture or operation should succeed");
     assert!(!transaction.is_changed());
-    assert!(transaction.changes().unwrap().changes.is_empty());
-    let noop = transaction.commit().unwrap();
+    assert!(
+        transaction
+            .changes()
+            .expect("test fixture or operation should succeed")
+            .changes
+            .is_empty()
+    );
+    let noop = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(!noop.changed());
     assert_eq!(noop.content_xml(), source);
 }
@@ -145,15 +184,23 @@ fn retained_opaque_resources_reject_insert_before_candidate_or_draft_growth() {
     let source = format!("{PREFIX}{owner}{SUFFIX}");
     // Exact bounded scan: owner 1/23 plus opaque subtree 2/31.
     let limits = Limits::new().with_max_nodes(3).with_max_aggregate_bytes(54);
-    let snapshot = Snapshot::parse_with_limits(source.clone(), limits).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
+    let snapshot = Snapshot::parse_with_limits(source.clone(), limits)
+        .expect("test fixture or operation should succeed");
+    let mut transaction = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
     let before = transaction.changes().cloned();
-    let donor = one_change("i").changes.pop().unwrap();
+    let donor = one_change("i")
+        .changes
+        .pop()
+        .expect("test fixture or operation should succeed");
 
     assert!(transaction.insert(0, donor).is_err());
     assert_eq!(transaction.changes(), before.as_ref());
     assert!(!transaction.is_changed());
-    let noop = transaction.commit().unwrap();
+    let noop = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(!noop.changed());
     assert_eq!(noop.content_xml(), source);
 }
@@ -213,12 +260,26 @@ fn zero_node_budget_rejects_even_a_present_empty_owner() {
 fn exact_semantic_node_budget_creates_and_reopens_an_empty_owner() {
     let absent = format!("{PREFIX}{SUFFIX}");
     let limits = Limits::new().with_max_nodes(1);
-    let snapshot = Snapshot::parse_with_limits(absent, limits).unwrap();
-    let mut transaction = snapshot.transaction().unwrap();
-    transaction.replace_all(Some(Changes::default())).unwrap();
-    let commit = transaction.commit().unwrap();
+    let snapshot = Snapshot::parse_with_limits(absent, limits)
+        .expect("test fixture or operation should succeed");
+    let mut transaction = snapshot
+        .transaction()
+        .expect("test fixture or operation should succeed");
+    transaction
+        .replace_all(Some(Changes::default()))
+        .expect("test fixture or operation should succeed");
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(commit.changed());
-    let reopened = Snapshot::parse_with_limits(commit.source_arc(), limits).unwrap();
+    let reopened = Snapshot::parse_with_limits(commit.source_arc(), limits)
+        .expect("test fixture or operation should succeed");
     assert!(reopened.changes().is_some());
-    assert!(reopened.changes().unwrap().changes.is_empty());
+    assert!(
+        reopened
+            .changes()
+            .expect("test fixture or operation should succeed")
+            .changes
+            .is_empty()
+    );
 }

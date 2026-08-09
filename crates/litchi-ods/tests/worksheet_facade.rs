@@ -2,26 +2,51 @@ use litchi_ods::{Builder, Cell, CellValue, CellView, MutableSpreadsheet, Row, Sh
 
 #[test]
 fn worksheet_graph_round_trips_repeats_formula_and_style() {
-    let mut sheet = Sheet::new("Data").unwrap();
-    sheet.set_style_name("sheet-style").unwrap();
+    let mut sheet = Sheet::new("Data").expect("test fixture or operation should succeed");
+    sheet
+        .set_style_name("sheet-style")
+        .expect("test fixture or operation should succeed");
 
-    let mut row = Row::repeated(3).unwrap();
-    let mut number = Cell::repeated(CellValue::Number(7.5), "7.5", 2).unwrap();
-    number.set_formula("of:=SUM([.A1:.B1])").unwrap();
-    number.set_style_name("number-style").unwrap();
-    row.push_cell(number).unwrap();
-    row.push_cell(Cell::repeated(CellValue::Text("same".to_string()), "same", 4).unwrap())
-        .unwrap();
-    sheet.push_row(row).unwrap();
+    let mut row = Row::repeated(3).expect("test fixture or operation should succeed");
+    let mut number = Cell::repeated(CellValue::Number(7.5), "7.5", 2)
+        .expect("test fixture or operation should succeed");
+    number
+        .set_formula("of:=SUM([.A1:.B1])")
+        .expect("test fixture or operation should succeed");
+    number
+        .set_style_name("number-style")
+        .expect("test fixture or operation should succeed");
+    row.push_cell(number)
+        .expect("test fixture or operation should succeed");
+    row.push_cell(
+        Cell::repeated(CellValue::Text("same".to_string()), "same", 4)
+            .expect("test fixture or operation should succeed"),
+    )
+    .expect("test fixture or operation should succeed");
+    sheet
+        .push_row(row)
+        .expect("test fixture or operation should succeed");
 
     let mut builder = Builder::new();
-    builder.add_sheet(sheet).unwrap();
-    let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+    builder
+        .add_sheet(sheet)
+        .expect("test fixture or operation should succeed");
+    let spreadsheet = Spreadsheet::from_bytes(
+        builder
+            .build()
+            .expect("test fixture or operation should succeed"),
+    )
+    .expect("test fixture or operation should succeed");
 
-    let data = spreadsheet.sheet("Data").unwrap();
+    let data = spreadsheet
+        .sheet("Data")
+        .expect("test fixture or operation should succeed");
     assert_eq!(data.logical_row_count(), 3);
     assert_eq!(data.logical_column_count(), 6);
-    let CellView::Stored(cell) = spreadsheet.cell("Data", 2, 1).unwrap() else {
+    let CellView::Stored(cell) = spreadsheet
+        .cell("Data", 2, 1)
+        .expect("test fixture or operation should succeed")
+    else {
         panic!("expected the repeated physical cell run")
     };
     assert_eq!(cell.repeat(), 2);
@@ -33,28 +58,38 @@ fn worksheet_graph_round_trips_repeats_formula_and_style() {
 
 #[test]
 fn builder_cell_edit_splits_only_the_touched_repeat_runs() {
-    let mut sheet = Sheet::new("Data").unwrap();
-    let mut row = Row::repeated(5).unwrap();
-    row.push_cell(Cell::repeated(CellValue::Empty, "", 5).unwrap())
-        .unwrap();
-    sheet.push_row(row).unwrap();
+    let mut sheet = Sheet::new("Data").expect("test fixture or operation should succeed");
+    let mut row = Row::repeated(5).expect("test fixture or operation should succeed");
+    row.push_cell(
+        Cell::repeated(CellValue::Empty, "", 5).expect("test fixture or operation should succeed"),
+    )
+    .expect("test fixture or operation should succeed");
+    sheet
+        .push_row(row)
+        .expect("test fixture or operation should succeed");
 
     let mut builder = Builder::new();
-    builder.add_sheet(sheet).unwrap();
+    builder
+        .add_sheet(sheet)
+        .expect("test fixture or operation should succeed");
     builder
         .set_cell("Data", 2, 2, Cell::new(CellValue::Number(42.0), "42"))
-        .unwrap()
+        .expect("test fixture or operation should succeed")
         .set_formula("Data", 2, 2, "of:=42")
-        .unwrap()
+        .expect("test fixture or operation should succeed")
         .set_cell_style("Data", 2, 2, "cell-style")
-        .unwrap();
+        .expect("test fixture or operation should succeed");
 
-    let sheets = builder.sheets().unwrap();
+    let sheets = builder
+        .sheets()
+        .expect("test fixture or operation should succeed");
     assert_eq!(sheets[0].rows.len(), 3);
     assert_eq!(sheets[0].rows[0].repeat(), 2);
     assert_eq!(sheets[0].rows[1].repeat(), 1);
     assert_eq!(sheets[0].rows[2].repeat(), 2);
-    let cell = sheets[0].cell(2, 2).unwrap();
+    let cell = sheets[0]
+        .cell(2, 2)
+        .expect("test fixture or operation should succeed");
     assert_eq!(cell.repeat(), 1);
     assert_eq!(cell.value, CellValue::Number(42.0));
     assert_eq!(cell.formula.as_deref(), Some("of:=42"));
@@ -63,15 +98,26 @@ fn builder_cell_edit_splits_only_the_touched_repeat_runs() {
 
 #[test]
 fn mutable_worksheet_edits_are_atomic_on_validation_failure() {
-    let mut sheet = Sheet::new("Data").unwrap();
-    sheet.push_row(Row::new()).unwrap();
+    let mut sheet = Sheet::new("Data").expect("test fixture or operation should succeed");
+    sheet
+        .push_row(Row::new())
+        .expect("test fixture or operation should succeed");
     let mut builder = Builder::new();
-    builder.add_sheet(sheet).unwrap();
-    let bytes = builder.build().unwrap();
+    builder
+        .add_sheet(sheet)
+        .expect("test fixture or operation should succeed");
+    let bytes = builder
+        .build()
+        .expect("test fixture or operation should succeed");
 
-    let mut mutable = MutableSpreadsheet::from_bytes(bytes).unwrap();
+    let mut mutable =
+        MutableSpreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
     let before = mutable.sheets().to_vec();
-    assert!(mutable.add_sheet(Sheet::new("Data").unwrap()).is_err());
+    assert!(
+        mutable
+            .add_sheet(Sheet::new("Data").expect("test fixture or operation should succeed"))
+            .is_err()
+    );
     assert_eq!(mutable.sheets(), before.as_slice());
 
     assert!(mutable.set_cell_style("Data", 0, 0, "").is_err());
@@ -84,7 +130,7 @@ fn mutable_worksheet_edits_are_atomic_on_validation_failure() {
             0,
             Cell::new(CellValue::Text("ok".to_string()), "ok"),
         )
-        .unwrap();
+        .expect("test fixture or operation should succeed");
     assert!(matches!(
         mutable.cell("Data", 0, 0),
         Some(CellView::Stored(_))
@@ -93,14 +139,25 @@ fn mutable_worksheet_edits_are_atomic_on_validation_failure() {
 
 #[test]
 fn mutable_worksheet_remove_is_transactional() {
-    let first = Sheet::new("First").unwrap();
-    let second = Sheet::new("Second").unwrap();
+    let first = Sheet::new("First").expect("test fixture or operation should succeed");
+    let second = Sheet::new("Second").expect("test fixture or operation should succeed");
     let mut builder = Builder::new();
-    builder.add_sheet(first).unwrap();
-    builder.add_sheet(second).unwrap();
+    builder
+        .add_sheet(first)
+        .expect("test fixture or operation should succeed");
+    builder
+        .add_sheet(second)
+        .expect("test fixture or operation should succeed");
 
-    let mut mutable = MutableSpreadsheet::from_bytes(builder.build().unwrap()).unwrap();
-    let removed = mutable.remove_sheet("First").unwrap();
+    let mut mutable = MutableSpreadsheet::from_bytes(
+        builder
+            .build()
+            .expect("test fixture or operation should succeed"),
+    )
+    .expect("test fixture or operation should succeed");
+    let removed = mutable
+        .remove_sheet("First")
+        .expect("test fixture or operation should succeed");
     assert_eq!(removed.name, "First");
     assert_eq!(mutable.sheets().len(), 1);
     assert_eq!(mutable.sheets()[0].name, "Second");

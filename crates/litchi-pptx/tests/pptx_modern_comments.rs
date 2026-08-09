@@ -13,7 +13,13 @@ use litchi_pptx::modern_comments::{
 };
 use litchi_pptx::{Error, Package};
 
-const SLIDE_XML: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/modern-comments/slide.xml");
+// The external-relationship negative republishes this positive fixture.
+const SLIDE_XML: &[u8] = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+    r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+    r#"<p:cSld><p:spTree/></p:cSld></p:sld>"#,
+)
+.as_bytes();
 
 #[test]
 fn presentation_loads_the_modern_comment_graph() {

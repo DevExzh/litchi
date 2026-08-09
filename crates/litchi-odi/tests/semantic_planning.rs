@@ -16,6 +16,8 @@ const FLAT: &str = concat!(
 
 const META: &str = r#"<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><dc:title>Before</dc:title><meta:user-defined meta:name="opaque">keep</meta:user-defined></office:meta></office:document-meta>"#;
 
+const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:styles><style:style style:name="gr2" style:family="graphic"/></office:styles></office:document-styles>"#;
+
 const NORMATIVE_SYNTHETIC: &[u8] = include_bytes!("fixtures/odf-1.4-normative-synthetic.fodi");
 
 fn flat() -> FlatImage {
@@ -43,9 +45,94 @@ fn map() -> ImageMap {
     ImageMap::new(vec![
         Area::rectangle("0cm", "0cm", "1cm", "1cm")
             .with_href("https://example.test/one")
+            .with_target_frame_name("_blank")
+            .with_show("new")
             .with_title("One"),
         Area::circle("2cm", "2cm", "1cm").with_no_href(),
     ])
+}
+
+#[test]
+fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
+    let source = flat();
+    let mut edit = source.transaction();
+    edit.set_frame_xml_id(0, Some("frame-xml-id".into()))
+        .unwrap();
+    edit.set_frame_title(0, Some("Accessible title".into()))
+        .unwrap();
+    edit.set_frame_description(0, Some("Accessible description".into()))
+        .unwrap();
+    edit.set_image_media_type(0, Some("image/png".into()))
+        .unwrap();
+    edit.set_image_xml_id(0, Some("image-xml-id".into()))
+        .unwrap();
+    edit.set_filter_name(0, Some("producer-filter".into()))
+        .unwrap();
+    edit.set_link_type(0, Some("simple".into())).unwrap();
+    edit.set_show(0, Some("embed".into())).unwrap();
+    edit.set_actuate(0, Some("onLoad".into())).unwrap();
+    edit.set_copy_of(0, Some("OtherFrame".into())).unwrap();
+    edit.set_image_map(0, Some(map())).unwrap();
+    let commit = edit.commit().unwrap();
+    let frame = commit.snapshot().frame().unwrap();
+    assert_eq!(frame.xml_id(), Some("frame-xml-id"));
+    assert_eq!(frame.title(), Some("Accessible title"));
+    assert_eq!(frame.description(), Some("Accessible description"));
+    assert_eq!(frame.media_type(), Some("image/png"));
+    assert_eq!(frame.image_xml_id(), Some("image-xml-id"));
+    assert_eq!(frame.filter_name(), Some("producer-filter"));
+    assert_eq!(frame.link_type(), Some("simple"));
+    assert_eq!(frame.show(), Some("embed"));
+    assert_eq!(frame.actuate(), Some("onLoad"));
+    assert_eq!(frame.copy_of(), Some("OtherFrame"));
+
+    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    assert_eq!(patch.operations().len(), 11);
+    let package_source = package();
+    let transfer = patch.plan_package(&package_source);
+    assert!(transfer.is_conflict_free());
+    let transferred = transfer
+        .commit_package(&package_source, &SecurityPolicy::default())
+        .unwrap();
+    assert_eq!(transferred.image().frame().unwrap(), frame);
+
+    let mut styles_edit = package_source.edit();
+    styles_edit.set_styles_xml(Some(STYLES.into())).unwrap();
+    let styles_commit = styles_edit.commit().unwrap();
+    assert_eq!(styles_commit.image().styles_xml(), Some(STYLES));
+    let styles_patch = styles_commit
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
+    assert!(
+        styles_patch
+            .operations()
+            .iter()
+            .any(|operation| operation.key() == &OperationKey::Styles)
+    );
+    assert!(
+        styles_commit
+            .semantic_patch(&SecurityPolicy::default().with_xml_bytes(1))
+            .is_err()
+    );
+    assert_eq!(
+        styles_patch
+            .inverse()
+            .apply_package(styles_commit.image())
+            .unwrap()
+            .as_bytes(),
+        package_source.as_bytes()
+    );
+
+    let mut remove = styles_commit.image().edit();
+    remove.set_styles_xml(None).unwrap();
+    assert_eq!(remove.commit().unwrap().image().styles_xml(), None);
+
+    let mut noncompact = package_source.edit();
+    assert!(
+        noncompact
+            .set_styles_xml(Some(STYLES.replace("><", ">\n<")))
+            .is_err()
+    );
 }
 
 #[test]
@@ -114,6 +201,15 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
             .len(),
         2
     );
+    let first_area = &package_commit
+        .image()
+        .frame()
+        .unwrap()
+        .image_map()
+        .unwrap()
+        .areas()[0];
+    assert_eq!(first_area.target_frame_name(), Some("_blank"));
+    assert_eq!(first_area.show(), Some("new"));
 }
 
 #[test]

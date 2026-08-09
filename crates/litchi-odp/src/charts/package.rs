@@ -5,9 +5,14 @@ use super::model::{Chart, Location, Storage};
 use crate::core::OwnedPackage;
 use litchi_core::{Error, Result, xml::escape_xml};
 use litchi_odf_common::constants::ODF_CHART;
+use litchi_odf_common::core::{
+    AuthoredXmlFragment, XmlSourcePart, XmlSplicePublication, rebuild_package_with_xml_splices,
+};
 use litchi_odf_common::embedded::{Source, scan_package};
 use litchi_odf_common::package::{Addition, rebuild_package, splice};
 use std::collections::{BTreeMap, BTreeSet};
+
+const MAX_PACKAGE_BYTES: usize = 128 * 1024 * 1024;
 
 /// Apply one clone-staged chart transaction to an immutable ODP package.
 pub(crate) fn apply(source: &OwnedPackage, original: &[Chart], draft: &[Chart]) -> Result<Vec<u8>> {
@@ -110,6 +115,7 @@ pub(crate) fn apply(source: &OwnedPackage, original: &[Chart], draft: &[Chart]) 
     }
     edits.extend(inserted);
     edits.sort_unstable_by(|left, right| right.0.cmp(&left.0).then_with(|| right.3.cmp(&left.3)));
+    let spliced_source = publish_host_edits(source, &edits)?;
     for (start, end, replacement, _) in edits {
         content = splice(&content, start, end, &replacement)?;
     }
@@ -141,13 +147,64 @@ pub(crate) fn apply(source: &OwnedPackage, original: &[Chart], draft: &[Chart]) 
         return Ok(source.as_bytes().to_vec());
     }
     rebuild_package(
-        source,
+        spliced_source.as_ref().unwrap_or(source),
         &content,
         normalized_additions,
         directories,
         excluded_paths,
         excluded_prefixes,
     )
+}
+
+fn publish_host_edits(
+    source: &OwnedPackage,
+    edits: &[(usize, usize, String, usize)],
+) -> Result<Option<OwnedPackage>> {
+    if edits.is_empty() {
+        return Ok(None);
+    }
+    let part = XmlSourcePart::load(source, "content.xml")?;
+    let mut publication = XmlSplicePublication::new(part.clone());
+    let mut index = 0usize;
+    while index < edits.len() {
+        let (start, end, replacement, _) = &edits[index];
+        let mut next = index + 1;
+        let fragment = if start == end {
+            while next < edits.len() && edits[next].0 == *start && edits[next].1 == *end {
+                next += 1;
+            }
+            let capacity = edits[index..next].iter().try_fold(0usize, |total, edit| {
+                total
+                    .checked_add(edit.2.len())
+                    .ok_or_else(|| invalid_error("ODP chart insertion size overflow"))
+            })?;
+            let mut combined = String::new();
+            combined
+                .try_reserve_exact(capacity)
+                .map_err(|allocation_error| Error::Allocation {
+                    resource: "ODP chart host insertion",
+                    source: allocation_error,
+                })?;
+            for edit in edits[index..next].iter().rev() {
+                combined.push_str(&edit.2);
+            }
+            AuthoredXmlFragment::markup(combined.into_bytes())?
+        } else if replacement.is_empty() {
+            AuthoredXmlFragment::deletion()
+        } else {
+            AuthoredXmlFragment::markup(replacement.as_bytes().to_vec())?
+        };
+        let range = *start..*end;
+        let expected = part
+            .bytes()
+            .get(range.clone())
+            .ok_or_else(|| invalid_error("ODP chart host splice range is invalid"))?;
+        let proof = part.checked_range(range, expected)?;
+        publication.replace(proof, fragment)?;
+        index = next;
+    }
+    let bytes = rebuild_package_with_xml_splices(source, vec![publication], MAX_PACKAGE_BYTES)?;
+    OwnedPackage::from_bytes(bytes).map(Some)
 }
 
 fn unused_root(used: &mut BTreeSet<String>) -> Result<String> {

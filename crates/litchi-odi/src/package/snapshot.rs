@@ -25,6 +25,13 @@ pub(crate) struct ResourceReplacement<'a> {
     pub(crate) bytes: Option<&'a [u8]>,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum StylesReplacement<'a> {
+    Preserve,
+    Remove,
+    Set(&'a str),
+}
+
 struct State {
     package: Package,
     content: FlatImage,
@@ -135,6 +142,7 @@ impl Snapshot {
     pub(crate) fn rebuild(
         &self,
         content: &str,
+        replacement_styles_xml: StylesReplacement<'_>,
         replacement_meta_xml: Option<&str>,
         replacements: &[ResourceReplacement<'_>],
     ) -> Result<Self> {
@@ -148,10 +156,26 @@ impl Snapshot {
         let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content.as_bytes())?;
-        for path in ["styles.xml", "settings.xml"] {
-            if self.0.package.package().has_file(path)? {
-                writer.add_file(path, &self.0.package.package().get_file(path)?)?;
-            }
+        match replacement_styles_xml {
+            StylesReplacement::Set(styles_xml) => {
+                compact_xml::validate(styles_xml.as_bytes()).map_err(Error::from)?;
+                writer.add_file("styles.xml", styles_xml.as_bytes())?;
+            },
+            StylesReplacement::Preserve => {
+                if self.0.package.package().has_file("styles.xml")? {
+                    writer.add_file(
+                        "styles.xml",
+                        &self.0.package.package().get_file("styles.xml")?,
+                    )?;
+                }
+            },
+            StylesReplacement::Remove => {},
+        }
+        if self.0.package.package().has_file("settings.xml")? {
+            writer.add_file(
+                "settings.xml",
+                &self.0.package.package().get_file("settings.xml")?,
+            )?;
         }
         if let Some(meta_xml) = replacement_meta_xml {
             compact_xml::validate(meta_xml.as_bytes()).map_err(Error::from)?;

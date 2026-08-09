@@ -384,7 +384,7 @@ mod tests {
         source.actuate_on_request = true;
         source.refresh_delay = Some("PT15M".to_string());
         let mut xml = String::new();
-        write_table_source(&mut xml, &source).unwrap();
+        write_table_source(&mut xml, &source).expect("test fixture or operation should succeed");
         assert!(xml.contains(r#"xlink:href="../A&amp;B.ods""#));
         assert!(xml.contains(r#"table:mode="copy-results-only""#));
         assert!(xml.contains(r#"table:table-name="Q1 &lt;Q2""#));
@@ -396,10 +396,13 @@ mod tests {
         assert!(CellRange::new("Range", "source.ods", 0, 1).is_err());
         assert!(CellRange::new("Range", "source.ods", 1, 0).is_err());
 
-        let mut source = CellRange::new("Data & More", "../A&B.ods", 3, 4).unwrap();
+        let mut source = CellRange::new("Data & More", "../A&B.ods", 3, 4)
+            .expect("test fixture or operation should succeed");
         source.set_actuate_on_request(true);
         source.set_filter_name(Some("calc8".to_string()));
-        source.set_refresh_delay(Some("PT5M".to_string())).unwrap();
+        source
+            .set_refresh_delay(Some("PT5M".to_string()))
+            .expect("test fixture or operation should succeed");
         assert!(
             source
                 .set_refresh_delay(Some("every five minutes".to_string()))

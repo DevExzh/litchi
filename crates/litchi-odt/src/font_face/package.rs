@@ -7,9 +7,13 @@ use super::{
     model::Declarations,
     xml_error,
 };
-use crate::{FlatDocument, Package};
+use crate::{
+    FlatDocument, Package,
+    core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication},
+};
 use litchi_core::{Error, Result};
 use quick_xml::{events::Event, reader::NsReader};
+use std::ops::Range;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Part {
@@ -91,6 +95,122 @@ pub(crate) fn remove_styles_font_face_declarations_xml(
     xml: &str,
 ) -> Result<(String, Option<Declarations>)> {
     remove_font_face_declarations_xml(xml, Part::Styles)
+}
+
+pub(crate) fn content_font_face_splice_publication(
+    source: &OwnedPackage,
+    candidate: &str,
+) -> Result<Option<XmlSplicePublication>> {
+    font_face_splice_publication(source, "content.xml", candidate, Part::Content)
+}
+
+pub(crate) fn styles_font_face_splice_publication(
+    source: &OwnedPackage,
+    candidate: &str,
+) -> Result<Option<XmlSplicePublication>> {
+    font_face_splice_publication(source, "styles.xml", candidate, Part::Styles)
+}
+
+fn font_face_splice_publication(
+    package: &OwnedPackage,
+    path: &str,
+    candidate: &str,
+    part: Part,
+) -> Result<Option<XmlSplicePublication>> {
+    let source = XmlSourcePart::load(package, path)?;
+    if source.bytes() == candidate.as_bytes() {
+        return Ok(Some(XmlSplicePublication::new(source)));
+    }
+    let source_xml = std::str::from_utf8(source.bytes()).map_err(|error| {
+        Error::InvalidFormat(format!("invalid UTF-8 in source {path}: {error}"))
+    })?;
+    let (_, source_location) = locate_font_face_declarations(source_xml, part)?;
+    let (_, candidate_location) = locate_font_face_declarations(candidate, part)?;
+    let source_range = declaration_or_insertion_range(&source_location);
+    let candidate_range = declaration_or_insertion_range(&candidate_location);
+    let replacement = candidate
+        .as_bytes()
+        .get(candidate_range.clone())
+        .ok_or_else(|| {
+            Error::InvalidFormat("invalid candidate font-face splice range".to_string())
+        })?;
+    let fragment = if replacement.is_empty() {
+        AuthoredXmlFragment::deletion()
+    } else {
+        AuthoredXmlFragment::markup(replacement.to_vec())?
+    };
+
+    if source_xml.get(..source_range.start) == candidate.get(..candidate_range.start)
+        && source_xml.get(source_range.end..) == candidate.get(candidate_range.end..)
+    {
+        let expected = source_xml
+            .as_bytes()
+            .get(source_range.clone())
+            .ok_or_else(|| {
+                Error::InvalidFormat("invalid source font-face splice range".to_string())
+            })?;
+        let proof = source.checked_range(source_range, expected)?;
+        let mut publication = XmlSplicePublication::new(source);
+        publication.replace(proof, fragment)?;
+        return Ok(Some(publication));
+    }
+
+    let (Some(source_target), Some(_candidate_target)) =
+        (&source_location.target, &candidate_location.target)
+    else {
+        return Ok(None);
+    };
+    let source_without = remove_range(source_xml.as_bytes(), source_range.clone())?;
+    let candidate_without = remove_range(candidate.as_bytes(), candidate_range.clone())?;
+    if source_without != candidate_without {
+        return Ok(None);
+    }
+    let source_insertion = if candidate_range.start < source_target.start {
+        candidate_range.start
+    } else {
+        candidate_range
+            .start
+            .checked_add(source_range.len())
+            .ok_or_else(|| Error::InvalidFormat("font-face splice offset overflow".to_string()))?
+    };
+    let deletion_bytes = source_xml
+        .as_bytes()
+        .get(source_range.clone())
+        .ok_or_else(|| Error::InvalidFormat("invalid source font-face deletion".to_string()))?;
+    let deletion = source.checked_range(source_range, deletion_bytes)?;
+    let insertion = source.checked_range(source_insertion..source_insertion, b"")?;
+    let mut publication = XmlSplicePublication::new(source);
+    publication.replace(deletion, AuthoredXmlFragment::deletion())?;
+    publication.replace(insertion, fragment)?;
+    Ok(Some(publication))
+}
+
+fn remove_range(bytes: &[u8], range: Range<usize>) -> Result<Vec<u8>> {
+    let prefix = bytes
+        .get(..range.start)
+        .ok_or_else(|| Error::InvalidFormat("invalid font-face prefix range".to_string()))?;
+    let suffix = bytes
+        .get(range.end..)
+        .ok_or_else(|| Error::InvalidFormat("invalid font-face suffix range".to_string()))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(prefix.len().saturating_add(suffix.len()))
+        .map_err(|source| Error::Allocation {
+            resource: "font-face XML splice comparison",
+            source,
+        })?;
+    output.extend_from_slice(prefix);
+    output.extend_from_slice(suffix);
+    Ok(output)
+}
+
+fn declaration_or_insertion_range(location: &Location) -> Range<usize> {
+    location
+        .target
+        .as_ref()
+        .map_or(location.insertion..location.insertion, |target| {
+            target.start..target.end
+        })
 }
 
 fn set_font_face_declarations_xml(

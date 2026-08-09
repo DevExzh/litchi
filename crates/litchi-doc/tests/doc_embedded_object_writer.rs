@@ -138,28 +138,25 @@ fn producer_fixtures_append_only_when_their_layout_is_supported() {
     let mut rejected = 0usize;
     for (ordinal, path) in fixtures.into_iter().enumerate() {
         let original = fs::read(&path).unwrap();
-        match Editor::open(original.clone(), Limits::default()) {
-            Ok(mut editor) => {
-                let id = 2_000_000 + ordinal as u32;
-                editor.add(options(id)).unwrap();
-                let output = editor.finish().unwrap();
-                let reopened = Editor::open(output.clone(), Limits::default()).unwrap();
-                assert!(
-                    reopened
-                        .objects()
-                        .unwrap()
-                        .iter()
-                        .any(|value| value.storage_id == id)
-                );
-                let mut package = Package::from_reader(Cursor::new(output)).unwrap();
-                assert!(!package.document().unwrap().text().unwrap().is_empty());
-                supported += 1;
-            },
-            Err(_) => {
-                // Construction owns no external state and therefore cannot mutate the fixture.
-                assert_eq!(fs::read(&path).unwrap(), original);
-                rejected += 1;
-            },
+        if let Ok(mut editor) = Editor::open(original.clone(), Limits::default()) {
+            let id = 2_000_000 + ordinal as u32;
+            editor.add(options(id)).unwrap();
+            let output = editor.finish().unwrap();
+            let reopened = Editor::open(output.clone(), Limits::default()).unwrap();
+            assert!(
+                reopened
+                    .objects()
+                    .unwrap()
+                    .iter()
+                    .any(|value| value.storage_id == id)
+            );
+            let mut package = Package::from_reader(Cursor::new(output)).unwrap();
+            assert!(!package.document().unwrap().text().unwrap().is_empty());
+            supported += 1;
+        } else {
+            // Construction owns no external state and therefore cannot mutate the fixture.
+            assert_eq!(fs::read(&path).unwrap(), original);
+            rejected += 1;
         }
     }
     assert_eq!(supported + rejected, 2);

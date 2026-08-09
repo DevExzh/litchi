@@ -173,9 +173,8 @@ impl Master {
     /// Returns subdocument references in document order.
     ///
     /// Targets are classified but never opened, resolved, fetched, or
-    /// executed. The snapshot is intentionally read-only because the current
-    /// archive adapter cannot rewrite this XML dependency closure without
-    /// normalizing unknown package records.
+    /// executed. Unified transactions can retarget existing references or add
+    /// and transfer linked sections with explicit package dependency closure.
     #[must_use]
     pub fn subdocuments(&self) -> &[crate::model::subdocument::Reference] {
         self.package.references()
@@ -199,7 +198,7 @@ impl Master {
         self.package.resources()
     }
 
-    /// Starts one atomic title and linked-section transaction.
+    /// Starts one atomic metadata, section, style, and resource transaction.
     #[must_use]
     pub fn edit(&self) -> crate::transaction::Edit<'_> {
         crate::transaction::Edit::new(self)

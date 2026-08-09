@@ -23,6 +23,7 @@ pub(super) const MAX_NAME_BYTES: usize = 65_536;
 pub(super) const MAX_VALUE_BYTES: usize = 1_048_576;
 pub(super) const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
+pub(crate) use codec::splice_publication;
 pub use codec::{remove_xml, set_xml};
 pub use model::{
     Body, DateValue, Declaration, Declarations, Group, HeaderFooter, Kind, Part, Scope, Value,

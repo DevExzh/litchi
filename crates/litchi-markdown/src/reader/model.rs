@@ -96,10 +96,18 @@ pub enum BlockKind {
         /// The first ordered-list value, or `None` for an unordered list.
         start: Option<u64>,
     },
+    /// One ordered or unordered list item.
+    ListItem,
     /// A GFM footnote definition.
     FootnoteDefinition,
     /// A GFM pipe table.
     Table,
+    /// A GFM table header group.
+    TableHead,
+    /// A GFM table row.
+    TableRow,
+    /// A GFM table cell.
+    TableCell,
     /// A thematic break.
     ThematicBreak,
     /// A `CommonMark` link reference definition.
@@ -188,6 +196,72 @@ impl<'snapshot> Block<'snapshot> {
             source: self.source,
             records: self.record.inlines.iter(),
         }
+    }
+
+    /// Iterate over nested block nodes in parser preorder.
+    #[must_use]
+    pub fn descendants(&self) -> NestedBlocks<'snapshot> {
+        NestedBlocks {
+            source: self.source,
+            records: self.record.descendants.iter(),
+        }
+    }
+}
+
+/// A borrowed nested block node within one top-level block.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NestedBlock<'snapshot> {
+    source: &'snapshot str,
+    record: &'snapshot NestedBlockRecord,
+}
+
+impl<'snapshot> NestedBlock<'snapshot> {
+    /// Parser nesting depth relative to the top-level block.
+    #[must_use]
+    pub const fn depth(&self) -> usize {
+        self.record.depth
+    }
+
+    /// Semantic classification of this nested block.
+    #[must_use]
+    pub const fn kind(&self) -> BlockKind {
+        self.record.kind
+    }
+
+    /// Exact byte range in the complete snapshot source.
+    #[must_use]
+    pub fn range(&self) -> Range<usize> {
+        self.record.range.clone()
+    }
+
+    /// Exact Markdown source represented by this node.
+    #[must_use]
+    pub fn source(&self) -> &'snapshot str {
+        &self.source[self.record.range.clone()]
+    }
+}
+
+/// Iterator over nested block nodes in parser preorder.
+#[derive(Clone, Debug)]
+pub struct NestedBlocks<'snapshot> {
+    source: &'snapshot str,
+    records: std::slice::Iter<'snapshot, NestedBlockRecord>,
+}
+
+impl ExactSizeIterator for NestedBlocks<'_> {}
+
+impl<'snapshot> Iterator for NestedBlocks<'snapshot> {
+    type Item = NestedBlock<'snapshot>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.records.next().map(|record| NestedBlock {
+            source: self.source,
+            record,
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.records.size_hint()
     }
 }
 
@@ -450,6 +524,162 @@ impl Snapshot {
             records: self.state.references.iter(),
         }
     }
+
+    /// Check which source-ranged features cannot be represented by a target.
+    ///
+    /// This is a read-only preflight; it never renders or mutates the snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation error if the bounded issue report cannot be built.
+    pub fn preflight_projection(
+        &self,
+        capabilities: ProjectionCapabilities,
+    ) -> Result<ProjectionPreflight, Error> {
+        let mut issues = Vec::new();
+        for block in self.blocks() {
+            if block.kind() == BlockKind::Table && !capabilities.tables {
+                push_projection_issue(&mut issues, ProjectionIssueKind::Table, block.range())?;
+            }
+            if block.kind() == BlockKind::FootnoteDefinition && !capabilities.footnotes {
+                push_projection_issue(&mut issues, ProjectionIssueKind::Footnote, block.range())?;
+            }
+            if matches!(block.kind(), BlockKind::Html) && !capabilities.raw_html {
+                push_projection_issue(&mut issues, ProjectionIssueKind::RawHtml, block.range())?;
+            }
+            for inline in block.inlines() {
+                let issue_kind = match inline.kind() {
+                    InlineKind::Html if !capabilities.raw_html => {
+                        Some(ProjectionIssueKind::RawHtml)
+                    },
+                    InlineKind::TaskListMarker { .. } if !capabilities.task_lists => {
+                        Some(ProjectionIssueKind::TaskList)
+                    },
+                    InlineKind::FootnoteReference if !capabilities.footnotes => {
+                        Some(ProjectionIssueKind::Footnote)
+                    },
+                    InlineKind::Text
+                    | InlineKind::Emphasis
+                    | InlineKind::Strong
+                    | InlineKind::Strikethrough
+                    | InlineKind::Code
+                    | InlineKind::Link
+                    | InlineKind::Image
+                    | InlineKind::Html
+                    | InlineKind::FootnoteReference
+                    | InlineKind::SoftBreak
+                    | InlineKind::HardBreak
+                    | InlineKind::TaskListMarker { .. } => None,
+                };
+                if let Some(kind) = issue_kind {
+                    push_projection_issue(&mut issues, kind, inline.range())?;
+                }
+            }
+        }
+        Ok(ProjectionPreflight {
+            issues: issues.into_boxed_slice(),
+        })
+    }
+
+    /// Build and fully validate a reference-aware append into `destination`.
+    ///
+    /// Link and footnote definitions required by the selected block are
+    /// included recursively when absent from the destination. Neither snapshot
+    /// is mutated by this preflight.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed missing-block, dialect, dependency-conflict, allocation,
+    /// limit, or candidate-validation error.
+    pub fn preflight_transfer_block(
+        &self,
+        position: usize,
+        destination: &Self,
+    ) -> Result<super::TransferPlan, Error> {
+        super::transaction::preflight_transfer_block(self, position, destination)
+    }
+}
+
+/// Features supported by a projection target.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the public projection contract exposes four independently selectable features"
+)]
+pub struct ProjectionCapabilities {
+    /// Preserve raw block and inline HTML.
+    pub raw_html: bool,
+    /// Preserve GFM tables.
+    pub tables: bool,
+    /// Preserve GFM task-list markers.
+    pub task_lists: bool,
+    /// Preserve footnote uses and definitions.
+    pub footnotes: bool,
+}
+
+impl ProjectionCapabilities {
+    /// A target capable of retaining every feature checked by the preflight.
+    pub const LOSSLESS: Self = Self {
+        raw_html: true,
+        tables: true,
+        task_lists: true,
+        footnotes: true,
+    };
+}
+
+/// A feature that a projection target declared unsupported.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ProjectionIssueKind {
+    /// Raw block or inline HTML.
+    RawHtml,
+    /// A GFM pipe table.
+    Table,
+    /// A GFM task-list marker.
+    TaskList,
+    /// A footnote use or definition.
+    Footnote,
+}
+
+/// One exact source-ranged projection issue.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProjectionIssue {
+    kind: ProjectionIssueKind,
+    range: Range<usize>,
+}
+
+impl ProjectionIssue {
+    /// Unsupported feature class.
+    #[must_use]
+    pub const fn kind(&self) -> ProjectionIssueKind {
+        self.kind
+    }
+
+    /// Exact range requiring target-specific handling.
+    #[must_use]
+    pub fn range(&self) -> Range<usize> {
+        self.range.clone()
+    }
+}
+
+/// Complete, non-mutating projection preflight result.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ProjectionPreflight {
+    issues: Box<[ProjectionIssue]>,
+}
+
+impl ProjectionPreflight {
+    /// Source-ordered unsupported features.
+    #[must_use]
+    pub const fn issues(&self) -> &[ProjectionIssue] {
+        &self.issues
+    }
+
+    /// Whether the declared target can preserve all checked features.
+    #[must_use]
+    pub fn is_lossless(&self) -> bool {
+        self.issues.is_empty()
+    }
 }
 
 impl fmt::Debug for Snapshot {
@@ -531,6 +761,34 @@ pub enum Error {
         /// Requested zero-based position.
         position: usize,
     },
+    /// A selected nested block does not exist.
+    #[error("Markdown block {block_position} has no nested block at position {nested_position}")]
+    NestedBlockNotFound {
+        /// Top-level block position.
+        block_position: usize,
+        /// Nested block position in parser preorder.
+        nested_position: usize,
+    },
+    /// A selected inline node does not exist.
+    #[error("Markdown block {block_position} has no inline at position {inline_position}")]
+    InlineNotFound {
+        /// Top-level block position.
+        block_position: usize,
+        /// Inline position in parser preorder.
+        inline_position: usize,
+    },
+    /// A nested edit escaped or changed its enclosing top-level block.
+    #[error("Markdown nested edit changed its top-level structural boundary")]
+    StructuralBoundaryChanged,
+    /// A transfer was requested between different Markdown dialects.
+    #[error("Markdown transfer requires matching source and destination dialects")]
+    TransferDialectMismatch,
+    /// A destination defines a transferred dependency differently.
+    #[error("Markdown destination has a conflicting definition for '{label}'")]
+    TransferDependencyConflict {
+        /// Normalized link or footnote label.
+        label: String,
+    },
     /// A block replacement or append was not exactly one parsed block.
     #[error("Markdown replacement must contain exactly one top-level block; found {actual}")]
     ReplacementBlockCount {
@@ -605,6 +863,14 @@ pub(crate) struct BlockRecord {
     pub(crate) kind: BlockKind,
     pub(crate) range: Range<usize>,
     pub(crate) inlines: Box<[InlineRecord]>,
+    pub(crate) descendants: Box<[NestedBlockRecord]>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct NestedBlockRecord {
+    pub(crate) kind: BlockKind,
+    pub(crate) range: Range<usize>,
+    pub(crate) depth: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -630,4 +896,17 @@ pub(crate) struct State {
     pub(crate) references: Box<[ReferenceRecord]>,
     pub(crate) dialect: Dialect,
     pub(crate) limits: ReadLimits,
+}
+
+fn push_projection_issue(
+    issues: &mut Vec<ProjectionIssue>,
+    kind: ProjectionIssueKind,
+    range: Range<usize>,
+) -> Result<(), Error> {
+    issues.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "Markdown projection preflight",
+        source,
+    })?;
+    issues.push(ProjectionIssue { kind, range });
+    Ok(())
 }

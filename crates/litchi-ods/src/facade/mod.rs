@@ -724,8 +724,11 @@ mod tests {
 
     #[test]
     fn builder_round_trips_through_facade() {
-        let bytes = Builder::new().build().unwrap();
-        let spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
+        let bytes = Builder::new()
+            .build()
+            .expect("test fixture or operation should succeed");
+        let spreadsheet =
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
         assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
     }
 
@@ -736,18 +739,25 @@ mod tests {
                 r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:body><office:spreadsheet><draw:frame draw:name="Photo"><draw:image><office:binary-data>AQID</office:binary-data></draw:image></draw:frame><draw:object xlink:href="https://example.invalid/object" xlink:type="simple"/></office:spreadsheet></office:body></office:document-content>"#,
             )
             .build()
-            .unwrap();
-        let spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
+            .expect("test fixture or operation should succeed");
+        let spreadsheet =
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
 
-        let images = spreadsheet.images().unwrap();
+        let images = spreadsheet
+            .images()
+            .expect("test fixture or operation should succeed");
         assert_eq!(images.len(), 1);
         assert_eq!(images[0].inline_bytes(), Some(&[1, 2, 3][..]));
         assert_eq!(
-            spreadsheet.image_bytes(&images[0]).unwrap(),
+            spreadsheet
+                .image_bytes(&images[0])
+                .expect("test fixture or operation should succeed"),
             Some(vec![1, 2, 3])
         );
 
-        let objects = spreadsheet.embedded_objects().unwrap();
+        let objects = spreadsheet
+            .embedded_objects()
+            .expect("test fixture or operation should succeed");
         assert_eq!(objects.len(), 1);
         assert!(matches!(
             objects[0].source,
@@ -761,41 +771,49 @@ mod tests {
         let bytes = Builder::new()
             .content_xml(ANNOTATED_CONTENT)
             .build()
-            .unwrap();
-        let spreadsheet = Spreadsheet::from_bytes(bytes.clone()).unwrap();
-        let annotations = spreadsheet.annotations().unwrap();
+            .expect("test fixture or operation should succeed");
+        let spreadsheet = Spreadsheet::from_bytes(bytes.clone())
+            .expect("test fixture or operation should succeed");
+        let annotations = spreadsheet
+            .annotations()
+            .expect("test fixture or operation should succeed");
         assert_eq!(
             annotations
                 .cell("Data", 0, 0)
-                .unwrap()
-                .unwrap()
+                .expect("test fixture or operation should succeed")
+                .expect("test fixture or operation should succeed")
                 .annotation()
                 .text(),
             "existing"
         );
 
-        let mut mutable = MutableSpreadsheet::from_bytes(bytes.clone()).unwrap();
+        let mut mutable = MutableSpreadsheet::from_bytes(bytes.clone())
+            .expect("test fixture or operation should succeed");
         mutable
             .edit_annotations(|transaction| {
                 transaction.set("Data", 0, 1, crate::annotations::Annotation::new("added"))
             })
-            .unwrap();
-        let edited = Spreadsheet::from_bytes(mutable.to_bytes()).unwrap();
+            .expect("test fixture or operation should succeed");
+        let edited = Spreadsheet::from_bytes(mutable.to_bytes())
+            .expect("test fixture or operation should succeed");
         assert_eq!(
             edited
                 .annotations()
-                .unwrap()
+                .expect("test fixture or operation should succeed")
                 .cell("Data", 0, 1)
-                .unwrap()
-                .unwrap()
+                .expect("test fixture or operation should succeed")
+                .expect("test fixture or operation should succeed")
                 .annotation()
                 .text(),
             "added"
         );
         assert!(edited.content_xml().contains("vendor:keep"));
 
-        let mut no_op = MutableSpreadsheet::from_bytes(bytes.clone()).unwrap();
-        no_op.edit_annotations(|_| Ok(())).unwrap();
+        let mut no_op = MutableSpreadsheet::from_bytes(bytes.clone())
+            .expect("test fixture or operation should succeed");
+        no_op
+            .edit_annotations(|_| Ok(()))
+            .expect("test fixture or operation should succeed");
         assert_eq!(no_op.to_bytes(), bytes);
     }
 }

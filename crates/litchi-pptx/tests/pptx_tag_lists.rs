@@ -15,10 +15,22 @@ const TAG_RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags";
 const TAG_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.presentationml.tags+xml";
-const LOCAL_PRIMARY_TAGS: &[u8] =
-    include_bytes!("../../../test-data/ooxml/pptx/tags/basic_tags.xml");
-const LOCAL_SECONDARY_TAGS: &[u8] =
-    include_bytes!("../../../test-data/ooxml/pptx/tags/secondary_tags.xml");
+// These positive tag-list fixtures can become authored package parts in CRUD
+// tests. Their extension attributes and escaped values are significant;
+// formatting whitespace is not.
+const LOCAL_PRIMARY_TAGS: &[u8] = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+    r#"<p:tagLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:ext="urn:litchi:fixture" ext:origin="local">"#,
+    r#"<p:tag name="OWNER" val="Alice" ext:source="fixture"/>"#,
+    r#"<p:tag name="INERT" val="&lt;not-a-command/&gt;"/></p:tagLst>"#,
+)
+.as_bytes();
+const LOCAL_SECONDARY_TAGS: &[u8] = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+    r#"<p:tagLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+    r#"<p:tag name="STATUS" val="Review"/></p:tagLst>"#,
+)
+.as_bytes();
 
 #[test]
 fn package_reads_direct_slide_tag_lists() {

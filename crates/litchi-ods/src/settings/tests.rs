@@ -14,8 +14,12 @@ const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 
 #[test]
 fn no_op_commit_borrows_original_xml_and_preserves_unknown_content() {
-    let snapshot = Snapshot::from_content_xml(XML).unwrap();
-    let commit = snapshot.transaction().commit().unwrap();
+    let snapshot =
+        Snapshot::from_content_xml(XML).expect("test fixture or operation should succeed");
+    let commit = snapshot
+        .transaction()
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(!commit.changed());
     assert_eq!(commit.content_xml(), XML);
     assert!(commit.content_xml().contains("vendor:extension"));
@@ -23,7 +27,8 @@ fn no_op_commit_borrows_original_xml_and_preserves_unknown_content() {
 
 #[test]
 fn update_replaces_only_owned_element_and_keeps_unknown_siblings() {
-    let snapshot = Snapshot::from_content_xml(XML).unwrap();
+    let snapshot =
+        Snapshot::from_content_xml(XML).expect("test fixture or operation should succeed");
     let mut transaction = snapshot.transaction();
     transaction
         .editor()
@@ -31,8 +36,10 @@ fn update_replaces_only_owned_element_and_keeps_unknown_siblings() {
             settings.case_sensitive = Some(true);
             Ok(())
         })
-        .unwrap();
-    let commit = transaction.commit().unwrap();
+        .expect("test fixture or operation should succeed");
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(commit.changed());
     assert!(commit.content_xml().contains("vendor:extension"));
     assert!(
@@ -40,8 +47,15 @@ fn update_replaces_only_owned_element_and_keeps_unknown_siblings() {
             .content_xml()
             .contains("table:case-sensitive=\"true\"")
     );
-    let reparsed = Snapshot::from_content_xml(commit.content_xml()).unwrap();
-    assert_eq!(reparsed.calculation().unwrap().case_sensitive, Some(true));
+    let reparsed = Snapshot::from_content_xml(commit.content_xml())
+        .expect("test fixture or operation should succeed");
+    assert_eq!(
+        reparsed
+            .calculation()
+            .expect("test fixture or operation should succeed")
+            .case_sensitive,
+        Some(true)
+    );
 }
 
 #[test]
@@ -50,7 +64,8 @@ fn insertion_and_removal_are_atomic_and_contextual() {
         "    <table:calculation-settings table:case-sensitive=\"false\"/>\n",
         "",
     );
-    let snapshot = Snapshot::from_content_xml(&source).unwrap();
+    let snapshot =
+        Snapshot::from_content_xml(&source).expect("test fixture or operation should succeed");
     assert!(snapshot.calculation().is_none());
 
     let mut transaction = snapshot.transaction();
@@ -59,17 +74,26 @@ fn insertion_and_removal_are_atomic_and_contextual() {
             precision_as_shown: Some(true),
             ..Settings::default()
         })
-        .unwrap();
-    let inserted = transaction.commit().unwrap().into_owned();
-    let inserted_snapshot = Snapshot::from_content_xml(&inserted).unwrap();
+        .expect("test fixture or operation should succeed");
+    let inserted = transaction
+        .commit()
+        .expect("test fixture or operation should succeed")
+        .into_owned();
+    let inserted_snapshot =
+        Snapshot::from_content_xml(&inserted).expect("test fixture or operation should succeed");
     assert_eq!(
-        inserted_snapshot.calculation().unwrap().precision_as_shown,
+        inserted_snapshot
+            .calculation()
+            .expect("test fixture or operation should succeed")
+            .precision_as_shown,
         Some(true)
     );
 
     let mut removal = inserted_snapshot.transaction();
     removal.editor().remove();
-    let removed = removal.commit().unwrap();
+    let removed = removal
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(removed.changed());
     assert!(!removed.content_xml().contains("calculation-settings"));
     assert!(removed.content_xml().contains("vendor:extension"));
@@ -78,15 +102,21 @@ fn insertion_and_removal_are_atomic_and_contextual() {
 #[test]
 fn empty_spreadsheet_hosts_a_new_calculation_element() {
     let source = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:spreadsheet/></o:body></o:document-content>"#;
-    let snapshot = Snapshot::from_content_xml(source).unwrap();
+    let snapshot =
+        Snapshot::from_content_xml(source).expect("test fixture or operation should succeed");
     let mut transaction = snapshot.transaction();
-    transaction.replace(Settings::default()).unwrap();
-    let output = transaction.commit().unwrap().into_owned();
+    transaction
+        .replace(Settings::default())
+        .expect("test fixture or operation should succeed");
+    let output = transaction
+        .commit()
+        .expect("test fixture or operation should succeed")
+        .into_owned();
     assert!(output.contains("<o:spreadsheet><table:calculation-settings"));
     assert!(output.contains("</o:spreadsheet>"));
     assert!(
         Snapshot::from_content_xml(&output)
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .calculation()
             .is_some()
     );
@@ -94,7 +124,8 @@ fn empty_spreadsheet_hosts_a_new_calculation_element() {
 
 #[test]
 fn invalid_typed_replacement_does_not_mutate_transaction() {
-    let snapshot = Snapshot::from_content_xml(XML).unwrap();
+    let snapshot =
+        Snapshot::from_content_xml(XML).expect("test fixture or operation should succeed");
     let original = snapshot.calculation().cloned();
     let mut transaction = snapshot.transaction();
     let result = transaction.editor().update(|settings| {

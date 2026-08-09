@@ -3,6 +3,7 @@
 use litchi_core::Position;
 use litchi_odf_common::{compact_xml, core::PackageWriter};
 use litchi_odm::{Master, subdocument::Target};
+use std::path::Path;
 
 const MIME: &str = "application/vnd.oasis.opendocument.text-master";
 const CONTENT: &str = concat!(
@@ -23,11 +24,11 @@ fn package(content: &str, extra_path: Option<&str>) -> Vec<u8> {
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     if let Some(path) = extra_path {
-        let bytes: &[u8] = if path.ends_with(".xml") {
-            b"<signature/>"
-        } else {
-            b"opaque"
-        };
+        let is_xml = Path::new(path)
+            .extension()
+            .and_then(std::ffi::OsStr::to_str)
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"));
+        let bytes: &[u8] = if is_xml { b"<signature/>" } else { b"opaque" };
         writer
             .add_file_with_media_type(path, bytes, "application/octet-stream")
             .unwrap();
@@ -159,7 +160,7 @@ fn linked_section_noop_and_refusals_are_typed() {
 }
 
 #[test]
-fn opening_requires_compact_content_xml() {
+fn authored_package_writer_rejects_pretty_content_xml() {
     let noncompact = CONTENT.replace("<office:body>", "<office:body>\n");
     let mut writer = PackageWriter::new();
     writer.set_mimetype(MIME).unwrap();

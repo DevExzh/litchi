@@ -280,7 +280,7 @@ impl Package {
             crate::variable_declaration::Part::Flat => unreachable!(),
         };
 
-        self.replace_variable_xml(content, styles, old)
+        self.replace_variable_xml(content, styles, old, group.part, &group.scope, group.kind)
     }
 
     /// Atomically remove one variable declaration container.
@@ -333,7 +333,7 @@ impl Package {
             crate::variable_declaration::Part::Flat => unreachable!(),
         };
 
-        self.replace_variable_xml(content, styles, Some(old))
+        self.replace_variable_xml(content, styles, Some(old), part, scope, kind)
     }
 
     fn replace_variable_xml(
@@ -341,6 +341,9 @@ impl Package {
         content: String,
         styles: Option<String>,
         old: Option<crate::variable_declaration::Group>,
+        changed_part: crate::variable_declaration::Part,
+        scope: &crate::variable_declaration::Scope,
+        kind: crate::variable_declaration::Kind,
     ) -> Result<Option<crate::variable_declaration::Group>> {
         let mut parts = vec![(content.as_str(), crate::variable_declaration::Part::Content)];
         if let Some(styles) = styles.as_deref() {
@@ -350,13 +353,46 @@ impl Package {
 
         let mut writer = crate::core::PackageWriter::new();
         writer.set_mimetype(&self.mimetype)?;
-        writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
+        if changed_part == crate::variable_declaration::Part::Content {
+            crate::variable_declaration::splice_publication(
+                &self.package,
+                constants::ODF_CONTENT,
+                &content,
+                scope,
+                kind,
+            )?
+            .publish(&mut writer)?;
+        } else {
+            crate::core::XmlSplicePublication::new(crate::core::XmlSourcePart::load(
+                &self.package,
+                constants::ODF_CONTENT,
+            )?)
+            .publish(&mut writer)?;
+        }
         if let Some(styles) = styles.as_deref() {
-            writer.add_file(constants::ODF_STYLES, styles.as_bytes())?;
+            if changed_part == crate::variable_declaration::Part::Styles {
+                crate::variable_declaration::splice_publication(
+                    &self.package,
+                    constants::ODF_STYLES,
+                    styles,
+                    scope,
+                    kind,
+                )?
+                .publish(&mut writer)?;
+            } else {
+                crate::core::XmlSplicePublication::new(crate::core::XmlSourcePart::load(
+                    &self.package,
+                    constants::ODF_STYLES,
+                )?)
+                .publish(&mut writer)?;
+            }
         }
         if self.package.has_file(constants::ODF_META)? {
-            let bytes = self.package.get_file(constants::ODF_META)?;
-            writer.add_file(constants::ODF_META, &bytes)?;
+            crate::core::XmlSplicePublication::new(crate::core::XmlSourcePart::load(
+                &self.package,
+                constants::ODF_META,
+            )?)
+            .publish(&mut writer)?;
         }
         writer.copy_auxiliary_files_from(&self.package)?;
         let replacement = Package::from_bytes(writer.finish_to_bytes()?)?;

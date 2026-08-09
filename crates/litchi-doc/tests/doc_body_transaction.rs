@@ -1,6 +1,11 @@
+#![expect(
+    clippy::expect_used,
+    reason = "integration fixtures intentionally fail fast with contextual assertions"
+)]
+
 use litchi_core::Position;
 use litchi_doc::Package;
-use litchi_doc::body_text::{Projection, Snapshot};
+use litchi_doc::body_text::{CharacterProperty, Projection, Snapshot, Story};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -80,4 +85,87 @@ fn durable_stale_source_is_rejected_without_mutation() {
     );
     let patch = commit.patch().to_durable(limits).expect("durable patch");
     assert!(second.apply_durable(&patch).is_err());
+}
+
+#[test]
+fn real_story_field_and_table_targets_fully_reopen() {
+    let header_bytes =
+        std::fs::read(fixture("test-data/ole/doc/ThreeColHeadFoot.doc")).expect("header fixture");
+    let header_source = Snapshot::parse(&header_bytes).expect("header snapshot");
+    let header = header_source
+        .story_paragraphs(Story::Header)
+        .expect("header story")
+        .into_iter()
+        .find(|item| {
+            !item.text().is_empty()
+                && !item
+                    .text()
+                    .chars()
+                    .any(|character| character.is_control() && character != '\t')
+        })
+        .expect("header paragraph");
+    let mut header_edit = header_source.edit().expect("header edit");
+    header_edit
+        .set_character_property(header.target(), CharacterProperty::Italic, true)
+        .expect("header direct format");
+    let header_commit = header_edit.commit().expect("header commit");
+    let mut header_package = Package::from_reader(Cursor::new(header_commit.snapshot().finish()))
+        .expect("formatted header CFB reopens");
+    assert_eq!(
+        header_package
+            .document()
+            .expect("formatted header DOC reopens")
+            .fib()
+            .version(),
+        0x00C1
+    );
+
+    let field_bytes =
+        std::fs::read(fixture("test-data/ole/doc/hyperlink.doc")).expect("field fixture");
+    let field_source = Snapshot::parse(&field_bytes).expect("field snapshot");
+    let field = field_source
+        .field_results()
+        .expect("field results")
+        .into_iter()
+        .find(|item| !item.text().is_empty())
+        .expect("simple field result");
+    let field_replacement = format!("{} updated", field.text());
+    let mut field_edit = field_source.edit().expect("field edit");
+    field_edit
+        .replace_text(field.target(), &field_replacement)
+        .expect("field result resize");
+    let field_commit = field_edit.commit().expect("field commit");
+    let mut field_package = Package::from_reader(Cursor::new(field_commit.snapshot().finish()))
+        .expect("field CFB reopens");
+    field_package.document().expect("field DOC reopens");
+    assert_eq!(
+        field_commit
+            .snapshot()
+            .field_results()
+            .expect("field semantic readback")
+            .into_iter()
+            .find(|item| item.target() == field.target())
+            .expect("same field selector")
+            .text(),
+        field_replacement
+    );
+
+    let table_bytes =
+        std::fs::read(fixture("test-data/ole/doc/commented-table.doc")).expect("table fixture");
+    let table_source = Snapshot::parse(&table_bytes).expect("table snapshot");
+    let cell = table_source
+        .table_cells()
+        .expect("simple real table cells")
+        .into_iter()
+        .find(|item| !item.text().is_empty())
+        .expect("non-empty real table cell");
+    let cell_replacement = format!("{}!", cell.text());
+    let mut table_edit = table_source.edit().expect("table edit");
+    table_edit
+        .replace_text(cell.target(), &cell_replacement)
+        .expect("table cell resize");
+    let table_commit = table_edit.commit().expect("table commit");
+    let mut table_package = Package::from_reader(Cursor::new(table_commit.snapshot().finish()))
+        .expect("table CFB reopens");
+    table_package.document().expect("table DOC reopens");
 }

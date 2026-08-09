@@ -1757,21 +1757,29 @@ mod tests {
         let limits = Limits::default().with_max_integer_digits(512);
         let positive_digits = "9".repeat(300);
         let negative_lexical = format!(" \t-000{positive_digits}\r\n");
-        let negative = Integer::parse_with_limits(&negative_lexical, &limits).unwrap();
+        let negative = Integer::parse_with_limits(&negative_lexical, &limits)
+            .expect("test fixture or operation should succeed");
         let positive =
             PositiveInteger::parse_with_limits(&format!("\n+000{positive_digits}\t"), &limits)
-                .unwrap();
+                .expect("test fixture or operation should succeed");
         assert_eq!(negative.as_str(), format!("-{positive_digits}"));
         assert_eq!(positive.as_str(), positive_digits);
         assert!(negative < Integer::from(i128::MIN));
-        assert!(positive > PositiveInteger::try_from(u128::MAX).unwrap());
+        assert!(
+            positive
+                > PositiveInteger::try_from(u128::MAX)
+                    .expect("test fixture or operation should succeed")
+        );
 
         let insertion = Change::Insertion(Insertion {
             metadata: metadata("huge"),
             dimension: Dimension::Column,
             position: negative,
             count: positive,
-            table: Some(Integer::parse("-999999999999999999999999999999999999").unwrap()),
+            table: Some(
+                Integer::parse("-999999999999999999999999999999999999")
+                    .expect("test fixture or operation should succeed"),
+            ),
         });
         assert!(insertion.validate_with_limits(&limits).is_ok());
         assert!(
@@ -1831,19 +1839,21 @@ mod tests {
             changes: vec![deletion("d1", -2, Some(2)), deletion("d2", -2, None)],
         };
         let limits = Limits::default();
-        let validated = changes.validate_indexed_with_limits(&limits).unwrap();
+        let validated = changes
+            .validate_indexed_with_limits(&limits)
+            .expect("test fixture or operation should succeed");
         let cloned = changes
             .try_clone_validated_with_limits(&validated, &limits)
-            .unwrap();
+            .expect("test fixture or operation should succeed");
         assert_eq!(cloned, changes);
         assert_eq!(
             cloned
                 .validate_indexed_with_limits(&Limits::default())
-                .unwrap()
+                .expect("test fixture or operation should succeed")
                 .resources,
             changes
                 .validate_indexed_with_limits(&Limits::default())
-                .unwrap()
+                .expect("test fixture or operation should succeed")
                 .resources
         );
     }

@@ -4,8 +4,10 @@ const XML: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:o
 
 #[test]
 fn compact_source_feature_inventory_is_semantic_bounded_and_inert() {
-    let features = SourceFeatures::parse(XML).unwrap();
-    let sheet = features.sheet("Data").unwrap();
+    let features = SourceFeatures::parse(XML).expect("test fixture or operation should succeed");
+    let sheet = features
+        .sheet("Data")
+        .expect("test fixture or operation should succeed");
     assert_eq!(sheet.conditional_format_count(), 1);
     assert_eq!(sheet.sparkline_group_count(), 1);
     assert_eq!(
@@ -23,10 +25,18 @@ fn compact_source_feature_inventory_is_semantic_bounded_and_inert() {
 
 #[test]
 fn package_facade_exposes_the_same_inert_inventory() {
-    let bytes = Builder::new().content_xml(XML).build().unwrap();
-    let spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
-    let inventory = spreadsheet.source_features().unwrap();
-    let sheet = inventory.sheet("Data").unwrap();
+    let bytes = Builder::new()
+        .content_xml(XML)
+        .build()
+        .expect("test fixture or operation should succeed");
+    let spreadsheet =
+        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    let inventory = spreadsheet
+        .source_features()
+        .expect("test fixture or operation should succeed");
+    let sheet = inventory
+        .sheet("Data")
+        .expect("test fixture or operation should succeed");
     assert_eq!(sheet.hyperlinks()[0].text(), "external link");
     assert_eq!(sheet.drawings()[1].kind(), DrawingKind::Image);
 }

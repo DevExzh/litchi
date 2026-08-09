@@ -114,6 +114,27 @@ impl Area {
         self
     }
 
+    /// Sets the target frame name used when the inert link is activated.
+    #[must_use]
+    pub fn with_target_frame_name(mut self, value: impl Into<String>) -> Self {
+        self.target_frame_name = Some(value.into());
+        self
+    }
+
+    /// Sets the lexical `XLink` type.
+    #[must_use]
+    pub fn with_link_type(mut self, value: impl Into<String>) -> Self {
+        self.link_type = Some(value.into());
+        self
+    }
+
+    /// Sets the lexical `XLink` presentation behavior.
+    #[must_use]
+    pub fn with_show(mut self, value: impl Into<String>) -> Self {
+        self.show = Some(value.into());
+        self
+    }
+
     /// Marks this region as explicitly unlinked.
     #[must_use]
     pub fn with_no_href(mut self) -> Self {

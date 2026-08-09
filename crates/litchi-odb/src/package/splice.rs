@@ -199,3 +199,18 @@ fn token<'a>(xml: &'a str, range: &Range<usize>) -> &'a str {
 fn token_start(tokens: &[Range<usize>], index: usize, end: usize) -> usize {
     tokens.get(index).map_or(end, |range| range.start)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::classify_fragment;
+
+    #[test]
+    fn shared_authored_fragment_classes_reject_raw_noncompact_bytes() {
+        assert!(classify_fragment(b"<x  value=\"one\">".to_vec()).is_err());
+        assert!(classify_fragment(b"<x>\n <y/>\n</x>".to_vec()).is_err());
+        assert!(classify_fragment(b"   ".to_vec()).is_err());
+        assert!(classify_fragment(b"<x>".to_vec()).is_ok());
+        assert!(classify_fragment(b"one &amp; two".to_vec()).is_ok());
+        assert!(classify_fragment(Vec::new()).is_ok());
+    }
+}

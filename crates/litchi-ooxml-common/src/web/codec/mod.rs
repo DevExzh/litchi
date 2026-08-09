@@ -15,7 +15,10 @@ mod tests;
 #[cfg(test)]
 pub(in crate::web) use semantic::{parse_add_in, parse_panes, write_add_in, write_panes};
 
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "the codec facade preserves validators shared by package and semantic owners"
+)]
 pub(in crate::web) use super::validation::{
     add_escaped_xml_budget, add_reference_budget, charge_authored_metadata, validate_add_in_budget,
     validate_binding, validate_extension_list, validate_external_uri_reference,

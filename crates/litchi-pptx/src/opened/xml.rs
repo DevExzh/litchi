@@ -3,6 +3,8 @@
 use std::ops::Range;
 
 use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
+use quick_xml::Reader;
+use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -12,6 +14,203 @@ use crate::{Error, Result};
 
 const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
+
+pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<Vec<u8>> {
+    let mut reader = Reader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation compact slide XML",
+            source,
+        })?;
+    let mut preserve_space = Vec::new();
+    let mut pending_whitespace = Vec::new();
+    let mut text_run_has_content = false;
+    let mut roots = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Start(element) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                if preserve_space.is_empty() {
+                    roots = roots
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("opened-presentation slide root count overflow"))?;
+                }
+                let inherited = preserve_space.last().copied().unwrap_or(false);
+                preserve_space.push(element_preserves_space(
+                    &element,
+                    reader.decoder(),
+                    inherited,
+                )?);
+                write_compact_start(&mut output, &element, reader.decoder(), false)?;
+            },
+            Event::Empty(element) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                if preserve_space.is_empty() {
+                    roots = roots
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("opened-presentation slide root count overflow"))?;
+                }
+                let inherited = preserve_space.last().copied().unwrap_or(false);
+                let _preserve = element_preserves_space(&element, reader.decoder(), inherited)?;
+                write_compact_start(&mut output, &element, reader.decoder(), true)?;
+            },
+            Event::End(element) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                preserve_space.pop().ok_or_else(|| {
+                    invalid("opened-presentation slide has an unexpected end element")
+                })?;
+                output.extend_from_slice(b"</");
+                output.extend_from_slice(element.name().as_ref());
+                output.push(b'>');
+            },
+            Event::Text(text) => {
+                let bytes = text.as_ref();
+                if preserve_space.is_empty() {
+                    if bytes.iter().all(u8::is_ascii_whitespace) {
+                        continue;
+                    }
+                    return Err(invalid(
+                        "opened-presentation slide has text outside its root",
+                    ));
+                }
+                if bytes.iter().all(u8::is_ascii_whitespace)
+                    && !preserve_space.last().copied().unwrap_or(false)
+                {
+                    if text_run_has_content {
+                        output.extend_from_slice(bytes);
+                    } else {
+                        pending_whitespace.extend_from_slice(bytes);
+                    }
+                } else {
+                    output.extend_from_slice(&pending_whitespace);
+                    pending_whitespace.clear();
+                    output.extend_from_slice(bytes);
+                    text_run_has_content = true;
+                }
+            },
+            Event::CData(data) => {
+                if preserve_space.is_empty() {
+                    return Err(invalid(
+                        "opened-presentation slide has CDATA outside its root",
+                    ));
+                }
+                output.extend_from_slice(&pending_whitespace);
+                pending_whitespace.clear();
+                output.extend_from_slice(b"<![CDATA[");
+                output.extend_from_slice(data.as_ref());
+                output.extend_from_slice(b"]]>");
+                text_run_has_content = true;
+            },
+            Event::GeneralRef(reference) => {
+                if preserve_space.is_empty() {
+                    return Err(invalid(
+                        "opened-presentation slide has an entity outside its root",
+                    ));
+                }
+                output.extend_from_slice(&pending_whitespace);
+                pending_whitespace.clear();
+                output.push(b'&');
+                output.extend_from_slice(reference.as_ref());
+                output.push(b';');
+                text_run_has_content = true;
+            },
+            Event::Decl(declaration) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                output.extend_from_slice(b"<?");
+                output.extend_from_slice(declaration.as_ref());
+                output.extend_from_slice(b"?>");
+            },
+            Event::PI(instruction) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                output.extend_from_slice(b"<?");
+                output.extend_from_slice(instruction.as_ref());
+                output.extend_from_slice(b"?>");
+            },
+            Event::Comment(comment) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                output.extend_from_slice(b"<!--");
+                output.extend_from_slice(comment.as_ref());
+                output.extend_from_slice(b"-->");
+            },
+            Event::DocType(_) => {
+                return Err(invalid(
+                    "opened-presentation slide document types are not publishable",
+                ));
+            },
+            Event::Eof => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                break;
+            },
+        }
+    }
+    if !preserve_space.is_empty() || roots != 1 {
+        return Err(invalid(
+            "opened-presentation slide must contain exactly one closed root",
+        ));
+    }
+    Ok(output)
+}
+
+fn finish_compact_text_run(pending_whitespace: &mut Vec<u8>, has_content: &mut bool) {
+    pending_whitespace.clear();
+    *has_content = false;
+}
+
+fn element_preserves_space(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    inherited: bool,
+) -> Result<bool> {
+    let mut preserve = inherited;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_ref() != b"xml:space" {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        preserve = match value.as_ref() {
+            "preserve" => true,
+            "default" => false,
+            _ => {
+                return Err(invalid(
+                    "opened-presentation slide xml:space must be default or preserve",
+                ));
+            },
+        };
+    }
+    Ok(preserve)
+}
+
+fn write_compact_start(
+    output: &mut Vec<u8>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    empty: bool,
+) -> Result<()> {
+    output.push(b'<');
+    output.extend_from_slice(element.name().as_ref());
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        output.push(b' ');
+        output.extend_from_slice(attribute.key.as_ref());
+        output.extend_from_slice(b"=\"");
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        output.extend_from_slice(quick_xml::escape::escape(value.as_ref()).as_bytes());
+        output.push(b'"');
+    }
+    output.extend_from_slice(if empty { b"/>" } else { b">" });
+    Ok(())
+}
 
 #[derive(Debug)]
 struct SlideIdElement {
@@ -105,6 +304,36 @@ pub(crate) fn reorder_slides(xml: &[u8], current: &[Slide], ordered: &[u32]) -> 
     Ok(output)
 }
 
+pub(crate) fn remove_slide(xml: &[u8], current: &[Slide], id: u32) -> Result<Vec<u8>> {
+    let elements = slide_id_elements(xml)?;
+    if elements.len() != current.len() {
+        return Err(invalid(
+            "opened-presentation slide-order XML differs from the semantic graph",
+        ));
+    }
+    for (element, slide) in elements.iter().zip(current) {
+        if element.id != slide.id || element.relationship_id != slide.relationship_id {
+            return Err(invalid(
+                "opened-presentation slide-order binding changed during staging",
+            ));
+        }
+    }
+    let target = elements
+        .iter()
+        .find(|element| element.id == id)
+        .ok_or_else(|| invalid("opened-presentation slide removal identity is missing"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len().saturating_sub(target.span.len()))
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide removal XML",
+            source,
+        })?;
+    output.extend_from_slice(&xml[..target.span.start]);
+    output.extend_from_slice(&xml[target.span.end..]);
+    Ok(output)
+}
+
 pub(crate) fn rewrite_shape_text(
     xml: &[u8],
     shape: Range<usize>,
@@ -168,6 +397,93 @@ pub(crate) fn rewrite_shape_text(
         cursor = span.span.end;
     }
     output.extend_from_slice(&xml[cursor..]);
+    Ok(output)
+}
+
+pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
+    if fragment.is_empty() {
+        return Err(invalid(
+            "opened-presentation shape fragment cannot be empty",
+        ));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut tree_depth = None;
+    let mut trees = 0usize;
+    let mut insertion = None;
+    loop {
+        let start = position(&reader)?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let pml_namespace = is_presentation_namespace(&namespace);
+        let event = event.into_owned();
+        drop(namespace);
+        match event {
+            Event::Start(element) => {
+                bump(&mut nodes)?;
+                if depth >= MAX_XML_DEPTH {
+                    return Err(Error::Limit {
+                        resource: "opened-presentation XML depth",
+                        limit: MAX_XML_DEPTH,
+                    });
+                }
+                depth += 1;
+                if pml_namespace && element.local_name().as_ref() == b"spTree" {
+                    trees = trees.saturating_add(1);
+                    if trees != 1 || tree_depth.replace(depth).is_some() {
+                        return Err(invalid(
+                            "opened-presentation slide has multiple shape trees",
+                        ));
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                bump(&mut nodes)?;
+                if pml_namespace && element.local_name().as_ref() == b"spTree" {
+                    return Err(invalid(
+                        "opened-presentation cannot append to an empty shape-tree element",
+                    ));
+                }
+            },
+            Event::End(element) => {
+                if tree_depth == Some(depth)
+                    && pml_namespace
+                    && element.local_name().as_ref() == b"spTree"
+                {
+                    insertion = Some(start);
+                    tree_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("opened-presentation XML depth underflow"))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if depth != 0 || tree_depth.is_some() {
+        return Err(invalid("opened-presentation slide XML is unterminated"));
+    }
+    if trees != 1 {
+        return Err(invalid(
+            "opened-presentation slide must have one shape tree",
+        ));
+    }
+    let insertion =
+        insertion.ok_or_else(|| invalid("opened-presentation slide has no shape tree"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len().saturating_add(fragment.len()))
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation appended shape XML",
+            source,
+        })?;
+    output.extend_from_slice(&xml[..insertion]);
+    output.extend_from_slice(fragment);
+    output.extend_from_slice(&xml[insertion..]);
     Ok(output)
 }
 

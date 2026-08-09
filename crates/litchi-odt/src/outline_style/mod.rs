@@ -12,6 +12,7 @@ mod tests;
 
 use litchi_core::{Error, Result};
 
+pub(crate) use codec::splice_publication;
 pub use codec::{parse_outline_styles, remove_outline_style_xml, set_outline_style_xml};
 pub use model::{
     Attribute, LevelStyle, ListProperties, NumberFormat, PositionMode, PositiveInteger, Style,

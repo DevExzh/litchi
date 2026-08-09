@@ -10,12 +10,36 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::comments::load_presentation_comments;
 use litchi_pptx::{Error, Package};
 
-const PRESENTATION_XML: &[u8] =
-    include_bytes!("../../../test-data/ooxml/pptx/comments/presentation.xml");
-const SLIDE_XML: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/comments/slide.xml");
-const AUTHORS_XML: &[u8] =
-    include_bytes!("../../../test-data/ooxml/pptx/comments/comment-authors.xml");
-const COMMENTS_XML: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/comments/comments.xml");
+// These package-writer fixtures are intentionally compact. The external
+// relationship below is the hostile condition under test; formatting
+// whitespace is unrelated and must not bypass production XML publication.
+const PRESENTATION_XML: &[u8] = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+    r#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
+    r#"<p:sldIdLst><p:sldId id="256" r:id="rIdSlideOne"/></p:sldIdLst>"#,
+    r#"</p:presentation>"#,
+)
+.as_bytes();
+const SLIDE_XML: &[u8] = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+    r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+    r#"<p:cSld><p:spTree/></p:cSld></p:sld>"#,
+)
+.as_bytes();
+const AUTHORS_XML: &[u8] = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+    r#"<p:cmAuthorLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+    r#"<p:cmAuthor id="0" name="Ada Lovelace" initials="AL" lastIdx="1" clrIdx="0"/>"#,
+    r#"</p:cmAuthorLst>"#,
+)
+.as_bytes();
+const COMMENTS_XML: &[u8] = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+    r#"<p:cmLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+    r#"<p:cm authorId="0" idx="1"><p:pos x="120" y="240"/>"#,
+    r#"<p:text>Review this slide</p:text></p:cm></p:cmLst>"#,
+)
+.as_bytes();
 
 #[test]
 fn presentation_comments_are_typed_and_legacy_adapters_preserve_data() {

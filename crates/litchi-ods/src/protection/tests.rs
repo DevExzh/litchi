@@ -26,18 +26,27 @@ fn source() -> String {
 #[test]
 fn no_op_snapshot_retains_exact_content_xml() {
     let source = source();
-    let snapshot = Snapshot::parse(source.clone(), None).unwrap();
-    let commit = snapshot.edit().commit().unwrap();
+    let snapshot =
+        Snapshot::parse(source.clone(), None).expect("test fixture or operation should succeed");
+    let commit = snapshot
+        .edit()
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(!commit.changed());
     assert_eq!(commit.content_xml(), source);
 }
 
 #[test]
 fn document_and_sheet_edits_are_source_checked_and_atomic() {
-    let snapshot = Snapshot::parse(source(), None).unwrap();
+    let snapshot =
+        Snapshot::parse(source(), None).expect("test fixture or operation should succeed");
     assert_eq!(snapshot.document().structure_protected, Some(false));
     assert_eq!(
-        snapshot.sheet("Sheet1").unwrap().permissions.insert_rows,
+        snapshot
+            .sheet("Sheet1")
+            .expect("test fixture or operation should succeed")
+            .permissions
+            .insert_rows,
         Some(false)
     );
 
@@ -45,7 +54,9 @@ fn document_and_sheet_edits_are_source_checked_and_atomic() {
     transaction.document_mut().structure_protected = Some(true);
     transaction.sheets_mut()[0].protected = Some(false);
     transaction.sheets_mut()[0].permissions.insert_rows = Some(true);
-    let commit = transaction.commit().unwrap();
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(commit.changed());
     assert!(
         commit
@@ -55,19 +66,26 @@ fn document_and_sheet_edits_are_source_checked_and_atomic() {
     assert!(commit.content_xml().contains("loext:insert-rows=\"true\""));
     assert!(commit.content_xml().contains("draw:name=\"keep\""));
     assert_eq!(
-        commit.snapshot().sheet("Sheet1").unwrap().protected,
+        commit
+            .snapshot()
+            .sheet("Sheet1")
+            .expect("test fixture or operation should succeed")
+            .protected,
         Some(false)
     );
 }
 
 #[test]
 fn style_edits_replace_only_managed_automatic_styles() {
-    let snapshot = Snapshot::parse(source(), None).unwrap();
+    let snapshot =
+        Snapshot::parse(source(), None).expect("test fixture or operation should succeed");
     let mut transaction = snapshot.edit();
     transaction
         .styles_mut()
         .set_automatic(vec![Style::new("locked", Protection::HiddenAndProtected)]);
-    let commit = transaction.commit().unwrap();
+    let commit = transaction
+        .commit()
+        .expect("test fixture or operation should succeed");
     assert!(
         commit
             .content_xml()

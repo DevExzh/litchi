@@ -31,6 +31,11 @@ pub(crate) fn validate_subtree(root: &Element) -> Result<()> {
     let mut pending = vec![root];
     while let Some(element) = pending.pop() {
         validate_element(element)?;
+        if element.namespace_uri() == Some(MATHML_NAMESPACE)
+            && element.local_name() == "annotation-xml"
+        {
+            continue;
+        }
         for child in element.children() {
             pending.push(child);
         }
@@ -62,7 +67,8 @@ pub(crate) fn validate_element(element: &Element) -> Result<()> {
         "mtable" => validate_named_children(element, &["mtr", "mlabeledtr"]),
         "mtr" | "mlabeledtr" => validate_named_children(element, &["mtd"]),
         "maction" => validate_nonempty_expressions(element),
-        "apply" | "reln" => validate_nonempty_application(element),
+        "apply" => validate_application(element),
+        "reln" => validate_relation(element),
         "ci" | "cn" | "csymbol" => validate_content_token(element),
         "interval" | "piece" => validate_exact_content_expressions(element, 2),
         "condition" => validate_condition(element),
@@ -78,7 +84,9 @@ pub(crate) fn validate_element(element: &Element) -> Result<()> {
         "lambda" => validate_lambda(element),
         "bvar" => validate_bound_variable(element),
         "declare" => validate_declare(element),
-        "list" | "matrixrow" | "set" | "vector" => validate_content_expression_sequence(element),
+        "list" | "set" => validate_list_or_set(element),
+        "matrixrow" => validate_content_expression_sequence(element),
+        "vector" => validate_vector(element),
         "matrix" => validate_matrix(element),
         local_name if is_content_symbol(local_name) => validate_empty(element),
         local_name => Err(invalid(format!(
@@ -492,18 +500,8 @@ fn validate_exact_content_expressions(element: &Element, expected: usize) -> Res
 fn validate_lambda(element: &Element) -> Result<()> {
     validate_no_character_data(element)?;
     let children: Vec<_> = element.children().collect();
-    let mut index = 0_usize;
-    while children.get(index).is_some_and(|child| {
-        child.namespace_uri() == Some(MATHML_NAMESPACE) && child.local_name() == "bvar"
-    }) {
-        index += 1;
-    }
-    if children
-        .get(index)
-        .is_some_and(|child| is_domain_qualifier(child))
-    {
-        index += 1;
-    }
+    let mut index = consume_bound_variables(&children, 0);
+    index = consume_domain_qualifier(&children, index);
     if children.len() != index.saturating_add(1)
         || !children
             .get(index)
@@ -514,6 +512,35 @@ fn validate_lambda(element: &Element) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn validate_list_or_set(element: &Element) -> Result<()> {
+    validate_no_character_data(element)?;
+    let children: Vec<_> = element.children().collect();
+    if children.iter().all(|child| is_content_expression(child)) {
+        return Ok(());
+    }
+    let mut index = consume_bound_variables(&children, 0);
+    let domain_end = consume_domain_qualifier(&children, index);
+    if domain_end == index {
+        return Err(invalid(format!(
+            "MathML {} generated form requires a domain qualifier",
+            element.local_name()
+        )));
+    }
+    index = domain_end;
+    validate_single_trailing_argument(element.local_name(), &children, index)
+}
+
+fn validate_vector(element: &Element) -> Result<()> {
+    validate_no_character_data(element)?;
+    let children: Vec<_> = element.children().collect();
+    if children.iter().all(|child| is_content_expression(child)) {
+        return Ok(());
+    }
+    let mut index = consume_bound_variables(&children, 0);
+    index = consume_domain_qualifier(&children, index);
+    validate_single_trailing_argument("vector", &children, index)
 }
 
 fn validate_math_sequence(element: &Element) -> Result<()> {
@@ -539,28 +566,53 @@ fn validate_math_sequence(element: &Element) -> Result<()> {
     Ok(())
 }
 
-fn validate_nonempty_application(element: &Element) -> Result<()> {
+fn validate_application(element: &Element) -> Result<()> {
     validate_no_character_data(element)?;
-    let mut children = element.children();
-    let Some(first) = children.next() else {
-        return Err(invalid(format!(
-            "MathML {} requires at least one content expression",
-            element.local_name()
-        )));
+    let children: Vec<_> = element.children().collect();
+    let Some(operator) = children.first() else {
+        return Err(invalid("MathML apply requires an operator"));
     };
-    if !is_content_expression(first) {
-        return Err(invalid(format!(
-            "MathML {} has an invalid operator expression",
-            element.local_name()
-        )));
+    if operator.namespace_uri() != Some(MATHML_NAMESPACE) {
+        return Err(invalid(
+            "MathML apply operator must be in the MathML namespace",
+        ));
     }
-    if children.all(|child| is_content_expression(child) || is_application_qualifier(child)) {
-        Ok(())
-    } else {
-        Err(invalid(format!(
-            "MathML {} has an invalid argument or qualifier",
-            element.local_name()
-        )))
+    let name = operator.local_name();
+    let arguments = &children[1..];
+    if is_relation_operator(name) {
+        return validate_relation_arguments(name, arguments);
+    }
+    if is_unary_operator(name) {
+        return validate_exact_arguments(name, arguments, 1);
+    }
+    if name == "minus" {
+        return validate_argument_range(name, arguments, 1, 2);
+    }
+    if is_binary_operator(name) {
+        return validate_exact_arguments(name, arguments, 2);
+    }
+    if is_nary_operator(name) {
+        return validate_enumerated_or_bound(name, arguments);
+    }
+    match name {
+        "diff" | "partialdiff" => validate_bound_application(name, arguments, false),
+        "int" => {
+            if arguments.len() == 1 && is_content_expression(arguments[0]) {
+                Ok(())
+            } else {
+                validate_bound_application(name, arguments, true)
+            }
+        },
+        "sum" | "product" => validate_enumerated_or_bound(name, arguments),
+        "log" => validate_optional_qualifier(name, arguments, "logbase"),
+        "root" => validate_optional_qualifier(name, arguments, "degree"),
+        "moment" => validate_moment(arguments),
+        "limit" => validate_limit(arguments),
+        "forall" | "exists" => validate_bound_application(name, arguments, true),
+        local_name if is_special_application_operator(local_name) => {
+            validate_enumerated_or_bound(local_name, arguments)
+        },
+        _ => Err(invalid(format!("MathML apply has invalid operator {name}"))),
     }
 }
 
@@ -572,9 +624,159 @@ fn validate_matrix(element: &Element) -> Result<()> {
     }) {
         return Ok(());
     }
-    Err(invalid(
-        "MathML matrix currently supports only enumerated matrixrow children",
-    ))
+    let mut index = consume_bound_variables(&children, 0);
+    index = consume_domain_qualifier(&children, index);
+    validate_single_trailing_argument("matrix", &children, index)
+}
+
+fn validate_relation(element: &Element) -> Result<()> {
+    validate_no_character_data(element)?;
+    let children: Vec<_> = element.children().collect();
+    let Some(relation) = children.first() else {
+        return Err(invalid("MathML reln requires a relation operator"));
+    };
+    if relation.namespace_uri() != Some(MATHML_NAMESPACE)
+        || !is_relation_operator(relation.local_name())
+    {
+        return Err(invalid("MathML reln has an invalid relation operator"));
+    }
+    validate_relation_arguments(relation.local_name(), &children[1..])
+}
+
+fn validate_relation_arguments(name: &str, arguments: &[&Element]) -> Result<()> {
+    let mut index = consume_bound_variables(arguments, 0);
+    if is_named(arguments.get(index).copied(), "condition") {
+        index += 1;
+    }
+    let values = &arguments[index..];
+    if is_binary_relation(name) {
+        validate_exact_arguments(name, values, 2)
+    } else {
+        validate_argument_sequence(name, values)
+    }
+}
+
+fn validate_bound_application(
+    name: &str,
+    arguments: &[&Element],
+    allow_domain: bool,
+) -> Result<()> {
+    let mut index = consume_bound_variables(arguments, 0);
+    if allow_domain {
+        index = consume_domain_qualifier(arguments, index);
+    }
+    validate_single_trailing_argument(name, arguments, index)
+}
+
+fn validate_limit(arguments: &[&Element]) -> Result<()> {
+    let mut index = consume_bound_variables(arguments, 0);
+    if is_named(arguments.get(index).copied(), "lowlimit") {
+        index += 1;
+    }
+    if is_named(arguments.get(index).copied(), "condition") {
+        index += 1;
+    }
+    validate_single_trailing_argument("limit", arguments, index)
+}
+
+fn validate_moment(arguments: &[&Element]) -> Result<()> {
+    let mut index = usize::from(is_named(arguments.first().copied(), "degree"));
+    if is_named(arguments.get(index).copied(), "momentabout") {
+        index += 1;
+    }
+    validate_argument_sequence("moment", &arguments[index..])
+}
+
+fn validate_optional_qualifier(name: &str, arguments: &[&Element], qualifier: &str) -> Result<()> {
+    let index = usize::from(is_named(arguments.first().copied(), qualifier));
+    validate_single_trailing_argument(name, arguments, index)
+}
+
+fn validate_single_trailing_argument(
+    name: &str,
+    arguments: &[&Element],
+    index: usize,
+) -> Result<()> {
+    if arguments.len() == index.saturating_add(1)
+        && arguments
+            .get(index)
+            .is_some_and(|child| is_content_expression(child))
+    {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "MathML {name} requires one trailing content argument"
+        )))
+    }
+}
+
+fn validate_exact_arguments(name: &str, arguments: &[&Element], expected: usize) -> Result<()> {
+    validate_argument_range(name, arguments, expected, expected)
+}
+
+fn validate_enumerated_or_bound(name: &str, arguments: &[&Element]) -> Result<()> {
+    if arguments.iter().all(|child| is_content_expression(child)) {
+        Ok(())
+    } else {
+        validate_bound_application(name, arguments, true)
+    }
+}
+
+fn validate_argument_range(
+    name: &str,
+    arguments: &[&Element],
+    minimum: usize,
+    maximum: usize,
+) -> Result<()> {
+    if (minimum..=maximum).contains(&arguments.len())
+        && arguments.iter().all(|child| is_content_expression(child))
+    {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "MathML {name} requires {minimum}..={maximum} content arguments"
+        )))
+    }
+}
+
+fn validate_argument_sequence(name: &str, arguments: &[&Element]) -> Result<()> {
+    if arguments.iter().all(|child| is_content_expression(child)) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "MathML {name} has a non-expression argument"
+        )))
+    }
+}
+
+fn consume_bound_variables(arguments: &[&Element], mut index: usize) -> usize {
+    while is_named(arguments.get(index).copied(), "bvar") {
+        index += 1;
+    }
+    index
+}
+
+fn consume_domain_qualifier(arguments: &[&Element], index: usize) -> usize {
+    if is_named(arguments.get(index).copied(), "lowlimit") {
+        return index + 1 + usize::from(is_named(arguments.get(index + 1).copied(), "uplimit"));
+    }
+    if arguments.get(index).is_some_and(|element| {
+        element.namespace_uri() == Some(MATHML_NAMESPACE)
+            && matches!(
+                element.local_name(),
+                "condition" | "domainofapplication" | "interval" | "uplimit"
+            )
+    }) {
+        index + 1
+    } else {
+        index
+    }
+}
+
+fn is_named(candidate: Option<&Element>, name: &str) -> bool {
+    candidate.is_some_and(|element| {
+        element.namespace_uri() == Some(MATHML_NAMESPACE) && element.local_name() == name
+    })
 }
 
 fn validate_piecewise(element: &Element) -> Result<()> {
@@ -659,22 +861,6 @@ fn is_content_expression(element: &Element) -> bool {
     ) || is_content_symbol(element.local_name())
 }
 
-fn is_application_qualifier(element: &Element) -> bool {
-    element.namespace_uri() == Some(MATHML_NAMESPACE)
-        && matches!(
-            element.local_name(),
-            "bvar"
-                | "condition"
-                | "degree"
-                | "domainofapplication"
-                | "interval"
-                | "logbase"
-                | "lowlimit"
-                | "momentabout"
-                | "uplimit"
-        )
-}
-
 fn is_constructor(local_name: &str) -> bool {
     matches!(
         local_name,
@@ -690,14 +876,6 @@ fn is_constructor(local_name: &str) -> bool {
     )
 }
 
-fn is_domain_qualifier(element: &Element) -> bool {
-    element.namespace_uri() == Some(MATHML_NAMESPACE)
-        && matches!(
-            element.local_name(),
-            "condition" | "domainofapplication" | "interval" | "lowlimit" | "uplimit"
-        )
-}
-
 fn is_identifier_token(element: &Element) -> bool {
     if element.namespace_uri() != Some(MATHML_NAMESPACE) {
         return false;
@@ -711,6 +889,124 @@ fn is_identifier_token(element: &Element) -> bool {
     element.children().next().is_some_and(|child| {
         child.namespace_uri() == Some(MATHML_NAMESPACE) && child.local_name() == "ci"
     })
+}
+
+fn is_binary_operator(local_name: &str) -> bool {
+    matches!(
+        local_name,
+        "approx"
+            | "divide"
+            | "equivalent"
+            | "factorof"
+            | "implies"
+            | "outerproduct"
+            | "power"
+            | "quotient"
+            | "rem"
+            | "scalarproduct"
+            | "setdiff"
+            | "vectorproduct"
+    )
+}
+
+fn is_binary_relation(local_name: &str) -> bool {
+    matches!(
+        local_name,
+        "in" | "neq" | "notin" | "notprsubset" | "notsubset" | "tendsto"
+    )
+}
+
+fn is_nary_operator(local_name: &str) -> bool {
+    matches!(
+        local_name,
+        "and"
+            | "cartesianproduct"
+            | "compose"
+            | "gcd"
+            | "intersect"
+            | "lcm"
+            | "max"
+            | "mean"
+            | "median"
+            | "min"
+            | "mode"
+            | "or"
+            | "plus"
+            | "sdev"
+            | "selector"
+            | "times"
+            | "union"
+            | "variance"
+            | "xor"
+    )
+}
+
+fn is_relation_operator(local_name: &str) -> bool {
+    is_binary_relation(local_name)
+        || matches!(
+            local_name,
+            "eq" | "geq" | "gt" | "leq" | "lt" | "prsubset" | "subset"
+        )
+}
+
+fn is_special_application_operator(local_name: &str) -> bool {
+    matches!(
+        local_name,
+        "apply" | "ci" | "csymbol" | "fn" | "lambda" | "reln" | "semantics"
+    )
+}
+
+fn is_unary_operator(local_name: &str) -> bool {
+    matches!(
+        local_name,
+        "abs"
+            | "arccos"
+            | "arccosh"
+            | "arccot"
+            | "arccoth"
+            | "arccsc"
+            | "arccsch"
+            | "arcsec"
+            | "arcsech"
+            | "arcsin"
+            | "arcsinh"
+            | "arctan"
+            | "arctanh"
+            | "arg"
+            | "card"
+            | "ceiling"
+            | "codomain"
+            | "conjugate"
+            | "cos"
+            | "cosh"
+            | "cot"
+            | "coth"
+            | "csc"
+            | "csch"
+            | "curl"
+            | "determinant"
+            | "divergence"
+            | "domain"
+            | "exp"
+            | "factorial"
+            | "floor"
+            | "grad"
+            | "ident"
+            | "image"
+            | "imaginary"
+            | "inverse"
+            | "laplacian"
+            | "ln"
+            | "not"
+            | "real"
+            | "sec"
+            | "sech"
+            | "sin"
+            | "sinh"
+            | "tan"
+            | "tanh"
+            | "transpose"
+    )
 }
 
 fn is_content_symbol(local_name: &str) -> bool {

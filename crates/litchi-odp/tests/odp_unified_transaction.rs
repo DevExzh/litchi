@@ -3,12 +3,43 @@
     reason = "integration-test assertions panic on failure by design"
 )]
 
+use litchi_odf_common::chart::ChartClass;
+use litchi_odf_common::chart::authoring::{
+    CachedCell, CachedRow, CachedTable, CachedValue, Definition, SeriesSpec, Text,
+};
 use litchi_odp::core::{OwnedPackage, PackageWriter};
 use litchi_odp::rdf::{Object, Subject, Triple};
 use litchi_odp::{Builder, MasterPage, edit};
 use soapberry_zip::office::StreamingArchiveWriter;
+use std::path::Path;
 
 const CHART: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:future="urn:example:future"><office:body><office:chart><chart:chart chart:class="chart:bar"><future:retained/></chart:chart></office:chart></office:body></office:document-content>"#;
+const DEPENDENT_CHART: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:chart><chart:chart chart:class="chart:bar" xlink:href="Pictures/chart.png"><chart:plot-area/></chart:chart></office:chart></office:body></office:document-content>"#;
+
+fn typed_chart() -> Definition {
+    let mut definition = Definition::new(ChartClass::line());
+    definition.title = Some(Text::new("Quarterly revenue"));
+    definition.plot_area.series.push(SeriesSpec {
+        values_cell_range_address: Some("local-table.B2:.B3".to_string()),
+        label_cell_address: Some("local-table.B1".to_string()),
+        ..SeriesSpec::default()
+    });
+    let mut table = CachedTable::new("local-table", 2);
+    table.header_rows.push(CachedRow::new(vec![
+        CachedCell::new(CachedValue::String("Quarter".to_string())),
+        CachedCell::new(CachedValue::String("Revenue".to_string())),
+    ]));
+    table.rows.push(CachedRow::new(vec![
+        CachedCell::new(CachedValue::String("Q1".to_string())),
+        CachedCell::new(CachedValue::Float(10.0)),
+    ]));
+    table.rows.push(CachedRow::new(vec![
+        CachedCell::new(CachedValue::String("Q2".to_string())),
+        CachedCell::new(CachedValue::Float(14.5)),
+    ]));
+    definition.cached_table = Some(table);
+    definition
+}
 
 fn literal(value: &str) -> Triple {
     Triple {
@@ -155,6 +186,20 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
     assert_eq!(history.current().bytes(), commit.snapshot().bytes());
     assert_eq!(history.undo().unwrap().bytes(), source.bytes());
     assert_eq!(history.redo().unwrap().bytes(), commit.snapshot().bytes());
+    let durable_history = history.to_durable_bytes().unwrap();
+    let mut reopened_history = edit::History::from_durable_bytes(&durable_history).unwrap();
+    assert_eq!(
+        reopened_history.current().bytes(),
+        commit.snapshot().bytes()
+    );
+    assert_eq!(reopened_history.undo().unwrap().bytes(), source.bytes());
+    assert_eq!(
+        reopened_history.redo().unwrap().bytes(),
+        commit.snapshot().bytes()
+    );
+    let mut malformed_history = durable_history;
+    malformed_history.push(0);
+    assert!(edit::History::from_durable_bytes(&malformed_history).is_err());
 }
 
 #[test]
@@ -178,6 +223,23 @@ fn merge_planning_is_independent_only_for_disjoint_rdf_work() {
             .unwrap()
             .is_independent()
     );
+    let durable_slide =
+        edit::Patch::from_durable_bytes(&slide_commit.patch().to_durable_bytes().unwrap()).unwrap();
+    let durable_rdf =
+        edit::Patch::from_durable_bytes(&rdf_commit.patch().to_durable_bytes().unwrap()).unwrap();
+    let joined = durable_slide.join_snapshot(&durable_rdf).unwrap();
+    assert_eq!(joined.slides().len(), 1);
+    assert_eq!(
+        joined
+            .to_presentation()
+            .unwrap()
+            .rdf_graphs()
+            .unwrap()
+            .len(),
+        1
+    );
+    let three_way = edit::Patch::three_way_snapshot(&source, &durable_slide, &durable_rdf).unwrap();
+    assert_eq!(three_way.bytes(), joined.bytes());
 
     let mut other_slide = source.transaction().unwrap();
     other_slide.add("Other", "content").unwrap();
@@ -187,6 +249,91 @@ fn merge_planning_is_independent_only_for_disjoint_rdf_work() {
         .plan_join(other_commit.patch())
         .unwrap();
     assert_eq!(conflict.conflicts(), &[edit::Domain::Slides]);
+    assert!(
+        slide_commit
+            .patch()
+            .join_snapshot(other_commit.patch())
+            .is_err()
+    );
+}
+
+#[test]
+fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
+    let chart_base = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let mut source_transaction = chart_base.transaction().unwrap();
+    source_transaction
+        .add("Chart source", "typed cached data")
+        .unwrap();
+    source_transaction
+        .add_chart_definition(
+            0usize,
+            "Typed source chart",
+            litchi_odp::charts::Storage::PackageSubdocument,
+            &typed_chart(),
+        )
+        .unwrap();
+    let chart_source = source_transaction.commit().unwrap().snapshot().clone();
+
+    let real_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/odf/odp/tdf169979.odp");
+    let real = edit::Snapshot::open(real_path).unwrap();
+    let reopened_real = edit::Snapshot::from_bytes(real.bytes().to_vec()).unwrap();
+    assert_eq!(reopened_real.slides(), real.slides());
+    assert!(!real.slides().is_empty());
+
+    let mut destination_builder = Builder::new();
+    destination_builder.add_slide("Chart destination").unwrap();
+    let destination_source =
+        edit::Snapshot::from_bytes(destination_builder.build().unwrap()).unwrap();
+    let mut destination = destination_source.transaction().unwrap();
+    destination
+        .transfer_chart_from(
+            &chart_source,
+            "Typed source chart",
+            0usize,
+            "Transferred typed chart",
+            litchi_odp::charts::Storage::PackageSubdocument,
+        )
+        .unwrap();
+    let commit = destination.commit().unwrap();
+    assert_eq!(commit.snapshot().slides().len(), 1);
+
+    let reopened = edit::Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let chart = reopened
+        .to_presentation()
+        .unwrap()
+        .chart("Transferred typed chart")
+        .unwrap()
+        .unwrap();
+    assert!(chart.content_xml().contains("Quarterly revenue"));
+    assert!(chart.content_xml().contains("local-table"));
+    assert!(chart.content_xml().contains("14.5"));
+    assert!(!chart.content_xml().contains("> <"));
+    assert!(!chart.content_xml().contains('\n'));
+
+    let dependent_base = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let mut dependent = dependent_base.transaction().unwrap();
+    dependent.add("Dependent", "chart").unwrap();
+    dependent
+        .add_chart(
+            0usize,
+            "Dependent chart",
+            litchi_odp::charts::Storage::InlineXml,
+            litchi_odp::charts::Part::from_xml(DEPENDENT_CHART).unwrap(),
+        )
+        .unwrap();
+    let dependent_source = dependent.commit().unwrap().snapshot().clone();
+    let mut refused = reopened.transaction().unwrap();
+    let error = refused
+        .transfer_chart_from(
+            &dependent_source,
+            "Dependent chart",
+            0usize,
+            "Must not transfer",
+            litchi_odp::charts::Storage::InlineXml,
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("xlink:href dependencies"));
 }
 
 #[test]

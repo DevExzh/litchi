@@ -16,5 +16,6 @@ mod package;
 mod tests;
 
 pub use super::super::format::ImageFormat;
+pub(crate) use codec::compact_changed_document_xml;
 pub use model::{MutableDocument, Protection};
 pub(crate) use package::{BodyElement, DocumentBody};

@@ -25,6 +25,7 @@ mod semantic;
 pub use editing::{FrameEditor, MetadataEditor};
 pub use facade::{
     Builder, Commit, Edit, Image, MetadataChange, MetadataFields, Patch, ResourceChange,
+    StyleChange,
 };
 pub use flat::{FlatImage, FlatImageCommit, FlatImagePatch, FlatImageTransaction, FrameChange};
 pub use history::{CommittedTransition, History, HistoryArtifact};

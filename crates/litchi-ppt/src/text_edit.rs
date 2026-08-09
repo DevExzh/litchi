@@ -24,6 +24,7 @@ const PPT_HEADER_LEN: usize = 8;
 const OFFICEART_SP_CONTAINER: u16 = 0xF004;
 const OFFICEART_SP: u16 = 0xF00A;
 const OFFICEART_CLIENT_TEXTBOX: u16 = 0xF00D;
+const OFFICEART_CLIENT_ANCHOR: u16 = 0xF010;
 
 /// Semantic identity of one existing text-bearing shape.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -67,6 +68,10 @@ pub enum Refusal {
     ShapeNotFound,
     /// The selected semantic shape position resolved to ambiguous native data.
     AmbiguousShape,
+    /// The selected shape has no top-level `PowerPoint` host anchor.
+    NoAnchor,
+    /// The selected shape has several top-level host anchors.
+    AmbiguousAnchor,
     /// The selected shape has no host `ClientTextbox` payload.
     NoTextbox,
     /// More than one host textbox payload would need a choice.
@@ -100,6 +105,10 @@ impl fmt::Display for Refusal {
             },
             Self::ShapeNotFound => write!(formatter, "PPT shape position was not found"),
             Self::AmbiguousShape => write!(formatter, "PPT shape position is ambiguous"),
+            Self::NoAnchor => write!(formatter, "PPT shape has no editable client anchor"),
+            Self::AmbiguousAnchor => {
+                write!(formatter, "PPT shape has multiple client anchors")
+            },
             Self::NoTextbox => write!(formatter, "PPT shape has no ClientTextbox payload"),
             Self::AmbiguousTextbox => {
                 write!(formatter, "PPT shape has multiple ClientTextbox payloads")
@@ -589,6 +598,19 @@ fn durable_operation(
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct AnchorRewrite {
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) before: crate::Anchor,
+    pub(crate) after: crate::Anchor,
+}
+
+struct ShapeLocation {
+    persist_id: u32,
+    shape_id: u32,
+    slide_record: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
 struct Resolved {
     target: Target,
     slide_persist_id: u32,
@@ -612,6 +634,21 @@ fn presentation(bytes: &[u8]) -> PackageResult<Presentation> {
 }
 
 fn resolve(bytes: &[u8], target: Target) -> Result<Resolved> {
+    let location = resolve_shape(bytes, target)?;
+    let text = inspect_slide(&location.slide_record, location.shape_id)?;
+    Ok(Resolved {
+        target,
+        slide_persist_id: location.persist_id,
+        native_shape_id: location.shape_id,
+        slide_record: Arc::from(location.slide_record.into_boxed_slice()),
+        kind: text.kind,
+        payload: text.payload,
+        text: text.text,
+        can_resize: text.can_resize,
+    })
+}
+
+fn resolve_shape(bytes: &[u8], target: Target) -> Result<ShapeLocation> {
     let presentation = presentation(bytes)?;
     let slides = presentation.slides()?;
     let slide = slides
@@ -626,17 +663,60 @@ fn resolve(bytes: &[u8], target: Target) -> Result<Resolved> {
     let native_shape_id = native_shape_id(shape);
     let slide_record = crate::embedded::object::Editor::open_records(bytes.to_vec())?
         .persisted_record(slide.persist_id())?;
-    let text = inspect_slide(&slide_record, native_shape_id)?;
-    Ok(Resolved {
-        target,
-        slide_persist_id: slide.persist_id(),
-        native_shape_id,
-        slide_record: Arc::from(slide_record.into_boxed_slice()),
-        kind: text.kind,
-        payload: text.payload,
-        text: text.text,
-        can_resize: text.can_resize,
+    Ok(ShapeLocation {
+        persist_id: slide.persist_id(),
+        shape_id: native_shape_id,
+        slide_record,
     })
+}
+
+pub(crate) fn replace_shape_anchor(
+    bytes: &[u8],
+    target: Target,
+    replacement: crate::Anchor,
+) -> Result<AnchorRewrite> {
+    let location = resolve_shape(bytes, target)?;
+    let before = inspect_anchor(&location.slide_record, location.shape_id)?;
+    if before == replacement {
+        return Ok(AnchorRewrite {
+            bytes: bytes.to_vec(),
+            before,
+            after: replacement,
+        });
+    }
+    let rewritten = rewrite_anchor(
+        &location.slide_record,
+        location.shape_id,
+        &before.to_bytes(),
+        &replacement.to_bytes(),
+    )?;
+    let mut editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+    if editor.persisted_record(location.persist_id)? != location.slide_record {
+        return Err(PackageError::Corrupted(
+            "PPT shape-anchor source changed before publication".into(),
+        )
+        .into());
+    }
+    editor.replace_persisted_record(location.persist_id, rewritten)?;
+    let candidate = editor.finish()?;
+    crate::font::validate_unrelated_streams(bytes, &candidate)?;
+    let _ = presentation(&candidate)?;
+    if inspect_shape_anchor(&candidate, target)? != replacement {
+        return Err(PackageError::Corrupted(
+            "published PPT shape anchor did not round-trip".into(),
+        )
+        .into());
+    }
+    Ok(AnchorRewrite {
+        bytes: candidate,
+        before,
+        after: replacement,
+    })
+}
+
+pub(crate) fn inspect_shape_anchor(bytes: &[u8], target: Target) -> Result<crate::Anchor> {
+    let location = resolve_shape(bytes, target)?;
+    inspect_anchor(&location.slide_record, location.shape_id)
 }
 
 fn native_shape_id(selected: &ShapeEnum<'_>) -> u32 {
@@ -667,6 +747,39 @@ fn inspect_slide(slide: &[u8], shape_id: u32) -> Result<TextAtom> {
     let drawing = find_ppt_record(slide, RecordType::PPDrawing as u16, 0)?
         .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
     inspect_drawing(drawing, shape_id)
+}
+
+fn inspect_anchor(slide: &[u8], shape_id: u32) -> Result<crate::Anchor> {
+    let (_, consumed) = crate::Record::parse_strict(slide, 0)?;
+    if consumed != slide.len() {
+        return Err(PackageError::Corrupted("selected slide has trailing bytes".into()).into());
+    }
+    let drawing = find_ppt_record(slide, RecordType::PPDrawing as u16, 0)?
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let mut matches = 0usize;
+    let mut anchor = None;
+    visit_shape_container(
+        drawing_payload(drawing)?,
+        shape_id,
+        0,
+        &mut matches,
+        &mut |container| {
+            for child_result in children(container)? {
+                let child = child_result?;
+                if record_type(child)? == OFFICEART_CLIENT_ANCHOR
+                    && anchor.replace(crate::Anchor::parse(child)?).is_some()
+                {
+                    return Err(Error::Refused(Refusal::AmbiguousAnchor));
+                }
+            }
+            Ok(())
+        },
+    )?;
+    match matches {
+        0 => Err(Error::Refused(Refusal::ShapeNotFound)),
+        1 => anchor.ok_or(Error::Refused(Refusal::NoAnchor)),
+        _ => Err(Error::Refused(Refusal::AmbiguousShape)),
+    }
 }
 
 fn find_ppt_record(record: &[u8], target: u16, depth: usize) -> PackageResult<Option<&[u8]>> {
@@ -824,6 +937,103 @@ fn rewrite_slide(
         .into());
     }
     rewritten.ok_or(Error::Refused(Refusal::ShapeNotFound))
+}
+
+fn rewrite_anchor(slide: &[u8], shape_id: u32, before: &[u8], after: &[u8]) -> Result<Vec<u8>> {
+    let mut drawing_count = 0usize;
+    let rewritten = rewrite_ppt_record(slide, 0, &mut |record| {
+        if record_type(record)? != RecordType::PPDrawing as u16 {
+            return Ok(None);
+        }
+        drawing_count += 1;
+        let mut shapes = 0usize;
+        let drawing = rewrite_anchor_drawing(record, shape_id, before, after, &mut shapes)?;
+        match shapes {
+            0 => Ok(None),
+            1 => Ok(Some(drawing)),
+            _ => Err(Error::Refused(Refusal::AmbiguousShape)),
+        }
+    })?;
+    if drawing_count != 1 {
+        return Err(PackageError::Corrupted(
+            "selected slide has ambiguous PPDrawing ownership".into(),
+        )
+        .into());
+    }
+    rewritten.ok_or(Error::Refused(Refusal::ShapeNotFound))
+}
+
+fn rewrite_anchor_drawing(
+    drawing: &[u8],
+    shape_id: u32,
+    before: &[u8],
+    after: &[u8],
+    matches: &mut usize,
+) -> Result<Vec<u8>> {
+    let data = rewrite_anchor_officeart(
+        drawing_payload(drawing)?,
+        shape_id,
+        before,
+        after,
+        0,
+        matches,
+    )?;
+    rebuild(drawing, &data).map_err(Into::into)
+}
+
+fn rewrite_anchor_officeart(
+    record: &[u8],
+    shape_id: u32,
+    before: &[u8],
+    after: &[u8],
+    depth: usize,
+    matches: &mut usize,
+) -> Result<Vec<u8>> {
+    if depth >= 128 {
+        return Err(
+            PackageError::Corrupted("OfficeArt nesting exceeds shape-anchor limit".into()).into(),
+        );
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER && shape_id_of(record)? == Some(shape_id) {
+        *matches = matches.saturating_add(1);
+        let mut anchors = 0usize;
+        let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+        for child_result in children(record)? {
+            let child = child_result?;
+            if record_type(child)? == OFFICEART_CLIENT_ANCHOR {
+                anchors += 1;
+                if child != before {
+                    return Err(PackageError::Corrupted(
+                        "selected shape anchor changed before publication".into(),
+                    )
+                    .into());
+                }
+                data.extend_from_slice(after);
+            } else {
+                data.extend_from_slice(child);
+            }
+        }
+        return match anchors {
+            0 => Err(Error::Refused(Refusal::NoAnchor)),
+            1 => rebuild(record, &data).map_err(Into::into),
+            _ => Err(Error::Refused(Refusal::AmbiguousAnchor)),
+        };
+    }
+    if record_version(record)? != 0xF {
+        return Ok(record.to_vec());
+    }
+    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    for child_result in children(record)? {
+        data.extend_from_slice(&rewrite_anchor_officeart(
+            child_result?,
+            shape_id,
+            before,
+            after,
+            depth + 1,
+            matches,
+        )?);
+    }
+    rebuild(record, &data).map_err(Into::into)
 }
 
 fn rewrite_ppt_record(
@@ -1020,6 +1230,32 @@ fn visit_officeart(
         for child_result in children(record)? {
             let child = child_result?;
             visit_officeart(child, shape_id, depth + 1, matches, visit)?;
+        }
+    }
+    Ok(())
+}
+
+fn visit_shape_container(
+    record: &[u8],
+    shape_id: u32,
+    depth: usize,
+    matches: &mut usize,
+    visit: &mut impl FnMut(&[u8]) -> Result<()>,
+) -> Result<()> {
+    if depth >= 128 {
+        return Err(PackageError::Corrupted(
+            "OfficeArt nesting exceeds shape-inspection limit".into(),
+        )
+        .into());
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER && shape_id_of(record)? == Some(shape_id) {
+        *matches = matches.saturating_add(1);
+        visit(record)?;
+        return Ok(());
+    }
+    if record_version(record)? == 0xF {
+        for child_result in children(record)? {
+            visit_shape_container(child_result?, shape_id, depth + 1, matches, visit)?;
         }
     }
     Ok(())

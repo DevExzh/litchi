@@ -4,9 +4,12 @@ use crate::FlatChart;
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{
     compact_xml,
-    core::{PackageWriter, family::Package},
+    core::{
+        AuthoredXmlFragment, OwnedPackage, PackageWriter, XmlSourcePart, XmlSplicePublication,
+        family::Package,
+    },
 };
-use std::{fs, path::Path, sync::Arc};
+use std::{fs, io::Write, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.chart";
 struct State {
@@ -136,6 +139,7 @@ impl Snapshot {
     pub(crate) fn rebuild(
         &self,
         content: &str,
+        content_splice: Option<&crate::FlatChartPatch>,
         styles: StylesReplacement<'_>,
         replacements: &[ResourceReplacement<'_>],
     ) -> Result<Self> {
@@ -149,23 +153,25 @@ impl Snapshot {
                 "ODC package edits refuse encrypted package members".to_string(),
             ));
         }
-        ensure_compact_rewrite_source(self)?;
         let compact_limits =
             compact_xml::Limits::new(self.0.limits.max_content_bytes(), self.0.limits.max_depth())
                 .map_err(Error::from)?;
-        compact_xml::validate_with_limits(content.as_bytes(), compact_limits)
-            .map_err(Error::from)?;
+        if content_splice.is_none() {
+            compact_xml::validate_with_limits(content.as_bytes(), compact_limits)
+                .map_err(Error::from)?;
+        }
         crate::codec::validate(content)?;
         let mut writer = PackageWriter::new_bounded(self.0.limits.max_package_bytes());
         writer.set_mimetype(MIMETYPE)?;
-        writer.add_file("content.xml", content.as_bytes())?;
+        if let Some(patch) = content_splice {
+            publish_content_splice(self.0.package.package(), patch, content, &mut writer)?;
+        } else {
+            writer.add_file("content.xml", content.as_bytes())?;
+        }
         match styles {
             StylesReplacement::Unchanged => {
                 if self.0.package.package().has_file("styles.xml")? {
-                    writer.add_file(
-                        "styles.xml",
-                        &self.0.package.package().get_file("styles.xml")?,
-                    )?;
+                    publish_retained_xml(self.0.package.package(), "styles.xml", &mut writer)?;
                 }
             },
             StylesReplacement::Replace(xml) => {
@@ -178,7 +184,7 @@ impl Snapshot {
         }
         for path in ["meta.xml", "settings.xml"] {
             if self.0.package.package().has_file(path)? {
-                writer.add_file(path, &self.0.package.package().get_file(path)?)?;
+                publish_retained_xml(self.0.package.package(), path, &mut writer)?;
             }
         }
         let excluded = replacements
@@ -188,11 +194,55 @@ impl Snapshot {
         writer.copy_auxiliary_files_from_except(self.0.package.package(), &excluded, &[])?;
         for replacement in replacements {
             if let Some(bytes) = replacement.bytes {
+                validate_authored_resource(
+                    replacement.path,
+                    replacement.media_type,
+                    bytes,
+                    compact_limits,
+                )?;
                 writer.add_file_with_media_type(replacement.path, bytes, replacement.media_type)?;
             }
         }
         Self::from_bytes_with_limits(writer.finish_to_bounded_bytes()?, self.0.limits)
     }
+}
+
+fn publish_content_splice<W: Write>(
+    source: &OwnedPackage,
+    patch: &crate::FlatChartPatch,
+    content: &str,
+    writer: &mut PackageWriter<W>,
+) -> Result<()> {
+    if patch.target_bytes() != content.as_bytes() {
+        return Err(Error::InvalidFormat(
+            "ODC content splice target does not match the committed chart".into(),
+        ));
+    }
+    let source_part = XmlSourcePart::load(source, "content.xml")?;
+    if source_part.bytes() != patch.source_bytes() {
+        return Err(Error::InvalidFormat(
+            "ODC content splice has different package provenance".into(),
+        ));
+    }
+    let mut publication = XmlSplicePublication::new(source_part.clone());
+    for splice in patch.axis_tag_splices()? {
+        let proof = source_part.checked_range(splice.range, &splice.expected)?;
+        let fragment = if splice.replacement.ends_with(b"/>") {
+            AuthoredXmlFragment::markup(splice.replacement)?
+        } else {
+            AuthoredXmlFragment::start_tag(splice.replacement)?
+        };
+        publication.replace(proof, fragment)?;
+    }
+    publication.publish(writer)
+}
+
+fn publish_retained_xml<W: Write>(
+    source: &OwnedPackage,
+    path: &str,
+    writer: &mut PackageWriter<W>,
+) -> Result<()> {
+    XmlSplicePublication::new(XmlSourcePart::load(source, path)?).publish(writer)
 }
 
 fn scan_resources(package: &Package, limits: crate::Limits) -> Result<Vec<crate::Resource>> {
@@ -237,22 +287,20 @@ fn scan_security(package: &Package) -> Result<(bool, bool)> {
     Ok((signed, archive.manifest().has_encrypted_entries()))
 }
 
-fn ensure_compact_rewrite_source(source: &Snapshot) -> Result<()> {
-    let archive = source.0.package.package();
-    for path in source.files()? {
-        if Path::new(&path)
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
-            && path != "META-INF/manifest.xml"
-        {
-            let limits = compact_xml::Limits::new(
-                source.0.limits.max_content_bytes(),
-                source.0.limits.max_depth(),
-            )
-            .map_err(Error::from)?;
-            compact_xml::validate_with_limits(&archive.get_file(&path)?, limits)
-                .map_err(Error::from)?;
-        }
+pub(crate) fn validate_authored_resource(
+    path: &str,
+    media_type: &str,
+    bytes: &[u8],
+    limits: compact_xml::Limits,
+) -> Result<()> {
+    let is_xml = Path::new(path)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
+        || media_type == "application/xml"
+        || media_type == "text/xml"
+        || media_type.ends_with("+xml");
+    if is_xml {
+        compact_xml::validate_with_limits(bytes, limits).map_err(Error::from)?;
     }
     Ok(())
 }

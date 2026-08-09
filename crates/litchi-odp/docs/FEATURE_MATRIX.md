@@ -29,7 +29,10 @@ The public ODP path includes package opening, slide parsing, slide/text and
 shape authoring, package-contained image/media access, page-layout models,
 presentation settings, declarations, page metadata, custom shows, metadata,
 RDF graph editing, password opening, and a unified source-checked transaction
-for slides, shapes, media, charts, layouts, masters, annotations, and RDF.
+for slides, shapes, media, charts, layouts, masters, annotations, and RDF. Durable
+patches can materialize the RDF/non-RDF merge cases the conservative planner proves
+independent, bounded undo/redo timelines have a validated durable envelope, and
+dependency-free chart parts can transfer between deck snapshots.
 Attached mutable presentation roots are private implementation
 details and cannot be obtained through the public API.
 
@@ -50,7 +53,7 @@ the existence of a PPTX feature is never treated as ODP support.
 | Common styles and data styles | 🟡 | 🟡 | 🟡 | Direct presentation/drawing properties and bounded shared style values are supported; there is no complete public style-graph resolver/editor for every ODF style family |
 | Images and package media | ✅ | ✅ | ✅ | Package-contained and linked image/media references are typed; package bytes are read without fetching external URLs, and builder media embedding creates package resources |
 | Embedded objects and OLE-like payloads | 🟡 | ✅ | 🟡 | `embedded_objects()` provides a bounded inert inventory for regular objects, OLE payloads, applets, plugins, and floating frames, including storage/link classification and applet/plugin parameters. Payloads are never opened, fetched, activated, executed, or rendered |
-| Embedded charts | 🟡 | ✅ | 🟡 | Bounded chart parts and frame/storage context are typed; `chart_snapshot()` and the unified `edit::Transaction` provide source-checked add/remove/replace commits, typed readback, and reversible exact-source patches. There is no complete chart-data CRUD or recalculation engine |
+| Embedded charts | 🟡 | ✅ | 🟡 | Bounded chart parts and frame/storage context are typed; `chart_snapshot()` and the unified `edit::Transaction` provide source-checked add/remove/replace commits, complete typed-definition replacement (including cached tables/series), checked dependency-free cross-deck transfer, typed readback, and reversible exact-source patches. There is no fine-grained in-place chart-data CRUD or recalculation engine |
 | Annotations/comments | ✅ | ✅ | ✅ | `annotation::{Anchor, Info, Position}` inventories shared rich ODF annotations at validated pages or uniquely named shapes; `Presentation` and the unified transaction provide atomic add/replace/remove while untouched XML and no-op bytes remain preserved |
 | Hyperlinks and external references | ✅ | ✅ | ✅ | Shape links, XLink targets, show/actuate values, page jumps, and action metadata are typed and serialized; targets are never opened or followed |
 | Forms and controls | ❌ | ❌ | ❌ | No public ODP form/control model or authoring surface is exposed; a control-shaped XML payload is not treated as typed form support |
@@ -73,7 +76,7 @@ the existence of a PPTX feature is never treated as ODP support.
 | Images in slide frames | ✅ | ✅ | ✅ | Embedded or linked image references and package resources are parsed; builder insertion embeds supported payloads and preserves inert external links |
 | Audio and video plugins | ✅ | ✅ | ✅ | `draw:plugin` references include MIME type, XLink show/actuate, IDs, and parameters; package-contained media is embeddable/readable, but playback is never attempted |
 | Tables | 🟡 | 🟡 | 🟡 | Table-shaped frames or opaque table XML can be retained within the bounded drawing model; there is no public typed cell/row/table editor |
-| Charts and chart data ranges | 🟡 | ✅ | 🟡 | Chart frames and shared range/series views are bounded and chart parts can be added, removed, or atomically replaced. Fine-grained series/data editing, recalculation, and rendering remain unavailable |
+| Charts and chart data ranges | 🟡 | ✅ | 🟡 | Chart frames and shared range/series views are bounded; complete typed definitions with series, ranges, axes, local styles, and cached table data can be added or atomically replaced. Dependency-free parts can transfer between immutable deck snapshots. Fine-grained in-place series/data editing, recalculation, and rendering remain unavailable |
 | Presentation page layouts | ✅ | ✅ | ✅ | Named presentation page layouts and typed placeholder roles/geometry are parsed, validated, added, replaced, reordered, removed, and serialized through public builder/package and unified transaction APIs |
 | Slide page metadata and layout references | ✅ | ✅ | ✅ | Page names, IDs, page-layout/master references, and related declaration bindings are inspected and authored through the public page metadata model |
 | Master pages | ✅ | ✅ | ✅ | Typed master-page metadata, shared ODF regions/children, lossless XML fragments, package CRUD, ordering, and slide master/layout assignment are exposed through the layered `master` facade and unified transaction |
@@ -98,6 +101,6 @@ the existence of a PPTX feature is never treated as ODP support.
 | PPTX threaded comments, presence, and collaboration commands | ❌ | ❌ | ❌ | Threading/presence metadata, comment authors/replies, revision command monikers, and master/layout/shape change descriptors listed by `[MS-PPTX]` are not supported |
 | PPTX media extensions | ❌ | ❌ | ❌ | Media bookmarks, fades, trims, playback event records, narration/presence flags, and media-control extensions are not typed; ODF plugin metadata is not equivalent support |
 | PPTX guides and application-specific UI state | ❌ | ❌ | ❌ | Slide/master guides, browse/window state, laser traces, and other application-specific extension structures are not exposed |
-| Full chart/table/form object models | ❌ | 🟡 | ❌ | Opaque frames and bounded common XML views must not be mistaken for typed chart series CRUD, table-cell CRUD, form controls, or recalculated embedded objects |
+| Full chart/table/form object models | ❌ | 🟡 | 🟡 | Charts have complete typed-definition add/replace and cached-data authoring, but not fine-grained in-place series CRUD or recalculation. Opaque table frames and form XML must not be mistaken for typed cell/row CRUD or form-control support |
 | Macro/script execution and external fetching | ❌ | ❌ | ❌ | No macro, script, hyperlink, external media, DDE, or database source is resolved, fetched, executed, or refreshed |
 | Signature writing and security policy | ❌ | ❌ | ❌ | Digital-signature authoring/verification and document-protection enforcement are not public ODP capabilities |

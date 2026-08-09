@@ -5,7 +5,9 @@ use litchi_odf_common::core::PackageWriter;
 use litchi_odm::{
     Master,
     style::Origin,
-    transaction::{MergeError, ResourceSpec, SectionSpec, SecurityPolicy, StyleSpec},
+    transaction::{
+        Conflict, MergeError, ResourceSpec, SectionSpec, SecurityPolicy, StyleSpec, SubdocumentSpec,
+    },
 };
 
 const MIME: &str = "application/vnd.oasis.opendocument.text-master";
@@ -231,15 +233,15 @@ fn transfer_durable_stale_and_three_way_plan_share_the_strong_boundary() {
 
     let mut metadata = source.metadata().unwrap().clone();
     metadata.description = Some("planned".to_string());
-    let mut left = source.edit();
-    left.set_metadata(metadata).unwrap();
-    let left = left.commit().unwrap();
-    let plan = left
+    let mut metadata_edit = source.edit();
+    metadata_edit.set_metadata(metadata).unwrap();
+    let metadata_commit = metadata_edit.commit().unwrap();
+    let metadata_plan = metadata_commit
         .patch()
         .plan_three_way(transfer_commit.patch())
         .unwrap();
-    assert!(plan.can_commit());
-    let merged = plan.commit().unwrap().apply(&source).unwrap();
+    assert!(metadata_plan.can_commit());
+    let merged = metadata_plan.commit().unwrap().apply(&source).unwrap();
     assert_eq!(
         merged.metadata().unwrap().description.as_deref(),
         Some("planned")
@@ -252,15 +254,218 @@ fn transfer_durable_stale_and_three_way_plan_share_the_strong_boundary() {
             .any(|resource| resource.path() == "Pictures/copied.png")
     );
 
-    let mut right = source.edit();
-    right.rename_section(Position::new(0), "Right").unwrap();
-    let right = right.commit().unwrap();
-    let mut conflicting = source.edit();
-    conflicting
+    let mut right_edit = source.edit();
+    right_edit
+        .rename_section(Position::new(0), "Right")
+        .unwrap();
+    let right_commit = right_edit.commit().unwrap();
+    let mut conflicting_edit = source.edit();
+    conflicting_edit
         .rename_section(Position::new(0), "Conflicting")
         .unwrap();
-    let conflicting = conflicting.commit().unwrap();
-    let plan = right.patch().plan_three_way(conflicting.patch()).unwrap();
-    assert!(!plan.can_commit());
-    assert!(matches!(plan.commit(), Err(MergeError::Conflicts(_))));
+    let conflicting_commit = conflicting_edit.commit().unwrap();
+    let conflict_plan = right_commit
+        .patch()
+        .plan_three_way(conflicting_commit.patch())
+        .unwrap();
+    assert!(!conflict_plan.can_commit());
+    assert!(matches!(
+        conflict_plan.commit(),
+        Err(MergeError::Conflicts(_))
+    ));
+}
+
+#[test]
+fn linked_section_transfer_and_subtree_cleanup_close_package_dependencies() {
+    let source = source();
+    let mut destination_edit = source.edit();
+    destination_edit.set_title("Destination master").unwrap();
+    let destination = destination_edit.commit().unwrap().into_snapshot();
+    let mut transfer = destination.edit_with_policy(SecurityPolicy::strict());
+    transfer
+        .transfer_linked_section(
+            &source,
+            Position::new(0),
+            "Imported chapter",
+            "Chapters/imported.odt",
+        )
+        .unwrap();
+    let commit = transfer.commit().unwrap();
+    let changed = commit.snapshot();
+    let imported = changed
+        .section_tree()
+        .sections()
+        .iter()
+        .find(|section| section.name() == "Imported chapter")
+        .unwrap();
+    let reference = &changed.subdocuments()[imported.reference().unwrap().get()];
+    assert_eq!(reference.href(), "Chapters/imported.odt");
+    assert_eq!(reference.source_section(), None);
+    assert_eq!(changed.resources().missing(), &[]);
+    assert_eq!(
+        changed
+            .resources()
+            .resources()
+            .iter()
+            .find(|resource| resource.path() == "Chapters/imported.odt")
+            .unwrap()
+            .references(),
+        &[imported.reference().unwrap()]
+    );
+
+    let imported_position = changed
+        .section_tree()
+        .sections()
+        .iter()
+        .position(|section| section.name() == "Imported chapter")
+        .map(Position::new)
+        .unwrap();
+    let mut cleanup = changed.edit();
+    cleanup
+        .remove_section_with_orphaned_resources(imported_position)
+        .unwrap();
+    let cleaned = cleanup.commit().unwrap().into_snapshot();
+    assert!(
+        cleaned
+            .section_tree()
+            .sections()
+            .iter()
+            .all(|section| section.name() != "Imported chapter")
+    );
+    assert!(
+        cleaned
+            .resources()
+            .resources()
+            .iter()
+            .all(|resource| resource.path() != "Chapters/imported.odt")
+    );
+    assert!(Master::from_bytes(cleaned.as_bytes().to_vec()).is_ok());
+    assert_eq!(
+        commit.patch().inverse().apply(changed).unwrap().as_bytes(),
+        destination.as_bytes()
+    );
+}
+
+#[test]
+fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
+    let source = source();
+
+    let mut missing_edit = source.edit();
+    missing_edit
+        .set_link(Position::new(0), "Chapters/missing.odt")
+        .unwrap();
+    let missing_snapshot = missing_edit.commit().unwrap().into_snapshot();
+    assert!(!missing_snapshot.resources().missing().is_empty());
+    let mut strict_change = missing_snapshot.edit_with_policy(SecurityPolicy::strict());
+    strict_change.set_title("blocked by final graph").unwrap();
+    assert!(strict_change.commit().is_err());
+
+    let mut atomic_cleanup = source.edit();
+    atomic_cleanup
+        .remove_section_with_orphaned_resources(Position::new(0))
+        .unwrap()
+        .remove_style(Origin::Content, "AutoSection")
+        .unwrap();
+    let cleaned = atomic_cleanup.commit().unwrap().into_snapshot();
+    assert!(
+        cleaned
+            .styles()
+            .iter()
+            .all(|style| style.name() != "AutoSection")
+    );
+    assert!(
+        cleaned
+            .resources()
+            .resources()
+            .iter()
+            .all(|resource| resource.path() != "Chapters/a.odt")
+    );
+
+    let mut author_metadata = source.metadata().unwrap().clone();
+    author_metadata.author = Some("Left author".to_string());
+    let mut author_edit = source.edit();
+    author_edit.set_metadata(author_metadata).unwrap();
+    let author_commit = author_edit.commit().unwrap();
+    let mut description_metadata = source.metadata().unwrap().clone();
+    description_metadata.description = Some("Right description".to_string());
+    let mut description_edit = source.edit();
+    description_edit.set_metadata(description_metadata).unwrap();
+    let description_commit = description_edit.commit().unwrap();
+    let metadata_plan = author_commit
+        .patch()
+        .plan_three_way(description_commit.patch())
+        .unwrap();
+    assert!(metadata_plan.can_commit());
+    let metadata_merged = metadata_plan.commit().unwrap().apply(&source).unwrap();
+    assert_eq!(
+        metadata_merged.metadata().unwrap().author.as_deref(),
+        Some("Left author")
+    );
+    assert_eq!(
+        metadata_merged.metadata().unwrap().description.as_deref(),
+        Some("Right description")
+    );
+    let mut title_edit = source.edit();
+    title_edit.set_title("Planned title").unwrap();
+    let title_commit = title_edit.commit().unwrap();
+    for plan in [
+        title_commit
+            .patch()
+            .plan_three_way(author_commit.patch())
+            .unwrap(),
+        author_commit
+            .patch()
+            .plan_three_way(title_commit.patch())
+            .unwrap(),
+    ] {
+        let merged = plan.commit().unwrap().apply(&source).unwrap();
+        assert_eq!(merged.title(), Some("Planned title"));
+        assert_eq!(
+            merged.metadata().unwrap().author.as_deref(),
+            Some("Left author")
+        );
+    }
+
+    let mut left_edit = source.edit();
+    left_edit
+        .add_section(SectionSpec::new("Same destination").unwrap())
+        .unwrap();
+    let left_commit = left_edit.commit().unwrap();
+    let identical_plan = left_commit
+        .patch()
+        .plan_three_way(left_commit.patch())
+        .unwrap();
+    assert!(identical_plan.can_commit());
+    let identical = identical_plan.commit().unwrap().apply(&source).unwrap();
+    assert_eq!(
+        identical
+            .section_tree()
+            .sections()
+            .iter()
+            .filter(|section| section.name() == "Same destination")
+            .count(),
+        1
+    );
+    let mut right_edit = source.edit();
+    right_edit
+        .add_section(
+            SectionSpec::new("Same destination")
+                .unwrap()
+                .with_subdocument(
+                    SubdocumentSpec::new("Chapters/other.odt")
+                        .unwrap()
+                        .with_source_section("Body")
+                        .unwrap(),
+                ),
+        )
+        .unwrap();
+    let right_commit = right_edit.commit().unwrap();
+    let named_conflict_plan = left_commit
+        .patch()
+        .plan_three_way(right_commit.patch())
+        .unwrap();
+    assert!(named_conflict_plan.conflicts().conflicts().iter().any(
+        |conflict| matches!(conflict, Conflict::SectionName(name) if name == "Same destination")
+    ));
+    assert!(!named_conflict_plan.can_commit());
 }

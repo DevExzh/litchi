@@ -805,10 +805,10 @@ mod tests {
     fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
         let archive = ArchiveReader::new(package).unwrap();
         let mut writer = StreamingArchiveWriter::new();
-        let path = path.trim_start_matches('/');
+        let normalized_path = path.trim_start_matches('/');
         let mut replaced = false;
         for name in archive.file_names() {
-            let data = if name == path {
+            let data = if name == normalized_path {
                 replaced = true;
                 replacement.to_vec()
             } else {
@@ -816,7 +816,7 @@ mod tests {
             };
             writer.write_stored(name, &data).unwrap();
         }
-        assert!(replaced, "test ZIP member {path} must exist");
+        assert!(replaced, "test ZIP member {normalized_path} must exist");
         writer.finish_to_bytes().unwrap()
     }
 
@@ -837,11 +837,11 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         package.to_stream(&mut output).unwrap();
-        let mut output = output.into_inner();
+        let mut output_bytes = output.into_inner();
         for (name, _content_type, _relationship_type, data) in parts {
-            output = replace_zip_member_raw(&output, name, data);
+            output_bytes = replace_zip_member_raw(&output_bytes, name, data);
         }
-        output
+        output_bytes
     }
 
     fn valid_animation_package() -> Vec<u8> {

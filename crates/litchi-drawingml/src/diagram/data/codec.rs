@@ -381,7 +381,8 @@ impl DiagramDataModel {
     pub fn to_xml(&self, conformance: Conformance) -> Result<String> {
         let capacity = self.serialized_xml_len(conformance)?;
         let mut xml = String::new();
-        xml.try_reserve_exact(capacity).map_err(reserve_error)?;
+        xml.try_reserve_exact(capacity)
+            .map_err(|error| reserve_error(&error))?;
         self.write_validated_xml(&mut xml, conformance)?;
         Ok(xml)
     }
@@ -398,7 +399,8 @@ impl DiagramDataModel {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn write_xml(&self, xml: &mut String, conformance: Conformance) -> Result<()> {
         let additional = self.serialized_xml_len(conformance)?;
-        xml.try_reserve_exact(additional).map_err(reserve_error)?;
+        xml.try_reserve_exact(additional)
+            .map_err(|error| reserve_error(&error))?;
         let initial_len = xml.len();
         if let Err(error) = self.write_validated_xml(xml, conformance) {
             xml.truncate(initial_len);
@@ -505,10 +507,6 @@ fn write_connection(xml: &mut impl fmt::Write, connection: &Connection) -> Resul
     xml.write_str("/>").map_err(write_error)
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "the copyable optional attribute mirrors the schema writer call shape"
-)]
 fn write_optional_attribute(
     xml: &mut impl fmt::Write,
     name: &str,
@@ -526,11 +524,7 @@ fn write_error(error: fmt::Error) -> Error {
     Error::Xml(format!("failed to write diagram XML: {error}"))
 }
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "String::try_reserve map_err supplies the owned allocation error"
-)]
-fn reserve_error(error: std::collections::TryReserveError) -> Error {
+fn reserve_error(error: &std::collections::TryReserveError) -> Error {
     invalid(format!("cannot reserve diagram XML output: {error}"))
 }
 
@@ -803,4 +797,20 @@ fn is_dgm(namespace: &str) -> bool {
 
 fn is_dml(namespace: &str) -> bool {
     matches!(namespace, DML_NAMESPACE | DML_NAMESPACE_STRICT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_optional_attribute;
+
+    #[test]
+    fn optional_attribute_keeps_minimal_schema_lexical_form() -> crate::Result<()> {
+        let mut xml = String::new();
+        write_optional_attribute(&mut xml, "presId", None)?;
+        assert!(xml.is_empty());
+
+        write_optional_attribute(&mut xml, "presId", Some("a&\"b"))?;
+        assert_eq!(xml, " presId=\"a&amp;&quot;b\"");
+        Ok(())
+    }
 }

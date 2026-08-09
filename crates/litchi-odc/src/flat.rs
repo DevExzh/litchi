@@ -26,9 +26,12 @@ struct State {
 #[derive(Clone, Debug)]
 struct AxisRecord {
     name: Option<String>,
+    style_name: Option<String>,
     tag: Range<usize>,
     name_value: Option<Range<usize>>,
     name_attribute: Option<Range<usize>>,
+    style_value: Option<Range<usize>>,
+    style_attribute: Option<Range<usize>>,
     prefix: Option<String>,
 }
 
@@ -126,6 +129,8 @@ pub struct AxisUpdate {
     /// `None` leaves the name unchanged, `Some(None)` removes it, and
     /// `Some(Some(name))` sets it.
     pub name: Option<Option<String>>,
+    /// `None` leaves the style unchanged, while `Some` sets or removes it.
+    pub style_name: Option<Option<String>>,
 }
 
 impl AxisUpdate {
@@ -134,13 +139,35 @@ impl AxisUpdate {
     pub fn named(name: impl Into<String>) -> Self {
         Self {
             name: Some(Some(name.into())),
+            style_name: None,
         }
     }
 
     /// Creates an update that removes `chart:name`.
     #[must_use]
     pub const fn unnamed() -> Self {
-        Self { name: Some(None) }
+        Self {
+            name: Some(None),
+            style_name: None,
+        }
+    }
+
+    /// Creates an update that sets `chart:style-name` exactly in place.
+    #[must_use]
+    pub fn styled(style_name: impl Into<String>) -> Self {
+        Self {
+            name: None,
+            style_name: Some(Some(style_name.into())),
+        }
+    }
+
+    /// Creates an update that removes `chart:style-name`.
+    #[must_use]
+    pub const fn unstyled() -> Self {
+        Self {
+            name: None,
+            style_name: Some(None),
+        }
     }
 }
 
@@ -162,16 +189,31 @@ impl FlatChartEdit {
     /// Returns an error when the selector is out of bounds or the requested
     /// name exceeds the bounded value limit.
     pub fn update_axis(&mut self, index: usize, update: AxisUpdate) -> Result<()> {
-        let Some(after) = update.name else {
-            return Ok(());
-        };
+        let axis = self
+            .source
+            .0
+            .axes
+            .get(index)
+            .ok_or_else(|| invalid_error("flat ODC axis selector is out of bounds"))?;
+        let staged_change = self.changes.iter().find(|change| change.index == index);
+        let current_name =
+            staged_change.map_or_else(|| axis.name.clone(), |change| change.after.clone());
+        let current_style = staged_change.map_or_else(
+            || axis.style_name.clone(),
+            |change| change.after_style_name.clone(),
+        );
+        let after = update.name.unwrap_or(current_name);
+        let after_style = update.style_name.unwrap_or(current_style);
         if after.as_ref().is_some_and(|name| {
+            name.len() > MAX_NAME_BYTES || name.len() > self.source.0.limits.max_scalar_bytes()
+        }) || after_style.as_ref().is_some_and(|name| {
             name.len() > MAX_NAME_BYTES || name.len() > self.source.0.limits.max_scalar_bytes()
         }) {
             return Err(invalid_error("flat ODC axis name exceeds its byte limit"));
         }
         let before = self.source.axis_name(index)?.map(str::to_owned);
-        if before == after {
+        let before_style = axis.style_name.clone();
+        if before == after && before_style == after_style {
             self.changes.retain(|change| change.index != index);
             return Ok(());
         }
@@ -179,13 +221,15 @@ impl FlatChartEdit {
             index,
             before,
             after,
+            before_style_name: before_style,
+            after_style_name: after_style,
         };
-        if let Some(existing) = self
+        if let Some(change_slot) = self
             .changes
             .iter_mut()
-            .find(|existing| existing.index == index)
+            .find(|candidate| candidate.index == index)
         {
-            *existing = change;
+            *change_slot = change;
         } else {
             self.changes.push(change);
         }
@@ -203,34 +247,27 @@ impl FlatChartEdit {
         let mut replacements = Vec::with_capacity(changes.len());
         for change in &changes {
             let axis = &source.0.axes[change.index];
-            match (&change.after, &axis.name_value, &axis.name_attribute) {
-                (Some(name), Some(value), _) => replacements.push(Replacement {
-                    range: value.clone(),
-                    value: escape_attribute(name).into_bytes(),
-                }),
-                (None, _, Some(attribute)) => replacements.push(Replacement {
-                    range: attribute.clone(),
-                    value: Vec::new(),
-                }),
-                (Some(name), None, None) => {
-                    let prefix = axis.prefix.as_deref().ok_or_else(|| {
-                        Error::Unsupported(
-                            "cannot add chart:name without a lossless chart namespace prefix"
-                                .to_string(),
-                        )
-                    })?;
-                    let raw = &source.as_bytes()[axis.tag.clone()];
-                    let relative = insertion_offset(raw)?;
-                    replacements.push(Replacement {
-                        range: axis.tag.start + relative..axis.tag.start + relative,
-                        value: format!(" {prefix}:name=\"{}\"", escape_attribute(name))
-                            .into_bytes(),
-                    });
-                },
-                (None, None, None) => {},
-                (None, Some(_), None) | (Some(_), None, Some(_)) => {
-                    return Err(invalid_error("flat ODC axis attribute span is incomplete"));
-                },
+            if change.before != change.after {
+                stage_axis_attribute(
+                    &source,
+                    axis,
+                    "name",
+                    change.after.as_ref(),
+                    axis.name_value.as_ref(),
+                    axis.name_attribute.as_ref(),
+                    &mut replacements,
+                )?;
+            }
+            if change.before_style_name != change.after_style_name {
+                stage_axis_attribute(
+                    &source,
+                    axis,
+                    "style-name",
+                    change.after_style_name.as_ref(),
+                    axis.style_value.as_ref(),
+                    axis.style_attribute.as_ref(),
+                    &mut replacements,
+                )?;
             }
         }
         replacements.sort_unstable_by_key(|replacement| std::cmp::Reverse(replacement.range.start));
@@ -250,6 +287,11 @@ impl FlatChartEdit {
         for change in &changes {
             if snapshot.axis_name(change.index)? != change.after.as_deref() {
                 return Err(invalid_error("flat ODC edit failed typed readback"));
+            }
+            if snapshot.0.axes[change.index].style_name.as_deref()
+                != change.after_style_name.as_deref()
+            {
+                return Err(invalid_error("flat ODC style edit failed typed readback"));
             }
         }
         Ok(FlatChartCommit {
@@ -328,6 +370,43 @@ impl FlatChartPatch {
         &self.changes
     }
 
+    pub(crate) fn axis_tag_splices(&self) -> Result<Vec<AxisTagSplice>> {
+        if self.source.0.axes.len() != self.target.0.axes.len() {
+            return Err(invalid_error(
+                "flat ODC axis splice changed the axis inventory",
+            ));
+        }
+        let mut splices = Vec::with_capacity(self.changes.len());
+        for change in &self.changes {
+            let source_axis = &self.source.0.axes[change.index];
+            let target_axis = &self.target.0.axes[change.index];
+            splices.push(AxisTagSplice {
+                range: source_axis.tag.clone(),
+                expected: self.source.as_bytes()[source_axis.tag.clone()].to_vec(),
+                replacement: self.target.as_bytes()[target_axis.tag.clone()].to_vec(),
+            });
+        }
+        let mut rebuilt = self.source.as_bytes().to_vec();
+        splices.sort_unstable_by_key(|splice| std::cmp::Reverse(splice.range.start));
+        for splice in &splices {
+            rebuilt.splice(splice.range.clone(), splice.replacement.iter().copied());
+        }
+        if rebuilt != self.target.as_bytes() {
+            return Err(invalid_error(
+                "flat ODC axis splice does not reproduce its committed target",
+            ));
+        }
+        Ok(splices)
+    }
+
+    pub(crate) fn target_bytes(&self) -> &[u8] {
+        self.target.as_bytes()
+    }
+
+    pub(crate) fn source_bytes(&self) -> &[u8] {
+        self.source.as_bytes()
+    }
+
     /// Returns a patch that reverses this patch.
     #[must_use]
     pub fn inverse(&self) -> Self {
@@ -341,6 +420,8 @@ impl FlatChartPatch {
                     index: change.index,
                     before: change.after.clone(),
                     after: change.before.clone(),
+                    before_style_name: change.after_style_name.clone(),
+                    after_style_name: change.before_style_name.clone(),
                 })
                 .collect(),
         }
@@ -363,12 +444,14 @@ impl FlatChartPatch {
     }
 }
 
-/// One selector-bound axis name change.
+/// One selector-bound axis name and style-reference change.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AxisChange {
     index: usize,
     before: Option<String>,
     after: Option<String>,
+    before_style_name: Option<String>,
+    after_style_name: Option<String>,
 }
 
 impl AxisChange {
@@ -377,7 +460,19 @@ impl AxisChange {
             index,
             before,
             after,
+            before_style_name: None,
+            after_style_name: None,
         }
+    }
+
+    pub(crate) fn with_style(
+        mut self,
+        before_style_name: Option<String>,
+        after_style_name: Option<String>,
+    ) -> Self {
+        self.before_style_name = before_style_name;
+        self.after_style_name = after_style_name;
+        self
     }
 
     pub(crate) fn new_inverse(change: &Self) -> Self {
@@ -385,6 +480,8 @@ impl AxisChange {
             index: change.index,
             before: change.after.clone(),
             after: change.before.clone(),
+            before_style_name: change.after_style_name.clone(),
+            after_style_name: change.before_style_name.clone(),
         }
     }
 
@@ -402,11 +499,29 @@ impl AxisChange {
     pub fn after(&self) -> Option<&str> {
         self.after.as_deref()
     }
+
+    /// Return the style reference before the edit.
+    #[must_use]
+    pub fn before_style_name(&self) -> Option<&str> {
+        self.before_style_name.as_deref()
+    }
+
+    /// Return the style reference after the edit.
+    #[must_use]
+    pub fn after_style_name(&self) -> Option<&str> {
+        self.after_style_name.as_deref()
+    }
 }
 
 struct Replacement {
     range: Range<usize>,
     value: Vec<u8>,
+}
+
+pub(crate) struct AxisTagSplice {
+    pub(crate) range: Range<usize>,
+    pub(crate) expected: Vec<u8>,
+    pub(crate) replacement: Vec<u8>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -670,6 +785,8 @@ fn push_axis(
     }
     let mut name = None;
     let mut key = None;
+    let mut style_name = None;
+    let mut style_key = None;
     for attribute_result in element.attributes().with_checks(true) {
         let attribute = attribute_result
             .map_err(|error| invalid_error(format!("invalid flat ODC attribute: {error}")))?;
@@ -687,6 +804,21 @@ fn push_axis(
             }
             name = Some(value);
             key = Some(attribute.key.as_ref().to_vec());
+        } else if resolved(&namespace, CHART) && local.as_ref() == b"style-name" {
+            if style_key.is_some() {
+                return Err(invalid_error(
+                    "flat ODC axis has duplicate chart:style-name",
+                ));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| invalid_error(format!("invalid flat ODC axis style: {error}")))?
+                .into_owned();
+            if value.len() > MAX_NAME_BYTES || value.len() > limits.max_scalar_bytes() {
+                return Err(invalid_error("flat ODC axis style exceeds its byte limit"));
+            }
+            style_name = Some(value);
+            style_key = Some(attribute.key.as_ref().to_vec());
         }
     }
     let prefix = element
@@ -705,13 +837,65 @@ fn push_axis(
     } else {
         (None, None)
     };
+    let (style_value, style_attribute) = if let Some(attribute_key) = style_key {
+        let (value, attribute) = attribute_spans(&bytes[tag.clone()], &attribute_key)?;
+        (
+            Some(tag.start + value.start..tag.start + value.end),
+            Some(tag.start + attribute.start..tag.start + attribute.end),
+        )
+    } else {
+        (None, None)
+    };
     axes.push(AxisRecord {
         name,
+        style_name,
         tag,
         name_value,
         name_attribute,
+        style_value,
+        style_attribute,
         prefix,
     });
+    Ok(())
+}
+
+fn stage_axis_attribute(
+    source: &FlatChart,
+    axis: &AxisRecord,
+    local: &str,
+    after: Option<&String>,
+    value: Option<&Range<usize>>,
+    attribute: Option<&Range<usize>>,
+    replacements: &mut Vec<Replacement>,
+) -> Result<()> {
+    match (after, value, attribute) {
+        (Some(new_value), Some(value_span), _) => replacements.push(Replacement {
+            range: value_span.clone(),
+            value: escape_attribute(new_value).into_bytes(),
+        }),
+        (None, _, Some(attribute_span)) => replacements.push(Replacement {
+            range: attribute_span.clone(),
+            value: Vec::new(),
+        }),
+        (Some(new_value), None, None) => {
+            let prefix = axis.prefix.as_deref().ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "cannot add chart:{local} without a lossless chart namespace prefix"
+                ))
+            })?;
+            let raw = &source.as_bytes()[axis.tag.clone()];
+            let relative = insertion_offset(raw)?;
+            replacements.push(Replacement {
+                range: axis.tag.start + relative..axis.tag.start + relative,
+                value: format!(" {prefix}:{local}=\"{}\"", escape_attribute(new_value))
+                    .into_bytes(),
+            });
+        },
+        (None, None, None) => {},
+        (None, Some(_), None) | (Some(_), None, Some(_)) => {
+            return Err(invalid_error("flat ODC axis attribute span is incomplete"));
+        },
+    }
     Ok(())
 }
 

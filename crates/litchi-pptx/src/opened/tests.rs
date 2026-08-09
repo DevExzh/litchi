@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use litchi_opc::PackURI;
 
-use super::{History, Limits, Patch};
+use super::{History, Limits, Patch, Resolution};
 use crate::{Error, Package, Result};
 
 fn opened_two_slide_package() -> Result<Package> {
@@ -256,5 +256,302 @@ fn real_powerpoint_fixture_round_trips_an_exact_no_op() -> Result<()> {
         reopened.opened_presentation()?.slides()[0].id(),
         original_first
     );
+    Ok(())
+}
+
+#[test]
+fn one_opened_transaction_spans_complex_ordinary_domains_and_full_reopen() -> Result<()> {
+    let mut package = opened_two_slide_package()?;
+    let before = part_states(&package);
+    let mut styles = package
+        .styles()?
+        .ok_or_else(|| Error::Invalid("authored package has no table styles".into()))?;
+    let default_style = styles.default();
+    styles.add(crate::table::style::Def::new(
+        default_style,
+        "Opened transaction style",
+    )?)?;
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    edit.move_slide(0, 1)?;
+    edit.set_shape_text(0_usize, 0_usize, "Complex transaction title")?;
+    edit.set_notes_text(0_usize, "Complex transaction notes")?;
+    assert!(edit.put_table_styles(styles)?);
+    edit.add_table(
+        0_usize,
+        &[
+            vec!["Quarter".into(), "Revenue".into()],
+            vec!["Q1".into(), "10".into()],
+        ],
+        (100, 100, 2_000_000, 1_000_000),
+    )?;
+
+    let chart =
+        crate::chart::Chart::new(crate::chart::Type::Column, 100, 200, 3_000_000, 2_000_000)
+            .with_title("Quarterly chart")
+            .add_series(
+                crate::chart::Series::new("Revenue")
+                    .with_categories(vec!["Q1".into(), "Q2".into()])
+                    .with_values(vec![10.0, 12.0]),
+            );
+    edit.add_chart(0_usize, &chart)?;
+
+    let media = crate::media_parts::List {
+        pictures: vec![crate::media_parts::Picture {
+            shape_id: 40,
+            name: "clip.mp4".into(),
+            kind: crate::media_parts::Kind::Video,
+            relationship_id: "rIdOpenedVideo".into(),
+            resource: Some(crate::media_parts::Resource::new(
+                "/ppt/media/opened-video.mp4",
+                "video/mp4",
+                vec![0, 1, 2, 3, 4],
+            )),
+            poster: Some(crate::media_parts::Poster {
+                relationship_id: "rIdOpenedPoster".into(),
+                resource: Some(crate::media_parts::Resource::new(
+                    "/ppt/media/opened-poster.png",
+                    "image/png",
+                    vec![137, 80, 78, 71],
+                )),
+            }),
+            transform: Some(crate::media_parts::Transform::emu(10, 20, 300, 400)?),
+            office_extension: None,
+        }],
+    };
+    edit.store_media(
+        1_usize,
+        &media,
+        crate::media_parts::Conformance::Transitional,
+    )?;
+
+    let master = edit.add_slide_master()?;
+    edit.add_slide_layout(
+        &master.part_name,
+        crate::master_layout::SlideLayoutKind::Blank,
+        "Opened Blank",
+        &[],
+    )?;
+    edit.add_comment_author(
+        crate::comments::Author::new(7, "Opened Author", "OA"),
+        crate::comments::Conformance::Transitional,
+    )?;
+    edit.add_comment(
+        0_usize,
+        crate::comments::Comment::new(7, "Opened comment", 10, 20),
+        crate::comments::Conformance::Transitional,
+    )?;
+
+    let commit = edit.commit()?;
+    assert!(commit.patch().resource_count() >= 10);
+    let durable = Patch::from_bytes(&commit.patch().to_bytes()?)?;
+    let inverse = durable.inverse();
+    package.apply_opened_presentation_patch(&durable)?;
+    let bytes = package.to_bytes()?;
+    let mut reopened = Package::from_bytes(&bytes)?;
+
+    let opened = reopened.opened_presentation()?;
+    let chart_slide = reopened.opc.get_part(opened.slides()[0].part_name())?;
+    assert_eq!(crate::chart::related(&reopened.opc, chart_slide)?.len(), 1);
+    assert!(
+        chart_slide
+            .blob()
+            .windows(b"<a:tbl>".len())
+            .any(|window| window == b"<a:tbl>")
+    );
+    assert_eq!(
+        crate::media_parts::load(&reopened.opc, opened.slides()[1].part_name())?
+            .pictures
+            .len(),
+        1
+    );
+    assert_eq!(
+        crate::comments::load_presentation_comments(&reopened.opc)?
+            .ok_or_else(|| Error::Invalid("comments disappeared".into()))?
+            .slides[0]
+            .comments[0]
+            .text,
+        "Opened comment"
+    );
+    assert!(
+        reopened
+            .styles()?
+            .is_some_and(|catalog| catalog.named("Opened transaction style").count() == 1)
+    );
+    crate::master_layout::validate_master_layout_graph(&reopened.opc)?;
+
+    reopened.apply_opened_presentation_patch(&inverse)?;
+    assert_eq!(part_states(&reopened), before);
+    Ok(())
+}
+
+#[test]
+fn three_way_plan_is_immutable_and_history_supports_redo() -> Result<()> {
+    let mut package = opened_two_slide_package()?;
+    let base = package.opened_presentation()?;
+    let mut left = base.edit();
+    left.set_shape_text(0_usize, 0_usize, "Left title")?;
+    left.set_notes_text(1_usize, "Merged notes")?;
+    let left = left.commit()?.into_patch();
+    let mut right = base.edit();
+    right.set_shape_text(0_usize, 0_usize, "Right title")?;
+    let right = right.commit()?.into_patch();
+
+    let plan = Patch::three_way(&base, &left, &right)?;
+    assert_eq!(plan.unresolved_count(), 1);
+    assert_eq!(
+        plan.unresolved_count(),
+        1,
+        "the original plan remains immutable"
+    );
+    let selected = plan.resolve(0, Resolution::Right)?;
+    assert_eq!(plan.unresolved_count(), 1);
+    let merged = selected.finish()?;
+    package.apply_opened_presentation_patch(&merged)?;
+    assert!(
+        package
+            .presentation()?
+            .slide(0)?
+            .is_some_and(|slide| slide.text().is_ok_and(|text| text.contains("Right title")))
+    );
+    assert_eq!(
+        package
+            .notes()?
+            .ok_or_else(|| Error::Invalid("notes disappeared".into()))?
+            .slides()[1]
+            .text()?
+            .as_deref(),
+        Some("Merged notes")
+    );
+
+    let mut history = History::new(Limits::default());
+    history.push(merged.clone())?;
+    let undo = history
+        .pop_undo()
+        .ok_or_else(|| Error::Invalid("undo disappeared".into()))?;
+    assert_eq!(history.redo_len(), 1);
+    package.apply_opened_presentation_patch(&undo)?;
+    let redo = history
+        .pop_redo()
+        .ok_or_else(|| Error::Invalid("redo disappeared".into()))?;
+    package.apply_opened_presentation_patch(&redo)?;
+    assert_eq!(history.redo_len(), 0);
+    Ok(())
+}
+
+#[test]
+fn slide_removal_and_dependency_transfer_are_durable_and_reversible() -> Result<()> {
+    let source_bytes = std::fs::read("../../test-data/ooxml/pptx/line-chart.pptx")?;
+    let source_package = Package::from_bytes(&source_bytes)?;
+    let source_root = source_package.opened_presentation()?;
+    let source_slide = source_root.slides()[0].part_name().clone();
+    let relationship_id = source_package
+        .opc
+        .get_part(&source_slide)?
+        .rels()
+        .iter()
+        .find(|relationship| {
+            crate::parts::is_relationship_type(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::CHART,
+                "chart",
+            )
+        })
+        .map(|relationship| relationship.r_id().to_owned())
+        .ok_or_else(|| Error::Invalid("real chart fixture has no chart relationship".into()))?;
+
+    let mut destination = opened_two_slide_package()?;
+    let destination_before = part_states(&destination);
+    let destination_root = destination.opened_presentation()?;
+    let mut transfer = destination_root.edit();
+    let copied_relationship = transfer.transfer_relationship_closure(
+        &source_root,
+        &source_slide,
+        &relationship_id,
+        0_usize,
+    )?;
+    assert!(!copied_relationship.is_empty());
+    let transfer_patch = transfer.commit()?.into_patch();
+    destination.apply_opened_presentation_patch(&transfer_patch)?;
+    let opened = destination.opened_presentation()?;
+    let slide = destination.opc.get_part(opened.slides()[0].part_name())?;
+    let related = crate::chart::related(&destination.opc, slide)?;
+    assert_eq!(related.len(), 1);
+    let copied_chart = related[0].part();
+    assert!(!copied_chart.rels().is_empty());
+    for relationship in copied_chart
+        .rels()
+        .iter()
+        .filter(|relationship| !relationship.is_external())
+    {
+        assert!(
+            destination
+                .opc
+                .contains_part(&relationship.target_partname()?)
+        );
+    }
+    destination.apply_opened_presentation_patch(&transfer_patch.inverse())?;
+    assert_eq!(part_states(&destination), destination_before);
+
+    let mut removal = destination.opened_presentation()?.edit();
+    let removed = removal.remove_slide(1_usize)?;
+    let removed_part = removed.part_name().clone();
+    let removal_patch = removal.commit()?.into_patch();
+    destination.apply_opened_presentation_patch(&removal_patch)?;
+    assert_eq!(destination.opened_presentation()?.slides().len(), 1);
+    assert!(!destination.opc.contains_part(&removed_part));
+    destination.apply_opened_presentation_patch(&removal_patch.inverse())?;
+    assert_eq!(part_states(&destination), destination_before);
+    Ok(())
+}
+
+#[test]
+fn real_complex_chart_deck_survives_transaction_and_full_reopen() -> Result<()> {
+    let bytes = std::fs::read("../../test-data/ooxml/pptx/line-chart.pptx")?;
+    let mut package = Package::from_bytes(&bytes)?;
+    let before = part_states(&package);
+    let source = package.opened_presentation()?;
+    let first_slide = source
+        .slides()
+        .first()
+        .ok_or_else(|| Error::Invalid("real chart fixture has no slide".into()))?
+        .part_name()
+        .clone();
+    assert!(!crate::chart::related(&package.opc, package.opc.get_part(&first_slide)?)?.is_empty());
+
+    let mut edit = source.edit();
+    edit.add_table(
+        0_usize,
+        &[
+            vec!["Series".into(), "Value".into()],
+            vec!["Preserved chart".into(), "42".into()],
+        ],
+        (100, 100, 2_000_000, 800_000),
+    )?;
+    edit.add_comment_author(
+        crate::comments::Author::new(91, "Fixture Author", "FA"),
+        crate::comments::Conformance::Transitional,
+    )?;
+    edit.add_comment(
+        0_usize,
+        crate::comments::Comment::new(91, "Fixture transaction", 50, 50),
+        crate::comments::Conformance::Transitional,
+    )?;
+    let patch = edit.commit()?.into_patch();
+    let inverse = patch.inverse();
+    package.apply_opened_presentation_patch(&patch)?;
+    let saved = package.to_bytes()?;
+    let mut reopened = Package::from_bytes(&saved)?;
+    let reopened_root = reopened.opened_presentation()?;
+    let reopened_slide = reopened
+        .opc
+        .get_part(reopened_root.slides()[0].part_name())?;
+    assert!(!crate::chart::related(&reopened.opc, reopened_slide)?.is_empty());
+    assert!(
+        crate::comments::load_presentation_comments(&reopened.opc)?
+            .is_some_and(|comments| comments.slides[0].comments[0].text == "Fixture transaction")
+    );
+    reopened.apply_opened_presentation_patch(&inverse)?;
+    assert_eq!(part_states(&reopened), before);
     Ok(())
 }

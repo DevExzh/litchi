@@ -14,6 +14,7 @@ use std::num::NonZeroUsize;
 pub(crate) const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 pub(crate) const TABLE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 pub(crate) const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 const MAX_XML_DEPTH: usize = 1_024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -939,6 +940,8 @@ fn write_row_inner(output: &mut String, row: &Row, bind_namespaces: bool) -> Res
         output.push_str(OFFICE_NAMESPACE);
         output.push_str("\" xmlns:text=\"");
         output.push_str(TEXT_NAMESPACE);
+        output.push_str("\" xmlns:xlink=\"");
+        output.push_str(XLINK_NAMESPACE);
         output.push('"');
     }
     if row.repeat() > 1 {
@@ -969,6 +972,21 @@ fn write_row_inner(output: &mut String, row: &Row, bind_namespaces: bool) -> Res
 }
 
 fn write_cell(output: &mut String, cell: &Cell) -> Result<()> {
+    write_cell_inner(output, cell, None, false)
+}
+
+pub(crate) fn write_cell_fragment(cell: &Cell, body: Option<&str>) -> Result<String> {
+    let mut output = String::new();
+    write_cell_inner(&mut output, cell, body, true)?;
+    Ok(output)
+}
+
+fn write_cell_inner(
+    output: &mut String,
+    cell: &Cell,
+    body: Option<&str>,
+    bind_namespaces: bool,
+) -> Result<()> {
     validation::validate_cell(cell)?;
     let covered = matches!(cell.merge, Merge::Covered);
     output.push_str(if covered {
@@ -976,6 +994,15 @@ fn write_cell(output: &mut String, cell: &Cell) -> Result<()> {
     } else {
         "<table:table-cell"
     });
+    if bind_namespaces {
+        output.push_str(" xmlns:table=\"");
+        output.push_str(TABLE_NAMESPACE);
+        output.push_str("\" xmlns:office=\"");
+        output.push_str(OFFICE_NAMESPACE);
+        output.push_str("\" xmlns:text=\"");
+        output.push_str(TEXT_NAMESPACE);
+        output.push('"');
+    }
     if cell.repeat() > 1 {
         output.push_str(" table:number-columns-repeated=\"");
         output.push_str(&cell.repeat().to_string());
@@ -1001,12 +1028,18 @@ fn write_cell(output: &mut String, cell: &Cell) -> Result<()> {
     if !covered {
         write_value_attributes(output, &cell.value);
     }
-    if cell.text.is_empty() && matches!(cell.value, CellValue::Empty) && cell.formula.is_none() {
+    if body.is_none()
+        && cell.text.is_empty()
+        && matches!(cell.value, CellValue::Empty)
+        && cell.formula.is_none()
+    {
         output.push_str("/>");
         return Ok(());
     }
     output.push('>');
-    if !cell.text.is_empty() || matches!(cell.value, CellValue::Text(_)) {
+    if let Some(body) = body {
+        output.push_str(body);
+    } else if !cell.text.is_empty() || matches!(cell.value, CellValue::Text(_)) {
         output.push_str("<text:p>");
         output.push_str(&escape_xml(&cell.text));
         output.push_str("</text:p>");

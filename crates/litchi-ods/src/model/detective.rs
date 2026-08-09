@@ -296,14 +296,20 @@ mod tests {
                     Direction::FromAnotherTable,
                     Some(true),
                 )
-                .unwrap(),
+                .expect("test fixture or operation should succeed"),
             )
             .add_highlighted_range(HighlightedRange::invalid(true))
             .add_operation(Operation::new(OperationKind::TraceErrors, 7));
         let mut xml = String::new();
         write_detective(&mut xml, &detective);
         assert!(xml.contains("&apos;A&amp;B&apos;.$A$1:$B$2"));
-        assert!(xml.find("highlighted-range").unwrap() < xml.find("operation").unwrap());
+        assert!(
+            xml.find("highlighted-range")
+                .expect("test fixture or operation should succeed")
+                < xml
+                    .find("operation")
+                    .expect("test fixture or operation should succeed")
+        );
     }
 
     #[test]

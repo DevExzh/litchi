@@ -1,7 +1,10 @@
 //! Concise family entry points.
 
 use litchi_core::{Error, Metadata, Result};
-use litchi_odf_common::core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml};
+use litchi_odf_common::{
+    compact_xml,
+    core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml},
+};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
@@ -133,6 +136,7 @@ impl Image {
             transaction: self.package.content_snapshot().transaction(),
             resource_changes: Vec::new(),
             metadata: None,
+            styles: None,
         }
     }
 
@@ -149,6 +153,7 @@ pub struct Edit<'a> {
     transaction: crate::FlatImageTransaction,
     resource_changes: Vec<ResourceEdit>,
     metadata: Option<MetadataEdit>,
+    styles: Option<StyleEdit>,
 }
 
 impl Edit<'_> {
@@ -189,6 +194,51 @@ impl Edit<'_> {
     /// Returns an error for an invalid selector or lossy source representation.
     pub fn set_source(&mut self, frame: usize, source: crate::source::Source) -> Result<()> {
         self.transaction.set_source(frame, source)
+    }
+
+    /// Stages the optional stable XML identifier on `draw:frame`.
+    pub fn set_frame_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_frame_xml_id(frame, value)
+    }
+
+    /// Stages the optional accessible frame title.
+    pub fn set_frame_title(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_frame_title(frame, value)
+    }
+
+    /// Stages the optional accessible frame description.
+    pub fn set_frame_description(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_frame_description(frame, value)
+    }
+
+    /// Stages the optional declared image media type.
+    pub fn set_image_media_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_image_media_type(frame, value)
+    }
+
+    /// Stages the optional stable XML identifier on `draw:image`.
+    pub fn set_image_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_image_xml_id(frame, value)
+    }
+
+    /// Stages the optional inert producer filter hint.
+    pub fn set_filter_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_filter_name(frame, value)
+    }
+
+    /// Stages the optional image `XLink` type.
+    pub fn set_link_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_link_type(frame, value)
+    }
+
+    /// Stages the optional image `XLink` presentation behavior.
+    pub fn set_show(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_show(frame, value)
+    }
+
+    /// Stages the optional image `XLink` activation behavior.
+    pub fn set_actuate(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_actuate(frame, value)
     }
 
     /// Stages the optional graphic style reference.
@@ -282,6 +332,11 @@ impl Edit<'_> {
         self.transaction.set_relative_height(frame, value)
     }
 
+    /// Replaces the optional `draw:copy-of` frame reference.
+    pub fn set_copy_of(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_copy_of(frame, value)
+    }
+
     /// Stages the document title while preserving every unedited metadata node.
     pub fn set_title(&mut self, value: Option<String>) -> Result<()> {
         self.metadata_mut()?.after.title = value;
@@ -314,6 +369,26 @@ impl Edit<'_> {
     pub fn set_keywords(&mut self, value: Option<String>) -> Result<()> {
         self.metadata_mut()?.after.keywords = value;
         self.remove_metadata_noop();
+        Ok(())
+    }
+
+    /// Replaces or removes the exact compact `styles.xml` part.
+    ///
+    /// The supplied XML is treated as newly authored and must pass the shared
+    /// compact publication boundary before it is staged.
+    pub fn set_styles_xml(&mut self, value: Option<String>) -> Result<()> {
+        if let Some(xml) = &value {
+            compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+        }
+        let before = self.source.styles_xml().map(str::to_owned);
+        if before == value {
+            self.styles = None;
+        } else {
+            self.styles = Some(StyleEdit {
+                before,
+                after: value,
+            });
+        }
         Ok(())
     }
 
@@ -376,6 +451,10 @@ impl Edit<'_> {
             .iter()
             .map(ResourceChange::inverse)
             .collect::<Vec<_>>();
+        let style_change = self.styles.map(|edit| StyleChange {
+            before: edit.before,
+            after: edit.after,
+        });
         let metadata_change = self.metadata.map(|edit| MetadataChange {
             before: edit.before,
             after: edit.after,
@@ -384,29 +463,40 @@ impl Edit<'_> {
             .as_ref()
             .map(|change| patch_metadata(self.source, &change.after))
             .transpose()?;
-        let snapshot =
-            if changes.is_empty() && resource_edits.is_empty() && metadata_change.is_none() {
-                self.source.clone()
-            } else {
-                let xml = std::str::from_utf8(content.snapshot().as_bytes()).map_err(|error| {
-                    Error::InvalidFormat(format!("ODI edited content.xml is not UTF-8: {error}"))
-                })?;
-                let replacements = resource_edits
-                    .iter()
-                    .map(|change| crate::package::ResourceReplacement {
-                        path: &change.path,
-                        media_type: change.after_media_type.as_deref().unwrap_or_default(),
-                        bytes: change.after_bytes.as_deref(),
-                    })
-                    .collect::<Vec<_>>();
-                Image {
-                    package: self.source.package.rebuild(
-                        xml,
-                        replacement_meta_xml.as_deref(),
-                        &replacements,
-                    )?,
-                }
+        let snapshot = if changes.is_empty()
+            && resource_edits.is_empty()
+            && metadata_change.is_none()
+            && style_change.is_none()
+        {
+            self.source.clone()
+        } else {
+            let xml = std::str::from_utf8(content.snapshot().as_bytes()).map_err(|error| {
+                Error::InvalidFormat(format!("ODI edited content.xml is not UTF-8: {error}"))
+            })?;
+            let replacements = resource_edits
+                .iter()
+                .map(|change| crate::package::ResourceReplacement {
+                    path: &change.path,
+                    media_type: change.after_media_type.as_deref().unwrap_or_default(),
+                    bytes: change.after_bytes.as_deref(),
+                })
+                .collect::<Vec<_>>();
+            let styles_replacement = match &style_change {
+                None => crate::package::StylesReplacement::Preserve,
+                Some(change) => match change.after.as_deref() {
+                    Some(styles_xml) => crate::package::StylesReplacement::Set(styles_xml),
+                    None => crate::package::StylesReplacement::Remove,
+                },
             };
+            Image {
+                package: self.source.package.rebuild(
+                    xml,
+                    styles_replacement,
+                    replacement_meta_xml.as_deref(),
+                    &replacements,
+                )?,
+            }
+        };
         for change in &changes {
             let actual = snapshot.frames().get(change.frame()).ok_or_else(|| {
                 Error::InvalidFormat("ODI edited frame disappeared during readback".to_string())
@@ -446,6 +536,13 @@ impl Edit<'_> {
                 "ODI package metadata edit failed semantic readback".to_string(),
             ));
         }
+        if let Some(change) = &style_change
+            && snapshot.styles_xml() != change.after.as_deref()
+        {
+            return Err(Error::InvalidFormat(
+                "ODI styles.xml edit failed semantic readback".to_string(),
+            ));
+        }
         Ok(Commit {
             snapshot: snapshot.clone(),
             patch: Patch {
@@ -455,6 +552,8 @@ impl Edit<'_> {
                 inverse_changes,
                 resource_changes,
                 inverse_resource_changes,
+                style_change: style_change.clone(),
+                inverse_style_change: style_change.as_ref().map(StyleChange::inverse),
                 metadata_change: metadata_change.clone(),
                 inverse_metadata_change: metadata_change.as_ref().map(MetadataChange::inverse),
             },
@@ -577,6 +676,11 @@ struct MetadataEdit {
     after: MetadataFields,
 }
 
+struct StyleEdit {
+    before: Option<String>,
+    after: Option<String>,
+}
+
 struct ResourceEdit {
     resource: Option<usize>,
     path: String,
@@ -612,6 +716,7 @@ impl Commit {
     pub fn changed(&self) -> bool {
         !self.patch.changes.is_empty()
             || !self.patch.resource_changes.is_empty()
+            || self.patch.style_change.is_some()
             || self.patch.metadata_change.is_some()
     }
 
@@ -654,6 +759,8 @@ pub struct Patch {
     inverse_changes: Vec<crate::FrameChange>,
     resource_changes: Vec<ResourceChange>,
     inverse_resource_changes: Vec<ResourceChange>,
+    style_change: Option<StyleChange>,
+    inverse_style_change: Option<StyleChange>,
     metadata_change: Option<MetadataChange>,
     inverse_metadata_change: Option<MetadataChange>,
 }
@@ -703,6 +810,12 @@ impl Patch {
         &self.resource_changes
     }
 
+    /// Returns the whole compact style-part change, if any.
+    #[must_use]
+    pub const fn style_change(&self) -> Option<&StyleChange> {
+        self.style_change.as_ref()
+    }
+
     /// Returns the simple metadata change, if any.
     #[must_use]
     pub const fn metadata_change(&self) -> Option<&MetadataChange> {
@@ -719,6 +832,8 @@ impl Patch {
             inverse_changes: self.changes.clone(),
             resource_changes: self.inverse_resource_changes.clone(),
             inverse_resource_changes: self.resource_changes.clone(),
+            style_change: self.inverse_style_change.clone(),
+            inverse_style_change: self.style_change.clone(),
             metadata_change: self.inverse_metadata_change.clone(),
             inverse_metadata_change: self.metadata_change.clone(),
         }
@@ -792,6 +907,34 @@ impl From<Option<&Metadata>> for MetadataFields {
             description: value.description.clone(),
             keywords: value.keywords.clone(),
         })
+    }
+}
+
+/// One reversible whole `styles.xml` part change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StyleChange {
+    before: Option<String>,
+    after: Option<String>,
+}
+
+impl StyleChange {
+    /// Returns the exact source style XML, if present.
+    #[must_use]
+    pub fn before(&self) -> Option<&str> {
+        self.before.as_deref()
+    }
+
+    /// Returns the exact target style XML, if present.
+    #[must_use]
+    pub fn after(&self) -> Option<&str> {
+        self.after.as_deref()
+    }
+
+    fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
     }
 }
 

@@ -12,13 +12,13 @@ fn new_range_has_an_ergonomic_validated_baseline() {
 #[test]
 fn codec_round_trip_preserves_nested_filter_metadata() {
     let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:name="Sales" t:target-range-address="Sheet1.A1:Sheet1.B20"><t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"/><t:filter t:condition-source="self"><t:filter-and><t:filter-condition t:field-number="0" t:value="East &amp; West" t:operator="="/><t:filter-or><t:filter-condition t:field-number="1" t:value="10" t:operator=">"/></t:filter-or></t:filter-and></t:filter></t:database-range></t:database-ranges></s>"#;
-    let parsed = parse_database_ranges(xml).unwrap();
+    let parsed = parse_database_ranges(xml).expect("test fixture or operation should succeed");
     let mut written = String::new();
-    write_database_ranges(&mut written, &parsed).unwrap();
+    write_database_ranges(&mut written, &parsed).expect("test fixture or operation should succeed");
     let reparsed = parse_database_ranges(&format!(
         r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{written}</s>"#
     ))
-    .unwrap();
+    .expect("test fixture or operation should succeed");
     assert_eq!(reparsed, parsed);
 }
 
@@ -52,25 +52,40 @@ mod legacy_end_to_end {
     #[test]
     fn parses_and_writes_complete_database_range_metadata() {
         let xml = r##"<o:spreadsheet xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:name="Data &amp; More" t:is-selection="false" t:on-update-keep-styles="true" t:on-update-keep-size="false" t:has-persistent-data="true" t:orientation="column" t:contains-header="true" t:display-filter-buttons="true" t:target-range-address="Sheet1.A1:Sheet1.D20" t:refresh-delay="PT5M"><t:database-source-sql t:database-name="db&amp;1" t:sql-statement="SELECT &lt;x&gt;" t:parse-sql-statement="true"/><t:filter t:target-range-address="Sheet1.F1:Sheet1.I20" t:condition-source="cell-range" t:condition-source-range-address="Sheet2.A1:Sheet2.B2" t:display-duplicates="false"><t:filter-and><t:filter-condition t:field-number="0" t:value="alpha" t:operator="=" t:case-sensitive="true" t:data-type="text"/><t:filter-or><t:filter-condition t:field-number="1" t:value="10" t:operator=">=" t:data-type="number"/><t:filter-condition t:field-number="2" t:value="" t:operator="in"><t:filter-set-item t:value="A&amp;B"/><t:filter-set-item t:value="C"/></t:filter-condition></t:filter-or></t:filter-and></t:filter><t:sort t:bind-styles-to-content="true" t:target-range-address="Sheet1.A2:Sheet1.D20" t:case-sensitive="false" t:language="en" t:country="US" t:script="Latn" t:rfc-language-tag="en-US" t:algorithm="unicode" t:embedded-number-behavior="integer"><t:sort-by t:field-number="1" t:data-type="number" t:order="descending"/></t:sort><t:subtotal-rules t:bind-styles-to-content="false" t:case-sensitive="true" t:page-breaks-on-group-change="true"><t:sort-groups t:data-type="text" t:order="ascending"/><t:subtotal-rule t:group-by-field-number="0"><t:subtotal-field t:field-number="3" t:function="sum"/></t:subtotal-rule></t:subtotal-rules></t:database-range></t:database-ranges></o:spreadsheet>"##;
-        let parsed = parse_database_ranges(xml).unwrap();
+        let parsed = parse_database_ranges(xml).expect("test fixture or operation should succeed");
         assert_eq!(parsed.len(), 1);
         let range = &parsed[0];
         assert_eq!(range.name.as_deref(), Some("Data & More"));
         assert_eq!(range.orientation, Some(Orientation::Column));
         assert_eq!(range.refresh_delay.as_deref(), Some("PT5M"));
         assert!(matches!(range.source, Some(Source::Sql { .. })));
-        assert_eq!(range.sort.as_ref().unwrap().keys[0].field_number, 1);
         assert_eq!(
-            range.subtotals.as_ref().unwrap().rules[0].fields[0].function,
+            range
+                .sort
+                .as_ref()
+                .expect("test fixture or operation should succeed")
+                .keys[0]
+                .field_number,
+            1
+        );
+        assert_eq!(
+            range
+                .subtotals
+                .as_ref()
+                .expect("test fixture or operation should succeed")
+                .rules[0]
+                .fields[0]
+                .function,
             "sum"
         );
 
         let mut written = String::new();
-        write_database_ranges(&mut written, &parsed).unwrap();
+        write_database_ranges(&mut written, &parsed)
+            .expect("test fixture or operation should succeed");
         let reparsed = parse_database_ranges(&format!(
             r#"<o:spreadsheet xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{written}</o:spreadsheet>"#
         ))
-        .unwrap();
+        .expect("test fixture or operation should succeed");
         assert_eq!(reparsed, parsed);
         assert!(written.contains("Data &amp; More"));
         assert!(written.contains("SELECT &lt;x&gt;"));
@@ -90,7 +105,7 @@ mod legacy_end_to_end {
     #[test]
     fn external_database_sources_remain_inert_data() {
         let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="A1"><t:database-source-query t:database-name="file:///database.odb" t:query-name="DangerousQuery"/></t:database-range></t:database-ranges></s>"#;
-        let ranges = parse_database_ranges(xml).unwrap();
+        let ranges = parse_database_ranges(xml).expect("test fixture or operation should succeed");
         assert_eq!(
             ranges[0].source,
             Some(Source::Query {
@@ -144,17 +159,25 @@ mod legacy_end_to_end {
         });
 
         let mut builder = Builder::new();
-        builder.add_sheet("Sheet1").unwrap();
-        builder.add_database_range(range.clone()).unwrap();
-        let bytes = builder.build().unwrap();
-        let spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
+        builder
+            .add_sheet("Sheet1")
+            .expect("test fixture or operation should succeed");
+        builder
+            .add_database_range(range.clone())
+            .expect("test fixture or operation should succeed");
+        let bytes = builder
+            .build()
+            .expect("test fixture or operation should succeed");
+        let spreadsheet =
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
         assert_eq!(spreadsheet.database_ranges(), &[range.clone()]);
 
-        let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+        let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet)
+            .expect("test fixture or operation should succeed");
         let Expression::And(expressions) = &mut mutable.database_ranges_mut()[0]
             .filter
             .as_mut()
-            .unwrap()
+            .expect("test fixture or operation should succeed")
             .expression
         else {
             panic!("expected AND filter")
@@ -164,9 +187,18 @@ mod legacy_end_to_end {
         };
         condition.value = "West & Central".to_string();
 
-        let reopened = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let reopened = Spreadsheet::from_bytes(
+            mutable
+                .to_bytes()
+                .expect("test fixture or operation should succeed"),
+        )
+        .expect("test fixture or operation should succeed");
         let reopened_range = &reopened.database_ranges()[0];
-        let Expression::And(expressions) = &reopened_range.filter.as_ref().unwrap().expression
+        let Expression::And(expressions) = &reopened_range
+            .filter
+            .as_ref()
+            .expect("test fixture or operation should succeed")
+            .expression
         else {
             panic!("expected AND filter")
         };

@@ -144,6 +144,9 @@ fn frame_content(frame: &Frame) -> String {
     if let Some(name) = frame.name() {
         push_attribute(&mut xml, "draw:name", name);
     }
+    if let Some(xml_id) = frame.xml_id() {
+        push_attribute(&mut xml, "xml:id", xml_id);
+    }
     for (name, value) in [
         ("draw:style-name", frame.style_name()),
         ("draw:text-style-name", frame.text_style_name()),
@@ -156,6 +159,7 @@ fn frame_content(frame: &Frame) -> String {
         ("svg:height", frame.height()),
         ("style:rel-width", frame.relative_width()),
         ("style:rel-height", frame.relative_height()),
+        ("draw:copy-of", frame.copy_of()),
     ] {
         if let Some(value) = value {
             push_attribute(&mut xml, name, value);
@@ -169,10 +173,13 @@ fn frame_content(frame: &Frame) -> String {
         Source::Linked(href) => {
             xml.push_str("<draw:image");
             push_attribute(&mut xml, "xlink:href", href);
+            push_image_attributes(&mut xml, frame);
             xml.push_str("/>");
         },
         Source::Embedded(bytes) => {
-            xml.push_str("<draw:image><office:binary-data>");
+            xml.push_str("<draw:image");
+            push_image_attributes(&mut xml, frame);
+            xml.push_str("><office:binary-data>");
             xml.push_str(&base64(bytes));
             xml.push_str("</office:binary-data></draw:image>");
         },
@@ -192,6 +199,21 @@ fn frame_content(frame: &Frame) -> String {
     }
     xml.push_str("</draw:frame></office:image></office:body></office:document-content>");
     xml
+}
+
+fn push_image_attributes(xml: &mut String, frame: &Frame) {
+    for (name, value) in [
+        ("draw:mime-type", frame.media_type()),
+        ("xml:id", frame.image_xml_id()),
+        ("draw:filter-name", frame.filter_name()),
+        ("xlink:type", frame.link_type()),
+        ("xlink:show", frame.show()),
+        ("xlink:actuate", frame.actuate()),
+    ] {
+        if let Some(value) = value {
+            push_attribute(xml, name, value);
+        }
+    }
 }
 
 pub(crate) fn image_map_xml(image_map: &ImageMap) -> String {
@@ -261,8 +283,13 @@ fn push_area(xml: &mut String, area: &Area) {
         },
     };
     if let Some(href) = area.href() {
-        push_attribute(xml, "xlink:type", "simple");
+        if let Some(link_type) = area.link_type() {
+            push_attribute(xml, "xlink:type", link_type);
+        }
         push_attribute(xml, "xlink:href", href);
+    }
+    if let Some(show) = area.show() {
+        push_attribute(xml, "xlink:show", show);
     }
     if let Some(target) = area.target_frame_name() {
         push_attribute(xml, "office:target-frame-name", target);

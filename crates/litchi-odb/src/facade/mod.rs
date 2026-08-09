@@ -30,6 +30,29 @@ impl Database {
         crate::package::Snapshot::from_bytes(bytes).map(|package| Self { package })
     }
 
+    /// Opens a password-encrypted database package from a file path.
+    ///
+    /// The password is used only to decode package entries. No database
+    /// credential, driver, connection, query, macro, form, or report executes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, the password is incorrect,
+    /// or the decrypted package is invalid.
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        Self::from_bytes_with_password(std::fs::read(path)?, password)
+    }
+
+    /// Opens a password-encrypted database package from in-memory bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an incorrect password or invalid decrypted package.
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        crate::package::Snapshot::from_bytes_with_password(bytes, password)
+            .map(|package| Self { package })
+    }
+
     /// Returns the `content.xml` document.
     #[must_use]
     pub fn content_xml(&self) -> &str {
@@ -105,6 +128,27 @@ impl Database {
     /// Returns an error if the package entries cannot be inspected.
     pub fn protection_status(&self) -> Result<crate::ProtectionStatus> {
         self.package.protection_status()
+    }
+
+    /// Reads inert document and macro signature metadata without verifying it
+    /// or activating macro content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signature XML cannot be decoded safely.
+    pub fn digital_signatures(&self) -> Result<crate::DigitalSignatures> {
+        self.package.digital_signatures()
+    }
+
+    /// Verifies package/document signature math without making a certificate
+    /// trust decision and without executing database or macro content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signature metadata or referenced bytes cannot be
+    /// decoded or verified.
+    pub fn verify_document_signatures(&self) -> Result<Vec<crate::SignatureVerification>> {
+        self.package.verify_document_signatures()
     }
 
     /// Starts a source-bound unified database-front-end transaction.

@@ -15,11 +15,12 @@ use super::codec::{
 use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
 use crate::sprm_operations::{
-    SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL,
-    SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL,
-    SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL,
-    SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_F_IN_TABLE, SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT,
-    SPRM_P_PROP_RMARK90, SPRM_P_WALL, SPRM_T_PROP_RMARK, SPRM_T_RSID, SPRM_T_WALL,
+    SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_RMARK,
+    SPRM_C_F_RMARK_DEL, SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK,
+    SPRM_C_IDSL_RMARK_DEL, SPRM_C_KUL, SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90,
+    SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_F_IN_TABLE,
+    SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT, SPRM_P_PROP_RMARK90, SPRM_P_WALL,
+    SPRM_T_PROP_RMARK, SPRM_T_RSID, SPRM_T_WALL,
 };
 use crate::writer::ChpxFkpBuilder;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
@@ -168,19 +169,59 @@ impl RevisionEditor {
     /// transaction must not treat malformed UTF-16 or a discontinuous piece
     /// table as editable text.
     pub(crate) fn main_story_text(&self) -> Result<String> {
+        self.decode_text_range(0, self.main_ccp)
+    }
+
+    /// Returns one of the seven FIB story ranges in global piece-table CPs.
+    pub(crate) fn story_range(&self, story_index: usize) -> Result<(u32, u32)> {
+        if story_index >= 7 {
+            return Err(corrupted("story index is out of range"));
+        }
+        let mut start = 0u32;
+        for index in 0..story_index {
+            start = start
+                .checked_add(self.story_length(index)?)
+                .ok_or_else(|| corrupted("story CP range overflow"))?;
+        }
+        let end = start
+            .checked_add(self.story_length(story_index)?)
+            .ok_or_else(|| corrupted("story CP range overflow"))?;
+        if self.pieces.last().is_none_or(|piece| piece.end < end) {
+            return Err(corrupted("piece table does not cover selected story"));
+        }
+        Ok((start, end))
+    }
+
+    /// Strict text for one FIB story, plus its global CP origin.
+    pub(crate) fn story_text(&self, story_index: usize) -> Result<(u32, String)> {
+        let (start, end) = self.story_range(story_index)?;
+        self.decode_text_range(start, end).map(|text| (start, text))
+    }
+
+    fn decode_text_range(&self, range_start: u32, range_end: u32) -> Result<String> {
         let mut output = String::new();
         let mut covered = 0u32;
         for piece in &self.pieces {
-            if piece.start >= self.main_ccp {
+            if piece.start >= range_end {
                 break;
             }
-            let end = piece.end.min(self.main_ccp);
-            if end <= piece.start {
+            let start = piece.start.max(range_start);
+            let end = piece.end.min(range_end);
+            if end <= start {
                 continue;
             }
-            let count = end - piece.start;
+            let count = end - start;
+            let relative = start - piece.start;
             if piece.unicode {
-                let offset = usize::try_from(piece.fc)
+                let fc = piece
+                    .fc
+                    .checked_add(
+                        relative
+                            .checked_mul(2)
+                            .ok_or_else(|| corrupted("Unicode piece relative offset overflow"))?,
+                    )
+                    .ok_or_else(|| corrupted("Unicode piece offset overflow"))?;
+                let offset = usize::try_from(fc)
                     .map_err(|_| corrupted("Unicode piece offset exceeds usize"))?;
                 let byte_count = usize::try_from(count)
                     .ok()
@@ -199,7 +240,11 @@ impl RevisionEditor {
                         .map_err(|_| corrupted("main-story text contains invalid UTF-16"))?,
                 );
             } else {
-                let offset = usize::try_from(piece.fc)
+                let fc = piece
+                    .fc
+                    .checked_add(relative)
+                    .ok_or_else(|| corrupted("compressed piece offset overflow"))?;
+                let offset = usize::try_from(fc)
                     .map_err(|_| corrupted("compressed piece offset exceeds usize"))?;
                 let byte_count = usize::try_from(count)
                     .map_err(|_| corrupted("compressed piece byte count exceeds usize"))?;
@@ -217,12 +262,21 @@ impl RevisionEditor {
                 .checked_add(count)
                 .ok_or_else(|| corrupted("main-story CP count overflow"))?;
         }
-        if covered != self.main_ccp || output.encode_utf16().count() != self.main_ccp as usize {
+        let expected = range_end - range_start;
+        if covered != expected || output.encode_utf16().count() != expected as usize {
             return Err(corrupted(
-                "piece table does not exactly cover the main story",
+                "piece table does not exactly cover the selected story",
             ));
         }
         Ok(output)
+    }
+
+    fn story_length(&self, story_index: usize) -> Result<u32> {
+        if story_index == 0 {
+            Ok(self.main_ccp)
+        } else {
+            u32_at(&self.word, FIB_CCP_TEXT + story_index * 4)
+        }
     }
 
     /// Known CP-indexed FIB tables outside the length-changing splice model.
@@ -239,6 +293,16 @@ impl RevisionEditor {
         Ok(groups.windows(2).all(|pair| pair[0] == pair[1]))
     }
 
+    #[must_use]
+    pub(crate) fn is_unicode_range(&self, start: u32, end: u32) -> bool {
+        start < end
+            && self
+                .pieces
+                .iter()
+                .filter(|piece| piece.start < end && start < piece.end)
+                .all(|piece| piece.unicode)
+    }
+
     /// Returns a uniform direct bold override, or `None` when the selected
     /// runs disagree or use a non-literal toggle value.
     pub(crate) fn uniform_bold_override(
@@ -246,13 +310,38 @@ impl RevisionEditor {
         start: u32,
         end: u32,
     ) -> Result<Option<Option<bool>>> {
+        self.uniform_character_override(start, end, SPRM_C_F_BOLD)
+    }
+
+    pub(crate) fn uniform_italic_override(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> Result<Option<Option<bool>>> {
+        self.uniform_character_override(start, end, SPRM_C_F_ITALIC)
+    }
+
+    pub(crate) fn uniform_underline_override(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> Result<Option<Option<bool>>> {
+        self.uniform_character_override(start, end, SPRM_C_KUL)
+    }
+
+    fn uniform_character_override(
+        &self,
+        start: u32,
+        end: u32,
+        opcode: u16,
+    ) -> Result<Option<Option<bool>>> {
         let groups = self.character_groups(start, end)?;
         let mut uniform = None;
         for group in groups {
             let value = strict_sprms(group)?
                 .iter()
                 .rev()
-                .find(|sprm| sprm.opcode == SPRM_C_F_BOLD)
+                .find(|sprm| sprm.opcode == opcode)
                 .and_then(super::super::sprm::Sprm::operand_byte);
             let value = match value {
                 Some(0) => Some(false),
@@ -347,13 +436,45 @@ impl RevisionEditor {
         end: u32,
         value: Option<bool>,
     ) -> Result<()> {
-        validate_range(start, end, self.main_ccp)?;
+        self.set_character_override(start, end, SPRM_C_F_BOLD, value)
+    }
+
+    pub(crate) fn set_character_italic_override(
+        &mut self,
+        start: u32,
+        end: u32,
+        value: Option<bool>,
+    ) -> Result<()> {
+        self.set_character_override(start, end, SPRM_C_F_ITALIC, value)
+    }
+
+    pub(crate) fn set_character_underline_override(
+        &mut self,
+        start: u32,
+        end: u32,
+        value: Option<bool>,
+    ) -> Result<()> {
+        self.set_character_override(start, end, SPRM_C_KUL, value)
+    }
+
+    fn set_character_override(
+        &mut self,
+        start: u32,
+        end: u32,
+        opcode: u16,
+        value: Option<bool>,
+    ) -> Result<()> {
+        validate_range(
+            start,
+            end,
+            self.pieces.last().map_or(self.main_ccp, |piece| piece.end),
+        )?;
         let intervals = self.fc_intervals(start, end)?;
         let mut candidate = self.clone();
         split_transform_chpx(&mut candidate.chpx, &intervals, |group| {
-            let mut output = retain_sprms(group, &[SPRM_C_F_BOLD])?;
+            let mut output = retain_sprms(group, &[opcode])?;
             if let Some(enabled) = value {
-                output.extend_from_slice(&SPRM_C_F_BOLD.to_le_bytes());
+                output.extend_from_slice(&opcode.to_le_bytes());
                 output.push(u8::from(enabled));
             }
             if output.len() > 255 {
@@ -362,6 +483,64 @@ impl RevisionEditor {
             Ok(output)
         })?;
         candidate.rewrite_chpx()?;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Same-length overwrite for a non-main Unicode story range. No CP, CLX,
+    /// FKP, PLCF, or FIB length changes, so story-relative dependencies remain
+    /// byte-identical.
+    pub(crate) fn replace_unicode_text_same_length(
+        &mut self,
+        start: u32,
+        end: u32,
+        replacement: &str,
+    ) -> Result<()> {
+        if start >= end || end > self.pieces.last().map_or(0, |piece| piece.end) {
+            return Err(corrupted("story text range is outside the piece table"));
+        }
+        let units = replacement.encode_utf16().collect::<Vec<_>>();
+        if units.len() != (end - start) as usize {
+            return Err(corrupted("story replacement changes UTF-16 length"));
+        }
+        let mut candidate = self.clone();
+        let mut copied = 0usize;
+        for piece in &candidate.pieces {
+            let left = start.max(piece.start);
+            let right = end.min(piece.end);
+            if left >= right {
+                continue;
+            }
+            if !piece.unicode {
+                return Err(corrupted("story replacement intersects a compressed piece"));
+            }
+            let count = (right - left) as usize;
+            let fc = piece
+                .fc
+                .checked_add(
+                    (left - piece.start)
+                        .checked_mul(2)
+                        .ok_or_else(|| corrupted("story replacement FC offset overflow"))?,
+                )
+                .ok_or_else(|| corrupted("story replacement FC overflow"))?;
+            let offset =
+                usize::try_from(fc).map_err(|_| corrupted("story replacement FC exceeds usize"))?;
+            let bytes = candidate
+                .word
+                .get_mut(offset..offset + count * 2)
+                .ok_or_else(|| corrupted("story replacement exceeds WordDocument"))?;
+            for (slot, unit) in bytes
+                .chunks_exact_mut(2)
+                .zip(units[copied..copied + count].iter().copied())
+            {
+                slot.copy_from_slice(&unit.to_le_bytes());
+            }
+            copied += count;
+        }
+        if copied != units.len() {
+            return Err(corrupted("story replacement is not fully piece-covered"));
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())

@@ -12,9 +12,26 @@ enum Intent {
         position: usize,
         replacement: String,
     },
+    ReplaceNested {
+        block_position: usize,
+        nested_position: usize,
+        replacement: String,
+    },
+    ReplaceInline {
+        block_position: usize,
+        inline_position: usize,
+        replacement: String,
+    },
     Append {
         block: String,
     },
+}
+
+#[derive(Clone, Copy)]
+enum EndingPolicy {
+    None,
+    One,
+    Exact,
 }
 
 /// A bounded one-operation edit against an immutable Markdown snapshot.
@@ -75,6 +92,7 @@ impl<'snapshot> Edit<'snapshot> {
         }
         validate_dependencies(self.source, &self.intents)?;
         let target = render(self.source, &self.intents)?;
+        validate_structural_boundaries(self.source, &target, &self.intents)?;
         publish(self.source, &target, &self.intents)
     }
 
@@ -116,9 +134,11 @@ impl<'snapshot> Edit<'snapshot> {
         if self.source.block(position).is_none() {
             return Err(Error::BlockNotFound { position });
         }
-        if self.intents.iter().any(
-            |intent| matches!(intent, Intent::Replace { position: existing, .. } if *existing == position),
-        ) {
+        if self
+            .intents
+            .iter()
+            .any(|intent| intent_targets_block(intent, position))
+        {
             return Err(Error::OverlappingOperation { position });
         }
         if !replacement.is_empty() {
@@ -129,6 +149,94 @@ impl<'snapshot> Edit<'snapshot> {
             replacement: copy_source(replacement)?,
         });
         Ok(self)
+    }
+
+    /// Replace an exact nested block-node range without touching its container.
+    ///
+    /// The complete candidate is reparsed and refused if the edit escapes or
+    /// changes the enclosing top-level block boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns a missing-target, overlap, allocation, limit, dependency, or
+    /// structural-boundary error.
+    pub fn replace_nested_block(
+        &mut self,
+        block_position: usize,
+        nested_position: usize,
+        replacement: &str,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_capacity()?;
+        let block = self
+            .source
+            .block(block_position)
+            .ok_or(Error::BlockNotFound {
+                position: block_position,
+            })?;
+        let target =
+            block
+                .descendants()
+                .nth(nested_position)
+                .ok_or(Error::NestedBlockNotFound {
+                    block_position,
+                    nested_position,
+                })?;
+        self.ensure_disjoint(target.range(), block_position)?;
+        self.intents.push(Intent::ReplaceNested {
+            block_position,
+            nested_position,
+            replacement: copy_source(replacement)?,
+        });
+        Ok(self)
+    }
+
+    /// Replace an exact inline-node range, including its original delimiters.
+    ///
+    /// # Errors
+    ///
+    /// Returns a missing-target, overlap, allocation, limit, dependency, or
+    /// structural-boundary error.
+    pub fn replace_inline(
+        &mut self,
+        block_position: usize,
+        inline_position: usize,
+        replacement: &str,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_capacity()?;
+        let block = self
+            .source
+            .block(block_position)
+            .ok_or(Error::BlockNotFound {
+                position: block_position,
+            })?;
+        let target = block
+            .inlines()
+            .nth(inline_position)
+            .ok_or(Error::InlineNotFound {
+                block_position,
+                inline_position,
+            })?;
+        self.ensure_disjoint(target.range(), block_position)?;
+        self.intents.push(Intent::ReplaceInline {
+            block_position,
+            inline_position,
+            replacement: copy_source(replacement)?,
+        });
+        Ok(self)
+    }
+
+    fn ensure_disjoint(
+        &self,
+        candidate: std::ops::Range<usize>,
+        position: usize,
+    ) -> Result<(), Error> {
+        if self.intents.iter().any(|intent| {
+            intent_range(self.source, intent)
+                .is_some_and(|existing| ranges_overlap(&existing, &candidate))
+        }) {
+            return Err(Error::OverlappingOperation { position });
+        }
+        Ok(())
     }
 
     /// Replace one block with one safely escaped literal paragraph.
@@ -271,6 +379,10 @@ struct DurableEnvelope {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct SemanticOperation {
     position: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    nested_position: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    inline_position: Option<usize>,
     replacement: String,
 }
 
@@ -278,6 +390,8 @@ struct SemanticOperation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Conflict {
     position: usize,
+    nested_position: Option<usize>,
+    inline_position: Option<usize>,
 }
 
 impl Conflict {
@@ -285,6 +399,18 @@ impl Conflict {
     #[must_use]
     pub const fn position(self) -> usize {
         self.position
+    }
+
+    /// Nested block position when the conflict targets a nested node.
+    #[must_use]
+    pub const fn nested_position(self) -> Option<usize> {
+        self.nested_position
+    }
+
+    /// Inline position when the conflict targets an inline node.
+    #[must_use]
+    pub const fn inline_position(self) -> Option<usize> {
+        self.inline_position
     }
 }
 
@@ -342,6 +468,33 @@ impl MergePlan {
     /// Consume a conflict-free plan into its already validated commit.
     #[must_use]
     pub fn into_commit(self) -> Option<Commit> {
+        self.commit
+    }
+}
+
+/// A fully validated, non-mutating reference-aware block transfer.
+#[derive(Debug)]
+pub struct TransferPlan {
+    commit: Commit,
+    dependency_count: usize,
+}
+
+impl TransferPlan {
+    /// Number of definition blocks added after the selected block.
+    #[must_use]
+    pub const fn dependency_count(&self) -> usize {
+        self.dependency_count
+    }
+
+    /// Inspect the validated destination commit without publishing it.
+    #[must_use]
+    pub const fn planned_commit(&self) -> &Commit {
+        &self.commit
+    }
+
+    /// Consume this preflight into its already validated commit.
+    #[must_use]
+    pub fn into_commit(self) -> Commit {
         self.commit
     }
 }
@@ -719,6 +872,104 @@ impl History {
     }
 }
 
+pub(crate) fn preflight_transfer_block(
+    source: &Snapshot,
+    position: usize,
+    destination: &Snapshot,
+) -> Result<TransferPlan, Error> {
+    if source.dialect() != destination.dialect() {
+        return Err(Error::TransferDialectMismatch);
+    }
+    source
+        .block(position)
+        .ok_or(Error::BlockNotFound { position })?;
+    let mut closure = vec![position];
+    let mut cursor = 0usize;
+    while cursor < closure.len() {
+        let range = source
+            .block(closure[cursor])
+            .ok_or(Error::BlockNotFound {
+                position: closure[cursor],
+            })?
+            .range();
+        let dependencies: Vec<_> = source
+            .references()
+            .filter(|reference| {
+                range.start <= reference.range().start
+                    && reference.range().end <= range.end
+                    && matches!(
+                        reference.kind(),
+                        super::ReferenceKind::Link
+                            | super::ReferenceKind::Image
+                            | super::ReferenceKind::Footnote
+                    )
+                    && reference.label().is_some()
+            })
+            .map(|reference| {
+                (
+                    reference.kind(),
+                    reference.label().unwrap_or_default().to_owned(),
+                )
+            })
+            .collect();
+        for (use_kind, label) in dependencies {
+            let definition_kind = match use_kind {
+                super::ReferenceKind::Link | super::ReferenceKind::Image => {
+                    super::ReferenceKind::LinkDefinition
+                },
+                super::ReferenceKind::Footnote => super::ReferenceKind::FootnoteDefinition,
+                super::ReferenceKind::LinkDefinition | super::ReferenceKind::FootnoteDefinition => {
+                    continue;
+                },
+            };
+            let matching_definition = source.references().find(|reference| {
+                reference.kind() == definition_kind && reference.label() == Some(label.as_str())
+            });
+            let Some(source_definition) = matching_definition else {
+                continue;
+            };
+            if let Some(destination_definition) = destination.references().find(|reference| {
+                reference.kind() == definition_kind && reference.label() == Some(label.as_str())
+            }) {
+                if source_definition.destination() != destination_definition.destination()
+                    || source_definition.title() != destination_definition.title()
+                {
+                    return Err(Error::TransferDependencyConflict { label });
+                }
+                continue;
+            }
+            let definition_position = containing_block(source, source_definition.range()).ok_or(
+                Error::TransferDependencyConflict {
+                    label: label.clone(),
+                },
+            )?;
+            if !closure.contains(&definition_position) {
+                closure
+                    .try_reserve(1)
+                    .map_err(|allocation_error| Error::Allocation {
+                        resource: "Markdown transfer dependency closure",
+                        source: allocation_error,
+                    })?;
+                closure.push(definition_position);
+            }
+        }
+        cursor = cursor.saturating_add(1);
+    }
+    let dependency_count = closure.len().saturating_sub(1);
+    let mut edit = destination.edit();
+    for block_position in closure {
+        let block = source.block(block_position).ok_or(Error::BlockNotFound {
+            position: block_position,
+        })?;
+        edit.append_block(block.source())?;
+    }
+    let commit = edit.commit()?;
+    Ok(TransferPlan {
+        commit,
+        dependency_count,
+    })
+}
+
 fn patch_bytes(patch: &Patch) -> usize {
     patch.before.len().saturating_add(patch.after.len())
 }
@@ -773,22 +1024,52 @@ fn joined_operations(
             resource: "Markdown conflict set",
             source: allocation_error,
         })?;
+    let base = Snapshot::read_with(&left.before, left.dialect, left.limits)?;
     for candidate in right_operations {
         let Some(position) = candidate.position else {
             operations.push(candidate.clone());
             continue;
         };
-        let existing = left_operations
+        let mut duplicate = false;
+        let candidate_range = semantic_operation_range(&base, candidate)?;
+        for existing in left_operations
             .iter()
-            .find(|operation| operation.position == Some(position));
-        match existing {
-            Some(operation) if operation.replacement == candidate.replacement => {},
-            Some(_) => conflicts.push(Conflict { position }),
-            None => operations.push(candidate.clone()),
+            .filter(|operation| operation.position.is_some())
+        {
+            let existing_range = semantic_operation_range(&base, existing)?;
+            if !ranges_overlap(&existing_range, &candidate_range) {
+                continue;
+            }
+            if semantic_target(existing) == semantic_target(candidate)
+                && existing.replacement == candidate.replacement
+            {
+                duplicate = true;
+            } else {
+                conflicts.push(Conflict {
+                    position,
+                    nested_position: candidate.nested_position,
+                    inline_position: candidate.inline_position,
+                });
+            }
+        }
+        if !duplicate
+            && !conflicts.iter().any(|conflict| {
+                conflict.position == position
+                    && conflict.nested_position == candidate.nested_position
+                    && conflict.inline_position == candidate.inline_position
+            })
+        {
+            operations.push(candidate.clone());
         }
     }
-    conflicts.sort_unstable_by_key(|conflict| conflict.position);
-    conflicts.dedup_by_key(|conflict| conflict.position);
+    conflicts.sort_unstable_by_key(|conflict| {
+        (
+            conflict.position,
+            conflict.nested_position,
+            conflict.inline_position,
+        )
+    });
+    conflicts.dedup();
     Ok((
         operations,
         ConflictSet {
@@ -847,6 +1128,50 @@ fn copy_source(source: &str) -> Result<String, Error> {
     Ok(retained)
 }
 
+fn semantic_target(operation: &SemanticOperation) -> (Option<usize>, Option<usize>, Option<usize>) {
+    (
+        operation.position,
+        operation.nested_position,
+        operation.inline_position,
+    )
+}
+
+fn semantic_operation_range(
+    source: &Snapshot,
+    operation: &SemanticOperation,
+) -> Result<std::ops::Range<usize>, Error> {
+    let position = operation
+        .position
+        .ok_or_else(|| Error::InvalidPatchEnvelope {
+            reason: "append operation has no source range".to_owned(),
+        })?;
+    let block = source
+        .block(position)
+        .ok_or(Error::BlockNotFound { position })?;
+    match (operation.nested_position, operation.inline_position) {
+        (None, None) => Ok(block.range()),
+        (Some(nested_position), None) => block
+            .descendants()
+            .nth(nested_position)
+            .map(|nested| nested.range())
+            .ok_or(Error::NestedBlockNotFound {
+                block_position: position,
+                nested_position,
+            }),
+        (None, Some(inline_position)) => block
+            .inlines()
+            .nth(inline_position)
+            .map(|inline| inline.range())
+            .ok_or(Error::InlineNotFound {
+                block_position: position,
+                inline_position,
+            }),
+        (Some(_), Some(_)) => Err(Error::InvalidPatchEnvelope {
+            reason: "semantic operation has two nested targets".to_owned(),
+        }),
+    }
+}
+
 fn semantic_operations(intents: &[Intent]) -> Vec<SemanticOperation> {
     intents
         .iter()
@@ -856,10 +1181,34 @@ fn semantic_operations(intents: &[Intent]) -> Vec<SemanticOperation> {
                 replacement,
             } => SemanticOperation {
                 position: Some(*position),
+                nested_position: None,
+                inline_position: None,
+                replacement: replacement.clone(),
+            },
+            Intent::ReplaceNested {
+                block_position,
+                nested_position,
+                replacement,
+            } => SemanticOperation {
+                position: Some(*block_position),
+                nested_position: Some(*nested_position),
+                inline_position: None,
+                replacement: replacement.clone(),
+            },
+            Intent::ReplaceInline {
+                block_position,
+                inline_position,
+                replacement,
+            } => SemanticOperation {
+                position: Some(*block_position),
+                nested_position: None,
+                inline_position: Some(*inline_position),
                 replacement: replacement.clone(),
             },
             Intent::Append { block } => SemanticOperation {
                 position: None,
+                nested_position: None,
+                inline_position: None,
                 replacement: block.clone(),
             },
         })
@@ -877,10 +1226,28 @@ fn replay_semantic_operations(
     }
     let mut edit = source.edit();
     for operation in operations {
-        if let Some(position) = operation.position {
-            edit.replace_block(position, &operation.replacement)?;
-        } else {
-            edit.append_block(&operation.replacement)?;
+        match (
+            operation.position,
+            operation.nested_position,
+            operation.inline_position,
+        ) {
+            (Some(position), None, None) => {
+                edit.replace_block(position, &operation.replacement)?;
+            },
+            (Some(position), Some(nested_position), None) => {
+                edit.replace_nested_block(position, nested_position, &operation.replacement)?;
+            },
+            (Some(position), None, Some(inline_position)) => {
+                edit.replace_inline(position, inline_position, &operation.replacement)?;
+            },
+            (None, None, None) => {
+                edit.append_block(&operation.replacement)?;
+            },
+            _ => {
+                return Err(Error::InvalidPatchEnvelope {
+                    reason: "semantic operation has an invalid target".to_owned(),
+                });
+            },
         }
     }
     edit.commit()
@@ -937,17 +1304,39 @@ fn publish(source: &Snapshot, target: &str, intents: &[Intent]) -> Result<Commit
 }
 
 fn render(source: &Snapshot, intents: &[Intent]) -> Result<String, Error> {
-    let mut replacements: Vec<(usize, &str)> = intents
+    let mut replacements: Vec<(std::ops::Range<usize>, &str, EndingPolicy)> = intents
         .iter()
         .filter_map(|intent| match intent {
             Intent::Replace {
                 position,
                 replacement,
-            } => Some((*position, replacement.as_str())),
+            } => source
+                .block(*position)
+                .map(|block| (block.range(), replacement.as_str(), EndingPolicy::One)),
+            Intent::ReplaceNested {
+                block_position,
+                nested_position,
+                replacement,
+            } => source.block(*block_position).and_then(|block| {
+                block
+                    .descendants()
+                    .nth(*nested_position)
+                    .map(|nested| (nested.range(), replacement.as_str(), EndingPolicy::Exact))
+            }),
+            Intent::ReplaceInline {
+                block_position,
+                inline_position,
+                replacement,
+            } => source.block(*block_position).and_then(|block| {
+                block
+                    .inlines()
+                    .nth(*inline_position)
+                    .map(|inline| (inline.range(), replacement.as_str(), EndingPolicy::None))
+            }),
             Intent::Append { .. } => None,
         })
         .collect();
-    replacements.sort_unstable_by_key(|(position, _)| *position);
+    replacements.sort_unstable_by_key(|(range, _, _)| range.start);
     let mut target = String::new();
     target
         .try_reserve_exact(source.source().len())
@@ -956,21 +1345,26 @@ fn render(source: &Snapshot, intents: &[Intent]) -> Result<String, Error> {
             source: allocation_error,
         })?;
     let mut cursor = 0usize;
-    for (position, replacement) in replacements {
-        let block = source
-            .block(position)
-            .ok_or(Error::BlockNotFound { position })?;
-        let range = block.range();
+    for (range, replacement, ending_policy) in replacements {
         target.push_str(&source.source()[cursor..range.start]);
         target.push_str(replacement);
         if !replacement.is_empty()
             && range.end != source.source().len()
             && !replacement.ends_with(['\r', '\n'])
         {
-            if block.source().ends_with("\r\n") {
-                target.push_str("\r\n");
-            } else if block.source().ends_with(['\r', '\n']) {
-                target.push('\n');
+            let replaced_source = &source.source()[range.clone()];
+            match ending_policy {
+                EndingPolicy::One if replaced_source.ends_with("\r\n") => {
+                    target.push_str("\r\n");
+                },
+                EndingPolicy::One if replaced_source.ends_with(['\r', '\n']) => {
+                    target.push('\n');
+                },
+                EndingPolicy::None | EndingPolicy::One => {},
+                EndingPolicy::Exact => {
+                    let suffix_start = replaced_source.trim_end_matches(['\r', '\n']).len();
+                    target.push_str(&replaced_source[suffix_start..]);
+                },
             }
         }
         cursor = range.end;
@@ -978,7 +1372,9 @@ fn render(source: &Snapshot, intents: &[Intent]) -> Result<String, Error> {
     target.push_str(&source.source()[cursor..]);
     for block in intents.iter().filter_map(|intent| match intent {
         Intent::Append { block } => Some(block.as_str()),
-        Intent::Replace { .. } => None,
+        Intent::Replace { .. } | Intent::ReplaceNested { .. } | Intent::ReplaceInline { .. } => {
+            None
+        },
     }) {
         if !target.is_empty() {
             if target.ends_with('\n') {
@@ -996,6 +1392,73 @@ fn render(source: &Snapshot, intents: &[Intent]) -> Result<String, Error> {
         });
     }
     Ok(target)
+}
+
+fn validate_structural_boundaries(
+    source: &Snapshot,
+    target: &str,
+    intents: &[Intent],
+) -> Result<(), Error> {
+    let structural_positions: Vec<_> = intents
+        .iter()
+        .filter_map(|intent| match intent {
+            Intent::ReplaceNested { block_position, .. }
+            | Intent::ReplaceInline { block_position, .. } => Some(*block_position),
+            Intent::Replace { .. } | Intent::Append { .. } => None,
+        })
+        .collect();
+    if structural_positions.is_empty() {
+        return Ok(());
+    }
+    let candidate = Snapshot::read_with(target, source.dialect(), source.limits())?;
+    for position in structural_positions {
+        let removed_before = intents
+            .iter()
+            .filter(|intent| {
+                matches!(
+                    intent,
+                    Intent::Replace {
+                        position: replaced,
+                        replacement,
+                    } if *replaced < position && replacement.is_empty()
+                )
+            })
+            .count();
+        let candidate_position = position.saturating_sub(removed_before);
+        let source_kind = source
+            .block(position)
+            .ok_or(Error::BlockNotFound { position })?
+            .kind();
+        if candidate
+            .block(candidate_position)
+            .map(|block| block.kind())
+            != Some(source_kind)
+        {
+            return Err(Error::StructuralBoundaryChanged);
+        }
+    }
+    let removed = intents
+        .iter()
+        .filter(|intent| {
+            matches!(
+                intent,
+                Intent::Replace { replacement, .. } if replacement.is_empty()
+            )
+        })
+        .count();
+    let appended = intents
+        .iter()
+        .filter(|intent| matches!(intent, Intent::Append { .. }))
+        .count();
+    let expected = source
+        .blocks()
+        .len()
+        .saturating_sub(removed)
+        .saturating_add(appended);
+    if candidate.blocks().len() != expected {
+        return Err(Error::StructuralBoundaryChanged);
+    }
+    Ok(())
 }
 
 fn validate_replacement(source: &Snapshot, replacement: &str) -> Result<(), Error> {
@@ -1048,6 +1511,46 @@ fn containing_block(source: &Snapshot, range: std::ops::Range<usize>) -> Option<
     })
 }
 
+fn ranges_overlap(left: &std::ops::Range<usize>, right: &std::ops::Range<usize>) -> bool {
+    left.start < right.end && right.start < left.end
+}
+
+fn intent_targets_block(intent: &Intent, position: usize) -> bool {
+    match intent {
+        Intent::Replace {
+            position: existing, ..
+        } => *existing == position,
+        Intent::ReplaceNested { block_position, .. }
+        | Intent::ReplaceInline { block_position, .. } => *block_position == position,
+        Intent::Append { .. } => false,
+    }
+}
+
+fn intent_range(source: &Snapshot, intent: &Intent) -> Option<std::ops::Range<usize>> {
+    match intent {
+        Intent::Replace { position, .. } => source.block(*position).map(|block| block.range()),
+        Intent::ReplaceNested {
+            block_position,
+            nested_position,
+            ..
+        } => source
+            .block(*block_position)?
+            .descendants()
+            .nth(*nested_position)
+            .map(|block| block.range()),
+        Intent::ReplaceInline {
+            block_position,
+            inline_position,
+            ..
+        } => source
+            .block(*block_position)?
+            .inlines()
+            .nth(*inline_position)
+            .map(|inline| inline.range()),
+        Intent::Append { .. } => None,
+    }
+}
+
 const fn is_use_of(kind: super::ReferenceKind, definition: super::ReferenceKind) -> bool {
     matches!(
         (kind, definition),
@@ -1067,7 +1570,10 @@ fn replacement_at(intents: &[Intent], position: usize) -> Option<&str> {
             position: candidate,
             replacement,
         } if *candidate == position => Some(replacement.as_str()),
-        Intent::Replace { .. } | Intent::Append { .. } => None,
+        Intent::Replace { .. }
+        | Intent::ReplaceNested { .. }
+        | Intent::ReplaceInline { .. }
+        | Intent::Append { .. } => None,
     })
 }
 

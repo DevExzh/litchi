@@ -33,16 +33,18 @@ fn definition() -> Definition {
 #[test]
 fn granular_definition_crud_composes_and_survives_history() {
     let source = DefinitionSnapshot::with_default_limits(definition()).unwrap();
-    let mut first = source.edit();
-    first.insert_axis(1, AxisSpec::new(Dimension::Y)).unwrap();
-    first.insert_series(1, SeriesSpec::default()).unwrap();
-    first
+    let mut first_edit = source.edit();
+    first_edit
+        .insert_axis(1, AxisSpec::new(Dimension::Y))
+        .unwrap();
+    first_edit.insert_series(1, SeriesSpec::default()).unwrap();
+    first_edit
         .insert_data_point(1, 0, DataPointSpec::default())
         .unwrap();
-    first
+    first_edit
         .set_style(StyleTarget::Series(1), Some("second-series".into()))
         .unwrap();
-    first
+    first_edit
         .insert_cached_cell(
             false,
             0,
@@ -50,20 +52,20 @@ fn granular_definition_crud_composes_and_survives_history() {
             CachedCell::new(CachedValue::String("one".into())),
         )
         .unwrap();
-    let first = first.commit().unwrap();
+    let first = first_edit.commit().unwrap();
 
-    let mut second = first.snapshot().edit();
-    second.remove_data_point(0, 0).unwrap();
-    second.remove_series(0).unwrap();
-    second.remove_axis(0).unwrap();
-    second
+    let mut second_edit = first.snapshot().edit();
+    second_edit.remove_data_point(0, 0).unwrap();
+    second_edit.remove_series(0).unwrap();
+    second_edit.remove_axis(0).unwrap();
+    second_edit
         .update_cached_row(
             false,
             0,
             CachedRow::new(vec![CachedCell::new(CachedValue::Float(2.0))]),
         )
         .unwrap();
-    let second = second.commit().unwrap();
+    let second = second_edit.commit().unwrap();
 
     let composed = first.patch().compose(second.patch()).unwrap();
     let target = composed.apply(&source).unwrap();

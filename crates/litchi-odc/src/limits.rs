@@ -20,6 +20,9 @@ pub struct Limits {
     axes: usize,
     series: usize,
     data_points: usize,
+    cached_rows: usize,
+    cached_cells: usize,
+    range_items: usize,
     resources: usize,
     history: usize,
     scalar_bytes: usize,
@@ -34,6 +37,9 @@ impl Default for Limits {
             axes: 16_384,
             series: 65_536,
             data_points: HARD_MAX_ITEMS,
+            cached_rows: HARD_MAX_ITEMS,
+            cached_cells: HARD_MAX_ITEMS,
+            range_items: 65_536,
             resources: 100_000,
             history: 4_096,
             scalar_bytes: 64 * 1024,
@@ -108,6 +114,36 @@ impl Limits {
         Ok(self)
     }
 
+    /// Set the expanded cached-row ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
+    pub fn with_cached_rows(mut self, value: usize) -> Result<Self> {
+        self.cached_rows = checked(value, HARD_MAX_ITEMS, "cached-row count")?;
+        Ok(self)
+    }
+
+    /// Set the expanded cached-cell ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
+    pub fn with_cached_cells(mut self, value: usize) -> Result<Self> {
+        self.cached_cells = checked(value, HARD_MAX_ITEMS, "cached-cell count")?;
+        Ok(self)
+    }
+
+    /// Set the number of addresses accepted in one range list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
+    pub fn with_range_items(mut self, value: usize) -> Result<Self> {
+        self.range_items = checked(value, HARD_MAX_ITEMS, "range-list item count")?;
+        Ok(self)
+    }
+
     /// Set the auxiliary-resource count ceiling.
     ///
     /// # Errors
@@ -166,6 +202,21 @@ impl Limits {
     #[must_use]
     pub const fn max_data_points(self) -> usize {
         self.data_points
+    }
+
+    #[must_use]
+    pub const fn max_cached_rows(self) -> usize {
+        self.cached_rows
+    }
+
+    #[must_use]
+    pub const fn max_cached_cells(self) -> usize {
+        self.cached_cells
+    }
+
+    #[must_use]
+    pub const fn max_range_items(self) -> usize {
+        self.range_items
     }
 
     #[must_use]

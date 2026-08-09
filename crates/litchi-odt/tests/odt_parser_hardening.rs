@@ -2,6 +2,7 @@
 
 use litchi_core::Error;
 use litchi_odt::{Document, core::PackageWriter};
+mod support;
 
 const CONTENT_HEAD: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.3"><office:body><office:text>"#;
 const CONTENT_TAIL: &str = "</office:text></office:body></office:document-content>";
@@ -89,7 +90,15 @@ fn corpus_xxe_probe_is_rejected_without_resolution() -> Result<(), Error> {
     let xml = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE office [<!ENTITY nasty SYSTEM "externalcontent.txt">]>{CONTENT_HEAD}<text:p>&nasty;</text:p>{CONTENT_TAIL}"#
     );
-    let document = Document::from_bytes(package(xml.as_bytes(), None, Some(META))?)?;
+    assert!(package(xml.as_bytes(), None, Some(META)).is_err());
+    let raw = support::package(
+        "application/vnd.oasis.opendocument.text",
+        &[
+            ("content.xml", xml.as_bytes()),
+            ("meta.xml", META.as_bytes()),
+        ],
+    );
+    let document = Document::from_bytes(raw)?;
     match document.text() {
         Err(Error::InvalidFormat(_)) => {},
         Err(error) => panic!("text produced a non-format error: {error:?}"),

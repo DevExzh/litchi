@@ -2,4 +2,6 @@
 
 mod snapshot;
 
-pub(crate) use snapshot::{MIMETYPE, ResourceReplacement, Snapshot, StylesReplacement};
+pub(crate) use snapshot::{
+    MIMETYPE, ResourceReplacement, Snapshot, StylesReplacement, validate_authored_resource,
+};

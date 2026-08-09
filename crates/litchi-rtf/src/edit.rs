@@ -7,18 +7,21 @@
 //! updated losslessly yet. Header destinations and all bytes outside the
 //! rewritten root-body span remain exact.
 
-use crate::{Alignment, Document, RtfError, RtfWriter};
+use crate::{Alignment, Document, HeaderFooterType, RtfError, RtfWriter, TableCellPath};
 use bumpalo::Bump;
 use serde_json::Value;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Range;
 
 mod composition;
+mod transfer;
 pub use composition::{
     Composition, CompositionConflict, CompositionError, CompositionLimits, ConflictSet, MergePlan,
     MergeResolution, Prepared,
 };
+pub use transfer::TransferPlan;
 
 /// Immutable RTF snapshot used by the transaction API.
 pub type Snapshot = Document;
@@ -166,6 +169,44 @@ impl TextSpan {
     }
 }
 
+/// Checked route to one paragraph in a retained section header or footer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeaderFooterParagraph {
+    section: usize,
+    kind: HeaderFooterType,
+    paragraph: usize,
+}
+
+impl HeaderFooterParagraph {
+    /// Creates a selector whose existence is checked when an operation is staged.
+    #[must_use]
+    pub const fn new(section: usize, kind: HeaderFooterType, paragraph: usize) -> Self {
+        Self {
+            section,
+            kind,
+            paragraph,
+        }
+    }
+
+    /// Zero-based section position.
+    #[must_use]
+    pub const fn section(self) -> usize {
+        self.section
+    }
+
+    /// Native header/footer destination kind.
+    #[must_use]
+    pub const fn kind(self) -> HeaderFooterType {
+        self.kind
+    }
+
+    /// Zero-based paragraph position within the destination.
+    #[must_use]
+    pub const fn paragraph(self) -> usize {
+        self.paragraph
+    }
+}
+
 /// Failure from an RTF transaction or patch application.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -180,6 +221,8 @@ pub enum Error {
     Conflict { existing: usize, incoming: usize },
     /// Paragraph-structure and property changes cannot be proven independent.
     StructuralPropertyConflict,
+    /// Canonical retained-destination work cannot share a transaction with a body splice.
+    BodyDestinationConflict,
     /// Replacement text exceeds the source snapshot's retained resource profile.
     InputTooLarge { observed: usize, limit: usize },
     /// A span has its endpoints in reverse order.
@@ -190,6 +233,8 @@ pub enum Error {
     SpanNotOnCharacterBoundary { position: usize },
     /// A checked paragraph position does not exist in the source body story.
     ParagraphOutOfRange { position: usize, count: usize },
+    /// A checked retained-destination selector does not exist.
+    DestinationOutOfRange(&'static str),
     /// A durable operation's semantic expectation is stale.
     StalePrecondition(&'static str),
     /// A durable patch uses an unsupported format-owned vocabulary.
@@ -225,6 +270,9 @@ impl fmt::Display for Error {
             ),
             Self::StructuralPropertyConflict => formatter
                 .write_str("RTF paragraph-structure and property changes cannot compose safely"),
+            Self::BodyDestinationConflict => formatter.write_str(
+                "RTF body splices and canonical retained-destination edits cannot compose safely",
+            ),
             Self::InputTooLarge { observed, limit } => write!(
                 formatter,
                 "replacement body text exceeds the source limit: observed {observed}, limit {limit}"
@@ -244,6 +292,12 @@ impl fmt::Display for Error {
                 formatter,
                 "RTF body paragraph position {position} is outside 0..{count}"
             ),
+            Self::DestinationOutOfRange(destination) => {
+                write!(
+                    formatter,
+                    "RTF retained destination does not exist: {destination}"
+                )
+            },
             Self::StalePrecondition(reason) => {
                 write!(formatter, "stale RTF patch precondition: {reason}")
             },
@@ -300,12 +354,24 @@ enum Operation {
         span: TextSpan,
         text: String,
     },
+    TableCellText {
+        path: TableCellPath,
+        before: String,
+        after: String,
+    },
+    HeaderFooterText {
+        target: HeaderFooterParagraph,
+        before: String,
+        after: String,
+    },
 }
 
 impl Operation {
     fn replacement_bytes(&self) -> usize {
         match self {
-            Self::Text { after, .. } => after.len(),
+            Self::Text { after, .. }
+            | Self::TableCellText { after, .. }
+            | Self::HeaderFooterText { after, .. } => after.len(),
             Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
             Self::Alignment { .. } | Self::Bold { .. } => 0,
         }
@@ -324,6 +390,8 @@ impl Operation {
                 vec![format!("body:character:{}-{}:bold", span.start, span.end)]
             },
             Self::InsertParagraph { .. } => vec!["body:structure".to_string()],
+            Self::TableCellText { path, .. } => vec![table_cell_effect(path)],
+            Self::HeaderFooterText { target, .. } => vec![header_footer_effect(*target)],
         }
     }
 
@@ -332,12 +400,21 @@ impl Operation {
             Self::Text { span, .. }
             | Self::Bold { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
-            Self::Alignment { .. } => None,
+            Self::Alignment { .. } | Self::TableCellText { .. } | Self::HeaderFooterText { .. } => {
+                None
+            },
         }
     }
 
     const fn is_property(&self) -> bool {
         matches!(self, Self::Alignment { .. } | Self::Bold { .. })
+    }
+
+    const fn is_destination(&self) -> bool {
+        matches!(
+            self,
+            Self::TableCellText { .. } | Self::HeaderFooterText { .. }
+        )
     }
 }
 
@@ -413,6 +490,7 @@ impl Edit {
         span: TextSpan,
         replacement: impl Into<String>,
     ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
         let body = self.source.text();
         validate_span(body, span)?;
@@ -461,6 +539,7 @@ impl Edit {
     /// Returns an error for invalid geometry, conflicts, structure changes,
     /// mixed formatting, or finite bounds.
     pub fn set_text_bold(&mut self, span: TextSpan, bold: bool) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
         let body = self.source.text();
         validate_span(body, span)?;
@@ -516,6 +595,7 @@ impl Edit {
         position: usize,
         input: impl Into<String>,
     ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
         if self.operations.iter().any(Operation::is_property) {
             return Err(Error::StructuralPropertyConflict);
@@ -578,6 +658,7 @@ impl Edit {
         position: usize,
         alignment: Alignment,
     ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
         if self.operations.iter().any(|operation| {
             matches!(
@@ -613,6 +694,119 @@ impl Edit {
             after: alignment,
         });
         Ok(self)
+    }
+
+    /// Stages replacement of one retained table-cell text story.
+    ///
+    /// The complete cell path is resolved against the immutable base. Cell
+    /// drawings, fields, nested tables, and positional events remain retained;
+    /// their positions must still validate against the replacement. Canonical
+    /// publication refuses every snapshot containing unknown destinations.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid path, dependent story geometry,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_table_cell_text(
+        &mut self,
+        path: TableCellPath,
+        input: impl Into<String>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = input.into();
+        let before = table_cell(&self.source, &path)?.text().to_string();
+        let effect = table_cell_effect(&path);
+        self.ensure_unique_destination(&effect)?;
+
+        // Exercise the retained model's dependency validation before staging.
+        let mut candidate = table_cell(&self.source, &path)?.clone();
+        candidate.set_text(Cow::Owned(after.clone()))?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::TableCellText {
+            path,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
+    /// Stages replacement of one retained header/footer paragraph.
+    ///
+    /// The paragraph's formatting is preserved. Destinations with drawings,
+    /// fields, or other positional story events are refused because changing
+    /// text could stale dependent offsets.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, dependent story content,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_header_footer_text(
+        &mut self,
+        target: HeaderFooterParagraph,
+        input: impl Into<String>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = input.into();
+        if after.contains('\n') {
+            return Err(Error::UnsupportedSource(
+                "one header/footer paragraph cannot contain a paragraph break",
+            ));
+        }
+        let header_footer = header_footer(&self.source, target)?;
+        if !header_footer.shapes.is_empty()
+            || !header_footer.shape_groups.is_empty()
+            || !header_footer.story_events.is_empty()
+        {
+            return Err(Error::UnsupportedSource(
+                "header/footer text has dependent positioned content",
+            ));
+        }
+        let before = header_footer
+            .paragraphs
+            .get(target.paragraph)
+            .ok_or(Error::DestinationOutOfRange("header/footer paragraph"))?
+            .text
+            .to_string();
+        let effect = header_footer_effect(target);
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::HeaderFooterText {
+            target,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
+    fn ensure_body_compatible(&self) -> Result<(), Error> {
+        if self.operations.iter().any(Operation::is_destination) {
+            return Err(Error::BodyDestinationConflict);
+        }
+        Ok(())
+    }
+
+    fn ensure_destination_compatible(&self) -> Result<(), Error> {
+        if self
+            .operations
+            .iter()
+            .any(|operation| !operation.is_destination())
+        {
+            return Err(Error::BodyDestinationConflict);
+        }
+        Ok(())
+    }
+
+    fn ensure_unique_destination(&self, effect: &str) -> Result<(), Error> {
+        let incoming = self.operations.len();
+        if let Some(existing) = self.operations.iter().position(|operation| {
+            operation
+                .effect_keys()
+                .iter()
+                .any(|candidate| candidate == effect)
+        }) {
+            return Err(Error::Conflict { existing, incoming });
+        }
+        Ok(())
     }
 
     fn ensure_operation_room(&self) -> Result<(), Error> {
@@ -653,6 +847,18 @@ impl Edit {
             ));
         }
 
+        let destination_count = self
+            .operations
+            .iter()
+            .filter(|operation| operation.is_destination())
+            .count();
+        if destination_count == operation_count {
+            return commit_destinations(self, operation_count);
+        }
+        if destination_count != 0 {
+            return Err(Error::BodyDestinationConflict);
+        }
+
         let (replacement, projected_spans) = project_text(&self.source, &self.operations)?;
         let mut alignments = source_alignments(&self.source);
         let base_bold = base_bold_for_edit(&self.source, &self.operations)?;
@@ -679,6 +885,9 @@ impl Edit {
                     property_operation = true;
                 },
                 Operation::Text { .. } | Operation::InsertParagraph { .. } => {},
+                Operation::TableCellText { .. } | Operation::HeaderFooterText { .. } => {
+                    return Err(Error::BodyDestinationConflict);
+                },
             }
         }
         let original_alignments = source_alignments(&self.source);
@@ -766,6 +975,198 @@ impl Edit {
     }
 }
 
+fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::UnsupportedSource(
+            "compressed RTF needs a transport-aware rewrite",
+        ));
+    }
+    if !edit.source.opaque().is_empty() {
+        return Err(Error::UnsupportedSource(
+            "canonical destination edits refuse unknown RTF destinations",
+        ));
+    }
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if semantic_delta.is_empty() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            false,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+
+    let mut model =
+        crate::document::RtfDocument::parse_bytes_with_limits(source_bytes, edit.source.limits())?;
+    for operation in &edit.operations {
+        match operation {
+            Operation::TableCellText { path, after, .. } => {
+                model
+                    .table_cell_mut(path)?
+                    .set_text(Cow::Owned(after.clone()))?;
+            },
+            Operation::HeaderFooterText { target, after, .. } => {
+                let paragraph = model_header_footer_paragraph_mut(&mut model, *target)?;
+                paragraph.text = Cow::Owned(after.clone());
+            },
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::Bold { .. }
+            | Operation::InsertParagraph { .. } => return Err(Error::BodyDestinationConflict),
+        }
+    }
+
+    let mut bytes = Vec::new();
+    RtfWriter::new(&mut bytes)
+        .write_document(&model)
+        .map_err(|error| Error::Write(error.to_string()))?;
+    let limit = edit.source.limits().max_source_bytes();
+    if bytes.len() > limit {
+        return Err(Error::InputTooLarge {
+            observed: bytes.len(),
+            limit,
+        });
+    }
+    let snapshot = Snapshot::from_bytes_with_limits(&bytes, edit.source.limits())?;
+    if snapshot.text() != edit.source.text() {
+        return Err(Error::UnsupportedSource(
+            "canonical destination edit changed the ordinary body story",
+        ));
+    }
+    for operation in &edit.operations {
+        match operation {
+            Operation::TableCellText { path, after, .. } => {
+                if table_cell(&snapshot, path)?.text() != after {
+                    return Err(Error::UnsupportedSource(
+                        "table-cell text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::HeaderFooterText { target, after, .. } => {
+                let actual = header_footer(&snapshot, *target)?
+                    .paragraphs
+                    .get(target.paragraph)
+                    .ok_or(Error::DestinationOutOfRange("header/footer paragraph"))?
+                    .text
+                    .as_ref();
+                if actual != after {
+                    return Err(Error::UnsupportedSource(
+                        "header/footer text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::Bold { .. }
+            | Operation::InsertParagraph { .. } => return Err(Error::BodyDestinationConflict),
+        }
+    }
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        true,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn table_cell<'a>(
+    source: &'a Snapshot,
+    path: &TableCellPath,
+) -> Result<&'a crate::Cell<'a>, Error> {
+    let root = path.root;
+    let mut cell = source
+        .tables()
+        .get(root.table_index)
+        .and_then(|table| table.rows().get(root.row_index))
+        .and_then(|row| row.cells().get(root.cell_index))
+        .ok_or(Error::DestinationOutOfRange("table cell"))?;
+    for coordinate in &path.nested {
+        cell = cell
+            .nested_tables()
+            .get(coordinate.table_index)
+            .and_then(|nested| nested.table.rows().get(coordinate.row_index))
+            .and_then(|row| row.cells().get(coordinate.cell_index))
+            .ok_or(Error::DestinationOutOfRange("nested table cell"))?;
+    }
+    Ok(cell)
+}
+
+fn header_footer(
+    source: &Snapshot,
+    target: HeaderFooterParagraph,
+) -> Result<&crate::HeaderFooter<'_>, Error> {
+    source
+        .sections()
+        .get(target.section)
+        .ok_or(Error::DestinationOutOfRange("section"))?
+        .headers_footers
+        .iter()
+        .find(|candidate| candidate.header_type == target.kind)
+        .ok_or(Error::DestinationOutOfRange("header/footer"))
+}
+
+fn model_header_footer_paragraph_mut<'a>(
+    model: &'a mut crate::document::RtfDocument<'static>,
+    target: HeaderFooterParagraph,
+) -> Result<&'a mut crate::HeaderFooterParagraph<'static>, Error> {
+    model
+        .sections_mut()
+        .get_mut(target.section)
+        .ok_or(Error::DestinationOutOfRange("section"))?
+        .headers_footers
+        .iter_mut()
+        .find(|candidate| candidate.header_type == target.kind)
+        .ok_or(Error::DestinationOutOfRange("header/footer"))?
+        .paragraphs
+        .get_mut(target.paragraph)
+        .ok_or(Error::DestinationOutOfRange("header/footer paragraph"))
+}
+
+fn table_cell_effect(path: &TableCellPath) -> String {
+    let mut effect = format!(
+        "table:{}:row:{}:cell:{}",
+        path.root.table_index, path.root.row_index, path.root.cell_index
+    );
+    for coordinate in &path.nested {
+        effect.push_str(":nested:");
+        effect.push_str(&coordinate.table_index.to_string());
+        effect.push(':');
+        effect.push_str(&coordinate.row_index.to_string());
+        effect.push(':');
+        effect.push_str(&coordinate.cell_index.to_string());
+    }
+    effect.push_str(":text");
+    effect
+}
+
+fn header_footer_effect(target: HeaderFooterParagraph) -> String {
+    format!(
+        "section:{}:{}:paragraph:{}:text",
+        target.section,
+        header_footer_kind_name(target.kind),
+        target.paragraph
+    )
+}
+
+const fn header_footer_kind_name(kind: HeaderFooterType) -> &'static str {
+    match kind {
+        HeaderFooterType::Header => "header",
+        HeaderFooterType::Footer => "footer",
+        HeaderFooterType::HeaderFirst => "header-first",
+        HeaderFooterType::FooterFirst => "footer-first",
+        HeaderFooterType::HeaderLeft => "header-left",
+        HeaderFooterType::FooterLeft => "footer-left",
+        HeaderFooterType::HeaderRight => "header-right",
+        HeaderFooterType::FooterRight => "footer-right",
+    }
+}
+
 fn validate_span(body: &str, span: TextSpan) -> Result<(), Error> {
     if span.end > body.len() {
         return Err(Error::SpanOutOfRange {
@@ -837,7 +1238,10 @@ fn project_text(
             Operation::InsertParagraph { span, text, .. } => {
                 Some((index, *span, text.as_str(), true))
             },
-            Operation::Alignment { .. } | Operation::Bold { .. } => None,
+            Operation::Alignment { .. }
+            | Operation::Bold { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. } => None,
         })
         .collect::<Vec<_>>();
     text_operations.sort_unstable_by_key(|(_, span, _, _)| (span.start, span.end));
@@ -926,7 +1330,9 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             Operation::Bold { span, .. } => Some(*span),
             Operation::Text { .. }
             | Operation::Alignment { .. }
-            | Operation::InsertParagraph { .. } => None,
+            | Operation::InsertParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. } => None,
         })
         .collect::<Vec<_>>();
     if bold_spans.is_empty() {
@@ -966,7 +1372,9 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 Operation::Bold { after, .. } => Some(*after),
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
-                | Operation::InsertParagraph { .. } => None,
+                | Operation::InsertParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. } => None,
             })
             .unwrap_or(false)
     }))
@@ -1024,7 +1432,10 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             Operation::InsertParagraph { span, text, .. } => {
                 Some((*span, text.len().saturating_add(1)))
             },
-            Operation::Alignment { .. } | Operation::Bold { .. } => None,
+            Operation::Alignment { .. }
+            | Operation::Bold { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. } => None,
         })
         .collect::<Vec<_>>();
     changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
@@ -1416,6 +1827,16 @@ enum Change {
         text: String,
         removing: bool,
     },
+    TableCellText {
+        path: TableCellPath,
+        before: String,
+        after: String,
+    },
+    HeaderFooterText {
+        target: HeaderFooterParagraph,
+        before: String,
+        after: String,
+    },
 }
 
 impl Change {
@@ -1464,6 +1885,24 @@ impl Change {
                 after_span: *span,
                 text: text.clone(),
                 removing: !removing,
+            },
+            Self::TableCellText {
+                path,
+                before,
+                after,
+            } => Self::TableCellText {
+                path: path.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::HeaderFooterText {
+                target,
+                before,
+                after,
+            } => Self::HeaderFooterText {
+                target: *target,
+                before: after.clone(),
+                after: before.clone(),
             },
         }
     }
@@ -1528,7 +1967,29 @@ fn semantic_changes(
                         removing: false,
                     })
                 }),
-            Operation::Text { .. } | Operation::Alignment { .. } | Operation::Bold { .. } => None,
+            Operation::TableCellText {
+                path,
+                before,
+                after,
+            } if before != after => Some(Change::TableCellText {
+                path: path.clone(),
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::HeaderFooterText {
+                target,
+                before,
+                after,
+            } if before != after => Some(Change::HeaderFooterText {
+                target: *target,
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::Bold { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. } => None,
         })
         .collect()
 }
@@ -1707,6 +2168,34 @@ fn durable_operation(
                 },
             )
         },
+        Change::TableCellText {
+            path,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "table-cell-text.replace",
+                table_cell_effect(path),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
+        Change::HeaderFooterText {
+            target,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "header-footer-text.replace",
+                header_footer_effect(*target),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
     }
 }
 
@@ -1828,6 +2317,46 @@ pub(crate) fn apply_durable<Mode>(
                 }
                 edit.remove_paragraph_after(position, expected)?;
             },
+            "table-cell-text.replace" => {
+                let cell_path = parse_table_cell_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing table-cell text precondition".to_string())
+                    })?;
+                if table_cell(source, &cell_path)?.text() != expected {
+                    return Err(Error::StalePrecondition("table-cell text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("table-cell text value must be a string".to_string())
+                })?;
+                edit.set_table_cell_text(cell_path, replacement)?;
+            },
+            "header-footer-text.replace" => {
+                let target = parse_header_footer_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing header/footer text precondition".to_string())
+                    })?;
+                let actual = header_footer(source, target)?
+                    .paragraphs
+                    .get(target.paragraph)
+                    .ok_or(Error::DestinationOutOfRange("header/footer paragraph"))?
+                    .text
+                    .as_ref();
+                if actual != expected {
+                    return Err(Error::StalePrecondition("header/footer text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("header/footer text value must be a string".to_string())
+                })?;
+                edit.set_header_footer_text(target, replacement)?;
+            },
             _ => {
                 return Err(Error::DurablePatch(
                     "unsupported operation vocabulary".to_string(),
@@ -1860,6 +2389,94 @@ fn parse_paragraph_target(target: &str) -> Result<usize, Error> {
         .ok_or_else(|| Error::DurablePatch("invalid paragraph target".to_string()))?
         .parse::<usize>()
         .map_err(|_error| Error::DurablePatch("invalid paragraph position".to_string()))
+}
+
+fn parse_table_cell_target(target: &str) -> Result<TableCellPath, Error> {
+    let mut parts = target.split(':');
+    if parts.next() != Some("table") {
+        return Err(Error::DurablePatch("invalid table-cell target".to_string()));
+    }
+    let table_index = parse_target_position(parts.next(), "table position")?;
+    if parts.next() != Some("row") {
+        return Err(Error::DurablePatch(
+            "invalid table-cell row target".to_string(),
+        ));
+    }
+    let row_index = parse_target_position(parts.next(), "row position")?;
+    if parts.next() != Some("cell") {
+        return Err(Error::DurablePatch(
+            "invalid table-cell column target".to_string(),
+        ));
+    }
+    let cell_index = parse_target_position(parts.next(), "cell position")?;
+    let mut path = TableCellPath::outer(table_index, row_index, cell_index);
+    loop {
+        match parts.next() {
+            Some("nested") => {
+                let nested_table = parse_target_position(parts.next(), "nested table position")?;
+                let nested_row = parse_target_position(parts.next(), "nested row position")?;
+                let nested_cell = parse_target_position(parts.next(), "nested cell position")?;
+                path = path.with_nested(crate::TableCellCoordinate {
+                    table_index: nested_table,
+                    row_index: nested_row,
+                    cell_index: nested_cell,
+                });
+            },
+            Some("text") if parts.next().is_none() => return Ok(path),
+            _ => {
+                return Err(Error::DurablePatch(
+                    "invalid nested table-cell target".to_string(),
+                ));
+            },
+        }
+    }
+}
+
+fn parse_header_footer_target(target: &str) -> Result<HeaderFooterParagraph, Error> {
+    let mut parts = target.split(':');
+    if parts.next() != Some("section") {
+        return Err(Error::DurablePatch(
+            "invalid header/footer section target".to_string(),
+        ));
+    }
+    let section = parse_target_position(parts.next(), "section position")?;
+    let kind = parts
+        .next()
+        .and_then(parse_header_footer_kind)
+        .ok_or_else(|| Error::DurablePatch("invalid header/footer kind".to_string()))?;
+    if parts.next() != Some("paragraph") {
+        return Err(Error::DurablePatch(
+            "invalid header/footer paragraph target".to_string(),
+        ));
+    }
+    let paragraph = parse_target_position(parts.next(), "header/footer paragraph position")?;
+    if parts.next() != Some("text") || parts.next().is_some() {
+        return Err(Error::DurablePatch(
+            "invalid header/footer text target".to_string(),
+        ));
+    }
+    Ok(HeaderFooterParagraph::new(section, kind, paragraph))
+}
+
+fn parse_target_position(value: Option<&str>, name: &'static str) -> Result<usize, Error> {
+    value
+        .ok_or_else(|| Error::DurablePatch(format!("missing {name}")))?
+        .parse::<usize>()
+        .map_err(|_error| Error::DurablePatch(format!("invalid {name}")))
+}
+
+fn parse_header_footer_kind(value: &str) -> Option<HeaderFooterType> {
+    match value {
+        "header" => Some(HeaderFooterType::Header),
+        "footer" => Some(HeaderFooterType::Footer),
+        "header-first" => Some(HeaderFooterType::HeaderFirst),
+        "footer-first" => Some(HeaderFooterType::FooterFirst),
+        "header-left" => Some(HeaderFooterType::HeaderLeft),
+        "footer-left" => Some(HeaderFooterType::FooterLeft),
+        "header-right" => Some(HeaderFooterType::HeaderRight),
+        "footer-right" => Some(HeaderFooterType::FooterRight),
+        _ => None,
+    }
 }
 
 const fn alignment_name(alignment: Alignment) -> &'static str {

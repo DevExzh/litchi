@@ -245,10 +245,6 @@ impl Inert {
         &self.namespace
     }
 
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "the wire decoder transfers ownership of renderer strings into the bounded model"
-    )]
     pub(super) fn from_wire(
         xml: Vec<u8>,
         local_name: impl Into<Box<str>>,

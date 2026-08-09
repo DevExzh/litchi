@@ -20,7 +20,8 @@ fn signature(sheets: &[Sheet]) -> Vec<(String, usize, usize)> {
 
 #[test]
 fn producer_package_opens_without_expanding_grid_padding() {
-    let spreadsheet = Spreadsheet::from_bytes(PACKAGE_FIXTURE.to_vec()).unwrap();
+    let spreadsheet = Spreadsheet::from_bytes(PACKAGE_FIXTURE.to_vec())
+        .expect("test fixture or operation should succeed");
     let sheets = spreadsheet.sheets();
 
     assert_eq!(sheets.len(), 3);
@@ -40,11 +41,13 @@ fn producer_package_opens_without_expanding_grid_padding() {
 
 #[test]
 fn padded_package_survives_mutable_round_trip() {
-    let spreadsheet = Spreadsheet::from_bytes(PACKAGE_FIXTURE.to_vec()).unwrap();
+    let spreadsheet = Spreadsheet::from_bytes(PACKAGE_FIXTURE.to_vec())
+        .expect("test fixture or operation should succeed");
     let before = signature(spreadsheet.sheets());
 
     let mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet);
-    let reopened = Spreadsheet::from_bytes(mutable.to_bytes()).unwrap();
+    let reopened = Spreadsheet::from_bytes(mutable.to_bytes())
+        .expect("test fixture or operation should succeed");
 
     assert_eq!(signature(reopened.sheets()), before);
 }

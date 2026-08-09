@@ -136,6 +136,14 @@ impl Composition {
     /// # Errors
     /// Returns bounded, lineage, duplicate-ID, or typed overlap details.
     pub fn join(&mut self, incoming: Prepared) -> Result<&mut Self, CompositionError> {
+        if let Some(existing) = self.inner.sub_edits().find(|existing| {
+            different_publication_domains(existing.payload(), incoming.inner.payload())
+        }) {
+            return Err(CompositionError::Conflicts(publication_conflict(
+                existing.id(),
+                incoming.inner.id(),
+            )));
+        }
         self.inner.join(incoming.inner).map_err(|error| {
             let (failure, _rejected) = error.into_parts();
             match failure {
@@ -204,6 +212,19 @@ impl MergePlan {
     /// # Errors
     /// Returns both-branch validation or finite-bound failures.
     pub fn new(left: Composition, right: Composition) -> Result<Self, CompositionError> {
+        if let Some((left_id, right_id)) = left.inner.sub_edits().find_map(|left_edit| {
+            right
+                .inner
+                .sub_edits()
+                .find(|right_edit| {
+                    different_publication_domains(left_edit.payload(), right_edit.payload())
+                })
+                .map(|right_edit| (left_edit.id(), right_edit.id()))
+        }) {
+            return Err(CompositionError::Conflicts(publication_conflict(
+                left_id, right_id,
+            )));
+        }
         let source = left.source.clone();
         let inner = core::ThreeWayMergePlan::new(left.inner, right.inner)
             .map_err(|error| CompositionError::Core(format!("{error:?}")))?;
@@ -277,6 +298,20 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
         writes.extend(operation.effect_keys());
     }
     (reads, writes)
+}
+
+fn different_publication_domains(left: &[Operation], right: &[Operation]) -> bool {
+    let left_destination = left.iter().any(Operation::is_destination);
+    let right_destination = right.iter().any(Operation::is_destination);
+    left_destination != right_destination
+}
+
+fn publication_conflict(left: &str, right: &str) -> ConflictSet {
+    ConflictSet::new(vec![CompositionConflict::Effect {
+        effect: "rtf:publication-domain".to_string(),
+        left: left.to_string(),
+        right: right.to_string(),
+    }])
 }
 
 fn map_conflicts(conflicts: &core::ConflictSet<core::SubEditConflict>) -> ConflictSet {

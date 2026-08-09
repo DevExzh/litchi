@@ -5,8 +5,8 @@
 
 use litchi_xlsx::page_breaks::{Break, Collection, PageBreaks};
 use litchi_xlsx::{
-    Cell, DurablePatch, Error, History, HistoryLimits, MergeChoice, MergeLimits, Package, Value,
-    Workbook,
+    Cell, DurablePatch, Error, Formula, History, HistoryLimits, LocalStyle, MergeChoice,
+    MergeLimits, Package, Value, Workbook,
 };
 
 fn two_sheet_workbook() -> Workbook {
@@ -261,6 +261,214 @@ fn page_break_copy_and_move_are_atomic_dependency_checked_transfers() {
 }
 
 #[test]
+fn cell_copy_and_move_close_formula_text_and_style_dependencies() {
+    let base = two_sheet_workbook();
+    let style = base.styles().unwrap().base().unwrap();
+    let mut prepare = base.edit().unwrap();
+    let mut source = prepare.sheet("Sheet1").unwrap().unwrap();
+    source
+        .set("A1", Formula::new("B1*2").unwrap())
+        .unwrap()
+        .set("A2", "shared text")
+        .unwrap()
+        .style("A1", &style)
+        .unwrap()
+        .style("A2", &style)
+        .unwrap();
+    let prepared = prepare.commit().unwrap().into_workbook();
+
+    let mut copy = prepared.edit().unwrap();
+    assert!(
+        copy.copy_cells("Sheet1", "A1:A2", "Target", "B2")
+            .unwrap()
+            .is_some()
+    );
+    let commit = copy.commit().unwrap();
+    let durable = commit.patch().durable().unwrap();
+    let durable_json = durable.to_deterministic_json().unwrap();
+    assert_eq!(durable_json, durable.to_deterministic_json().unwrap());
+    let parsed = DurablePatch::from_deterministic_json(&durable_json).unwrap();
+    let copied = parsed.apply(&prepared).unwrap();
+    let target = copied.sheet("Target").unwrap().unwrap();
+    assert!(matches!(
+        target.cell("B2").unwrap().stored().unwrap(),
+        Cell::Formula(formula)
+            if formula.text() == "C2*2" && formula.cached().is_none()
+    ));
+    assert!(matches!(
+        target.cell("B3").unwrap().stored().unwrap(),
+        Cell::Value(Value::Text(text)) if text.as_str() == "shared text"
+    ));
+    assert!(matches!(
+        target.local_style("B2").unwrap(),
+        Some(LocalStyle::Shared(_))
+    ));
+
+    let reopened = Workbook::from_bytes(copied.to_plain_bytes().unwrap()).unwrap();
+    assert!(matches!(
+        reopened
+            .sheet("Target")
+            .unwrap()
+            .unwrap()
+            .cell("B2")
+            .unwrap()
+            .stored()
+            .unwrap(),
+        Cell::Formula(formula) if formula.text() == "C2*2"
+    ));
+    assert_eq!(
+        parsed
+            .inverse()
+            .apply(&copied)
+            .unwrap()
+            .to_plain_bytes()
+            .unwrap(),
+        prepared.to_plain_bytes().unwrap()
+    );
+
+    let mut history = History::new(prepared.clone(), HistoryLimits::new(2, 256 * 1024 * 1024));
+    assert!(commit.record(&mut history).unwrap().is_empty());
+    assert!(history.undo());
+    assert!(history.redo());
+
+    let mut move_edit = copied.edit().unwrap();
+    assert!(
+        move_edit
+            .move_cells("Target", "B2:B3", "Sheet1", "D4")
+            .unwrap()
+            .is_some()
+    );
+    let moved = move_edit.commit().unwrap().into_workbook();
+    assert!(
+        moved
+            .sheet("Target")
+            .unwrap()
+            .unwrap()
+            .cell("B2")
+            .unwrap()
+            .stored()
+            .is_none()
+    );
+    assert!(matches!(
+        moved
+            .sheet("Sheet1")
+            .unwrap()
+            .unwrap()
+            .cell("D4")
+            .unwrap()
+            .stored()
+            .unwrap(),
+        Cell::Formula(formula) if formula.text() == "E4*2"
+    ));
+    let reopened_move = Workbook::from_bytes(moved.to_plain_bytes().unwrap()).unwrap();
+    assert!(matches!(
+        reopened_move
+            .sheet("Sheet1")
+            .unwrap()
+            .unwrap()
+            .cell("D4")
+            .unwrap()
+            .stored()
+            .unwrap(),
+        Cell::Formula(formula) if formula.text() == "E4*2"
+    ));
+
+    let mut overlap = prepared.edit().unwrap();
+    overlap
+        .move_cells("Sheet1", "A1:A2", "Sheet1", "A2")
+        .unwrap();
+    let overlapped = overlap.commit().unwrap().into_workbook();
+    let sheet = overlapped.sheet("Sheet1").unwrap().unwrap();
+    assert!(sheet.cell("A1").unwrap().stored().is_none());
+    assert!(matches!(
+        sheet.cell("A2").unwrap().stored().unwrap(),
+        Cell::Formula(formula) if formula.text() == "B2*2"
+    ));
+    assert!(matches!(
+        sheet.cell("A3").unwrap().stored().unwrap(),
+        Cell::Value(Value::Text(text)) if text.as_str() == "shared text"
+    ));
+}
+
+#[test]
+fn cell_transfer_participates_in_non_applying_three_way_plans() {
+    let base = two_sheet_workbook();
+    let mut prepare = base.edit().unwrap();
+    prepare
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap()
+        .set("A1", Formula::new("B1+1").unwrap())
+        .unwrap();
+    let prepared = prepare.commit().unwrap().into_workbook();
+    let limits = MergeLimits::new(2, 64, 128, 64);
+
+    let mut left = prepared.edit().unwrap();
+    left.copy_cells("Sheet1", "A1", "Target", "B2").unwrap();
+    let mut right = prepared.edit().unwrap();
+    right
+        .sheet("Target")
+        .unwrap()
+        .unwrap()
+        .set("H8", "right")
+        .unwrap();
+    let plan = left.plan_three_way(right, limits).unwrap();
+    assert!(plan.conflicts().is_empty());
+    let merged = plan.finish().unwrap().commit().unwrap().into_workbook();
+    assert!(matches!(
+        merged
+            .sheet("Target")
+            .unwrap()
+            .unwrap()
+            .cell("B2")
+            .unwrap()
+            .stored()
+            .unwrap(),
+        Cell::Formula(formula) if formula.text() == "C2+1"
+    ));
+
+    let mut conflict_left = prepared.edit().unwrap();
+    conflict_left
+        .copy_cells("Sheet1", "A1", "Target", "B2")
+        .unwrap();
+    let mut conflict_right = prepared.edit().unwrap();
+    conflict_right
+        .sheet("Target")
+        .unwrap()
+        .unwrap()
+        .set("B2", "conflict")
+        .unwrap();
+    assert!(
+        !conflict_left
+            .plan_three_way(conflict_right, limits)
+            .unwrap()
+            .conflicts()
+            .is_empty()
+    );
+}
+
+#[test]
+fn cell_transfer_is_bounded_and_malformed_package_bytes_stay_test_only() {
+    let base = two_sheet_workbook();
+    let mut edit = base.edit().unwrap();
+    assert!(
+        edit.copy_cells("Sheet1", "A1:XFD1048576", "Target", "A1")
+            .is_err()
+    );
+
+    let truncated_zip = b"PK\x03\x04\0\0\0".to_vec();
+    assert!(Workbook::from_bytes(truncated_zip).is_err());
+
+    let array_book = Workbook::open(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsx/MatrixFormulaEvalTestData.xlsx"
+    ))
+    .unwrap();
+    let mut array_edit = array_book.edit().unwrap();
+    assert!(array_edit.copy_cells(0usize, "I3", 0usize, "A100").is_err());
+}
+
+#[test]
 fn real_poi_fixture_round_trips_and_inverse_preserves_the_exact_package() {
     let base = Workbook::open(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -308,4 +516,72 @@ fn real_poi_fixture_round_trips_and_inverse_preserves_the_exact_package() {
     );
     let restored = durable.inverse().apply(&changed).unwrap();
     assert_eq!(restored.to_plain_bytes().unwrap(), before);
+}
+
+#[test]
+fn real_poi_and_libreoffice_formulas_copy_and_fully_reopen() {
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let cases = [
+        (
+            format!("{root}/test-data/poi/test-data/spreadsheet/shared_formulas.xlsx"),
+            "A41",
+            "AA1000",
+            Some(("A1", "Z999", "Currently Using")),
+        ),
+        (
+            format!(
+                "{root}/test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx"
+            ),
+            "B19",
+            "Y1000*10",
+            None,
+        ),
+    ];
+    for (path, source, expected, shared_text) in cases {
+        let base = Workbook::open(path).unwrap();
+        let before = base.to_plain_bytes().unwrap();
+        let sheet_name = base.sheet(0usize).unwrap().unwrap().name().to_owned();
+        let mut edit = base.edit().unwrap();
+        edit.copy_cells(sheet_name.as_str(), source, sheet_name.as_str(), "Z1000")
+            .unwrap();
+        if let Some((source, target, _)) = shared_text {
+            edit.copy_cells(sheet_name.as_str(), source, sheet_name.as_str(), target)
+                .unwrap();
+        }
+        let durable = edit.commit().unwrap().patch().durable().unwrap();
+        let changed = durable.apply(&base).unwrap();
+        let reopened = Workbook::from_bytes(changed.to_plain_bytes().unwrap()).unwrap();
+        assert!(matches!(
+            reopened
+                .sheet(sheet_name.as_str())
+                .unwrap()
+                .unwrap()
+                .cell("Z1000")
+                .unwrap()
+                .stored()
+                .unwrap(),
+            Cell::Formula(formula)
+                if formula.text() == expected && formula.cached().is_none()
+        ));
+        if let Some((_, target, expected)) = shared_text {
+            let sheet = reopened.sheet(sheet_name.as_str()).unwrap().unwrap();
+            assert!(matches!(
+                sheet.cell(target).unwrap().stored().unwrap(),
+                Cell::Value(Value::Text(text)) if text.as_str() == expected
+            ));
+            assert!(matches!(
+                sheet.local_style(target).unwrap(),
+                Some(LocalStyle::Shared(_))
+            ));
+        }
+        assert_eq!(
+            durable
+                .inverse()
+                .apply(&changed)
+                .unwrap()
+                .to_plain_bytes()
+                .unwrap(),
+            before
+        );
+    }
 }

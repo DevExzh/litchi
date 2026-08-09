@@ -8,7 +8,7 @@ pub use crate::authoring::Builder;
 
 const MAX_PARAGRAPH_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DURABLE_PATCH_BYTES: usize = 512 * 1024 * 1024;
-const PATCH_MAGIC: &[u8; 8] = b"LOTHP001";
+const PATCH_MAGIC: &[u8; 8] = b"LOTHP002";
 
 /// A read-only semantic text-web body projection.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -236,6 +236,36 @@ impl Template {
         })
     }
 
+    /// Plans a dependency-checked block transfer from another immutable template.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either package violates the policy, the selector is
+    /// invalid, rich inline markup cannot be preserved by structural authoring,
+    /// or a required style is missing or collides with the destination catalog.
+    pub fn plan_transfer_from(
+        &self,
+        source: &Self,
+        selector: TransferSelector,
+        policy: TransferPolicy,
+    ) -> Result<TransferPlan> {
+        source.check_security(policy.security)?;
+        self.check_security(policy.security)?;
+        let block = transfer_block(source, selector)?;
+        let style_names = block_style_names(&block);
+        let imported_styles = resolve_transfer_styles(
+            source.styles(),
+            self.styles(),
+            &style_names,
+            policy.include_styles,
+        )?;
+        Ok(TransferPlan {
+            block,
+            destination: self.clone(),
+            imported_styles,
+        })
+    }
+
     /// Starts a source-bound text-body transaction.
     #[must_use]
     pub fn edit(&self) -> Edit<'_> {
@@ -244,9 +274,9 @@ impl Template {
             changes: Vec::new(),
             heading_changes: Vec::new(),
             list_changes: Vec::new(),
-            metadata_xml: None,
+            metadata: PartChange::Keep,
             source: self,
-            styles_xml: None,
+            styles: PartChange::Keep,
         }
     }
 
@@ -291,15 +321,106 @@ pub struct SecurityReport {
     pub signed: bool,
 }
 
+/// One source block selected for cross-template transfer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TransferSelector {
+    /// A heading by source-order heading position.
+    Heading(Position),
+    /// An isolated list by source-close list position.
+    List(Position),
+    /// A paragraph by source-order paragraph position.
+    Paragraph(Position),
+}
+
+/// Explicit dependency and active-content policy for block transfer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TransferPolicy {
+    /// Permit copying missing named style dependencies and their parents.
+    pub include_styles: bool,
+    /// Policy applied independently to both source and destination packages.
+    pub security: SecurityPolicy,
+}
+
+impl Default for TransferPolicy {
+    fn default() -> Self {
+        Self {
+            include_styles: true,
+            security: SecurityPolicy::default(),
+        }
+    }
+}
+
+/// A validated, non-mutating cross-template publication plan.
+pub struct TransferPlan {
+    block: crate::ContentBlock,
+    destination: Template,
+    imported_styles: Vec<crate::style::Style>,
+}
+
+impl TransferPlan {
+    /// Missing styles selected for import in deterministic dependency order.
+    #[must_use]
+    pub fn imported_styles(&self) -> &[crate::style::Style] {
+        &self.imported_styles
+    }
+
+    /// Publishes the transfer as a normal source-checked commit and reopens it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if style or block publication fails semantic readback.
+    pub fn publish(self) -> Result<Commit> {
+        let mut edit = self.destination.edit();
+        edit.append_block(self.block)?;
+        if !self.imported_styles.is_empty() {
+            let mut styles = self
+                .destination
+                .styles()
+                .iter()
+                .filter(|style| style.origin() == crate::style::Origin::Styles)
+                .cloned()
+                .collect::<Vec<_>>();
+            styles.extend(self.imported_styles);
+            edit.set_styles(&styles)?;
+        }
+        edit.commit()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PartChange {
+    Keep,
+    Remove,
+    Set(String),
+}
+
+impl PartChange {
+    const fn is_keep(&self) -> bool {
+        matches!(self, Self::Keep)
+    }
+
+    fn replacement(&self) -> Option<&str> {
+        match self {
+            Self::Set(xml) => Some(xml),
+            Self::Keep | Self::Remove => None,
+        }
+    }
+
+    const fn removes(&self) -> bool {
+        matches!(self, Self::Remove)
+    }
+}
+
 /// A source-bound web-template text transaction.
 pub struct Edit<'a> {
     appended: Vec<crate::ContentBlock>,
     changes: Vec<ParagraphChange>,
     heading_changes: Vec<HeadingChange>,
     list_changes: Vec<ListChange>,
-    metadata_xml: Option<String>,
+    metadata: PartChange,
     source: &'a Template,
-    styles_xml: Option<String>,
+    styles: PartChange,
 }
 
 impl Edit<'_> {
@@ -483,8 +604,22 @@ impl Edit<'_> {
     ///
     /// Returns an error if the metadata cannot be rendered within XML limits.
     pub fn set_metadata(&mut self, metadata: &Metadata) -> Result<()> {
-        self.metadata_xml = Some(crate::authoring::render_metadata(metadata)?);
+        let xml = crate::authoring::render_metadata(metadata)?;
+        self.metadata = if self.source.meta_xml() == Some(xml.as_str()) {
+            PartChange::Keep
+        } else {
+            PartChange::Set(xml)
+        };
         Ok(())
+    }
+
+    /// Removes the optional `meta.xml` package member.
+    pub fn remove_metadata(&mut self) {
+        self.metadata = if self.source.meta_xml().is_some() {
+            PartChange::Remove
+        } else {
+            PartChange::Keep
+        };
     }
 
     /// Replaces the named common-style catalog.
@@ -493,8 +628,22 @@ impl Edit<'_> {
     ///
     /// Returns an error if the style catalog cannot be rendered compactly.
     pub fn set_styles(&mut self, styles: &[crate::style::Style]) -> Result<()> {
-        self.styles_xml = Some(crate::authoring::render_styles(styles)?);
+        let xml = crate::authoring::render_styles(styles)?;
+        self.styles = if self.source.styles_xml() == Some(xml.as_str()) {
+            PartChange::Keep
+        } else {
+            PartChange::Set(xml)
+        };
         Ok(())
+    }
+
+    /// Removes the optional `styles.xml` package member.
+    pub fn remove_styles(&mut self) {
+        self.styles = if self.source.styles_xml().is_some() {
+            PartChange::Remove
+        } else {
+            PartChange::Keep
+        };
     }
 
     fn stage_list(&mut self, list: Position, after: Option<crate::list::List>) -> Result<()> {
@@ -569,8 +718,8 @@ impl Edit<'_> {
         if self.changes.is_empty()
             && self.heading_changes.is_empty()
             && self.list_changes.is_empty()
-            && self.metadata_xml.is_none()
-            && self.styles_xml.is_none()
+            && self.metadata.is_keep()
+            && self.styles.is_keep()
             && self.appended.is_empty()
         {
             return Ok(Commit::unchanged(self.source.clone()));
@@ -586,8 +735,8 @@ impl Edit<'_> {
         let snapshot = Template {
             package: self.source.package.rebuild_with_parts(
                 &content,
-                self.metadata_xml.as_deref(),
-                self.styles_xml.as_deref(),
+                &self.metadata,
+                &self.styles,
             )?,
         };
         validate_edit_readback(&self, &snapshot)?;
@@ -601,8 +750,8 @@ impl Edit<'_> {
                 durable_fragment: None,
                 heading_changes: self.heading_changes,
                 list_changes: self.list_changes,
-                metadata_xml: self.metadata_xml,
-                styles_xml: self.styles_xml,
+                metadata: self.metadata,
+                styles: self.styles,
             },
             changed: true,
         })
@@ -624,9 +773,9 @@ impl<'a> Edit<'a> {
             Some(JoinFailure::DifferentSnapshot)
         } else if !self.appended.is_empty() && !other.appended.is_empty() {
             Some(JoinFailure::Append)
-        } else if self.metadata_xml.is_some() && other.metadata_xml.is_some() {
+        } else if !self.metadata.is_keep() && !other.metadata.is_keep() {
             Some(JoinFailure::Metadata)
-        } else if self.styles_xml.is_some() && other.styles_xml.is_some() {
+        } else if !self.styles.is_keep() && !other.styles.is_keep() {
             Some(JoinFailure::Styles)
         } else {
             self.changes
@@ -693,11 +842,11 @@ impl<'a> Edit<'a> {
         self.heading_changes.extend(other.heading_changes);
         self.list_changes.extend(other.list_changes);
         self.appended.extend(other.appended);
-        if self.metadata_xml.is_none() {
-            self.metadata_xml = other.metadata_xml;
+        if self.metadata.is_keep() {
+            self.metadata = other.metadata;
         }
-        if self.styles_xml.is_none() {
-            self.styles_xml = other.styles_xml;
+        if self.styles.is_keep() {
+            self.styles = other.styles;
         }
         Ok(self)
     }
@@ -859,9 +1008,9 @@ impl Commit {
                 durable_fragment: None,
                 heading_changes: Vec::new(),
                 list_changes: Vec::new(),
-                metadata_xml: None,
+                metadata: PartChange::Keep,
                 source: snapshot.clone(),
-                styles_xml: None,
+                styles: PartChange::Keep,
                 target: snapshot.clone(),
             },
             snapshot,
@@ -902,9 +1051,9 @@ pub struct Patch {
     durable_fragment: Option<String>,
     heading_changes: Vec<HeadingChange>,
     list_changes: Vec<ListChange>,
-    metadata_xml: Option<String>,
+    metadata: PartChange,
     source: Template,
-    styles_xml: Option<String>,
+    styles: PartChange,
     target: Template,
 }
 
@@ -973,10 +1122,10 @@ impl Patch {
         if left.has_append() && right.has_append() {
             conflicts.push(MergeConflict::Append);
         }
-        if left.metadata_xml.is_some() && right.metadata_xml.is_some() {
+        if !left.metadata.is_keep() && !right.metadata.is_keep() {
             conflicts.push(MergeConflict::Metadata);
         }
-        if left.styles_xml.is_some() && right.styles_xml.is_some() {
+        if !left.styles.is_keep() && !right.styles.is_keep() {
             conflicts.push(MergeConflict::Styles);
         }
         Ok(MergePlan {
@@ -1044,13 +1193,25 @@ impl Patch {
     /// Replacement metadata XML retained by this semantic patch.
     #[must_use]
     pub fn metadata_xml(&self) -> Option<&str> {
-        self.metadata_xml.as_deref()
+        self.metadata.replacement()
+    }
+
+    /// Whether this patch removes `meta.xml`.
+    #[must_use]
+    pub const fn removes_metadata(&self) -> bool {
+        self.metadata.removes()
     }
 
     /// Replacement styles XML retained by this semantic patch.
     #[must_use]
     pub fn styles_xml(&self) -> Option<&str> {
-        self.styles_xml.as_deref()
+        self.styles.replacement()
+    }
+
+    /// Whether this patch removes `styles.xml`.
+    #[must_use]
+    pub const fn removes_styles(&self) -> bool {
+        self.styles.removes()
     }
 
     /// Typed blocks appended by the transaction.
@@ -1112,6 +1273,14 @@ impl Patch {
             push_wire_bytes(&mut output, change.before.as_bytes())?;
             push_wire_bytes(&mut output, change.after.as_bytes())?;
         }
+        push_wire_usize(&mut output, self.list_changes.len())?;
+        for change in &self.list_changes {
+            push_wire_usize(&mut output, change.list.get())?;
+            push_wire_list(&mut output, change.before.as_ref())?;
+            push_wire_list(&mut output, change.after.as_ref())?;
+        }
+        push_wire_part_change(&mut output, &self.metadata)?;
+        push_wire_part_change(&mut output, &self.styles)?;
         if output.len() > MAX_DURABLE_PATCH_BYTES {
             return Err(Error::InvalidFormat(
                 "OTH durable patch exceeds the byte limit".to_string(),
@@ -1144,6 +1313,11 @@ impl Patch {
         }
         let changes = read_paragraph_changes(bytes, &mut cursor, &source, &target)?;
         let heading_changes = read_heading_changes(bytes, &mut cursor, &source, &target)?;
+        let list_changes = read_list_changes(bytes, &mut cursor, &source, &target)?;
+        let metadata = read_wire_part_change(bytes, &mut cursor)?;
+        let styles = read_wire_part_change(bytes, &mut cursor)?;
+        validate_part_change(&metadata, source.meta_xml(), target.meta_xml(), "metadata")?;
+        validate_part_change(&styles, source.styles_xml(), target.styles_xml(), "styles")?;
         if cursor != bytes.len() {
             return Err(Error::InvalidFormat(
                 "OTH durable patch has trailing bytes".to_string(),
@@ -1159,11 +1333,9 @@ impl Patch {
             changes,
             durable_fragment: (!appended_xml.is_empty()).then_some(appended_xml),
             heading_changes,
-            list_changes: Vec::new(),
-            metadata_xml: (source.meta_xml() != target.meta_xml())
-                .then(|| target.meta_xml().unwrap_or_default().to_owned()),
-            styles_xml: (source.styles_xml() != target.styles_xml())
-                .then(|| target.styles_xml().unwrap_or_default().to_owned()),
+            list_changes,
+            metadata,
+            styles,
             source,
             target,
         })
@@ -1202,9 +1374,9 @@ impl Patch {
                     list: change.list,
                 })
                 .collect(),
-            metadata_xml: self.source.meta_xml().map(str::to_owned),
+            metadata: part_change_between(self.target.meta_xml(), self.source.meta_xml()),
             source: self.target.clone(),
-            styles_xml: self.source.styles_xml().map(str::to_owned),
+            styles: part_change_between(self.target.styles_xml(), self.source.styles_xml()),
             target: self.source.clone(),
         }
     }
@@ -1282,21 +1454,21 @@ impl MergePlan {
             &appended,
             durable_fragment,
         )?)?;
-        let metadata_xml = self
-            .left
-            .metadata_xml
-            .as_deref()
-            .or(self.right.metadata_xml.as_deref());
-        let styles_xml = self
-            .left
-            .styles_xml
-            .as_deref()
-            .or(self.right.styles_xml.as_deref());
+        let metadata = if self.left.metadata.is_keep() {
+            &self.right.metadata
+        } else {
+            &self.left.metadata
+        };
+        let styles = if self.left.styles.is_keep() {
+            &self.right.styles
+        } else {
+            &self.left.styles
+        };
         let candidate = Template {
             package: self
                 .base
                 .package
-                .rebuild_with_parts(&content, metadata_xml, styles_xml)?,
+                .rebuild_with_parts(&content, metadata, styles)?,
         };
         for change in paragraph_changes {
             if candidate
@@ -1395,6 +1567,162 @@ impl History {
     }
 }
 
+fn transfer_block(source: &Template, selector: TransferSelector) -> Result<crate::ContentBlock> {
+    match selector {
+        TransferSelector::Heading(position) => {
+            let heading = source
+                .package
+                .headings()
+                .get(position.get())
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH transfer heading is out of bounds".to_string())
+                })?;
+            if !heading.links().is_empty()
+                || !heading.fields().is_empty()
+                || !heading.formatting_runs().is_empty()
+            {
+                return Err(Error::InvalidFormat(
+                    "OTH transfer refuses a heading with rich inline markup".to_string(),
+                ));
+            }
+            Ok(crate::ContentBlock::Heading(heading.clone()))
+        },
+        TransferSelector::Paragraph(position) => {
+            let paragraph = source
+                .package
+                .paragraphs()
+                .get(position.get())
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH transfer paragraph is out of bounds".to_string())
+                })?;
+            validate_transfer_paragraph(paragraph)?;
+            Ok(crate::ContentBlock::Paragraph(paragraph.clone()))
+        },
+        TransferSelector::List(position) => {
+            let list = source.package.lists().get(position.get()).ok_or_else(|| {
+                Error::InvalidFormat("OTH transfer list is out of bounds".to_string())
+            })?;
+            let site = source.package.list_site(position.get()).ok_or_else(|| {
+                Error::InvalidFormat("OTH transfer list site is missing".to_string())
+            })?;
+            let contains_nested =
+                source
+                    .package
+                    .list_sites()
+                    .iter()
+                    .enumerate()
+                    .any(|(index, candidate)| {
+                        index != position.get()
+                            && candidate.range.start >= site.range.start
+                            && candidate.range.end <= site.range.end
+                    });
+            if list.level() != 1 || contains_nested {
+                return Err(Error::InvalidFormat(
+                    "OTH transfer refuses nested list structure".to_string(),
+                ));
+            }
+            for paragraph in list.items().iter().flat_map(crate::list::Item::paragraphs) {
+                validate_transfer_paragraph(paragraph)?;
+            }
+            Ok(crate::ContentBlock::List(list.clone()))
+        },
+    }
+}
+
+fn validate_transfer_paragraph(paragraph: &crate::paragraph::Paragraph) -> Result<()> {
+    if paragraph.links().is_empty()
+        && paragraph.fields().is_empty()
+        && paragraph.formatting_runs().is_empty()
+    {
+        Ok(())
+    } else {
+        Err(Error::InvalidFormat(
+            "OTH transfer refuses a paragraph with rich inline markup".to_string(),
+        ))
+    }
+}
+
+fn block_style_names(block: &crate::ContentBlock) -> Vec<String> {
+    match block {
+        crate::ContentBlock::Heading(heading) => heading
+            .style_name()
+            .map(str::to_owned)
+            .into_iter()
+            .collect(),
+        crate::ContentBlock::Paragraph(paragraph) => paragraph
+            .style_name()
+            .map(str::to_owned)
+            .into_iter()
+            .collect(),
+        crate::ContentBlock::List(list) => list
+            .items()
+            .iter()
+            .flat_map(crate::list::Item::paragraphs)
+            .filter_map(crate::paragraph::Paragraph::style_name)
+            .map(str::to_owned)
+            .collect(),
+    }
+}
+
+fn resolve_transfer_styles(
+    source: &[crate::style::Style],
+    destination: &[crate::style::Style],
+    roots: &[String],
+    include_styles: bool,
+) -> Result<Vec<crate::style::Style>> {
+    let mut pending = roots.to_vec();
+    let mut visited = Vec::<String>::new();
+    let mut imported = Vec::new();
+    let mut index = 0;
+    while let Some(name) = pending.get(index) {
+        index = index.saturating_add(1);
+        if visited.iter().any(|candidate| candidate == name) {
+            continue;
+        }
+        visited.push(name.clone());
+        let source_matches = source
+            .iter()
+            .filter(|style| style.name() == name)
+            .collect::<Vec<_>>();
+        let destination_matches = destination
+            .iter()
+            .filter(|style| style.name() == name)
+            .collect::<Vec<_>>();
+        if source_matches.len() > 1 || destination_matches.len() > 1 {
+            return Err(Error::InvalidFormat(format!(
+                "OTH transfer style {name:?} is ambiguous"
+            )));
+        }
+        let source_style = source_matches.first().copied();
+        let destination_style = destination_matches.first().copied();
+        match (source_style, destination_style) {
+            (Some(left), Some(right)) if !styles_semantically_equal(left, right) => {
+                return Err(Error::InvalidFormat(format!(
+                    "OTH transfer style {name:?} collides with the destination"
+                )));
+            },
+            (Some(style), None) if include_styles => imported.push(style.clone()),
+            (Some(_) | None, None) => {
+                return Err(Error::InvalidFormat(format!(
+                    "OTH transfer style dependency {name:?} is unavailable"
+                )));
+            },
+            (Some(_) | None, Some(_)) => {},
+        }
+        if let Some(parent) = source_style.and_then(crate::style::Style::parent_name) {
+            pending.push(parent.to_owned());
+        }
+    }
+    Ok(imported)
+}
+
+fn styles_semantically_equal(left: &crate::style::Style, right: &crate::style::Style) -> bool {
+    left.name() == right.name()
+        && left.family() == right.family()
+        && left.parent_name() == right.parent_name()
+        && left.text_properties() == right.text_properties()
+}
+
 fn list_paragraph_count(list: &crate::list::List) -> usize {
     list.items()
         .iter()
@@ -1465,20 +1793,18 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
             ));
         }
     }
-    if let Some(expected) = edit.metadata_xml.as_deref()
-        && snapshot.package.meta_xml() != Some(expected)
-    {
-        return Err(Error::InvalidFormat(
-            "OTH metadata replacement failed exact readback".to_string(),
-        ));
-    }
-    if let Some(expected) = edit.styles_xml.as_deref()
-        && snapshot.package.styles_xml() != Some(expected)
-    {
-        return Err(Error::InvalidFormat(
-            "OTH styles replacement failed exact readback".to_string(),
-        ));
-    }
+    validate_part_change(
+        &edit.metadata,
+        edit.source.meta_xml(),
+        snapshot.meta_xml(),
+        "metadata",
+    )?;
+    validate_part_change(
+        &edit.styles,
+        edit.source.styles_xml(),
+        snapshot.styles_xml(),
+        "styles",
+    )?;
     let appended_block_count = edit.appended.iter().fold(0_usize, |count, block| {
         count.saturating_add(match block {
             crate::ContentBlock::Heading(_) | crate::ContentBlock::Paragraph(_) => 1,
@@ -1566,6 +1892,29 @@ fn push_wire_bytes(output: &mut Vec<u8>, value: &[u8]) -> Result<()> {
     Ok(())
 }
 
+fn push_wire_list(output: &mut Vec<u8>, optional_list: Option<&crate::list::List>) -> Result<()> {
+    match optional_list {
+        None => push_wire_usize(output, 0),
+        Some(value) => {
+            push_wire_usize(output, 1)?;
+            let xml =
+                crate::authoring::render_fragment(&[crate::ContentBlock::List(value.clone())])?;
+            push_wire_bytes(output, xml.as_bytes())
+        },
+    }
+}
+
+fn push_wire_part_change(output: &mut Vec<u8>, change: &PartChange) -> Result<()> {
+    match change {
+        PartChange::Keep => push_wire_usize(output, 0),
+        PartChange::Remove => push_wire_usize(output, 1),
+        PartChange::Set(xml) => {
+            push_wire_usize(output, 2)?;
+            push_wire_bytes(output, xml.as_bytes())
+        },
+    }
+}
+
 fn read_wire_usize(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
     let end = cursor
         .checked_add(8)
@@ -1595,6 +1944,39 @@ fn read_wire_bytes<'a>(bytes: &'a [u8], cursor: &mut usize) -> Result<&'a [u8]> 
 fn read_wire_string(bytes: &[u8], cursor: &mut usize) -> Result<String> {
     String::from_utf8(read_wire_bytes(bytes, cursor)?.to_vec())
         .map_err(|error| Error::InvalidFormat(format!("invalid OTH patch UTF-8: {error}")))
+}
+
+fn read_wire_list(bytes: &[u8], cursor: &mut usize) -> Result<Option<crate::list::List>> {
+    match read_wire_usize(bytes, cursor)? {
+        0 => Ok(None),
+        1 => {
+            let fragment = read_wire_string(bytes, cursor)?;
+            let wrapped = format!(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\"><office:body><office:text>{fragment}</office:text></office:body></office:document-content>"
+            );
+            let mut projection = crate::codec::project(&wrapped)?;
+            if projection.lists.len() != 1 || projection.lists[0].level() != 1 {
+                return Err(Error::InvalidFormat(
+                    "OTH durable patch list fragment is not one top-level list".to_string(),
+                ));
+            }
+            Ok(projection.lists.pop())
+        },
+        _ => Err(Error::InvalidFormat(
+            "OTH durable patch list marker is invalid".to_string(),
+        )),
+    }
+}
+
+fn read_wire_part_change(bytes: &[u8], cursor: &mut usize) -> Result<PartChange> {
+    match read_wire_usize(bytes, cursor)? {
+        0 => Ok(PartChange::Keep),
+        1 => Ok(PartChange::Remove),
+        2 => Ok(PartChange::Set(read_wire_string(bytes, cursor)?)),
+        _ => Err(Error::InvalidFormat(
+            "OTH durable patch part-change marker is invalid".to_string(),
+        )),
+    }
 }
 
 fn read_paragraph_changes(
@@ -1689,6 +2071,132 @@ fn read_heading_changes(
         });
     }
     Ok(changes)
+}
+
+fn read_list_changes(
+    bytes: &[u8],
+    cursor: &mut usize,
+    source: &Template,
+    target: &Template,
+) -> Result<Vec<ListChange>> {
+    let count = read_wire_usize(bytes, cursor)?;
+    if count
+        > source
+            .package
+            .lists()
+            .len()
+            .saturating_add(target.package.lists().len())
+    {
+        return Err(Error::InvalidFormat(
+            "OTH durable patch list count is invalid".to_string(),
+        ));
+    }
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(count)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "OTH durable list changes",
+            source: allocation_error,
+        })?;
+    for _ in 0..count {
+        let list = Position::new(read_wire_usize(bytes, cursor)?);
+        if changes
+            .iter()
+            .any(|candidate: &ListChange| candidate.list == list)
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable patch repeats a list selector".to_string(),
+            ));
+        }
+        let before = read_wire_list(bytes, cursor)?;
+        let after = read_wire_list(bytes, cursor)?;
+        if before.is_none() && after.is_none() {
+            return Err(Error::InvalidFormat(
+                "OTH durable patch contains an empty list change".to_string(),
+            ));
+        }
+        if let Some(expected) = before.as_ref()
+            && !source
+                .package
+                .lists()
+                .get(list.get())
+                .is_some_and(|actual| lists_semantically_equal(actual, expected))
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable list change failed source readback".to_string(),
+            ));
+        }
+        changes.push(ListChange {
+            after,
+            before,
+            list,
+        });
+    }
+    let removed = changes
+        .iter()
+        .filter(|change| change.before.is_some() && change.after.is_none())
+        .count();
+    let inserted = changes
+        .iter()
+        .filter(|change| change.before.is_none() && change.after.is_some())
+        .count();
+    if target.package.lists().len()
+        != source
+            .package
+            .lists()
+            .len()
+            .saturating_sub(removed)
+            .saturating_add(inserted)
+    {
+        return Err(Error::InvalidFormat(
+            "OTH durable list changes fail structural target readback".to_string(),
+        ));
+    }
+    for change in &changes {
+        let Some(expected) = change.after.as_ref() else {
+            continue;
+        };
+        let target_index = list_target_index(&changes, change)?;
+        if !target
+            .package
+            .lists()
+            .get(target_index)
+            .is_some_and(|actual| lists_semantically_equal(actual, expected))
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable list change failed target readback".to_string(),
+            ));
+        }
+    }
+    Ok(changes)
+}
+
+fn part_change_between(before: Option<&str>, after: Option<&str>) -> PartChange {
+    match (before, after) {
+        (left, right) if left == right => PartChange::Keep,
+        (_, Some(xml)) => PartChange::Set(xml.to_owned()),
+        (_, None) => PartChange::Remove,
+    }
+}
+
+fn validate_part_change(
+    change: &PartChange,
+    before: Option<&str>,
+    after: Option<&str>,
+    label: &str,
+) -> Result<()> {
+    let valid = match change {
+        PartChange::Keep => before == after,
+        PartChange::Remove => after.is_none(),
+        PartChange::Set(xml) => after == Some(xml.as_str()),
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(Error::InvalidFormat(format!(
+            "OTH {label} part change failed exact readback"
+        )))
+    }
 }
 
 fn replace_texts(

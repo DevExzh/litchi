@@ -22,6 +22,15 @@ fn large_libreoffice_producer_artifacts_round_trip_exactly() {
         "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158982.rtf",
         "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/watermark.rtf",
         "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/all_gaps_word.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569-2.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158762.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf161878.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/text-with-comment.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158830.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tblrepeat.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf163003.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf165923.rtf",
     ];
     let mut accepted = 0usize;
     for fixture in fixtures {
@@ -43,6 +52,11 @@ fn hostile_large_corpus_is_bounded_and_never_normalized_on_open() {
         "test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-4.rtf",
         "test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf",
         "test-data/libreoffice-core/sw/qa/writerfilter/filters-test/data/pass/TCI-TN65GP-DDRHDLL-partial.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-1.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-3.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/fdo80924.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf",
     ];
     for fixture in fixtures {
         let bytes = std::fs::read(corpus(fixture)).unwrap();

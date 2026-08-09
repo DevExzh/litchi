@@ -53,18 +53,25 @@ individual typed codecs can impose additional format-specific bounds.
 Password-to-open input is owned by non-cloneable, zeroizing `Password` and is
 supplied through `OpenOptions::with_password`; it is redacted in diagnostics.
 `Document::text` preserves stored source text. `body_text::Snapshot` also
-projects ordinary main-story paragraphs as stored, accepted, or rejected text.
-Its bounded source-checked transaction supports length-changing replacements
-across multiple ordinary paragraphs and direct-bold changes atomically. It
-appends Unicode pieces, rebuilds CLX/CHPX data, shifts modeled main/all-story CP
-tables, updates the main-story count, and performs both CFB and full DOC reopen
-validation before publication. Structural or tracked text, mixed character
-formatting, interior modeled CP boundaries, and known unmodeled CP-indexed structures
-are typed refusals. The same semantic changes drive source-checked reversible
-patches, deterministic durable patches, disjoint composition, and bounded
-undo/redo history. Paragraph selection uses the format-neutral
-`litchi_core::Position`, with collection resolution returning a typed not-found
-refusal.
+projects ordinary main-story paragraphs as stored, accepted, or rejected text,
+and selects paragraphs in every story, simple table cells, simple cached field
+results, revision marks, and passive embedded-object display metadata. Its
+bounded source-checked transaction supports modeled main-story length changes,
+equal-length Unicode overwrites in auxiliary stories, direct
+bold/italic/underline, non-destructive revision-mark disposition, and passive
+`ObjInfo` display changes atomically. It appends Unicode pieces, rebuilds
+CLX/CHPX data, shifts modeled CP/PLCF tables, updates story counts, delegates
+ObjectPool metadata to its dedicated owner, and performs both CFB and full DOC
+reopen validation before publication. Structural table edits, field nesting or
+delimiter changes, destructive revision dispositions, auxiliary-story length
+changes, mixed character formatting, interior modeled CP boundaries, and known
+unmodeled CP-indexed structures are typed refusals. The same semantic changes
+drive source-checked reversible patches, deterministic durable patches,
+disjoint composition, three-way planning, dependency-free inert text transfer,
+and bounded undo/redo history. OfficeArt, drawing payload, and resource transfer
+remain outside this transaction's dependency closure. Selection uses the
+format-neutral `litchi_core::Position`, with collection resolution returning a
+typed not-found refusal.
 
 ## Core Word binary document model
 
@@ -97,7 +104,7 @@ refusal.
 | Feature family | Status | Read | Write | Notes |
 |----------------|--------|------|-------|-------|
 | CP, PLC, STTB, SPRM/PRL, and property storage primitives | ✅ | ✅ | ✅ | [MS-DOC] 2.2 defines character positions, piece and property storage, string tables, and single-property modifiers used by the typed model |
-| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds bounded multi-paragraph length-changing text plus direct-bold transactions, modeled CLX/CHPX/PLCF/FIB updates, full reopen validation, reversible and durable patches, disjoint composition, and bounded history; unmodeled dependencies are refused before mutation. |
+| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds bounded story/paragraph, simple table-cell and cached-field-result text, direct bold/italic/underline, safe revision-mark disposition, and embedded-display metadata to one immutable root transaction. Modeled CLX/CHPX/PLCF/FIB closure, full reopen validation, reversible and durable patches, disjoint composition, three-way planning, dependency-free text transfer, and bounded history are covered; structural, destructive, drawing/resource-transfer, and unmodeled dependencies are refused before mutation. |
 | Main, footnote, endnote, header, comment, textbox, and header-textbox parts | ✅ | ✅ | ✅ | [MS-DOC] 2.3 story ranges and the corresponding PLCs are exposed through typed document, note, comment, header/footer, picture, shape, and textbox APIs |
 | Bookmark PLCs and names | ✅ | ✅ | ✅ | Range and point bookmarks are typed and editable, including repair/validation behavior for malformed ranges |
 | Field PLCs and non-Plcfld text-only fields | ✅ | ✅ | ✅ | Native field delimiters, instruction/result text, marker positions, nesting, and the five text-only field families are reconstructed and authored with balanced graphs |

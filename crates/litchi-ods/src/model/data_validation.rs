@@ -1435,7 +1435,7 @@ mod tests {
             <t:error-message t:title="Invalid" t:display="true" t:message-type="stop"><x:p>Try again</x:p></t:error-message>
           </t:content-validation></t:content-validations>
         </office:spreadsheet>"#;
-        let parsed = parse(xml).unwrap();
+        let parsed = parse(xml).expect("test fixture or operation should succeed");
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].name, "whole");
         assert_eq!(
@@ -1447,18 +1447,26 @@ mod tests {
         );
         assert_eq!(parsed[0].display_list, Some(DisplayList::Unsorted));
         assert_eq!(
-            parsed[0].help_message.as_ref().unwrap().paragraphs,
+            parsed[0]
+                .help_message
+                .as_ref()
+                .expect("test fixture or operation should succeed")
+                .paragraphs,
             ["Enter a whole number"]
         );
         assert_eq!(
-            parsed[0].error_message.as_ref().unwrap().message_type,
+            parsed[0]
+                .error_message
+                .as_ref()
+                .expect("test fixture or operation should succeed")
+                .message_type,
             Some(MessageType::Stop)
         );
         let mut encoded = String::new();
         write(&mut encoded, &parsed);
         assert_eq!(parse(&format!(
             r#"<office:spreadsheet xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{encoded}</office:spreadsheet>"#
-        )).unwrap(), parsed);
+        )).expect("test fixture or operation should succeed"), parsed);
     }
 
     #[test]
@@ -1467,7 +1475,8 @@ mod tests {
         assert!(parse(duplicate).is_err());
         let invalid = r#"<t:content-validations xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:content-validation t:name="x" t:display-list="bad"/></t:content-validations>"#;
         assert!(parse(invalid).is_err());
-        let mut validation = ContentValidation::new("x").unwrap();
+        let mut validation =
+            ContentValidation::new("x").expect("test fixture or operation should succeed");
         validation.error_message = Some(ErrorMessage::default());
         validation.error_macro = Some(ErrorMacro::default());
         assert!(validation.validate().is_err());
@@ -1476,9 +1485,13 @@ mod tests {
     #[test]
     fn preserves_odf_whitespace_elements_in_messages() {
         let xml = r#"<t:content-validations xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:x="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:content-validation t:name="x"><t:help-message><x:p>two<x:s x:c="2"/>spaces<x:tab/>tab<x:line-break/>line</x:p></t:help-message></t:content-validation></t:content-validations>"#;
-        let parsed = parse(xml).unwrap();
+        let parsed = parse(xml).expect("test fixture or operation should succeed");
         assert_eq!(
-            parsed[0].help_message.as_ref().unwrap().paragraphs,
+            parsed[0]
+                .help_message
+                .as_ref()
+                .expect("test fixture or operation should succeed")
+                .paragraphs,
             ["two  spaces\ttab\nline"]
         );
 
@@ -1506,8 +1519,11 @@ mod tests {
             </o:event-listeners>
           </t:content-validation>
         </t:content-validations>"#;
-        let parsed = parse(xml).unwrap();
-        let error_macro = parsed[0].error_macro.as_ref().unwrap();
+        let parsed = parse(xml).expect("test fixture or operation should succeed");
+        let error_macro = parsed[0]
+            .error_macro
+            .as_ref()
+            .expect("test fixture or operation should succeed");
         assert_eq!(error_macro.execute, Some(false));
         assert_eq!(error_macro.event_listeners.len(), 2);
         let EventListener::Presentation(listener) = &error_macro.event_listeners[1] else {
@@ -1515,7 +1531,12 @@ mod tests {
         };
         assert_eq!(listener.verb, Some(2));
         assert_eq!(
-            listener.sound.as_ref().unwrap().xml_id.as_deref(),
+            listener
+                .sound
+                .as_ref()
+                .expect("test fixture or operation should succeed")
+                .xml_id
+                .as_deref(),
             Some("sound1")
         );
 
@@ -1524,6 +1545,9 @@ mod tests {
         let document = format!(
             r#"<office:spreadsheet xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:xlink="http://www.w3.org/1999/xlink">{encoded}</office:spreadsheet>"#
         );
-        assert_eq!(parse(&document).unwrap(), parsed);
+        assert_eq!(
+            parse(&document).expect("test fixture or operation should succeed"),
+            parsed
+        );
     }
 }

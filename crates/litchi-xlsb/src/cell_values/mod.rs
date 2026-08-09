@@ -11,9 +11,15 @@
 //! Patches carry deterministic semantic deltas, exact before/after images,
 //! bounded durable transfer, three-way conflict reporting, and undo/redo.
 
+mod resources;
+mod root;
 pub mod workbook;
 mod worksheet;
 
+pub use root::{
+    WorkbookCommit, WorkbookEdit, WorkbookHistory, WorkbookMergeConflict, WorkbookMergeOutcome,
+    WorkbookPatch,
+};
 pub use worksheet::{
     CellError, CellFormula, Change, Commit, Edit, History, Limits, MergeConflict, MergeOutcome,
     Number, Patch, Reference, Snapshot, StoredCell, StyleIndex, TransferLimits, Value,
