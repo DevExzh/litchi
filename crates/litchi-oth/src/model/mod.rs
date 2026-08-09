@@ -6,6 +6,7 @@ pub mod field;
 pub mod form;
 pub mod formatting;
 pub mod heading;
+pub mod inline;
 pub mod link;
 pub mod list;
 pub mod paragraph;

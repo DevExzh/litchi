@@ -197,9 +197,10 @@ impl Chart {
         self.0.package.resource_bytes(index)
     }
 
-    /// Starts a source-bound package axis transaction.
+    /// Starts a source-bound package chart transaction.
     ///
-    /// The transaction edits only `chart:name` attributes on existing axes.
+    /// The exact surface covers selected chart, plot, series, and axis
+    /// attributes; canonical definitions additionally support structural edits.
     /// Untouched package members and unmodeled chart XML remain payload-exact.
     #[must_use]
     pub fn edit(&self) -> Edit<'_> {
@@ -208,7 +209,7 @@ impl Chart {
             transaction: self.0.package.content_snapshot().edit(),
             replacement: None,
             typed_transaction: None,
-            flat_axis_staged: false,
+            flat_content_staged: false,
             staged_styles: None,
             resource_edits: Vec::new(),
         }
@@ -229,7 +230,7 @@ pub struct Edit<'a> {
     transaction: crate::FlatChartEdit,
     replacement: Option<Definition>,
     typed_transaction: Option<crate::DefinitionEdit>,
-    flat_axis_staged: bool,
+    flat_content_staged: bool,
     staged_styles: Option<StagedStyles>,
     resource_edits: Vec<ResourceEdit>,
 }
@@ -248,7 +249,32 @@ impl Edit<'_> {
             ));
         }
         self.transaction.update_axis(index, update)?;
-        self.flat_axis_staged = true;
+        self.flat_content_staged = true;
+        Ok(())
+    }
+
+    /// Stage a namespace-resolved, exact-span chart attribute edit.
+    ///
+    /// This surface accepts only the documented target/attribute combinations
+    /// and reparses the complete candidate before publication.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, attribute pairing, value, or
+    /// a change that cannot preserve source XML outside the checked tag span.
+    pub fn update_exact(
+        &mut self,
+        target: crate::ExactTarget,
+        attribute: crate::ExactAttribute,
+        after: Option<String>,
+    ) -> Result<()> {
+        if self.replacement.is_some() || self.typed_transaction.is_some() {
+            return Err(Error::InvalidFormat(
+                "an ODC typed chart edit is already staged".to_string(),
+            ));
+        }
+        self.transaction.update_exact(target, attribute, after)?;
+        self.flat_content_staged = true;
         Ok(())
     }
 
@@ -279,7 +305,7 @@ impl Edit<'_> {
     ///
     /// Returns an error after a flat axis edit or when projection is lossy.
     pub fn definition_edit(&mut self) -> Result<&mut crate::DefinitionEdit> {
-        if self.flat_axis_staged {
+        if self.flat_content_staged {
             return Err(Error::InvalidFormat(
                 "ODC granular definition edits cannot follow a flat axis edit".into(),
             ));
@@ -561,6 +587,11 @@ impl Edit<'_> {
         } else {
             content_commit.patch().changes().to_vec()
         };
+        let exact_changes = if replacement.is_some() {
+            Vec::new()
+        } else {
+            content_commit.patch().exact_changes().to_vec()
+        };
         let content = if let Some(definition) = replacement.as_ref() {
             crate::serialize_content_with_limits(definition, self.source.limits())?
         } else {
@@ -669,6 +700,7 @@ impl Edit<'_> {
                 source: self.source.clone(),
                 target: snapshot,
                 changes,
+                exact_changes,
                 replaces_chart,
                 style_change,
                 resource_changes,
@@ -736,6 +768,7 @@ pub struct Patch {
     source: Chart,
     target: Chart,
     changes: Vec<crate::AxisChange>,
+    exact_changes: Vec<crate::ExactChange>,
     replaces_chart: bool,
     style_change: Option<StylesChange>,
     resource_changes: Vec<ResourceChange>,
@@ -837,6 +870,12 @@ impl Patch {
         &self.changes
     }
 
+    /// Returns controlled exact-span chart, plot-area, and series changes.
+    #[must_use]
+    pub fn exact_changes(&self) -> &[crate::ExactChange] {
+        &self.exact_changes
+    }
+
     /// Returns whether this patch replaces the complete chart definition.
     #[must_use]
     pub fn replaces_chart(&self) -> bool {
@@ -874,12 +913,15 @@ impl Patch {
         }
         let mut changes = self.changes.clone();
         changes.extend_from_slice(&next.changes);
+        let mut exact_changes = self.exact_changes.clone();
+        exact_changes.extend_from_slice(&next.exact_changes);
         let mut resource_changes = self.resource_changes.clone();
         resource_changes.extend_from_slice(&next.resource_changes);
         Ok(Self {
             source: self.source.clone(),
             target: next.target.clone(),
             changes,
+            exact_changes,
             replaces_chart: self.replaces_chart || next.replaces_chart,
             style_change: compose_style_change(
                 self.style_change.as_ref(),
@@ -957,6 +999,11 @@ impl Patch {
                 .changes
                 .iter()
                 .map(crate::AxisChange::new_inverse)
+                .collect(),
+            exact_changes: self
+                .exact_changes
+                .iter()
+                .map(crate::ExactChange::new_inverse)
                 .collect(),
             replaces_chart: self.replaces_chart,
             style_change: self.style_change.as_ref().map(StylesChange::inverse),
@@ -1203,7 +1250,11 @@ fn merge_package_content(
         right.target.definition(),
     );
     let (Ok(base_definition), Ok(left_definition), Ok(right_definition)) = definitions else {
-        conflicts.push(crate::Conflict::new("chart.content"));
+        if flat_summary_matches(left) && flat_summary_matches(right) {
+            merge_flat_content(left, right, edit, conflicts)?;
+        } else {
+            conflicts.push(crate::Conflict::new("chart.content"));
+        }
         return Ok(());
     };
     let limits = left.source.limits();
@@ -1263,7 +1314,11 @@ fn transfer_package_content(
     );
     let (Ok(source_definition), Ok(target_definition), Ok(destination_definition)) = definitions
     else {
-        conflicts.push(crate::Conflict::new("chart.content"));
+        if flat_summary_matches(patch) {
+            transfer_flat_content(patch, destination, edit, conflicts)?;
+        } else {
+            conflicts.push(crate::Conflict::new("chart.content"));
+        }
         return Ok(());
     };
     let source = crate::DefinitionSnapshot::new(source_definition, patch.source.limits())?;
@@ -1281,6 +1336,180 @@ fn transfer_package_content(
         edit.replace_chart(transferred_patch.target.definition())?;
     }
     Ok(())
+}
+
+fn flat_summary_matches(patch: &Patch) -> bool {
+    let replay = || -> Result<bool> {
+        let source = patch.source.0.package.content_snapshot();
+        let mut edit = source.edit();
+        for change in &patch.changes {
+            edit.update_axis(
+                change.index(),
+                crate::AxisUpdate {
+                    name: (change.before() != change.after())
+                        .then(|| change.after().map(str::to_owned)),
+                    style_name: (change.before_style_name() != change.after_style_name())
+                        .then(|| change.after_style_name().map(str::to_owned)),
+                },
+            )?;
+        }
+        for change in &patch.exact_changes {
+            edit.update_exact(
+                change.target(),
+                change.attribute(),
+                change.after().map(str::to_owned),
+            )?;
+        }
+        Ok(edit.commit()?.snapshot().as_bytes() == patch.target.content_xml().as_bytes())
+    };
+    replay().unwrap_or(false)
+}
+
+fn merge_flat_content(
+    left: &Patch,
+    right: &Patch,
+    edit: &mut Edit<'_>,
+    conflicts: &mut Vec<crate::Conflict>,
+) -> Result<()> {
+    for left_change in &left.exact_changes {
+        if let Some(right_change) = right.exact_changes.iter().find(|candidate| {
+            candidate.target() == left_change.target()
+                && candidate.attribute() == left_change.attribute()
+        }) && left_change.after() != right_change.after()
+        {
+            conflicts.push(crate::Conflict::new(exact_change_path(left_change)));
+        }
+    }
+    for left_change in &left.changes {
+        if let Some(right_change) = right
+            .changes
+            .iter()
+            .find(|candidate| candidate.index() == left_change.index())
+        {
+            if left_change.before() != left_change.after()
+                && right_change.before() != right_change.after()
+                && left_change.after() != right_change.after()
+            {
+                conflicts.push(crate::Conflict::new(format!(
+                    "chart.plot.axes[{}].name",
+                    left_change.index()
+                )));
+            }
+            if left_change.before_style_name() != left_change.after_style_name()
+                && right_change.before_style_name() != right_change.after_style_name()
+                && left_change.after_style_name() != right_change.after_style_name()
+            {
+                conflicts.push(crate::Conflict::new(format!(
+                    "chart.plot.axes[{}].style-name",
+                    left_change.index()
+                )));
+            }
+        }
+    }
+    if !conflicts.is_empty() {
+        return Ok(());
+    }
+    for change in left.exact_changes.iter().chain(&right.exact_changes) {
+        edit.update_exact(
+            change.target(),
+            change.attribute(),
+            change.after().map(str::to_owned),
+        )?;
+    }
+    for change in left.changes.iter().chain(&right.changes) {
+        edit.update_axis(
+            change.index(),
+            crate::AxisUpdate {
+                name: (change.before() != change.after())
+                    .then(|| change.after().map(str::to_owned)),
+                style_name: (change.before_style_name() != change.after_style_name())
+                    .then(|| change.after_style_name().map(str::to_owned)),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn transfer_flat_content(
+    patch: &Patch,
+    destination: &Chart,
+    edit: &mut Edit<'_>,
+    conflicts: &mut Vec<crate::Conflict>,
+) -> Result<()> {
+    let destination_flat = destination.0.package.content_snapshot();
+    for change in &patch.exact_changes {
+        let Ok(current) = destination_flat.exact_value(change.target(), change.attribute()) else {
+            conflicts.push(crate::Conflict::new(exact_change_path(change)));
+            continue;
+        };
+        if current != change.before() && current != change.after() {
+            conflicts.push(crate::Conflict::new(exact_change_path(change)));
+        } else if current == change.before() {
+            edit.update_exact(
+                change.target(),
+                change.attribute(),
+                change.after().map(str::to_owned),
+            )?;
+        }
+    }
+    for change in &patch.changes {
+        let axis = destination.plot_area().and_then(|plot| {
+            plot.axes().nth(change.index()).map(|axis| {
+                (
+                    axis.name().map(str::to_owned),
+                    axis.style_name().map(str::to_owned),
+                )
+            })
+        });
+        let Some((axis_name, axis_style_name)) = axis else {
+            conflicts.push(crate::Conflict::new(format!(
+                "chart.plot.axes[{}]",
+                change.index()
+            )));
+            continue;
+        };
+        let name_changed = change.before() != change.after();
+        let style_changed = change.before_style_name() != change.after_style_name();
+        let name_conflict = name_changed
+            && axis_name.as_deref() != change.before()
+            && axis_name.as_deref() != change.after();
+        let style_conflict = style_changed
+            && axis_style_name.as_deref() != change.before_style_name()
+            && axis_style_name.as_deref() != change.after_style_name();
+        if name_conflict {
+            conflicts.push(crate::Conflict::new(format!(
+                "chart.plot.axes[{}].name",
+                change.index()
+            )));
+        }
+        if style_conflict {
+            conflicts.push(crate::Conflict::new(format!(
+                "chart.plot.axes[{}].style-name",
+                change.index()
+            )));
+        }
+        if !name_conflict && !style_conflict {
+            edit.update_axis(
+                change.index(),
+                crate::AxisUpdate {
+                    name: (name_changed && axis_name.as_deref() == change.before())
+                        .then(|| change.after().map(str::to_owned)),
+                    style_name: (style_changed
+                        && axis_style_name.as_deref() == change.before_style_name())
+                    .then(|| change.after_style_name().map(str::to_owned)),
+                },
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn exact_change_path(change: &crate::ExactChange) -> String {
+    format!(
+        "chart.exact[{:?}].{:?}",
+        change.target(),
+        change.attribute()
+    )
 }
 
 fn transfer_package_styles(
@@ -1444,10 +1673,15 @@ fn patch_between(source: Chart, target: Chart) -> Patch {
         _ => Vec::new(),
     };
     let replaces_chart = source.content_xml() != target.content_xml();
+    let exact_changes = crate::flat::exact_changes_between(
+        &source.0.package.content_snapshot(),
+        &target.0.package.content_snapshot(),
+    );
     Patch {
         source,
         target,
         changes,
+        exact_changes,
         replaces_chart,
         style_change,
         resource_changes,

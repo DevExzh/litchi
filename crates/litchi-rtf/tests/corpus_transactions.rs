@@ -6,7 +6,7 @@
 
 use litchi_rtf::{
     Document,
-    edit::{Error, Limits, TextSpan},
+    edit::{Error, Limits, TextSpan, TransferPlan},
 };
 use std::path::{Path, PathBuf};
 
@@ -82,4 +82,44 @@ fn hostile_operation_fanout_stops_at_the_caller_bound() {
             limit: 256
         })
     ));
+}
+
+#[test]
+fn changed_microsoft_and_libreoffice_corpus_output_reopens() {
+    let microsoft_bytes = std::fs::read(corpus("test-data/rtf/testNegativeUnicode.rtf")).unwrap();
+    let microsoft = Document::from_bytes(&microsoft_bytes).unwrap();
+    let microsoft_target = Document::parse(r"{\rtf1\ansi Microsoft interop target}").unwrap();
+    let changed = TransferPlan::field(&microsoft, 0, &microsoft_target)
+        .unwrap()
+        .commit()
+        .unwrap()
+        .into_snapshot();
+    assert_ne!(
+        changed.to_bytes().unwrap(),
+        microsoft_target.to_bytes().unwrap()
+    );
+    let reopened = Document::from_bytes(&changed.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.fields().len(), 1);
+    assert_eq!(
+        reopened.fields()[0].instruction,
+        microsoft.fields()[0].instruction
+    );
+
+    let libreoffice = Document::from_bytes(
+        &std::fs::read(corpus(
+            "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/ole-inline.rtf",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let target = Document::parse(r"{\rtf1\ansi Interop target}").unwrap();
+    let transferred = TransferPlan::object(&libreoffice, 0, &target)
+        .unwrap()
+        .commit()
+        .unwrap()
+        .into_snapshot();
+    assert_ne!(transferred.to_bytes().unwrap(), target.to_bytes().unwrap());
+    let reopened = Document::from_bytes(&transferred.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.objects().len(), 1);
+    assert_eq!(reopened.objects()[0].data, libreoffice.objects()[0].data);
 }

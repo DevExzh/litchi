@@ -42,7 +42,7 @@ fn semantic_facade_uses_contextual_names() {
 
 mod comment_tests {
     use super::*;
-    use crate::modern_comments::{AC, MAX_BYTES, P188, PC};
+    use crate::modern_comments::{AC, MAX_BYTES, P, P188, P223, PC};
     use litchi_opc::Part as _;
     use std::mem::size_of;
 
@@ -104,6 +104,36 @@ mod comment_tests {
                 .contains("Needs more cowbell")
         );
         assert_eq!(List::parse(&parsed.to_xml().unwrap()).unwrap(), parsed);
+    }
+
+    #[test]
+    fn typed_reaction_extensions_retain_their_namespace_through_comment_reparse() {
+        let mut list = List::parse(&sdk_xml()).unwrap();
+        let mut extensions = semantic::extensions::List::default();
+        extensions
+            .replace_reactions(
+                Some("{E1E2D3D4-C5C6-47A8-99AA-BBCCDDEEFF00}"),
+                Some(semantic::reactions::List::default()),
+            )
+            .unwrap();
+        list.comments[0].set_extensions(extensions).unwrap();
+
+        let reparsed = List::parse(&list.to_xml().unwrap()).unwrap();
+        assert!(reparsed.comments[0].reactions().unwrap().is_some());
+    }
+
+    #[test]
+    fn typed_payload_inherits_the_extension_entry_namespace_scope() {
+        let mut list = List::parse(&sdk_xml()).unwrap();
+        list.comments[0].extension_xml = Some(
+            format!(
+                r#"<p188:extLst xmlns:p188="{P188}" xmlns:p="{P}"><p:ext uri="{{E1E2D3D4-C5C6-47A8-99AA-BBCCDDEEFF00}}" xmlns:p223="{P223}"><p223:reactions/></p:ext></p188:extLst>"#
+            )
+            .into_bytes(),
+        );
+
+        let reparsed = List::parse(&list.to_xml().unwrap()).unwrap();
+        assert!(reparsed.comments[0].reactions().unwrap().is_some());
     }
 
     #[test]

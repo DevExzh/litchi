@@ -9,12 +9,14 @@ pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-maste
 // empty compatibility marker avoids making arbitrary XML prefixes semantic.
 const BODY_MARKER: &str = "";
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
+const MAX_ACTIVE_CONTENT: usize = 1_000_000;
 
 struct State {
     package: Package,
     semantics: crate::codec::Semantics,
     styles: Vec<crate::style::Definition>,
     resources: crate::resource::Graph,
+    security: crate::security::State,
 }
 
 pub(crate) struct ResourceWrite {
@@ -56,11 +58,13 @@ impl Snapshot {
         let semantics = crate::codec::parse(package.content_xml())?;
         let styles = crate::codec::parse_catalog(package.content_xml(), package.styles_xml())?;
         let resources = build_resource_graph(&package, semantics.references())?;
+        let security = build_security_state(&package, &semantics)?;
         Ok(Self(Arc::new(State {
             package,
             semantics,
             styles,
             resources,
+            security,
         })))
     }
 
@@ -205,12 +209,20 @@ impl Snapshot {
         self.0.semantics.tree()
     }
 
+    pub(crate) fn structure(&self) -> &crate::structure::Structure {
+        self.0.semantics.structure()
+    }
+
     pub(crate) fn styles(&self) -> &[crate::style::Definition] {
         &self.0.styles
     }
 
     pub(crate) fn resources(&self) -> &crate::resource::Graph {
         &self.0.resources
+    }
+
+    pub(crate) fn security(&self) -> &crate::security::State {
+        &self.0.security
     }
 
     pub(crate) fn resource_bytes(&self, path: &str) -> Result<Vec<u8>> {
@@ -220,6 +232,123 @@ impl Snapshot {
     pub(crate) fn local_section_references(&self) -> &[(String, std::ops::Range<usize>)] {
         self.0.semantics.local_section_references()
     }
+}
+
+fn build_security_state(
+    package: &Package,
+    semantics: &crate::codec::Semantics,
+) -> Result<crate::security::State> {
+    let archive = package.package().package()?;
+    let files = archive.files()?;
+    let signed = files.iter().any(|path| {
+        matches!(
+            path.as_str(),
+            "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
+        )
+    });
+    let encrypted = archive.manifest().has_encrypted_entries();
+    let mut active_content = Vec::new();
+    for node in semantics.tree().sections() {
+        if node.has_dde_source() {
+            push_active(
+                &mut active_content,
+                crate::security::ActiveKind::Dde,
+                "content.xml",
+            )?;
+        }
+    }
+    for path in files {
+        if path.starts_with("Basic/") || path.starts_with("Scripts/") {
+            push_active(
+                &mut active_content,
+                crate::security::ActiveKind::ScriptResource,
+                &path,
+            )?;
+        }
+    }
+    inspect_active_xml(package.content_xml(), "content.xml", &mut active_content)?;
+    if let Some(styles) = package.styles_xml() {
+        inspect_active_xml(styles, "styles.xml", &mut active_content)?;
+    }
+    Ok(crate::security::State {
+        signed,
+        encrypted,
+        active_content,
+    })
+}
+
+fn inspect_active_xml(
+    xml: &str,
+    location: &str,
+    output: &mut Vec<crate::security::ActiveContent>,
+) -> Result<()> {
+    use quick_xml::{events::Event, name::ResolveResult, reader::NsReader};
+
+    const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    const SCRIPT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
+    const FORM: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:form:1.0";
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    loop {
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODM active-content XML: {error}"))
+        })?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let is_office =
+                    matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == OFFICE);
+                let is_script =
+                    matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == SCRIPT);
+                let is_form =
+                    matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == FORM);
+                let local = element.local_name();
+                let kind = if is_script || (is_office && local.as_ref() == b"scripts") {
+                    Some(crate::security::ActiveKind::Script)
+                } else if is_form || (is_office && local.as_ref() == b"forms") {
+                    Some(crate::security::ActiveKind::FormControl)
+                } else {
+                    None
+                };
+                if let Some(kind) = kind {
+                    push_active(output, kind, location)?;
+                }
+            },
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "DOCTYPE is not allowed in ODM active-content scan".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    Ok(())
+}
+
+fn push_active(
+    output: &mut Vec<crate::security::ActiveContent>,
+    kind: crate::security::ActiveKind,
+    location: &str,
+) -> Result<()> {
+    if output.len() >= MAX_ACTIVE_CONTENT {
+        return Err(Error::InvalidFormat(
+            "ODM active-content item count exceeds the limit".to_string(),
+        ));
+    }
+    output.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "ODM active-content inventory",
+        source,
+    })?;
+    output.push(crate::security::ActiveContent {
+        kind,
+        location: location.to_string(),
+    });
+    Ok(())
 }
 
 fn ensure_editable(archive: &OwnedPackage, files: &[String]) -> Result<()> {

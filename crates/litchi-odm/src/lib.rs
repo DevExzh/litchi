@@ -18,4 +18,4 @@ pub mod title;
 pub mod transaction;
 
 pub use facade::{Builder, Master};
-pub use model::{resource, section, style, subdocument};
+pub use model::{resource, section, security, structure, style, subdocument};

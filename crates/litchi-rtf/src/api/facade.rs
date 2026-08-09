@@ -184,6 +184,24 @@ impl Document {
         self.inner.model.fields()
     }
 
+    /// Borrow inert embedded and linked object records in body order.
+    #[must_use]
+    pub fn objects(&self) -> &[crate::EmbeddedObject<'_>] {
+        self.inner.model.objects()
+    }
+
+    /// Borrow list definitions in list-table order.
+    #[must_use]
+    pub fn lists(&self) -> &[crate::list::List<'_>] {
+        self.inner.model.list_table().lists()
+    }
+
+    /// Borrow list-instance overrides in override-table order.
+    #[must_use]
+    pub fn list_overrides(&self) -> &[crate::list::ListOverride] {
+        self.inner.model.list_override_table().overrides()
+    }
+
     /// Borrow sections in source order.
     #[must_use]
     pub fn sections(&self) -> &[crate::section::Section<'_>] {

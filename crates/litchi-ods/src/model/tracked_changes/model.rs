@@ -540,6 +540,19 @@ pub(crate) enum RelationKind {
     Previous,
 }
 
+impl RelationKind {
+    pub(crate) const fn bit(self) -> u8 {
+        match self {
+            Self::Rejecting => 0,
+            Self::Dependency => 1,
+            Self::CellContentDeletion => 2,
+            Self::ChangeDeletion => 3,
+            Self::InsertionCutOff => 4,
+            Self::Previous => 5,
+        }
+    }
+}
+
 /// Exact resource contribution used by incremental tracked-change validation.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Resources {
@@ -1101,7 +1114,7 @@ fn try_clone_string(value: &str, label: &str) -> Result<String> {
 
 fn is_xml_10_scalar(value: char) -> bool {
     matches!(value, '\u{9}' | '\u{A}' | '\u{D}')
-        || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+        || matches!(u32::from(value), 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
 }
 
 fn validate_address(address: &CellAddress, budget: &mut Budget<'_>) -> Result<()> {

@@ -188,7 +188,9 @@ pub use auto_filter::{
     Item, Top10, Values, parse_auto_filter, parse_auto_filter_fragment, write_auto_filter_fragment,
 };
 pub use calculation_properties::{Mode, ReferenceMode};
-pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
+pub use cell::{
+    Cell, Cells, Content, Date, ErrorValue, Extents, Number, SharedStringKey, Text, Value,
+};
 pub use cell_watches::{
     CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
 };

@@ -102,9 +102,9 @@ fn changed_libreoffice_formula_reopens_with_non_content_members_exact() {
         .set_text(&NodePath::new([0, 0]), "changed")
         .expect("stage token");
     let mut starmath_edit = source.edit();
-    starmath_edit
-        .set_starmath_source(StarMathVersion::V6, "changed + 1")
-        .expect("stage StarMath");
+    let opaque = litchi_odf_formula::OpaqueStarMath::new(StarMathVersion::V6, "changed + 1")
+        .expect("opaque StarMath");
+    starmath_edit.set_starmath(&opaque).expect("stage StarMath");
     token_edit
         .join(&starmath_edit)
         .expect("join producer edits");
@@ -122,7 +122,10 @@ fn changed_libreoffice_formula_reopens_with_non_content_members_exact() {
         source.as_bytes()
     );
     let reopened = Formula::from_bytes(published.to_bytes()).expect("full Formula reopen");
-    assert_eq!(reopened.starmath_source().as_deref(), Some("changed + 1"));
+    assert_eq!(
+        reopened.starmath().expect("StarMath").opaque().source(),
+        "changed + 1"
+    );
 
     let changed = OwnedPackage::from_bytes(reopened.to_bytes()).expect("raw changed package");
     let mut original_names = original.files().expect("source members");

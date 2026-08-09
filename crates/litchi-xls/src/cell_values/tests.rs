@@ -255,6 +255,107 @@ fn edits_boolean_text_and_formula_cache() {
 }
 
 #[test]
+fn formula_string_cache_resizes_and_semantically_inverts() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(8, 0).unwrap();
+    let mut transaction = source.transaction();
+    transaction
+        .set_value(
+            "Sheet1".into(),
+            reference,
+            Value::FormulaCache(FormulaCache::String("cached λ value".to_string())),
+        )
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    assert_eq!(
+        commit
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap()
+            .value(),
+        &Value::FormulaCache(FormulaCache::String("cached λ value".to_string()))
+    );
+    let wire = commit.patch().semantic().to_deterministic_json().unwrap();
+    let durable = SemanticPatch::from_deterministic_json(&wire).unwrap();
+    let restored = durable.inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(
+        restored
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap()
+            .value(),
+        &Value::FormulaCache(FormulaCache::Empty)
+    );
+}
+
+#[test]
+fn new_sst_and_xf_resources_round_trip_with_cells() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let base_style = source
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(Reference::new(3, 2).unwrap())
+        .unwrap()
+        .unwrap()
+        .style();
+    let mut transaction = source.transaction();
+    let authored_style = transaction.duplicate_style(base_style).unwrap();
+    let text_reference = Reference::new(3, 3).unwrap();
+    let style_reference = Reference::new(4, 3).unwrap();
+    transaction
+        .insert_cell(
+            "Sheet1".into(),
+            text_reference,
+            Value::Text("new shared resource".to_string()),
+        )
+        .unwrap();
+    transaction
+        .insert_cell_with_style(
+            "Sheet1".into(),
+            style_reference,
+            Value::Number(33.0),
+            authored_style,
+        )
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let sheet = commit
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        sheet.cell(text_reference).unwrap().unwrap().value(),
+        &Value::Text("new shared resource".to_string())
+    );
+    assert_eq!(
+        sheet.cell(style_reference).unwrap().unwrap().style(),
+        authored_style
+    );
+    let restored = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.snapshot())
+        .unwrap();
+    let restored = restored
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert!(restored.cell(text_reference).unwrap().is_none());
+    assert!(restored.cell(style_reference).unwrap().is_none());
+}
+
+#[test]
 fn converts_fixed_width_labelsst_and_rk_with_sst_accounting() {
     let source = Snapshot::from_bytes(package()).unwrap();
     let reference = Reference::new(6, 0).unwrap();

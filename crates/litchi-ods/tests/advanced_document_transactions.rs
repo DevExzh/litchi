@@ -1,11 +1,16 @@
+mod support;
+
 use std::{fs, path::Path};
 
 use litchi_core::{MergeChoice, Result};
+use litchi_odf_common::{chart::ChartClass, core::OwnedPackage};
 use litchi_ods::{
     Builder, Cell, CellValue, Row, Sheet, Spreadsheet,
     document::{
-        CellStyle, Collision, Drawing, FormControl, History, JoinFailure, Resource, RichRun,
-        RichText, Snapshot,
+        BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, Collision,
+        Drawing, DrawingFrame, EncryptionWritePolicy, FormControl, History, JoinFailure,
+        NumberStyleNode, Resource, RichRun, RichText, SecurityWritePolicy, SignatureWritePolicy,
+        Snapshot, StyleGraph, TextProperties, TextStyleNode,
     },
     model::{
         conditional_format::{Condition, Format},
@@ -24,6 +29,235 @@ fn compact_source() -> Result<Vec<u8>> {
         Cell::new(CellValue::Text("seed".to_string()), "seed"),
     )?;
     builder.build()
+}
+
+fn deep_style_graph() -> StyleGraph {
+    StyleGraph {
+        number_styles: vec![NumberStyleNode {
+            name: "Money2".to_string(),
+            decimal_places: 2,
+            min_integer_digits: 1,
+            prefix: Some("$".to_string()),
+            suffix: None,
+        }],
+        text_styles: vec![TextStyleNode {
+            name: "StrongRun".to_string(),
+            parent: None,
+            text: TextProperties {
+                color: Some("#224466".to_string()),
+                font_family: Some("Liberation Sans".to_string()),
+                font_size_pt: Some(11.0),
+                bold: Some(true),
+                italic: Some(false),
+                underline: Some(true),
+            },
+        }],
+        cell_styles: vec![
+            CellStyleNode {
+                name: "BaseInput".to_string(),
+                parent: None,
+                data_style: None,
+                cell: CellProperties::default(),
+                text: TextProperties::default(),
+            },
+            CellStyleNode {
+                name: "MoneyInput".to_string(),
+                parent: Some("BaseInput".to_string()),
+                data_style: Some("Money2".to_string()),
+                cell: CellProperties {
+                    background: Some("#fff4cc".to_string()),
+                    horizontal_align: Some("end".to_string()),
+                    vertical_align: Some("middle".to_string()),
+                    wrap: Some(true),
+                    border: Some("0.02cm solid #224466".to_string()),
+                },
+                text: TextProperties::default(),
+            },
+        ],
+    }
+}
+
+#[test]
+fn deep_style_form_drawing_and_chart_dependencies_are_atomic_and_durable() -> Result<()> {
+    let source = compact_source()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    let rich = RichText::new(vec![vec![
+        RichRun::Text("Total ".to_string()),
+        RichRun::Span {
+            text: "$12.00".to_string(),
+            style_name: "StrongRun".to_string(),
+        },
+    ]])?;
+    edit.set_rich_cell_text_with_styles("Data", 0, 0, &rich, &deep_style_graph())?;
+    edit.set_cell_style("Data", 0, 0, "MoneyInput")?;
+    edit.set_bound_form_controls_with_resources(
+        &[BoundFormControl {
+            id: "amount-picker".to_string(),
+            label: "Choose amount".to_string(),
+            linked_cell: Some("Data.A1".to_string()),
+            source_range: Some("Data.A1:A2".to_string()),
+            image_path: Some("Pictures/control.png".to_string()),
+        }],
+        vec![Resource::new(
+            "Pictures/control.png",
+            "image/png",
+            vec![1, 2, 3],
+        )?],
+        Collision::Reject,
+    )?;
+    edit.put_drawing_frame_with_resource(
+        "Data",
+        &DrawingFrame {
+            name: "PositionedImage".to_string(),
+            resource_path: "Pictures/frame.png".to_string(),
+            anchor_cell: Some("Data.B2".to_string()),
+            x_cm: 1.0,
+            y_cm: 2.0,
+            width_cm: 4.5,
+            height_cm: 3.0,
+            z_index: 7,
+        },
+        Resource::new("Pictures/frame.png", "image/png", vec![4, 5, 6])?,
+        Collision::Reject,
+    )?;
+    edit.put_chart_definition(
+        "Data",
+        "SalesChart",
+        "Object_1",
+        &litchi_ods::charts::Definition::new(ChartClass::bar()),
+        Collision::Reject,
+    )?;
+
+    let commit = edit.commit()?;
+    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let charts = reopened.charts()?;
+    assert_eq!(charts.len(), 1);
+    assert!(charts.named("SalesChart")?.is_some());
+    for expected in [
+        "style:name=\"Money2\"",
+        "style:name=\"StrongRun\"",
+        "style:parent-style-name=\"BaseInput\"",
+        "form:linked-cell=\"Data.A1\"",
+        "draw:name=\"PositionedImage\"",
+        "draw:name=\"SalesChart\"",
+    ] {
+        assert!(reopened.content_xml().contains(expected));
+    }
+    for path in [
+        "Pictures/control.png",
+        "Pictures/frame.png",
+        "Object_1/content.xml",
+    ] {
+        assert!(commit.snapshot().resource(path)?.is_some());
+    }
+    let wire = commit.patch().to_deterministic_json()?;
+    let decoded = litchi_ods::document::Patch::from_deterministic_json(&wire, snapshot.limits())?;
+    assert_eq!(
+        decoded.apply(&snapshot)?.snapshot().as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())?
+            .snapshot()
+            .as_bytes(),
+        source
+    );
+    Ok(())
+}
+
+#[test]
+fn deep_dependency_failures_leave_the_candidate_unchanged() -> Result<()> {
+    let snapshot = Snapshot::from_bytes(compact_source()?)?;
+    let mut edit = snapshot.edit();
+    let before = edit.as_bytes().to_vec();
+    let unresolved_rich = RichText::new(vec![vec![RichRun::Span {
+        text: "unresolved".to_string(),
+        style_name: "MissingStyle".to_string(),
+    }]])?;
+    assert!(
+        edit.set_rich_cell_text_with_styles(
+            "Data",
+            0,
+            0,
+            &unresolved_rich,
+            &StyleGraph::default(),
+        )
+        .is_err()
+    );
+    assert_eq!(edit.as_bytes(), before);
+    let cyclic = StyleGraph {
+        cell_styles: vec![
+            CellStyleNode {
+                name: "A".to_string(),
+                parent: Some("B".to_string()),
+                data_style: None,
+                cell: CellProperties::default(),
+                text: TextProperties::default(),
+            },
+            CellStyleNode {
+                name: "B".to_string(),
+                parent: Some("A".to_string()),
+                data_style: None,
+                cell: CellProperties::default(),
+                text: TextProperties::default(),
+            },
+        ],
+        ..StyleGraph::default()
+    };
+    assert!(edit.put_style_graph(&cyclic).is_err());
+    assert_eq!(edit.as_bytes(), before);
+    assert!(
+        edit.set_bound_form_controls_with_resources(
+            &[BoundFormControl {
+                id: "missing-image".to_string(),
+                label: "Missing".to_string(),
+                linked_cell: Some("Data.A1:A2".to_string()),
+                source_range: None,
+                image_path: Some("Pictures/missing.png".to_string()),
+            }],
+            Vec::new(),
+            Collision::Reject,
+        )
+        .is_err()
+    );
+    assert_eq!(edit.as_bytes(), before);
+    assert!(
+        edit.put_drawing_frame_with_resource(
+            "Data",
+            &DrawingFrame {
+                name: "WrongSheet".to_string(),
+                resource_path: "Pictures/wrong-sheet.png".to_string(),
+                anchor_cell: Some("Other.A1".to_string()),
+                x_cm: 0.0,
+                y_cm: 0.0,
+                width_cm: 1.0,
+                height_cm: 1.0,
+                z_index: 0,
+            },
+            Resource::new("Pictures/wrong-sheet.png", "image/png", vec![9])?,
+            Collision::Reject,
+        )
+        .is_err()
+    );
+    assert_eq!(edit.as_bytes(), before);
+    assert!(
+        edit.put_chart_object(
+            "Data",
+            &ChartObject {
+                name: "PrettyChart".to_string(),
+                object_path: "Object_pretty".to_string(),
+                content_xml: "<office:document-content>\n</office:document-content>".to_string(),
+            },
+            Collision::Reject,
+        )
+        .is_err()
+    );
+    assert_eq!(edit.as_bytes(), before);
+    Ok(())
 }
 
 #[test]
@@ -149,6 +383,75 @@ fn real_calc_pretty_xml_keeps_source_formatting_outside_splice() -> Result<()> {
         .next()
         .ok_or_else(|| litchi_core::Error::InvalidFormat("cell prefix missing".to_string()))?;
     assert!(reopened.content_xml().starts_with(preserved_prefix));
+    Ok(())
+}
+
+#[test]
+fn raw_zip_pretty_provenance_and_malformed_negative_stay_test_only() -> Result<()> {
+    let compact = Spreadsheet::from_bytes(compact_source()?)?
+        .content_xml()
+        .to_string();
+    let pretty = compact.replace("><", ">\n  <");
+    let raw = support::raw_package(&[("content.xml", pretty.as_bytes(), "text/xml")]);
+    let snapshot = Snapshot::from_bytes(raw)?;
+    let mut edit = snapshot.edit();
+    edit.set_cell_formula("Data", 0, 0, "of:=40+2")?;
+    let commit = edit.commit()?;
+    let content = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?
+        .content_xml()
+        .to_string();
+    let untouched = pretty
+        .split("<table:table-cell")
+        .next()
+        .ok_or_else(|| litchi_core::Error::InvalidFormat("cell prefix missing".to_string()))?;
+    assert!(content.starts_with(untouched));
+    assert!(content.contains("table:formula=\"of:=40+2\""));
+
+    let malformed = support::raw_package(&[(
+        "content.xml",
+        b"<office:document-content><office:body>",
+        "text/xml",
+    )]);
+    assert!(Snapshot::from_bytes(malformed).is_err());
+    Ok(())
+}
+
+#[test]
+fn explicit_signature_policy_strips_stale_signatures_for_commit_and_apply() -> Result<()> {
+    let content = Spreadsheet::from_bytes(compact_source()?)?
+        .content_xml()
+        .to_string();
+    let signed_bytes = support::raw_package(&[
+        ("content.xml", content.as_bytes(), "text/xml"),
+        (
+            "META-INF/documentsignatures.xml",
+            br#"<ds:document-signatures xmlns:ds="urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"/>"#,
+            "text/xml",
+        ),
+    ]);
+    let signed = Snapshot::from_bytes(signed_bytes)?;
+    let mut refused = signed.edit();
+    refused.set_cell_formula("Data", 0, 0, "of:=6*7")?;
+    assert!(refused.commit().is_err());
+
+    let policy = SecurityWritePolicy {
+        signatures: SignatureWritePolicy::StripInvalidated,
+        encryption: EncryptionWritePolicy::Refuse,
+    };
+    let mut allowed = signed.edit();
+    allowed.set_cell_formula("Data", 0, 0, "of:=6*7")?;
+    let commit = allowed.commit_with_security(policy)?;
+    let package = OwnedPackage::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    assert!(!package.has_file("META-INF/documentsignatures.xml")?);
+    assert!(commit.patch().apply(&signed).is_err());
+    assert_eq!(
+        commit
+            .patch()
+            .apply_with_security(&signed, policy)?
+            .snapshot()
+            .as_bytes(),
+        commit.snapshot().as_bytes()
+    );
     Ok(())
 }
 

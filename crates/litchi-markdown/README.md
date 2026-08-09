@@ -37,11 +37,20 @@ assert_eq!(restored.snapshot().source(), source.source());
 # Ok::<(), litchi_markdown::reader::Error>(())
 ```
 
-The offline conformance tests include selected verbatim inputs distributed by
-`pulldown-cmark 0.13.4` from CommonMark 0.31.2 and its GFM suites, plus
-project-authored real-document roundtrip fixtures. Exact provenance and the
-limits of those claims are recorded in `tests/data/PROVENANCE.md`; the selected
-inputs are not represented as the complete normative suites.
+The offline release gate vendors all 652 normative CommonMark 0.31.2 examples
+and all 670 examples from a pinned GitHub `cmark-gfm` specification. It checks
+normative CommonMark rendering, supported GFM-extension rendering, exact source
+ranges, deterministic reparsing, reversible edits, and project-authored
+real-document roundtrips. Exact provenance, hashes, attribution, licenses, and
+explicit semantic limits are recorded in `tests/data/PROVENANCE.md`.
+
+## Reproducible release gate
+
+Run the focused gate from the repository root:
+
+```sh
+sh crates/litchi-markdown/scripts/release-gate.sh
+```
 
 ## Usage
 

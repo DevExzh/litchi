@@ -25,7 +25,10 @@ use serde_json::{Value, json};
 
 use crate::package::Package;
 
-pub use crate::advanced::{CellStyle, Drawing, FormControl, RichRun, RichText};
+pub use crate::advanced::{
+    BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, Drawing, DrawingFrame,
+    FormControl, NumberStyleNode, RichRun, RichText, StyleGraph, TextProperties, TextStyleNode,
+};
 
 const FORMAT: &str = "litchi.ods.document";
 const MAX_PATH_BYTES: usize = 4_096;
@@ -306,6 +309,33 @@ pub enum TransferDisposition {
     Reused,
     /// Existing bytes were explicitly replaced.
     Replaced,
+}
+
+/// Explicit disposition for signatures invalidated by a changed publication.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SignatureWritePolicy {
+    /// Reject changes to a signed source.
+    #[default]
+    Refuse,
+    /// Deliberately omit stale document and macro signature containers.
+    StripInvalidated,
+}
+
+/// Explicit encrypted-source write policy.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EncryptionWritePolicy {
+    /// Reject changes to encrypted source members; no password is inferred or retained.
+    #[default]
+    Refuse,
+}
+
+/// Caller-selected security disposition for changed package publication.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SecurityWritePolicy {
+    pub signatures: SignatureWritePolicy,
+    pub encryption: EncryptionWritePolicy,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -699,6 +729,55 @@ impl Edit {
         self.stage_spliced("style.put", &style.name, bytes)
     }
 
+    /// Add a dependency-checked automatic number/text/cell style graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for duplicate names, unresolved parent/data-style references, invalid
+    /// properties, existing-name collisions, bounds, or splice failure.
+    pub fn put_style_graph(&mut self, graph: &StyleGraph) -> Result<()> {
+        let bytes = crate::advanced::put_style_graph(
+            &self.candidate,
+            graph,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("style-graph.put", "automatic-styles", bytes)
+    }
+
+    /// Atomically add a style dependency graph and apply rich text to one cell.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either the graph or rich cell publication fails; no partial style
+    /// nodes are retained.
+    pub fn set_rich_cell_text_with_styles(
+        &mut self,
+        sheet: &str,
+        row: usize,
+        column: usize,
+        rich: &RichText,
+        styles: &StyleGraph,
+    ) -> Result<()> {
+        let declared = styles
+            .text_styles
+            .iter()
+            .map(|style| style.name.as_str())
+            .collect::<BTreeSet<_>>();
+        if rich.paragraphs().iter().flatten().any(|run| {
+            matches!(
+                run,
+                RichRun::Span { style_name, .. } if !declared.contains(style_name.as_str())
+            )
+        }) {
+            return invalid("ODS rich cell style dependency is unresolved");
+        }
+        let mut candidate = self.clone();
+        candidate.put_style_graph(styles)?;
+        candidate.set_rich_cell_text(sheet, row, column, rich)?;
+        *self = candidate;
+        Ok(())
+    }
+
     /// Replace or remove the typed conditional-format catalog of one sheet.
     ///
     /// # Errors
@@ -751,6 +830,45 @@ impl Edit {
         self.stage_spliced("form.edit", "forms", bytes)
     }
 
+    /// Replace bound form controls and close every declared image dependency atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for duplicate controls, invalid bindings, an absent/unprovided image,
+    /// collision, bounds, or splice failure.
+    pub fn set_bound_form_controls_with_resources(
+        &mut self,
+        controls: &[BoundFormControl],
+        resources: Vec<Resource>,
+        collision: Collision,
+    ) -> Result<()> {
+        let mut candidate = self.clone();
+        let supplied = resources
+            .iter()
+            .map(Resource::path)
+            .collect::<BTreeSet<_>>();
+        let current = Package::from_bytes(candidate.candidate.clone())?;
+        for control in controls {
+            if let Some(path) = &control.image_path
+                && !supplied.contains(path.as_str())
+                && !current.package().has_file(path)?
+            {
+                return invalid(format!("ODS form image dependency '{path}' is unresolved"));
+            }
+        }
+        for resource in resources {
+            let _disposition = candidate.put_resource(resource, collision)?;
+        }
+        let bytes = crate::advanced::set_bound_forms(
+            &candidate.candidate,
+            controls,
+            candidate.before.limits.package_bytes,
+        )?;
+        candidate.stage_spliced("form.bindings", "forms", bytes)?;
+        *self = candidate;
+        Ok(())
+    }
+
     /// Atomically add a drawing frame and its exact package dependency.
     ///
     /// The detached resource path must equal the drawing reference. Both staged changes roll back
@@ -781,6 +899,108 @@ impl Edit {
         candidate.stage_spliced("drawing.put", &drawing.name, bytes)?;
         *self = candidate;
         Ok(disposition)
+    }
+
+    /// Atomically add a positioned drawing frame and its package dependency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid geometry/anchor, dependency mismatch, collision, bounds, or
+    /// splice failure.
+    pub fn put_drawing_frame_with_resource(
+        &mut self,
+        sheet: &str,
+        frame: &DrawingFrame,
+        resource: Resource,
+        collision: Collision,
+    ) -> Result<TransferDisposition> {
+        if frame.resource_path != resource.path {
+            return invalid("ODS drawing-frame dependency path differs from its resource");
+        }
+        let mut candidate = self.clone();
+        let disposition = candidate.put_resource(resource, collision)?;
+        let bytes = crate::advanced::put_drawing_frame(
+            &candidate.candidate,
+            sheet,
+            frame,
+            candidate.before.limits.package_bytes,
+        )?;
+        candidate.stage_spliced("drawing-frame.put", &frame.name, bytes)?;
+        *self = candidate;
+        Ok(disposition)
+    }
+
+    /// Atomically add a package-backed chart drawing and compact chart content dependency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unsafe object path, noncompact/malformed chart XML, collision,
+    /// bounds, drawing publication, or full chart readback failure.
+    pub fn put_chart_object(
+        &mut self,
+        sheet: &str,
+        chart: &ChartObject,
+        collision: Collision,
+    ) -> Result<TransferDisposition> {
+        let content_path = format!("{}/content.xml", chart.object_path);
+        let resource = Resource::new(&content_path, "text/xml", chart.content_xml.as_bytes())?;
+        let mut candidate = self.clone();
+        let disposition = candidate.put_resource(resource, collision)?;
+        let package = Package::from_bytes(candidate.candidate.clone())?;
+        candidate.candidate = rebuild_package(
+            package.package(),
+            package.content_xml(),
+            Vec::new(),
+            vec![(
+                format!("{}/", chart.object_path),
+                litchi_odf_common::constants::ODF_CHART.to_string(),
+            )],
+            Vec::<String>::new(),
+            Vec::<String>::new(),
+        )?;
+        let bytes = crate::advanced::put_chart_object(
+            &candidate.candidate,
+            sheet,
+            chart,
+            candidate.before.limits.package_bytes,
+        )?;
+        candidate.stage_spliced("chart-object.put", &chart.name, bytes)?;
+        let chart_snapshot = crate::charts::Snapshot::from_bytes(candidate.candidate.clone())?;
+        if chart_snapshot
+            .charts()
+            .iter()
+            .all(|value| value.name() != Some(chart.name.as_str()))
+        {
+            return invalid("ODS chart dependency failed typed readback");
+        }
+        *self = candidate;
+        Ok(disposition)
+    }
+
+    /// Serialize a typed chart definition and add its complete package-backed occurrence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when chart serialization, compactness, collision, dependency publication,
+    /// or typed readback fails.
+    pub fn put_chart_definition(
+        &mut self,
+        sheet: &str,
+        drawing_name: &str,
+        object_path: &str,
+        definition: &crate::charts::Definition,
+        collision: Collision,
+    ) -> Result<TransferDisposition> {
+        let part = crate::charts::Part::from_definition(definition)?;
+        self.put_chart_object(
+            sheet,
+            &ChartObject {
+                name: drawing_name.to_string(),
+                object_path: object_path.to_string(),
+                content_xml: part.xml().to_string(),
+            },
+            collision,
+        )
     }
 
     /// Transfer one resource dependency and author a destination drawing reference atomically.
@@ -953,6 +1173,16 @@ impl Edit {
     /// Returns an error for a security refusal, bound failure, malformed candidate, typed readback
     /// failure, noncompact authored XML, or durable-patch construction failure.
     pub fn commit(self) -> Result<Commit> {
+        self.commit_with_security(SecurityWritePolicy::default())
+    }
+
+    /// Validate and publish under an explicit signature/encryption write policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected policy refuses signed, encrypted, or protected input,
+    /// or when bounds, compactness, readback, or durable patch construction fails.
+    pub fn commit_with_security(self, policy: SecurityWritePolicy) -> Result<Commit> {
         if self.candidate.as_slice() == self.before.as_bytes() || self.steps.is_empty() {
             let patch = Patch::build(
                 self.before.source.clone(),
@@ -965,7 +1195,7 @@ impl Edit {
                 patch,
             });
         }
-        refuse_unsafe_edit(&self.before)?;
+        enforce_security_policy(&self.before, policy)?;
         validate_package_size(self.candidate.len(), self.before.limits)?;
         validate_authored_parts(&self.before.source, &self.candidate, &self.spliced_parts)?;
         let snapshot = Snapshot::from_bytes_with(self.candidate, self.before.limits)?;
@@ -1127,11 +1357,25 @@ impl Patch {
     /// Returns an error for stale source bytes, security refusal, bounds, malformed target, or
     /// complete facade readback failure.
     pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
+        self.apply_with_security(snapshot, SecurityWritePolicy::default())
+    }
+
+    /// Apply under an explicit signature/encryption write policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale lineage, a security-policy refusal, bounds, malformed target,
+    /// or complete facade readback failure.
+    pub fn apply_with_security(
+        &self,
+        snapshot: &Snapshot,
+        policy: SecurityWritePolicy,
+    ) -> Result<Commit> {
         if !self.is_applicable_to(snapshot) {
             return invalid("ODS unified patch source snapshot does not match");
         }
         if self.changed() {
-            refuse_unsafe_edit(snapshot)?;
+            enforce_security_policy(snapshot, policy)?;
         }
         let target = Snapshot::from_arc(self.target.clone(), self.limits)?;
         Ok(Commit {
@@ -1719,11 +1963,15 @@ fn known_operation(operation: &str) -> bool {
             | "sheet.insert"
             | "sheet.remove"
             | "style.put"
+            | "style-graph.put"
             | "conditional-format.edit"
             | "sparkline.edit"
             | "drawing.put"
             | "drawing.remove"
+            | "drawing-frame.put"
+            | "chart-object.put"
             | "form.edit"
+            | "form.bindings"
     )
 }
 
@@ -1814,13 +2062,17 @@ fn refuse_referenced_removal(package: &Package, path: &str) -> Result<()> {
     Ok(())
 }
 
-fn refuse_unsafe_edit(snapshot: &Snapshot) -> Result<()> {
+fn enforce_security_policy(snapshot: &Snapshot, policy: SecurityWritePolicy) -> Result<()> {
     let package = Package::from_bytes(snapshot.source.as_ref().to_vec())?;
     let reader = package.package().package()?;
-    if reader.manifest().has_encrypted_entries() {
+    if reader.manifest().has_encrypted_entries()
+        && matches!(policy.encryption, EncryptionWritePolicy::Refuse)
+    {
         return invalid("changed unified ODS transactions refuse encrypted package members");
     }
-    if reader.has_file(DOCUMENT_SIGNATURE_PATH) || reader.has_file(MACRO_SIGNATURE_PATH) {
+    if (reader.has_file(DOCUMENT_SIGNATURE_PATH) || reader.has_file(MACRO_SIGNATURE_PATH))
+        && matches!(policy.signatures, SignatureWritePolicy::Refuse)
+    {
         return invalid("changed unified ODS transactions require explicit signature stripping");
     }
     let protection =

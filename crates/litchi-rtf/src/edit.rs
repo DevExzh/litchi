@@ -364,6 +364,12 @@ enum Operation {
         before: String,
         after: String,
     },
+    RootTransfer {
+        vocabulary: &'static str,
+        effect: String,
+        before: Vec<u8>,
+        after: Vec<u8>,
+    },
 }
 
 impl Operation {
@@ -373,6 +379,7 @@ impl Operation {
             | Self::TableCellText { after, .. }
             | Self::HeaderFooterText { after, .. } => after.len(),
             Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
+            Self::RootTransfer { after, .. } => after.len(),
             Self::Alignment { .. } | Self::Bold { .. } => 0,
         }
     }
@@ -392,6 +399,7 @@ impl Operation {
             Self::InsertParagraph { .. } => vec!["body:structure".to_string()],
             Self::TableCellText { path, .. } => vec![table_cell_effect(path)],
             Self::HeaderFooterText { target, .. } => vec![header_footer_effect(*target)],
+            Self::RootTransfer { effect, .. } => vec![effect.clone()],
         }
     }
 
@@ -400,9 +408,10 @@ impl Operation {
             Self::Text { span, .. }
             | Self::Bold { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
-            Self::Alignment { .. } | Self::TableCellText { .. } | Self::HeaderFooterText { .. } => {
-                None
-            },
+            Self::Alignment { .. }
+            | Self::TableCellText { .. }
+            | Self::HeaderFooterText { .. }
+            | Self::RootTransfer { .. } => None,
         }
     }
 
@@ -413,8 +422,12 @@ impl Operation {
     const fn is_destination(&self) -> bool {
         matches!(
             self,
-            Self::TableCellText { .. } | Self::HeaderFooterText { .. }
+            Self::TableCellText { .. } | Self::HeaderFooterText { .. } | Self::RootTransfer { .. }
         )
+    }
+
+    const fn is_root_transfer(&self) -> bool {
+        matches!(self, Self::RootTransfer { .. })
     }
 }
 
@@ -430,6 +443,36 @@ impl Edit {
             operations: Vec::new(),
             replacement_bytes: 0,
         }
+    }
+
+    pub(crate) fn stage_root_transfer(
+        &mut self,
+        vocabulary: &'static str,
+        effect: String,
+        after: Vec<u8>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_operation_room()?;
+        if !self.operations.is_empty() {
+            return Err(Error::BodyDestinationConflict);
+        }
+        if !self.source.opaque().is_empty() {
+            return Err(Error::UnsupportedSource(
+                "ordinary-root transfer refuses unknown target destinations",
+            ));
+        }
+        let before = self
+            .source
+            .source_bytes()
+            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?
+            .to_vec();
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::RootTransfer {
+            vocabulary,
+            effect,
+            before,
+            after,
+        });
+        Ok(self)
     }
 
     /// Returns the immutable source snapshot.
@@ -852,6 +895,17 @@ impl Edit {
             .iter()
             .filter(|operation| operation.is_destination())
             .count();
+        let root_transfer_count = self
+            .operations
+            .iter()
+            .filter(|operation| operation.is_root_transfer())
+            .count();
+        if root_transfer_count != 0 {
+            if root_transfer_count != 1 || operation_count != 1 {
+                return Err(Error::BodyDestinationConflict);
+            }
+            return commit_root_transfer(self, operation_count);
+        }
         if destination_count == operation_count {
             return commit_destinations(self, operation_count);
         }
@@ -888,6 +942,7 @@ impl Edit {
                 Operation::TableCellText { .. } | Operation::HeaderFooterText { .. } => {
                     return Err(Error::BodyDestinationConflict);
                 },
+                Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
             }
         }
         let original_alignments = source_alignments(&self.source);
@@ -1017,7 +1072,8 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::Bold { .. }
-            | Operation::InsertParagraph { .. } => return Err(Error::BodyDestinationConflict),
+            | Operation::InsertParagraph { .. }
+            | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
         }
     }
 
@@ -1063,13 +1119,62 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::Bold { .. }
-            | Operation::InsertParagraph { .. } => return Err(Error::BodyDestinationConflict),
+            | Operation::InsertParagraph { .. }
+            | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
         }
     }
     Ok(Commit::new(
         edit.source,
         snapshot,
         true,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let operation = edit
+        .operations
+        .first()
+        .ok_or(Error::UnsupportedSource("missing ordinary-root transfer"))?;
+    let Operation::RootTransfer {
+        before,
+        after,
+        vocabulary: _,
+        effect: _,
+    } = operation
+    else {
+        return Err(Error::BodyDestinationConflict);
+    };
+    let source = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    if source != before {
+        return Err(Error::PatchConflict);
+    }
+    if crate::compressed::is_compressed_rtf(source) {
+        return Err(Error::UnsupportedSource(
+            "compressed RTF needs a transport-aware rewrite",
+        ));
+    }
+    if !edit.source.opaque().is_empty() {
+        return Err(Error::UnsupportedSource(
+            "ordinary-root transfer refuses unknown target destinations",
+        ));
+    }
+    let snapshot = Snapshot::from_bytes_with_limits(after, edit.source.limits())?;
+    if !snapshot.opaque().is_empty() {
+        return Err(Error::UnsupportedSource(
+            "ordinary-root transfer produced unknown destinations",
+        ));
+    }
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    let changed = source != after;
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        changed,
         operation_count,
         semantic_delta,
     ))
@@ -1241,7 +1346,8 @@ fn project_text(
             Operation::Alignment { .. }
             | Operation::Bold { .. }
             | Operation::TableCellText { .. }
-            | Operation::HeaderFooterText { .. } => None,
+            | Operation::HeaderFooterText { .. }
+            | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
     text_operations.sort_unstable_by_key(|(_, span, _, _)| (span.start, span.end));
@@ -1332,7 +1438,8 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::Alignment { .. }
             | Operation::InsertParagraph { .. }
             | Operation::TableCellText { .. }
-            | Operation::HeaderFooterText { .. } => None,
+            | Operation::HeaderFooterText { .. }
+            | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
     if bold_spans.is_empty() {
@@ -1374,7 +1481,8 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::Alignment { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::TableCellText { .. }
-                | Operation::HeaderFooterText { .. } => None,
+                | Operation::HeaderFooterText { .. }
+                | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
     }))
@@ -1435,7 +1543,8 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             Operation::Alignment { .. }
             | Operation::Bold { .. }
             | Operation::TableCellText { .. }
-            | Operation::HeaderFooterText { .. } => None,
+            | Operation::HeaderFooterText { .. }
+            | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
     changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
@@ -1837,6 +1946,12 @@ enum Change {
         before: String,
         after: String,
     },
+    RootTransfer {
+        vocabulary: &'static str,
+        effect: String,
+        before: Vec<u8>,
+        after: Vec<u8>,
+    },
 }
 
 impl Change {
@@ -1901,6 +2016,17 @@ impl Change {
                 after,
             } => Self::HeaderFooterText {
                 target: *target,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::RootTransfer {
+                vocabulary,
+                effect,
+                before,
+                after,
+            } => Self::RootTransfer {
+                vocabulary,
+                effect: effect.clone(),
                 before: after.clone(),
                 after: before.clone(),
             },
@@ -1985,11 +2111,23 @@ fn semantic_changes(
                 before: before.clone(),
                 after: after.clone(),
             }),
+            Operation::RootTransfer {
+                vocabulary,
+                effect,
+                before,
+                after,
+            } if before != after => Some(Change::RootTransfer {
+                vocabulary,
+                effect: effect.clone(),
+                before: before.clone(),
+                after: after.clone(),
+            }),
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::Bold { .. }
             | Operation::TableCellText { .. }
-            | Operation::HeaderFooterText { .. } => None,
+            | Operation::HeaderFooterText { .. }
+            | Operation::RootTransfer { .. } => None,
         })
         .collect()
 }
@@ -2196,6 +2334,21 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Change::RootTransfer {
+            vocabulary,
+            effect,
+            before: _,
+            after,
+        } => {
+            preconditions.insert("feature".to_string(), Value::String(effect.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                *vocabulary,
+                effect.clone(),
+                preconditions,
+                Value::String(hex_encode(after)),
+            )
+        },
     }
 }
 
@@ -2357,6 +2510,27 @@ pub(crate) fn apply_durable<Mode>(
                 })?;
                 edit.set_header_footer_text(target, replacement)?;
             },
+            vocabulary if is_root_transfer_vocabulary(vocabulary) => {
+                let expected_feature = operation
+                    .preconditions
+                    .get("feature")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing feature precondition".to_string())
+                    })?;
+                if expected_feature != operation.target {
+                    return Err(Error::StalePrecondition("ordinary-root feature differs"));
+                }
+                let encoded = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("ordinary-root value must be hexadecimal".to_string())
+                })?;
+                let after = hex_decode(encoded, source.limits().max_source_bytes())?;
+                edit.stage_root_transfer(
+                    root_transfer_vocabulary(vocabulary)?,
+                    operation.target.clone(),
+                    after,
+                )?;
+            },
             _ => {
                 return Err(Error::DurablePatch(
                     "unsupported operation vocabulary".to_string(),
@@ -2365,6 +2539,80 @@ pub(crate) fn apply_durable<Mode>(
         }
     }
     edit.commit().map(Commit::into_snapshot)
+}
+
+fn is_root_transfer_vocabulary(vocabulary: &str) -> bool {
+    matches!(
+        vocabulary,
+        "field.transfer"
+            | "nested-table.transfer"
+            | "list.transfer"
+            | "style.transfer"
+            | "object.transfer"
+    )
+}
+
+fn root_transfer_vocabulary(vocabulary: &str) -> Result<&'static str, Error> {
+    match vocabulary {
+        "field.transfer" => Ok("field.transfer"),
+        "nested-table.transfer" => Ok("nested-table.transfer"),
+        "list.transfer" => Ok("list.transfer"),
+        "style.transfer" => Ok("style.transfer"),
+        "object.transfer" => Ok("object.transfer"),
+        _ => Err(Error::DurablePatch(
+            "unsupported ordinary-root vocabulary".to_string(),
+        )),
+    }
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        output.push(hex_character(byte >> 4));
+        output.push(hex_character(byte & 0x0f));
+    }
+    output
+}
+
+fn hex_decode(input: &str, limit: usize) -> Result<Vec<u8>, Error> {
+    if !input.len().is_multiple_of(2) {
+        return Err(Error::DurablePatch(
+            "ordinary-root hexadecimal value has odd length".to_string(),
+        ));
+    }
+    let observed = input.len() / 2;
+    if observed > limit {
+        return Err(Error::InputTooLarge { observed, limit });
+    }
+    let mut output = Vec::with_capacity(observed);
+    let mut digits = input.bytes();
+    while let Some(high) = digits.next() {
+        let low = digits.next().ok_or_else(|| {
+            Error::DurablePatch("ordinary-root hexadecimal value has odd length".to_string())
+        })?;
+        let high_nibble = hex_digit(high)?;
+        let low_nibble = hex_digit(low)?;
+        output.push((high_nibble << 4) | low_nibble);
+    }
+    Ok(output)
+}
+
+fn hex_character(value: u8) -> char {
+    match value {
+        0..=9 => char::from(b'0' + value),
+        _ => char::from(b'a' + value - 10),
+    }
+}
+
+fn hex_digit(value: u8) -> Result<u8, Error> {
+    match value {
+        b'0'..=b'9' => Ok(value - b'0'),
+        b'a'..=b'f' => Ok(value - b'a' + 10),
+        b'A'..=b'F' => Ok(value - b'A' + 10),
+        _ => Err(Error::DurablePatch(
+            "ordinary-root value contains non-hexadecimal data".to_string(),
+        )),
+    }
 }
 
 fn parse_text_target(target: &str) -> Result<TextSpan, Error> {

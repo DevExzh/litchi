@@ -212,6 +212,94 @@ pub struct Drawing {
     pub resource_path: String,
 }
 
+/// Text properties shared by automatic text and table-cell styles.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TextProperties {
+    pub color: Option<String>,
+    pub font_family: Option<String>,
+    pub font_size_pt: Option<f64>,
+    pub bold: Option<bool>,
+    pub italic: Option<bool>,
+    pub underline: Option<bool>,
+}
+
+/// Table-cell properties retained by a deep automatic style node.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CellProperties {
+    pub background: Option<String>,
+    pub horizontal_align: Option<String>,
+    pub vertical_align: Option<String>,
+    pub wrap: Option<bool>,
+    pub border: Option<String>,
+}
+
+/// One automatic table-cell style with checked parent and number-style dependencies.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CellStyleNode {
+    pub name: String,
+    pub parent: Option<String>,
+    pub data_style: Option<String>,
+    pub cell: CellProperties,
+    pub text: TextProperties,
+}
+
+/// One automatic text style referenced by rich cell runs.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextStyleNode {
+    pub name: String,
+    pub parent: Option<String>,
+    pub text: TextProperties,
+}
+
+/// One bounded decimal number style referenced by a cell style.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NumberStyleNode {
+    pub name: String,
+    pub decimal_places: u8,
+    pub min_integer_digits: u8,
+    pub prefix: Option<String>,
+    pub suffix: Option<String>,
+}
+
+/// A dependency-checked automatic style graph.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StyleGraph {
+    pub cell_styles: Vec<CellStyleNode>,
+    pub text_styles: Vec<TextStyleNode>,
+    pub number_styles: Vec<NumberStyleNode>,
+}
+
+/// One bound inert form control with an optional package image dependency.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoundFormControl {
+    pub id: String,
+    pub label: String,
+    pub linked_cell: Option<String>,
+    pub source_range: Option<String>,
+    pub image_path: Option<String>,
+}
+
+/// A positioned drawing frame with one package image dependency.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawingFrame {
+    pub name: String,
+    pub resource_path: String,
+    pub anchor_cell: Option<String>,
+    pub x_cm: f64,
+    pub y_cm: f64,
+    pub width_cm: f64,
+    pub height_cm: f64,
+    pub z_index: u32,
+}
+
+/// A package-backed chart object and its compact chart `content.xml` dependency.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChartObject {
+    pub name: String,
+    pub object_path: String,
+    pub content_xml: String,
+}
+
 #[derive(Clone, Debug)]
 struct Span {
     namespace: Option<String>,
@@ -464,6 +552,400 @@ pub(crate) fn put_cell_style(
     }
 }
 
+pub(crate) fn put_style_graph(
+    source: &[u8],
+    graph: &StyleGraph,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let markup = style_graph_markup(graph)?;
+    if markup.is_empty() {
+        return Ok(source.to_vec());
+    }
+    insert_automatic_styles(source, &markup, max_output)
+}
+
+fn style_graph_markup(graph: &StyleGraph) -> Result<String> {
+    let total = graph
+        .cell_styles
+        .len()
+        .saturating_add(graph.text_styles.len())
+        .saturating_add(graph.number_styles.len());
+    if total > 4_096 {
+        return invalid("ODS automatic style graph exceeds the node limit");
+    }
+    let cell_names = graph
+        .cell_styles
+        .iter()
+        .map(|style| style.name.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let text_names = graph
+        .text_styles
+        .iter()
+        .map(|style| style.name.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let number_names = graph
+        .number_styles
+        .iter()
+        .map(|style| style.name.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    if cell_names.len() != graph.cell_styles.len()
+        || text_names.len() != graph.text_styles.len()
+        || number_names.len() != graph.number_styles.len()
+    {
+        return invalid("ODS automatic style graph contains duplicate names");
+    }
+    validate_parent_graph(
+        graph
+            .cell_styles
+            .iter()
+            .map(|style| (style.name.as_str(), style.parent.as_deref())),
+    )?;
+    validate_parent_graph(
+        graph
+            .text_styles
+            .iter()
+            .map(|style| (style.name.as_str(), style.parent.as_deref())),
+    )?;
+    for style in &graph.cell_styles {
+        validate_token(&style.name, "cell style name")?;
+        if style
+            .parent
+            .as_deref()
+            .is_some_and(|parent| !cell_names.contains(parent))
+            || style
+                .data_style
+                .as_deref()
+                .is_some_and(|name| !number_names.contains(name))
+        {
+            return invalid("ODS cell style dependency is unresolved");
+        }
+        validate_cell_properties(&style.cell)?;
+        validate_text_properties(&style.text)?;
+    }
+    for style in &graph.text_styles {
+        validate_token(&style.name, "text style name")?;
+        if style
+            .parent
+            .as_deref()
+            .is_some_and(|parent| !text_names.contains(parent))
+        {
+            return invalid("ODS text style parent dependency is unresolved");
+        }
+        validate_text_properties(&style.text)?;
+    }
+    for style in &graph.number_styles {
+        validate_token(&style.name, "number style name")?;
+        if style.decimal_places > 20
+            || style.min_integer_digits == 0
+            || style.min_integer_digits > 20
+            || style.prefix.as_deref().is_some_and(invalid_style_text)
+            || style.suffix.as_deref().is_some_and(invalid_style_text)
+        {
+            return invalid("ODS number style digits or text are invalid");
+        }
+    }
+    let mut output = String::new();
+    for style in &graph.number_styles {
+        write!(
+            output,
+            "<number:number-style xmlns:number=\"urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0\" xmlns:style=\"{STYLE}\" style:name=\"{}\">",
+            escape_xml(&style.name)
+        )
+        .map_err(|_error| invalid_error("ODS number style formatting failed"))?;
+        if let Some(prefix) = &style.prefix {
+            output.push_str("<number:text>");
+            output.push_str(&escape_xml(prefix));
+            output.push_str("</number:text>");
+        }
+        write!(
+            output,
+            "<number:number number:decimal-places=\"{}\" number:min-integer-digits=\"{}\"/>",
+            style.decimal_places, style.min_integer_digits
+        )
+        .map_err(|_error| invalid_error("ODS number style formatting failed"))?;
+        if let Some(suffix) = &style.suffix {
+            output.push_str("<number:text>");
+            output.push_str(&escape_xml(suffix));
+            output.push_str("</number:text>");
+        }
+        output.push_str("</number:number-style>");
+    }
+    for style in &graph.text_styles {
+        write_style_open(
+            &mut output,
+            &style.name,
+            "text",
+            style.parent.as_deref(),
+            None,
+        )?;
+        write_text_properties(&mut output, &style.text)?;
+        output.push_str("</style:style>");
+    }
+    for style in &graph.cell_styles {
+        write_style_open(
+            &mut output,
+            &style.name,
+            "table-cell",
+            style.parent.as_deref(),
+            style.data_style.as_deref(),
+        )?;
+        write_cell_properties(&mut output, &style.cell)?;
+        write_text_properties(&mut output, &style.text)?;
+        output.push_str("</style:style>");
+    }
+    Ok(output)
+}
+
+fn validate_parent_graph<'a>(
+    nodes: impl IntoIterator<Item = (&'a str, Option<&'a str>)>,
+) -> Result<()> {
+    let parents = nodes
+        .into_iter()
+        .collect::<std::collections::BTreeMap<_, _>>();
+    for name in parents.keys() {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut current = Some(*name);
+        while let Some(node) = current {
+            if !seen.insert(node) {
+                return invalid("ODS automatic style graph contains a parent cycle");
+            }
+            current = parents.get(node).copied().flatten();
+        }
+    }
+    Ok(())
+}
+
+fn invalid_style_text(value: &str) -> bool {
+    value.len() > 65_536 || value.chars().any(char::is_control)
+}
+
+fn insert_automatic_styles(source: &[u8], markup: &str, max_output: usize) -> Result<Vec<u8>> {
+    let (xml, spans) = content_spans(source)?;
+    let automatic = spans
+        .iter()
+        .enumerate()
+        .find(|(_, span)| is_element(span, OFFICE, "automatic-styles"))
+        .map(|(index, _)| index);
+    let Some(automatic) = automatic else {
+        let body = one(&spans, OFFICE, "body")?;
+        let container = format!(
+            "<office:automatic-styles xmlns:office=\"{OFFICE}\">{markup}</office:automatic-styles>"
+        );
+        return splice_content(
+            source,
+            spans[body].start..spans[body].start,
+            container.into_bytes(),
+            max_output,
+        );
+    };
+    for name in style_names(markup)? {
+        for (index, span) in spans.iter().enumerate() {
+            if span.parent == Some(automatic)
+                && attribute(&xml, &spans[index], b"style:name")?.as_deref() == Some(name.as_str())
+            {
+                return invalid("ODS automatic style name already exists");
+            }
+        }
+    }
+    if xml[spans[automatic].start..spans[automatic].tag_end].ends_with("/>") {
+        let container = format!(
+            "<office:automatic-styles xmlns:office=\"{OFFICE}\">{markup}</office:automatic-styles>"
+        );
+        splice_content(
+            source,
+            spans[automatic].start..spans[automatic].end,
+            container.into_bytes(),
+            max_output,
+        )
+    } else {
+        splice_content(
+            source,
+            spans[automatic].close_start..spans[automatic].close_start,
+            markup.as_bytes().to_vec(),
+            max_output,
+        )
+    }
+}
+
+fn style_names(markup: &str) -> Result<Vec<String>> {
+    let wrapped = format!("<root>{markup}</root>");
+    let mut reader = quick_xml::Reader::from_str(&wrapped);
+    let mut names = Vec::new();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid_error(format!("invalid ODS style graph: {error}")))?
+        {
+            Event::Start(element) if element.name().as_ref() != b"root" => {
+                for attribute in element.attributes().with_checks(true) {
+                    let attribute = attribute.map_err(|error| {
+                        invalid_error(format!("invalid ODS style attribute: {error}"))
+                    })?;
+                    if attribute.key.as_ref() == b"style:name" {
+                        names.push(
+                            attribute
+                                .decoded_and_normalized_value(
+                                    quick_xml::XmlVersion::Explicit1_0,
+                                    reader.decoder(),
+                                )
+                                .map_err(|error| {
+                                    invalid_error(format!("invalid ODS style name: {error}"))
+                                })?
+                                .into_owned(),
+                        );
+                    }
+                }
+            },
+            Event::Eof => break,
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    Ok(names)
+}
+
+fn write_style_open(
+    output: &mut String,
+    name: &str,
+    family: &str,
+    parent: Option<&str>,
+    data_style: Option<&str>,
+) -> Result<()> {
+    write!(
+        output,
+        "<style:style xmlns:style=\"{STYLE}\" xmlns:fo=\"{FO}\" style:name=\"{}\" style:family=\"{family}\"",
+        escape_xml(name)
+    )
+    .map_err(|_error| invalid_error("ODS style formatting failed"))?;
+    if let Some(parent) = parent {
+        write!(
+            output,
+            " style:parent-style-name=\"{}\"",
+            escape_xml(parent)
+        )
+        .map_err(|_error| invalid_error("ODS style formatting failed"))?;
+    }
+    if let Some(data_style) = data_style {
+        write!(
+            output,
+            " style:data-style-name=\"{}\"",
+            escape_xml(data_style)
+        )
+        .map_err(|_error| invalid_error("ODS style formatting failed"))?;
+    }
+    output.push('>');
+    Ok(())
+}
+
+fn validate_text_properties(value: &TextProperties) -> Result<()> {
+    validate_color(value.color.as_deref())?;
+    if value
+        .font_family
+        .as_deref()
+        .is_some_and(|font| validate_token(font, "font family").is_err())
+        || value
+            .font_size_pt
+            .is_some_and(|size| !size.is_finite() || !(1.0..=512.0).contains(&size))
+    {
+        return invalid("ODS text style properties are invalid");
+    }
+    Ok(())
+}
+
+fn validate_cell_properties(value: &CellProperties) -> Result<()> {
+    validate_color(value.background.as_deref())?;
+    if value
+        .horizontal_align
+        .as_deref()
+        .is_some_and(|align| !matches!(align, "start" | "center" | "end" | "justify"))
+        || value
+            .vertical_align
+            .as_deref()
+            .is_some_and(|align| !matches!(align, "top" | "middle" | "bottom"))
+        || value
+            .border
+            .as_deref()
+            .is_some_and(|border| border.is_empty() || border.len() > 256)
+    {
+        return invalid("ODS cell style properties are invalid");
+    }
+    Ok(())
+}
+
+fn write_text_properties(output: &mut String, value: &TextProperties) -> Result<()> {
+    if value == &TextProperties::default() {
+        return Ok(());
+    }
+    output.push_str("<style:text-properties");
+    push_optional_attribute(output, "fo:color", value.color.as_deref());
+    push_optional_attribute(output, "fo:font-family", value.font_family.as_deref());
+    if let Some(size) = value.font_size_pt {
+        write!(output, " fo:font-size=\"{size}pt\"")
+            .map_err(|_error| invalid_error("ODS text property formatting failed"))?;
+    }
+    push_optional_attribute(
+        output,
+        "fo:font-weight",
+        value.bold.map(|set| if set { "bold" } else { "normal" }),
+    );
+    push_optional_attribute(
+        output,
+        "fo:font-style",
+        value
+            .italic
+            .map(|set| if set { "italic" } else { "normal" }),
+    );
+    push_optional_attribute(
+        output,
+        "style:text-underline-style",
+        value
+            .underline
+            .map(|set| if set { "solid" } else { "none" }),
+    );
+    output.push_str("/>");
+    Ok(())
+}
+
+fn write_cell_properties(output: &mut String, value: &CellProperties) -> Result<()> {
+    if value == &CellProperties::default() {
+        return Ok(());
+    }
+    output.push_str("<style:table-cell-properties");
+    push_optional_attribute(output, "fo:background-color", value.background.as_deref());
+    push_optional_attribute(output, "fo:text-align", value.horizontal_align.as_deref());
+    push_optional_attribute(
+        output,
+        "style:vertical-align",
+        value.vertical_align.as_deref(),
+    );
+    push_optional_attribute(output, "fo:border", value.border.as_deref());
+    push_optional_attribute(
+        output,
+        "fo:wrap-option",
+        value.wrap.map(|set| if set { "wrap" } else { "no-wrap" }),
+    );
+    output.push_str("/>");
+    Ok(())
+}
+
+fn push_optional_attribute(output: &mut String, name: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        output.push(' ');
+        output.push_str(name);
+        output.push_str("=\"");
+        output.push_str(&escape_xml(value));
+        output.push('"');
+    }
+}
+
 pub(crate) fn set_conditional_formats(
     source: &[u8],
     sheet: &str,
@@ -551,6 +1033,118 @@ pub(crate) fn put_drawing(
     splice_content(source, range, markup.into_bytes(), max_output)
 }
 
+pub(crate) fn put_drawing_frame(
+    source: &[u8],
+    sheet: &str,
+    frame: &DrawingFrame,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    validate_frame(frame)?;
+    if let Some(anchor) = &frame.anchor_cell {
+        let address = crate::model::data_pilot::parse_data_pilot_range(anchor)?;
+        if address.start_column != address.end_column
+            || address.start_row != address.end_row
+            || (!address.sheet.is_empty() && address.sheet != sheet)
+        {
+            return invalid("ODS drawing frame anchor must be one cell on its owning sheet");
+        }
+    }
+    let child = format!(
+        "<draw:frame xmlns:draw=\"{DRAW}\" xmlns:xlink=\"{XLINK}\" xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\" xmlns:table=\"{TABLE}\" draw:name=\"{}\" draw:z-index=\"{}\" svg:x=\"{}cm\" svg:y=\"{}cm\" svg:width=\"{}cm\" svg:height=\"{}cm\"{}><draw:image xlink:href=\"{}\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/></draw:frame>",
+        escape_xml(&frame.name),
+        frame.z_index,
+        frame.x_cm,
+        frame.y_cm,
+        frame.width_cm,
+        frame.height_cm,
+        frame
+            .anchor_cell
+            .as_deref()
+            .map_or_else(String::new, |anchor| format!(
+                " table:end-cell-address=\"{}\"",
+                escape_xml(anchor)
+            )),
+        escape_xml(&frame.resource_path)
+    );
+    insert_shape_child(source, sheet, &frame.name, child, max_output)
+}
+
+pub(crate) fn put_chart_object(
+    source: &[u8],
+    sheet: &str,
+    chart: &ChartObject,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    validate_token(&chart.name, "chart drawing name")?;
+    super::document::validate_detached_resource_path(&format!(
+        "{}/content.xml",
+        chart.object_path
+    ))?;
+    litchi_odf_common::compact_xml::validate(chart.content_xml.as_bytes()).map_err(Error::from)?;
+    let child = format!(
+        "<draw:frame xmlns:draw=\"{DRAW}\" xmlns:xlink=\"{XLINK}\" draw:name=\"{}\"><draw:object xlink:href=\"./{}\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/></draw:frame>",
+        escape_xml(&chart.name),
+        escape_xml(&chart.object_path)
+    );
+    insert_shape_child(source, sheet, &chart.name, child, max_output)
+}
+
+fn insert_shape_child(
+    source: &[u8],
+    sheet: &str,
+    name: &str,
+    child: String,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let (xml, spans) = content_spans(source)?;
+    let table = select_sheet(&xml, &spans, sheet)?;
+    let shapes = children(&spans, table, TABLE, "shapes");
+    if shapes.len() > 1 {
+        return invalid("ODS sheet has more than one shapes container");
+    }
+    if let Some(shapes) = shapes.first().copied()
+        && descendants(&spans, shapes, DRAW, "frame")
+            .into_iter()
+            .any(|index| {
+                attribute(&xml, &spans[index], b"draw:name")
+                    .ok()
+                    .flatten()
+                    .as_deref()
+                    == Some(name)
+            })
+    {
+        return invalid("ODS drawing name already exists");
+    }
+    let (range, markup) = if let Some(index) = shapes.first().copied() {
+        (spans[index].close_start..spans[index].close_start, child)
+    } else {
+        let position = spans[table].close_start;
+        (
+            position..position,
+            format!("<table:shapes xmlns:table=\"{TABLE}\">{child}</table:shapes>"),
+        )
+    };
+    splice_content(source, range, markup.into_bytes(), max_output)
+}
+
+fn validate_frame(frame: &DrawingFrame) -> Result<()> {
+    validate_token(&frame.name, "drawing frame name")?;
+    super::document::validate_detached_resource_path(&frame.resource_path)?;
+    if [frame.x_cm, frame.y_cm, frame.width_cm, frame.height_cm]
+        .into_iter()
+        .any(|value| !value.is_finite())
+        || frame.width_cm <= 0.0
+        || frame.height_cm <= 0.0
+        || frame
+            .anchor_cell
+            .as_deref()
+            .is_some_and(|anchor| anchor.is_empty() || anchor.len() > 65_536)
+    {
+        return invalid("ODS drawing frame geometry is invalid");
+    }
+    Ok(())
+}
+
 pub(crate) fn remove_drawing(
     source: &[u8],
     sheet: &str,
@@ -604,6 +1198,100 @@ pub(crate) fn set_forms(
         }
         markup.push_str("</form:form></office:forms>");
     }
+    let (_xml, spans) = content_spans(source)?;
+    let spreadsheet = one(&spans, OFFICE, "spreadsheet")?;
+    let existing = children(&spans, spreadsheet, OFFICE, "forms");
+    if existing.len() > 1 {
+        return invalid("ODS spreadsheet has more than one forms container");
+    }
+    let range = existing.first().copied().map_or_else(
+        || {
+            let insertion = children(&spans, spreadsheet, TABLE, "table")
+                .first()
+                .map_or(spans[spreadsheet].close_start, |index| spans[*index].start);
+            insertion..insertion
+        },
+        |index| spans[index].start..spans[index].end,
+    );
+    splice_content(source, range, markup.into_bytes(), max_output)
+}
+
+pub(crate) fn set_bound_forms(
+    source: &[u8],
+    controls: &[BoundFormControl],
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let spreadsheet = crate::Spreadsheet::from_bytes(source.to_vec())?;
+    let mut markup = String::new();
+    if !controls.is_empty() {
+        write!(
+            markup,
+            "<office:forms xmlns:office=\"{OFFICE}\" xmlns:form=\"{FORM}\" xmlns:xlink=\"{XLINK}\"><form:form form:name=\"LitchiForm\">"
+        )
+        .map_err(|_error| invalid_error("ODS form markup formatting failed"))?;
+        let mut ids = std::collections::BTreeSet::new();
+        for control in controls {
+            validate_token(&control.id, "form control id")?;
+            if !ids.insert(control.id.as_str())
+                || control.label.len() > 65_536
+                || control.label.chars().any(char::is_control)
+            {
+                return invalid("ODS bound form control is invalid or duplicated");
+            }
+            if let Some(path) = &control.image_path {
+                super::document::validate_detached_resource_path(path)?;
+            }
+            if let Some(address) = &control.linked_cell {
+                validate_form_address(&spreadsheet, address, true)?;
+            }
+            if let Some(address) = &control.source_range {
+                validate_form_address(&spreadsheet, address, false)?;
+            }
+            markup.push_str("<form:button form:id=\"");
+            markup.push_str(&escape_xml(&control.id));
+            markup.push_str("\" form:label=\"");
+            markup.push_str(&escape_xml(&control.label));
+            markup.push('"');
+            push_optional_attribute(
+                &mut markup,
+                "form:linked-cell",
+                control.linked_cell.as_deref(),
+            );
+            push_optional_attribute(
+                &mut markup,
+                "form:source-cell-range",
+                control.source_range.as_deref(),
+            );
+            push_optional_attribute(
+                &mut markup,
+                "form:image-data",
+                control.image_path.as_deref(),
+            );
+            markup.push_str("/>");
+        }
+        markup.push_str("</form:form></office:forms>");
+    }
+    set_forms_markup(source, markup, max_output)
+}
+
+fn validate_form_address(
+    spreadsheet: &crate::Spreadsheet,
+    value: &str,
+    require_single_cell: bool,
+) -> Result<()> {
+    let address = crate::model::data_pilot::parse_data_pilot_range(value)?;
+    if require_single_cell
+        && (address.start_column != address.end_column || address.start_row != address.end_row)
+    {
+        return invalid("ODS form linked-cell binding must identify one cell");
+    }
+    if !address.sheet.is_empty() && spreadsheet.sheet(&address.sheet).is_none() {
+        return invalid("ODS form binding references an unknown sheet");
+    }
+    Ok(())
+}
+
+fn set_forms_markup(source: &[u8], markup: String, max_output: usize) -> Result<Vec<u8>> {
     let (_xml, spans) = content_spans(source)?;
     let spreadsheet = one(&spans, OFFICE, "spreadsheet")?;
     let existing = children(&spans, spreadsheet, OFFICE, "forms");

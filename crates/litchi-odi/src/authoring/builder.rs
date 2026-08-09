@@ -291,6 +291,9 @@ fn push_area(xml: &mut String, area: &Area) {
     if let Some(show) = area.show() {
         push_attribute(xml, "xlink:show", show);
     }
+    if let Some(actuate) = area.actuate() {
+        push_attribute(xml, "xlink:actuate", actuate);
+    }
     if let Some(target) = area.target_frame_name() {
         push_attribute(xml, "office:target-frame-name", target);
     }

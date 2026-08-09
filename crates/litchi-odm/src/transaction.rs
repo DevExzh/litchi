@@ -7,15 +7,15 @@ use litchi_core::{
 };
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
 use crate::{Master, link::Selector};
 
 pub use crate::edit_ops::{
-    ResourceChange, ResourceSpec, SectionChange, SectionSpec, SecurityPolicy, StyleChange,
-    StyleSpec, SubdocumentSpec,
+    ActiveContentPolicy, ResourceChange, ResourceSpec, SectionChange, SectionSpec, SecurityPolicy,
+    StyleChange, StyleSpec, SubdocumentSpec,
 };
 
 const MAX_PACKAGE_BYTES: usize = 256 * 1024 * 1024;
@@ -24,6 +24,56 @@ const DURABLE_FORMAT: &str = "litchi.odm";
 const DURABLE_OPERATION: &str = "package.replace";
 const DURABLE_TARGET: &str = "master";
 const SOURCE_PRECONDITION: &str = "source_sha256";
+
+/// How a cross-master transfer handles an occupied identity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CollisionPolicy {
+    /// Refuse every occupied destination identity.
+    Refuse,
+    /// Reuse an identity only when its complete bytes/definition match.
+    ReuseIdentical,
+    /// Reuse identical content or choose a deterministic imported identity.
+    Rename,
+}
+
+/// Collision behavior for a dependency-closed linked-section transfer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TransferOptions {
+    resource: CollisionPolicy,
+    style: CollisionPolicy,
+}
+
+impl TransferOptions {
+    /// Uses deterministic rename with identical-content reuse.
+    #[must_use]
+    pub const fn collision_safe() -> Self {
+        Self {
+            resource: CollisionPolicy::Rename,
+            style: CollisionPolicy::Rename,
+        }
+    }
+
+    /// Configures package-resource collisions.
+    #[must_use]
+    pub const fn with_resource_collision(mut self, policy: CollisionPolicy) -> Self {
+        self.resource = policy;
+        self
+    }
+
+    /// Configures style-identity collisions.
+    #[must_use]
+    pub const fn with_style_collision(mut self, policy: CollisionPolicy) -> Self {
+        self.style = policy;
+        self
+    }
+}
+
+impl Default for TransferOptions {
+    fn default() -> Self {
+        Self::collision_safe()
+    }
+}
 
 /// One atomic edit derived from an immutable master snapshot.
 pub struct Edit<'source> {
@@ -166,14 +216,15 @@ impl<'source> Edit<'source> {
 
     /// Copies one linked section and its package resource from another master.
     ///
-    /// The destination must already contain the referenced section style, if
-    /// any. This prevents a partial transfer which silently loses styling.
-    /// The source package is never recursively opened or executed.
+    /// The complete style-parent closure is reused when identical or copied
+    /// under deterministic imported names when it differs. Resource
+    /// collisions use the same default behavior. The source package is never
+    /// recursively opened or executed.
     ///
     /// # Errors
     ///
     /// Returns an error for a non-linked or external source section, a missing
-    /// style dependency, an existing destination path, or a policy violation.
+    /// style/resource dependency, or a policy violation.
     pub fn transfer_linked_section(
         &mut self,
         source: &Master,
@@ -181,6 +232,35 @@ impl<'source> Edit<'source> {
         destination_name: impl Into<String>,
         destination_path: impl Into<String>,
     ) -> Result<&mut Self> {
+        self.transfer_linked_section_with_options(
+            source,
+            position,
+            destination_name,
+            destination_path,
+            TransferOptions::default(),
+        )
+    }
+
+    /// Copies a linked section, its complete style-parent closure, and its
+    /// package resource under explicit collision rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid source semantics, a refused collision, or
+    /// a transaction security-policy violation.
+    pub fn transfer_linked_section_with_options(
+        &mut self,
+        source: &Master,
+        position: Position,
+        destination_name: impl Into<String>,
+        destination_path: impl Into<String>,
+        options: TransferOptions,
+    ) -> Result<&mut Self> {
+        let destination_name = destination_name.into();
+        SectionSpec::new(&destination_name)?;
+        if section_name_exists(self.source, &self.sections, &destination_name) {
+            return Err(invalid("ODM section destination name already exists"));
+        }
         let node = source
             .section_tree()
             .get(position)
@@ -198,43 +278,40 @@ impl<'source> Edit<'source> {
             ));
         };
         let destination_path = destination_path.into();
-        if self
-            .source
-            .resources()
-            .resources()
-            .iter()
-            .any(|resource| resource.path() == destination_path)
-            || self.resources.contains_key(&destination_path)
-        {
-            return Err(invalid(
-                "ODM linked-section transfer destination already exists",
-            ));
-        }
-        if let Some(style_name) = node.style_name()
-            && !transfer_style_dependency_is_satisfied(
-                self.source,
-                &self.styles,
-                source,
-                style_name,
-            )?
-        {
-            return Err(invalid(
-                "ODM linked-section transfer has an unresolved style dependency",
-            ));
-        }
         let source_resource = source
             .resources()
             .resources()
             .iter()
             .find(|resource| resource.path() == source_path)
             .ok_or_else(|| invalid("ODM transfer package resource is missing"))?;
-        let resource = ResourceSpec::new(
-            destination_path.clone(),
-            source_resource
-                .media_type()
-                .unwrap_or("application/octet-stream"),
-            source.resource_bytes(source_path)?,
+        let media_type = source_resource
+            .media_type()
+            .unwrap_or("application/octet-stream");
+        let bytes = source.resource_bytes(source_path)?;
+        if bytes.len() > self.policy.max_resource_bytes() {
+            return Err(invalid(
+                "ODM resource exceeds the transaction security policy",
+            ));
+        }
+        let (destination_path, write_resource) = resolve_resource_collision(
+            self.source,
+            &self.resources,
+            &destination_path,
+            media_type,
+            &bytes,
+            options.resource,
         )?;
+        let style_name = node
+            .style_name()
+            .map(|name| transfer_style_closure(self, source, name, options.style))
+            .transpose()?;
+        if write_resource {
+            self.put_resource(ResourceSpec::new(
+                destination_path.clone(),
+                media_type,
+                bytes,
+            )?)?;
+        }
         let mut subdocument = SubdocumentSpec::new(destination_path)?;
         if let Some(source_section) = reference.source_section() {
             subdocument = subdocument.with_source_section(source_section)?;
@@ -243,10 +320,10 @@ impl<'source> Edit<'source> {
             subdocument = subdocument.with_filter_name(filter_name)?;
         }
         let mut section = SectionSpec::new(destination_name)?.with_subdocument(subdocument);
-        if let Some(style_name) = node.style_name() {
+        if let Some(style_name) = style_name {
             section = section.with_style(style_name)?;
         }
-        self.put_resource(resource)?.add_section(section)
+        self.add_section(section)
     }
 
     /// Renames one source section and its modeled local-section references.
@@ -470,18 +547,48 @@ impl<'source> Edit<'source> {
         source_path: &str,
         destination_path: impl Into<String>,
     ) -> Result<&mut Self> {
+        self.transfer_resource_with_collision(
+            source,
+            source_path,
+            destination_path,
+            CollisionPolicy::Refuse,
+        )
+    }
+
+    /// Copies one inert resource with explicit collision handling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an absent source, refused collision, or policy
+    /// violation.
+    pub fn transfer_resource_with_collision(
+        &mut self,
+        source: &Master,
+        source_path: &str,
+        destination_path: impl Into<String>,
+        collision: CollisionPolicy,
+    ) -> Result<&mut Self> {
         let resource = source
             .resources()
             .resources()
             .iter()
             .find(|resource| resource.path() == source_path)
             .ok_or_else(|| invalid("ODM transfer source resource was not found"))?;
-        let spec = ResourceSpec::new(
-            destination_path,
-            resource.media_type().unwrap_or("application/octet-stream"),
-            source.resource_bytes(source_path)?,
+        let media_type = resource.media_type().unwrap_or("application/octet-stream");
+        let bytes = source.resource_bytes(source_path)?;
+        let destination_path = destination_path.into();
+        let (destination_path, write) = resolve_resource_collision(
+            self.source,
+            &self.resources,
+            &destination_path,
+            media_type,
+            &bytes,
+            collision,
         )?;
-        self.put_resource(spec)
+        if write {
+            self.put_resource(ResourceSpec::new(destination_path, media_type, bytes)?)?;
+        }
+        Ok(self)
     }
 
     /// Publishes every staged effect as one fully reopened package.
@@ -499,7 +606,6 @@ impl<'source> Edit<'source> {
             || !self.styles.is_empty()
             || !self.resources.is_empty();
         if !title_changed && link_changes.is_empty() && !extended_changed {
-            validate_security_policy(self.source, self.policy)?;
             return Ok(Commit::new(
                 self.source,
                 self.source.clone(),
@@ -1211,35 +1317,225 @@ fn style_name_exists(source: &Master, staged: &[StyleChange], name: &str) -> boo
         })
 }
 
-fn transfer_style_dependency_is_satisfied(
+fn transfer_style_closure(
+    edit: &mut Edit<'_>,
+    source: &Master,
+    leaf_name: &str,
+    collision: CollisionPolicy,
+) -> Result<String> {
+    let mut closure = Vec::new();
+    let mut seen = HashSet::new();
+    let mut current = Some(leaf_name.to_string());
+    while let Some(name) = current {
+        if !seen.insert(name.clone()) {
+            return Err(invalid("ODM transfer style parent cycle is not supported"));
+        }
+        let matches = source
+            .styles()
+            .iter()
+            .filter(|definition| definition.name() == name)
+            .collect::<Vec<_>>();
+        let definition = match matches.as_slice() {
+            [definition] => *definition,
+            [] => return Err(invalid("ODM transfer source style dependency is missing")),
+            _ => return Err(invalid("ODM transfer source style dependency is ambiguous")),
+        };
+        current = definition.parent().map(str::to_string);
+        closure.push(definition);
+    }
+    closure.reverse();
+
+    let mut names = HashMap::new();
+    for definition in closure {
+        let mapped_parent = definition
+            .parent()
+            .map(|parent| {
+                names
+                    .get(parent)
+                    .cloned()
+                    .ok_or_else(|| invalid("ODM transferred style parent mapping is incomplete"))
+            })
+            .transpose()?;
+        let desired = definition.name();
+        let source_xml = style_owner_xml(source, definition)?;
+        let desired_spec =
+            StyleSpec::imported(source_xml, definition, desired, mapped_parent.as_deref())?;
+        let occupied = style_name_exists(edit.source, &edit.styles, desired);
+        let identical = occupied
+            && transferred_style_is_identical(
+                edit.source,
+                &edit.styles,
+                source,
+                definition,
+                &desired_spec,
+            )?;
+        let destination_name = if !occupied {
+            desired.to_string()
+        } else if identical && collision != CollisionPolicy::Refuse {
+            names.insert(desired.to_string(), desired.to_string());
+            continue;
+        } else if collision == CollisionPolicy::Rename {
+            unique_style_name(edit.source, &edit.styles, desired)?
+        } else {
+            return Err(invalid(
+                "ODM linked-section transfer style identity collision",
+            ));
+        };
+        let spec = if destination_name == desired {
+            desired_spec
+        } else {
+            StyleSpec::imported(
+                source_xml,
+                definition,
+                &destination_name,
+                mapped_parent.as_deref(),
+            )?
+        };
+        edit.add_style(spec)?;
+        names.insert(desired.to_string(), destination_name);
+    }
+    names
+        .remove(leaf_name)
+        .ok_or_else(|| invalid("ODM transferred leaf style mapping disappeared"))
+}
+
+fn style_owner_xml<'source>(
+    source: &'source Master,
+    definition: &crate::style::Definition,
+) -> Result<&'source str> {
+    match definition.origin() {
+        crate::style::Origin::Content => Ok(source.content_xml()),
+        crate::style::Origin::Styles => source
+            .styles_xml()
+            .ok_or_else(|| invalid("ODM transferred style owner is missing")),
+    }
+}
+
+fn transferred_style_is_identical(
     destination: &Master,
     staged: &[StyleChange],
     source: &Master,
-    name: &str,
+    source_definition: &crate::style::Definition,
+    desired_spec: &StyleSpec,
 ) -> Result<bool> {
-    let mut source_definitions = source
-        .styles()
-        .iter()
-        .filter(|definition| definition.name() == name);
-    let source_definition = source_definitions
-        .next()
-        .ok_or_else(|| invalid("ODM transfer source style dependency is missing"))?;
-    if source_definitions.next().is_some() {
-        return Err(invalid("ODM transfer source style dependency is ambiguous"));
-    }
-    let mut destination_matches = destination
-        .styles()
-        .iter()
-        .filter(|definition| definition.name() == name);
-    if let Some(destination_definition) = destination_matches.next()
-        && destination_matches.next().is_none()
-        && destination_definition.family() == source_definition.family()
-    {
+    if staged.iter().any(|change| {
+        matches!(change, StyleChange::Add(spec)
+            if spec.name() == desired_spec.name()
+                && spec.family() == desired_spec.family()
+                && spec.origin() == desired_spec.origin()
+                && spec.parent() == desired_spec.parent()
+                && spec.raw_fragment() == desired_spec.raw_fragment())
+    }) {
         return Ok(true);
     }
-    Ok(staged.iter().any(|change| {
-        matches!(change, StyleChange::Add(spec) if spec.name() == name && Some(spec.family()) == source_definition.family())
-    }))
+    let matches = destination
+        .styles()
+        .iter()
+        .filter(|definition| definition.name() == source_definition.name())
+        .collect::<Vec<_>>();
+    let [destination_definition] = matches.as_slice() else {
+        return Ok(false);
+    };
+    if destination_definition.origin() != source_definition.origin()
+        || destination_definition.family() != source_definition.family()
+        || destination_definition.parent() != source_definition.parent()
+    {
+        return Ok(false);
+    }
+    let source_fragment = style_owner_xml(source, source_definition)?
+        .get(source_definition.source_span.clone())
+        .ok_or_else(|| invalid("ODM source style span is stale"))?;
+    let destination_fragment = style_owner_xml(destination, destination_definition)?
+        .get(destination_definition.source_span.clone())
+        .ok_or_else(|| invalid("ODM destination style span is stale"))?;
+    Ok(source_fragment == destination_fragment)
+}
+
+fn unique_style_name(source: &Master, staged: &[StyleChange], base: &str) -> Result<String> {
+    for sequence in 1..=1_000_000usize {
+        let candidate = format!("{base}__import{sequence}");
+        crate::edit_ops::validate_value(&candidate, "ODM imported style name", false)?;
+        if !style_name_exists(source, staged, &candidate) {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid(
+        "ODM imported style collision sequence is exhausted",
+    ))
+}
+
+fn resolve_resource_collision(
+    destination: &Master,
+    staged: &BTreeMap<String, ResourceChange>,
+    desired: &str,
+    media_type: &str,
+    bytes: &[u8],
+    collision: CollisionPolicy,
+) -> Result<(String, bool)> {
+    ResourceSpec::new(desired, media_type, Vec::new())?;
+    let mut candidate = desired.to_string();
+    for sequence in 0..=1_000_000usize {
+        let existing = staged_resource(staged, &candidate).or_else(|| {
+            destination
+                .resources()
+                .resources()
+                .iter()
+                .find(|resource| resource.path() == candidate)
+                .map(|resource| (resource.media_type(), None))
+        });
+        let Some((existing_media_type, staged_bytes)) = existing else {
+            return Ok((candidate, true));
+        };
+        let existing_bytes = staged_bytes.map_or_else(
+            || destination.resource_bytes(&candidate),
+            |resource_bytes| Ok(resource_bytes.to_owned()),
+        )?;
+        let identical = existing_media_type.unwrap_or("application/octet-stream") == media_type
+            && existing_bytes == bytes;
+        if identical && collision != CollisionPolicy::Refuse {
+            return Ok((candidate, false));
+        }
+        if collision != CollisionPolicy::Rename {
+            return Err(invalid("ODM transfer resource destination already exists"));
+        }
+        candidate = imported_resource_path(desired, sequence.saturating_add(1))?;
+    }
+    Err(invalid(
+        "ODM imported resource collision sequence is exhausted",
+    ))
+}
+
+fn staged_resource<'change>(
+    staged: &'change BTreeMap<String, ResourceChange>,
+    path: &str,
+) -> Option<(Option<&'change str>, Option<&'change [u8]>)> {
+    match staged.get(path) {
+        Some(ResourceChange::Put(resource)) => {
+            Some((Some(resource.media_type()), Some(resource.bytes())))
+        },
+        Some(ResourceChange::Remove(_)) | None => None,
+    }
+}
+
+fn imported_resource_path(path: &str, sequence: usize) -> Result<String> {
+    let (directory, file_name) = path
+        .rsplit_once('/')
+        .map_or(("", path), |(dir, name)| (dir, name));
+    let (stem, extension) = file_name
+        .rsplit_once('.')
+        .map_or((file_name, ""), |(stem, extension)| (stem, extension));
+    let imported_file_name = if extension.is_empty() {
+        format!("{stem}__import{sequence}")
+    } else {
+        format!("{stem}__import{sequence}.{extension}")
+    };
+    let candidate = if directory.is_empty() {
+        imported_file_name
+    } else {
+        format!("{directory}/{imported_file_name}")
+    };
+    ResourceSpec::new(&candidate, "application/octet-stream", Vec::new())?;
+    Ok(candidate)
 }
 
 fn resolve_style(source: &Master, origin: crate::style::Origin, name: &str) -> Result<()> {
@@ -1273,6 +1569,13 @@ fn ensure_removed_resources_are_unreferenced(content: &str, removed: &[String]) 
 }
 
 fn validate_security_policy(snapshot: &Master, policy: SecurityPolicy) -> Result<()> {
+    if policy.active_content() == ActiveContentPolicy::Refuse
+        && !snapshot.security().active_content().is_empty()
+    {
+        return Err(invalid(
+            "ODM security policy refuses changed output containing active content",
+        ));
+    }
     if !policy.allows_external_targets()
         && snapshot
             .subdocuments()
@@ -1354,10 +1657,25 @@ fn verify_extended_readback(
     for change in styles {
         match change {
             StyleChange::Add(style) => {
-                if !snapshot.styles().iter().any(|definition| {
-                    definition.origin() == style.origin() && definition.name() == style.name()
-                }) {
-                    return Err(invalid("ODM added style failed semantic readback"));
+                let definition = snapshot
+                    .styles()
+                    .iter()
+                    .find(|definition| {
+                        definition.origin() == style.origin() && definition.name() == style.name()
+                    })
+                    .ok_or_else(|| invalid("ODM added style failed semantic readback"))?;
+                if definition.family() != Some(style.family())
+                    || definition.parent() != style.parent()
+                {
+                    return Err(invalid("ODM added style dependency readback differs"));
+                }
+                if let Some(expected) = style.raw_fragment() {
+                    let actual = style_owner_xml(snapshot, definition)?
+                        .get(definition.source_span.clone())
+                        .ok_or_else(|| invalid("ODM added style readback span is stale"))?;
+                    if actual != expected {
+                        return Err(invalid("ODM imported style XML readback differs"));
+                    }
                 }
             },
             StyleChange::Rename {
@@ -1696,24 +2014,10 @@ fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
     for link in &changes.links {
         edit.set_link(link.reference, link.after.clone())?;
     }
-    for section in &changes.sections {
-        if edit.sections.contains(section) {
-            continue;
-        }
-        match section {
-            SectionChange::Add(spec) => {
-                edit.add_section(spec.clone())?;
-            },
-            SectionChange::Rename {
-                position, after, ..
-            } => {
-                edit.rename_section(*position, after.clone())?;
-            },
-            SectionChange::Remove { position, .. } => {
-                edit.remove_section(*position)?;
-            },
-        }
-    }
+    // Style additions/renames must be visible before strict section staging:
+    // an added section may reference a style imported by the same patch.
+    // Removals remain atomic because XML mutation receives both complete
+    // intent lists and computes removed section spans before staging styles.
     for style in &changes.styles {
         if edit.styles.contains(style) {
             continue;
@@ -1731,6 +2035,24 @@ fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
             },
             StyleChange::Remove { origin, name } => {
                 edit.remove_style(*origin, name.clone())?;
+            },
+        }
+    }
+    for section in &changes.sections {
+        if edit.sections.contains(section) {
+            continue;
+        }
+        match section {
+            SectionChange::Add(spec) => {
+                edit.add_section(spec.clone())?;
+            },
+            SectionChange::Rename {
+                position, after, ..
+            } => {
+                edit.rename_section(*position, after.clone())?;
+            },
+            SectionChange::Remove { position, .. } => {
+                edit.remove_section(*position)?;
             },
         }
     }

@@ -1,3 +1,14 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::expect_used,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unwrap_used
+    )
+)]
+
 use std::collections::HashMap;
 use std::io::{self, ErrorKind};
 
@@ -7,6 +18,8 @@ const TABLE_RECORD_TYPE: u16 = 0x0236;
 const SHARED_FORMULA_RECORD_TYPE: u16 = 0x04BC;
 const ARRAY_RECORD_TYPE: u16 = 0x0221;
 const FORMULA_RECORD_TYPE: u16 = 0x0006;
+const STRING_RECORD_TYPE: u16 = 0x0207;
+const CONTINUE_RECORD_TYPE: u16 = 0x003c;
 const DBCELL_RECORD_TYPE: u16 = 0x00d7;
 const MAX_ROWS_PER_BLOCK: usize = 32;
 const MAX_ROW_BLOCKS: usize = 2048;
@@ -223,7 +236,11 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<RowBlockLayoutRow>> {
             ));
         } else if matches!(
             record_type,
-            TABLE_RECORD_TYPE | SHARED_FORMULA_RECORD_TYPE | ARRAY_RECORD_TYPE
+            TABLE_RECORD_TYPE
+                | SHARED_FORMULA_RECORD_TYPE
+                | ARRAY_RECORD_TYPE
+                | STRING_RECORD_TYPE
+                | CONTINUE_RECORD_TYPE
         ) {
             // Table, ShrFmla, and Array records follow their anchor Formula
             // and share its layout row; their payloads do not start with the
@@ -557,7 +574,11 @@ fn validate_cell_records(row: &RowBlockLayoutRow) -> io::Result<()> {
         }
         if matches!(
             record_type,
-            TABLE_RECORD_TYPE | SHARED_FORMULA_RECORD_TYPE | ARRAY_RECORD_TYPE
+            TABLE_RECORD_TYPE
+                | SHARED_FORMULA_RECORD_TYPE
+                | ARRAY_RECORD_TYPE
+                | STRING_RECORD_TYPE
+                | CONTINUE_RECORD_TYPE
         ) {
             // Table, ShrFmla, and Array records carry continuation metadata
             // rather than the anchor cell's row.

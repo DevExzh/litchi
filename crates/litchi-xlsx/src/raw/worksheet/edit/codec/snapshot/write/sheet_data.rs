@@ -272,11 +272,10 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
     let Action::Update { payload, style } = action else {
         return Err(invalid("cannot rewrite a removed cell"));
     };
-    let content = match payload.as_ref() {
-        Some(Payload::Set(content)) => Some(content),
-        Some(Payload::Clear | Payload::ClearIfPresent) | None => None,
-    };
-    let cell_type = content.and_then(content_type);
+    let content = payload
+        .as_ref()
+        .filter(|payload| matches!(payload, Payload::Set(_) | Payload::SharedString { .. }));
+    let cell_type = content.and_then(payload_type);
     let mut removed = vec!["r"];
     if payload.is_some() {
         removed.push("t");
@@ -297,7 +296,7 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
         return Ok(());
     }
     if let Some(content) = content {
-        write_content(output, &cell.tag.name, content)?;
+        write_payload(output, &cell.tag.name, content)?;
     }
     if !cell.empty {
         if payload.is_some() {
@@ -328,17 +327,16 @@ fn write_new_action(
     if !action.creates_missing() {
         return Ok(());
     }
-    let content = match payload.as_ref() {
-        Some(Payload::Set(content)) => Some(content),
-        Some(Payload::Clear | Payload::ClearIfPresent) | None => None,
-    };
+    let content = payload
+        .as_ref()
+        .filter(|payload| matches!(payload, Payload::Set(_) | Payload::SharedString { .. }));
     let name = sibling_name(row_name, "c");
     let tag = Tag {
         name: name.clone().into_boxed_str(),
         attributes: Box::new([]),
     };
     let mut appended = vec![("r", address.a1())];
-    if let Some(cell_type) = content.and_then(content_type) {
+    if let Some(cell_type) = content.and_then(payload_type) {
         appended.push(("t", cell_type.to_owned()));
     }
     if let Some(StyleEffect::Set(key)) = style {
@@ -347,7 +345,7 @@ fn write_new_action(
     let empty = content.is_none();
     write_tag(output, &tag, empty, &[], &appended);
     if let Some(content) = content {
-        write_content(output, &name, content)?;
+        write_payload(output, &name, content)?;
         write_close(output, &name);
     }
     Ok(())
@@ -360,6 +358,25 @@ fn content_type(content: &Content) -> Option<&'static str> {
         Content::Value(Value::Date(_)) => Some("d"),
         Content::Value(Value::Error(_)) => Some("e"),
         Content::Value(Value::Number(_)) | Content::Formula(_) => None,
+    }
+}
+
+fn payload_type(payload: &Payload) -> Option<&'static str> {
+    match payload {
+        Payload::Set(content) => content_type(content),
+        Payload::SharedString { .. } => Some("s"),
+        Payload::Clear | Payload::ClearIfPresent => None,
+    }
+}
+
+fn write_payload(output: &mut Vec<u8>, cell_name: &str, payload: &Payload) -> Result<()> {
+    match payload {
+        Payload::Set(content) => write_content(output, cell_name, content),
+        Payload::SharedString { index, .. } => {
+            write_text_element(output, cell_name, "v", &index.to_string());
+            Ok(())
+        },
+        Payload::Clear | Payload::ClearIfPresent => Ok(()),
     }
 }
 

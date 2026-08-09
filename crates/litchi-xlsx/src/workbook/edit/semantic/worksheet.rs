@@ -247,7 +247,10 @@ impl WorksheetEdit<'_> {
         let address = at.into().resolve()?;
         let actions = self.edit.actions(self.position);
         let create = actions.get(&address).is_some_and(|action| {
-            matches!(action.payload(), Some(Payload::Set(_) | Payload::Clear))
+            matches!(
+                action.payload(),
+                Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::Clear)
+            )
         });
         match actions.entry(address) {
             Entry::Vacant(entry) => {
@@ -471,7 +474,10 @@ impl NewSheet<'_> {
         let address = at.into().resolve()?;
         let actions = &mut self.added.actions.cells;
         let create = actions.get(&address).is_some_and(|action| {
-            matches!(action.payload(), Some(Payload::Set(_) | Payload::Clear))
+            matches!(
+                action.payload(),
+                Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::Clear)
+            )
         });
         match actions.entry(address) {
             Entry::Vacant(entry) => {

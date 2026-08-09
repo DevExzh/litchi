@@ -61,15 +61,17 @@ fn granular_edits_record_paths_and_round_trip_durable_history() {
         .expect("operator");
     edit.insert_child(&row_path, 2, authoring::number("1"))
         .expect("number");
-    edit.set_starmath_source(StarMathVersion::V6, "y + 1")
-        .expect("StarMath");
+    let starmath = OpaqueStarMath::new(StarMathVersion::V6, "y + 1").expect("opaque StarMath");
+    edit.set_starmath(&starmath).expect("StarMath");
     let commit = edit.commit().expect("commit");
 
     assert_eq!(commit.patch().changes().len(), 4);
     assert_eq!(commit.patch().changes()[0].kind(), ChangeKind::SetText);
     assert_eq!(commit.patch().changes()[1].path().indices(), &[0, 0, 1]);
     assert_eq!(
-        commit.formula().starmath_annotations()[0].version(),
+        commit.formula().starmath_annotations()[0]
+            .opaque()
+            .version(),
         StarMathVersion::V6
     );
 
@@ -229,7 +231,7 @@ fn opaque_starmath_boundary_is_versioned_bounded_and_publishable() {
         .into_iter()
         .next()
         .expect("StarMath annotation");
-    assert_eq!(annotation.to_opaque().expect("opaque readback"), opaque);
+    assert_eq!(annotation.opaque(), &opaque);
 }
 
 #[test]

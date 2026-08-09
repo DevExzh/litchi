@@ -27,6 +27,272 @@ const WORKBOOK_URI: &str = "/xl/workbook.bin";
 const SST_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
 const MAX_SST_COUNT: u32 = 0x7fff_ffff;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct StylePlan {
+    pub(super) font: Vec<u8>,
+    pub(super) fill: Vec<u8>,
+    pub(super) border: Vec<u8>,
+    pub(super) number_format: Option<String>,
+    pub(super) xf_tail: [u8; 6],
+}
+
+pub(super) fn plan_style(style: &super::AuthoredStyle) -> Result<StylePlan> {
+    let alignment = style.alignment.as_ref();
+    if alignment
+        .is_some_and(|value| value.rotation > 180 || value.indent > 250 || value.text_direction > 2)
+    {
+        return Err(Error::InvalidFormat(
+            "authored style alignment is outside BIFF12 bounds".to_string(),
+        ));
+    }
+    let mut xf_tail = [0_u8; 6];
+    if let Some(value) = alignment {
+        xf_tail[0] = value.rotation;
+        xf_tail[1] = value.indent;
+        xf_tail[2] = horizontal_bits(value.horizontal)
+            | (vertical_bits(value.vertical) << 3)
+            | (u8::from(value.wrap_text) << 6);
+        xf_tail[3] = u8::from(value.shrink_to_fit) | (value.text_direction << 2);
+    }
+    if let Some(code) = &style.number_format {
+        let units = code.encode_utf16().count();
+        if !(1..=255).contains(&units) || code.contains('\0') {
+            return Err(Error::InvalidFormat(
+                "authored number format must contain 1..=255 UTF-16 units and no NUL".to_string(),
+            ));
+        }
+    }
+    Ok(StylePlan {
+        font: crate::writer::StylesWriter::encode_font_payload(&style.font)?,
+        fill: crate::writer::StylesWriter::encode_fill_payload(&style.fill)?,
+        border: encode_authored_border(&style.border)?,
+        number_format: style.number_format.clone(),
+        xf_tail,
+    })
+}
+
+fn encode_authored_border(border: &crate::styles::Border) -> Result<Vec<u8>> {
+    if border.vertical.is_some() || border.horizontal.is_some() {
+        return Err(Error::UnsupportedFeature(
+            "vertical and horizontal table borders are not BrtBorder fields".to_string(),
+        ));
+    }
+    if (border.diagonal_down || border.diagonal_up) && border.diagonal.is_none() {
+        return Err(Error::InvalidFormat(
+            "authored diagonal direction requires a diagonal border".to_string(),
+        ));
+    }
+    let mut data = Vec::new();
+    let mut writer = Writer::new(&mut data);
+    writer.write_u8(u8::from(border.diagonal_down) | (u8::from(border.diagonal_up) << 1))?;
+    write_authored_border_side(&mut writer, border.top.as_ref())?;
+    write_authored_border_side(&mut writer, border.bottom.as_ref())?;
+    write_authored_border_side(&mut writer, border.left.as_ref())?;
+    write_authored_border_side(&mut writer, border.right.as_ref())?;
+    write_authored_border_side(&mut writer, border.diagonal.as_ref())?;
+    Ok(data)
+}
+
+fn write_authored_border_side<W: std::io::Write>(
+    writer: &mut Writer<W>,
+    side: Option<&crate::styles::BorderSide>,
+) -> Result<()> {
+    if let Some(side) = side {
+        writer.write_u8(border_style_bits(side.style))?;
+        writer.write_u8(0)?;
+        write_authored_color(writer, side.color)?;
+    } else {
+        writer.write_u16(0)?;
+        write_authored_color(writer, None)?;
+    }
+    Ok(())
+}
+
+const fn border_style_bits(style: crate::styles::BorderStyle) -> u8 {
+    match style {
+        crate::styles::BorderStyle::None => 0,
+        crate::styles::BorderStyle::Thin => 1,
+        crate::styles::BorderStyle::Medium => 2,
+        crate::styles::BorderStyle::Dashed => 3,
+        crate::styles::BorderStyle::Dotted => 4,
+        crate::styles::BorderStyle::Thick => 5,
+        crate::styles::BorderStyle::Double => 6,
+        crate::styles::BorderStyle::Hair => 7,
+        crate::styles::BorderStyle::MediumDashed => 8,
+        crate::styles::BorderStyle::DashDot => 9,
+        crate::styles::BorderStyle::MediumDashDot => 10,
+        crate::styles::BorderStyle::DashDotDot => 11,
+        crate::styles::BorderStyle::MediumDashDotDot => 12,
+        crate::styles::BorderStyle::SlantDashDot => 13,
+    }
+}
+
+fn write_authored_color<W: std::io::Write>(
+    writer: &mut Writer<W>,
+    color: Option<u32>,
+) -> Result<()> {
+    if let Some(argb) = color {
+        writer.write_u8(5)?;
+        writer.write_u8(0)?;
+        writer.write_u16(0)?;
+        writer.write_u8(argb.to_be_bytes()[1])?;
+        writer.write_u8(argb.to_be_bytes()[2])?;
+        writer.write_u8(argb.to_be_bytes()[3])?;
+        writer.write_u8(argb.to_be_bytes()[0])?;
+    } else {
+        writer.write_u32(0)?;
+        writer.write_u32(0)?;
+    }
+    Ok(())
+}
+
+const fn horizontal_bits(value: crate::styles::HorizontalAlignment) -> u8 {
+    match value {
+        crate::styles::HorizontalAlignment::General => 0,
+        crate::styles::HorizontalAlignment::Left => 1,
+        crate::styles::HorizontalAlignment::Center => 2,
+        crate::styles::HorizontalAlignment::Right => 3,
+        crate::styles::HorizontalAlignment::Fill => 4,
+        crate::styles::HorizontalAlignment::Justify => 5,
+        crate::styles::HorizontalAlignment::CenterContinuous => 6,
+        crate::styles::HorizontalAlignment::Distributed => 7,
+    }
+}
+
+const fn vertical_bits(value: crate::styles::VerticalAlignment) -> u8 {
+    match value {
+        crate::styles::VerticalAlignment::Top => 0,
+        crate::styles::VerticalAlignment::Center => 1,
+        crate::styles::VerticalAlignment::Bottom => 2,
+        crate::styles::VerticalAlignment::Justify => 3,
+        crate::styles::VerticalAlignment::Distributed => 4,
+    }
+}
+
+pub(super) fn intern_style_plan(package: &mut OpcPackage, plan: &StylePlan) -> Result<StyleIndex> {
+    ensure_styles_part(package)?;
+    let uri = PackURI::new(STYLES_URI)?;
+    let mut styles = package.get_part(&uri)?.blob().to_vec();
+    let font = intern_payload(
+        &mut styles,
+        kind::BEGIN_FONTS,
+        kind::END_FONTS,
+        kind::FONT,
+        &plan.font,
+    )?;
+    let fill = intern_payload(
+        &mut styles,
+        kind::BEGIN_FILLS,
+        kind::END_FILLS,
+        kind::FILL,
+        &plan.fill,
+    )?;
+    let border = intern_payload(
+        &mut styles,
+        kind::BEGIN_BORDERS,
+        kind::END_BORDERS,
+        kind::BORDER,
+        &plan.border,
+    )?;
+    let number_format = match &plan.number_format {
+        Some(code) => intern_number_format(&mut styles, code)?,
+        None => 0,
+    };
+    let mut xf = vec![0_u8; 16];
+    xf[..2].copy_from_slice(&0_u16.to_le_bytes());
+    xf[2..4].copy_from_slice(&number_format.to_le_bytes());
+    xf[4..6].copy_from_slice(&font.to_le_bytes());
+    xf[6..8].copy_from_slice(&fill.to_le_bytes());
+    xf[8..10].copy_from_slice(&border.to_le_bytes());
+    xf[10..16].copy_from_slice(&plan.xf_tail);
+    let index = intern_payload(
+        &mut styles,
+        kind::BEGIN_CELL_XFS,
+        kind::END_CELL_XFS,
+        kind::XF,
+        &xf,
+    )?;
+    package.get_part_mut(&uri)?.set_blob(styles);
+    StyleIndex::new(u32::from(index))
+}
+
+fn ensure_styles_part(package: &mut OpcPackage) -> Result<()> {
+    let uri = PackURI::new(STYLES_URI)?;
+    if package.get_part(&uri).is_ok() {
+        return Ok(());
+    }
+    let mut bytes = Vec::new();
+    crate::writer::StylesWriter::new().write(&mut Writer::new(&mut bytes))?;
+    package.try_add_part(Box::new(BlobPart::new(
+        uri,
+        "application/vnd.ms-excel.styles".to_string(),
+        bytes,
+    )))?;
+    let workbook = package.get_part_mut(&PackURI::new(WORKBOOK_URI)?)?;
+    let strict = workbook.rels().iter().any(|relationship| {
+        relationship
+            .reltype()
+            .starts_with("http://purl.oclc.org/ooxml/")
+    });
+    workbook.rels_mut().get_or_add(
+        if strict {
+            litchi_opc::constants::relationship_type::STRICT_STYLES
+        } else {
+            litchi_opc::constants::relationship_type::STYLES
+        },
+        "styles.bin",
+    );
+    Ok(())
+}
+
+fn intern_payload(
+    styles: &mut Vec<u8>,
+    begin: Kind,
+    end: Kind,
+    item: Kind,
+    payload: &[u8],
+) -> Result<u16> {
+    let values = collection(styles, begin, end, item)?;
+    let index = if let Some(index) = values.iter().position(|value| value == payload) {
+        index
+    } else {
+        *styles = append_collection_item(styles, begin, end, item, payload)?;
+        values.len()
+    };
+    u16::try_from(index)
+        .map_err(|_| Error::UnsupportedFeature("authored style resource index exceeds u16".into()))
+}
+
+fn intern_number_format(styles: &mut Vec<u8>, code: &str) -> Result<u16> {
+    let formats = collection(styles, kind::BEGIN_FMTS, kind::END_FMTS, kind::FMT)?;
+    for payload in &formats {
+        let (id, existing) = crate::styles::parse_num_fmt(payload).map_err(map_style_error)?;
+        if existing == code {
+            return u16::try_from(id).map_err(|_| {
+                Error::UnsupportedFeature("number-format ID exceeds u16".to_string())
+            });
+        }
+    }
+    let used = formats
+        .iter()
+        .filter_map(|payload| payload.get(..2))
+        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+        .collect::<std::collections::BTreeSet<_>>();
+    let id = (164_u16..=382)
+        .find(|id| !used.contains(id))
+        .ok_or_else(|| Error::UnsupportedFeature("no custom number-format ID remains".into()))?;
+    let mut payload = id.to_le_bytes().to_vec();
+    Writer::new(&mut payload).write_wide_string(code)?;
+    *styles = append_collection_item(
+        styles,
+        kind::BEGIN_FMTS,
+        kind::END_FMTS,
+        kind::FMT,
+        &payload,
+    )?;
+    Ok(id)
+}
+
 pub(super) fn intern_shared_string_for_new_cell(
     package: &mut OpcPackage,
     value: &SharedString,
@@ -87,19 +353,8 @@ pub(super) fn transfer_style(
             ))
         };
     };
-    let Some(mut target_blob) = target
-        .get_part(&source_uri)
-        .ok()
-        .map(|part| part.blob().to_vec())
-    else {
-        return if source_index.get() == 0 {
-            StyleIndex::new(0)
-        } else {
-            Err(Error::UnsupportedFeature(
-                "target workbook omits styles.bin; nonzero style transfer is refused".to_string(),
-            ))
-        };
-    };
+    ensure_styles_part(target)?;
+    let mut target_blob = target.get_part(&source_uri)?.blob().to_vec();
     let source_cell_xfs = collection(
         &source_blob,
         kind::BEGIN_CELL_XFS,

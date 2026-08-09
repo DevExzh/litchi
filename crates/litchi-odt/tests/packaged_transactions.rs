@@ -4,13 +4,18 @@ use litchi_odt::{
     core::{PackageWriter, Profile},
     elements::field::DynamicTextField,
     mutable::MutableDocument,
+    note::{Note, NoteClass},
+    odc::{ChartClass, Definition},
     package::{
         embedded::{EmbeddedResource, EmbeddedResourceKind, EmbeddedResourceSource},
         forms::{AuthoredForm, AuthoredFormControl},
     },
     protection::Policy,
     rdf::{Object, Subject, Triple},
-    ruby_family::{Alignment, Properties as RubyProperties, Style as RubyStyle},
+    ruby_family::{
+        Alignment, Annotation as RubyAnnotation, Base as RubyBase, Properties as RubyProperties,
+        Style as RubyStyle,
+    },
     transaction::{
         EnvelopeKind, HistoryLimits, MergeChoice, MergePlan, OperationResult, ParagraphSelector,
         Position, SubEditJoinFailure, TransferDependencyKind,
@@ -441,6 +446,127 @@ fn semantic_durable_patch_covers_styles_fields_revisions_rdf_protection_and_scri
 }
 
 #[test]
+fn rich_note_and_ruby_edits_use_typed_durable_fragments() {
+    let snapshot = source().snapshot().unwrap();
+    let note = Note::new(NoteClass::Footnote, "1", "Durable footnote").unwrap();
+    let ruby = RubyAnnotation::new(None, RubyBase::from_text("漢").unwrap(), "kan", None).unwrap();
+    let mut edit = snapshot.edit();
+    edit.insert_note(Position::new(0), &note)
+        .unwrap()
+        .insert_ruby_annotation(Position::new(0), &ruby)
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    assert!(wire_text.contains("note.insert"));
+    assert!(wire_text.contains("ruby.annotation.insert"));
+    assert!(!wire_text.contains("document.replace"));
+
+    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let inserted = decoded.apply(&snapshot).unwrap();
+    assert_eq!(inserted.as_bytes(), committed.snapshot().as_bytes());
+    let reopened = inserted.document().unwrap();
+    assert_eq!(reopened.notes().unwrap(), vec![note]);
+    assert_eq!(reopened.ruby_annotations().unwrap().annotations, vec![ruby]);
+
+    let replacement_note = Note::new(NoteClass::Endnote, "A", "Replacement").unwrap();
+    let replacement_ruby =
+        RubyAnnotation::new(None, RubyBase::from_text("字").unwrap(), "ji", None).unwrap();
+    let mut replacement = inserted.edit();
+    replacement
+        .replace_note(Position::new(0), &replacement_note)
+        .unwrap()
+        .replace_ruby_annotation(Position::new(0), &replacement_ruby)
+        .unwrap();
+    let replacement = replacement.commit().unwrap();
+    let replayed = replacement
+        .patch()
+        .durable()
+        .unwrap()
+        .apply(&inserted)
+        .unwrap();
+    assert_eq!(replayed.as_bytes(), replacement.snapshot().as_bytes());
+
+    let mut removal = replayed.edit();
+    removal
+        .remove_note(Position::new(0))
+        .unwrap()
+        .remove_ruby_annotation(Position::new(0))
+        .unwrap();
+    let removal = removal.commit().unwrap();
+    let removed = removal
+        .patch()
+        .durable()
+        .unwrap()
+        .apply(&replayed)
+        .unwrap()
+        .document()
+        .unwrap();
+    assert!(removed.notes().unwrap().is_empty());
+    assert!(removed.ruby_annotations().unwrap().annotations.is_empty());
+}
+
+#[test]
+fn chart_and_resource_payloads_replay_and_transfer_with_explicit_dependencies() {
+    let snapshot = source().snapshot().unwrap();
+    let chart = Definition::new(ChartClass::line());
+    let resource = EmbeddedResource {
+        kind: EmbeddedResourceKind::Image,
+        source: EmbeddedResourceSource::InlineBinary {
+            bytes: b"durable-resource-payload".to_vec(),
+            media_type: Some("image/png".to_string()),
+        },
+        frame_name: Some("Durable Resource".to_string()),
+        xml_id: Some("durable-resource".to_string()),
+        class_id: None,
+    };
+    let mut edit = snapshot.edit();
+    edit.add_embedded_chart(&chart)
+        .unwrap()
+        .add_embedded_resource(&resource)
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    assert!(wire_text.contains("chart.add"));
+    assert!(wire_text.contains("resource.embedded.add"));
+    assert!(!wire_text.contains("durable-resource-payload"));
+
+    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let applied = decoded.apply(&snapshot).unwrap();
+    assert_eq!(applied.as_bytes(), committed.snapshot().as_bytes());
+    applied.document().unwrap().embedded_chart(0).unwrap();
+
+    let destination = source().snapshot().unwrap();
+    let transfer = committed.patch().plan_transfer(&destination).unwrap();
+    assert!(transfer.dependencies().iter().any(|dependency| {
+        dependency.kind() == TransferDependencyKind::ResourcePayload && dependency.is_satisfied()
+    }));
+    let transferred = transfer.commit().unwrap();
+    transferred
+        .snapshot()
+        .document()
+        .unwrap()
+        .embedded_chart(0)
+        .unwrap();
+
+    let mut styled = Definition::new(ChartClass::line());
+    styled.style_name = Some("MissingChartStyle".to_string());
+    let mut styled_edit = snapshot.edit();
+    styled_edit.add_embedded_chart(&styled).unwrap();
+    let styled_commit = styled_edit.commit().unwrap();
+    let styled_transfer = styled_commit.patch().plan_transfer(&destination).unwrap();
+    assert!(styled_transfer.dependencies().iter().any(|dependency| {
+        dependency.kind() == TransferDependencyKind::ChartStyle
+            && dependency.key() == "MissingChartStyle"
+            && !dependency.is_satisfied()
+    }));
+    assert!(styled_transfer.commit().is_err());
+}
+
+#[test]
 fn cross_document_transfer_is_dependency_checked_and_refuses_source_local_edits() {
     let source_snapshot = source().snapshot().unwrap();
     let mut portable = source_snapshot.edit();
@@ -514,10 +640,28 @@ fn genuine_libreoffice_package_survives_transaction_reopen_and_full_resave() {
             language: None,
         },
     };
+    let chart = Definition::new(ChartClass::line());
+    let resource = EmbeddedResource {
+        kind: EmbeddedResourceKind::Object,
+        source: EmbeddedResourceSource::Linked {
+            href: "https://example.invalid/writer-resource".to_string(),
+        },
+        frame_name: Some("Writer Resource".to_string()),
+        xml_id: Some("writer-resource".to_string()),
+        class_id: None,
+    };
     let mut edit = snapshot.edit();
     edit.add_rdf_graph(Some("metadata/litchi-reopen.rdf"), &[triple.clone()])
+        .unwrap()
+        .add_embedded_chart(&chart)
+        .unwrap()
+        .add_embedded_resource(&resource)
         .unwrap();
     let committed = edit.commit().unwrap();
+    let chart_index = match committed.results().get(1) {
+        Some(OperationResult::Index(index)) => *index,
+        other => panic!("unexpected embedded chart result: {other:?}"),
+    };
 
     let first_reopen = Document::from_bytes(committed.snapshot().as_bytes().to_vec()).unwrap();
     let resaved = first_reopen.to_bytes().unwrap();
@@ -530,6 +674,8 @@ fn genuine_libreoffice_package_survives_transaction_reopen_and_full_resave() {
         .unwrap();
     assert_eq!(graph.triples, vec![triple]);
     assert!(!second_reopen.forms().unwrap().groups.is_empty());
+    second_reopen.embedded_chart(chart_index).unwrap();
+    assert!(second_reopen.embedded_objects().unwrap().len() >= 2);
 }
 
 #[test]

@@ -1104,3 +1104,61 @@ fn showing_an_unknown_producer_state_repairs_it_explicitly() {
         source_bytes
     );
 }
+
+#[test]
+fn defined_name_catalog_write_is_compact_joinable_replayable_and_reversible() {
+    let source = two_sheet_workbook(WorksheetKind::Worksheet);
+    let source_bytes = source.to_bytes().expect("source bytes");
+    let names = vec![
+        raw::DefinedName {
+            name: "GlobalTotal".to_owned(),
+            reference: "SUM(Sheet1!$A$1:$A$9)".to_owned(),
+            comment: Some("owned & inert".to_owned()),
+            ..raw::DefinedName::default()
+        },
+        raw::DefinedName {
+            name: "LocalInput".to_owned(),
+            reference: "Sheet2!$B$2".to_owned(),
+            local_sheet_id: Some(1),
+            hidden: true,
+            ..raw::DefinedName::default()
+        },
+    ];
+
+    let mut names_edit = source.edit().expect("defined-name edit");
+    names_edit
+        .replace_defined_names(names.clone())
+        .expect("stage defined names");
+    let mut cell_edit = source.edit().expect("disjoint cell edit");
+    cell_edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("D4", 11_i32)
+        .expect("cell value");
+    names_edit.join(cell_edit).expect("join disjoint edit");
+    let committed = names_edit.commit().expect("commit defined names");
+
+    assert_eq!(committed.workbook().defined_names(), names);
+    assert!(part_text(committed.workbook(), "/xl/workbook.xml").contains(
+        r#"<definedNames><definedName name="GlobalTotal" comment="owned &amp; inert">SUM(Sheet1!$A$1:$A$9)</definedName><definedName name="LocalInput" localSheetId="1" hidden="1">Sheet2!$B$2</definedName></definedNames>"#
+    ));
+    assert!(committed.patch().package_changes().iter().any(|change| {
+        change
+            .defined_names()
+            .is_some_and(|(before, after)| before.is_empty() && after == names)
+    }));
+
+    let replayed = source
+        .apply(committed.patch())
+        .expect("replay defined names");
+    assert_eq!(replayed.workbook().defined_names(), names);
+    let restored = committed
+        .workbook()
+        .apply(&committed.patch().inverse())
+        .expect("inverse defined names");
+    assert_eq!(
+        restored.workbook().to_bytes().expect("restored bytes"),
+        source_bytes
+    );
+}

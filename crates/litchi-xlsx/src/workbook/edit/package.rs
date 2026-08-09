@@ -16,6 +16,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
     let Edit {
         base,
         panes: _,
+        defined_names: _,
         active: _,
         order: _,
         sheets: _,

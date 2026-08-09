@@ -1,16 +1,14 @@
-//! Dependency-free text transfer into immutable RTF transactions.
+//! Checked transfer of ordinary RTF owners and their bounded dependencies.
 
 use super::{Commit, Edit, Error, HeaderFooterParagraph, Snapshot};
-use crate::TableCellPath;
+use crate::{RtfWriter, TableCellPath};
+use std::borrow::Cow;
+use std::collections::BTreeSet;
 
 /// A checked, non-applying transfer into one immutable target snapshot.
-///
-/// Transfer deliberately copies only plain Unicode text. It never copies font,
-/// color, style, list, field, object, drawing, or external-resource handles, so
-/// the plan has no hidden resource dependencies. Publication still goes
-/// through the ordinary atomic transaction and full RTF readback.
 pub struct TransferPlan {
     edit: Edit,
+    dependency_count: usize,
 }
 
 impl TransferPlan {
@@ -41,7 +39,10 @@ impl TransferPlan {
         }
         let mut edit = target.edit();
         edit.insert_paragraph_after(insert_after, text)?;
-        Ok(Self { edit })
+        Ok(Self {
+            edit,
+            dependency_count: 0,
+        })
     }
 
     /// Plans copying plain text between checked table-cell destinations.
@@ -58,7 +59,10 @@ impl TransferPlan {
         let text = super::table_cell(source, source_path)?.text().to_string();
         let mut edit = target.edit();
         edit.set_table_cell_text(target_path, text)?;
-        Ok(Self { edit })
+        Ok(Self {
+            edit,
+            dependency_count: 0,
+        })
     }
 
     /// Plans copying one plain header/footer paragraph into another.
@@ -80,13 +84,270 @@ impl TransferPlan {
             .to_string();
         let mut edit = target.edit();
         edit.set_header_footer_text(target_destination, text)?;
-        Ok(Self { edit })
+        Ok(Self {
+            edit,
+            dependency_count: 0,
+        })
     }
 
-    /// This transfer class never imports format resource handles.
+    /// Plans transfer of one inert, plain-result body field at the target body end.
+    ///
+    /// Active/external field kinds and result stories with drawings or nested
+    /// fields are refused. Their dependencies cannot be made inert merely by
+    /// copying the field destination.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, active field, unresolved
+    /// result-story dependency, opaque syntax, or invalid candidate readback.
+    pub fn field(source: &Snapshot, source_index: usize, target: &Snapshot) -> Result<Self, Error> {
+        let source_field = source
+            .fields()
+            .get(source_index)
+            .ok_or(Error::DestinationOutOfRange("field"))?;
+        refuse_feature_opaque(source, crate::opaque::Context::Field, source_field.position)?;
+        if active_field(source_field.field_type) {
+            return Err(Error::UnsupportedSource(
+                "field transfer refuses active or external field instructions",
+            ));
+        }
+        if !source_field.shapes.is_empty()
+            || !source_field.shape_groups.is_empty()
+            || !source_field.result_events.is_empty()
+        {
+            return Err(Error::UnsupportedSource(
+                "field transfer requires a dependency-free plain result story",
+            ));
+        }
+        let mut field = owned_field(source_field);
+        field.owner = crate::FieldOwner::Body;
+        field.position = target.text().len();
+        field.range_end = field.position;
+        let after = canonical_candidate(target, |model| model.push_field(field))?;
+        root_plan(target, "field.transfer", "body:field:append", after, 0)
+    }
+
+    /// Plans copying one complete nested table tree into a target cell end.
+    ///
+    /// Nested table text, geometry, borders, and recursively nested tables are
+    /// retained. Global story handles, drawings, and incompatible table-style
+    /// dependencies are refused.
+    ///
+    /// # Errors
+    /// Returns an error for invalid paths, unresolved dependencies, opaque
+    /// syntax, or invalid candidate readback.
+    pub fn nested_table(
+        source: &Snapshot,
+        source_cell: &TableCellPath,
+        source_nested_index: usize,
+        target: &Snapshot,
+        target_cell: TableCellPath,
+    ) -> Result<Self, Error> {
+        let nested = super::table_cell(source, source_cell)?
+            .nested_tables()
+            .get(source_nested_index)
+            .ok_or(Error::DestinationOutOfRange("nested table"))?;
+        refuse_feature_opaque(source, crate::opaque::Context::Table, usize::MAX)?;
+        validate_table_transfer(&nested.table)?;
+        let styled_rows = count_styled_rows(&nested.table);
+        if styled_rows != 0 && source.styles() != target.styles() {
+            return Err(Error::UnsupportedSource(
+                "nested-table transfer requires identical table-style dependencies",
+            ));
+        }
+        let table = crate::document::owned_table(&nested.table)?;
+        let target_offset = super::table_cell(target, &target_cell)?.text().len();
+        let effect = format!(
+            "{}:nested-table:append",
+            super::table_cell_effect(&target_cell)
+        );
+        let after = canonical_candidate(target, move |model| {
+            model
+                .table_cell_mut(&target_cell)?
+                .add_nested_table(target_offset, table)
+        })?;
+        root_plan(target, "nested-table.transfer", &effect, after, styled_rows)
+    }
+
+    /// Plans copying one style and its based-on/next/linked style closure.
+    ///
+    /// Font and color tables must be identical so copied numeric references
+    /// retain their meaning. Existing equal definitions are reused; conflicting
+    /// typed IDs are refused.
+    ///
+    /// # Errors
+    /// Returns an error for missing or conflicting dependencies, opaque syntax,
+    /// or invalid candidate readback.
+    pub fn style(
+        source: &Snapshot,
+        kind: crate::style::Kind,
+        id: u16,
+        target: &Snapshot,
+    ) -> Result<Self, Error> {
+        refuse_feature_opaque(source, crate::opaque::Context::Metadata, usize::MAX)?;
+        require_equal_text_resources(source, target)?;
+        let styles = style_closure(source, kind, id)?;
+        let mut additions = Vec::new();
+        for style in styles {
+            match target
+                .model()
+                .stylesheet()
+                .get_typed(style.style_type, style.id)
+            {
+                Some(existing) if existing == style => {},
+                Some(_) => {
+                    return Err(Error::UnsupportedSource(
+                        "style transfer found a conflicting typed style ID",
+                    ));
+                },
+                None => additions.push(owned_style(style)),
+            }
+        }
+        let dependency_count = additions.len().saturating_sub(1);
+        let effect = format!("stylesheet:{kind:?}:{id}");
+        let after = canonical_candidate(target, |model| {
+            for style in additions {
+                model.stylesheet_mut().add(style);
+            }
+            Ok(())
+        })?;
+        root_plan(target, "style.transfer", &effect, after, dependency_count)
+    }
+
+    /// Plans copying one list definition and all overrides that reference it.
+    ///
+    /// List fonts must resolve identically in both documents. Picture-bullet
+    /// lists are refused because their rendering dependency is not optional.
+    /// Existing equal definitions are reused; ID/index collisions are refused.
+    ///
+    /// # Errors
+    /// Returns an error for missing or conflicting dependencies, opaque syntax,
+    /// or invalid candidate readback.
+    pub fn list(source: &Snapshot, id: i32, target: &Snapshot) -> Result<Self, Error> {
+        refuse_feature_opaque(source, crate::opaque::Context::Metadata, usize::MAX)?;
+        require_equal_text_resources(source, target)?;
+        let list = source
+            .model()
+            .list_table()
+            .get(id)
+            .ok_or(Error::DestinationOutOfRange("list definition"))?;
+        if list
+            .levels
+            .iter()
+            .any(|level| level.picture_index.is_some())
+        {
+            return Err(Error::UnsupportedSource(
+                "list transfer refuses unresolved picture-bullet dependencies",
+            ));
+        }
+        let add_list = match target.model().list_table().get(id) {
+            Some(existing) if existing == list => false,
+            Some(_) => {
+                return Err(Error::UnsupportedSource(
+                    "list transfer found a conflicting list ID",
+                ));
+            },
+            None => true,
+        };
+        let mut overrides = Vec::new();
+        for entry in source
+            .model()
+            .list_override_table()
+            .overrides()
+            .iter()
+            .filter(|entry| entry.list_id == id)
+        {
+            match target.model().list_override_table().get(entry.index) {
+                Some(existing) if existing == entry => {},
+                Some(_) => {
+                    return Err(Error::UnsupportedSource(
+                        "list transfer found a conflicting override index",
+                    ));
+                },
+                None => overrides.push(entry.clone()),
+            }
+        }
+        let dependency_count = overrides.len();
+        let owned_list = owned_list(list);
+        let effect = format!("list-table:list:{id}");
+        let after = canonical_candidate(target, |model| {
+            if add_list {
+                model.list_table_mut().add(owned_list);
+            }
+            for entry in overrides {
+                model.list_override_table_mut().add(entry);
+            }
+            Ok(())
+        })?;
+        root_plan(target, "list.transfer", &effect, after, dependency_count)
+    }
+
+    /// Plans transfer of one inert embedded object and its result pictures.
+    ///
+    /// External and automatically updated links are refused. Referenced result
+    /// pictures are copied and their indices remapped into the target store.
+    ///
+    /// # Errors
+    /// Returns an error for invalid selectors, active/external dependencies,
+    /// opaque syntax, or invalid candidate readback.
+    pub fn object(
+        source: &Snapshot,
+        source_index: usize,
+        target: &Snapshot,
+    ) -> Result<Self, Error> {
+        let object = source
+            .model()
+            .objects()
+            .get(source_index)
+            .ok_or(Error::DestinationOutOfRange("embedded object"))?;
+        refuse_feature_opaque(source, crate::opaque::Context::Drawing, object.position)?;
+        if matches!(
+            object.kind,
+            crate::ObjectKind::Link
+                | crate::ObjectKind::AutoLink
+                | crate::ObjectKind::Subscriber
+                | crate::ObjectKind::Publisher
+        ) || object.update_requested
+        {
+            return Err(Error::UnsupportedSource(
+                "object transfer refuses external or automatically updated dependencies",
+            ));
+        }
+        let mut pictures = Vec::new();
+        for index in &object.result_picture_indices {
+            let picture = source
+                .pictures()
+                .get(*index)
+                .ok_or(Error::UnsupportedSource(
+                    "object result references a missing picture",
+                ))?;
+            pictures.push(picture.clone().into_owned());
+        }
+        let dependency_count = pictures.len();
+        let mut transferred_object = owned_object(object);
+        transferred_object.position = target.text().len();
+        transferred_object.result_picture_indices.clear();
+        let effect = format!("body:object:append:{source_index}");
+        let after = canonical_candidate(target, |model| {
+            for picture in pictures {
+                transferred_object
+                    .result_picture_indices
+                    .push(model.push_picture(picture));
+            }
+            model.push_object(transferred_object)
+        })?;
+        root_plan(target, "object.transfer", &effect, after, dependency_count)
+    }
+
+    /// Number of resource or owner dependencies carried by this plan.
+    #[must_use]
+    pub const fn dependency_count(&self) -> usize {
+        self.dependency_count
+    }
+
+    /// Whether this plan imports no format resource handles.
     #[must_use]
     pub const fn is_dependency_free(&self) -> bool {
-        true
+        self.dependency_count == 0
     }
 
     /// Returns the still-uncommitted target edit.
@@ -101,5 +362,308 @@ impl TransferPlan {
     /// Returns the ordinary transaction refusal without mutating either input.
     pub fn commit(self) -> Result<Commit, Error> {
         self.edit.commit()
+    }
+}
+
+fn root_plan(
+    target: &Snapshot,
+    vocabulary: &'static str,
+    effect: &str,
+    after: Vec<u8>,
+    dependency_count: usize,
+) -> Result<TransferPlan, Error> {
+    let mut edit = target.edit();
+    edit.stage_root_transfer(vocabulary, effect.to_string(), after)?;
+    Ok(TransferPlan {
+        edit,
+        dependency_count,
+    })
+}
+
+fn canonical_candidate(
+    target: &Snapshot,
+    mutation: impl FnOnce(&mut crate::document::RtfDocument<'static>) -> crate::RtfResult<()>,
+) -> Result<Vec<u8>, Error> {
+    if !target.opaque().is_empty() {
+        return Err(Error::UnsupportedSource(
+            "ordinary-root transfer refuses unknown target destinations",
+        ));
+    }
+    let bytes = target
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    if crate::compressed::is_compressed_rtf(bytes) {
+        return Err(Error::UnsupportedSource(
+            "compressed RTF needs a transport-aware rewrite",
+        ));
+    }
+    let mut model = crate::document::RtfDocument::parse_bytes_with_limits(bytes, target.limits())?;
+    mutation(&mut model)?;
+    let mut output = Vec::new();
+    RtfWriter::new(&mut output)
+        .write_document(&model)
+        .map_err(|error| Error::Write(error.to_string()))?;
+    let limit = target.limits().max_source_bytes();
+    if output.len() > limit {
+        return Err(Error::InputTooLarge {
+            observed: output.len(),
+            limit,
+        });
+    }
+    let reopened = Snapshot::from_bytes_with_limits(&output, target.limits())?;
+    if !reopened.opaque().is_empty() {
+        return Err(Error::UnsupportedSource(
+            "ordinary-root transfer produced unknown destinations",
+        ));
+    }
+    Ok(output)
+}
+
+fn refuse_feature_opaque(
+    source: &Snapshot,
+    context: crate::opaque::Context,
+    body_position: usize,
+) -> Result<(), Error> {
+    if source.opaque().iter().any(|node| match node.anchor() {
+        crate::opaque::Anchor::Body(position) => position == body_position,
+        crate::opaque::Anchor::Structural { context: owner, .. } => owner == context,
+    }) {
+        return Err(Error::UnsupportedSource(
+            "selected feature owns an unknown destination",
+        ));
+    }
+    Ok(())
+}
+
+fn require_equal_text_resources(source: &Snapshot, target: &Snapshot) -> Result<(), Error> {
+    if source.model().font_table() != target.model().font_table()
+        || !equal_color_tables(source.model().color_table(), target.model().color_table())
+    {
+        return Err(Error::UnsupportedSource(
+            "transfer requires identical font and color dependencies",
+        ));
+    }
+    Ok(())
+}
+
+fn equal_color_tables(left: &crate::ColorTable, right: &crate::ColorTable) -> bool {
+    left.colors() == right.colors()
+        && (0..left.colors().len()).all(|index| {
+            let reference = u16::try_from(index).unwrap_or(u16::MAX);
+            left.is_automatic(reference) == right.is_automatic(reference)
+        })
+}
+
+fn active_field(kind: crate::FieldType) -> bool {
+    matches!(
+        kind,
+        crate::FieldType::MacroButton
+            | crate::FieldType::GoToButton
+            | crate::FieldType::Print
+            | crate::FieldType::Embed
+            | crate::FieldType::AddIn
+            | crate::FieldType::Control
+            | crate::FieldType::HtmlControl
+            | crate::FieldType::Dde
+            | crate::FieldType::DdeAuto
+            | crate::FieldType::Link
+            | crate::FieldType::Include
+            | crate::FieldType::Import
+            | crate::FieldType::IncludeText
+            | crate::FieldType::IncludePicture
+            | crate::FieldType::Database
+            | crate::FieldType::Ask
+            | crate::FieldType::FillIn
+    )
+}
+
+fn owned_field(field: &crate::Field<'_>) -> crate::Field<'static> {
+    crate::Field {
+        field_type: field.field_type,
+        instruction: Cow::Owned(field.instruction.to_string()),
+        result: Cow::Owned(field.result.to_string()),
+        status: field.status,
+        shapes: Vec::new(),
+        shape_groups: Vec::new(),
+        drawing_order: Vec::new(),
+        result_events: Vec::new(),
+        owner: field.owner,
+        position: field.position,
+        range_end: field.range_end,
+    }
+}
+
+fn validate_table_transfer(table: &crate::Table<'_>) -> Result<(), Error> {
+    for row in table.rows() {
+        for cell in row.cells() {
+            if !cell.shapes().is_empty()
+                || !cell.shape_groups().is_empty()
+                || cell
+                    .story_events()
+                    .iter()
+                    .any(|event| !matches!(event, crate::CellStoryEvent::NestedTable(_)))
+            {
+                return Err(Error::UnsupportedSource(
+                    "nested-table transfer refuses unresolved cell-story dependencies",
+                ));
+            }
+            for nested in cell.nested_tables() {
+                validate_table_transfer(&nested.table)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn count_styled_rows(table: &crate::Table<'_>) -> usize {
+    table
+        .rows()
+        .iter()
+        .map(|row| usize::from(row.table_style().is_some()))
+        .sum()
+}
+
+fn style_closure(
+    source: &Snapshot,
+    kind: crate::style::Kind,
+    id: u16,
+) -> Result<Vec<&crate::style::Style<'_>>, Error> {
+    let stylesheet = source.model().stylesheet();
+    if stylesheet.get_typed(kind, id).is_none() {
+        return Err(Error::DestinationOutOfRange("style definition"));
+    }
+    let mut pending = vec![(kind, id)];
+    let mut seen = BTreeSet::new();
+    let mut output = Vec::new();
+    while let Some((style_kind, style_id)) = pending.pop() {
+        if !seen.insert((style_kind as u8, style_id)) {
+            continue;
+        }
+        let style = stylesheet
+            .get_typed(style_kind, style_id)
+            .ok_or(Error::UnsupportedSource("style dependency is missing"))?;
+        if let Some(parent) = style.based_on {
+            pending.push((style_kind, parent));
+        }
+        if let Some(next) = style.next_style {
+            pending.push((style_kind, next));
+        }
+        if let Some(linked) = style.linked_style {
+            let linked_kind = match style_kind {
+                crate::style::Kind::Paragraph => crate::style::Kind::Character,
+                crate::style::Kind::Character => crate::style::Kind::Paragraph,
+                crate::style::Kind::Section => crate::style::Kind::Section,
+                crate::style::Kind::Table => crate::style::Kind::Table,
+            };
+            pending.push((linked_kind, linked));
+        }
+        output.push(style);
+    }
+    output.reverse();
+    Ok(output)
+}
+
+fn owned_style(style: &crate::style::Style<'_>) -> crate::style::Style<'static> {
+    crate::style::Style {
+        id: style.id,
+        name: Cow::Owned(style.name.to_string()),
+        style_type: style.style_type,
+        based_on: style.based_on,
+        next_style: style.next_style,
+        linked_style: style.linked_style,
+        formatting: style.formatting,
+        paragraph: style.paragraph,
+        table_conditional: style.table_conditional,
+        builtin: style.builtin,
+        hidden: style.hidden,
+        additive: style.additive,
+        auto_update: style.auto_update,
+        locked: style.locked,
+        semi_hidden: style.semi_hidden,
+        unhide_when_used: style.unhide_when_used,
+        quick_format: style.quick_format,
+        priority: style.priority,
+        revision_id: style.revision_id,
+        personal: style.personal,
+        compose: style.compose,
+        reply: style.reply,
+    }
+}
+
+fn owned_list(list: &crate::list::List<'_>) -> crate::list::List<'static> {
+    crate::list::List {
+        id: list.id,
+        template_id: list.template_id,
+        simple: list.simple,
+        hybrid: list.hybrid,
+        name: Cow::Owned(list.name.to_string()),
+        style_name: Cow::Owned(list.style_name.to_string()),
+        style_priority: list.style_priority,
+        levels: list
+            .levels
+            .iter()
+            .map(|level| crate::ListLevel {
+                level: level.level,
+                level_type: level.level_type,
+                number_text: Cow::Owned(level.number_text.to_string()),
+                number_positions: Cow::Owned(level.number_positions.to_string()),
+                start_at: level.start_at,
+                justification: level.justification,
+                follow_previous: level.follow_previous,
+                follow: level.follow,
+                font_ref: level.font_ref,
+                indent: level.indent,
+                space: level.space,
+                left_indent: level.left_indent,
+                first_line_indent: level.first_line_indent,
+                tabs: level.tabs.clone(),
+                picture_index: level.picture_index,
+                tentative: level.tentative,
+                legal_format: level.legal_format,
+                no_restart: level.no_restart,
+                legacy: level.legacy,
+                include_previous: level.include_previous,
+                include_previous_space: level.include_previous_space,
+                template_id: level.template_id,
+            })
+            .collect(),
+    }
+}
+
+fn owned_object(object: &crate::EmbeddedObject<'_>) -> crate::EmbeddedObject<'static> {
+    crate::EmbeddedObject {
+        position: object.position,
+        kind: object.kind,
+        link_self: object.link_self,
+        class_name: Cow::Owned(object.class_name.to_string()),
+        name: Cow::Owned(object.name.to_string()),
+        alias: object
+            .alias
+            .as_ref()
+            .map(|value| Cow::Owned(value.to_string())),
+        section: object
+            .section
+            .as_ref()
+            .map(|value| Cow::Owned(value.to_string())),
+        time: object.time,
+        class_id: Cow::Owned(object.class_id.to_string()),
+        width: object.width,
+        height: object.height,
+        alignment: object.alignment,
+        translation_y: object.translation_y,
+        crop_top: object.crop_top,
+        crop_bottom: object.crop_bottom,
+        crop_left: object.crop_left,
+        crop_right: object.crop_right,
+        scale_x: object.scale_x,
+        scale_y: object.scale_y,
+        locked: object.locked,
+        update_requested: object.update_requested,
+        set_size: object.set_size,
+        merge_result: object.merge_result,
+        result_kind: object.result_kind,
+        result_text: Cow::Owned(object.result_text.to_string()),
+        result_picture_indices: object.result_picture_indices.clone(),
+        data: object.data.clone(),
     }
 }

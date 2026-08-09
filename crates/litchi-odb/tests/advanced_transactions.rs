@@ -1,8 +1,8 @@
 use litchi_odb::{
-    Builder, ChangeKind, Column, Component, ComponentKind, CompositionLimits, Connection, Database,
-    DependencyDisposition, EditPolicy, History, HistoryLimits, Index, IndexColumn, JoinedEdits,
-    Key, KeyColumn, KeyKind, MergeChoice, MergePlan, Patch, Query, SealedPatch, SignaturePolicy,
-    Table, TableKind,
+    ActiveContentKind, Builder, ChangeKind, Column, Component, ComponentKind, CompositionLimits,
+    Connection, Database, DependencyDisposition, EditPolicy, History, HistoryLimits, Index,
+    IndexColumn, JoinedEdits, Key, KeyColumn, KeyKind, MergeChoice, MergePlan, Patch, Query,
+    SealedPatch, SignaturePolicy, Table, TableKind,
 };
 
 const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:database><d:data-source/><d:queries/></o:database></o:body></o:document-content>"#;
@@ -487,6 +487,145 @@ fn bounded_transfer_copies_only_inert_semantic_declarations() {
     assert!(catalog.components().iter().any(|component| {
         component.kind() == ComponentKind::Report && component.name() == Some("transferred-report")
     }));
+}
+
+#[test]
+#[expect(
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "unexpected fixture failure"
+)]
+fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
+    use litchi_odf_common::{
+        core::OwnedPackage,
+        package::edit::{Addition, rebuild_package},
+    };
+
+    let donor = source();
+    let mut author = donor.edit();
+    author
+        .add_component(
+            Component::new(ComponentKind::Report, "payload-report").with_href("reports/source"),
+        )
+        .unwrap();
+    let donor = author.commit().unwrap().into_database();
+    let owned = OwnedPackage::from_bytes(donor.as_bytes().to_vec()).unwrap();
+    let payload = b"<?xml version=\"1.0\"?><report:document xmlns:report=\"urn:example:report\"/>";
+    let donor = Database::from_bytes(
+        rebuild_package(
+            &owned,
+            donor.content_xml(),
+            vec![Addition {
+                path: "reports/source/content.xml".to_string(),
+                bytes: payload.to_vec(),
+                media_type: "text/xml".to_string(),
+            }],
+            vec![(
+                "reports/source/".to_string(),
+                "application/vnd.sun.xml.report".to_string(),
+            )],
+            Vec::<String>::new(),
+            Vec::<String>::new(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let destination = source();
+    let mut transfer = destination.edit();
+    transfer
+        .transfer_component_from_to(
+            &donor,
+            ComponentKind::Report,
+            "payload-report",
+            "reports/imported",
+        )
+        .unwrap();
+    let commit = transfer.commit().unwrap();
+    let received = commit.database();
+    let catalog = received.catalog().unwrap();
+    let component = catalog
+        .components()
+        .iter()
+        .find(|component| component.name() == Some("payload-report"))
+        .unwrap();
+    assert_eq!(component.href(), Some("reports/imported"));
+    let package = OwnedPackage::from_bytes(received.as_bytes().to_vec()).unwrap();
+    assert_eq!(
+        package.get_file("reports/imported/content.xml").unwrap(),
+        payload
+    );
+    assert!(!package.has_file("reports/source/content.xml").unwrap());
+    assert_eq!(
+        commit.patch().inverse().apply(received).unwrap().as_bytes(),
+        destination.as_bytes()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .apply(&destination)
+            .unwrap()
+            .as_bytes(),
+        received.as_bytes()
+    );
+
+    let prepared = commit.patch().prepare("payload", limits()).unwrap();
+    let mut joined = JoinedEdits::new(prepared.lineage().clone(), limits());
+    joined.join(prepared).unwrap();
+    assert!(matches!(
+        Patch::compose(joined),
+        Err(litchi_core::Error::Unsupported(_))
+    ));
+}
+
+#[test]
+#[expect(clippy::unwrap_used, reason = "unexpected fixture failure")]
+fn active_content_inventory_is_inert_bounded_and_source_located() {
+    const ACTIVE_SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:script:1.0"><o:body><o:database><d:data-source/><o:scripts><s:script/><s:event-listener/></o:scripts></o:database></o:body></o:document-content>"#;
+    use litchi_odf_common::{
+        core::OwnedPackage,
+        package::edit::{Addition, rebuild_package},
+    };
+
+    let database =
+        Database::from_bytes(Builder::new().content_xml(ACTIVE_SOURCE).build().unwrap()).unwrap();
+    let owned = OwnedPackage::from_bytes(database.as_bytes().to_vec()).unwrap();
+    let database = Database::from_bytes(
+        rebuild_package(
+            &owned,
+            database.content_xml(),
+            vec![Addition {
+                path: "Basic/Standard/Module1.xml".to_string(),
+                bytes: b"<module/>".to_vec(),
+                media_type: "text/xml".to_string(),
+            }],
+            vec![("Basic/".to_string(), String::new())],
+            Vec::<String>::new(),
+            Vec::<String>::new(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let inventory = database.active_content().unwrap();
+    assert!(inventory.entries().iter().any(|entry| {
+        entry.kind() == ActiveContentKind::BasicMacro
+            && entry.package_path() == "Basic/Standard/Module1.xml"
+    }));
+    assert!(inventory.entries().iter().any(|entry| {
+        entry.kind() == ActiveContentKind::Script && entry.declaration_name() == Some("script")
+    }));
+    assert!(inventory.entries().iter().any(|entry| {
+        entry.kind() == ActiveContentKind::EventListener
+            && entry.declaration_name() == Some("event-listener")
+    }));
+
+    let capabilities = database.protection_capabilities();
+    assert!(capabilities.can_verify_signatures());
+    assert!(capabilities.can_remove_invalidated_signatures());
+    assert!(!capabilities.can_re_sign());
+    assert!(!capabilities.can_re_encrypt());
 }
 
 #[test]

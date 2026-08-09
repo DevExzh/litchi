@@ -1,7 +1,112 @@
 //! Inert, namespace-aware `MathML` data model.
 
+macro_rules! content_symbols {
+    ($( $constant:ident => $name:literal ),+ $(,)?) => {
+        impl ContentSymbol {
+            $(pub const $constant: Self = Self($name);)+
+
+            /// Every accepted named Content `MathML` symbol.
+            pub const ALL: &'static [Self] = &[$(Self::$constant),+];
+
+            /// Parse an exact `MathML` local name.
+            #[must_use]
+            pub fn from_local_name(name: &str) -> Option<Self> {
+                match name {
+                    $($name => Some(Self::$constant),)+
+                    _ => None,
+                }
+            }
+        }
+    };
+}
+
 /// The `MathML` namespace used by Formula documents.
 pub(crate) const MATHML_NAMESPACE: &str = "http://www.w3.org/1998/Math/MathML";
+
+/// A checked Content `MathML` structural kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ContentKind {
+    Application,
+    BoundVariable,
+    Condition,
+    Declaration,
+    Degree,
+    DomainOfApplication,
+    Function,
+    Identifier,
+    Interval,
+    Lambda,
+    List,
+    LogBase,
+    LowLimit,
+    Matrix,
+    MatrixRow,
+    MomentAbout,
+    Number,
+    Otherwise,
+    Piece,
+    Piecewise,
+    Relation,
+    Separator,
+    Set,
+    Symbol,
+    SymbolToken,
+    UpLimit,
+    Vector,
+}
+
+/// A named empty Content `MathML` symbol.
+///
+/// The constants cover the complete named-symbol corpus accepted by the
+/// crate's `MathML` 2 validator. The private representation prevents callers
+/// from constructing an unknown symbol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ContentSymbol(&'static str);
+
+content_symbols! {
+    ABS => "abs", AND => "and", APPROX => "approx", ARCCOS => "arccos",
+    ARCCOSH => "arccosh", ARCCOT => "arccot", ARCCOTH => "arccoth",
+    ARCCSC => "arccsc", ARCCSCH => "arccsch", ARCSEC => "arcsec",
+    ARCSECH => "arcsech", ARCSIN => "arcsin", ARCSINH => "arcsinh",
+    ARCTAN => "arctan", ARCTANH => "arctanh", ARG => "arg", CARD => "card",
+    CARTESIAN_PRODUCT => "cartesianproduct", CEILING => "ceiling",
+    COMPLEXES => "complexes", COMPOSE => "compose", CONJUGATE => "conjugate",
+    CODOMAIN => "codomain", COS => "cos", COSH => "cosh", COT => "cot",
+    COTH => "coth", CSC => "csc", CSCH => "csch", CURL => "curl",
+    DETERMINANT => "determinant", DIFF => "diff", DIVERGENCE => "divergence",
+    DIVIDE => "divide", DOMAIN => "domain", EMPTY_SET => "emptyset", EQ => "eq",
+    EQUIVALENT => "equivalent", EULER_GAMMA => "eulergamma", EXISTS => "exists",
+    EXP => "exp", EXPONENTIAL_E => "exponentiale", FACTORIAL => "factorial",
+    FACTOR_OF => "factorof", FALSE => "false", FLOOR => "floor", FORALL => "forall",
+    GCD => "gcd", GEQ => "geq", GRAD => "grad", GT => "gt", IDENT => "ident",
+    IMAGE => "image", IMAGINARY => "imaginary", IMAGINARY_I => "imaginaryi",
+    IMPLIES => "implies", IN => "in", INFINITY => "infinity", INTEGERS => "integers",
+    INTERSECT => "intersect", INT => "int", INVERSE => "inverse",
+    LAPLACIAN => "laplacian", LCM => "lcm", LEQ => "leq", LIMIT => "limit",
+    LN => "ln", LOG => "log", LT => "lt", MAX => "max", MEAN => "mean",
+    MEDIAN => "median", MIN => "min", MINUS => "minus", MODE => "mode",
+    MOMENT => "moment", NATURAL_NUMBERS => "naturalnumbers", NEQ => "neq",
+    NOT => "not", NOT_A_NUMBER => "notanumber", NOT_IN => "notin",
+    NOT_PR_SUBSET => "notprsubset", NOT_SUBSET => "notsubset", OR => "or",
+    OUTER_PRODUCT => "outerproduct", PARTIAL_DIFF => "partialdiff", PI => "pi",
+    PLUS => "plus", POWER => "power", PRIMES => "primes", PRODUCT => "product",
+    PR_SUBSET => "prsubset", QUOTIENT => "quotient", RATIONALS => "rationals",
+    REAL => "real", REALS => "reals", REM => "rem", ROOT => "root",
+    SCALAR_PRODUCT => "scalarproduct", SDEV => "sdev", SEC => "sec", SECH => "sech",
+    SELECTOR => "selector", SET_DIFF => "setdiff", SIN => "sin", SINH => "sinh",
+    SUBSET => "subset", SUM => "sum", TAN => "tan", TANH => "tanh",
+    TENDS_TO => "tendsto", TIMES => "times", TRANSPOSE => "transpose", TRUE => "true",
+    UNION => "union", VARIANCE => "variance", VECTOR_PRODUCT => "vectorproduct", XOR => "xor",
+}
+
+impl ContentSymbol {
+    /// Exact `MathML` local name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
 
 /// A commonly used `MathML` element kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,6 +148,10 @@ pub enum Kind {
     Action,
     None,
     PreScripts,
+    /// A Content `MathML` structural element.
+    Content(ContentKind),
+    /// A named empty Content `MathML` symbol.
+    ContentSymbol(ContentSymbol),
     /// A future `MathML` element or a vendor element in another namespace.
     Other,
 }
@@ -210,7 +319,33 @@ impl Element {
             "maction" => Kind::Action,
             "none" => Kind::None,
             "mprescripts" => Kind::PreScripts,
-            _ => Kind::Other,
+            "apply" => Kind::Content(ContentKind::Application),
+            "bvar" => Kind::Content(ContentKind::BoundVariable),
+            "condition" => Kind::Content(ContentKind::Condition),
+            "declare" => Kind::Content(ContentKind::Declaration),
+            "degree" => Kind::Content(ContentKind::Degree),
+            "domainofapplication" => Kind::Content(ContentKind::DomainOfApplication),
+            "fn" => Kind::Content(ContentKind::Function),
+            "ci" => Kind::Content(ContentKind::Identifier),
+            "interval" => Kind::Content(ContentKind::Interval),
+            "lambda" => Kind::Content(ContentKind::Lambda),
+            "list" => Kind::Content(ContentKind::List),
+            "logbase" => Kind::Content(ContentKind::LogBase),
+            "lowlimit" => Kind::Content(ContentKind::LowLimit),
+            "matrix" => Kind::Content(ContentKind::Matrix),
+            "matrixrow" => Kind::Content(ContentKind::MatrixRow),
+            "momentabout" => Kind::Content(ContentKind::MomentAbout),
+            "cn" => Kind::Content(ContentKind::Number),
+            "otherwise" => Kind::Content(ContentKind::Otherwise),
+            "piece" => Kind::Content(ContentKind::Piece),
+            "piecewise" => Kind::Content(ContentKind::Piecewise),
+            "reln" => Kind::Content(ContentKind::Relation),
+            "sep" => Kind::Content(ContentKind::Separator),
+            "set" => Kind::Content(ContentKind::Set),
+            "csymbol" => Kind::Content(ContentKind::SymbolToken),
+            "uplimit" => Kind::Content(ContentKind::UpLimit),
+            "vector" => Kind::Content(ContentKind::Vector),
+            name => ContentSymbol::from_local_name(name).map_or(Kind::Other, Kind::ContentSymbol),
         }
     }
 

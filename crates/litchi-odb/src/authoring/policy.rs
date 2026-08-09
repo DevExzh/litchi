@@ -72,6 +72,69 @@ pub struct ProtectionStatus {
     encrypted: bool,
 }
 
+/// Stable root-level capability contract for protected ODB publication.
+///
+/// Re-signing and re-encryption are deliberately unsupported: callers can
+/// inspect this value before beginning an edit instead of discovering an
+/// implicit or producer-dependent downgrade during publication.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProtectionCapabilities {
+    signature: SignatureCapability,
+    encryption: EncryptionCapability,
+}
+
+/// Supported signature lifecycle for an ODB package.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SignatureCapability {
+    /// Verify signature math or remove invalidated signatures, but never sign.
+    VerificationAndInvalidationRemovalOnly,
+}
+
+/// Supported encryption lifecycle for an ODB package.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EncryptionCapability {
+    /// Preserve an encrypted package only when publication is byte-exact.
+    ExactPreservationOnly,
+}
+
+impl SignatureCapability {
+    /// Whether signature math can be verified without making a trust claim.
+    #[must_use]
+    pub const fn can_verify(self) -> bool {
+        match self {
+            Self::VerificationAndInvalidationRemovalOnly => true,
+        }
+    }
+
+    /// Whether invalidated signature members can be explicitly removed.
+    #[must_use]
+    pub const fn can_remove_invalidated(self) -> bool {
+        match self {
+            Self::VerificationAndInvalidationRemovalOnly => true,
+        }
+    }
+
+    /// Whether a new signature can be produced.
+    #[must_use]
+    pub const fn can_re_sign(self) -> bool {
+        match self {
+            Self::VerificationAndInvalidationRemovalOnly => false,
+        }
+    }
+}
+
+impl EncryptionCapability {
+    /// Whether a changed package can be newly encrypted.
+    #[must_use]
+    pub const fn can_re_encrypt(self) -> bool {
+        match self {
+            Self::ExactPreservationOnly => false,
+        }
+    }
+}
+
 /// Protection inventory before and after one committed publication.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProtectionTransition {
@@ -106,6 +169,51 @@ impl ProtectionStatus {
     #[must_use]
     pub const fn is_encrypted(self) -> bool {
         self.encrypted
+    }
+}
+
+impl ProtectionCapabilities {
+    pub(crate) const fn odb() -> Self {
+        Self {
+            signature: SignatureCapability::VerificationAndInvalidationRemovalOnly,
+            encryption: EncryptionCapability::ExactPreservationOnly,
+        }
+    }
+
+    /// Returns the typed signature lifecycle.
+    #[must_use]
+    pub const fn signature(self) -> SignatureCapability {
+        self.signature
+    }
+
+    /// Returns the typed encryption lifecycle.
+    #[must_use]
+    pub const fn encryption(self) -> EncryptionCapability {
+        self.encryption
+    }
+
+    /// Whether document-signature math can be verified without a trust claim.
+    #[must_use]
+    pub const fn can_verify_signatures(self) -> bool {
+        self.signature.can_verify()
+    }
+
+    /// Whether a changed publication may explicitly remove invalid signatures.
+    #[must_use]
+    pub const fn can_remove_invalidated_signatures(self) -> bool {
+        self.signature.can_remove_invalidated()
+    }
+
+    /// Whether this crate can produce a new database package signature.
+    #[must_use]
+    pub const fn can_re_sign(self) -> bool {
+        self.signature.can_re_sign()
+    }
+
+    /// Whether this crate can produce a newly encrypted database package.
+    #[must_use]
+    pub const fn can_re_encrypt(self) -> bool {
+        self.encryption.can_re_encrypt()
     }
 }
 

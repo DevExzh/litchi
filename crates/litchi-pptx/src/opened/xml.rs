@@ -487,6 +487,156 @@ pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+pub(crate) fn remap_shape_fragment(
+    source: &[u8],
+    shape_id: u32,
+    shape_name: &str,
+    relationships: &std::collections::HashMap<String, String>,
+) -> Result<Vec<u8>> {
+    let mut reader = Reader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let mut output = Vec::with_capacity(source.len());
+    let mut depth = 0usize;
+    let mut roots = 0usize;
+    let mut remap = ShapeRemap {
+        shape_id,
+        shape_name,
+        relationships,
+        identity_written: false,
+    };
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Start(element) => {
+                if depth == 0 {
+                    roots = roots.saturating_add(1);
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("opened-presentation shape depth overflow"))?;
+                write_remapped_shape_start(
+                    &mut output,
+                    &element,
+                    reader.decoder(),
+                    false,
+                    &mut remap,
+                )?;
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    roots = roots.saturating_add(1);
+                }
+                write_remapped_shape_start(
+                    &mut output,
+                    &element,
+                    reader.decoder(),
+                    true,
+                    &mut remap,
+                )?;
+            },
+            Event::End(element) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("opened-presentation shape depth underflow"))?;
+                output.extend_from_slice(b"</");
+                output.extend_from_slice(element.name().as_ref());
+                output.push(b'>');
+            },
+            Event::Text(text) => output.extend_from_slice(text.as_ref()),
+            Event::CData(data) => {
+                output.extend_from_slice(b"<![CDATA[");
+                output.extend_from_slice(data.as_ref());
+                output.extend_from_slice(b"]]");
+                output.push(b'>');
+            },
+            Event::GeneralRef(reference) => {
+                output.push(b'&');
+                output.extend_from_slice(reference.as_ref());
+                output.push(b';');
+            },
+            Event::Comment(comment) => {
+                output.extend_from_slice(b"<!--");
+                output.extend_from_slice(comment.as_ref());
+                output.extend_from_slice(b"-->");
+            },
+            Event::PI(instruction) => {
+                output.extend_from_slice(b"<?");
+                output.extend_from_slice(instruction.as_ref());
+                output.extend_from_slice(b"?>");
+            },
+            Event::Decl(_) | Event::DocType(_) => {
+                return Err(invalid(
+                    "opened-presentation shape fragment contains document-level markup",
+                ));
+            },
+            Event::Eof => break,
+        }
+    }
+    if depth != 0 || roots != 1 || !remap.identity_written {
+        return Err(invalid(
+            "opened-presentation transferred shape must have one root and identity",
+        ));
+    }
+    Ok(output)
+}
+
+struct ShapeRemap<'a> {
+    shape_id: u32,
+    shape_name: &'a str,
+    relationships: &'a std::collections::HashMap<String, String>,
+    identity_written: bool,
+}
+
+fn write_remapped_shape_start(
+    output: &mut Vec<u8>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    empty: bool,
+    remap: &mut ShapeRemap<'_>,
+) -> Result<()> {
+    let is_identity = !remap.identity_written && element.local_name().as_ref() == b"cNvPr";
+    output.push(b'<');
+    output.extend_from_slice(element.name().as_ref());
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        output.push(b' ');
+        output.extend_from_slice(attribute.key.as_ref());
+        output.extend_from_slice(b"=\"");
+        let decoded = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let value = if is_identity && attribute.key.as_ref() == b"id" {
+            remap.shape_id.to_string()
+        } else if is_identity && attribute.key.as_ref() == b"name" {
+            remap.shape_name.to_owned()
+        } else if attribute.key.as_ref().starts_with(b"r:")
+            && matches!(&attribute.key.as_ref()[2..], b"id" | b"embed" | b"link")
+        {
+            remap
+                .relationships
+                .get(decoded.as_ref())
+                .cloned()
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "opened-presentation transferred relationship {} was not remapped",
+                        decoded.as_ref()
+                    ))
+                })?
+        } else {
+            decoded.into_owned()
+        };
+        output.extend_from_slice(quick_xml::escape::escape(&value).as_bytes());
+        output.push(b'"');
+    }
+    if is_identity {
+        remap.identity_written = true;
+    }
+    output.extend_from_slice(if empty { b"/>" } else { b">" });
+    Ok(())
+}
+
 fn slide_id_elements(xml: &[u8]) -> Result<Vec<SlideIdElement>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);

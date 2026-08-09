@@ -246,6 +246,72 @@ impl Edit {
         self.push(Operation::AppendLineBreak { index })
     }
 
+    /// Stages a validated footnote or endnote at the end of one paragraph.
+    pub fn insert_note(
+        &mut self,
+        paragraph: Position,
+        note: &crate::note::Note,
+    ) -> Result<&mut Self> {
+        note.validate()?;
+        self.push(Operation::InsertNote {
+            paragraph: paragraph.get(),
+            note: note.clone(),
+            fragment: None,
+        })
+    }
+
+    /// Stages replacement of one note in semantic document order.
+    pub fn replace_note(
+        &mut self,
+        note: Position,
+        replacement: &crate::note::Note,
+    ) -> Result<&mut Self> {
+        replacement.validate()?;
+        self.push(Operation::ReplaceNote {
+            index: note.get(),
+            note: replacement.clone(),
+            fragment: None,
+        })
+    }
+
+    /// Stages removal of one note in semantic document order.
+    pub fn remove_note(&mut self, note: Position) -> Result<&mut Self> {
+        self.push(Operation::RemoveNote { index: note.get() })
+    }
+
+    /// Stages a validated ruby annotation at the end of one paragraph.
+    pub fn insert_ruby_annotation(
+        &mut self,
+        paragraph: Position,
+        annotation: &crate::ruby_family::Annotation,
+    ) -> Result<&mut Self> {
+        annotation.validate()?;
+        self.push(Operation::InsertRubyAnnotation {
+            paragraph: paragraph.get(),
+            annotation: annotation.clone(),
+        })
+    }
+
+    /// Stages replacement of one ruby annotation in document order.
+    pub fn replace_ruby_annotation(
+        &mut self,
+        annotation: Position,
+        replacement: &crate::ruby_family::Annotation,
+    ) -> Result<&mut Self> {
+        replacement.validate()?;
+        self.push(Operation::ReplaceRubyAnnotation {
+            index: annotation.get(),
+            annotation: replacement.clone(),
+        })
+    }
+
+    /// Stages removal of one ruby annotation in document order.
+    pub fn remove_ruby_annotation(&mut self, annotation: Position) -> Result<&mut Self> {
+        self.push(Operation::RemoveRubyAnnotation {
+            index: annotation.get(),
+        })
+    }
+
     /// Stages a typed dynamic field at the end of one paragraph.
     pub fn insert_dynamic_text_field(
         &mut self,
@@ -807,6 +873,7 @@ impl Edit {
                 source,
             })?;
         for operation in &self.operations {
+            let before_operation = copy_bytes(document.original_bytes())?;
             #[allow(
                 deprecated,
                 reason = "only this dispatch expression still reaches validated legacy codecs"
@@ -860,6 +927,61 @@ impl Edit {
                 Operation::AppendLineBreak { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_line_break_at(Position::new(*index))?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::InsertNote {
+                    paragraph,
+                    note,
+                    fragment,
+                } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    if let Some(fragment) = fragment {
+                        mutable.insert_note_fragment(*paragraph, fragment)?;
+                    } else {
+                        mutable.insert_note(*paragraph, note)?;
+                    }
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::ReplaceNote {
+                    index,
+                    note,
+                    fragment,
+                } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    if let Some(fragment) = fragment {
+                        mutable.replace_note_fragment(*index, fragment)?;
+                    } else {
+                        mutable.replace_note(*index, note)?;
+                    }
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::RemoveNote { index } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.remove_note(*index)?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::InsertRubyAnnotation {
+                    paragraph,
+                    annotation,
+                } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.insert_ruby_annotation(*paragraph, annotation)?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::ReplaceRubyAnnotation { index, annotation } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.replace_ruby_annotation(*index, annotation)?;
+                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    OperationResult::Unit
+                },
+                Operation::RemoveRubyAnnotation { index } => {
+                    let mut mutable = MutableDocument::from_document(document)?;
+                    mutable.remove_ruby_annotation(*index)?;
                     document = Document::from_bytes(mutable.to_bytes()?)?;
                     OperationResult::Unit
                 },
@@ -1073,8 +1195,31 @@ impl Edit {
                     document.replace_transaction_bytes(bytes)?;
                     OperationResult::Index(index)
                 },
+                Operation::AddEmbeddedChartContent { content, storage } => {
+                    let (bytes, index) = crate::package::charts::add_embedded_chart_content(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        crate::package::charts::EmbeddedChartHost::Text,
+                        *storage,
+                        content,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Index(index)
+                },
                 Operation::ReplaceEmbeddedChart { index, definition } => {
                     document.replace_embedded_chart(*index, definition)?;
+                    OperationResult::Unit
+                },
+                Operation::ReplaceEmbeddedChartContent { index, content } => {
+                    let bytes = crate::package::charts::replace_embedded_chart_content(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                        content,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveEmbeddedChart { index } => {
@@ -1137,11 +1282,11 @@ impl Edit {
                     OperationResult::Unit
                 },
             };
+            audit_changed_xml_is_compact(&before_operation, document.original_bytes())?;
             results.push(result);
         }
         let bytes = copy_bytes(document.original_bytes())?;
         ensure_package_size(bytes.len(), "ODT transaction output")?;
-        audit_changed_xml_is_compact(self.source.as_bytes(), &bytes)?;
         let after = if bytes == self.source.as_bytes() {
             self.source.clone()
         } else {
@@ -1423,6 +1568,30 @@ enum Operation {
     AppendLineBreak {
         index: usize,
     },
+    InsertNote {
+        paragraph: usize,
+        note: crate::note::Note,
+        fragment: Option<String>,
+    },
+    ReplaceNote {
+        index: usize,
+        note: crate::note::Note,
+        fragment: Option<String>,
+    },
+    RemoveNote {
+        index: usize,
+    },
+    InsertRubyAnnotation {
+        paragraph: usize,
+        annotation: crate::ruby_family::Annotation,
+    },
+    ReplaceRubyAnnotation {
+        index: usize,
+        annotation: crate::ruby_family::Annotation,
+    },
+    RemoveRubyAnnotation {
+        index: usize,
+    },
     InsertDynamicTextField {
         paragraph: usize,
         field: DynamicTextField,
@@ -1521,9 +1690,17 @@ enum Operation {
         definition: crate::odc::Definition,
         storage: crate::package::charts::EmbeddedChartStorage,
     },
+    AddEmbeddedChartContent {
+        content: String,
+        storage: crate::package::charts::EmbeddedChartStorage,
+    },
     ReplaceEmbeddedChart {
         index: usize,
         definition: crate::odc::Definition,
+    },
+    ReplaceEmbeddedChartContent {
+        index: usize,
+        content: String,
     },
     RemoveEmbeddedChart {
         index: usize,
@@ -1688,6 +1865,12 @@ pub enum TransferDependencyKind {
     Paragraph,
     /// A named ruby parent style must exist or be transferred in the same plan.
     RubyStyle,
+    /// A named text style referenced by rich inline content.
+    TextStyle,
+    /// A chart-local style definition is not present in the authored payload.
+    ChartStyle,
+    /// A content-addressed embedded payload travels with the operation.
+    ResourcePayload,
 }
 
 /// One deterministic prerequisite reported by a transfer plan.
@@ -1752,6 +1935,25 @@ impl TransferPlan {
                 | Operation::SetProtection { .. }
                 | Operation::SetTrackedChangePolicy { .. }
                 | Operation::AddScriptResource { .. } => {},
+                Operation::AddEmbeddedResource { resource } => {
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::ResourcePayload,
+                        embedded_resource_dependency_key(resource),
+                        true,
+                    );
+                },
+                Operation::AddEmbeddedChart { definition }
+                | Operation::AddEmbeddedChartWithStorage { definition, .. } => {
+                    for name in chart_style_names(definition) {
+                        merge_transfer_dependency(
+                            &mut dependencies,
+                            TransferDependencyKind::ChartStyle,
+                            name,
+                            false,
+                        );
+                    }
+                },
                 Operation::InsertParagraph { index, .. } => {
                     let satisfied = *index <= paragraph_count;
                     merge_transfer_dependency(
@@ -1771,13 +1973,41 @@ impl TransferPlan {
                 }
                 | Operation::AppendHyperlink { paragraph, .. }
                 | Operation::AppendLineBreak { index: paragraph }
-                | Operation::InsertDynamicTextField { paragraph, .. } => {
+                | Operation::InsertDynamicTextField { paragraph, .. }
+                | Operation::InsertNote { paragraph, .. } => {
                     merge_transfer_dependency(
                         &mut dependencies,
                         TransferDependencyKind::Paragraph,
                         paragraph.to_string(),
                         *paragraph < paragraph_count,
                     );
+                },
+                Operation::InsertRubyAnnotation {
+                    paragraph,
+                    annotation,
+                } => {
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::Paragraph,
+                        paragraph.to_string(),
+                        *paragraph < paragraph_count,
+                    );
+                    if let Some(style_name) = &annotation.style_name {
+                        merge_transfer_dependency(
+                            &mut dependencies,
+                            TransferDependencyKind::RubyStyle,
+                            style_name.clone(),
+                            ruby_styles.contains(style_name),
+                        );
+                    }
+                    if let Some(style_name) = &annotation.text_style_name {
+                        merge_transfer_dependency(
+                            &mut dependencies,
+                            TransferDependencyKind::TextStyle,
+                            style_name.clone(),
+                            false,
+                        );
+                    }
                 },
                 Operation::SetRubyStyle { style } => {
                     if let Some(parent) = &style.parent_style_name {
@@ -1853,6 +2083,95 @@ fn merge_transfer_dependency(
         .entry((kind, key))
         .and_modify(|existing| *existing &= satisfied)
         .or_insert(satisfied);
+}
+
+fn embedded_resource_dependency_key(
+    resource: &crate::package::embedded::EmbeddedResource,
+) -> String {
+    use crate::package::embedded::EmbeddedResourceSource;
+    let mut material = Vec::new();
+    match &resource.source {
+        EmbeddedResourceSource::Linked { href } => material.extend_from_slice(href.as_bytes()),
+        EmbeddedResourceSource::PackageFile { bytes, .. }
+        | EmbeddedResourceSource::InlineBinary { bytes, .. } => material.extend_from_slice(bytes),
+        EmbeddedResourceSource::PackageSubdocument { files, .. } => {
+            for file in files {
+                material.extend_from_slice(file.path.as_bytes());
+                material.push(0);
+                material.extend_from_slice(&file.bytes);
+                material.push(0xff);
+            }
+        },
+        EmbeddedResourceSource::InlineXml { xml, .. } => material.extend_from_slice(xml.as_bytes()),
+    }
+    BlobId::of(&material).as_hex()
+}
+
+fn chart_style_names(definition: &crate::odc::Definition) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let mut add = |name: &Option<String>| {
+        if let Some(name) = name {
+            names.insert(name.clone());
+        }
+    };
+    add(&definition.style_name);
+    for text in [&definition.title, &definition.subtitle, &definition.footer]
+        .into_iter()
+        .flatten()
+    {
+        add(&text.style_name);
+    }
+    if let Some(legend) = &definition.legend {
+        add(&legend.style_name);
+    }
+    let plot = &definition.plot_area;
+    add(&plot.style_name);
+    for axis in &plot.axes {
+        add(&axis.style_name);
+        if let Some(title) = &axis.title {
+            add(&title.style_name);
+        }
+        for grid in &axis.grids {
+            add(&grid.style_name);
+        }
+    }
+    for series in &plot.series {
+        add(&series.style_name);
+        if let Some(label) = &series.data_label {
+            add(&label.style_name);
+        }
+        for point in &series.data_points {
+            add(&point.style_name);
+            if let Some(label) = &point.label {
+                add(&label.style_name);
+            }
+        }
+        for style in [&series.mean_value, &series.error_indicator]
+            .into_iter()
+            .flatten()
+        {
+            add(&style.style_name);
+        }
+        for regression in &series.regression_curves {
+            add(&regression.style_name);
+            if let Some(equation) = &regression.equation {
+                add(&equation.style_name);
+            }
+        }
+    }
+    for style in [
+        &plot.wall,
+        &plot.floor,
+        &plot.stock_gain_marker,
+        &plot.stock_loss_marker,
+        &plot.stock_range_line,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        add(&style.style_name);
+    }
+    names
 }
 
 /// Bounded deterministic-JSON patch for cross-process ODT exchange.
@@ -2132,6 +2451,45 @@ fn semantic_patch_operation(
             format!("/body/paragraphs/{index}/runs/-"),
             Value::Null,
         ),
+        Operation::InsertNote {
+            paragraph,
+            note,
+            fragment,
+        } => (
+            "note.insert",
+            format!("/body/paragraphs/{paragraph}/notes/-"),
+            note_fragment_value(note, fragment.as_deref())?,
+        ),
+        Operation::ReplaceNote {
+            index,
+            note,
+            fragment,
+        } => (
+            "note.replace",
+            format!("/body/notes/{index}"),
+            note_fragment_value(note, fragment.as_deref())?,
+        ),
+        Operation::RemoveNote { index } => {
+            ("note.remove", format!("/body/notes/{index}"), Value::Null)
+        },
+        Operation::InsertRubyAnnotation {
+            paragraph,
+            annotation,
+        } => (
+            "ruby.annotation.insert",
+            format!("/body/paragraphs/{paragraph}/ruby/-"),
+            serde_json::json!({"xml": annotation.to_xml_fragment()?}),
+        ),
+        Operation::ReplaceRubyAnnotation { index, annotation } => (
+            "ruby.annotation.replace",
+            format!("/body/ruby/{index}"),
+            serde_json::json!({"xml": annotation.to_xml_fragment()?}),
+        ),
+        Operation::RemoveRubyAnnotation { index } => (
+            "ruby.annotation.remove",
+            format!("/body/ruby/{index}"),
+            Value::Null,
+        ),
         Operation::InsertDynamicTextField { paragraph, field } => (
             "field.dynamic.insert",
             format!("/body/paragraphs/{paragraph}/fields/-"),
@@ -2225,6 +2583,61 @@ fn semantic_patch_operation(
             format!("/package/rdf/{path}/triples/{from}"),
             serde_json::json!({"to": to}),
         ),
+        Operation::AddEmbeddedChart { definition } => (
+            "chart.add",
+            "/package/charts/-".to_string(),
+            chart_content_value(
+                &crate::odc::serialize_content(definition)?,
+                crate::package::charts::EmbeddedChartStorage::PackageSubdocument,
+                blobs,
+            )?,
+        ),
+        Operation::AddEmbeddedChartWithStorage {
+            definition,
+            storage,
+        } => (
+            "chart.add",
+            "/package/charts/-".to_string(),
+            chart_content_value(&crate::odc::serialize_content(definition)?, *storage, blobs)?,
+        ),
+        Operation::AddEmbeddedChartContent { content, storage } => (
+            "chart.add",
+            "/package/charts/-".to_string(),
+            chart_content_value(content, *storage, blobs)?,
+        ),
+        Operation::ReplaceEmbeddedChart { index, definition } => (
+            "chart.replace",
+            format!("/package/charts/{index}"),
+            chart_content_value(
+                &crate::odc::serialize_content(definition)?,
+                crate::package::charts::EmbeddedChartStorage::PackageSubdocument,
+                blobs,
+            )?,
+        ),
+        Operation::ReplaceEmbeddedChartContent { index, content } => (
+            "chart.replace",
+            format!("/package/charts/{index}"),
+            chart_content_value(
+                content,
+                crate::package::charts::EmbeddedChartStorage::PackageSubdocument,
+                blobs,
+            )?,
+        ),
+        Operation::AddEmbeddedResource { resource } => (
+            "resource.embedded.add",
+            "/package/embedded/-".to_string(),
+            embedded_resource_value(resource, blobs)?,
+        ),
+        Operation::ReplaceEmbeddedObject { index, resource } => (
+            "resource.embedded.object.replace",
+            format!("/package/embedded/objects/{index}"),
+            embedded_resource_value(resource, blobs)?,
+        ),
+        Operation::ReplaceEmbeddedImage { index, resource } => (
+            "resource.embedded.image.replace",
+            format!("/package/embedded/images/{index}"),
+            embedded_resource_value(resource, blobs)?,
+        ),
         Operation::AddScriptResource { resource } => (
             "resource.script.add",
             "/package/scripts/-".to_string(),
@@ -2250,13 +2663,7 @@ fn semantic_patch_operation(
         | Operation::ReplaceForm { .. }
         | Operation::RemoveForm { .. }
         | Operation::MoveForm { .. }
-        | Operation::AddEmbeddedChart { .. }
-        | Operation::AddEmbeddedChartWithStorage { .. }
-        | Operation::ReplaceEmbeddedChart { .. }
         | Operation::RemoveEmbeddedChart { .. }
-        | Operation::AddEmbeddedResource { .. }
-        | Operation::ReplaceEmbeddedObject { .. }
-        | Operation::ReplaceEmbeddedImage { .. }
         | Operation::RemoveEmbeddedObject { .. }
         | Operation::RemoveEmbeddedImage { .. }
         | Operation::MoveEmbeddedObject { .. }
@@ -2346,13 +2753,7 @@ fn validate_patch_direction<Mode>(patch: &CorePatch<Mode>) -> Result<()> {
     let mut referenced_blobs = BTreeSet::new();
     for operation in patch.operations() {
         decode_semantic_operation(operation, patch.blobs())?;
-        if matches!(
-            operation.op.as_str(),
-            "resource.script.add" | "resource.script.replace"
-        ) {
-            let id = object_required_string(&operation.value, "blob")?;
-            referenced_blobs.insert(id.to_owned());
-        }
+        collect_blob_references(&operation.value, &mut referenced_blobs)?;
     }
     if referenced_blobs.len() != patch.blobs().len()
         || referenced_blobs
@@ -2360,6 +2761,32 @@ fn validate_patch_direction<Mode>(patch: &CorePatch<Mode>) -> Result<()> {
             .any(|id| blob_by_hex(patch.blobs(), id).is_none())
     {
         return Err(invalid_durable_patch());
+    }
+    Ok(())
+}
+
+fn collect_blob_references(value: &Value, output: &mut BTreeSet<String>) -> Result<()> {
+    match value {
+        Value::Object(object) => {
+            if let Some(blob) = object.get("blob") {
+                let blob = blob.as_str().ok_or_else(invalid_durable_patch)?;
+                if !is_canonical_digest(blob) {
+                    return Err(invalid_durable_patch());
+                }
+                output.insert(blob.to_owned());
+            }
+            for (key, child) in object {
+                if key != "blob" {
+                    collect_blob_references(child, output)?;
+                }
+            }
+        },
+        Value::Array(values) => {
+            for child in values {
+                collect_blob_references(child, output)?;
+            }
+        },
+        _ => {},
     }
     Ok(())
 }
@@ -2500,6 +2927,38 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
         "run.append_line_break" if operation.value.is_null() => Ok(Operation::AppendLineBreak {
             index: index("/body/paragraphs/", "/runs/-")?,
         }),
+        "note.insert" => {
+            let (note, fragment) = note_from_value(&operation.value)?;
+            Ok(Operation::InsertNote {
+                paragraph: index("/body/paragraphs/", "/notes/-")?,
+                note,
+                fragment: Some(fragment),
+            })
+        },
+        "note.replace" => {
+            let (note, fragment) = note_from_value(&operation.value)?;
+            Ok(Operation::ReplaceNote {
+                index: index("/body/notes/", "")?,
+                note,
+                fragment: Some(fragment),
+            })
+        },
+        "note.remove" if operation.value.is_null() => Ok(Operation::RemoveNote {
+            index: index("/body/notes/", "")?,
+        }),
+        "ruby.annotation.insert" => Ok(Operation::InsertRubyAnnotation {
+            paragraph: index("/body/paragraphs/", "/ruby/-")?,
+            annotation: ruby_annotation_from_value(&operation.value)?,
+        }),
+        "ruby.annotation.replace" => Ok(Operation::ReplaceRubyAnnotation {
+            index: index("/body/ruby/", "")?,
+            annotation: ruby_annotation_from_value(&operation.value)?,
+        }),
+        "ruby.annotation.remove" if operation.value.is_null() => {
+            Ok(Operation::RemoveRubyAnnotation {
+                index: index("/body/ruby/", "")?,
+            })
+        },
         "field.dynamic.insert" => Ok(Operation::InsertDynamicTextField {
             paragraph: index("/body/paragraphs/", "/fields/-")?,
             field: dynamic_field_from_value(&operation.value)?,
@@ -2599,6 +3058,30 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
                 .ok_or_else(invalid_durable_patch)?;
             Ok(Operation::MoveRdfTriple { path, from, to })
         },
+        "chart.add" if operation.target == "/package/charts/-" => {
+            let (content, storage) = chart_content_from_value(&operation.value, blobs)?;
+            Ok(Operation::AddEmbeddedChartContent { content, storage })
+        },
+        "chart.replace" => {
+            let (content, _) = chart_content_from_value(&operation.value, blobs)?;
+            Ok(Operation::ReplaceEmbeddedChartContent {
+                index: index("/package/charts/", "")?,
+                content,
+            })
+        },
+        "resource.embedded.add" if operation.target == "/package/embedded/-" => {
+            Ok(Operation::AddEmbeddedResource {
+                resource: embedded_resource_from_value(&operation.value, blobs)?,
+            })
+        },
+        "resource.embedded.object.replace" => Ok(Operation::ReplaceEmbeddedObject {
+            index: index("/package/embedded/objects/", "")?,
+            resource: embedded_resource_from_value(&operation.value, blobs)?,
+        }),
+        "resource.embedded.image.replace" => Ok(Operation::ReplaceEmbeddedImage {
+            index: index("/package/embedded/images/", "")?,
+            resource: embedded_resource_from_value(&operation.value, blobs)?,
+        }),
         "resource.script.add" if operation.target == "/package/scripts/-" => {
             Ok(Operation::AddScriptResource {
                 resource: script_resource_from_value(&operation.value, blobs)?,
@@ -2615,6 +3098,36 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
         },
         _ => Err(invalid_durable_patch()),
     }
+}
+
+fn note_from_value(value: &Value) -> Result<(crate::note::Note, String)> {
+    let fragment = object_string(value, "xml", 1)?;
+    crate::note::validate_note_fragment(&fragment)?;
+    let xml = format!(
+        r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>{fragment}</text:p></office:text></office:body></office:document-content>"#
+    );
+    let mut notes = crate::parse_notes(&xml)?;
+    if notes.len() != 1 {
+        return Err(invalid_durable_patch());
+    }
+    notes
+        .pop()
+        .map(|note| (note, fragment))
+        .ok_or_else(invalid_durable_patch)
+}
+
+fn note_fragment_value(note: &crate::note::Note, fragment: Option<&str>) -> Result<Value> {
+    let xml = match fragment {
+        Some(fragment) => fragment.to_owned(),
+        None => note.to_xml_fragment()?,
+    };
+    crate::note::validate_note_fragment(&xml)?;
+    Ok(serde_json::json!({"xml": xml}))
+}
+
+fn ruby_annotation_from_value(value: &Value) -> Result<crate::ruby_family::Annotation> {
+    crate::ruby_family::Annotation::from_xml_fragment(&object_string(value, "xml", 1)?)
+        .map_err(|_| invalid_durable_patch())
 }
 
 fn dynamic_field_from_value(value: &Value) -> Result<DynamicTextField> {
@@ -2764,6 +3277,298 @@ fn protection_from_value(value: &Value) -> Result<crate::protection::Policy> {
     Ok(policy)
 }
 
+fn chart_content_value(
+    content: &str,
+    storage: crate::package::charts::EmbeddedChartStorage,
+    blobs: &mut BlobBundle,
+) -> Result<Value> {
+    crate::package::charts::validate_chart_content(content)?;
+    let blob = blobs
+        .insert(content.as_bytes())
+        .map_err(durable_wire_error)?;
+    let storage = match storage {
+        crate::package::charts::EmbeddedChartStorage::PackageSubdocument => "package",
+        crate::package::charts::EmbeddedChartStorage::InlineXml => "inline",
+    };
+    Ok(serde_json::json!({"blob": blob.as_hex(), "storage": storage}))
+}
+
+fn chart_content_from_value(
+    value: &Value,
+    blobs: &BlobBundle,
+) -> Result<(String, crate::package::charts::EmbeddedChartStorage)> {
+    let value = exact_object(value, 2)?;
+    let blob = object_required_string_map(value, "blob")?;
+    if !is_canonical_digest(blob) {
+        return Err(invalid_durable_patch());
+    }
+    let content = std::str::from_utf8(blob_by_hex(blobs, blob).ok_or_else(invalid_durable_patch)?)
+        .map_err(|_| invalid_durable_patch())?
+        .to_owned();
+    crate::package::charts::validate_chart_content(&content)?;
+    let storage = match object_required_string_map(value, "storage")? {
+        "package" => crate::package::charts::EmbeddedChartStorage::PackageSubdocument,
+        "inline" => crate::package::charts::EmbeddedChartStorage::InlineXml,
+        _ => return Err(invalid_durable_patch()),
+    };
+    Ok((content, storage))
+}
+
+fn embedded_resource_value(
+    resource: &crate::package::embedded::EmbeddedResource,
+    blobs: &mut BlobBundle,
+) -> Result<Value> {
+    use crate::package::embedded::{EmbeddedResourceKind, EmbeddedResourceSource};
+    let kind = match resource.kind {
+        EmbeddedResourceKind::Object => "object",
+        EmbeddedResourceKind::ObjectOle => "object-ole",
+        EmbeddedResourceKind::Image => "image",
+    };
+    let source = match &resource.source {
+        EmbeddedResourceSource::Linked { href } => {
+            serde_json::json!({"href": href, "type": "linked"})
+        },
+        EmbeddedResourceSource::PackageFile {
+            bytes,
+            media_type,
+            preferred_path,
+        } => {
+            let blob = blobs.insert(bytes).map_err(durable_wire_error)?;
+            serde_json::json!({
+                "blob": blob.as_hex(),
+                "media_type": media_type,
+                "preferred_path": preferred_path,
+                "type": "package-file",
+            })
+        },
+        EmbeddedResourceSource::PackageSubdocument {
+            files,
+            media_type,
+            preferred_root,
+        } => {
+            if files.len() > 16_384 {
+                return Err(Error::InvalidFormat(
+                    "embedded resource has too many durable files".to_string(),
+                ));
+            }
+            let total = files.iter().try_fold(0usize, |total, file| {
+                total.checked_add(file.bytes.len()).ok_or_else(|| {
+                    Error::InvalidFormat("embedded resource byte count overflow".to_string())
+                })
+            })?;
+            ensure_package_size(total, "embedded resource durable payload")?;
+            let mut payload = Vec::new();
+            payload
+                .try_reserve_exact(total)
+                .map_err(|source| Error::Allocation {
+                    resource: "embedded resource durable payload",
+                    source,
+                })?;
+            let mut offset = 0usize;
+            let mut entries = Vec::new();
+            entries
+                .try_reserve_exact(files.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "embedded resource durable file table",
+                    source,
+                })?;
+            for file in files {
+                payload.extend_from_slice(&file.bytes);
+                entries.push(serde_json::json!({
+                    "length": file.bytes.len(),
+                    "media_type": file.media_type,
+                    "offset": offset,
+                    "path": file.path,
+                }));
+                offset = offset.saturating_add(file.bytes.len());
+            }
+            let blob = blobs.insert(payload).map_err(durable_wire_error)?;
+            serde_json::json!({
+                "blob": blob.as_hex(),
+                "files": entries,
+                "media_type": media_type,
+                "preferred_root": preferred_root,
+                "type": "package-subdocument",
+            })
+        },
+        EmbeddedResourceSource::InlineXml { root, xml } => {
+            let blob = blobs.insert(xml.as_bytes()).map_err(durable_wire_error)?;
+            let root = match root {
+                litchi_odf_common::embedded::Root::OpenDocument => "open-document",
+                litchi_odf_common::embedded::Root::MathMl => "mathml",
+                _ => {
+                    return Err(Error::Unsupported(
+                        "unsupported embedded XML root".to_string(),
+                    ));
+                },
+            };
+            serde_json::json!({"blob": blob.as_hex(), "root": root, "type": "inline-xml"})
+        },
+        EmbeddedResourceSource::InlineBinary { bytes, media_type } => {
+            let blob = blobs.insert(bytes).map_err(durable_wire_error)?;
+            serde_json::json!({
+                "blob": blob.as_hex(),
+                "media_type": media_type,
+                "type": "inline-binary",
+            })
+        },
+    };
+    Ok(serde_json::json!({
+        "class_id": resource.class_id,
+        "frame_name": resource.frame_name,
+        "kind": kind,
+        "source": source,
+        "xml_id": resource.xml_id,
+    }))
+}
+
+fn embedded_resource_from_value(
+    value: &Value,
+    blobs: &BlobBundle,
+) -> Result<crate::package::embedded::EmbeddedResource> {
+    use crate::package::embedded::{
+        EmbeddedResource, EmbeddedResourceFile, EmbeddedResourceKind, EmbeddedResourceSource,
+    };
+    let value = exact_object(value, 5)?;
+    let kind = match object_required_string_map(value, "kind")? {
+        "object" => EmbeddedResourceKind::Object,
+        "object-ole" => EmbeddedResourceKind::ObjectOle,
+        "image" => EmbeddedResourceKind::Image,
+        _ => return Err(invalid_durable_patch()),
+    };
+    let source = exact_object(
+        value.get("source").ok_or_else(invalid_durable_patch)?,
+        value
+            .get("source")
+            .and_then(Value::as_object)
+            .map_or(0, serde_json::Map::len),
+    )?;
+    let source = match object_required_string_map(source, "type")? {
+        "linked" if source.len() == 2 => EmbeddedResourceSource::Linked {
+            href: bounded_semantic_text(
+                object_required_string_map(source, "href")?.to_owned(),
+                "embedded resource link",
+            )?,
+        },
+        "package-file" if source.len() == 4 => EmbeddedResourceSource::PackageFile {
+            bytes: resource_blob(source, blobs)?,
+            media_type: bounded_semantic_text(
+                object_required_string_map(source, "media_type")?.to_owned(),
+                "embedded resource media type",
+            )?,
+            preferred_path: optional_bounded_string(
+                source.get("preferred_path"),
+                "embedded resource path",
+            )?,
+        },
+        "package-subdocument" if source.len() == 5 => {
+            let payload = resource_blob_ref(source, blobs)?;
+            let entries = source
+                .get("files")
+                .and_then(Value::as_array)
+                .ok_or_else(invalid_durable_patch)?;
+            if entries.len() > 16_384 {
+                return Err(invalid_durable_patch());
+            }
+            let mut files = Vec::new();
+            files
+                .try_reserve_exact(entries.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "embedded resource durable file table",
+                    source,
+                })?;
+            let mut expected_offset = 0usize;
+            for entry in entries {
+                let entry = exact_object(entry, 4)?;
+                let offset = json_usize(entry.get("offset"))?;
+                let length = json_usize(entry.get("length"))?;
+                if offset != expected_offset {
+                    return Err(invalid_durable_patch());
+                }
+                let end = offset
+                    .checked_add(length)
+                    .ok_or_else(invalid_durable_patch)?;
+                let bytes = payload.get(offset..end).ok_or_else(invalid_durable_patch)?;
+                files.push(EmbeddedResourceFile {
+                    path: bounded_semantic_text(
+                        object_required_string_map(entry, "path")?.to_owned(),
+                        "embedded resource file path",
+                    )?,
+                    bytes: copy_bytes(bytes)?,
+                    media_type: bounded_semantic_text(
+                        object_required_string_map(entry, "media_type")?.to_owned(),
+                        "embedded resource file media type",
+                    )?,
+                });
+                expected_offset = end;
+            }
+            if expected_offset != payload.len() {
+                return Err(invalid_durable_patch());
+            }
+            EmbeddedResourceSource::PackageSubdocument {
+                files,
+                media_type: bounded_semantic_text(
+                    object_required_string_map(source, "media_type")?.to_owned(),
+                    "embedded resource media type",
+                )?,
+                preferred_root: optional_bounded_string(
+                    source.get("preferred_root"),
+                    "embedded resource root",
+                )?,
+            }
+        },
+        "inline-xml" if source.len() == 3 => {
+            let bytes = resource_blob_ref(source, blobs)?;
+            let xml = std::str::from_utf8(bytes)
+                .map_err(|_| invalid_durable_patch())?
+                .to_owned();
+            let root = match object_required_string_map(source, "root")? {
+                "open-document" => litchi_odf_common::embedded::Root::OpenDocument,
+                "mathml" => litchi_odf_common::embedded::Root::MathMl,
+                _ => return Err(invalid_durable_patch()),
+            };
+            EmbeddedResourceSource::InlineXml { root, xml }
+        },
+        "inline-binary" if source.len() == 3 => EmbeddedResourceSource::InlineBinary {
+            bytes: resource_blob(source, blobs)?,
+            media_type: optional_bounded_string(
+                source.get("media_type"),
+                "embedded resource media type",
+            )?,
+        },
+        _ => return Err(invalid_durable_patch()),
+    };
+    Ok(EmbeddedResource {
+        kind,
+        source,
+        frame_name: optional_bounded_string(value.get("frame_name"), "embedded frame name")?,
+        xml_id: optional_bounded_string(value.get("xml_id"), "embedded resource XML ID")?,
+        class_id: optional_bounded_string(value.get("class_id"), "embedded resource class ID")?,
+    })
+}
+
+fn resource_blob(source: &serde_json::Map<String, Value>, blobs: &BlobBundle) -> Result<Vec<u8>> {
+    copy_bytes(resource_blob_ref(source, blobs)?)
+}
+
+fn resource_blob_ref<'a>(
+    source: &serde_json::Map<String, Value>,
+    blobs: &'a BlobBundle,
+) -> Result<&'a [u8]> {
+    let blob = object_required_string_map(source, "blob")?;
+    if !is_canonical_digest(blob) {
+        return Err(invalid_durable_patch());
+    }
+    blob_by_hex(blobs, blob).ok_or_else(invalid_durable_patch)
+}
+
+fn json_usize(value: Option<&Value>) -> Result<usize> {
+    value
+        .and_then(Value::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or_else(invalid_durable_patch)
+}
+
 fn script_resource_value(
     resource: &crate::ScriptResourceSpec,
     blobs: &mut BlobBundle,
@@ -2824,10 +3629,6 @@ fn exact_object(value: &Value, fields: usize) -> Result<&serde_json::Map<String,
         return Err(invalid_durable_patch());
     }
     Ok(value)
-}
-
-fn object_required_string<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
-    object_required_string_map(value.as_object().ok_or_else(invalid_durable_patch)?, key)
 }
 
 fn object_required_string_map<'a>(
@@ -3004,6 +3805,21 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             | Operation::AppendLineBreak { index: paragraph } => {
                 writes.push(format!("/body/paragraphs/{paragraph}/content"));
             },
+            Operation::InsertNote { paragraph, .. } => {
+                writes.push(format!("/body/paragraphs/{paragraph}/content"));
+                writes.push("/body/notes/order".to_string());
+            },
+            Operation::ReplaceNote { index, .. } | Operation::RemoveNote { index } => {
+                writes.push(format!("/body/notes/{index}"));
+            },
+            Operation::InsertRubyAnnotation { paragraph, .. } => {
+                writes.push(format!("/body/paragraphs/{paragraph}/content"));
+                writes.push("/body/ruby/order".to_string());
+            },
+            Operation::ReplaceRubyAnnotation { index, .. }
+            | Operation::RemoveRubyAnnotation { index } => {
+                writes.push(format!("/body/ruby/{index}"));
+            },
             Operation::InsertDynamicTextField { paragraph, .. } => {
                 writes.push(format!("/body/paragraphs/{paragraph}/content"));
             },
@@ -3047,6 +3863,33 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             | Operation::RemoveScriptResource { path } => {
                 writes.push(format!("/package/scripts/{path}"));
             },
+            Operation::AddEmbeddedChart { .. }
+            | Operation::AddEmbeddedChartWithStorage { .. }
+            | Operation::AddEmbeddedChartContent { .. } => {
+                writes.push("/package/charts/order".to_string());
+            },
+            Operation::ReplaceEmbeddedChart { index, .. }
+            | Operation::ReplaceEmbeddedChartContent { index, .. }
+            | Operation::RemoveEmbeddedChart { index } => {
+                writes.push(format!("/package/charts/{index}"));
+            },
+            Operation::AddEmbeddedResource { .. } => {
+                writes.push("/package/embedded/order".to_string());
+            },
+            Operation::ReplaceEmbeddedObject { index, .. }
+            | Operation::RemoveEmbeddedObject { index } => {
+                writes.push(format!("/package/embedded/objects/{index}"));
+            },
+            Operation::ReplaceEmbeddedImage { index, .. }
+            | Operation::RemoveEmbeddedImage { index } => {
+                writes.push(format!("/package/embedded/images/{index}"));
+            },
+            Operation::MoveEmbeddedObject { .. } => {
+                writes.push("/package/embedded/objects/order".to_string());
+            },
+            Operation::MoveEmbeddedImage { .. } => {
+                writes.push("/package/embedded/images/order".to_string());
+            },
             Operation::RestoreSnapshot
             | Operation::AddForm { .. }
             | Operation::AddNestedForm { .. }
@@ -3056,18 +3899,7 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             | Operation::MoveFormControl { .. }
             | Operation::ReplaceForm { .. }
             | Operation::RemoveForm { .. }
-            | Operation::MoveForm { .. }
-            | Operation::AddEmbeddedChart { .. }
-            | Operation::AddEmbeddedChartWithStorage { .. }
-            | Operation::ReplaceEmbeddedChart { .. }
-            | Operation::RemoveEmbeddedChart { .. }
-            | Operation::AddEmbeddedResource { .. }
-            | Operation::ReplaceEmbeddedObject { .. }
-            | Operation::ReplaceEmbeddedImage { .. }
-            | Operation::RemoveEmbeddedObject { .. }
-            | Operation::RemoveEmbeddedImage { .. }
-            | Operation::MoveEmbeddedObject { .. }
-            | Operation::MoveEmbeddedImage { .. } => writes.push("/package".to_string()),
+            | Operation::MoveForm { .. } => writes.push("/package".to_string()),
         }
     }
     (Vec::new(), writes)
@@ -3163,6 +3995,19 @@ fn audit_changed_xml_is_compact(source: &[u8], candidate: &[u8]) -> Result<()> {
             let xml = candidate.get_file(&path)?;
             if source_archive.has_file(&path) && source.get_file(&path)? == xml {
                 continue;
+            }
+            if path == crate::constants::ODF_CONTENT {
+                let candidate_content = std::str::from_utf8(&xml).map_err(|error| {
+                    Error::InvalidFormat(format!("changed content.xml is not valid UTF-8: {error}"))
+                })?;
+                if litchi_odf_common::package::content_splice_publication(
+                    &source,
+                    candidate_content,
+                )
+                .is_ok()
+                {
+                    continue;
+                }
             }
             let limits = litchi_odf_common::compact_xml::Limits::new(MAX_PACKAGE_BYTES, 4_096)
                 .map_err(Error::from)?;

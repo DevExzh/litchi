@@ -1,6 +1,6 @@
 //! Deterministic ODB sub-edit composition and three-way planning.
 
-use std::{ops::Range, sync::Arc};
+use std::{collections::BTreeSet, ops::Range, sync::Arc};
 
 use litchi_core::{Error, Result};
 
@@ -77,6 +77,12 @@ impl Patch {
             if patch.source.as_bytes() != source.as_bytes() {
                 return invalid("ODB composition patch source is stale");
             }
+            if has_non_content_changes(&patch.source, &patch.target)? {
+                return Err(Error::Unsupported(
+                    "ODB composition refuses patches that change package members outside content.xml"
+                        .to_string(),
+                ));
+            }
             if let Some(hunk) = difference(base, patch.target.content_xml(), ordinal) {
                 hunks.push(hunk);
             }
@@ -121,6 +127,24 @@ impl Patch {
             legacy_query: None,
         })
     }
+}
+
+fn has_non_content_changes(source: &Database, target: &Database) -> Result<bool> {
+    let source_files = source.files()?.into_iter().collect::<BTreeSet<_>>();
+    let target_files = target.files()?.into_iter().collect::<BTreeSet<_>>();
+    let paths = source_files.union(&target_files);
+    for path in paths {
+        if path == "content.xml" {
+            continue;
+        }
+        if !source_files.contains(path) || !target_files.contains(path) {
+            return Ok(true);
+        }
+        if source.package.file(path)? != target.package.file(path)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 struct Hunk {

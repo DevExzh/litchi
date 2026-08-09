@@ -120,6 +120,17 @@ impl Database {
         crate::authoring::producer_extensions(self.content_xml())
     }
 
+    /// Inventories macros, scripts, event listeners, form controls, actions,
+    /// DDE declarations, and embedded objects without activating any member.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a candidate XML member is malformed or the
+    /// bounded scan limits are exceeded.
+    pub fn active_content(&self) -> Result<crate::ActiveContentInventory> {
+        self.package.active_content()
+    }
+
     /// Inventories signatures and manifest-declared encryption without
     /// validating, decrypting, or executing protected content.
     ///
@@ -128,6 +139,16 @@ impl Database {
     /// Returns an error if the package entries cannot be inspected.
     pub fn protection_status(&self) -> Result<crate::ProtectionStatus> {
         self.package.protection_status()
+    }
+
+    /// Returns the stable protected-publication capability contract.
+    ///
+    /// ODB signature verification and explicit invalid-signature removal are
+    /// supported. Re-signing and re-encryption are explicitly unsupported;
+    /// changed encrypted publication remains fail-closed.
+    #[must_use]
+    pub const fn protection_capabilities(&self) -> crate::ProtectionCapabilities {
+        crate::ProtectionCapabilities::odb()
     }
 
     /// Reads inert document and macro signature metadata without verifying it

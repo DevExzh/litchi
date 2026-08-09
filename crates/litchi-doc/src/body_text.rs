@@ -4,8 +4,20 @@
 //! FKPs, shift modeled main-story PLCFs, and update the FIB story length. The
 //! transaction refuses structural text, tracked ranges, non-uniform character
 //! formatting, interior position boundaries, and unmodeled dependencies before
-//! publication. Text and direct-bold changes share one immutable
-//! multi-operation transaction.
+//! publication. Text, direct formatting, revision marks, and managed embedded
+//! resources share one immutable multi-operation transaction.
+
+#![deny(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::expect_used,
+    clippy::let_underscore_must_use,
+    clippy::map_err_ignore,
+    clippy::unwrap_used,
+    reason = "the ordinary immutable DOC root uses checked conversions and propagated typed errors"
+)]
 
 use crate::DateTime;
 use crate::package::Error as PackageError;
@@ -16,7 +28,7 @@ use litchi_core::patch::{
     Reversible, ReversibleOperation, SubEdit,
 };
 pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -177,6 +189,30 @@ pub enum RevisionDisposition {
     Reject,
 }
 
+/// Active binary dependency carried by a special DOC text character.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DrawingDependency {
+    /// `0x0001`: inline picture or an embedded object's preview PICF.
+    InlinePictureOrObjectPreview,
+    /// `0x0008`: floating shape/picture with `PlcfSpa` and drawing-group edges.
+    FloatingOfficeArt,
+    /// `0xFFFC`: producer-defined object replacement character.
+    ObjectReplacement,
+    /// Another active control whose coupled binary owner is not modeled here.
+    UnsupportedControl,
+}
+
+impl DrawingDependency {
+    const fn transfer_name(self) -> &'static str {
+        match self {
+            Self::InlinePictureOrObjectPreview => "inline-picture/embedded-preview",
+            Self::FloatingOfficeArt => "floating-OfficeArt",
+            Self::ObjectReplacement => "object-replacement",
+            Self::UnsupportedControl => "active-control",
+        }
+    }
+}
+
 impl CharacterProperty {
     const fn wire_name(self) -> &'static str {
         match self {
@@ -226,6 +262,9 @@ pub enum Refusal {
     CompressedPiece,
     /// Fields, object markers, cell markers, or other structural controls occur.
     StructuralContent,
+    /// A special character has a drawing/resource owner that cannot be
+    /// rewritten safely by a whole-target text replacement.
+    DrawingDependency { dependency: DrawingDependency },
     /// The paragraph intersects text-affecting tracked revisions.
     TrackedText,
     /// The requested replacement contains structural controls.
@@ -253,6 +292,10 @@ pub enum Refusal {
     TargetNotFound,
     /// Cross-document transfer is limited to inert text with no resource edges.
     TransferDependency { dependency: &'static str },
+    /// The receiver already owns the requested semantic resource identifier.
+    ResourceCollision { storage_id: u32 },
+    /// No managed embedded resource owns the requested identifier.
+    ResourceNotFound { storage_id: u32 },
     /// This disposition would delete text or require restoring prior formatting.
     DestructiveRevisionDisposition { kind: RevisionKind },
     /// The configured operation count was exhausted.
@@ -280,6 +323,10 @@ impl std::fmt::Display for Refusal {
             Self::StructuralContent => {
                 formatter.write_str("body paragraph contains DOC structural content")
             },
+            Self::DrawingDependency { dependency } => write!(
+                formatter,
+                "DOC text target contains an active {dependency:?} dependency"
+            ),
             Self::TrackedText => formatter.write_str("body paragraph intersects tracked text"),
             Self::ReplacementContainsStructuralContent => {
                 formatter.write_str("replacement contains DOC structural content")
@@ -315,6 +362,14 @@ impl std::fmt::Display for Refusal {
             Self::TransferDependency { dependency } => write!(
                 formatter,
                 "DOC transfer has an unsupported {dependency} dependency"
+            ),
+            Self::ResourceCollision { storage_id } => write!(
+                formatter,
+                "DOC receiver already contains embedded storage ID {storage_id}"
+            ),
+            Self::ResourceNotFound { storage_id } => write!(
+                formatter,
+                "DOC embedded storage ID {storage_id} was not found"
             ),
             Self::DestructiveRevisionDisposition { kind } => write!(
                 formatter,
@@ -499,6 +554,14 @@ impl Snapshot {
         target_spans(&editor, TargetCollection::FieldResults).map(items_from_spans)
     }
 
+    /// Managed embedded fields and their passive `ObjectPool` metadata.
+    pub fn embedded_objects(&self) -> Result<crate::embedded_object::Inventory> {
+        crate::embedded_object::Snapshot::open(self.finish(), self.limits)
+            .map_err(Error::Invalid)?
+            .inventory()
+            .map_err(Error::Invalid)
+    }
+
     /// Lists tracked main-story ranges in stable CP/kind order.
     pub fn revisions(&self) -> Result<Vec<Revision>> {
         self.editor()?.revisions().map_err(Error::Invalid)
@@ -647,14 +710,20 @@ impl Snapshot {
     /// artifact or semantic precondition conflict, bound violation, or typed
     /// body-edit refusal.
     pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Self> {
-        if patch.format() != "litchi-doc-body" || !patch.blobs().is_empty() {
-            return Err(invalid_durable_patch("unsupported format or blob bundle"));
+        if patch.format() != "litchi-doc-body" {
+            return Err(invalid_durable_patch("unsupported format"));
         }
         if patch.operations().is_empty() {
+            if !patch.blobs().is_empty() {
+                return Err(invalid_durable_patch(
+                    "operation-free durable patch has unreferenced blobs",
+                ));
+            }
             return Ok(self.clone());
         }
         let expected_artifact = BlobId::of(self.bytes()).as_hex();
         let mut edit = self.edit()?;
+        let mut used_blobs = BTreeSet::new();
         for operation in patch.operations() {
             if operation.preconditions.len() != 2 {
                 return Err(invalid_durable_patch(
@@ -675,6 +744,15 @@ impl Snapshot {
             }
             if operation.op == "embedded-display.set" {
                 apply_durable_embedded_display(&mut edit, operation)?;
+                continue;
+            }
+            if operation.op == "embedded-object.set" {
+                apply_durable_embedded_object(
+                    &mut edit,
+                    operation,
+                    patch.blobs(),
+                    &mut used_blobs,
+                )?;
                 continue;
             }
             let target = parse_durable_target(&operation.target)?;
@@ -712,6 +790,11 @@ impl Snapshot {
                 _ => return Err(invalid_durable_patch("unsupported operation vocabulary")),
             }
         }
+        if used_blobs.len() != patch.blobs().len() {
+            return Err(invalid_durable_patch(
+                "durable patch has unreferenced blobs",
+            ));
+        }
         edit.commit().map(|commit| commit.snapshot)
     }
 
@@ -726,6 +809,11 @@ impl Snapshot {
     ) -> Result<TransferPlan> {
         let donor_editor = donor.editor()?;
         let value = resolve_target(&donor_editor, source)?.text;
+        if let Some(dependency) = drawing_dependency(&value) {
+            return Err(Error::Refused(Refusal::TransferDependency {
+                dependency: dependency.transfer_name(),
+            }));
+        }
         if has_structural_content(&value) {
             return Err(Error::Refused(Refusal::TransferDependency {
                 dependency: "structural text",
@@ -737,6 +825,49 @@ impl Snapshot {
             target: self.lineage(),
             destination,
             value,
+        })
+    }
+
+    /// Plans transfer of a complete inert embedded-object dependency closure.
+    ///
+    /// The donor's standalone object CFB and exact preview block are retained;
+    /// the receiver regenerates the field text, field PLCF, CHPX picture
+    /// references, Data-stream offset, and `ObjectPool` storage identity.
+    pub fn plan_embedded_transfer_from(
+        &self,
+        donor: &Self,
+        source_storage_id: u32,
+        destination_storage_id: u32,
+    ) -> Result<EmbeddedTransferPlan> {
+        if self
+            .embedded_objects()?
+            .get(destination_storage_id)
+            .is_some()
+        {
+            return Err(Error::Refused(Refusal::ResourceCollision {
+                storage_id: destination_storage_id,
+            }));
+        }
+        let donor = crate::embedded_object::Snapshot::open(donor.finish(), donor.limits)
+            .map_err(Error::Invalid)?;
+        if donor
+            .inventory()
+            .map_err(Error::Invalid)?
+            .get(source_storage_id)
+            .is_none()
+        {
+            return Err(Error::Refused(Refusal::ResourceNotFound {
+                storage_id: source_storage_id,
+            }));
+        }
+        let options = donor
+            .export_for_transfer(source_storage_id, destination_storage_id)
+            .map_err(Error::Invalid)?;
+        let mut validation = self.edit()?;
+        validation.add_embedded_object(options.clone())?;
+        Ok(EmbeddedTransferPlan {
+            target: self.lineage(),
+            options,
         })
     }
 
@@ -838,6 +969,9 @@ impl Edit {
     /// non-main story paragraphs require equal UTF-16 length.
     pub fn replace_text(&mut self, target: TextTarget, replacement: &str) -> Result<()> {
         let span = resolve_target(&self.editor, target)?;
+        if let Some(dependency) = drawing_dependency(&span.text) {
+            return Err(Error::Refused(Refusal::DrawingDependency { dependency }));
+        }
         if has_structural_content(&span.text) {
             return Err(Error::Refused(Refusal::StructuralContent));
         }
@@ -934,6 +1068,90 @@ impl Edit {
             return Err(Error::Conflict);
         }
         self.replace_text(plan.destination, &plan.value)
+    }
+
+    /// Applies a dependency-closed embedded-object transfer prepared for this
+    /// exact receiving artifact.
+    pub fn apply_embedded_transfer(&mut self, plan: &EmbeddedTransferPlan) -> Result<()> {
+        if plan.target != self.source.lineage() {
+            return Err(Error::Conflict);
+        }
+        self.add_embedded_object(plan.options.clone())
+    }
+
+    /// Adds one inert embedded object through the dedicated field,
+    /// `ObjectPool`, Data-stream, CHPX, CLX, and field-PLCF owner.
+    pub fn add_embedded_object(
+        &mut self,
+        mut options: crate::embedded_object::WriteOptions,
+    ) -> Result<()> {
+        let storage_id = options.storage_id;
+        options.instruction = format!(" EMBED LITCHI_OBJECT _{storage_id} ");
+        let bytes = self.editor.clone().finish().map_err(Error::Invalid)?;
+        let snapshot = crate::embedded_object::Snapshot::open(bytes, self.source.limits)
+            .map_err(Error::Invalid)?;
+        if snapshot
+            .inventory()
+            .map_err(Error::Invalid)?
+            .get(storage_id)
+            .is_some()
+        {
+            return Err(Error::Refused(Refusal::ResourceCollision { storage_id }));
+        }
+        self.ensure_operation_capacity()?;
+        let mut transaction = snapshot.edit();
+        transaction
+            .add(options.clone())
+            .map_err(|error| Error::Invalid(error.into()))?;
+        let bytes = transaction
+            .commit()
+            .map_err(|error| Error::Invalid(error.into()))?
+            .snapshot()
+            .finish();
+        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        self.changes.push(Change::EmbeddedObject {
+            storage_id,
+            before: None,
+            after: Some(options),
+        });
+        Ok(())
+    }
+
+    /// Removes one managed embedded field together with its preview and owning
+    /// `ObjectPool` storage. The exact dependency closure is retained in the
+    /// reversible patch.
+    pub fn remove_embedded_object(&mut self, storage_id: u32) -> Result<()> {
+        let bytes = self.editor.clone().finish().map_err(Error::Invalid)?;
+        let snapshot = crate::embedded_object::Snapshot::open(bytes, self.source.limits)
+            .map_err(Error::Invalid)?;
+        if snapshot
+            .inventory()
+            .map_err(Error::Invalid)?
+            .get(storage_id)
+            .is_none()
+        {
+            return Err(Error::Refused(Refusal::ResourceNotFound { storage_id }));
+        }
+        let before = snapshot
+            .export_for_transfer(storage_id, storage_id)
+            .map_err(Error::Invalid)?;
+        self.ensure_operation_capacity()?;
+        let mut transaction = snapshot.edit();
+        transaction
+            .remove(storage_id)
+            .map_err(|error| Error::Invalid(error.into()))?;
+        let bytes = transaction
+            .commit()
+            .map_err(|error| Error::Invalid(error.into()))?
+            .snapshot()
+            .finish();
+        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        self.changes.push(Change::EmbeddedObject {
+            storage_id,
+            before: Some(before),
+            after: None,
+        });
+        Ok(())
     }
 
     /// Accepts an insertion/move-to mark or rejects a deletion/move-from mark
@@ -1071,6 +1289,9 @@ impl Edit {
         let span = resolve_target(&self.editor, target)?;
         if span.start_cp == span.end_cp {
             return Err(Error::Refused(Refusal::EmptyParagraph));
+        }
+        if let Some(dependency) = drawing_dependency(&span.text) {
+            return Err(Error::Refused(Refusal::DrawingDependency { dependency }));
         }
         if has_structural_content(&span.text) {
             return Err(Error::Refused(Refusal::StructuralContent));
@@ -1236,21 +1457,25 @@ impl Patch {
     ) -> std::result::Result<litchi_core::patch::Patch<Reversible>, PatchError> {
         let before_artifact = BlobId::of(self.before.bytes()).as_hex();
         let after_artifact = BlobId::of(self.after.bytes()).as_hex();
-        let operations = self
-            .changes
-            .iter()
-            .map(|change| {
-                let forward = durable_operation(limits, change, &before_artifact)?;
-                let inverse = durable_operation(limits, &change.inverse(), &after_artifact)?;
-                Ok(ReversibleOperation::new(forward, inverse))
-            })
-            .collect::<std::result::Result<Vec<_>, PatchError>>()?;
+        let mut forward_blobs = BlobBundle::new(limits.blobs());
+        let mut reverse_blobs = BlobBundle::new(limits.blobs());
+        let mut operations = Vec::with_capacity(self.changes.len());
+        for change in &self.changes {
+            let forward = durable_operation(limits, change, &before_artifact, &mut forward_blobs)?;
+            let inverse = durable_operation(
+                limits,
+                &change.inverse(),
+                &after_artifact,
+                &mut reverse_blobs,
+            )?;
+            operations.push(ReversibleOperation::new(forward, inverse));
+        }
         litchi_core::patch::Patch::<Reversible>::new(
             limits,
             "litchi-doc-body",
             operations,
-            BlobBundle::new(limits.blobs()),
-            BlobBundle::new(limits.blobs()),
+            forward_blobs,
+            reverse_blobs,
         )
     }
 }
@@ -1285,6 +1510,12 @@ pub enum ChangeRef<'a> {
         storage_id: u32,
         before: bool,
         after: bool,
+    },
+    /// One complete embedded field/preview/storage presence change.
+    EmbeddedObject {
+        storage_id: u32,
+        before_present: bool,
+        after_present: bool,
     },
 }
 
@@ -1344,6 +1575,11 @@ enum Change {
         before: bool,
         after: bool,
     },
+    EmbeddedObject {
+        storage_id: u32,
+        before: Option<crate::embedded_object::WriteOptions>,
+        after: Option<crate::embedded_object::WriteOptions>,
+    },
 }
 
 impl Change {
@@ -1355,7 +1591,10 @@ impl Change {
             } => format!("{}/{}", durable_target(*target), property.wire_name()),
             Self::RevisionMark { identity, .. } => identity.clone(),
             Self::EmbeddedDisplay { storage_id, .. } => {
-                format!("resource/embedded:{storage_id}/display-as-icon")
+                format!("resource/embedded:{storage_id}")
+            },
+            Self::EmbeddedObject { storage_id, .. } => {
+                format!("resource/embedded:{storage_id}")
             },
         }
     }
@@ -1416,6 +1655,18 @@ impl Change {
                     ..
                 },
             ) => left_id == right_id && left_after == right_after,
+            (
+                Self::EmbeddedObject {
+                    storage_id: left_id,
+                    after: left_after,
+                    ..
+                },
+                Self::EmbeddedObject {
+                    storage_id: right_id,
+                    after: right_after,
+                    ..
+                },
+            ) => left_id == right_id && left_after == right_after,
             _ => false,
         }
     }
@@ -1467,6 +1718,15 @@ impl Change {
                 before: *before,
                 after: *after,
             },
+            Self::EmbeddedObject {
+                storage_id,
+                before,
+                after,
+            } => ChangeRef::EmbeddedObject {
+                storage_id: *storage_id,
+                before_present: before.is_some(),
+                after_present: after.is_some(),
+            },
         }
     }
 
@@ -1509,6 +1769,15 @@ impl Change {
                 storage_id: *storage_id,
                 before: *after,
                 after: *before,
+            },
+            Self::EmbeddedObject {
+                storage_id,
+                before,
+                after,
+            } => Self::EmbeddedObject {
+                storage_id: *storage_id,
+                before: after.clone(),
+                after: before.clone(),
             },
         }
     }
@@ -1720,6 +1989,33 @@ impl TransferPlan {
     }
 }
 
+/// Complete inert embedded-object closure prepared for one exact receiver.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EmbeddedTransferPlan {
+    target: Lineage,
+    options: crate::embedded_object::WriteOptions,
+}
+
+impl EmbeddedTransferPlan {
+    /// Destination semantic storage identifier.
+    #[must_use]
+    pub const fn storage_id(&self) -> u32 {
+        self.options.storage_id
+    }
+
+    /// Size of the standalone bounded object CFB.
+    #[must_use]
+    pub fn compound_size(&self) -> usize {
+        self.options.compound_file.len()
+    }
+
+    /// Size of the exact `PICFAndOfficeArtData` preview dependency.
+    #[must_use]
+    pub fn preview_size(&self) -> usize {
+        self.options.picture_data.len()
+    }
+}
+
 /// One semantic facet changed differently by both sides of a three-way plan.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ThreeWayConflict {
@@ -1790,6 +2086,7 @@ fn durable_operation(
     limits: PatchLimits,
     change: &Change,
     artifact: &str,
+    blobs: &mut BlobBundle,
 ) -> std::result::Result<PatchOperation, PatchError> {
     let mut preconditions = BTreeMap::new();
     preconditions.insert(
@@ -1852,8 +2149,103 @@ fn durable_operation(
                 (*after).into(),
             )
         },
+        Change::EmbeddedObject {
+            storage_id,
+            before,
+            after,
+        } => {
+            preconditions.insert("present".to_string(), before.is_some().into());
+            (
+                "embedded-object.set".to_string(),
+                format!("resource/embedded:{storage_id}"),
+                embedded_options_value(after.as_ref(), blobs)?,
+            )
+        },
     };
     PatchOperation::new(limits, op, target, preconditions, value)
+}
+
+fn embedded_options_value(
+    options: Option<&crate::embedded_object::WriteOptions>,
+    blobs: &mut BlobBundle,
+) -> std::result::Result<serde_json::Value, PatchError> {
+    let Some(options) = options else {
+        return Ok(serde_json::Value::Null);
+    };
+    let compound = blobs.insert(&options.compound_file)?.as_hex();
+    let preview = blobs.insert(&options.picture_data)?.as_hex();
+    let mut value = serde_json::Map::new();
+    value.insert("compound_blob".to_string(), compound.into());
+    value.insert("preview_blob".to_string(), preview.into());
+    Ok(serde_json::Value::Object(value))
+}
+
+fn apply_durable_embedded_object(
+    edit: &mut Edit,
+    operation: &PatchOperation,
+    blobs: &BlobBundle,
+    used_blobs: &mut BTreeSet<String>,
+) -> Result<()> {
+    let storage_id = operation
+        .target
+        .strip_prefix("resource/embedded:")
+        .and_then(|value| value.parse::<u32>().ok())
+        .ok_or_else(|| invalid_durable_patch("invalid embedded-resource target"))?;
+    let expected = operation
+        .preconditions
+        .get("present")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| invalid_durable_patch("embedded presence precondition is invalid"))?;
+    let actual = embedded_object_value(edit, storage_id)?.is_some();
+    if actual != expected {
+        return Err(Error::Conflict);
+    }
+    if operation.value.is_null() {
+        if !expected {
+            return Err(invalid_durable_patch(
+                "embedded-object removal requires an existing resource",
+            ));
+        }
+        return edit.remove_embedded_object(storage_id);
+    }
+    if expected {
+        return Err(invalid_durable_patch(
+            "embedded-object replacement is outside this add/remove vocabulary",
+        ));
+    }
+    let object = operation
+        .value
+        .as_object()
+        .filter(|object| object.len() == 2)
+        .ok_or_else(|| invalid_durable_patch("embedded-object value has invalid fields"))?;
+    let compound = required_blob(object, "compound_blob", blobs, used_blobs)?;
+    let preview = required_blob(object, "preview_blob", blobs, used_blobs)?;
+    edit.add_embedded_object(crate::embedded_object::WriteOptions::new(
+        storage_id, compound, preview,
+    ))
+}
+
+fn required_blob(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    blobs: &BlobBundle,
+    used_blobs: &mut BTreeSet<String>,
+) -> Result<Vec<u8>> {
+    let id = object
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .ok_or_else(|| invalid_durable_patch("embedded blob reference is invalid"))?;
+    let blob_id = blobs
+        .ids()
+        .find(|candidate| candidate.as_hex() == id)
+        .ok_or_else(|| invalid_durable_patch("embedded blob is missing"))?;
+    let bytes = blobs
+        .get(blob_id)
+        .ok_or_else(|| invalid_durable_patch("embedded blob is missing"))?
+        .to_vec();
+    used_blobs.insert(id.to_string());
+    Ok(bytes)
 }
 
 fn optional_bool_value(value: Option<bool>) -> serde_json::Value {
@@ -2025,24 +2417,28 @@ fn parse_timestamp(value: &serde_json::Value) -> Result<Option<DateTime>> {
         .filter(|object| object.len() == 6)
         .ok_or_else(|| invalid_durable_patch("revision timestamp has invalid fields"))?;
     Ok(Some(DateTime {
-        year: required_u32(object, "year")?
-            .try_into()
-            .map_err(|_error| invalid_durable_patch("revision year exceeds u16"))?,
-        month: required_u32(object, "month")?
-            .try_into()
-            .map_err(|_error| invalid_durable_patch("revision month exceeds u8"))?,
+        year: required_u32(object, "year")?.try_into().map_err(|error| {
+            invalid_durable_patch(&format!("revision year exceeds u16: {error}"))
+        })?,
+        month: required_u32(object, "month")?.try_into().map_err(|error| {
+            invalid_durable_patch(&format!("revision month exceeds u8: {error}"))
+        })?,
         day: required_u32(object, "day")?
             .try_into()
-            .map_err(|_error| invalid_durable_patch("revision day exceeds u8"))?,
-        hour: required_u32(object, "hour")?
-            .try_into()
-            .map_err(|_error| invalid_durable_patch("revision hour exceeds u8"))?,
+            .map_err(|error| invalid_durable_patch(&format!("revision day exceeds u8: {error}")))?,
+        hour: required_u32(object, "hour")?.try_into().map_err(|error| {
+            invalid_durable_patch(&format!("revision hour exceeds u8: {error}"))
+        })?,
         minute: required_u32(object, "minute")?
             .try_into()
-            .map_err(|_error| invalid_durable_patch("revision minute exceeds u8"))?,
+            .map_err(|error| {
+                invalid_durable_patch(&format!("revision minute exceeds u8: {error}"))
+            })?,
         weekday: required_u32(object, "weekday")?
             .try_into()
-            .map_err(|_error| invalid_durable_patch("revision weekday exceeds u8"))?,
+            .map_err(|error| {
+                invalid_durable_patch(&format!("revision weekday exceeds u8: {error}"))
+            })?,
     }))
 }
 
@@ -2160,7 +2556,55 @@ fn apply_change_after(edit: &mut Edit, change: &Change) -> Result<()> {
         Change::EmbeddedDisplay {
             storage_id, after, ..
         } => edit.set_embedded_display_as_icon(*storage_id, *after),
+        Change::EmbeddedObject {
+            storage_id,
+            before,
+            after,
+        } => set_embedded_object(edit, *storage_id, before.clone(), after.clone()),
     }
+}
+
+fn set_embedded_object(
+    edit: &mut Edit,
+    storage_id: u32,
+    expected: Option<crate::embedded_object::WriteOptions>,
+    value: Option<crate::embedded_object::WriteOptions>,
+) -> Result<()> {
+    let actual = embedded_object_value(edit, storage_id)?;
+    if actual != expected {
+        return Err(Error::Conflict);
+    }
+    if expected == value {
+        return Ok(());
+    }
+    match value {
+        Some(options) if options.storage_id == storage_id => edit.add_embedded_object(options),
+        None if expected.is_some() => edit.remove_embedded_object(storage_id),
+        _ => Err(invalid_durable_patch(
+            "embedded-object transition or storage identity is invalid",
+        )),
+    }
+}
+
+fn embedded_object_value(
+    edit: &Edit,
+    storage_id: u32,
+) -> Result<Option<crate::embedded_object::WriteOptions>> {
+    let bytes = edit.editor.clone().finish().map_err(Error::Invalid)?;
+    let snapshot = crate::embedded_object::Snapshot::open(bytes, edit.source.limits)
+        .map_err(Error::Invalid)?;
+    if snapshot
+        .inventory()
+        .map_err(Error::Invalid)?
+        .get(storage_id)
+        .is_none()
+    {
+        return Ok(None);
+    }
+    snapshot
+        .export_for_transfer(storage_id, storage_id)
+        .map(Some)
+        .map_err(Error::Invalid)
 }
 
 fn set_revision_mark(
@@ -2283,10 +2727,9 @@ fn parse_position(value: &str) -> Result<Position> {
     {
         return Err(invalid_durable_patch("invalid canonical DOC position"));
     }
-    value
-        .parse::<usize>()
-        .map(Position::new)
-        .map_err(|_error| invalid_durable_patch("DOC position exceeds this platform"))
+    value.parse::<usize>().map(Position::new).map_err(|error| {
+        invalid_durable_patch(&format!("DOC position exceeds this platform: {error}"))
+    })
 }
 
 fn invalid_durable_patch(message: &str) -> Error {
@@ -2382,7 +2825,7 @@ fn story_paragraph_spans(editor: &RevisionEditor, story: Story) -> Result<Vec<So
     let mut start_byte = 0usize;
     let mut cp = origin;
     for (byte, character) in text.char_indices() {
-        let width = character.len_utf16() as u32;
+        let width = if character.len_utf16() == 1 { 1 } else { 2 };
         let next_cp = cp.checked_add(width).ok_or_else(cp_overflow)?;
         if character == '\r' {
             output.push(SourceSpan {
@@ -2413,7 +2856,7 @@ fn simple_table_cell_spans(editor: &RevisionEditor) -> Result<Vec<SourceSpan>> {
     let mut pending: Option<(u32, u32, usize, usize)> = None;
     let mut cp = 0u32;
     for (byte, character) in text.char_indices() {
-        let width = character.len_utf16() as u32;
+        let width = if character.len_utf16() == 1 { 1 } else { 2 };
         let next_cp = cp.checked_add(width).ok_or_else(cp_overflow)?;
         if character == '\r' {
             if editor.is_in_table_at_cp(cp).map_err(Error::Invalid)? {
@@ -2460,7 +2903,7 @@ fn simple_field_result_spans(editor: &RevisionEditor) -> Result<Vec<SourceSpan>>
     let mut stack = Vec::<FieldFrame>::new();
     let mut cp = 0u32;
     for (byte, character) in text.char_indices() {
-        let width = character.len_utf16() as u32;
+        let width = if character.len_utf16() == 1 { 1 } else { 2 };
         let next_cp = cp.checked_add(width).ok_or_else(cp_overflow)?;
         match character {
             '\u{13}' => {
@@ -2646,6 +3089,23 @@ fn has_structural_content(text: &str) -> bool {
     })
 }
 
+fn drawing_dependency(text: &str) -> Option<DrawingDependency> {
+    if text.contains('\u{1}') {
+        Some(DrawingDependency::InlinePictureOrObjectPreview)
+    } else if text.contains('\u{8}') {
+        Some(DrawingDependency::FloatingOfficeArt)
+    } else if text.contains('\u{fffc}') {
+        Some(DrawingDependency::ObjectReplacement)
+    } else if text
+        .chars()
+        .any(|character| character.is_control() && !matches!(character, '\t' | '\r'))
+    {
+        Some(DrawingDependency::UnsupportedControl)
+    } else {
+        None
+    }
+}
+
 fn fingerprint(bytes: &[u8]) -> u64 {
     let mut value = 0xcbf2_9ce4_8422_2325u64;
     for byte in bytes {
@@ -2657,9 +3117,15 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "unit-test fixtures use contextual fail-fast assertions"
+    )]
+
     use super::{
-        CharacterProperty, Error, Projection, Refusal, RevisionDisposition, Snapshot, Story,
-        TextTarget, TransactionLimits,
+        CharacterProperty, DrawingDependency, Error, Projection, Refusal, RevisionDisposition,
+        Snapshot, Story, TextTarget, TransactionLimits,
     };
     use crate::tracked_revision::Limits;
     use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
@@ -2754,6 +3220,17 @@ mod tests {
             8,
             16 * 1024,
             64 * 1024,
+        )
+    }
+
+    fn resource_patch_limits() -> PatchLimits {
+        PatchLimits::new(
+            BlobLimits::new(8, 4 * 1024 * 1024, 8 * 1024 * 1024),
+            12 * 1024 * 1024,
+            32,
+            8,
+            16 * 1024,
+            12 * 1024 * 1024,
         )
     }
 
@@ -2966,19 +3443,20 @@ mod tests {
             None
         );
 
-        let mut history = source.history(HistoryLimits::new(1, wire.len() as u64));
+        let wire_bytes = u64::try_from(wire.len()).expect("wire length fits u64");
+        let mut history = source.history(HistoryLimits::new(1, wire_bytes));
         history
-            .record(commit.snapshot().clone(), wire.len() as u64)
+            .record(commit.snapshot().clone(), wire_bytes)
             .expect("record history");
         assert!(history.undo());
         assert_eq!(history.current(), &source);
         assert!(history.redo());
         assert_eq!(history.current(), commit.snapshot());
 
-        let mut too_small = source.history(HistoryLimits::new(1, wire.len() as u64 - 1));
+        let mut too_small = source.history(HistoryLimits::new(1, wire_bytes - 1));
         assert!(
             too_small
-                .record(commit.snapshot().clone(), wire.len() as u64)
+                .record(commit.snapshot().clone(), wire_bytes)
                 .is_err()
         );
         assert_eq!(too_small.current(), &source);
@@ -3191,6 +3669,156 @@ mod tests {
                 .expect("resource inverse"),
             source
         );
+    }
+
+    #[test]
+    fn embedded_transfer_closes_field_preview_storage_merge_and_history() {
+        let donor = Snapshot::parse(&embedded_doc()).expect("embedded donor");
+        let receiver = Snapshot::parse(&doc(&["receiver"])).expect("receiver");
+        let plan = receiver
+            .plan_embedded_transfer_from(&donor, 77, 88)
+            .expect("dependency-closed transfer plan");
+        assert_eq!(plan.storage_id(), 88);
+        assert!(plan.compound_size() > 0);
+        assert!(plan.preview_size() >= 12);
+
+        let mut transfer = receiver.edit().expect("transfer edit");
+        transfer
+            .apply_embedded_transfer(&plan)
+            .expect("embedded transfer");
+        let transfer = transfer.commit().expect("transfer commit");
+        assert!(
+            transfer
+                .snapshot()
+                .embedded_objects()
+                .expect("transferred inventory")
+                .get(88)
+                .is_some()
+        );
+        let exact_inverse = transfer
+            .patch()
+            .inverse()
+            .apply(transfer.snapshot())
+            .expect("exact in-memory inverse");
+        assert_eq!(exact_inverse.bytes(), receiver.bytes());
+
+        let durable = transfer
+            .patch()
+            .to_durable(resource_patch_limits())
+            .expect("resource durable patch");
+        assert_eq!(durable.blobs().len(), 2);
+        let wire = durable
+            .to_deterministic_json()
+            .expect("resource canonical JSON");
+        let decoded = Patch::<Reversible>::from_deterministic_json(&wire, resource_patch_limits())
+            .expect("resource durable decode");
+        let replay = receiver
+            .apply_durable(&decoded)
+            .expect("resource durable replay");
+        assert!(
+            replay
+                .embedded_objects()
+                .expect("replayed inventory")
+                .get(88)
+                .is_some()
+        );
+        let semantic_inverse = replay
+            .apply_durable(&decoded.inverse())
+            .expect("resource durable inverse");
+        assert!(
+            semantic_inverse
+                .embedded_objects()
+                .expect("inverse inventory")
+                .is_empty()
+        );
+
+        let mut text = receiver.edit().expect("text edit");
+        text.replace_paragraph(Position::new(0), "receiver changed")
+            .expect("disjoint text change");
+        let text = text.commit().expect("text commit");
+        let merged = receiver
+            .plan_three_way(transfer.patch(), text.patch())
+            .expect("resource/text three-way plan");
+        assert!(merged.is_conflict_free());
+        let merged = merged.commit().expect("resource/text merge");
+        assert!(
+            merged
+                .snapshot()
+                .embedded_objects()
+                .expect("merged inventory")
+                .get(88)
+                .is_some()
+        );
+        assert_eq!(
+            merged
+                .snapshot()
+                .paragraphs(Projection::All)
+                .expect("merged text")[0]
+                .text(),
+            "receiver changed"
+        );
+
+        let wire_bytes = u64::try_from(wire.len()).expect("wire length fits u64");
+        let mut history = receiver.history(HistoryLimits::new(1, wire_bytes));
+        history
+            .record(transfer.snapshot().clone(), wire_bytes)
+            .expect("resource history record");
+        assert!(history.undo());
+        assert_eq!(history.current(), &receiver);
+        assert!(history.redo());
+        assert_eq!(history.current(), transfer.snapshot());
+
+        assert!(matches!(
+            transfer
+                .snapshot()
+                .plan_embedded_transfer_from(&donor, 77, 88),
+            Err(Error::Refused(Refusal::ResourceCollision {
+                storage_id: 88
+            }))
+        ));
+    }
+
+    #[test]
+    fn drawing_and_preview_dependencies_have_precise_atomic_refusals() {
+        let embedded = Snapshot::parse(&embedded_doc()).expect("embedded snapshot");
+        let preview = embedded
+            .field_results()
+            .expect("embedded result")
+            .into_iter()
+            .find(|item| item.text().contains('\u{1}'))
+            .expect("embedded preview character");
+        let mut edit = embedded.edit().expect("preview edit");
+        assert!(matches!(
+            edit.replace_text(preview.target(), "replacement"),
+            Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::InlinePictureOrObjectPreview
+            }))
+        ));
+
+        let mut writer = Writer::new();
+        writer.add_paragraph("body").expect("body");
+        writer
+            .insert_floating_shape(
+                crate::writer::Shape::new(crate::writer::Kind::Rectangle, 720, 360).expect("shape"),
+                crate::writer::FloatingPosition::new(120, 240),
+            )
+            .expect("floating shape");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("drawing DOC");
+        let drawing = Snapshot::parse(&output.into_inner()).expect("drawing snapshot");
+        let anchor = drawing
+            .paragraphs(Projection::All)
+            .expect("drawing paragraphs")
+            .into_iter()
+            .find(|paragraph| paragraph.text().contains('\u{8}'))
+            .expect("floating anchor");
+        let mut edit = drawing.edit().expect("drawing edit");
+        assert!(matches!(
+            edit.replace_paragraph(anchor.position(), "replacement"),
+            Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::FloatingOfficeArt
+            }))
+        ));
     }
 
     #[test]

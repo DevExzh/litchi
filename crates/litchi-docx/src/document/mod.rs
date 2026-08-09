@@ -11,10 +11,12 @@ mod package;
 mod tests;
 mod transaction;
 
+pub(crate) use transaction::{TransferPart, TransferRelationship, durable_transfer_operations};
+
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use transaction::{
     Commit, Composition, CompositionLimits, Diagnostics, Edit, History, HistoryLimits, JoinError,
     MergeChoice, Operation, ParagraphTransfer, Patch, PreparedEdit, Refusal, RevisionKind,
     Snapshot, SubEditConflict, SubEditJoinFailure, ThreeWayError, ThreeWayMergeFailure,
-    ThreeWayPlan, TransactionError, TransactionResult, TransferRefusal,
+    ThreeWayPlan, TransactionError, TransactionResult, TransferGraph, TransferRefusal,
 };

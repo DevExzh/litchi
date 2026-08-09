@@ -29,6 +29,7 @@ pub struct Area {
     no_href: bool,
     link_type: Option<String>,
     show: Option<String>,
+    actuate: Option<String>,
     title: Option<String>,
     description: Option<String>,
 }
@@ -43,6 +44,7 @@ impl Area {
             no_href: properties.no_href,
             link_type: properties.link_type,
             show: properties.show,
+            actuate: properties.actuate,
             title: properties.title,
             description: properties.description,
         }
@@ -135,6 +137,13 @@ impl Area {
         self
     }
 
+    /// Sets the lexical `XLink` activation behavior.
+    #[must_use]
+    pub fn with_actuate(mut self, value: impl Into<String>) -> Self {
+        self.actuate = Some(value.into());
+        self
+    }
+
     /// Marks this region as explicitly unlinked.
     #[must_use]
     pub fn with_no_href(mut self) -> Self {
@@ -142,6 +151,7 @@ impl Area {
         self.no_href = true;
         self.link_type = None;
         self.show = None;
+        self.actuate = None;
         self
     }
 
@@ -208,6 +218,12 @@ impl Area {
         self.show.as_deref()
     }
 
+    /// Returns the `XLink` activation behavior, if present.
+    #[must_use]
+    pub fn actuate(&self) -> Option<&str> {
+        self.actuate.as_deref()
+    }
+
     /// Returns the short accessible title.
     #[must_use]
     pub fn title(&self) -> Option<&str> {
@@ -257,6 +273,7 @@ pub(crate) struct AreaProperties {
     pub(crate) no_href: bool,
     pub(crate) link_type: Option<String>,
     pub(crate) show: Option<String>,
+    pub(crate) actuate: Option<String>,
     pub(crate) title: Option<String>,
     pub(crate) description: Option<String>,
 }

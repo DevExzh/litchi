@@ -22,6 +22,54 @@ use crate::package::{Error as PackageError, Package, RecordLimits};
 /// Explicit bounded undo/redo history for slide-order snapshots.
 pub type History = litchi_core::patch::History<Snapshot>;
 
+/// A native owner edge that must be closed before a slide can be transferred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransferDependency {
+    /// The slide points at a notes persist object.
+    SpeakerNotes,
+    /// Slide comments also require the document author catalog.
+    CommentAuthorCatalog,
+    /// Interactive actions require the document hyperlink relationship table.
+    HyperlinkAction,
+    /// `OfficeArt` shape identifiers, drawing-group state, and picture-store
+    /// references are presentation-global.
+    DrawingGroup,
+    /// An `ExObjRefAtom` can address media, a chart, or another OLE object in
+    /// the document external-object relationship table.
+    ExternalObjectRelationship,
+}
+
+impl fmt::Display for TransferDependency {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::SpeakerNotes => "speaker-notes",
+            Self::CommentAuthorCatalog => "comment-author-catalog",
+            Self::HyperlinkAction => "hyperlink-action",
+            Self::DrawingGroup => "drawing-group/picture-store",
+            Self::ExternalObjectRelationship => "external media/chart/OLE relationship",
+        })
+    }
+}
+
+/// Root owners whose byte publications cannot be safely interleaved in one
+/// transaction without rebasing the staged document structure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OwnerBoundary {
+    /// Slide-list and master-list structure in the live document record.
+    DocumentStructure,
+    /// External media and its document relationship list.
+    ExternalMedia,
+}
+
+impl fmt::Display for OwnerBoundary {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::DocumentStructure => "document structure",
+            Self::ExternalMedia => "external media",
+        })
+    }
+}
+
 /// A reason why slide order cannot safely be changed for this source.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,13 +83,19 @@ pub enum Refusal {
     ReviewHistoryDependency,
     /// A slide depends on notes, drawings, media, or another owner whose
     /// identifiers cannot yet be rewritten as a closed transfer unit.
-    UnsupportedSlideDependency { dependency: &'static str },
+    UnsupportedSlideDependency { dependency: TransferDependency },
     /// The receiving presentation does not contain the referenced master.
     MissingMasterDependency { master_id: u32 },
     /// A transfer plan was prepared for a different exact receiving artifact.
     TransferTargetMismatch,
     /// A shape edit selected a slide inserted but not yet published.
     UncommittedSlideDependency,
+    /// Two live-document owners were requested in an order that cannot be
+    /// rebased without risking a lost update.
+    OwnerOrderConflict {
+        staged: OwnerBoundary,
+        requested: OwnerBoundary,
+    },
 }
 
 impl fmt::Display for Refusal {
@@ -72,6 +126,10 @@ impl fmt::Display for Refusal {
             },
             Self::UncommittedSlideDependency => formatter
                 .write_str("PPT shape text cannot target an inserted slide before publication"),
+            Self::OwnerOrderConflict { staged, requested } => write!(
+                formatter,
+                "PPT root cannot stage {requested} after {staged} without rebasing the live document"
+            ),
         }
     }
 }
@@ -254,6 +312,38 @@ impl Snapshot {
         crate::text_edit::inspect_shape_anchor(self.bytes(), target).map_err(Error::from)
     }
 
+    /// Returns the inert path of one linked movie/audio relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the live document's media owner is malformed, the
+    /// identifier is absent, or it addresses a non-path media kind.
+    pub fn external_media_path(&self, id: u32) -> Result<Option<String>> {
+        let media = external_media_snapshot(self)?;
+        let object = media
+            .collection()
+            .and_then(|collection| collection.objects.iter().find(|object| object.id() == id))
+            .ok_or_else(|| {
+                PackageError::InvalidFormat(format!("external media ID {id} was not found"))
+            })?;
+        media_path_of(object)
+    }
+
+    /// Returns the playback flags of one external-media relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the live document's media owner is malformed or
+    /// the identifier is absent.
+    pub fn external_media_playback(&self, id: u32) -> Result<crate::external_media::Playback> {
+        external_media_snapshot(self)?
+            .collection()
+            .and_then(|collection| collection.playback(id))
+            .ok_or_else(|| {
+                PackageError::InvalidFormat(format!("external media ID {id} was not found")).into()
+            })
+    }
+
     /// Resource bounds retained for commits and patch application.
     #[must_use]
     pub const fn limits(&self) -> RecordLimits {
@@ -276,6 +366,8 @@ impl Snapshot {
             structural: Vec::new(),
             text_changes: Vec::new(),
             anchor_changes: Vec::new(),
+            media_path_changes: Vec::new(),
+            media_playback_changes: Vec::new(),
             formatting: Vec::new(),
             inserted_records: BTreeMap::new(),
         })
@@ -403,6 +495,12 @@ impl Snapshot {
                     "presentation.shape-anchor.set" => {
                         apply_durable_anchor(&current, &operations[index])?
                     },
+                    "presentation.external-media-path.set" => {
+                        apply_durable_media_path(&current, &operations[index])?
+                    },
+                    "presentation.external-media-playback.set" => {
+                        apply_durable_media_playback(&current, &operations[index])?
+                    },
                     _ => unreachable!("formatting vocabulary is checked by its predicate"),
                 };
                 index += 1;
@@ -521,6 +619,62 @@ pub struct ShapeAnchorChange {
     after: crate::Anchor,
 }
 
+/// One checked replacement of an inert external movie/audio path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalMediaPathChange {
+    id: u32,
+    before: Option<String>,
+    after: Option<String>,
+}
+
+impl ExternalMediaPathChange {
+    /// External-object identifier retained by the replacement.
+    #[must_use]
+    pub const fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// Path required before the replacement.
+    #[must_use]
+    pub fn before(&self) -> Option<&str> {
+        self.before.as_deref()
+    }
+
+    /// Replacement path, or `None` to clear it.
+    #[must_use]
+    pub fn after(&self) -> Option<&str> {
+        self.after.as_deref()
+    }
+}
+
+/// One checked replacement of external-media playback flags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExternalMediaPlaybackChange {
+    id: u32,
+    before: crate::external_media::Playback,
+    after: crate::external_media::Playback,
+}
+
+impl ExternalMediaPlaybackChange {
+    /// External-object identifier retained by the replacement.
+    #[must_use]
+    pub const fn id(self) -> u32 {
+        self.id
+    }
+
+    /// Playback flags required before the replacement.
+    #[must_use]
+    pub const fn before(self) -> crate::external_media::Playback {
+        self.before
+    }
+
+    /// Replacement playback flags.
+    #[must_use]
+    pub const fn after(self) -> crate::external_media::Playback {
+        self.after
+    }
+}
+
 impl ShapeAnchorChange {
     /// Semantic source-order shape target.
     #[must_use]
@@ -545,6 +699,8 @@ impl ShapeAnchorChange {
 enum FormattingChange {
     Text(ShapeTextChange),
     Anchor(ShapeAnchorChange),
+    MediaPath(ExternalMediaPathChange),
+    MediaPlayback(ExternalMediaPlaybackChange),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -643,6 +799,8 @@ pub struct Transaction {
     structural: Vec<StructuralChange>,
     text_changes: Vec<ShapeTextChange>,
     anchor_changes: Vec<ShapeAnchorChange>,
+    media_path_changes: Vec<ExternalMediaPathChange>,
+    media_playback_changes: Vec<ExternalMediaPlaybackChange>,
     formatting: Vec<FormattingChange>,
     inserted_records: BTreeMap<u32, Vec<u8>>,
 }
@@ -680,6 +838,18 @@ impl Transaction {
         &self.anchor_changes
     }
 
+    /// External movie/audio path replacements staged in this root.
+    #[must_use]
+    pub fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
+        &self.media_path_changes
+    }
+
+    /// External-media playback replacements staged in this root.
+    #[must_use]
+    pub fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
+        &self.media_playback_changes
+    }
+
     /// Moves a slide to a final zero-based position in the current projected
     /// order. Moving a slide to its current position is an exact no-op.
     ///
@@ -693,6 +863,7 @@ impl Transaction {
         if from == destination {
             return Ok(());
         }
+        self.require_no_media_for_structure()?;
         let before_order = order_digest(&self.document)?;
         self.document
             .move_slide(from.get(), destination.get())
@@ -799,6 +970,94 @@ impl Transaction {
         Ok(())
     }
 
+    /// Changes or clears an inert linked movie/audio path through the live
+    /// document's external-media owner.
+    ///
+    /// The path is serialized only; it is never opened or resolved. A
+    /// transaction that already staged slide-list structure is refused
+    /// atomically because both owners replace the same live document record.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed owner-order refusal or an external-media validation or
+    /// package publication error.
+    pub fn set_external_media_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
+        self.require_no_structure_for_media()?;
+        let media = external_media_snapshot(&self.working)?;
+        let object = media
+            .collection()
+            .and_then(|collection| collection.objects.iter().find(|object| object.id() == id))
+            .ok_or_else(|| {
+                PackageError::InvalidFormat(format!("external media ID {id} was not found"))
+            })?;
+        let before = media_path_of(object)?;
+        let mut transaction = media.edit();
+        transaction.set_path(id, path.clone())?;
+        let commit = transaction.commit()?;
+        if commit.patch().is_empty() {
+            return Ok(());
+        }
+        self.working = publish_live_document(&self.working, commit.snapshot().bytes())?;
+        if self.working.external_media_path(id)? != path {
+            return Err(PackageError::Corrupted(
+                "published PPT external-media path did not round-trip".into(),
+            )
+            .into());
+        }
+        let change = ExternalMediaPathChange {
+            id,
+            before,
+            after: path,
+        };
+        self.media_path_changes.push(change.clone());
+        self.formatting.push(FormattingChange::MediaPath(change));
+        Ok(())
+    }
+
+    /// Replaces playback flags through the live document's external-media
+    /// owner without resolving or activating external content.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed owner-order refusal or an external-media validation or
+    /// package publication error.
+    pub fn set_external_media_playback(
+        &mut self,
+        id: u32,
+        playback: crate::external_media::Playback,
+    ) -> Result<()> {
+        self.require_no_structure_for_media()?;
+        let media = external_media_snapshot(&self.working)?;
+        let before = media
+            .collection()
+            .and_then(|collection| collection.playback(id))
+            .ok_or_else(|| {
+                PackageError::InvalidFormat(format!("external media ID {id} was not found"))
+            })?;
+        let mut transaction = media.edit();
+        transaction.set_playback(id, playback)?;
+        let commit = transaction.commit()?;
+        if commit.patch().is_empty() {
+            return Ok(());
+        }
+        self.working = publish_live_document(&self.working, commit.snapshot().bytes())?;
+        if self.working.external_media_playback(id)? != playback {
+            return Err(PackageError::Corrupted(
+                "published PPT external-media playback did not round-trip".into(),
+            )
+            .into());
+        }
+        let change = ExternalMediaPlaybackChange {
+            id,
+            before,
+            after: playback,
+        };
+        self.media_playback_changes.push(change);
+        self.formatting
+            .push(FormattingChange::MediaPlayback(change));
+        Ok(())
+    }
+
     /// Removes one slide-list entry and its dependency-owned outline records.
     /// The persisted slide payload remains as unreachable incremental history.
     ///
@@ -807,6 +1066,7 @@ impl Transaction {
     /// Returns a typed position refusal or a structural validation error.
     pub fn remove_slide(&mut self, position: Position) -> Result<()> {
         self.require_position(position)?;
+        self.require_no_media_for_structure()?;
         let before_order = order_digest(&self.document)?;
         let slides = self.document.slides()?;
         let selected = slides[position.get()];
@@ -840,6 +1100,7 @@ impl Transaction {
         if position.get() > self.slide_count() {
             return Err(Error::Refused(Refusal::SlideNotFound { position }));
         }
+        self.require_no_media_for_structure()?;
         require_master(&self.document, plan.payload.master_id)?;
         let persist_id = next_persist_id(&self.source, &self.inserted_records)?;
         let slide_id = next_slide_id(&self.document)?;
@@ -883,6 +1144,8 @@ impl Transaction {
                 self.structural,
                 self.text_changes,
                 self.anchor_changes,
+                self.media_path_changes,
+                self.media_playback_changes,
                 self.formatting,
                 true,
                 artifact_hash(working.bytes()),
@@ -941,6 +1204,8 @@ impl Transaction {
             self.structural,
             self.text_changes,
             self.anchor_changes,
+            self.media_path_changes,
+            self.media_playback_changes,
             self.formatting,
             true,
             artifact_hash(working.bytes()),
@@ -964,6 +1229,28 @@ impl Transaction {
 
     fn order_fingerprint(&self) -> Result<String> {
         order_digest(&self.document).map(hex_digest)
+    }
+
+    fn require_no_media_for_structure(&self) -> Result<()> {
+        if self.media_path_changes.is_empty() && self.media_playback_changes.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::Refused(Refusal::OwnerOrderConflict {
+                staged: OwnerBoundary::ExternalMedia,
+                requested: OwnerBoundary::DocumentStructure,
+            }))
+        }
+    }
+
+    fn require_no_structure_for_media(&self) -> Result<()> {
+        if self.structural.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::Refused(Refusal::OwnerOrderConflict {
+                staged: OwnerBoundary::DocumentStructure,
+                requested: OwnerBoundary::ExternalMedia,
+            }))
+        }
     }
 }
 
@@ -1003,6 +1290,8 @@ pub struct Patch {
     structural: Vec<StructuralChange>,
     text_changes: Vec<ShapeTextChange>,
     anchor_changes: Vec<ShapeAnchorChange>,
+    media_path_changes: Vec<ExternalMediaPathChange>,
+    media_playback_changes: Vec<ExternalMediaPlaybackChange>,
     formatting: Vec<FormattingChange>,
     formatting_first: bool,
     structural_before_artifact: String,
@@ -1017,6 +1306,8 @@ impl Patch {
         structural: Vec<StructuralChange>,
         text_changes: Vec<ShapeTextChange>,
         anchor_changes: Vec<ShapeAnchorChange>,
+        media_path_changes: Vec<ExternalMediaPathChange>,
+        media_playback_changes: Vec<ExternalMediaPlaybackChange>,
         formatting: Vec<FormattingChange>,
         formatting_first: bool,
         structural_before_artifact: String,
@@ -1029,6 +1320,8 @@ impl Patch {
             structural,
             text_changes,
             anchor_changes,
+            media_path_changes,
+            media_playback_changes,
             formatting,
             formatting_first,
             structural_before_artifact,
@@ -1052,6 +1345,18 @@ impl Patch {
     #[must_use]
     pub fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
         &self.anchor_changes
+    }
+
+    /// External movie/audio path replacements composed into this root patch.
+    #[must_use]
+    pub fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
+        &self.media_path_changes
+    }
+
+    /// External-media playback replacements composed into this root patch.
+    #[must_use]
+    pub fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
+        &self.media_playback_changes
     }
 
     /// Whether this patch changes no artifact bytes.
@@ -1122,6 +1427,24 @@ impl Patch {
                     after: change.before,
                 })
                 .collect(),
+            self.media_path_changes
+                .iter()
+                .rev()
+                .map(|change| ExternalMediaPathChange {
+                    id: change.id,
+                    before: change.after.clone(),
+                    after: change.before.clone(),
+                })
+                .collect(),
+            self.media_playback_changes
+                .iter()
+                .rev()
+                .map(|change| ExternalMediaPlaybackChange {
+                    id: change.id,
+                    before: change.after,
+                    after: change.before,
+                })
+                .collect(),
             self.formatting
                 .iter()
                 .rev()
@@ -1138,6 +1461,20 @@ impl Patch {
                             target: anchor_change.target,
                             before: anchor_change.after,
                             after: anchor_change.before,
+                        })
+                    },
+                    FormattingChange::MediaPath(media_change) => {
+                        FormattingChange::MediaPath(ExternalMediaPathChange {
+                            id: media_change.id,
+                            before: media_change.after.clone(),
+                            after: media_change.before.clone(),
+                        })
+                    },
+                    FormattingChange::MediaPlayback(media_change) => {
+                        FormattingChange::MediaPlayback(ExternalMediaPlaybackChange {
+                            id: media_change.id,
+                            before: media_change.after,
+                            after: media_change.before,
                         })
                     },
                 })
@@ -1198,6 +1535,34 @@ impl Patch {
                         anchor_change.target,
                         anchor_change.after,
                         anchor_change.before,
+                    )?,
+                ),
+                FormattingChange::MediaPath(media_change) => ReversibleOperation::new(
+                    durable_media_path_operation(
+                        limits,
+                        media_change.id,
+                        media_change.before.as_deref(),
+                        media_change.after.as_deref(),
+                    )?,
+                    durable_media_path_operation(
+                        limits,
+                        media_change.id,
+                        media_change.after.as_deref(),
+                        media_change.before.as_deref(),
+                    )?,
+                ),
+                FormattingChange::MediaPlayback(media_change) => ReversibleOperation::new(
+                    durable_media_playback_operation(
+                        limits,
+                        media_change.id,
+                        media_change.before,
+                        media_change.after,
+                    )?,
+                    durable_media_playback_operation(
+                        limits,
+                        media_change.id,
+                        media_change.after,
+                        media_change.before,
                     )?,
                 ),
             };
@@ -1536,6 +1901,46 @@ fn durable_anchor_operation(
     )
 }
 
+fn durable_media_path_operation(
+    limits: litchi_core::patch::PatchLimits,
+    id: u32,
+    before: Option<&str>,
+    after: Option<&str>,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let preconditions = BTreeMap::from([(
+        "path_sha256".to_string(),
+        serde_json::Value::String(media_path_digest(before)),
+    )]);
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "presentation.external-media-path.set",
+        format!("media:{id}"),
+        preconditions,
+        after.map_or(serde_json::Value::Null, |path| {
+            serde_json::Value::String(path.to_string())
+        }),
+    )
+}
+
+fn durable_media_playback_operation(
+    limits: litchi_core::patch::PatchLimits,
+    id: u32,
+    before: crate::external_media::Playback,
+    after: crate::external_media::Playback,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let preconditions = BTreeMap::from([(
+        "playback_sha256".to_string(),
+        serde_json::Value::String(playback_digest(before)),
+    )]);
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "presentation.external-media-playback.set",
+        format!("media:{id}"),
+        preconditions,
+        playback_value(after),
+    )
+}
+
 fn durable_remove_operation(
     limits: litchi_core::patch::PatchLimits,
     change: &ListChange,
@@ -1628,8 +2033,138 @@ fn apply_durable_text(
 fn is_formatting_operation(operation: &str) -> bool {
     matches!(
         operation,
-        "presentation.shape-text.set" | "presentation.shape-anchor.set"
+        "presentation.shape-text.set"
+            | "presentation.shape-anchor.set"
+            | "presentation.external-media-path.set"
+            | "presentation.external-media-playback.set"
     )
+}
+
+fn apply_durable_media_path(
+    snapshot: &Snapshot,
+    operation: &litchi_core::patch::PatchOperation,
+) -> Result<Snapshot> {
+    if operation.preconditions.len() != 1 {
+        return Err(invalid_durable_patch(
+            "external-media path operation has unexpected preconditions",
+        ));
+    }
+    let id = parse_media_target(&operation.target)?;
+    let replacement = match &operation.value {
+        serde_json::Value::Null => None,
+        serde_json::Value::String(path) => Some(path.clone()),
+        serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::Array(_)
+        | serde_json::Value::Object(_) => {
+            return Err(invalid_durable_patch(
+                "external-media path value must be a string or null",
+            ));
+        },
+    };
+    let expected = operation
+        .preconditions
+        .get("path_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_durable_patch("missing external-media path precondition"))?;
+    if media_path_digest(snapshot.external_media_path(id)?.as_deref()) != expected {
+        return Err(PackageError::InvalidFormat(
+            "PPT durable external-media path precondition does not match".into(),
+        )
+        .into());
+    }
+    let mut transaction = snapshot.edit()?;
+    transaction.set_external_media_path(id, replacement)?;
+    transaction.commit().map(|commit| commit.snapshot)
+}
+
+fn apply_durable_media_playback(
+    snapshot: &Snapshot,
+    operation: &litchi_core::patch::PatchOperation,
+) -> Result<Snapshot> {
+    if operation.preconditions.len() != 1 {
+        return Err(invalid_durable_patch(
+            "external-media playback operation has unexpected preconditions",
+        ));
+    }
+    let id = parse_media_target(&operation.target)?;
+    let replacement = parse_playback_value(&operation.value)?;
+    let expected = operation
+        .preconditions
+        .get("playback_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_durable_patch("missing external-media playback precondition"))?;
+    if playback_digest(snapshot.external_media_playback(id)?) != expected {
+        return Err(PackageError::InvalidFormat(
+            "PPT durable external-media playback precondition does not match".into(),
+        )
+        .into());
+    }
+    let mut transaction = snapshot.edit()?;
+    transaction.set_external_media_playback(id, replacement)?;
+    transaction.commit().map(|commit| commit.snapshot)
+}
+
+fn parse_media_target(target: &str) -> Result<u32> {
+    let value = target
+        .strip_prefix("media:")
+        .filter(|value| {
+            !value.is_empty()
+                && value.bytes().all(|byte| byte.is_ascii_digit())
+                && (value == &"0" || !value.starts_with('0'))
+        })
+        .ok_or_else(|| invalid_durable_patch("invalid external-media target"))?;
+    value
+        .parse::<u32>()
+        .map_err(|_error| invalid_durable_patch("external-media ID exceeds u32"))
+}
+
+fn media_path_digest(path: Option<&str>) -> String {
+    let mut bytes = Vec::with_capacity(path.map_or(1, |value| value.len().saturating_add(1)));
+    match path {
+        Some(value) => {
+            bytes.push(1);
+            bytes.extend_from_slice(value.as_bytes());
+        },
+        None => bytes.push(0),
+    }
+    artifact_hash(&bytes)
+}
+
+fn playback_digest(playback: crate::external_media::Playback) -> String {
+    artifact_hash(&[
+        u8::from(playback.loop_playback),
+        u8::from(playback.rewind_after_playing),
+        u8::from(playback.narration),
+    ])
+}
+
+fn playback_value(playback: crate::external_media::Playback) -> serde_json::Value {
+    serde_json::json!({
+        "loop": playback.loop_playback,
+        "narration": playback.narration,
+        "rewind": playback.rewind_after_playing,
+    })
+}
+
+fn parse_playback_value(value: &serde_json::Value) -> Result<crate::external_media::Playback> {
+    let object = value
+        .as_object()
+        .filter(|object| object.len() == 3)
+        .ok_or_else(|| {
+            invalid_durable_patch("external-media playback value must have exactly three fields")
+        })?;
+    let flag = |name: &str| {
+        object
+            .get(name)
+            .and_then(serde_json::Value::as_bool)
+            .ok_or_else(|| invalid_durable_patch("external-media playback flag is invalid"))
+    };
+    Ok(crate::external_media::Playback::new(
+        flag("loop")?,
+        flag("rewind")?,
+        flag("narration")?,
+    ))
 }
 
 fn apply_durable_anchor(
@@ -1836,6 +2371,58 @@ fn hex_digest(digest: [u8; 32]) -> String {
     text
 }
 
+fn external_media_snapshot(snapshot: &Snapshot) -> Result<crate::external_media::Snapshot> {
+    let limits = crate::external_media::Limits {
+        max_root_bytes: snapshot
+            .limits
+            .max_record_bytes
+            .min(snapshot.limits.max_input_bytes),
+        max_record_bytes: snapshot.limits.max_record_bytes,
+        max_depth: snapshot.limits.max_depth,
+        max_records: snapshot.limits.max_records,
+        max_owner_references: snapshot.limits.max_records,
+    };
+    crate::external_media::Snapshot::parse_with_limits(snapshot.document.bytes(), limits)
+        .map_err(Error::from)
+}
+
+fn media_path_of(object: &crate::external_media::Object) -> Result<Option<String>> {
+    match object {
+        crate::external_media::Object::Movie(movie) => Ok(movie.video.path.clone()),
+        crate::external_media::Object::LinkedAudio(audio) => Ok(audio.path.clone()),
+        crate::external_media::Object::CdAudio(_)
+        | crate::external_media::Object::EmbeddedWav(_) => Err(PackageError::InvalidFormat(
+            "external media object does not own a linked path".into(),
+        )
+        .into()),
+    }
+}
+
+fn publish_live_document(snapshot: &Snapshot, document: &[u8]) -> Result<Snapshot> {
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        snapshot.bytes.clone(),
+        snapshot.limits.max_package_bytes,
+    )?;
+    let live = editor.persisted_record(snapshot.document_persist_id)?;
+    if live.as_slice() != snapshot.document.bytes() {
+        return Err(PackageError::Corrupted(
+            "PPT live document changed before owner publication".into(),
+        )
+        .into());
+    }
+    editor.replace_persisted_record(snapshot.document_persist_id, document.to_vec())?;
+    let bytes = editor.finish()?;
+    crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
+    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    if published.document.slides() != snapshot.document.slides() {
+        return Err(PackageError::Corrupted(
+            "PPT live-document owner publication changed slide structure".into(),
+        )
+        .into());
+    }
+    Ok(published)
+}
+
 const fn hex_nibble(value: u8) -> u8 {
     match value {
         b'0'..=b'9' => value - b'0',
@@ -2014,19 +2601,19 @@ fn require_portable_slide(target: &Snapshot, record: &[u8]) -> Result<()> {
         .ok_or_else(|| PackageError::Corrupted("slide transfer source has no SlideAtom".into()))?;
     if read_payload_u32(&atom.data, 16)? != 0 {
         return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: "speaker-notes",
+            dependency: TransferDependency::SpeakerNotes,
         }));
     }
     if !crate::comments::parse_slide_comments(&root)?.is_empty() {
         return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: "comment-author-catalog",
+            dependency: TransferDependency::CommentAuthorCatalog,
         }));
     }
     if contains_record_type(&root, crate::RecordType::InteractiveInfo)
         || contains_record_type(&root, crate::RecordType::TextInteractiveInfoAtom)
     {
         return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: "hyperlink-action",
+            dependency: TransferDependency::HyperlinkAction,
         }));
     }
     let has_drawing = contains_record_type(&root, crate::RecordType::PPDrawing);
@@ -2052,14 +2639,14 @@ fn require_portable_slide(target: &Snapshot, record: &[u8]) -> Result<()> {
             return Ok(());
         }
     }
-    if has_drawing {
-        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: "drawing-group",
-        }));
-    }
     if has_external {
         return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: "external-media",
+            dependency: TransferDependency::ExternalObjectRelationship,
+        }));
+    }
+    if has_drawing {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::DrawingGroup,
         }));
     }
     Ok(())
@@ -2125,6 +2712,12 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
             change.target.slide().get(),
             change.target.shape().get()
         ));
+    }
+    for change in &patch.media_path_changes {
+        effects.insert(format!("external-media:{}/path", change.id));
+    }
+    for change in &patch.media_playback_changes {
+        effects.insert(format!("external-media:{}/playback", change.id));
     }
     for structural_change in &patch.structural {
         match structural_change {
@@ -2318,6 +2911,30 @@ mod tests {
                 crate::text_edit::inspect_shape_anchor(snapshot.bytes(), *target).is_ok()
             })
             .expect("fixture must expose one anchored shape")
+    }
+
+    fn real_media_fixture() -> (Snapshot, u32) {
+        for name in [
+            "sound.ppt",
+            "WithLinks.ppt",
+            "ppt_with_embeded.ppt",
+            "ole2-embedding-2003.ppt",
+        ] {
+            let Ok(snapshot) = Snapshot::from_bytes(fixture(name)) else {
+                continue;
+            };
+            let Ok(media) = external_media_snapshot(&snapshot) else {
+                continue;
+            };
+            if let Some(id) = media
+                .collection()
+                .and_then(|collection| collection.objects.first())
+                .map(crate::external_media::Object::id)
+            {
+                return (snapshot, id);
+            }
+        }
+        panic!("real fixture must expose one external-media object");
     }
 
     fn patch_limits() -> litchi_core::patch::PatchLimits {
@@ -2605,6 +3222,103 @@ mod tests {
     }
 
     #[test]
+    fn real_external_media_owner_reopens_and_round_trips_durable_inverse() {
+        let (source, id) = real_media_fixture();
+        let before = source.external_media_playback(id).unwrap();
+        let replacement = crate::external_media::Playback::new(
+            !before.loop_playback,
+            before.rewind_after_playing,
+            before.narration,
+        );
+        let mut edit = source.edit().unwrap();
+        edit.set_external_media_playback(id, replacement).unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(
+            commit.snapshot().external_media_playback(id).unwrap(),
+            replacement
+        );
+        assert_eq!(commit.patch().external_media_playback_changes().len(), 1);
+        assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
+        assert_eq!(
+            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            source
+        );
+        let mut reopened = Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+        assert_eq!(
+            reopened.presentation().unwrap().slide_count(),
+            commit.snapshot().slide_count()
+        );
+
+        let durable = commit.patch().to_durable(patch_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                patch_limits(),
+            )
+            .unwrap();
+        let applied = source.apply_durable(&decoded).unwrap();
+        assert_eq!(applied.external_media_playback(id).unwrap(), replacement);
+        let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+        assert_eq!(restored.external_media_playback(id).unwrap(), before);
+
+        let mut competing_edit = source.edit().unwrap();
+        competing_edit
+            .set_external_media_playback(
+                id,
+                crate::external_media::Playback::new(
+                    before.loop_playback,
+                    before.rewind_after_playing,
+                    !before.narration,
+                ),
+            )
+            .unwrap();
+        let competing = competing_edit.commit().unwrap();
+        assert!(
+            !source
+                .plan_three_way(commit.patch(), competing.patch())
+                .unwrap()
+                .is_clean()
+        );
+    }
+
+    #[test]
+    fn live_document_owner_overlap_is_a_typed_atomic_refusal() {
+        let (source, id) = real_media_fixture();
+        let before = source.external_media_playback(id).unwrap();
+        let replacement = crate::external_media::Playback::new(
+            !before.loop_playback,
+            before.rewind_after_playing,
+            before.narration,
+        );
+
+        let mut structural_first = source.edit().unwrap();
+        structural_first.remove_slide(Position::new(0)).unwrap();
+        assert!(matches!(
+            structural_first.set_external_media_playback(id, replacement),
+            Err(Error::Refused(Refusal::OwnerOrderConflict {
+                staged: OwnerBoundary::DocumentStructure,
+                requested: OwnerBoundary::ExternalMedia,
+            }))
+        ));
+        assert_eq!(structural_first.slide_count(), source.slide_count() - 1);
+
+        let mut media_first = source.edit().unwrap();
+        media_first
+            .set_external_media_playback(id, replacement)
+            .unwrap();
+        assert!(matches!(
+            media_first.remove_slide(Position::new(0)),
+            Err(Error::Refused(Refusal::OwnerOrderConflict {
+                staged: OwnerBoundary::ExternalMedia,
+                requested: OwnerBoundary::DocumentStructure,
+            }))
+        ));
+        assert!(media_first.changes().is_empty());
+        assert_eq!(media_first.external_media_playback_changes().len(), 1);
+    }
+
+    #[test]
     fn transfer_planning_closes_simple_dependencies_and_refuses_drawings() {
         let base = Snapshot::from_bytes(authored_fixture()).unwrap();
         let transferred_anchor = crate::Anchor::small(25, 35, 325, 235).unwrap();
@@ -2651,7 +3365,7 @@ mod tests {
         assert!(matches!(
             drawing.plan_transfer_from(&drawing, Position::new(0)),
             Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-                dependency: "drawing-group"
+                dependency: TransferDependency::DrawingGroup
             }))
         ));
 
@@ -2659,7 +3373,7 @@ mod tests {
         assert!(matches!(
             comments.plan_transfer_from(&comments, Position::new(0)),
             Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-                dependency: "comment-author-catalog"
+                dependency: TransferDependency::CommentAuthorCatalog
             }))
         ));
     }

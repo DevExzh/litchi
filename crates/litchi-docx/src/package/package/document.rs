@@ -1,7 +1,9 @@
 //! Mutable document acquisition for the package facade.
 
 use super::super::model::{Error, MutableDocument, PackURI, Package, Result};
-use super::transfer::relationship_graph_digest;
+use super::transfer::{
+    apply_transfer_graph, relationship_graph_digest, relationship_graph_digest_opc,
+};
 
 impl Package {
     /// Start the ordinary immutable main-document edit directly from this
@@ -47,12 +49,24 @@ impl Package {
     ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
         let current = self.document_snapshot()?;
         self.validate_transfer_operations(patch.operations())?;
+        let graph_transition = transfer_graph_transition(patch.operations())?;
         let candidate = patch.apply(&current)?;
         if !patch.changed() {
             return Ok(candidate);
         }
         let replacement = candidate.xml_bytes().to_vec();
         self.edit_semantic_opc("apply_document_patch", move |opc| {
+            if let Some((graph, insert, expected_digest)) = graph_transition {
+                apply_transfer_graph(opc, &graph, insert)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+                let actual = relationship_graph_digest_opc(opc)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+                if actual != expected_digest.as_ref() {
+                    return Err(Error::InvalidFormat(
+                        "paragraph transfer graph produced an unexpected target".into(),
+                    ));
+                }
+            }
             let main_name = opc.main_document_part()?.partname().clone();
             opc.get_part_mut(&main_name)?.set_blob(replacement);
             Ok(())
@@ -160,7 +174,10 @@ impl Package {
         let has_transfer = patch.operations().iter().any(|operation| {
             matches!(
                 operation.op.as_str(),
-                "paragraph.transfer.insert" | "paragraph.transfer.remove"
+                "paragraph.transfer.insert"
+                    | "paragraph.transfer.remove"
+                    | "document.restore-transfer.insert"
+                    | "document.restore-transfer.remove"
             )
         });
         if has_transfer {
@@ -168,7 +185,10 @@ impl Package {
             for operation in patch.operations().iter().filter(|operation| {
                 matches!(
                     operation.op.as_str(),
-                    "paragraph.transfer.insert" | "paragraph.transfer.remove"
+                    "paragraph.transfer.insert"
+                        | "paragraph.transfer.remove"
+                        | "document.restore-transfer.insert"
+                        | "document.restore-transfer.remove"
                 )
             }) {
                 if operation
@@ -181,12 +201,25 @@ impl Package {
                 }
             }
         }
+        let transfer_operations = crate::document::durable_transfer_operations(patch)?;
+        let graph_transition = transfer_graph_transition(&transfer_operations)?;
         let candidate = current.apply_durable(patch)?;
         if candidate.xml_bytes() == current.xml_bytes() {
             return Ok(candidate);
         }
         let replacement = candidate.xml_bytes().to_vec();
         self.edit_semantic_opc("apply_durable_document_patch", move |opc| {
+            if let Some((graph, insert, expected_digest)) = graph_transition {
+                apply_transfer_graph(opc, &graph, insert)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+                let actual = relationship_graph_digest_opc(opc)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+                if actual != expected_digest.as_ref() {
+                    return Err(Error::InvalidFormat(
+                        "durable paragraph transfer graph produced an unexpected target".into(),
+                    ));
+                }
+            }
             let main_name = opc.main_document_part()?.partname().clone();
             opc.get_part_mut(&main_name)?.set_blob(replacement);
             Ok(())
@@ -207,8 +240,46 @@ impl Package {
         if !moved {
             return Ok(false);
         }
+        let graph_transition = history.take_graph_transition();
+        if let Some((transition, forward)) = &graph_transition {
+            let expected_source = if *forward {
+                transition.before_digest.as_ref()
+            } else {
+                transition.after_digest.as_ref()
+            };
+            if relationship_graph_digest(self)? != expected_source {
+                if redo {
+                    let _restored = history.undo();
+                } else {
+                    let _restored = history.redo();
+                }
+                let _pending = history.take_graph_transition();
+                return Err(crate::document::TransactionError::StaleSource);
+            }
+        }
         let replacement = history.current().xml_bytes().to_vec();
         let result = self.edit_semantic_opc("publish_document_history", move |opc| {
+            if let Some((transition, forward)) = graph_transition {
+                let insert = if forward {
+                    transition.forward_insert
+                } else {
+                    !transition.forward_insert
+                };
+                apply_transfer_graph(opc, &transition.graph, insert)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+                let expected_target = if forward {
+                    transition.after_digest
+                } else {
+                    transition.before_digest
+                };
+                let actual = relationship_graph_digest_opc(opc)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+                if actual != expected_target.as_ref() {
+                    return Err(Error::InvalidFormat(
+                        "document history graph produced an unexpected target".into(),
+                    ));
+                }
+            }
             let main_name = opc.main_document_part()?.partname().clone();
             opc.get_part_mut(&main_name)?.set_blob(replacement);
             Ok(())
@@ -219,6 +290,7 @@ impl Package {
             } else {
                 let _restored = history.redo();
             }
+            let _pending = history.take_graph_transition();
             return Err(crate::document::TransactionError::from(error));
         }
         Ok(true)
@@ -316,4 +388,61 @@ impl Package {
             Error::InvalidFormat("mutable document initialization did not complete".into())
         })
     }
+}
+
+fn transfer_graph_transition(
+    operations: &[crate::document::Operation],
+) -> std::result::Result<
+    Option<(
+        std::sync::Arc<crate::document::TransferGraph>,
+        bool,
+        std::sync::Arc<str>,
+    )>,
+    crate::document::TransactionError,
+> {
+    let mut selected = None;
+    for operation in operations {
+        let candidate = match operation {
+            crate::document::Operation::InsertTransferredParagraph {
+                graph,
+                inverse_dependency_digest,
+                ..
+            } if !graph.is_empty() => Some((
+                std::sync::Arc::clone(graph),
+                true,
+                std::sync::Arc::clone(inverse_dependency_digest),
+            )),
+            crate::document::Operation::RemoveTransferredParagraph {
+                graph,
+                inverse_dependency_digest,
+                ..
+            } if !graph.is_empty() => Some((
+                std::sync::Arc::clone(graph),
+                false,
+                std::sync::Arc::clone(inverse_dependency_digest),
+            )),
+            crate::document::Operation::InsertTransferredParagraph { .. }
+            | crate::document::Operation::RemoveTransferredParagraph { .. }
+            | crate::document::Operation::ReplaceParagraphText { .. }
+            | crate::document::Operation::ReplaceHyperlinkText { .. }
+            | crate::document::Operation::ReplaceRunText { .. }
+            | crate::document::Operation::ReplaceSimpleFieldText { .. }
+            | crate::document::Operation::ReplaceComplexFieldText { .. }
+            | crate::document::Operation::ReplaceRevisionText { .. }
+            | crate::document::Operation::ReplaceContentControlText { .. }
+            | crate::document::Operation::ReplaceCellText { .. }
+            | crate::document::Operation::ReplaceCellParagraphText { .. }
+            | crate::document::Operation::InsertParagraph { .. }
+            | crate::document::Operation::RemoveParagraph { .. } => None,
+        };
+        if let Some(selected_transition) = candidate {
+            if selected.is_some() {
+                return Err(crate::document::TransactionError::InvalidDurable(
+                    "one commit cannot publish multiple dependency subgraphs".into(),
+                ));
+            }
+            selected = Some(selected_transition);
+        }
+    }
+    Ok(selected)
 }

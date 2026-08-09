@@ -261,7 +261,7 @@ pub(super) fn validate_string(label: &str, value: &str, allow_empty: bool) -> Re
     }
     if value
         .chars()
-        .any(|ch| matches!(ch as u32, 0..=8 | 11 | 12 | 14..=31 | 0xFFFE | 0xFFFF))
+        .any(|ch| matches!(u32::from(ch), 0..=8 | 11 | 12 | 14..=31 | 0xFFFE | 0xFFFF))
     {
         return Err(Error::InvalidFormat(format!(
             "{label} contains an XML-prohibited character"

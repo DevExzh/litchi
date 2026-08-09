@@ -13,7 +13,8 @@ pub use composition::{
 };
 pub use durable::{DurablePatch, SealedPatch};
 pub use policy::{
-    DependencyDisposition, EditPolicy, EncryptionPolicy, ProtectionStatus, ProtectionTransition,
+    DependencyDisposition, EditPolicy, EncryptionCapability, EncryptionPolicy,
+    ProtectionCapabilities, ProtectionStatus, ProtectionTransition, SignatureCapability,
     SignaturePolicy,
 };
 pub(crate) use transaction::producer_extensions;

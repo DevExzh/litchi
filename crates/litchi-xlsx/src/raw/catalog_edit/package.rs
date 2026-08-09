@@ -12,6 +12,137 @@ use super::model::{
 };
 use super::validation::{OrderMap, block, map_removed_position, validate_order};
 use crate::error::{Error, Result, TabEditBlock, allocation, invalid};
+use crate::raw::DefinedName;
+use litchi_core::xml::escape_xml;
+
+/// Replace the complete direct defined-name catalog without rebuilding
+/// unrelated workbook XML.
+pub(crate) fn replace_defined_names(content: &[u8], names: &[DefinedName]) -> Result<Vec<u8>> {
+    let layout = scan(content)?;
+    if layout.protected {
+        return Err(invalid(
+            "defined names cannot be replaced in a structure-protected workbook",
+        ));
+    }
+    if layout.alternate_dependencies
+        || layout
+            .defined_names
+            .as_ref()
+            .is_some_and(|container| container.payload)
+    {
+        return Err(invalid(
+            "defined names projected through markup compatibility or unknown children cannot be replaced",
+        ));
+    }
+    for name in names {
+        if name.name.is_empty() {
+            return Err(invalid("defined name cannot be empty"));
+        }
+        if name.local_sheet_id.is_some_and(|scope| {
+            usize::try_from(scope).map_or(true, |scope| scope >= layout.sheet_slots.len())
+        }) {
+            return Err(invalid(format!(
+                "defined name '{}' has a local scope outside the workbook sheet catalog",
+                name.name
+            )));
+        }
+    }
+    let replacement = write_defined_names(&layout, names);
+    let span = layout.defined_names.as_ref().map_or(
+        Span {
+            start: layout.sheets.slot.span.end,
+            end: layout.sheets.slot.span.end,
+        },
+        |container| container.slot.span,
+    );
+    if span.start == span.end && replacement.is_empty() {
+        return Ok(content.to_vec());
+    }
+    let capacity = content
+        .len()
+        .checked_sub(span.end.saturating_sub(span.start))
+        .and_then(|size| size.checked_add(replacement.len()))
+        .ok_or_else(|| invalid("defined-name replacement size overflow"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|source| allocation("defined-name workbook output", source))?;
+    output.extend_from_slice(&content[..span.start]);
+    output.extend_from_slice(&replacement);
+    output.extend_from_slice(&content[span.end..]);
+    crate::raw::compact::changed(&output, "compact defined-name workbook output")
+}
+
+fn write_defined_names(layout: &Layout, names: &[DefinedName]) -> Vec<u8> {
+    if names.is_empty() {
+        return Vec::new();
+    }
+    let container_name = layout.defined_names.as_ref().map_or_else(
+        || sibling_name(&layout.sheets.slot.tag.name, "definedNames"),
+        |container| container.slot.tag.name.to_string(),
+    );
+    let item_name = sibling_name(&container_name, "definedName");
+    let mut output = Vec::new();
+    if let Some(container) = &layout.defined_names {
+        write_tag(&mut output, &container.slot.tag, false, &[], &[]);
+    } else {
+        output.extend_from_slice(b"<");
+        output.extend_from_slice(container_name.as_bytes());
+        output.extend_from_slice(b">");
+    }
+    for name in names {
+        let mut item = String::new();
+        item.push('<');
+        item.push_str(&item_name);
+        write_defined_name_attribute(&mut item, "name", &name.name);
+        for (attribute, value) in [
+            ("comment", name.comment.as_deref()),
+            ("customMenu", name.custom_menu.as_deref()),
+            ("description", name.description.as_deref()),
+            ("help", name.help.as_deref()),
+            ("statusBar", name.status_bar.as_deref()),
+            ("shortcutKey", name.shortcut_key.as_deref()),
+        ] {
+            if let Some(value) = value {
+                write_defined_name_attribute(&mut item, attribute, value);
+            }
+        }
+        if let Some(scope) = name.local_sheet_id {
+            write_defined_name_attribute(&mut item, "localSheetId", &scope.to_string());
+        }
+        for (attribute, value) in [
+            ("hidden", name.hidden),
+            ("function", name.function),
+            ("vbProcedure", name.vb_procedure),
+            ("xlm", name.xlm),
+            ("publishToServer", name.publish_to_server),
+            ("workbookParameter", name.workbook_parameter),
+        ] {
+            if value {
+                write_defined_name_attribute(&mut item, attribute, "1");
+            }
+        }
+        if let Some(group) = name.function_group_id {
+            write_defined_name_attribute(&mut item, "functionGroupId", &group.to_string());
+        }
+        item.push('>');
+        item.push_str(&escape_xml(&name.reference));
+        item.push_str("</");
+        item.push_str(&item_name);
+        item.push('>');
+        output.extend_from_slice(item.as_bytes());
+    }
+    write_close(&mut output, &container_name);
+    output
+}
+
+fn write_defined_name_attribute(output: &mut String, name: &str, value: &str) {
+    output.push(' ');
+    output.push_str(name);
+    output.push_str("=\"");
+    output.push_str(&escape_xml(value));
+    output.push('"');
+}
 
 pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
     if plan.tabs.is_empty()

@@ -5,5 +5,6 @@ pub mod layer;
 pub mod page;
 pub mod resource;
 pub mod shape;
+pub mod style;
 
 pub use form::Control as FormControl;

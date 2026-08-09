@@ -130,7 +130,7 @@ pub mod sprm;
 /// Complete SPRM operation definitions based on Apache POI.
 pub mod sprm_operations;
 
-/// Source-checked, reversible same-shape edits of ordinary DOC body paragraphs.
+/// Immutable, durable ordinary-DOC text, revision, and embedded-resource edits.
 pub mod body_text;
 pub mod bookmark;
 /// Contextual Word caption and `AutoCaption` metadata.

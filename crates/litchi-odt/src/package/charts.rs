@@ -1,5 +1,13 @@
 //! Atomic authoring of inert embedded `OpenDocument` chart objects.
 
+#![deny(
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::unwrap_used
+)]
+
 use crate::constants;
 use crate::core::{OwnedPackage, PackageWriter};
 use crate::elements::xml::namespaced_attribute;
@@ -90,18 +98,34 @@ pub(crate) fn replace_embedded_chart(
     index: usize,
     definition: &Definition,
 ) -> Result<Vec<u8>> {
+    replace_embedded_chart_content(
+        package,
+        content,
+        styles,
+        index,
+        &serialize_content(definition)?,
+    )
+}
+
+pub(crate) fn replace_embedded_chart_content(
+    package: &OwnedPackage,
+    content: &str,
+    styles: Option<&str>,
+    index: usize,
+    chart_content: &str,
+) -> Result<Vec<u8>> {
     let objects = objects(package, content, styles)?;
     let object = select_chart_object(&objects, index)?;
     // Opening first validates MIME type and the existing chart hierarchy.
     let _ = open_embedded_chart(package, content, styles, index)?;
-    let chart_content = serialize_content(definition)?;
+    validate_chart_content(chart_content)?;
     match &object.source {
         Source::PackageSubdocument { content_path, .. } => rebuild_package(
             package,
             content,
             vec![Addition {
                 path: content_path.clone(),
-                bytes: chart_content.into_bytes(),
+                bytes: chart_content.as_bytes().to_vec(),
                 media_type: "text/xml".to_string(),
             }],
             Vec::new(),
@@ -173,12 +197,30 @@ pub(crate) fn add_embedded_chart(
     storage: EmbeddedChartStorage,
     definition: &Definition,
 ) -> Result<(Vec<u8>, usize)> {
+    add_embedded_chart_content(
+        package,
+        content,
+        styles,
+        host,
+        storage,
+        &serialize_content(definition)?,
+    )
+}
+
+pub(crate) fn add_embedded_chart_content(
+    package: &OwnedPackage,
+    content: &str,
+    styles: Option<&str>,
+    host: EmbeddedChartHost<'_>,
+    storage: EmbeddedChartStorage,
+    chart_content: &str,
+) -> Result<(Vec<u8>, usize)> {
+    validate_chart_content(chart_content)?;
     let current = objects(package, content, styles)?;
     let index = current
         .iter()
         .filter(|object| object.part == Part::Content)
         .count();
-    let chart_content = serialize_content(definition)?;
     let root = unused_object_root(package)?;
     let (object_xml, additions, directories) = match storage {
         EmbeddedChartStorage::PackageSubdocument => {
@@ -189,7 +231,7 @@ pub(crate) fn add_embedded_chart(
                 ),
                 vec![Addition {
                     path: format!("{root}content.xml"),
-                    bytes: chart_content.into_bytes(),
+                    bytes: chart_content.as_bytes().to_vec(),
                     media_type: "text/xml".to_string(),
                 }],
                 vec![(root.clone(), constants::ODF_CHART.to_string())],
@@ -218,6 +260,18 @@ pub(crate) fn add_embedded_chart(
         Vec::new(),
     )?;
     Ok((bytes, index))
+}
+
+pub(crate) fn validate_chart_content(chart_content: &str) -> Result<()> {
+    if chart_content.len() > MAX_CONTENT_BYTES {
+        return invalid("embedded chart content exceeds the safety limit");
+    }
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(constants::ODF_CHART)?;
+    writer.add_file(constants::ODF_CONTENT, chart_content.as_bytes())?;
+    let bytes = writer.finish_to_bytes()?;
+    let _ = Document::from_bytes(bytes)?;
+    Ok(())
 }
 
 fn objects(package: &OwnedPackage, content: &str, styles: Option<&str>) -> Result<Vec<Object>> {

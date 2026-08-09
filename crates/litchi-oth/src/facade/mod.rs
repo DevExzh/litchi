@@ -272,7 +272,9 @@ impl Template {
         Edit {
             appended: Vec::new(),
             changes: Vec::new(),
+            forms_change: None,
             heading_changes: Vec::new(),
+            inline_changes: Vec::new(),
             list_changes: Vec::new(),
             metadata: PartChange::Keep,
             source: self,
@@ -395,6 +397,81 @@ pub(crate) enum PartChange {
     Set(String),
 }
 
+/// A text block selected for a rich inline-content replacement.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum InlineBlock {
+    /// A heading by source-order heading position.
+    Heading(Position),
+    /// A paragraph by source-order paragraph position.
+    Paragraph(Position),
+}
+
+/// One reversible rich inline-content replacement.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InlineChange {
+    after_text: String,
+    after_xml: String,
+    before_text: String,
+    before_xml: String,
+    block: InlineBlock,
+}
+
+/// One reversible replacement of the complete inert form catalog.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FormsChange {
+    after: Vec<crate::form::Form>,
+    after_xml: String,
+    before: Vec<crate::form::Form>,
+    before_xml: String,
+}
+
+impl FormsChange {
+    /// Source forms.
+    #[must_use]
+    pub fn before(&self) -> &[crate::form::Form] {
+        &self.before
+    }
+
+    /// Replacement forms.
+    #[must_use]
+    pub fn after(&self) -> &[crate::form::Form] {
+        &self.after
+    }
+}
+
+impl InlineChange {
+    /// Selected block.
+    #[must_use]
+    pub const fn block(&self) -> InlineBlock {
+        self.block
+    }
+
+    /// Exact source inline XML.
+    #[must_use]
+    pub fn before_xml(&self) -> &str {
+        &self.before_xml
+    }
+
+    /// Compact replacement inline XML.
+    #[must_use]
+    pub fn after_xml(&self) -> &str {
+        &self.after_xml
+    }
+
+    /// Projected source text.
+    #[must_use]
+    pub fn before_text(&self) -> &str {
+        &self.before_text
+    }
+
+    /// Projected replacement text.
+    #[must_use]
+    pub fn after_text(&self) -> &str {
+        &self.after_text
+    }
+}
+
 impl PartChange {
     const fn is_keep(&self) -> bool {
         matches!(self, Self::Keep)
@@ -416,7 +493,9 @@ impl PartChange {
 pub struct Edit<'a> {
     appended: Vec<crate::ContentBlock>,
     changes: Vec<ParagraphChange>,
+    forms_change: Option<FormsChange>,
     heading_changes: Vec<HeadingChange>,
+    inline_changes: Vec<InlineChange>,
     list_changes: Vec<ListChange>,
     metadata: PartChange,
     source: &'a Template,
@@ -458,6 +537,15 @@ impl Edit<'_> {
         paragraph: Position,
         text: impl Into<String>,
     ) -> Result<()> {
+        if self
+            .inline_changes
+            .iter()
+            .any(|change| change.block == InlineBlock::Paragraph(paragraph))
+        {
+            return Err(Error::InvalidFormat(
+                "OTH paragraph text edit overlaps a staged rich inline edit".to_string(),
+            ));
+        }
         if self.list_changes.iter().any(|change| {
             change
                 .before
@@ -527,6 +615,15 @@ impl Edit<'_> {
     /// Returns an error for an invalid selector, oversized value, or heading
     /// whose nested markup cannot be rewritten losslessly.
     pub fn set_heading_text(&mut self, heading: Position, text: impl Into<String>) -> Result<()> {
+        if self
+            .inline_changes
+            .iter()
+            .any(|change| change.block == InlineBlock::Heading(heading))
+        {
+            return Err(Error::InvalidFormat(
+                "OTH heading text edit overlaps a staged rich inline edit".to_string(),
+            ));
+        }
         let after = text.into();
         if after.len() > MAX_PARAGRAPH_BYTES {
             return Err(Error::InvalidFormat(
@@ -576,6 +673,151 @@ impl Edit<'_> {
                 before,
                 after,
             });
+        }
+        Ok(())
+    }
+
+    /// Replaces a paragraph's complete inline content with typed rich items.
+    ///
+    /// This is the structural CRUD boundary for common links, formatting
+    /// spans, inert fields, and point or range bookmark markers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, overlapping staged work, or
+    /// inline content that cannot be compactly authored and fully reopened.
+    pub fn set_paragraph_inline(
+        &mut self,
+        paragraph: Position,
+        content: &[crate::inline::Content],
+    ) -> Result<()> {
+        self.stage_inline(InlineBlock::Paragraph(paragraph), content)
+    }
+
+    /// Replaces a heading's complete inline content with typed rich items.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, overlapping staged work, or
+    /// inline content that cannot be compactly authored and fully reopened.
+    pub fn set_heading_inline(
+        &mut self,
+        heading: Position,
+        content: &[crate::inline::Content],
+    ) -> Result<()> {
+        self.stage_inline(InlineBlock::Heading(heading), content)
+    }
+
+    fn stage_inline(
+        &mut self,
+        block: InlineBlock,
+        content: &[crate::inline::Content],
+    ) -> Result<()> {
+        let (site, before_text) = match block {
+            InlineBlock::Paragraph(position) => {
+                if self
+                    .changes
+                    .iter()
+                    .any(|change| change.paragraph == position)
+                    || self.list_changes.iter().any(|change| {
+                        change
+                            .before
+                            .as_ref()
+                            .is_some_and(|list| list_contains_paragraph(list, position))
+                    })
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH rich paragraph edit overlaps staged work".to_string(),
+                    ));
+                }
+                let value = self
+                    .source
+                    .package
+                    .paragraphs()
+                    .get(position.get())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "OTH rich paragraph selector is out of bounds".to_string(),
+                        )
+                    })?;
+                (
+                    self.source
+                        .package
+                        .paragraph_content_site(position.get())
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "OTH rich paragraph content site is missing".to_string(),
+                            )
+                        })?,
+                    value.text(),
+                )
+            },
+            InlineBlock::Heading(position) => {
+                if self
+                    .heading_changes
+                    .iter()
+                    .any(|change| change.heading == position)
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH rich heading edit overlaps staged work".to_string(),
+                    ));
+                }
+                let value = self
+                    .source
+                    .package
+                    .headings()
+                    .get(position.get())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "OTH rich heading selector is out of bounds".to_string(),
+                        )
+                    })?;
+                (
+                    self.source
+                        .package
+                        .heading_content_site(position.get())
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "OTH rich heading content site is missing".to_string(),
+                            )
+                        })?,
+                    value.text(),
+                )
+            },
+        };
+        let before_xml = self
+            .source
+            .content_xml()
+            .get(site.range.clone())
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH rich inline source span is invalid".to_string())
+            })?;
+        let (after_xml, after_text) = crate::authoring::render_inline(content)?;
+        if before_xml == after_xml {
+            self.inline_changes.retain(|change| change.block != block);
+            return Ok(());
+        }
+        let staged = InlineChange {
+            after_text,
+            after_xml,
+            before_text: before_text.to_owned(),
+            before_xml: before_xml.to_owned(),
+            block,
+        };
+        if let Some(change) = self
+            .inline_changes
+            .iter_mut()
+            .find(|change| change.block == block)
+        {
+            *change = staged;
+        } else {
+            self.inline_changes
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "OTH staged rich inline changes",
+                    source,
+                })?;
+            self.inline_changes.push(staged);
         }
         Ok(())
     }
@@ -646,6 +888,40 @@ impl Edit<'_> {
         };
     }
 
+    /// Replaces the complete inert form/control catalog.
+    ///
+    /// Passing an empty slice removes `office:forms`; passing a non-empty
+    /// slice creates or replaces it. Controls remain inert after publication.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a control kind is not safely authorable XML.
+    pub fn set_forms(&mut self, forms: &[crate::form::Form]) -> Result<()> {
+        let before = self.source.package.forms();
+        if before == forms {
+            self.forms_change = None;
+            return Ok(());
+        }
+        let before_xml = match self.source.package.forms_site() {
+            Some(site) => self
+                .source
+                .content_xml()
+                .get(site.range.clone())
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH forms source span is invalid".to_string())
+                })?
+                .to_owned(),
+            None => String::new(),
+        };
+        self.forms_change = Some(FormsChange {
+            after: forms.to_vec(),
+            after_xml: crate::authoring::render_forms(forms)?,
+            before: before.to_vec(),
+            before_xml,
+        });
+        Ok(())
+    }
+
     fn stage_list(&mut self, list: Position, after: Option<crate::list::List>) -> Result<()> {
         let before = self
             .source
@@ -654,6 +930,13 @@ impl Edit<'_> {
             .get(list.get())
             .ok_or_else(|| Error::InvalidFormat("OTH list selector is out of bounds".to_string()))?
             .clone();
+        let normalized_after = after.map(|value| {
+            crate::list::List::projected(
+                value.items().to_vec(),
+                before.level(),
+                value.style_name().map(str::to_owned),
+            )
+        });
         let site = self.source.package.list_site(list.get()).ok_or_else(|| {
             Error::InvalidFormat("OTH list structural site is missing".to_string())
         })?;
@@ -668,21 +951,24 @@ impl Edit<'_> {
                         && candidate.range.start >= site.range.start
                         && candidate.range.end <= site.range.end
                 });
-        if overlaps || before.level() > 1 {
+        if overlaps {
             return Err(Error::InvalidFormat(
-                "OTH nested list structural edits are refused".to_string(),
+                "OTH list edit would implicitly discard nested lists".to_string(),
             ));
         }
         if self
             .changes
             .iter()
             .any(|change| list_contains_paragraph(&before, change.paragraph))
+            || self.inline_changes.iter().any(|change| {
+                matches!(change.block, InlineBlock::Paragraph(position) if list_contains_paragraph(&before, position))
+            })
         {
             return Err(Error::InvalidFormat(
                 "OTH list structural edit overlaps a staged paragraph edit".to_string(),
             ));
         }
-        if after.as_ref() == Some(&before) {
+        if normalized_after.as_ref() == Some(&before) {
             self.list_changes.retain(|change| change.list != list);
             return Ok(());
         }
@@ -691,7 +977,7 @@ impl Edit<'_> {
             .iter_mut()
             .find(|change| change.list == list)
         {
-            change.after = after;
+            change.after = normalized_after;
         } else {
             self.list_changes
                 .try_reserve(1)
@@ -700,7 +986,7 @@ impl Edit<'_> {
                     source,
                 })?;
             self.list_changes.push(ListChange {
-                after,
+                after: normalized_after,
                 before: Some(before),
                 list,
             });
@@ -716,7 +1002,9 @@ impl Edit<'_> {
     /// fully reopened candidate fails semantic readback.
     pub fn commit(self) -> Result<Commit> {
         if self.changes.is_empty()
+            && self.forms_change.is_none()
             && self.heading_changes.is_empty()
+            && self.inline_changes.is_empty()
             && self.list_changes.is_empty()
             && self.metadata.is_keep()
             && self.styles.is_keep()
@@ -728,6 +1016,8 @@ impl Edit<'_> {
             self.source,
             &self.changes,
             &self.heading_changes,
+            &self.inline_changes,
+            self.forms_change.as_ref(),
             &self.list_changes,
             &self.appended,
             None,
@@ -748,7 +1038,9 @@ impl Edit<'_> {
                 appended: self.appended,
                 changes: self.changes,
                 durable_fragment: None,
+                forms_change: self.forms_change,
                 heading_changes: self.heading_changes,
+                inline_changes: self.inline_changes,
                 list_changes: self.list_changes,
                 metadata: self.metadata,
                 styles: self.styles,
@@ -777,6 +1069,8 @@ impl<'a> Edit<'a> {
             Some(JoinFailure::Metadata)
         } else if !self.styles.is_keep() && !other.styles.is_keep() {
             Some(JoinFailure::Styles)
+        } else if self.forms_change.is_some() && other.forms_change.is_some() {
+            Some(JoinFailure::Forms)
         } else {
             self.changes
                 .iter()
@@ -796,6 +1090,8 @@ impl<'a> Edit<'a> {
                             .then_some(JoinFailure::Heading(accepted.heading))
                     })
                 })
+                .or_else(|| inline_join_conflict(&self.inline_changes, &other))
+                .or_else(|| inline_join_conflict(&other.inline_changes, self))
                 .or_else(|| {
                     self.list_changes.iter().find_map(|accepted| {
                         other
@@ -839,7 +1135,11 @@ impl<'a> Edit<'a> {
             });
         }
         self.changes.extend(other.changes);
+        if self.forms_change.is_none() {
+            self.forms_change = other.forms_change;
+        }
         self.heading_changes.extend(other.heading_changes);
+        self.inline_changes.extend(other.inline_changes);
         self.list_changes.extend(other.list_changes);
         self.appended.extend(other.appended);
         if self.metadata.is_keep() {
@@ -875,6 +1175,8 @@ pub enum JoinFailure {
     },
     /// Both transactions replace metadata.
     Metadata,
+    /// Both transactions replace the form catalog.
+    Forms,
     /// Both transactions replace the style catalog.
     Styles,
 }
@@ -1006,7 +1308,9 @@ impl Commit {
                 appended: Vec::new(),
                 changes: Vec::new(),
                 durable_fragment: None,
+                forms_change: None,
                 heading_changes: Vec::new(),
+                inline_changes: Vec::new(),
                 list_changes: Vec::new(),
                 metadata: PartChange::Keep,
                 source: snapshot.clone(),
@@ -1049,7 +1353,9 @@ pub struct Patch {
     appended: Vec<crate::ContentBlock>,
     changes: Vec<ParagraphChange>,
     durable_fragment: Option<String>,
+    forms_change: Option<FormsChange>,
     heading_changes: Vec<HeadingChange>,
+    inline_changes: Vec<InlineChange>,
     list_changes: Vec<ListChange>,
     metadata: PartChange,
     source: Template,
@@ -1088,6 +1394,8 @@ impl Patch {
                 conflicts.push(MergeConflict::Heading(change.heading));
             }
         }
+        collect_inline_merge_conflicts(&left.inline_changes, right, &mut conflicts);
+        collect_inline_merge_conflicts(&right.inline_changes, left, &mut conflicts);
         for change in &left.list_changes {
             if right
                 .list_changes
@@ -1127,6 +1435,9 @@ impl Patch {
         }
         if !left.styles.is_keep() && !right.styles.is_keep() {
             conflicts.push(MergeConflict::Styles);
+        }
+        if left.forms_change.is_some() && right.forms_change.is_some() {
+            conflicts.push(MergeConflict::Forms);
         }
         Ok(MergePlan {
             base: base.clone(),
@@ -1182,6 +1493,18 @@ impl Patch {
     #[must_use]
     pub fn heading_changes(&self) -> &[HeadingChange] {
         &self.heading_changes
+    }
+
+    /// Rich inline-content changes in staging order.
+    #[must_use]
+    pub fn inline_changes(&self) -> &[InlineChange] {
+        &self.inline_changes
+    }
+
+    /// Complete form-catalog change, if present.
+    #[must_use]
+    pub const fn forms_change(&self) -> Option<&FormsChange> {
+        self.forms_change.as_ref()
     }
 
     /// Typed list changes in staging order.
@@ -1273,6 +1596,31 @@ impl Patch {
             push_wire_bytes(&mut output, change.before.as_bytes())?;
             push_wire_bytes(&mut output, change.after.as_bytes())?;
         }
+        push_wire_usize(&mut output, self.inline_changes.len())?;
+        for change in &self.inline_changes {
+            match change.block {
+                InlineBlock::Paragraph(position) => {
+                    push_wire_usize(&mut output, 0)?;
+                    push_wire_usize(&mut output, position.get())?;
+                },
+                InlineBlock::Heading(position) => {
+                    push_wire_usize(&mut output, 1)?;
+                    push_wire_usize(&mut output, position.get())?;
+                },
+            }
+            push_wire_bytes(&mut output, change.before_xml.as_bytes())?;
+            push_wire_bytes(&mut output, change.after_xml.as_bytes())?;
+            push_wire_bytes(&mut output, change.before_text.as_bytes())?;
+            push_wire_bytes(&mut output, change.after_text.as_bytes())?;
+        }
+        match &self.forms_change {
+            None => push_wire_usize(&mut output, 0)?,
+            Some(change) => {
+                push_wire_usize(&mut output, 1)?;
+                push_wire_bytes(&mut output, change.before_xml.as_bytes())?;
+                push_wire_bytes(&mut output, change.after_xml.as_bytes())?;
+            },
+        }
         push_wire_usize(&mut output, self.list_changes.len())?;
         for change in &self.list_changes {
             push_wire_usize(&mut output, change.list.get())?;
@@ -1313,6 +1661,8 @@ impl Patch {
         }
         let changes = read_paragraph_changes(bytes, &mut cursor, &source, &target)?;
         let heading_changes = read_heading_changes(bytes, &mut cursor, &source, &target)?;
+        let inline_changes = read_inline_changes(bytes, &mut cursor, &source, &target)?;
+        let forms_change = read_forms_change(bytes, &mut cursor, &source, &target)?;
         let list_changes = read_list_changes(bytes, &mut cursor, &source, &target)?;
         let metadata = read_wire_part_change(bytes, &mut cursor)?;
         let styles = read_wire_part_change(bytes, &mut cursor)?;
@@ -1332,7 +1682,9 @@ impl Patch {
             appended: Vec::new(),
             changes,
             durable_fragment: (!appended_xml.is_empty()).then_some(appended_xml),
+            forms_change,
             heading_changes,
+            inline_changes,
             list_changes,
             metadata,
             styles,
@@ -1356,6 +1708,12 @@ impl Patch {
                 })
                 .collect(),
             durable_fragment: None,
+            forms_change: self.forms_change.as_ref().map(|change| FormsChange {
+                after: change.before.clone(),
+                after_xml: change.before_xml.clone(),
+                before: change.after.clone(),
+                before_xml: change.after_xml.clone(),
+            }),
             heading_changes: self
                 .heading_changes
                 .iter()
@@ -1363,6 +1721,17 @@ impl Patch {
                     heading: change.heading,
                     before: change.after.clone(),
                     after: change.before.clone(),
+                })
+                .collect(),
+            inline_changes: self
+                .inline_changes
+                .iter()
+                .map(|change| InlineChange {
+                    after_text: change.before_text.clone(),
+                    after_xml: change.before_xml.clone(),
+                    before_text: change.after_text.clone(),
+                    before_xml: change.after_xml.clone(),
+                    block: change.block,
                 })
                 .collect(),
             list_changes: self
@@ -1401,6 +1770,8 @@ pub enum MergeConflict {
     },
     /// Both patches replace metadata.
     Metadata,
+    /// Both patches replace the form catalog.
+    Forms,
     /// Both patches replace styles.
     Styles,
     /// Both patches append at the structural tail.
@@ -1437,6 +1808,13 @@ impl MergePlan {
         paragraph_changes.extend(self.right.changes.clone());
         let mut heading_changes = self.left.heading_changes.clone();
         heading_changes.extend(self.right.heading_changes.clone());
+        let mut inline_changes = self.left.inline_changes.clone();
+        inline_changes.extend(self.right.inline_changes.clone());
+        let forms_change = self
+            .left
+            .forms_change
+            .as_ref()
+            .or(self.right.forms_change.as_ref());
         let mut list_changes = self.left.list_changes.clone();
         list_changes.extend(self.right.list_changes.clone());
         let mut appended = self.left.appended.clone();
@@ -1450,6 +1828,8 @@ impl MergePlan {
             &self.base,
             &paragraph_changes,
             &heading_changes,
+            &inline_changes,
+            forms_change,
             &list_changes,
             &appended,
             durable_fragment,
@@ -1496,6 +1876,8 @@ impl MergePlan {
                 ));
             }
         }
+        validate_inline_readback(&inline_changes, &candidate)?;
+        validate_forms_readback(forms_change, &candidate)?;
         for change in &list_changes {
             let Some(expected) = change.after.as_ref() else {
                 continue;
@@ -1723,6 +2105,105 @@ fn styles_semantically_equal(left: &crate::style::Style, right: &crate::style::S
         && left.text_properties() == right.text_properties()
 }
 
+fn inline_join_conflict(changes: &[InlineChange], other: &Edit<'_>) -> Option<JoinFailure> {
+    changes.iter().find_map(|change| match change.block {
+        InlineBlock::Paragraph(position) => (other
+            .inline_changes
+            .iter()
+            .any(|incoming| incoming.block == change.block)
+            || other
+                .changes
+                .iter()
+                .any(|incoming| incoming.paragraph == position))
+        .then_some(JoinFailure::Paragraph(position))
+        .or_else(|| {
+            other.list_changes.iter().find_map(|list_change| {
+                list_change.before.as_ref().and_then(|list| {
+                    list_contains_paragraph(list, position).then_some(JoinFailure::ListParagraph {
+                        list: list_change.list,
+                        paragraph: position,
+                    })
+                })
+            })
+        }),
+        InlineBlock::Heading(position) => (other
+            .inline_changes
+            .iter()
+            .any(|incoming| incoming.block == change.block)
+            || other
+                .heading_changes
+                .iter()
+                .any(|incoming| incoming.heading == position))
+        .then_some(JoinFailure::Heading(position)),
+    })
+}
+
+fn collect_inline_merge_conflicts(
+    changes: &[InlineChange],
+    other: &Patch,
+    conflicts: &mut Vec<MergeConflict>,
+) {
+    for change in changes {
+        match change.block {
+            InlineBlock::Paragraph(position) => {
+                if other
+                    .inline_changes
+                    .iter()
+                    .any(|incoming| incoming.block == change.block)
+                    || other
+                        .changes
+                        .iter()
+                        .any(|incoming| incoming.paragraph == position)
+                {
+                    conflicts.push(MergeConflict::Paragraph(position));
+                }
+                for list_change in &other.list_changes {
+                    if list_change
+                        .before
+                        .as_ref()
+                        .is_some_and(|list| list_contains_paragraph(list, position))
+                    {
+                        conflicts.push(MergeConflict::ListParagraph {
+                            list: list_change.list,
+                            paragraph: position,
+                        });
+                    }
+                }
+            },
+            InlineBlock::Heading(position) => {
+                if other
+                    .inline_changes
+                    .iter()
+                    .any(|incoming| incoming.block == change.block)
+                    || other
+                        .heading_changes
+                        .iter()
+                        .any(|incoming| incoming.heading == position)
+                {
+                    conflicts.push(MergeConflict::Heading(position));
+                }
+            },
+        }
+    }
+}
+
+fn validate_inline_readback(changes: &[InlineChange], snapshot: &Template) -> Result<()> {
+    for change in changes {
+        validate_one_inline_change(change, snapshot, true)?;
+    }
+    Ok(())
+}
+
+fn validate_forms_readback(
+    optional_change: Option<&FormsChange>,
+    snapshot: &Template,
+) -> Result<()> {
+    if let Some(forms_change) = optional_change {
+        validate_forms_source(forms_change, snapshot, true)?;
+    }
+    Ok(())
+}
+
 fn list_paragraph_count(list: &crate::list::List) -> usize {
     list.items()
         .iter()
@@ -1755,6 +2236,8 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
             ));
         }
     }
+    validate_inline_readback(&edit.inline_changes, snapshot)?;
+    validate_forms_readback(edit.forms_change.as_ref(), snapshot)?;
     let removed_lists = edit
         .list_changes
         .iter()
@@ -1897,6 +2380,7 @@ fn push_wire_list(output: &mut Vec<u8>, optional_list: Option<&crate::list::List
         None => push_wire_usize(output, 0),
         Some(value) => {
             push_wire_usize(output, 1)?;
+            push_wire_usize(output, value.level())?;
             let xml =
                 crate::authoring::render_fragment(&[crate::ContentBlock::List(value.clone())])?;
             push_wire_bytes(output, xml.as_bytes())
@@ -1950,6 +2434,12 @@ fn read_wire_list(bytes: &[u8], cursor: &mut usize) -> Result<Option<crate::list
     match read_wire_usize(bytes, cursor)? {
         0 => Ok(None),
         1 => {
+            let level = read_wire_usize(bytes, cursor)?;
+            if level == 0 {
+                return Err(Error::InvalidFormat(
+                    "OTH durable patch list level is invalid".to_string(),
+                ));
+            }
             let fragment = read_wire_string(bytes, cursor)?;
             let wrapped = format!(
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\"><office:body><office:text>{fragment}</office:text></office:body></office:document-content>"
@@ -1960,7 +2450,14 @@ fn read_wire_list(bytes: &[u8], cursor: &mut usize) -> Result<Option<crate::list
                     "OTH durable patch list fragment is not one top-level list".to_string(),
                 ));
             }
-            Ok(projection.lists.pop())
+            let parsed = projection.lists.pop().ok_or_else(|| {
+                Error::InvalidFormat("OTH durable patch list disappeared".to_string())
+            })?;
+            Ok(Some(crate::list::List::projected(
+                parsed.items().to_vec(),
+                level,
+                parsed.style_name().map(str::to_owned),
+            )))
         },
         _ => Err(Error::InvalidFormat(
             "OTH durable patch list marker is invalid".to_string(),
@@ -2071,6 +2568,155 @@ fn read_heading_changes(
         });
     }
     Ok(changes)
+}
+
+fn read_inline_changes(
+    bytes: &[u8],
+    cursor: &mut usize,
+    source: &Template,
+    target: &Template,
+) -> Result<Vec<InlineChange>> {
+    let count = read_wire_usize(bytes, cursor)?;
+    let maximum = source
+        .package
+        .paragraphs()
+        .len()
+        .saturating_add(source.package.headings().len());
+    if count > maximum {
+        return Err(Error::InvalidFormat(
+            "OTH durable rich inline count is invalid".to_string(),
+        ));
+    }
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(count)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "OTH durable rich inline changes",
+            source: allocation_error,
+        })?;
+    for _ in 0..count {
+        let kind = read_wire_usize(bytes, cursor)?;
+        let position = Position::new(read_wire_usize(bytes, cursor)?);
+        let block = match kind {
+            0 => InlineBlock::Paragraph(position),
+            1 => InlineBlock::Heading(position),
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "OTH durable rich inline block marker is invalid".to_string(),
+                ));
+            },
+        };
+        if changes
+            .iter()
+            .any(|change: &InlineChange| change.block == block)
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable patch repeats a rich inline selector".to_string(),
+            ));
+        }
+        let change = InlineChange {
+            before_xml: read_wire_string(bytes, cursor)?,
+            after_xml: read_wire_string(bytes, cursor)?,
+            before_text: read_wire_string(bytes, cursor)?,
+            after_text: read_wire_string(bytes, cursor)?,
+            block,
+        };
+        validate_one_inline_change(&change, source, false)?;
+        validate_one_inline_change(&change, target, true)?;
+        changes.push(change);
+    }
+    Ok(changes)
+}
+
+fn validate_one_inline_change(
+    change: &InlineChange,
+    template: &Template,
+    after: bool,
+) -> Result<()> {
+    let (optional_site, text) = match change.block {
+        InlineBlock::Paragraph(position) => (
+            template.package.paragraph_content_site(position.get()),
+            template
+                .package
+                .paragraphs()
+                .get(position.get())
+                .map(crate::paragraph::Paragraph::text),
+        ),
+        InlineBlock::Heading(position) => (
+            template.package.heading_content_site(position.get()),
+            template
+                .package
+                .headings()
+                .get(position.get())
+                .map(crate::heading::Heading::text),
+        ),
+    };
+    let content_site = optional_site.ok_or_else(|| {
+        Error::InvalidFormat("OTH durable rich inline site is invalid".to_string())
+    })?;
+    let actual_xml = template
+        .content_xml()
+        .get(content_site.range.clone())
+        .ok_or_else(|| {
+            Error::InvalidFormat("OTH durable rich inline span is invalid".to_string())
+        })?;
+    let (expected_xml, expected_text) = if after {
+        (change.after_xml.as_str(), change.after_text.as_str())
+    } else {
+        (change.before_xml.as_str(), change.before_text.as_str())
+    };
+    if actual_xml != expected_xml || text != Some(expected_text) {
+        return Err(Error::InvalidFormat(
+            "OTH durable rich inline semantic readback failed".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn read_forms_change(
+    bytes: &[u8],
+    cursor: &mut usize,
+    source: &Template,
+    target: &Template,
+) -> Result<Option<FormsChange>> {
+    match read_wire_usize(bytes, cursor)? {
+        0 => Ok(None),
+        1 => {
+            let change = FormsChange {
+                before: source.package.forms().to_vec(),
+                before_xml: read_wire_string(bytes, cursor)?,
+                after: target.package.forms().to_vec(),
+                after_xml: read_wire_string(bytes, cursor)?,
+            };
+            validate_forms_source(&change, source, false)?;
+            validate_forms_source(&change, target, true)?;
+            Ok(Some(change))
+        },
+        _ => Err(Error::InvalidFormat(
+            "OTH durable forms marker is invalid".to_string(),
+        )),
+    }
+}
+
+fn validate_forms_source(change: &FormsChange, template: &Template, after: bool) -> Result<()> {
+    let actual_xml = match template.package.forms_site() {
+        Some(site) => template
+            .content_xml()
+            .get(site.range.clone())
+            .ok_or_else(|| Error::InvalidFormat("OTH forms source span is invalid".to_string()))?,
+        None => "",
+    };
+    let (expected_xml, expected_forms) = if after {
+        (change.after_xml.as_str(), change.after.as_slice())
+    } else {
+        (change.before_xml.as_str(), change.before.as_slice())
+    };
+    if actual_xml != expected_xml || template.package.forms() != expected_forms {
+        return Err(Error::InvalidFormat(
+            "OTH durable forms semantic readback failed".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn read_list_changes(
@@ -2203,6 +2849,8 @@ fn replace_texts(
     source: &Template,
     changes: &[ParagraphChange],
     heading_changes: &[HeadingChange],
+    inline_changes: &[InlineChange],
+    forms_change: Option<&FormsChange>,
     list_changes: &[ListChange],
     appended: &[crate::ContentBlock],
     durable_fragment: Option<&str>,
@@ -2220,6 +2868,8 @@ fn replace_texts(
             changes
                 .len()
                 .saturating_add(heading_changes.len())
+                .saturating_add(inline_changes.len())
+                .saturating_add(usize::from(forms_change.is_some()))
                 .saturating_add(list_changes.len())
                 .saturating_add(usize::from(has_append)),
         )
@@ -2242,6 +2892,59 @@ fn replace_texts(
             .heading_replacement_site(change.heading.get())
             .ok_or_else(|| Error::InvalidFormat("OTH heading edit site disappeared".to_string()))?;
         replacements.push((site.clone(), quick_xml::escape::escape(&change.after)));
+    }
+    for change in inline_changes {
+        let site = match change.block {
+            InlineBlock::Paragraph(position) => source
+                .package
+                .paragraph_content_site(position.get())
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH rich paragraph edit site disappeared".to_string())
+                })?,
+            InlineBlock::Heading(position) => source
+                .package
+                .heading_content_site(position.get())
+                .ok_or_else(|| {
+                Error::InvalidFormat("OTH rich heading edit site disappeared".to_string())
+            })?,
+        };
+        let actual = source
+            .content_xml()
+            .get(site.range.clone())
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH rich inline edit source span is invalid".to_string())
+            })?;
+        if actual != change.before_xml {
+            return Err(Error::InvalidFormat(
+                "OTH rich inline edit source precondition failed".to_string(),
+            ));
+        }
+        replacements.push((
+            site.clone(),
+            std::borrow::Cow::Borrowed(change.after_xml.as_str()),
+        ));
+    }
+    if let Some(change) = forms_change {
+        let site =
+            source
+                .package
+                .forms_site()
+                .cloned()
+                .unwrap_or_else(|| crate::codec::ReplacementSite {
+                    prefix: String::new(),
+                    range: source.package.text_close()..source.package.text_close(),
+                    suffix: String::new(),
+                });
+        let actual = source
+            .content_xml()
+            .get(site.range.clone())
+            .ok_or_else(|| Error::InvalidFormat("OTH forms source span is invalid".to_string()))?;
+        if actual != change.before_xml {
+            return Err(Error::InvalidFormat(
+                "OTH forms source precondition failed".to_string(),
+            ));
+        }
+        replacements.push((site, std::borrow::Cow::Borrowed(change.after_xml.as_str())));
     }
     for change in list_changes {
         if change.before.is_none() {

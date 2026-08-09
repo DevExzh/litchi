@@ -61,7 +61,7 @@ fn read_file_with_limit(path: &Path, limit: usize) -> RtfResult<Vec<u8>> {
     Ok(bytes)
 }
 
-fn owned_table(
+pub(crate) fn owned_table(
     table: &super::super::table::Table<'_>,
 ) -> RtfResult<super::super::table::Table<'static>> {
     let mut output = super::super::table::Table::new();
@@ -1054,6 +1054,12 @@ impl<'a> RtfDocument<'a> {
     #[must_use]
     pub fn pictures(&self) -> &[super::super::picture::Picture<'_>] {
         &self.pictures
+    }
+
+    pub(crate) fn push_picture(&mut self, picture: super::super::picture::Picture<'a>) -> usize {
+        let index = self.pictures.len();
+        self.pictures.push(picture);
+        index
     }
 
     /// Replace typed `picprop` metadata on one existing picture without cloning image bytes.
@@ -3702,6 +3708,10 @@ impl<'a> RtfDocument<'a> {
         &self.list_table
     }
 
+    pub(crate) fn list_table_mut(&mut self) -> &mut super::super::list::ListTable<'a> {
+        &mut self.list_table
+    }
+
     /// Resolve ordered list-picture records without cloning their image payloads.
     #[must_use]
     pub fn list_picture_bullets(
@@ -3762,6 +3772,10 @@ impl<'a> RtfDocument<'a> {
     #[must_use]
     pub fn list_override_table(&self) -> &super::super::list::ListOverrideTable {
         &self.list_override_table
+    }
+
+    pub(crate) fn list_override_table_mut(&mut self) -> &mut super::super::list::ListOverrideTable {
+        &mut self.list_override_table
     }
 
     /// Return ordered legacy `pnseclvl` section-numbering defaults.
@@ -4774,6 +4788,10 @@ impl<'a> RtfDocument<'a> {
     #[must_use]
     pub fn stylesheet(&self) -> &super::super::stylesheet::StyleSheet<'_> {
         &self.stylesheet
+    }
+
+    pub(crate) fn stylesheet_mut(&mut self) -> &mut super::super::stylesheet::StyleSheet<'a> {
+        &mut self.stylesheet
     }
 
     /// Get document information/metadata.

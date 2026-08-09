@@ -14,3 +14,10 @@ The shipped filter registry contained no OpenDocument Image (`ODI`) or flat
 OpenDocument Image (`FODI`) export filter. Consequently, this corpus still has
 no genuine producer ODI/FODI evidence. A future producer fixture must include
 the producer name/version and an unchanged original file.
+
+On 2026-08-10, the local check was repeated. No `libreoffice`, `soffice`,
+`openoffice`, or `swriter` executable was available on `PATH`, and bounded
+searches of the workspace, `/tmp`, `/opt`, `/usr/local`, and the user cache
+found only this synthetic `.fodi`. Thus this environment cannot produce or
+validate a genuine changed-file resave without installing a producer that
+actually exposes an ODI/FODI export filter.

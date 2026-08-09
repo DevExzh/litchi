@@ -9,11 +9,15 @@
 use super::model::{Chart, Limits, Location, Page, Part, Storage};
 use crate::core::OwnedPackage;
 use litchi_core::{Error, Result};
-use litchi_odf_common::chart::authoring::{Definition, serialize_content};
+use litchi_odf_common::chart::authoring::{
+    CachedCell, CachedRow, CachedTable, Definition, SeriesSpec, serialize_content,
+    serialize_series_fragment,
+};
 use litchi_odf_common::chart::read;
 use litchi_odf_common::constants::{ODF_CHART, ODF_CHART_TEMPLATE};
 use litchi_odf_common::drawing::Part as DrawingPart;
 use litchi_odf_common::embedded::{Kind, Root, Source, scan_package};
+use litchi_odf_common::package::splice;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -158,6 +162,83 @@ impl Part {
         Self::from_xml(serialize_content(definition)?)
     }
 
+    /// Return a checked part with one typed series appended to its plot area.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the chart has no unique plot area or the series is invalid.
+    pub fn with_series_added(&self, series: &SeriesSpec) -> Result<Self> {
+        let fragment = serialize_series_fragment(series)?;
+        let plot_areas = locate_element_spans(self.xml(), CHART_NS, b"plot-area")?;
+        let plot_area = unique_span(&plot_areas, "ODP chart plot area")?;
+        let closing = closing_tag_start(self.xml(), plot_area)?;
+        Self::from_xml(splice(self.xml(), closing, closing, &fragment)?)
+    }
+
+    /// Return a checked part with one physical series replaced by index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range index or invalid series.
+    pub fn with_series_replaced(&self, index: usize, series: &SeriesSpec) -> Result<Self> {
+        let fragment = serialize_series_fragment(series)?;
+        let spans = locate_element_spans(self.xml(), CHART_NS, b"series")?;
+        let span = spans
+            .get(index)
+            .copied()
+            .ok_or_else(|| invalid_error("ODP chart series index is out of bounds"))?;
+        Self::from_xml(splice(self.xml(), span.start, span.end, &fragment)?)
+    }
+
+    /// Return a checked part with one physical series removed by index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range index or malformed chart XML.
+    pub fn with_series_removed(&self, index: usize) -> Result<Self> {
+        let spans = locate_element_spans(self.xml(), CHART_NS, b"series")?;
+        let span = spans
+            .get(index)
+            .copied()
+            .ok_or_else(|| invalid_error("ODP chart series index is out of bounds"))?;
+        Self::from_xml(splice(self.xml(), span.start, span.end, "")?)
+    }
+
+    /// Return a checked part with one physical cached-table cell replaced.
+    ///
+    /// Row indexing includes cached header rows. Repeated row/cell runs remain
+    /// physical XML entries and are not expanded implicitly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing cached table, out-of-range coordinate, or invalid cell.
+    pub fn with_cached_cell_replaced(
+        &self,
+        row: usize,
+        column: usize,
+        cell: &CachedCell,
+    ) -> Result<Self> {
+        let rows = locate_element_spans(self.xml(), TABLE_NS, b"table-row")?;
+        let row_span = rows
+            .get(row)
+            .copied()
+            .ok_or_else(|| invalid_error("ODP chart cached-table row is out of bounds"))?;
+        let cells = locate_element_spans(self.xml(), TABLE_NS, b"table-cell")?;
+        let cell_span = cells
+            .iter()
+            .filter(|span| span.start >= row_span.start && span.end <= row_span.end)
+            .nth(column)
+            .copied()
+            .ok_or_else(|| invalid_error("ODP chart cached-table column is out of bounds"))?;
+        let fragment = serialize_cached_cell_fragment(cell)?;
+        Self::from_xml(splice(
+            self.xml(),
+            cell_span.start,
+            cell_span.end,
+            &fragment,
+        )?)
+    }
+
     /// Parse an inline `office:document` chart payload.
     ///
     /// # Errors
@@ -193,6 +274,103 @@ impl Part {
         let content = rename_document_root(&xml, "document", "document-content", None)?;
         Self::from_xml_with_limit(content, max_bytes)
     }
+}
+
+const CHART_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
+const TABLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+
+#[derive(Clone, Copy)]
+struct ElementSpan {
+    start: usize,
+    end: usize,
+}
+
+fn locate_element_spans(xml: &str, namespace: &[u8], local: &[u8]) -> Result<Vec<ElementSpan>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut active = Vec::<(usize, usize, Vec<u8>)>::new();
+    let mut spans = Vec::new();
+    loop {
+        let start = position(&reader, utf8_bom_len(xml))?;
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid_error(format!("invalid ODP chart XML: {error}")))?;
+        let matches =
+            matches!(resolved, ResolveResult::Bound(Namespace(uri)) if *uri == *namespace);
+        let end = position(&reader, utf8_bom_len(xml))?;
+        match event {
+            Event::Start(element) => {
+                if matches && element.local_name().as_ref() == local {
+                    active.push((depth, start, element.name().as_ref().to_vec()));
+                }
+                depth = checked_depth(depth)?;
+            },
+            Event::Empty(element) => {
+                if matches && element.local_name().as_ref() == local {
+                    spans.push(ElementSpan { start, end });
+                }
+            },
+            Event::End(element) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid_error("ODP chart XML depth underflow"))?;
+                if active.last().is_some_and(|(active_depth, _, qualified)| {
+                    *active_depth == depth && qualified.as_slice() == element.name().as_ref()
+                }) {
+                    let (_, active_start, _) = active
+                        .pop()
+                        .ok_or_else(|| invalid_error("ODP chart span state disappeared"))?;
+                    spans.push(ElementSpan {
+                        start: active_start,
+                        end,
+                    });
+                }
+            },
+            Event::DocType(_) => return invalid("DTDs are not allowed in ODP chart XML"),
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+    if !active.is_empty() || depth != 0 {
+        return invalid("unterminated ODP chart XML");
+    }
+    spans.sort_unstable_by_key(|span| span.start);
+    Ok(spans)
+}
+
+fn unique_span(spans: &[ElementSpan], kind: &str) -> Result<ElementSpan> {
+    match spans {
+        [span] => Ok(*span),
+        [] => invalid(format!("{kind} was not found")),
+        _ => invalid(format!("{kind} is ambiguous")),
+    }
+}
+
+fn closing_tag_start(xml: &str, span: ElementSpan) -> Result<usize> {
+    xml.get(span.start..span.end)
+        .and_then(|fragment| fragment.rfind("</"))
+        .and_then(|relative| span.start.checked_add(relative))
+        .ok_or_else(|| invalid_error("ODP chart element has no closing tag"))
+}
+
+fn serialize_cached_cell_fragment(cell: &CachedCell) -> Result<String> {
+    let mut definition = Definition::new(litchi_odf_common::chart::ChartClass::line());
+    let mut table = CachedTable::new("cell", 1);
+    table.rows.push(CachedRow::new(vec![cell.clone()]));
+    definition.cached_table = Some(table);
+    let xml = serialize_content(&definition)?;
+    let cells = locate_element_spans(&xml, TABLE_NS, b"table-cell")?;
+    let span = unique_span(&cells, "serialized ODP chart cached cell")?;
+    xml.get(span.start..span.end)
+        .map(str::to_string)
+        .ok_or_else(|| invalid_error("serialized ODP cached-cell span is invalid"))
 }
 
 fn verify_authored_xml(xml: &str, max_bytes: usize) -> Result<()> {

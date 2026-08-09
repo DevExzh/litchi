@@ -3,7 +3,9 @@
 use std::collections::HashSet;
 
 use crate::constants;
-use crate::core::{OwnedPackage, PackageWriter};
+use crate::core::{
+    AuthoredXmlFragment, OwnedPackage, PackageWriter, XmlSourcePart, XmlSplicePublication,
+};
 use litchi_core::{Error, Result};
 
 const MAX_CONTENT_BYTES: usize = 16 * 1024 * 1024;
@@ -74,7 +76,21 @@ pub fn rebuild_package(
     let mut writer = PackageWriter::new();
     writer.set_mimetype(&source.mimetype()?)?;
     if !content_is_exact_source {
-        writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
+        match content_splice_publication(source, content) {
+            Ok(publication) => writer.add_spliced_xml(publication)?,
+            Err(splice_error) => {
+                // A changed whole part remains subject to the strict compact
+                // authored-XML audit. Only a checked fine-grained splice may
+                // retain formatting from a source-loaded producer part.
+                writer
+                    .add_file(constants::ODF_CONTENT, content.as_bytes())
+                    .map_err(|audit_error| {
+                        Error::InvalidFormat(format!(
+                            "outer content.xml is neither a checked source splice ({splice_error}) nor compact authored XML ({audit_error})"
+                        ))
+                    })?;
+            },
+        }
     }
     for (path, media_type) in directories {
         writer.add_manifest_directory(&path, &media_type)?;
@@ -92,6 +108,102 @@ pub fn rebuild_package(
     }
     writer.copy_source_files_from_except(source, &exact_exclusions)?;
     writer.finish_to_bytes()
+}
+
+/// Derive one audited, provenance-bearing `content.xml` splice publication.
+///
+/// This is intentionally limited to a single byte-contiguous change against
+/// the exact source package. Callers must fall back to whole-part compact XML
+/// validation when the change cannot be classified this way.
+///
+/// # Errors
+///
+/// Returns an error when the source part is unavailable, the change is not a
+/// single safely aligned splice, or the replacement fragment is not compact
+/// authored XML.
+pub fn content_splice_publication(
+    source: &OwnedPackage,
+    candidate: &str,
+) -> Result<XmlSplicePublication> {
+    let source_part = XmlSourcePart::load(source, constants::ODF_CONTENT)?;
+    let source_xml = std::str::from_utf8(source_part.bytes()).map_err(|error| {
+        Error::InvalidFormat(format!("invalid UTF-8 in source content.xml: {error}"))
+    })?;
+    let source_bytes = source_xml.as_bytes();
+    let candidate_bytes = candidate.as_bytes();
+    let mut prefix = source_bytes
+        .iter()
+        .zip(candidate_bytes)
+        .take_while(|(left, right)| left == right)
+        .count();
+    while !source_xml.is_char_boundary(prefix) || !candidate.is_char_boundary(prefix) {
+        prefix = prefix
+            .checked_sub(1)
+            .ok_or_else(|| Error::InvalidFormat("invalid XML splice prefix".to_string()))?;
+    }
+    let mut source_end = source_bytes.len();
+    let mut candidate_end = candidate_bytes.len();
+    while source_end > prefix
+        && candidate_end > prefix
+        && source_bytes[source_end - 1] == candidate_bytes[candidate_end - 1]
+    {
+        source_end -= 1;
+        candidate_end -= 1;
+    }
+    while !source_xml.is_char_boundary(source_end) || !candidate.is_char_boundary(candidate_end) {
+        source_end = source_end
+            .checked_add(1)
+            .filter(|end| *end <= source_bytes.len())
+            .ok_or_else(|| Error::InvalidFormat("invalid XML splice suffix".to_string()))?;
+        candidate_end = candidate_end
+            .checked_add(1)
+            .filter(|end| *end <= candidate_bytes.len())
+            .ok_or_else(|| Error::InvalidFormat("invalid XML splice suffix".to_string()))?;
+    }
+    // A pure insertion immediately before a same-named sibling can make the
+    // maximal common prefix end inside that sibling's start tag. Roll the
+    // shared overlap back to the preceding markup boundary in both suffix
+    // coordinates so the candidate delta is the complete inserted fragment
+    // and the source proof remains an exact empty range.
+    let provisional = candidate_bytes
+        .get(prefix..candidate_end)
+        .ok_or_else(|| Error::InvalidFormat("invalid candidate XML splice range".to_string()))?;
+    if provisional.first() != Some(&b'<') && provisional.contains(&b'<') {
+        let boundary = source_bytes[..prefix]
+            .iter()
+            .rposition(|byte| *byte == b'<')
+            .ok_or_else(|| Error::InvalidFormat("missing XML splice boundary".to_string()))?;
+        let overlap = prefix - boundary;
+        source_end = source_end
+            .checked_sub(overlap)
+            .filter(|end| *end >= boundary)
+            .ok_or_else(|| Error::InvalidFormat("invalid source XML splice overlap".to_string()))?;
+        candidate_end = candidate_end
+            .checked_sub(overlap)
+            .filter(|end| *end >= boundary)
+            .ok_or_else(|| {
+                Error::InvalidFormat("invalid candidate XML splice overlap".to_string())
+            })?;
+        prefix = boundary;
+    }
+    let expected = source_bytes
+        .get(prefix..source_end)
+        .ok_or_else(|| Error::InvalidFormat("invalid source XML splice range".to_string()))?;
+    let replacement = candidate_bytes
+        .get(prefix..candidate_end)
+        .ok_or_else(|| Error::InvalidFormat("invalid candidate XML splice range".to_string()))?;
+    let proof = source_part.checked_range(prefix..source_end, expected)?;
+    let fragment = if replacement.is_empty() {
+        AuthoredXmlFragment::deletion()
+    } else if replacement.first() == Some(&b'<') {
+        AuthoredXmlFragment::markup(replacement.to_vec())
+            .or_else(|_| AuthoredXmlFragment::start_tag(replacement.to_vec()))?
+    } else {
+        AuthoredXmlFragment::text(replacement.to_vec())?
+    };
+    let mut publication = XmlSplicePublication::new(source_part);
+    publication.replace(proof, fragment)?;
+    Ok(publication)
 }
 
 /// Replace a checked UTF-8 byte span without allocating intermediate XML trees.

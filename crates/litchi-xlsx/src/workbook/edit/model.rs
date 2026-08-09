@@ -12,7 +12,7 @@ use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
 
 use super::{Visibility, Workbook};
-use crate::cell::{Cell, Stored};
+use crate::cell::{Cell, SharedStringKey, Stored};
 use crate::column::{Flags as ColumnFlags, Outline, Props as ColumnProps, State as ColumnState};
 use crate::error::{Error, MergeEditBlock, Result, allocation, invalid};
 use crate::layout::{self, Defaults};
@@ -29,7 +29,12 @@ use crate::{StyleKey, StyleState};
 #[non_exhaustive]
 pub enum State {
     Missing,
-    Cell { content: Cell, style: StyleState },
+    Cell {
+        content: Cell,
+        style: StyleState,
+        /// Exact workbook shared-string identity, including any rich runs.
+        shared_string: Option<SharedStringKey>,
+    },
 }
 
 impl State {
@@ -41,6 +46,9 @@ impl State {
                     key,
                     Arc::clone(&workbook.inner.style_lineage),
                 ))
+            }),
+            shared_string: stored.shared_string.map(|index| {
+                SharedStringKey::new(index, Arc::clone(&workbook.inner.shared_string_lineage))
             }),
         })
     }
@@ -55,6 +63,9 @@ impl State {
         }
         let content = match payload {
             Some(Payload::Set(content)) => content.as_cell(),
+            Some(Payload::SharedString { text, .. }) => {
+                Cell::Value(crate::Value::Text(text.clone()))
+            },
             Some(Payload::Clear | Payload::ClearIfPresent) => Cell::Empty,
             None => before.map_or(Cell::Empty, |stored| stored.cell.clone()),
         };
@@ -73,12 +84,34 @@ impl State {
                     ))
                 }),
         };
-        Self::Cell { content, style }
+        let shared_string = match payload {
+            Some(Payload::SharedString { index, .. }) => Some(SharedStringKey::new(
+                *index,
+                Arc::clone(&workbook.inner.shared_string_lineage),
+            )),
+            Some(Payload::Set(_) | Payload::Clear | Payload::ClearIfPresent) => None,
+            None => before.and_then(|stored| stored.shared_string).map(|index| {
+                SharedStringKey::new(index, Arc::clone(&workbook.inner.shared_string_lineage))
+            }),
+        };
+        Self::Cell {
+            content,
+            style,
+            shared_string,
+        }
     }
 
     pub(super) fn rebind_style(&mut self, workbook: &Workbook) {
-        if let Self::Cell { style, .. } = self {
+        if let Self::Cell {
+            style,
+            shared_string,
+            ..
+        } = self
+        {
             style.rebind(&workbook.inner.style_lineage);
+            if let Some(shared_string) = shared_string {
+                shared_string.rebind(&workbook.inner.shared_string_lineage);
+            }
         }
     }
 
@@ -375,7 +408,7 @@ fn has_content_after(before: Option<&Cell>, action: Option<&Action>) -> bool {
     match action {
         Some(Action::Remove) => false,
         Some(Action::Update {
-            payload: Some(Payload::Set(_)),
+            payload: Some(Payload::Set(_) | Payload::SharedString { .. }),
             ..
         }) => true,
         Some(Action::Update {
@@ -1330,6 +1363,8 @@ pub enum JoinFailure {
     Overlap(ConflictSet),
     /// Both edits replace the workbook's one persisted task-pane graph.
     TaskPanes,
+    /// Both edits replace the complete workbook defined-name catalog.
+    DefinedNames,
 }
 
 /// Recoverable join failure that returns ownership of the rejected edit.
@@ -1360,7 +1395,9 @@ impl JoinError {
     pub fn conflicts(&self) -> Option<&ConflictSet> {
         match &self.failure {
             JoinFailure::Overlap(conflicts) => Some(conflicts),
-            JoinFailure::DifferentSnapshot | JoinFailure::TaskPanes => None,
+            JoinFailure::DifferentSnapshot | JoinFailure::TaskPanes | JoinFailure::DefinedNames => {
+                None
+            },
         }
     }
 
@@ -1395,6 +1432,9 @@ impl fmt::Display for JoinError {
             JoinFailure::TaskPanes => {
                 formatter.write_str("both edits replace the persisted task-pane graph")
             },
+            JoinFailure::DefinedNames => {
+                formatter.write_str("both edits replace the workbook defined-name catalog")
+            },
         }
     }
 }
@@ -1410,6 +1450,11 @@ pub enum PackageChange {
         before: Option<common_web::Panes>,
         after: Option<common_web::Panes>,
     },
+    /// Complete inert workbook defined-name catalog changed.
+    DefinedNames {
+        before: Box<[crate::raw::DefinedName]>,
+        after: Box<[crate::raw::DefinedName]>,
+    },
 }
 
 impl PackageChange {
@@ -1418,12 +1463,28 @@ impl PackageChange {
     pub fn task_panes(&self) -> (Option<&common_web::Panes>, Option<&common_web::Panes>) {
         match self {
             Self::TaskPanes { before, after } => (before.as_ref(), after.as_ref()),
+            Self::DefinedNames { .. } => (None, None),
+        }
+    }
+
+    /// Borrow the complete defined-name transition, when applicable.
+    #[must_use]
+    pub fn defined_names(
+        &self,
+    ) -> Option<(&[crate::raw::DefinedName], &[crate::raw::DefinedName])> {
+        match self {
+            Self::DefinedNames { before, after } => Some((before, after)),
+            Self::TaskPanes { .. } => None,
         }
     }
 
     pub(super) fn inverse(&self) -> Self {
         match self {
             Self::TaskPanes { before, after } => Self::TaskPanes {
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::DefinedNames { before, after } => Self::DefinedNames {
                 before: after.clone(),
                 after: before.clone(),
             },

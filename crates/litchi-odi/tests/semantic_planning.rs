@@ -47,6 +47,7 @@ fn map() -> ImageMap {
             .with_href("https://example.test/one")
             .with_target_frame_name("_blank")
             .with_show("new")
+            .with_actuate("onRequest")
             .with_title("One"),
         Area::circle("2cm", "2cm", "1cm").with_no_href(),
     ])
@@ -179,7 +180,12 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
     let stale = FlatImage::from_bytes(FLAT.replace("gr1", "other").into_bytes()).unwrap();
     assert!(patch.apply_flat(&stale).is_err());
 
-    let package_source = package();
+    let package_source = {
+        let package_without_styles = package();
+        let mut style_setup = package_without_styles.edit();
+        style_setup.set_styles_xml(Some(STYLES.into())).unwrap();
+        style_setup.commit().unwrap().image().clone()
+    };
     let transfer = patch.plan_package(&package_source);
     assert!(transfer.is_conflict_free());
     let package_commit = transfer
@@ -210,6 +216,118 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
         .areas()[0];
     assert_eq!(first_area.target_frame_name(), Some("_blank"));
     assert_eq!(first_area.show(), Some("new"));
+    assert_eq!(first_area.actuate(), Some("onRequest"));
+}
+
+#[test]
+fn package_transfer_copies_complete_resource_and_style_dependencies() {
+    let base = package();
+    let mut prepare = base.edit();
+    prepare.set_styles_xml(Some(STYLES.into())).unwrap();
+    prepare
+        .put_member(
+            "Pictures/replacement.png".into(),
+            "image/png".into(),
+            b"replacement".to_vec(),
+        )
+        .unwrap();
+    let prepared = prepare.commit().unwrap().image().clone();
+
+    let mut edit = prepared.edit();
+    edit.set_source(0, Source::Linked("Pictures/replacement.png".into()))
+        .unwrap();
+    edit.set_style_name(0, Some("gr2".into())).unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+
+    let destination = package();
+    let plan = patch.plan_package(&destination);
+    assert!(plan.is_conflict_free(), "{:?}", plan.conflicts());
+    assert!(
+        plan.operations()
+            .iter()
+            .any(|operation| operation.key() == &OperationKey::Styles)
+    );
+    assert!(plan.operations().iter().any(|operation| {
+        operation.key() == &OperationKey::Resource("Pictures/replacement.png".into())
+    }));
+    let transferred = plan
+        .commit_package(&destination, &SecurityPolicy::default())
+        .unwrap();
+    assert_eq!(transferred.image().styles_xml(), Some(STYLES));
+    assert_eq!(
+        transferred
+            .image()
+            .member_bytes("Pictures/replacement.png")
+            .unwrap(),
+        Some(b"replacement".to_vec())
+    );
+    assert_eq!(
+        transferred.image().frame().unwrap().source(),
+        &Source::Linked("Pictures/replacement.png".into())
+    );
+    assert!(
+        plan.commit_package(
+            &destination,
+            &SecurityPolicy::default().with_resource_bytes(1),
+        )
+        .is_err()
+    );
+    assert!(
+        plan.commit_package(&destination, &SecurityPolicy::default().with_patch_bytes(1),)
+            .is_err()
+    );
+
+    let mut seed_mismatch = destination.edit();
+    seed_mismatch
+        .put_member(
+            "Pictures/replacement.png".into(),
+            "image/png".into(),
+            b"different".to_vec(),
+        )
+        .unwrap();
+    let mismatched = seed_mismatch.commit().unwrap().image().clone();
+    let refused = patch.plan_package(&mismatched);
+    assert!(refused.conflicts().iter().any(|conflict| {
+        conflict.kind() == ConflictKind::MissingDependency
+            && conflict.key() == Some(&OperationKey::Resource("Pictures/replacement.png".into()))
+    }));
+    assert!(
+        refused
+            .commit_package(&mismatched, &SecurityPolicy::default())
+            .is_err()
+    );
+    assert_eq!(
+        mismatched.member_bytes("Pictures/replacement.png").unwrap(),
+        Some(b"different".to_vec())
+    );
+}
+
+#[test]
+fn flat_transfer_reports_dependencies_it_cannot_supply() {
+    let source = flat();
+    let mut edit = source.transaction();
+    edit.set_source(0, Source::Linked("Pictures/absent.png".into()))
+        .unwrap();
+    edit.set_style_name(0, Some("absent-style".into())).unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let destination = package();
+    let plan = patch.plan_package(&destination);
+
+    assert!(!plan.is_conflict_free());
+    assert_eq!(
+        plan.conflicts()
+            .iter()
+            .filter(|conflict| conflict.kind() == ConflictKind::MissingDependency)
+            .count(),
+        2
+    );
+    assert!(
+        plan.commit_package(&destination, &SecurityPolicy::default())
+            .is_err()
+    );
+    assert_eq!(destination.frame().unwrap().style_name(), Some("gr1"));
 }
 
 #[test]

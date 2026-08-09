@@ -17,8 +17,8 @@ pub mod workbook;
 mod worksheet;
 
 pub use root::{
-    WorkbookCommit, WorkbookEdit, WorkbookHistory, WorkbookMergeConflict, WorkbookMergeOutcome,
-    WorkbookPatch,
+    AuthoredStyle, WorkbookCommit, WorkbookEdit, WorkbookHistory, WorkbookMergeConflict,
+    WorkbookMergeOutcome, WorkbookPatch,
 };
 pub use worksheet::{
     CellError, CellFormula, Change, Commit, Edit, History, Limits, MergeConflict, MergeOutcome,

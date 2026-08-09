@@ -49,8 +49,11 @@ assert_eq!(
   UTF-8 body spans, paragraph alignment, character bold ranges, ordinary
   paragraph insertion, table-cell text, and header/footer text, with atomic
   commits, reversible durable patches, deterministic sub-edit/three-way
-  composition, commit-coupled bounded history, and dependency-free plain-text
-  transfer plans
+  composition and commit-coupled bounded history
+- Checked ordinary-root transfer plans for passive fields, complete nested
+  table trees, style dependency closures, lists with overrides, and inert
+  embedded objects with remapped result pictures; opaque target destinations,
+  active links, and unresolved resource collisions fail closed
 - Lazy borrowed `text::Story`, paragraph, inline, and run traversal
 - Sparse-safe `font::Catalog` and checked `color::Palette` resource views
 - Semantic run font/color resolution without numeric table references

@@ -11,7 +11,7 @@ const FLAT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:mimetype="application/vnd.oasis.opendocument.image"><office:body><office:image>"#,
     r#"<draw:frame draw:name="Photo" draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" draw:z-index="7" draw:transform="rotate (0.25)" text:anchor-type="paragraph" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm" style:rel-width="80%" style:rel-height="scale">"#,
     r#"<draw:image xml:id="image1" draw:filter-name="png" draw:mime-type="image/png" xlink:href="Pictures/photo.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>"#,
-    r##"<draw:image-map><draw:area-rectangle svg:x="0cm" svg:y="0cm" svg:width="1cm" svg:height="2cm" xlink:type="simple" xlink:href="https://example.test/#region" office:name="Region"><svg:title>Go &amp; see</svg:title><svg:desc>Rectangle</svg:desc></draw:area-rectangle><draw:area-circle svg:cx="2cm" svg:cy="2cm" svg:r="1cm" draw:nohref="nohref"/></draw:image-map>"##,
+    r##"<draw:image-map><draw:area-rectangle svg:x="0cm" svg:y="0cm" svg:width="1cm" svg:height="2cm" xlink:type="simple" xlink:href="https://example.test/#region" xlink:actuate="onRequest" office:name="Region"><svg:title>Go &amp; see</svg:title><svg:desc>Rectangle</svg:desc></draw:area-rectangle><draw:area-circle svg:cx="2cm" svg:cy="2cm" svg:r="1cm" draw:nohref="nohref"/></draw:image-map>"##,
     r#"<svg:title>Photo title</svg:title><svg:desc>Photo description</svg:desc></draw:frame></office:image></office:body></office:document>"#,
 );
 
@@ -50,6 +50,7 @@ fn image_maps_and_broader_frame_semantics_are_inert_and_bounded() {
     let areas = frame.image_map().unwrap().areas();
     assert_eq!(areas.len(), 2);
     assert_eq!(areas[0].href(), Some("https://example.test/#region"));
+    assert_eq!(areas[0].actuate(), Some("onRequest"));
     assert_eq!(areas[0].title(), Some("Go & see"));
     assert!(matches!(areas[0].kind(), AreaKind::Rectangle { .. }));
     assert!(areas[1].has_no_href());

@@ -3,7 +3,7 @@
 use litchi_core::{Error, Metadata, Position, Result};
 use quick_xml::{
     XmlVersion,
-    events::Event,
+    events::{BytesStart, Event},
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
@@ -20,18 +20,31 @@ const MAX_RESOURCE_BYTES: usize = 64 * 1024 * 1024;
 pub struct SecurityPolicy {
     allow_external_targets: bool,
     allow_missing_package_targets: bool,
+    active_content: ActiveContentPolicy,
     max_resource_bytes: usize,
+}
+
+/// Changed-write treatment for content which the library never executes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ActiveContentPolicy {
+    /// Refuse changed output when active content is present.
+    Refuse,
+    /// Preserve recognized active content inertly in the package.
+    PreserveInert,
 }
 
 impl SecurityPolicy {
     /// Returns a restrictive final-graph policy.
     ///
-    /// External links and unresolved package targets are refused.
+    /// External links, unresolved package targets, and changed output with
+    /// active content are refused.
     #[must_use]
     pub const fn strict() -> Self {
         Self {
             allow_external_targets: false,
             allow_missing_package_targets: false,
+            active_content: ActiveContentPolicy::Refuse,
             max_resource_bytes: MAX_RESOURCE_BYTES,
         }
     }
@@ -47,6 +60,13 @@ impl SecurityPolicy {
     #[must_use]
     pub const fn with_missing_package_targets(mut self, allow: bool) -> Self {
         self.allow_missing_package_targets = allow;
+        self
+    }
+
+    /// Configures changed writes for inert scripts, forms, macros, and DDE.
+    #[must_use]
+    pub const fn with_active_content(mut self, policy: ActiveContentPolicy) -> Self {
+        self.active_content = policy;
         self
     }
 
@@ -68,6 +88,10 @@ impl SecurityPolicy {
     pub(crate) const fn max_resource_bytes(self) -> usize {
         self.max_resource_bytes
     }
+
+    pub(crate) const fn active_content(self) -> ActiveContentPolicy {
+        self.active_content
+    }
 }
 
 impl Default for SecurityPolicy {
@@ -75,6 +99,7 @@ impl Default for SecurityPolicy {
         Self {
             allow_external_targets: true,
             allow_missing_package_targets: true,
+            active_content: ActiveContentPolicy::Refuse,
             max_resource_bytes: MAX_RESOURCE_BYTES,
         }
     }
@@ -210,6 +235,8 @@ pub struct StyleSpec {
     name: String,
     family: String,
     origin: Origin,
+    parent: Option<String>,
+    raw_fragment: Option<String>,
 }
 
 impl StyleSpec {
@@ -227,6 +254,8 @@ impl StyleSpec {
             name,
             family,
             origin: Origin::Styles,
+            parent: None,
+            raw_fragment: None,
         })
     }
 
@@ -247,6 +276,44 @@ impl StyleSpec {
 
     pub(crate) const fn origin(&self) -> Origin {
         self.origin
+    }
+
+    pub(crate) fn parent(&self) -> Option<&str> {
+        self.parent.as_deref()
+    }
+
+    pub(crate) fn raw_fragment(&self) -> Option<&str> {
+        self.raw_fragment.as_deref()
+    }
+
+    pub(crate) fn imported(
+        source_xml: &str,
+        definition: &crate::style::Definition,
+        name: &str,
+        parent: Option<&str>,
+    ) -> Result<Self> {
+        let family = definition
+            .family()
+            .ok_or_else(|| invalid("ODM imported style has no family"))?;
+        validate_value(name, "ODM imported style name", false)?;
+        let raw = source_xml
+            .get(definition.source_span.clone())
+            .ok_or_else(|| invalid("ODM imported style source span is stale"))?;
+        let raw_fragment = standalone_style_fragment(source_xml, raw)?;
+        let raw_fragment = rewrite_imported_style(
+            &raw_fragment,
+            definition.name(),
+            name,
+            definition.parent(),
+            parent,
+        )?;
+        Ok(Self {
+            name: name.to_string(),
+            family: family.to_string(),
+            origin: definition.origin(),
+            parent: parent.map(str::to_string),
+            raw_fragment: Some(raw_fragment),
+        })
     }
 }
 
@@ -731,11 +798,141 @@ fn section_fragment(spec: &SectionSpec) -> String {
 }
 
 fn style_fragment(spec: &StyleSpec) -> String {
+    if let Some(fragment) = spec.raw_fragment() {
+        return fragment.to_string();
+    }
     format!(
         r#"<style:style xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="{}" style:family="{}"/>"#,
         escape(spec.name()),
         escape(spec.family())
     )
+}
+
+fn standalone_style_fragment(document: &str, fragment: &str) -> Result<String> {
+    use std::collections::HashSet;
+
+    let mut reader = NsReader::from_reader(document.as_bytes());
+    let mut declarations = Vec::new();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("invalid ODM style namespace source: {error}")))?
+        {
+            Event::Start(root) => {
+                for raw in root.attributes() {
+                    let attribute = raw.map_err(|error| {
+                        invalid(format!("invalid ODM namespace declaration: {error}"))
+                    })?;
+                    let key = std::str::from_utf8(attribute.key.as_ref()).map_err(|error| {
+                        invalid(format!("ODM namespace name is not UTF-8: {error}"))
+                    })?;
+                    let Some(prefix) = key.strip_prefix("xmlns:") else {
+                        continue;
+                    };
+                    if fragment.contains(&format!("{prefix}:"))
+                        && !fragment.contains(&format!("xmlns:{prefix}="))
+                    {
+                        let value = attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .map(Cow::into_owned)
+                            .map_err(|error| {
+                                invalid(format!("invalid ODM namespace value: {error}"))
+                            })?;
+                        declarations.push((key.to_string(), value));
+                    }
+                }
+                break;
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM style XML")),
+            Event::Eof => return Err(invalid("ODM style document has no root element")),
+            Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    let mut seen = HashSet::new();
+    declarations.retain(|(key, _)| seen.insert(key.clone()));
+    if declarations.is_empty() {
+        return crate::codec::compact_source_xml(fragment);
+    }
+    let insertion = fragment
+        .find(|byte: char| byte.is_whitespace() || matches!(byte, '/' | '>'))
+        .ok_or_else(|| invalid("ODM imported style start tag is malformed"))?;
+    let mut output = fragment.to_string();
+    let mut attributes = String::new();
+    for (key, value) in declarations {
+        attributes.push(' ');
+        attributes.push_str(&key);
+        attributes.push_str("=\"");
+        attributes.push_str(&escape(&value));
+        attributes.push('"');
+    }
+    output.insert_str(insertion, &attributes);
+    crate::codec::compact_source_xml(&output)
+}
+
+fn rewrite_imported_style(
+    fragment: &str,
+    before: &str,
+    after: &str,
+    parent_before: Option<&str>,
+    parent_after: Option<&str>,
+) -> Result<String> {
+    const STYLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+    let mut reader = NsReader::from_reader(fragment.as_bytes());
+    let start = position(&reader)?;
+    let (namespace, event) = reader
+        .read_resolved_event()
+        .map_err(|error| invalid(format!("invalid imported ODM style: {error}")))?;
+    let is_style_namespace =
+        matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == STYLE);
+    let event = event.into_owned();
+    let end = position(&reader)?;
+    let element = match event {
+        Event::Start(element) | Event::Empty(element)
+            if is_style_namespace && element.local_name().as_ref() == b"style" =>
+        {
+            element
+        },
+        Event::Start(_)
+        | Event::Empty(_)
+        | Event::End(_)
+        | Event::Text(_)
+        | Event::CData(_)
+        | Event::Comment(_)
+        | Event::Decl(_)
+        | Event::PI(_)
+        | Event::DocType(_)
+        | Event::GeneralRef(_)
+        | Event::Eof => {
+            return Err(invalid("ODM imported style fragment is not style:style"));
+        },
+    };
+    let tag = fragment
+        .as_bytes()
+        .get(start..end)
+        .ok_or_else(|| invalid("ODM imported style tag span is stale"))?;
+    let mut edits = Vec::new();
+    let name_key = attribute_key(&reader, &element, STYLE, b"name")?
+        .ok_or_else(|| invalid("ODM imported style has no style:name"))?;
+    let (name_start, name_end) = attribute_value_span(tag, &name_key)?;
+    if before != after {
+        edits.push((start + name_start..start + name_end, escape(after)));
+    }
+    if parent_before != parent_after {
+        let parent_key = attribute_key(&reader, &element, STYLE, b"parent-style-name")?
+            .ok_or_else(|| invalid("ODM imported parent style attribute disappeared"))?;
+        let (parent_start, parent_end) = attribute_value_span(tag, &parent_key)?;
+        let parent =
+            parent_after.ok_or_else(|| invalid("ODM imported parent style mapping disappeared"))?;
+        edits.push((start + parent_start..start + parent_end, escape(parent)));
+    }
+    apply_edits(fragment, edits)
 }
 
 fn validate_resource_path(path: &str) -> Result<()> {
@@ -820,6 +1017,27 @@ fn attribute_value_span(tag: &[u8], wanted: &[u8]) -> Result<(usize, usize)> {
         }
     }
     Err(invalid("ODM attribute source span is missing"))
+}
+
+fn attribute_key(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &[u8],
+    local: &[u8],
+) -> Result<Option<Vec<u8>>> {
+    let mut key = None;
+    for raw_attribute in element.attributes() {
+        let attribute =
+            raw_attribute.map_err(|error| invalid(format!("invalid ODM attribute: {error}")))?;
+        let (resolved, name) = reader.resolver().resolve_attribute(attribute.key);
+        if matches!(resolved, ResolveResult::Bound(Namespace(uri)) if uri == namespace)
+            && name.as_ref() == local
+            && key.replace(attribute.key.as_ref().to_vec()).is_some()
+        {
+            return Err(invalid("duplicate namespace-equivalent ODM attribute"));
+        }
+    }
+    Ok(key)
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {

@@ -7,8 +7,9 @@ pub use crate::authoring::Builder;
 pub use crate::package::{
     Change, Commit, ControlReferenceChange, DurablePatch, GeometryChange, History, HistoryLimits,
     JoinedEdits, LayerChange, Lineage, MergePlan, NameChange, PageNameChange, PageStyleChange,
-    Patch, PathChange, PreparedEdit, ResourceChange, SecurityStatus, ShapeTransfer, Snapshot,
-    StructureChange, StyleChange, TextChange, Transaction, TransferResource,
+    Patch, PathChange, PreparedEdit, ResourceChange, SecurityStatus, SecurityWritePolicy,
+    ShapeTransfer, Snapshot, StructureChange, StyleChange, TextChange, Transaction,
+    TransferControl, TransferResource, TransferStyle,
 };
 
 /// Immutable source-owning drawing facade.
@@ -152,6 +153,12 @@ impl Drawing {
         self.package.form_controls()
     }
 
+    /// Returns inert drawing style definitions from content and styles parts.
+    #[must_use]
+    pub fn style_definitions(&self) -> &[crate::style::Style] {
+        self.package.style_definitions()
+    }
+
     /// Reads one package-local resource without activating it.
     ///
     /// # Errors
@@ -165,6 +172,12 @@ impl Drawing {
     #[must_use]
     pub fn edit(&self) -> Transaction {
         self.package.edit()
+    }
+
+    /// Starts a transaction with explicit signed-package write policy.
+    #[must_use]
+    pub fn edit_with_security_policy(&self, policy: SecurityWritePolicy) -> Transaction {
+        self.package.edit_with_security_policy(policy)
     }
 
     /// Prepares a provenance-bound shape or complete group subtree for cross-drawing transfer.

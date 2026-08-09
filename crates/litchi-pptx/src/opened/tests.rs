@@ -555,3 +555,326 @@ fn real_complex_chart_deck_survives_transaction_and_full_reopen() -> Result<()> 
     assert_eq!(part_states(&reopened), before);
     Ok(())
 }
+
+fn modern_author(id: &str, name: &str) -> crate::modern_comments::Author {
+    crate::modern_comments::Author {
+        id: id.into(),
+        name: name.into(),
+        initials: Some("OA".into()),
+        user_id: "opened@example.com".into(),
+        provider_id: String::new(),
+        namespace_declarations: Vec::new(),
+        extension_xml: None,
+    }
+}
+
+fn modern_comment(id: &str, author_id: &str, title: &str) -> crate::modern_comments::Comment {
+    crate::modern_comments::Comment {
+        id: id.into(),
+        author_id: author_id.into(),
+        status: Some(crate::modern_comments::Status::Active),
+        created: "2026-08-10T10:00:00Z".into(),
+        start_date: None,
+        due_date: None,
+        assigned_to: None,
+        complete: None,
+        title: Some(title.into()),
+        namespace_declarations: Vec::new(),
+        anchors: Vec::new(),
+        position: Some(crate::modern_comments::Position { x: 10, y: 20 }),
+        reply_list_namespace_declarations: Vec::new(),
+        replies: Vec::new(),
+        reply_list_present: false,
+        text_body_xml: None,
+        extension_xml: None,
+    }
+}
+
+fn modern_reply(id: &str, author_id: &str) -> crate::modern_comments::Reply {
+    crate::modern_comments::Reply {
+        id: id.into(),
+        author_id: author_id.into(),
+        status: Some(crate::modern_comments::Status::Active),
+        created: "2026-08-10T10:01:00Z".into(),
+        namespace_declarations: Vec::new(),
+        text_body_xml: None,
+        extension_xml: None,
+    }
+}
+
+#[test]
+fn general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible() -> Result<()> {
+    const AUTHOR: &str = "{CD37207E-7903-4ED4-8AE8-017538D2DF7E}";
+    const COMMENT: &str = "{62A8A96D-E5A8-4BFC-B993-A6EAE3907CAD}";
+    const REPLY: &str = "{BCA5ED0E-707B-4D89-8B89-62D96F48E871}";
+    let mut package = opened_two_slide_package()?;
+    let before = part_states(&package);
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    let text_id = edit.add_text_box(
+        0_usize,
+        "Opened text <safe> & compact",
+        (100, 200, 2_000_000, 500_000),
+    )?;
+    let rectangle_id =
+        edit.add_rectangle(0_usize, (100, 800_000, 800_000, 500_000), Some("12ABEF"))?;
+    let ellipse_id = edit.add_ellipse(0_usize, (1_000_000, 800_000, 800_000, 500_000), None)?;
+    let picture_id = edit.add_picture(
+        0_usize,
+        "Opened picture",
+        &crate::media_parts::Resource::new(
+            "/ppt/media/opened-picture.png",
+            "image/png",
+            vec![137, 80, 78, 71, 13, 10, 26, 10],
+        ),
+        (2_000_000, 800_000, 800_000, 500_000),
+    )?;
+    edit.add_modern_comment_author(modern_author(AUTHOR, "Opened Author"))
+        .map_err(|error| Error::Invalid(format!("add modern author: {error}")))?;
+    assert!(
+        edit.replace_modern_comment_author(AUTHOR, modern_author(AUTHOR, "Opened Author Updated"))?
+    );
+    assert_eq!(
+        edit.reorder_modern_comment_authors(&[AUTHOR.to_owned()])?
+            .len(),
+        1
+    );
+    edit.add_modern_comment(1_usize, modern_comment(COMMENT, AUTHOR, "Opened task"))
+        .map_err(|error| Error::Invalid(format!("add modern comment: {error}")))?;
+    assert!(edit.replace_modern_comment(
+        1_usize,
+        COMMENT,
+        modern_comment(COMMENT, AUTHOR, "Opened task updated")
+    )?);
+    assert_eq!(
+        edit.reorder_modern_comments(1_usize, &[COMMENT.to_owned()])?
+            .len(),
+        1
+    );
+    assert!(
+        edit.add_modern_comment_reply(1_usize, COMMENT, modern_reply(REPLY, AUTHOR))
+            .map_err(|error| Error::Invalid(format!("add modern reply: {error}")))?
+    );
+    let mut replacement_reply = modern_reply(REPLY, AUTHOR);
+    replacement_reply.status = Some(crate::modern_comments::Status::Resolved);
+    assert!(edit.replace_modern_comment_reply(1_usize, COMMENT, REPLY, replacement_reply)?);
+    assert!(
+        edit.update_modern_comment_extensions(1_usize, COMMENT, |extensions| {
+            extensions
+                .replace_reactions(
+                    Some("{E1E2D3D4-C5C6-47A8-99AA-BBCCDDEEFF00}"),
+                    Some(crate::modern_comments::semantic::reactions::List::default()),
+                )
+                .expect("test reaction extension is valid");
+        })
+        .map_err(|error| Error::Invalid(format!("update comment extensions: {error}")))?
+    );
+    assert!(
+        edit.update_modern_comment_reply_extensions(1_usize, COMMENT, REPLY, |extensions| {
+            extensions
+                .replace_reactions(
+                    Some("{10203040-5060-4780-90A0-B0C0D0E0F000}"),
+                    Some(crate::modern_comments::semantic::reactions::List::default()),
+                )
+                .expect("test reply extension is valid");
+        })
+        .map_err(|error| Error::Invalid(format!("update reply extensions: {error}")))?
+    );
+
+    let patch = Patch::from_bytes(
+        &edit
+            .commit()
+            .map_err(|error| Error::Invalid(format!("commit modern extensions: {error}")))?
+            .into_patch()
+            .to_bytes()?,
+    )?;
+    assert!(patch.resource_count() >= 5);
+    package
+        .apply_opened_presentation_patch(&patch)
+        .map_err(|error| Error::Invalid(format!("apply modern patch: {error}")))?;
+    let bytes = package
+        .to_bytes()
+        .map_err(|error| Error::Invalid(format!("write modern package: {error}")))?;
+    let mut reopened = Package::from_bytes(&bytes)
+        .map_err(|error| Error::Invalid(format!("reopen modern package: {error}")))?;
+    let opened = reopened.opened_presentation()?;
+    let slide = reopened.opc.get_part(opened.slides()[0].part_name())?;
+    let scene = crate::shape::Scene::read(slide.blob())?;
+    for id in [text_id, rectangle_id, ellipse_id, picture_id] {
+        assert!(scene.iter().any(|shape| shape.id() == Some(id)));
+    }
+    assert!(scene.iter().any(|shape| {
+        matches!(shape, crate::shape::Shape::Picture(_)) && shape.id() == Some(picture_id)
+    }));
+    let image = slide
+        .rels()
+        .iter()
+        .find(|relationship| {
+            crate::parts::is_relationship_type(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::IMAGE,
+                "image",
+            )
+        })
+        .ok_or_else(|| Error::Invalid("opened picture relationship disappeared".into()))?;
+    assert_eq!(
+        reopened.opc.get_part(&image.target_partname()?)?.blob()[..4],
+        [137, 80, 78, 71]
+    );
+    let graph = crate::modern_comments::load_modern_comment_graph(&reopened.opc)
+        .map_err(|error| Error::Invalid(format!("reload modern graph: {error}")))?;
+    assert_eq!(
+        graph
+            .authors
+            .as_ref()
+            .map(|part| part.authors.authors.len()),
+        Some(1)
+    );
+    let comment = &graph.comments[0].comments.comments[0];
+    assert_eq!(comment.replies.len(), 1);
+    assert!(comment.reactions()?.is_some());
+    assert!(comment.replies[0].reactions()?.is_some());
+
+    let mut history = History::new(Limits::default());
+    history.push(patch.clone())?;
+    let undo = history
+        .pop_undo()
+        .ok_or_else(|| Error::Invalid("shape/comment undo disappeared".into()))?;
+    reopened.apply_opened_presentation_patch(&undo)?;
+    assert_eq!(part_states(&reopened), before);
+    let redo = history
+        .pop_redo()
+        .ok_or_else(|| Error::Invalid("shape/comment redo disappeared".into()))?;
+    reopened.apply_opened_presentation_patch(&redo)?;
+    assert!(
+        crate::modern_comments::load_modern_comment_graph(&reopened.opc)?
+            .authors
+            .is_some()
+    );
+    let with_modern_graph = part_states(&reopened);
+    let mut cleanup = reopened.opened_presentation()?.edit();
+    assert!(cleanup.remove_modern_comment_reply(1_usize, COMMENT, REPLY)?);
+    assert!(cleanup.remove_modern_comment(1_usize, COMMENT)?);
+    assert!(cleanup.remove_modern_comment_author(AUTHOR)?);
+    let cleanup = cleanup.commit()?.into_patch();
+    reopened.apply_opened_presentation_patch(&cleanup)?;
+    let empty_graph = crate::modern_comments::load_modern_comment_graph(&reopened.opc)?;
+    assert!(empty_graph.authors.is_none());
+    assert!(empty_graph.comments.is_empty());
+    reopened.apply_opened_presentation_patch(&cleanup.inverse())?;
+    assert_eq!(part_states(&reopened), with_modern_graph);
+    Ok(())
+}
+
+#[test]
+fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> Result<()> {
+    let mut source_package = opened_two_slide_package()?;
+    let source_root = source_package.opened_presentation()?;
+    let mut source_edit = source_root.edit();
+    let picture_id = source_edit.add_picture(
+        0_usize,
+        "Transfer picture",
+        &crate::media_parts::Resource::new(
+            "/ppt/media/transfer-picture.png",
+            "image/png",
+            vec![137, 80, 78, 71, 1, 2, 3, 4],
+        ),
+        (100, 100, 900_000, 600_000),
+    )?;
+    let source_patch = source_edit.commit()?.into_patch();
+    source_package.apply_opened_presentation_patch(&source_patch)?;
+    let source_bytes = source_package.to_bytes()?;
+    let source_package = Package::from_bytes(&source_bytes)?;
+    let source_root = source_package.opened_presentation()?;
+    let source_slide = source_package
+        .opc
+        .get_part(source_root.slides()[0].part_name())?;
+    let source_position = crate::shape::Scene::read(source_slide.blob())?
+        .iter()
+        .position(|shape| shape.id() == Some(picture_id))
+        .ok_or_else(|| Error::Invalid("source picture shape disappeared".into()))?;
+
+    let mut destination = opened_two_slide_package()?;
+    let before = part_states(&destination);
+    let destination_root = destination.opened_presentation()?;
+    let mut transfer = destination_root.edit();
+    let transferred_id =
+        transfer.transfer_shape(&source_root, 0_usize, source_position, 1_usize)?;
+    let transfer_patch = transfer.commit()?.into_patch();
+    destination.apply_opened_presentation_patch(&transfer_patch)?;
+    let bytes = destination.to_bytes()?;
+    let mut reopened = Package::from_bytes(&bytes)?;
+    let opened = reopened.opened_presentation()?;
+    let slide = reopened.opc.get_part(opened.slides()[1].part_name())?;
+    let transferred_scene = crate::shape::Scene::read(slide.blob())?;
+    let transferred = transferred_scene
+        .iter()
+        .find(|shape| shape.id() == Some(transferred_id))
+        .ok_or_else(|| Error::Invalid("transferred picture shape disappeared".into()))?;
+    assert!(matches!(transferred, crate::shape::Shape::Picture(_)));
+    assert!(transferred.name().is_some_and(|name| name.contains("Copy")));
+    let transferred_name = transferred.name().unwrap_or("missing").to_owned();
+    let image_target = slide
+        .rels()
+        .iter()
+        .find(|relationship| {
+            crate::parts::is_relationship_type(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::IMAGE,
+                "image",
+            )
+        })
+        .ok_or_else(|| Error::Invalid("transferred image relationship disappeared".into()))?
+        .target_partname()?;
+    assert_eq!(
+        reopened.opc.get_part(&image_target)?.blob()[..4],
+        [137, 80, 78, 71]
+    );
+
+    let mut removal = reopened.opened_presentation()?.edit();
+    assert!(removal.remove_shape(1_usize, transferred_name.as_str())?);
+    let removal_patch = removal.commit()?.into_patch();
+    reopened.apply_opened_presentation_patch(&removal_patch)?;
+    assert!(!reopened.opc.contains_part(&image_target));
+    reopened.apply_opened_presentation_patch(&removal_patch.inverse())?;
+    reopened.apply_opened_presentation_patch(&transfer_patch.inverse())?;
+    assert_eq!(part_states(&reopened), before);
+    Ok(())
+}
+
+#[test]
+fn disjoint_new_shape_and_modern_comment_changes_merge_automatically() -> Result<()> {
+    const AUTHOR: &str = "{0B2043D4-0908-4C42-8A79-51EA2CC309F7}";
+    const COMMENT: &str = "{8F23E89D-A0D4-4AB0-AF88-6DEEA19D812A}";
+    let mut package = opened_two_slide_package()?;
+    let base = package.opened_presentation()?;
+    let mut shape = base.edit();
+    shape.add_rectangle(0_usize, (10, 10, 500_000, 500_000), Some("00AAFF"))?;
+    let shape = shape.commit()?.into_patch();
+    let mut modern = base.edit();
+    modern.add_modern_comment_author(modern_author(AUTHOR, "Merge Author"))?;
+    modern.add_modern_comment(1_usize, modern_comment(COMMENT, AUTHOR, "Merge comment"))?;
+    let modern = modern.commit()?.into_patch();
+    assert!(!shape.conflicts_with(&modern));
+    let merged = Patch::three_way(&base, &shape, &modern)?.finish()?;
+    package.apply_opened_presentation_patch(&merged)?;
+    let reopened = Package::from_bytes(&package.to_bytes()?)?;
+    assert!(
+        crate::modern_comments::load_modern_comment_graph(&reopened.opc)?
+            .authors
+            .is_some()
+    );
+    assert!(
+        crate::shape::Scene::read(
+            reopened
+                .opc
+                .get_part(reopened.opened_presentation()?.slides()[0].part_name())?
+                .blob()
+        )?
+        .iter()
+        .any(|shape| shape
+            .name()
+            .is_some_and(|name| name.starts_with("Rectangle ")))
+    );
+    Ok(())
+}

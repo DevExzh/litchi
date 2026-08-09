@@ -23,7 +23,10 @@ pub use authoring::{
 pub use facade::{
     Builder, Chart, Commit, Edit, History, PackageMerge, Patch, ResourceChange, StylesChange,
 };
-pub use flat::{AxisChange, AxisUpdate, FlatChart, FlatChartCommit, FlatChartEdit, FlatChartPatch};
+pub use flat::{
+    AxisChange, AxisUpdate, ExactAttribute, ExactChange, ExactTarget, FlatChart, FlatChartCommit,
+    FlatChartEdit, FlatChartPatch,
+};
 pub use limits::Limits;
 pub use litchi_odf_common::chart;
 pub use merge::{Conflict, DefinitionMerge};

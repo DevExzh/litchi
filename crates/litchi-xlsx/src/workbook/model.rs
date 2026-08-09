@@ -13,7 +13,7 @@ use litchi_opc::{OpcPackage, PackURI, ReadLimits};
 use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
 use once_cell::sync::OnceCell;
 
-use crate::cell::{Extents, Store, Text};
+use crate::cell::{Extents, SharedStringLineage, Store, Text};
 use crate::error::{Error, Result, invalid};
 use crate::raw;
 use crate::style::StyleLineage;
@@ -128,6 +128,7 @@ pub(crate) struct Inner {
     pub(super) workbook_uri: PackURI,
     pub(super) shared_strings_uri: Option<PackURI>,
     pub(super) shared_strings: OnceLock<Box<[Text]>>,
+    pub(crate) shared_string_lineage: Arc<SharedStringLineage>,
     pub(super) styles_uri: Option<PackURI>,
     pub(super) styles: OnceLock<raw::styles::Catalog>,
     pub(super) task_panes: OnceCell<Option<litchi_ooxml_common::web::Panes>>,
@@ -366,6 +367,18 @@ impl Workbook {
             },
             Some(_) | None => Arc::new(StyleLineage),
         };
+        let shared_string_lineage = match source {
+            Some(source)
+                if package::same_shared_string_table(
+                    source,
+                    &package,
+                    shared_strings_uri.as_ref(),
+                )? =>
+            {
+                Arc::clone(&source.inner.shared_string_lineage)
+            },
+            Some(_) | None => Arc::new(SharedStringLineage),
+        };
         let sheets = catalog
             .sheets
             .into_iter()
@@ -395,6 +408,7 @@ impl Workbook {
                 workbook_uri,
                 shared_strings_uri,
                 shared_strings: OnceLock::new(),
+                shared_string_lineage,
                 styles_uri,
                 styles: OnceLock::new(),
                 task_panes: OnceCell::new(),

@@ -3,6 +3,7 @@
     reason = "integration fixtures intentionally fail fast with contextual assertions"
 )]
 
+use litchi_cfb::OleWriter;
 use litchi_core::Position;
 use litchi_doc::Package;
 use litchi_doc::body_text::{CharacterProperty, Projection, Snapshot, Story};
@@ -168,4 +169,96 @@ fn real_story_field_and_table_targets_fully_reopen() {
     let mut table_package = Package::from_reader(Cursor::new(table_commit.snapshot().finish()))
         .expect("table CFB reopens");
     table_package.document().expect("table DOC reopens");
+}
+
+#[test]
+fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
+    let donor_base =
+        std::fs::read(fixture("test-data/ole/doc/NoHeadFoot.doc")).expect("real donor fixture");
+    let mut object = OleWriter::new();
+    object
+        .create_stream(&["CONTENTS"], b"inert transfer payload")
+        .expect("standalone object stream");
+    let mut object_output = Cursor::new(Vec::new());
+    object
+        .write_to(&mut object_output)
+        .expect("standalone object CFB");
+    let mut preview = 12u32.to_le_bytes().to_vec();
+    preview.extend_from_slice(&7_701u32.to_le_bytes());
+    preview.extend_from_slice(&[0; 4]);
+    let mut donor_owner =
+        litchi_doc::Editor::open(donor_base, litchi_doc::embedded_object::Limits::default())
+            .expect("real donor embedded owner");
+    donor_owner
+        .add(litchi_doc::WriteOptions::new(
+            7_701,
+            object_output.into_inner(),
+            preview,
+        ))
+        .expect("seed inert resource on genuine donor");
+    let donor = Snapshot::parse(&donor_owner.finish().expect("genuine donor publication"))
+        .expect("genuine donor root snapshot");
+
+    let receiver = Snapshot::parse(
+        &std::fs::read(fixture("test-data/ole/doc/documentProperties.doc"))
+            .expect("real receiver fixture"),
+    )
+    .expect("real receiver snapshot");
+    let plan = receiver
+        .plan_embedded_transfer_from(&donor, 7_701, 9_001)
+        .expect("genuine dependency-closed transfer plan");
+
+    let mut edit = receiver.edit().expect("real resource transfer edit");
+    edit.apply_embedded_transfer(&plan)
+        .expect("real resource transfer");
+    let commit = edit.commit().expect("real resource transfer commit");
+    let mut package = Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        .expect("transferred resource CFB reopens");
+    assert_eq!(
+        package
+            .document()
+            .expect("transferred resource DOC fully reopens")
+            .fib()
+            .version(),
+        0x0101
+    );
+    assert!(
+        commit
+            .snapshot()
+            .embedded_objects()
+            .expect("transferred real inventory")
+            .get(9_001)
+            .is_some()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .expect("real resource exact inverse"),
+        receiver
+    );
+
+    let limits = litchi_core::PatchLimits::new(
+        litchi_core::BlobLimits::new(8, 32 * 1024 * 1024, 64 * 1024 * 1024),
+        96 * 1024 * 1024,
+        16,
+        8,
+        16 * 1024,
+        96 * 1024 * 1024,
+    );
+    let durable = commit
+        .patch()
+        .to_durable(limits)
+        .expect("real durable closure");
+    let replay = receiver
+        .apply_durable(&durable)
+        .expect("real durable resource replay");
+    assert!(
+        replay
+            .embedded_objects()
+            .expect("durable real inventory")
+            .get(9_001)
+            .is_some()
+    );
 }

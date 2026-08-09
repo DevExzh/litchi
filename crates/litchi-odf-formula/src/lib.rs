@@ -21,4 +21,4 @@ pub use facade::{
     OpaqueStarMath, Patch, Revision, RootChange, SemanticChange, StarMathAnnotation,
     StarMathVersion, ThreeWayPlan,
 };
-pub use model::{Attribute, Content, Element, Kind};
+pub use model::{Attribute, Content, ContentKind, ContentSymbol, Element, Kind};

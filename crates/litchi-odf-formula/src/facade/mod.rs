@@ -103,8 +103,7 @@ impl StarMathVersion {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StarMathAnnotation<'element> {
     element: &'element Element,
-    source: String,
-    version: StarMathVersion,
+    opaque: OpaqueStarMath,
 }
 
 /// One bounded semantic commit retained with a published snapshot.
@@ -149,26 +148,10 @@ impl<'element> StarMathAnnotation<'element> {
         self.element
     }
 
-    /// Inert `StarMath` source. The crate never evaluates it.
+    /// Checked opaque `StarMath` source. The crate never evaluates it.
     #[must_use]
-    pub fn source(&self) -> &str {
-        &self.source
-    }
-
-    /// Declared `StarMath` grammar version.
-    #[must_use]
-    pub const fn version(&self) -> StarMathVersion {
-        self.version
-    }
-
-    /// Enter the checked opaque `StarMath` boundary.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the retained annotation exceeds the opaque-source
-    /// bound or contains an invalid XML character.
-    pub fn to_opaque(&self) -> Result<OpaqueStarMath> {
-        OpaqueStarMath::new(self.version, self.source.clone())
+    pub const fn opaque(&self) -> &OpaqueStarMath {
+        &self.opaque
     }
 }
 
@@ -305,6 +288,7 @@ impl Formula {
         limits: codec::Limits,
     ) -> Result<Self> {
         check_package_bytes(package.as_bytes().len(), limits)?;
+        validate_starmath_boundaries(&root)?;
         Ok(Self {
             history: Arc::from(Vec::new().into_boxed_slice()),
             package,
@@ -379,13 +363,10 @@ impl Formula {
         annotations
     }
 
-    /// Return the first `StarMath` annotation source, when present.
+    /// Return the first validated opaque `StarMath` annotation, when present.
     #[must_use]
-    pub fn starmath_source(&self) -> Option<String> {
-        self.starmath_annotations()
-            .into_iter()
-            .next()
-            .map(|annotation| annotation.source)
+    pub fn starmath(&self) -> Option<StarMathAnnotation<'_>> {
+        self.starmath_annotations().into_iter().next()
     }
 
     /// Return recognized, versioned `StarMath` annotations in document order.
@@ -395,11 +376,8 @@ impl Formula {
             .into_iter()
             .filter_map(|element| {
                 let version = StarMathVersion::parse(element.attribute(None, "encoding")?)?;
-                Some(StarMathAnnotation {
-                    element,
-                    source: element.all_text(),
-                    version,
-                })
+                let opaque = OpaqueStarMath::new(version, element.all_text()).ok()?;
+                Some(StarMathAnnotation { element, opaque })
             })
             .collect()
     }
@@ -726,17 +704,6 @@ impl Edit<'_> {
             element.push_text(text);
             Ok(())
         })
-    }
-
-    /// Replace the first recognized `StarMath` annotation atomically.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the formula has no recognized `StarMath`
-    /// annotation or the resulting tree violates retained limits.
-    pub fn set_starmath_source(&mut self, version: StarMathVersion, source: &str) -> Result<()> {
-        let starmath = OpaqueStarMath::new(version, source)?;
-        self.set_starmath(&starmath)
     }
 
     /// Replace the first recognized annotation with validated opaque source.
@@ -1929,7 +1896,25 @@ fn transform_at(
 
 fn validate_candidate(root: &Element, limits: codec::Limits) -> Result<Arc<Element>> {
     let xml = codec::serialize(root);
-    codec::parse_with_limits(&xml, limits).map(Arc::new)
+    let parsed = codec::parse_with_limits(&xml, limits)?;
+    validate_starmath_boundaries(&parsed)?;
+    Ok(Arc::new(parsed))
+}
+
+fn validate_starmath_boundaries(root: &Element) -> Result<()> {
+    let mut pending = vec![root];
+    while let Some(element) = pending.pop() {
+        if element.namespace_uri() == Some(crate::model::NAMESPACE)
+            && element.local_name() == "annotation"
+            && let Some(version) = element
+                .attribute(None, "encoding")
+                .and_then(StarMathVersion::parse)
+        {
+            let _opaque = OpaqueStarMath::new(version, element.all_text())?;
+        }
+        pending.extend(element.children());
+    }
+    Ok(())
 }
 
 fn invalid(message: impl Into<String>) -> Error {

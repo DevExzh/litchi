@@ -63,6 +63,18 @@ fn exact_source_and_nonoverlapping_ranges_survive_mixed_line_endings() -> Result
 }
 
 #[test]
+fn adjacent_list_and_indented_paragraph_have_disjoint_exact_ranges() -> Result<(), Error> {
+    let source = "- one\n\n two\n";
+    let snapshot = Snapshot::read(source)?;
+    let blocks: Vec<_> = snapshot.blocks().collect();
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[0].source(), "- one\n\n");
+    assert_eq!(blocks[1].source(), " two\n");
+    assert_eq!(blocks[0].range().end, blocks[1].range().start);
+    Ok(())
+}
+
+#[test]
 fn gfm_extensions_are_explicit_and_deterministic() -> Result<(), Error> {
     let table = "| a | b |\n| - | - |\n| x | y |";
     let commonmark = Snapshot::read(table)?;
@@ -154,6 +166,32 @@ fn nested_and_inline_structural_edits_are_exact_and_durable() -> Result<(), Erro
     let json = commit.patch().to_json(PatchEnvelopeLimits::DEFAULT)?;
     let restored = Patch::from_json(&json, PatchEnvelopeLimits::DEFAULT)?;
     assert_eq!(source.apply(&restored)?.snapshot(), commit.snapshot());
+    Ok(())
+}
+
+#[test]
+fn contained_link_definitions_are_nested_and_remain_reference_aware() -> Result<(), Error> {
+    let source = Snapshot::read("[foo]\n\n> [foo]: /old\n")?;
+    assert_eq!(source.blocks().len(), 2);
+    let quote = source
+        .block(1)
+        .ok_or(Error::BlockNotFound { position: 1 })?;
+    assert_eq!(quote.kind(), BlockKind::BlockQuote);
+    let definition = quote
+        .descendants()
+        .position(|block| block.kind() == BlockKind::LinkDefinition)
+        .ok_or(Error::NestedBlockNotFound {
+            block_position: 1,
+            nested_position: 0,
+        })?;
+
+    let mut edit = source.edit();
+    edit.replace_nested_block(1, definition, "[foo]: /new")?;
+    let commit = edit.commit()?;
+    assert_eq!(commit.snapshot().source(), "[foo]\n\n> [foo]: /new\n");
+    assert!(commit.snapshot().references().any(|reference| {
+        reference.kind() == ReferenceKind::Link && reference.destination() == Some("/new")
+    }));
     Ok(())
 }
 

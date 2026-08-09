@@ -27,13 +27,6 @@
     clippy::similar_names,
     reason = "short-lived streaming XML bindings mirror successive wire events and their decoded projections"
 )]
-// Remaining expectations are guarded state-machine invariants. Narrowing casts
-// are dominated by ODF range validation or fixed output limits.
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::expect_used,
-    reason = "accesses and conversions are confined to validated parser state and bounded ODF wire domains"
-)]
 // ODF codecs are ordered by document traversal and keep schema cases explicit.
 // These style exceptions retain that audit order while all correctness lints
 // continue to be warning-denied.

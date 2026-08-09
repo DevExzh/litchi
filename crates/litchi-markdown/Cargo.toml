@@ -16,5 +16,8 @@ serde       = { workspace = true }
 serde_json  = { workspace = true }
 thiserror   = { workspace = true }
 
+[dev-dependencies]
+pulldown-cmark = { version = "0.13.0", default-features = false, features = ["html"] }
+
 [lints]
 workspace = true

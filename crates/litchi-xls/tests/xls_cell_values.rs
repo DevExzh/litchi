@@ -63,6 +63,56 @@ fn real_mulrk_field_edit_remains_packed() {
 }
 
 #[test]
+fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/FormulaSheetRange.xls");
+    let source = Snapshot::from_bytes(std::fs::read(path).expect("read MulRk fixture"))
+        .expect("parse MulRk fixture");
+    let (sheet_position, reference) = source
+        .worksheets()
+        .find_map(|sheet| {
+            sheet
+                .cells()
+                .find(|cell| cell.storage() == Storage::MulRk)
+                .map(|cell| (sheet.position(), cell.reference()))
+        })
+        .expect("fixture contains a MulRk edge");
+    let mut transaction = source.transaction();
+    transaction
+        .remove_cell(Selector::Position(sheet_position), reference)
+        .expect("stage packed edge removal");
+    let commit = transaction.commit().expect("remove and reopen packed edge");
+    assert!(
+        commit
+            .snapshot()
+            .worksheet(Selector::Position(sheet_position))
+            .expect("resolve edited sheet")
+            .expect("edited sheet exists")
+            .cell(reference)
+            .expect("unique removed location")
+            .is_none()
+    );
+    let restored = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.snapshot())
+        .expect("semantically restore packed edge");
+    assert_eq!(
+        restored
+            .snapshot()
+            .worksheet(Selector::Position(sheet_position))
+            .expect("resolve restored sheet")
+            .expect("restored sheet exists")
+            .cell(reference)
+            .expect("unique restored location")
+            .expect("restored packed cell")
+            .storage(),
+        Storage::MulRk
+    );
+}
+
+#[test]
 fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
     let source = Snapshot::from_bytes(
         std::fs::read(fixture("44010-TwoCharts.xls")).expect("read real XLS fixture"),

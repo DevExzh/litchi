@@ -2,7 +2,7 @@
 
 use super::super::codec::calculation_chain_removal;
 use super::super::*;
-use super::support::{merged_workbook, styled_workbook};
+use super::support::{merged_workbook, part_text, styled_workbook, two_sheet_workbook};
 
 use crate::StyleState;
 use crate::cell::{Number, Value};
@@ -606,6 +606,7 @@ fn shared_style_crud_is_lineage_checked_reversible_and_exact() {
         Some((_, _, State::Cell {
             content: Cell::Value(Value::Number(number)),
             style: StyleState::Shared(_),
+            ..
         })) if number.as_str() == "42"
     ));
 
@@ -783,6 +784,7 @@ fn payload_and_style_effects_on_one_cell_join_without_locks() {
         Some((_, _, State::Cell {
             content: Cell::Value(Value::Number(number)),
             style: StyleState::Shared(_),
+            ..
         })) if number.as_str() == "9"
     ));
 
@@ -799,6 +801,120 @@ fn payload_and_style_effects_on_one_cell_join_without_locks() {
         sheet.local_style("B1").expect("style"),
         Some(crate::LocalStyle::Shared(_))
     ));
+}
+
+#[test]
+fn rich_shared_string_transfer_keeps_exact_dependency_through_join_replay_and_inverse() {
+    let baseline = two_sheet_workbook(WorksheetKind::Worksheet);
+    let mut package = baseline.inner.package.clone();
+    let shared_uri = PackURI::new("/xl/sharedStrings.xml").expect("shared strings URI");
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            shared_uri.clone(),
+            litchi_opc::constants::content_type::SML_SHARED_STRINGS.to_owned(),
+            br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><r><rPr><b/><color rgb="FFFF0000"/></rPr><t>Rich</t></r><r><rPr><i/></rPr><t> text</t></r></si></sst>"#.to_vec(),
+        )))
+        .expect("shared strings part");
+    package
+        .get_part_mut(&baseline.inner.workbook_uri)
+        .expect("workbook part")
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::SHARED_STRINGS.to_owned(),
+            "sharedStrings.xml".to_owned(),
+            "rIdSharedStrings".to_owned(),
+            TargetMode::Internal,
+        )
+        .expect("shared strings relationship");
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("source worksheet")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData></worksheet>"#.to_vec(),
+        );
+    let source = Workbook::from_package(package).expect("rich-string workbook");
+    let source_bytes = source.to_bytes().expect("source bytes");
+    let shared_before = part_text(&source, "/xl/sharedStrings.xml").to_owned();
+
+    let mut transfer = source.edit().expect("transfer edit");
+    transfer
+        .copy_cells("Sheet1", "A1", "Sheet2", "B2")
+        .expect("copy rich string");
+    let mut disjoint = source.edit().expect("disjoint edit");
+    disjoint
+        .sheet("Sheet2")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("C3", 7_i32)
+        .expect("disjoint value");
+    transfer.join(disjoint).expect("join disjoint edit");
+    let committed = transfer.commit().expect("commit rich transfer");
+
+    let target_xml = part_text(committed.workbook(), "/xl/worksheets/sheet2.xml");
+    assert!(target_xml.contains(r#"<c r="B2" t="s"><v>0</v></c>"#));
+    assert_eq!(
+        part_text(committed.workbook(), "/xl/sharedStrings.xml"),
+        shared_before
+    );
+    assert!(committed.patch().changes().iter().any(|change| matches!(
+        change.cell(),
+        Some((
+            _,
+            _,
+            State::Cell {
+                shared_string: Some(_),
+                ..
+            }
+        ))
+    )));
+
+    let replayed = source
+        .apply(committed.patch())
+        .expect("replay rich transfer");
+    assert!(
+        part_text(replayed.workbook(), "/xl/worksheets/sheet2.xml")
+            .contains(r#"<c r="B2" t="s"><v>0</v></c>"#)
+    );
+    let restored = committed
+        .workbook()
+        .apply(&committed.patch().inverse())
+        .expect("inverse rich transfer");
+    assert_eq!(
+        restored.workbook().to_bytes().expect("restored bytes"),
+        source_bytes
+    );
+}
+
+#[test]
+fn cell_transfer_refuses_drawing_graphs_without_staging_partial_work() {
+    let baseline = two_sheet_workbook(WorksheetKind::Worksheet);
+    let mut package = baseline.inner.package.clone();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/drawings/drawing1.xml").expect("drawing URI"),
+            litchi_opc::constants::content_type::OFC_DRAWING.to_owned(),
+            br#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"/>"#.to_vec(),
+        )))
+        .expect("drawing part");
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("source worksheet")
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::DRAWING.to_owned(),
+            "../drawings/drawing1.xml".to_owned(),
+            "rIdDrawing".to_owned(),
+            TargetMode::Internal,
+        )
+        .expect("drawing relationship");
+    let source = Workbook::from_package(package).expect("drawing workbook");
+    let mut edit = source.edit().expect("edit");
+    assert!(matches!(
+        edit.copy_cells("Sheet1", "A1", "Sheet2", "A1"),
+        Err(Error::Unsupported { feature })
+            if feature == "copying cells on a worksheet with drawing dependencies"
+    ));
+    assert!(edit.is_empty());
 }
 
 #[test]

@@ -202,24 +202,7 @@ impl StylesWriter {
         writer.write_record(kind::BEGIN_FILLS, &count_data)?;
 
         for fill in &self.fills {
-            if !matches!(fill.pattern_type, 0..=18) {
-                return Err(Error::UnsupportedFeature(format!(
-                    "XLSB fill pattern {} is not a supported pattern fill",
-                    fill.pattern_type
-                )));
-            }
-            let mut fill_data = Vec::new();
-            let mut temp = Writer::new(&mut fill_data);
-
-            temp.write_u32(fill.pattern_type)?;
-            Self::write_brt_color(&mut temp, fill.fg_color)?;
-            Self::write_brt_color(&mut temp, fill.bg_color)?;
-
-            // 12 reserved u32 values (gradient / extra fields)
-            for _ in 0..12 {
-                temp.write_u32(0)?;
-            }
-
+            let fill_data = Self::encode_fill_payload(fill)?;
             writer.write_record(kind::FILL, &fill_data)?;
         }
 
@@ -235,26 +218,7 @@ impl StylesWriter {
         writer.write_record(kind::BEGIN_BORDERS, &count_data)?;
 
         for border in &self.borders {
-            if border.vertical.is_some() || border.horizontal.is_some() {
-                return Err(Error::UnsupportedFeature(
-                    "vertical and horizontal table borders are not BrtBorder fields".to_string(),
-                ));
-            }
-            if (border.diagonal_down || border.diagonal_up) && border.diagonal.is_none() {
-                return Err(Error::Unrecognized {
-                    typ: "BrtBorder diagonal".to_string(),
-                    val: "direction is set without a diagonal border".to_string(),
-                });
-            }
-
-            let mut border_data = Vec::new();
-            let mut temp = Writer::new(&mut border_data);
-            temp.write_u8(u8::from(border.diagonal_down) | (u8::from(border.diagonal_up) << 1))?;
-            Self::write_blxf(&mut temp, border.top.as_ref())?;
-            Self::write_blxf(&mut temp, border.bottom.as_ref())?;
-            Self::write_blxf(&mut temp, border.left.as_ref())?;
-            Self::write_blxf(&mut temp, border.right.as_ref())?;
-            Self::write_blxf(&mut temp, border.diagonal.as_ref())?;
+            let border_data = Self::encode_border_payload(border)?;
             writer.write_record(kind::BORDER, &border_data)?;
         }
 
@@ -473,7 +437,7 @@ impl StylesWriter {
     /// Helper to write a BrtFont payload for the simplified Font structure
     /// used by this crate. This closely follows SheetJS'
     /// `write_BrtFont` implementation.
-    fn write_font_record<W: Write>(writer: &mut Writer<W>, font: &Font) -> Result<()> {
+    pub(crate) fn encode_font_payload(font: &Font) -> Result<Vec<u8>> {
         let height = (font.size * 20.0).round();
         if !font.size.is_finite() || !(20.0..=8191.0).contains(&height) {
             return Err(Error::Unrecognized {
@@ -531,8 +495,53 @@ impl StylesWriter {
         // Font name as XLWideString.
         temp_writer.write_wide_string(&font.name)?;
 
-        writer.write_record(kind::FONT, &font_data)?;
+        Ok(font_data)
+    }
+
+    fn write_font_record<W: Write>(writer: &mut Writer<W>, font: &Font) -> Result<()> {
+        writer.write_record(kind::FONT, &Self::encode_font_payload(font)?)?;
         Ok(())
+    }
+
+    pub(crate) fn encode_fill_payload(fill: &Fill) -> Result<Vec<u8>> {
+        if !matches!(fill.pattern_type, 0..=18) {
+            return Err(Error::UnsupportedFeature(format!(
+                "XLSB fill pattern {} is not a supported pattern fill",
+                fill.pattern_type
+            )));
+        }
+        let mut data = Vec::new();
+        let mut writer = Writer::new(&mut data);
+        writer.write_u32(fill.pattern_type)?;
+        Self::write_brt_color(&mut writer, fill.fg_color)?;
+        Self::write_brt_color(&mut writer, fill.bg_color)?;
+        for _ in 0..12 {
+            writer.write_u32(0)?;
+        }
+        Ok(data)
+    }
+
+    pub(crate) fn encode_border_payload(border: &Border) -> Result<Vec<u8>> {
+        if border.vertical.is_some() || border.horizontal.is_some() {
+            return Err(Error::UnsupportedFeature(
+                "vertical and horizontal table borders are not BrtBorder fields".to_string(),
+            ));
+        }
+        if (border.diagonal_down || border.diagonal_up) && border.diagonal.is_none() {
+            return Err(Error::Unrecognized {
+                typ: "BrtBorder diagonal".to_string(),
+                val: "direction is set without a diagonal border".to_string(),
+            });
+        }
+        let mut data = Vec::new();
+        let mut writer = Writer::new(&mut data);
+        writer.write_u8(u8::from(border.diagonal_down) | (u8::from(border.diagonal_up) << 1))?;
+        Self::write_blxf(&mut writer, border.top.as_ref())?;
+        Self::write_blxf(&mut writer, border.bottom.as_ref())?;
+        Self::write_blxf(&mut writer, border.left.as_ref())?;
+        Self::write_blxf(&mut writer, border.right.as_ref())?;
+        Self::write_blxf(&mut writer, border.diagonal.as_ref())?;
+        Ok(data)
     }
 
     /// Write an automatic or direct ARGB `BrtColor`.

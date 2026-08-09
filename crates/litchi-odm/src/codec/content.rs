@@ -8,7 +8,11 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{borrow::Cow, collections::HashSet, ops::Range};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    ops::Range,
+};
 
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;
@@ -42,6 +46,7 @@ pub(crate) struct Semantics {
     references: Vec<crate::model::subdocument::Reference>,
     href_spans: Vec<Range<usize>>,
     tree: crate::model::section::Tree,
+    structure: crate::structure::Structure,
     local_section_references: Vec<(String, Range<usize>)>,
 }
 
@@ -60,6 +65,10 @@ impl Semantics {
 
     pub(crate) fn local_section_references(&self) -> &[(String, Range<usize>)] {
         &self.local_section_references
+    }
+
+    pub(crate) const fn structure(&self) -> &crate::structure::Structure {
+        &self.structure
     }
 }
 
@@ -211,12 +220,152 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
     if !sections.is_empty() {
         return Err(invalid("ODM text:section nesting is incomplete"));
     }
+    let mut positions = HashMap::new();
+    positions
+        .try_reserve(tree.sections.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODM local section target index",
+            source,
+        })?;
+    for (index, section) in tree.sections.iter().enumerate() {
+        positions.insert(section.name.as_str(), Position::new(index));
+    }
+    for reference in &mut tree.local_references {
+        reference.target = positions.get(reference.target_name.as_str()).copied();
+    }
+    let structure = parse_master_structure(xml)?;
     Ok(Semantics {
         references,
         href_spans,
         tree,
+        structure,
         local_section_references,
     })
+}
+
+fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
+    const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    let mut depth = 0usize;
+    let mut text_depth = None;
+    let mut section_index = 0usize;
+    let mut structure = crate::structure::Structure::default();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid ODM master structure XML: {error}")))?;
+        let is_office = matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == OFFICE);
+        let is_text = matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == TEXT);
+        let is_table = matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == TABLE);
+        let event = event.into_owned();
+        match event {
+            Event::Start(element) => {
+                depth = depth.saturating_add(1);
+                observe_master_item(
+                    element.local_name().as_ref(),
+                    is_office,
+                    is_text,
+                    is_table,
+                    depth,
+                    &mut text_depth,
+                    &mut section_index,
+                    &mut structure,
+                )?;
+            },
+            Event::Empty(element) => {
+                observe_master_item(
+                    element.local_name().as_ref(),
+                    is_office,
+                    is_text,
+                    is_table,
+                    depth.saturating_add(1),
+                    &mut text_depth,
+                    &mut section_index,
+                    &mut structure,
+                )?;
+            },
+            Event::End(element) => {
+                if text_depth == Some(depth)
+                    && is_office
+                    && element.local_name().as_ref() == b"text"
+                {
+                    text_depth = None;
+                }
+                depth = depth.saturating_sub(1);
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM content")),
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    Ok(structure)
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the XML event classifier keeps namespace and traversal state explicit"
+)]
+fn observe_master_item(
+    local: &[u8],
+    is_office: bool,
+    is_text: bool,
+    is_table: bool,
+    depth: usize,
+    text_depth: &mut Option<usize>,
+    section_index: &mut usize,
+    structure: &mut crate::structure::Structure,
+) -> Result<()> {
+    use crate::structure::{IndexKind, Kind};
+
+    if is_office && local == b"text" {
+        *text_depth = Some(depth);
+    } else if *text_depth == Some(depth.saturating_sub(1)) {
+        let kind = if is_text {
+            match local {
+                b"p" => Kind::Paragraph,
+                b"h" => Kind::Heading,
+                b"list" => Kind::List,
+                b"section" => Kind::Section(Position::new(*section_index)),
+                b"table-of-content" => Kind::GeneratedIndex(IndexKind::TableOfContents),
+                b"illustration-index" => Kind::GeneratedIndex(IndexKind::Illustration),
+                b"table-index" => Kind::GeneratedIndex(IndexKind::Table),
+                b"object-index" => Kind::GeneratedIndex(IndexKind::Object),
+                b"user-index" => Kind::GeneratedIndex(IndexKind::User),
+                b"alphabetical-index" => Kind::GeneratedIndex(IndexKind::Alphabetical),
+                b"bibliography" => Kind::GeneratedIndex(IndexKind::Bibliography),
+                b"sequence-decls"
+                | b"user-field-decls"
+                | b"variable-decls"
+                | b"dde-connection-decls"
+                | b"tracked-changes" => Kind::Declarations,
+                _ => Kind::Other,
+            }
+        } else if is_table && local == b"table" {
+            Kind::Table
+        } else {
+            Kind::Other
+        };
+        if structure.items.len() >= MAX_IDENTITIES {
+            return Err(invalid("ODM master-body item count exceeds the limit"));
+        }
+        structure
+            .items
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODM master-body structure",
+                source,
+            })?;
+        structure.items.push(kind);
+    }
+    if is_text && local == b"section" {
+        *section_index = (*section_index).saturating_add(1);
+    }
+    Ok(())
 }
 
 #[allow(
@@ -331,6 +480,8 @@ fn observe(
             parent,
             children: Vec::new(),
             reference: None,
+            local_reference: None,
+            dde_source: false,
             source_span: tag_start..tag_start + tag.len(),
             name_span: tag_start + name_start..tag_start + name_end,
         });
@@ -447,10 +598,43 @@ fn observe(
                 })?;
             local_section_references
                 .push((local_name, tag_start + span_start..tag_start + span_end));
+            let reference_position = Position::new(tree.local_references.len());
+            tree.local_references
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODM local section relationship projection",
+                    source,
+                })?;
+            tree.local_references.push(crate::section::LocalReference {
+                owner: section.position,
+                target_name: local_section_references
+                    .last()
+                    .ok_or_else(|| invalid("ODM local section reference disappeared"))?
+                    .0
+                    .clone(),
+                target: None,
+            });
+            tree.sections
+                .get_mut(section.position.get())
+                .ok_or_else(|| invalid("ODM local section owner disappeared"))?
+                .local_reference = Some(reference_position);
         }
         if !empty {
             *section_source_depth = Some(depth);
         }
+    } else if is_dde_source {
+        let Some(section) = sections.last() else {
+            return Err(invalid("ODM office:dde-source is outside a text:section"));
+        };
+        if depth != section.depth.saturating_add(1) {
+            return Err(invalid(
+                "ODM office:dde-source is not a direct text:section child",
+            ));
+        }
+        tree.sections
+            .get_mut(section.position.get())
+            .ok_or_else(|| invalid("ODM DDE section owner disappeared"))?
+            .dde_source = true;
     }
     if let Some(xml_id) = attribute(reader, element, XML, b"id")? {
         ensure_short(&xml_id, "ODM xml:id")?;

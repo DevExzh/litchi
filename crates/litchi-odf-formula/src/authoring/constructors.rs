@@ -7,7 +7,7 @@
 //! [`Element`] mutation API and installed through the [`crate::Formula`]
 //! facade.
 
-use crate::facade::{OpaqueStarMath, StarMathVersion};
+use crate::facade::OpaqueStarMath;
 use crate::model::Element;
 
 /// The `MathML` `mathvariant` attribute value family (`MathML` 2 §3.2.2).
@@ -224,38 +224,19 @@ pub fn table(rows: Vec<Vec<Element>>) -> Element {
     table
 }
 
-/// A `semantics` wrapper pairing presentation content with an optional
-/// `StarMath` annotation (the `math:annotation` encoding `OpenOffice` writes).
+/// A `semantics` wrapper pairing presentation content with optional validated,
+/// opaque `StarMath` source.
 #[must_use]
-pub fn semantics(content: Element, starmath_source: Option<&str>) -> Element {
-    semantics_with_starmath(
-        content,
-        starmath_source.map(|source| (StarMathVersion::V5, source)),
-    )
-}
-
-/// A `semantics` wrapper with an explicitly versioned `LibreOffice` `StarMath`
-/// source annotation.
-#[must_use]
-pub fn semantics_with_starmath(
-    content: Element,
-    starmath: Option<(StarMathVersion, &str)>,
-) -> Element {
+pub fn semantics(content: Element, starmath: Option<&OpaqueStarMath>) -> Element {
     let mut wrapper = element("semantics");
     wrapper.push_child(content);
-    if let Some((version, source)) = starmath {
+    if let Some(source) = starmath {
         let mut annotation = element("annotation");
-        annotation.set_fixed_attribute("encoding", version.encoding());
-        annotation.push_text(source);
+        annotation.set_fixed_attribute("encoding", source.version().encoding());
+        annotation.push_text(source.source());
         wrapper.push_child(annotation);
     }
     wrapper
-}
-
-/// A `semantics` wrapper with validated opaque `StarMath` source.
-#[must_use]
-pub fn semantics_with_opaque_starmath(content: Element, starmath: &OpaqueStarMath) -> Element {
-    semantics_with_starmath(content, Some((starmath.version(), starmath.source())))
 }
 
 /// A `math` root element wrapping the body with the given display style.

@@ -163,6 +163,29 @@ pub(super) fn same_style_table(
     Ok(Arc::ptr_eq(&before_blob, &after_blob) || before_blob.as_slice() == after_blob.as_slice())
 }
 
+pub(super) fn same_shared_string_table(
+    source: &Workbook,
+    package: &OpcPackage,
+    shared_strings_uri: Option<&PackURI>,
+) -> Result<bool> {
+    let (Some(source_uri), Some(shared_strings_uri)) =
+        (source.inner.shared_strings_uri.as_ref(), shared_strings_uri)
+    else {
+        return Ok(source.inner.shared_strings_uri.is_none() && shared_strings_uri.is_none());
+    };
+    if source_uri != shared_strings_uri {
+        return Ok(false);
+    }
+    let before = source.inner.package.get_part(source_uri)?;
+    let after = package.get_part(shared_strings_uri)?;
+    if before.content_type() != after.content_type() {
+        return Ok(false);
+    }
+    let before_blob = before.blob_arc();
+    let after_blob = after.blob_arc();
+    Ok(Arc::ptr_eq(&before_blob, &after_blob) || before_blob.as_slice() == after_blob.as_slice())
+}
+
 fn require_content_type(sheet: &raw::Sheet, actual: &str, expected: &str) -> Result<()> {
     if actual != expected {
         return Err(invalid(format!(

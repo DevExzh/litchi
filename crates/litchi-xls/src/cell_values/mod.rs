@@ -30,8 +30,8 @@ use litchi_biff::Records;
 use litchi_core::binary;
 pub use litchi_core::patch::HistoryLimits;
 use litchi_core::patch::{
-    BlobBundle, BlobLimits, Patch as CorePatch, PatchLimits, PatchOperation, Reversible,
-    ReversibleOperation,
+    BlobBundle, BlobLimits, DiagnosticFingerprint, Patch as CorePatch, PatchLimits, PatchOperation,
+    Reversible, ReversibleOperation,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
 use std::collections::BTreeMap;
@@ -47,6 +47,8 @@ const FILE_PASS: u16 = 0x002f;
 const SST: u16 = 0x00fc;
 const XF: u16 = 0x00e0;
 const FORMULA: u16 = 0x0006;
+const STRING: u16 = 0x0207;
+const CONTINUE: u16 = 0x003c;
 const MUL_RK: u16 = 0x00bd;
 const BLANK: u16 = 0x0201;
 const NUMBER: u16 = 0x0203;
@@ -241,6 +243,8 @@ pub enum FormulaCache {
     Error(CellError),
     /// Empty cached result.
     Empty,
+    /// Cached string result owned by the following `String`/`Continue` records.
+    String(String),
 }
 
 /// A semantic value supported by the opened-workbook transaction.
@@ -436,6 +440,7 @@ impl Snapshot {
             source: self.clone(),
             changes: Vec::new(),
             structural_changes: Vec::new(),
+            resource_changes: Vec::new(),
         }
     }
 
@@ -612,12 +617,26 @@ enum StructuralChange {
     },
 }
 
+#[derive(Debug, Clone)]
+enum ResourceChange {
+    SharedString {
+        text: String,
+        insert: bool,
+    },
+    ExtendedFormat {
+        index: StyleIndex,
+        payload: Vec<u8>,
+        insert: bool,
+    },
+}
+
 /// Detached, failure-atomic edits of existing fixed-width BIFF8 cell fields.
 #[derive(Clone)]
 pub struct Transaction {
     source: Snapshot,
     changes: Vec<Change>,
     structural_changes: Vec<StructuralChange>,
+    resource_changes: Vec<ResourceChange>,
 }
 
 /// Backward-compatible name for [`Transaction`].
@@ -746,6 +765,20 @@ impl Transaction {
                 }
             }
         }
+        for right in &incoming.resource_changes {
+            for left in &self.resource_changes {
+                if resource_target(left) == resource_target(right)
+                    && !resource_changes_equal(left, right)
+                {
+                    structural_conflicts
+                        .try_reserve(1)
+                        .map_err(|_error| JoinError::Allocation)?;
+                    structural_conflicts.push(OperationConflict {
+                        target: resource_target(right),
+                    });
+                }
+            }
+        }
         structural_conflicts.sort_by(|left, right| left.target.cmp(&right.target));
         structural_conflicts.dedup();
         if !structural_conflicts.is_empty() {
@@ -767,6 +800,19 @@ impl Transaction {
         let observed = observed
             .saturating_add(self.structural_changes.len())
             .saturating_add(structural_additions);
+        let resource_additions = incoming
+            .resource_changes
+            .iter()
+            .filter(|right| {
+                !self
+                    .resource_changes
+                    .iter()
+                    .any(|left| resource_changes_equal(left, right))
+            })
+            .count();
+        let observed = observed
+            .saturating_add(self.resource_changes.len())
+            .saturating_add(resource_additions);
         if observed > MAX_STAGED_CHANGES {
             return Err(JoinError::Limit {
                 observed,
@@ -810,6 +856,18 @@ impl Transaction {
         }
         self.structural_changes
             .sort_by_key(|change| structural_target(&self.source, change));
+        self.resource_changes
+            .try_reserve(resource_additions)
+            .map_err(|_error| JoinError::Allocation)?;
+        for change in incoming.resource_changes {
+            if !self
+                .resource_changes
+                .iter()
+                .any(|left| resource_changes_equal(left, &change))
+            {
+                self.resource_changes.push(change);
+            }
+        }
         Ok(self)
     }
 
@@ -859,11 +917,12 @@ impl Transaction {
 
     /// Sets an existing cell through a storage-aware, dependency-checked path.
     ///
-    /// Numeric `Number`, `RK`, and `MulRk` cells, `BoolErr`, existing SST
+    /// Numeric `Number`, `RK`, and `MulRk` cells, `BoolErr`, SST
     /// references, and non-string Formula caches are editable in place.
     /// A standalone `RK` and `LabelSst` can be converted into each other
     /// because both have the same ten-byte payload; the SST reference count is
-    /// updated atomically. Text must already exist in the workbook SST.
+    /// updated atomically. Missing simple text is interned into a bounded SST
+    /// tail resource when the workbook has no `ExtSST` offset cache.
     ///
     /// # Errors
     ///
@@ -887,12 +946,46 @@ impl Transaction {
                 reference.column()
             ))
         })?;
-        let entry = &entries[entry_index];
-        let target = target_storage(
-            entry.cell.storage,
-            &value,
-            &self.source.inner.shared_strings,
-        )?;
+        let source_cell = entries[entry_index].cell.clone();
+        if source_cell.storage == Storage::Formula
+            && (matches!(
+                source_cell.value,
+                Value::FormulaCache(FormulaCache::String(_))
+            ) || matches!(value, Value::FormulaCache(FormulaCache::String(_))))
+        {
+            let Value::FormulaCache(cache) = &value else {
+                return Err(Error::UnsafeEdit(
+                    "Formula storage accepts only cached formula results".into(),
+                ));
+            };
+            if !valid_formula_cache(cache) {
+                return Err(Error::UnsafeEdit(
+                    "formula cache is not representable in BIFF8".into(),
+                ));
+            }
+            return self.stage_structural(StructuralChange::Cell {
+                sheet: sheet_index,
+                reference,
+                before: Some((
+                    source_cell.storage,
+                    source_cell.value.clone(),
+                    source_cell.style,
+                )),
+                after: Some((source_cell.storage, value, source_cell.style)),
+            });
+        }
+        let missing_text = match &value {
+            Value::Text(text) if !self.has_shared_string(text) => Some(text.clone()),
+            _ => None,
+        };
+        let mut shared_strings = self.effective_shared_strings();
+        if let Some(text) = &missing_text {
+            shared_strings.push(text.clone());
+        }
+        let target = target_storage(source_cell.storage, &value, &shared_strings)?;
+        if let Some(text) = missing_text {
+            self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
+        }
         self.stage(sheet_index, entry_index, target, value)
     }
 
@@ -926,9 +1019,9 @@ impl Transaction {
     /// Inserts a previously absent scalar cell using workbook XF zero.
     ///
     /// The affected worksheet's row blocks, `INDEX`, `DBCELL`, row extents,
-    /// and `DIMENSIONS` are regenerated as one checked closure. Text must
-    /// already exist in the SST; formulas and packed-cell overlaps are
-    /// deliberately refused.
+    /// and `DIMENSIONS` are regenerated as one checked closure. Missing simple
+    /// text is interned into a bounded SST tail resource; formulas and
+    /// packed-cell overlaps are deliberately refused.
     ///
     /// # Errors
     ///
@@ -956,13 +1049,23 @@ impl Transaction {
         value: Value,
         style: StyleIndex,
     ) -> Result<()> {
+        self.require_effective_style(style)?;
         let sheet = self.require_sheet(selector, "cell insertion")?;
         if unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?.is_some() {
             return Err(Error::UnsafeEdit(
                 "BIFF8 cell insertion target is occupied".into(),
             ));
         }
-        let storage = storage_for_new_value(&value, &self.source.inner.shared_strings)?;
+        if let Value::Text(text) = &value
+            && !self.has_shared_string(text)
+        {
+            self.stage_resource(ResourceChange::SharedString {
+                text: text.clone(),
+                insert: true,
+            })?;
+        }
+        let shared_strings = self.effective_shared_strings();
+        let storage = storage_for_new_value(&value, &shared_strings)?;
         self.stage_structural(StructuralChange::Cell {
             sheet,
             reference,
@@ -973,8 +1076,9 @@ impl Transaction {
 
     /// Physically removes an existing standalone BIFF8 cell record.
     ///
-    /// Packed `MulRk` cells and formula ownership groups are refused because a
-    /// partial deletion would not preserve their dependency semantics.
+    /// An edge member of `MulRk` can be removed while preserving or reducing
+    /// the packed record. Interior packed members and formula ownership groups
+    /// are refused because partial deletion would not preserve their semantics.
     ///
     /// # Errors
     ///
@@ -984,9 +1088,9 @@ impl Transaction {
         let entry = unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?
             .ok_or_else(|| Error::UnsafeEdit("BIFF8 cell removal target is absent".into()))?;
         let cell = &self.source.inner.sheets[sheet].entries[entry].cell;
-        if matches!(cell.storage, Storage::MulRk | Storage::Formula) {
+        if cell.storage == Storage::Formula {
             return Err(Error::UnsafeEdit(
-                "packed RK and formula records require a wider dependency rewrite".into(),
+                "formula records require a wider dependency rewrite".into(),
             ));
         }
         self.stage_structural(StructuralChange::Cell {
@@ -1008,6 +1112,7 @@ impl Transaction {
         reference: Reference,
         style: StyleIndex,
     ) -> Result<()> {
+        self.require_effective_style(style)?;
         let sheet = self.require_sheet(selector, "cell style edit")?;
         let entry = unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?
             .ok_or_else(|| Error::UnsafeEdit("BIFF8 style target is absent".into()))?;
@@ -1018,6 +1123,205 @@ impl Transaction {
             before: Some((cell.storage, cell.value.clone(), cell.style)),
             after: Some((cell.storage, cell.value.clone(), style)),
         })
+    }
+
+    /// Duplicates an existing XF into a newly authored workbook resource.
+    ///
+    /// The returned index can be used by later cell insert/style operations
+    /// in this transaction. Exact payload identity makes the operation
+    /// reversible and dependency-checkable during transfer.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stale source resource, index overflow, allocation, or bound
+    /// error without staging a partial resource.
+    pub fn duplicate_style(&mut self, source: StyleIndex) -> Result<StyleIndex> {
+        self.require_effective_style(source)?;
+        let payload = self
+            .effective_xf_payload(source)
+            .ok_or_else(|| Error::UnsafeEdit("source XF resource is absent".into()))?
+            .to_vec();
+        let pending = self
+            .resource_changes
+            .iter()
+            .filter(|change| matches!(change, ResourceChange::ExtendedFormat { insert: true, .. }))
+            .count();
+        let index = self
+            .source
+            .inner
+            .xf_records
+            .len()
+            .checked_add(pending)
+            .and_then(|value| u16::try_from(value).ok())
+            .map(StyleIndex)
+            .ok_or_else(|| Error::UnsafeEdit("new XF index exceeds u16".into()))?;
+        self.stage_resource(ResourceChange::ExtendedFormat {
+            index,
+            payload,
+            insert: true,
+        })?;
+        Ok(index)
+    }
+
+    fn has_shared_string(&self, text: &str) -> bool {
+        self.effective_shared_strings()
+            .iter()
+            .any(|candidate| candidate == text)
+    }
+
+    fn effective_shared_strings(&self) -> Vec<String> {
+        let mut strings = self.source.inner.shared_strings.as_ref().clone();
+        for text in self
+            .resource_changes
+            .iter()
+            .filter_map(|change| match change {
+                ResourceChange::SharedString {
+                    text,
+                    insert: false,
+                } => Some(text),
+                ResourceChange::SharedString { insert: true, .. }
+                | ResourceChange::ExtendedFormat { .. } => None,
+            })
+        {
+            if let Some(index) = strings.iter().position(|candidate| candidate == text) {
+                strings.remove(index);
+            }
+        }
+        let mut inserted: Vec<_> = self
+            .resource_changes
+            .iter()
+            .filter_map(|change| match change {
+                ResourceChange::SharedString { text, insert: true } => Some(text.clone()),
+                ResourceChange::SharedString { insert: false, .. }
+                | ResourceChange::ExtendedFormat { .. } => None,
+            })
+            .collect();
+        inserted.sort_by_key(|text| text_fingerprint(text));
+        strings.extend(inserted);
+        strings
+    }
+
+    fn effective_xf_payload(&self, style: StyleIndex) -> Option<&[u8]> {
+        let index = usize::from(style.get());
+        self.source
+            .inner
+            .xf_records
+            .get(index)
+            .map(Vec::as_slice)
+            .or_else(|| {
+                self.resource_changes
+                    .iter()
+                    .find_map(|change| match change {
+                        ResourceChange::ExtendedFormat {
+                            index: candidate,
+                            payload,
+                            insert: true,
+                        } if *candidate == style => Some(payload.as_slice()),
+                        ResourceChange::SharedString { .. }
+                        | ResourceChange::ExtendedFormat { .. } => None,
+                    })
+            })
+    }
+
+    fn require_effective_style(&self, style: StyleIndex) -> Result<()> {
+        self.effective_xf_payload(style)
+            .map(|_| ())
+            .ok_or_else(|| Error::UnsafeEdit(format!("XF index {} is not staged", style.get())))
+    }
+
+    fn effective_xf_count(&self) -> usize {
+        let inserted = self
+            .resource_changes
+            .iter()
+            .filter(|change| matches!(change, ResourceChange::ExtendedFormat { insert: true, .. }))
+            .count();
+        let removed = self
+            .resource_changes
+            .iter()
+            .filter(|change| matches!(change, ResourceChange::ExtendedFormat { insert: false, .. }))
+            .count();
+        self.source
+            .inner
+            .xf_records
+            .len()
+            .saturating_add(inserted)
+            .saturating_sub(removed)
+    }
+
+    fn stage_resource(&mut self, change: ResourceChange) -> Result<()> {
+        if self
+            .resource_changes
+            .iter()
+            .any(|existing| resource_changes_equal(existing, &change))
+        {
+            return Ok(());
+        }
+        match &change {
+            ResourceChange::SharedString { text, insert } => {
+                if self.has_shared_string(text) == *insert {
+                    return Err(Error::UnsafeEdit(
+                        "shared-string resource outcome is already present".into(),
+                    ));
+                }
+            },
+            ResourceChange::ExtendedFormat {
+                index,
+                payload,
+                insert,
+            } => {
+                let count = self.effective_xf_count();
+                if *insert {
+                    if usize::from(index.get()) != count {
+                        return Err(Error::UnsafeEdit(
+                            "new XF index is not the next effective resource".into(),
+                        ));
+                    }
+                    let duplicates_existing = self
+                        .source
+                        .inner
+                        .xf_records
+                        .iter()
+                        .any(|candidate| candidate == payload)
+                        || self.resource_changes.iter().any(|candidate| {
+                            matches!(
+                                candidate,
+                                ResourceChange::ExtendedFormat {
+                                    payload: existing,
+                                    insert: true,
+                                    ..
+                                } if existing == payload
+                            )
+                        });
+                    if !duplicates_existing {
+                        return Err(Error::UnsafeEdit(
+                            "new XF payload does not duplicate an effective resource".into(),
+                        ));
+                    }
+                } else if usize::from(index.get()).checked_add(1) != Some(count)
+                    || self.effective_xf_payload(*index) != Some(payload.as_slice())
+                {
+                    return Err(Error::UnsafeEdit(
+                        "XF removal is not the exact effective tail resource".into(),
+                    ));
+                }
+            },
+        }
+        let observed = self
+            .changes
+            .len()
+            .checked_add(self.structural_changes.len())
+            .and_then(|value| value.checked_add(self.resource_changes.len()))
+            .ok_or_else(|| Error::InvalidData("transaction resource size overflow".into()))?;
+        if observed >= MAX_STAGED_CHANGES {
+            return Err(Error::UnsafeEdit(format!(
+                "cell transaction exceeds its {MAX_STAGED_CHANGES}-change limit"
+            )));
+        }
+        self.resource_changes
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("staging XLS resources"))?;
+        self.resource_changes.push(change);
+        Ok(())
     }
 
     /// Inserts empty row coordinates and moves every retained row below them.
@@ -1175,6 +1479,7 @@ impl Transaction {
             .changes
             .len()
             .checked_add(self.structural_changes.len())
+            .and_then(|value| value.checked_add(self.resource_changes.len()))
             .ok_or_else(|| Error::InvalidData("cell transaction size overflow".into()))?;
         if observed >= MAX_STAGED_CHANGES {
             return Err(Error::UnsafeEdit(format!(
@@ -1223,7 +1528,13 @@ impl Transaction {
             change.storage = storage;
             change.value = value;
         } else {
-            if self.changes.len() >= MAX_STAGED_CHANGES {
+            if self
+                .changes
+                .len()
+                .saturating_add(self.structural_changes.len())
+                .saturating_add(self.resource_changes.len())
+                >= MAX_STAGED_CHANGES
+            {
                 return Err(Error::UnsafeEdit(format!(
                     "cell transaction exceeds its {MAX_STAGED_CHANGES}-change limit"
                 )));
@@ -1262,9 +1573,16 @@ impl Transaction {
                 .filter(|change| matches!(change, StructuralChange::Cell { .. }))
                 .count(),
         );
-        let semantic =
-            SemanticPatch::from_transaction(&self.source, &self.changes, &self.structural_changes)?;
-        if changed_cells == 0 && self.structural_changes.is_empty() {
+        let semantic = SemanticPatch::from_transaction(
+            &self.source,
+            &self.changes,
+            &self.structural_changes,
+            &self.resource_changes,
+        )?;
+        if changed_cells == 0
+            && self.structural_changes.is_empty()
+            && self.resource_changes.is_empty()
+        {
             let patch = Patch::new(
                 Arc::clone(&self.source.inner.bytes),
                 Arc::clone(&self.source.inner.bytes),
@@ -1278,6 +1596,7 @@ impl Transaction {
         }
 
         let mut workbook_bytes = self.source.inner.workbook_stream.to_vec();
+        let shared_strings = self.effective_shared_strings();
         let mut sst_delta = 0_i64;
         for change in &self.changes {
             let entry = &self.source.inner.sheets[change.sheet].entries[change.entry];
@@ -1301,12 +1620,7 @@ impl Transaction {
                     _ => 0,
                 };
             }
-            write_cell_value(
-                &mut workbook_bytes,
-                entry,
-                change,
-                &self.source.inner.shared_strings,
-            )?;
+            write_cell_value(&mut workbook_bytes, entry, change, &shared_strings)?;
         }
         for change in &self.structural_changes {
             if let StructuralChange::Cell { before, after, .. } = change {
@@ -1322,9 +1636,14 @@ impl Transaction {
             )?;
         }
 
-        if !self.structural_changes.is_empty() {
-            workbook_bytes =
-                structural::apply(workbook_bytes, &self.source, &self.structural_changes)?;
+        if !self.structural_changes.is_empty() || !self.resource_changes.is_empty() {
+            workbook_bytes = structural::apply(
+                workbook_bytes,
+                &self.source,
+                &self.structural_changes,
+                &self.resource_changes,
+                &shared_strings,
+            )?;
         }
 
         let workbook: Arc<[u8]> = Arc::from(workbook_bytes);
@@ -1339,6 +1658,7 @@ impl Transaction {
         let snapshot = Snapshot::from_bytes(candidate)?;
         verify_readback(&snapshot, &self.changes)?;
         verify_structural_readback(&snapshot, &self.source, &self.structural_changes)?;
+        verify_resource_readback(&snapshot, &self.resource_changes)?;
         let patch = Patch::new(
             Arc::clone(&self.source.inner.bytes),
             Arc::clone(&snapshot.inner.bytes),
@@ -1373,6 +1693,7 @@ impl fmt::Debug for Transaction {
             .field("source", &self.source)
             .field("staged_changes", &self.changes.len())
             .field("structural_changes", &self.structural_changes.len())
+            .field("resource_changes", &self.resource_changes.len())
             .finish()
     }
 }
@@ -1486,11 +1807,17 @@ impl SemanticPatch {
         snapshot: &Snapshot,
         changes: &[Change],
         structural_changes: &[StructuralChange],
+        resource_changes: &[ResourceChange],
     ) -> Result<Self> {
         let limits = semantic_patch_limits();
         let mut operations = Vec::new();
         operations
-            .try_reserve(changes.len().saturating_add(structural_changes.len()))
+            .try_reserve(
+                changes
+                    .len()
+                    .saturating_add(structural_changes.len())
+                    .saturating_add(resource_changes.len()),
+            )
             .map_err(|_error| Error::Allocation("retaining semantic cell operations"))?;
         for change in changes {
             if !change_is_effective(snapshot, change) {
@@ -1536,7 +1863,16 @@ impl SemanticPatch {
             operations.push(ReversibleOperation::new(forward, inverse));
         }
         for change in structural_changes {
-            append_structural_semantic(snapshot, change, limits, &mut operations)?;
+            append_structural_semantic(
+                snapshot,
+                change,
+                resource_changes,
+                limits,
+                &mut operations,
+            )?;
+        }
+        for change in resource_changes {
+            append_resource_semantic(change, limits, &mut operations)?;
         }
         operations.sort_by(|left, right| {
             semantic_operation_order(left.forward())
@@ -1787,6 +2123,7 @@ impl TransferPlan {
 fn append_structural_semantic(
     snapshot: &Snapshot,
     change: &StructuralChange,
+    resources: &[ResourceChange],
     limits: PatchLimits,
     operations: &mut Vec<ReversibleOperation>,
 ) -> Result<()> {
@@ -1803,7 +2140,9 @@ fn append_structural_semantic(
             if let Some((_, _, style)) = after {
                 preconditions.insert(
                     "target_xf".to_string(),
-                    serde_json::Value::String(xf_fingerprint(snapshot, *style)?),
+                    serde_json::Value::String(effective_xf_fingerprint(
+                        snapshot, resources, *style,
+                    )?),
                 );
             }
             (
@@ -1910,7 +2249,7 @@ fn append_structural_semantic(
         {
             inverse_preconditions.insert(
                 "target_xf".to_string(),
-                serde_json::Value::String(xf_fingerprint(snapshot, *style)?),
+                serde_json::Value::String(effective_xf_fingerprint(snapshot, resources, *style)?),
             );
         }
     }
@@ -1924,6 +2263,89 @@ fn append_structural_semantic(
     .map_err(patch_error)?;
     operations.push(ReversibleOperation::new(forward, inverse));
     Ok(())
+}
+
+fn append_resource_semantic(
+    change: &ResourceChange,
+    limits: PatchLimits,
+    operations: &mut Vec<ReversibleOperation>,
+) -> Result<()> {
+    let (target, forward_op, inverse_op, value, present, inverse_present) = match change {
+        ResourceChange::SharedString { text, insert } => (
+            format!("resource/sst/{}", text_fingerprint(text)),
+            if *insert { "sst.intern" } else { "sst.remove" },
+            if *insert { "sst.remove" } else { "sst.intern" },
+            serde_json::Value::String(text.clone()),
+            !*insert,
+            *insert,
+        ),
+        ResourceChange::ExtendedFormat {
+            index,
+            payload,
+            insert,
+        } => (
+            format!("resource/xf/{:05}", index.get()),
+            if *insert { "xf.duplicate" } else { "xf.remove" },
+            if *insert { "xf.remove" } else { "xf.duplicate" },
+            serde_json::Value::String(bytes_hex(payload)),
+            !*insert,
+            *insert,
+        ),
+    };
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert("present".to_string(), serde_json::Value::Bool(present));
+    let forward = PatchOperation::new(
+        limits,
+        forward_op,
+        target.clone(),
+        preconditions,
+        value.clone(),
+    )
+    .map_err(patch_error)?;
+    let mut inverse_preconditions = BTreeMap::new();
+    inverse_preconditions.insert(
+        "present".to_string(),
+        serde_json::Value::Bool(inverse_present),
+    );
+    let inverse = PatchOperation::new(limits, inverse_op, target, inverse_preconditions, value)
+        .map_err(patch_error)?;
+    operations.push(ReversibleOperation::new(forward, inverse));
+    Ok(())
+}
+
+fn text_fingerprint(text: &str) -> String {
+    DiagnosticFingerprint::of(text.as_bytes()).as_hex()
+}
+
+fn bytes_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        encoded.push(char::from(HEX[usize::from(*byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(*byte & 0x0f)]));
+    }
+    encoded
+}
+
+fn effective_xf_fingerprint(
+    snapshot: &Snapshot,
+    resources: &[ResourceChange],
+    style: StyleIndex,
+) -> Result<String> {
+    if let Some(payload) = snapshot.inner.xf_records.get(usize::from(style.get())) {
+        return Ok(bytes_hex(payload));
+    }
+    resources
+        .iter()
+        .find_map(|resource| match resource {
+            ResourceChange::ExtendedFormat {
+                index,
+                payload,
+                insert: true,
+            } if *index == style => Some(bytes_hex(payload)),
+            ResourceChange::SharedString { .. } | ResourceChange::ExtendedFormat { .. } => None,
+        })
+        .ok_or_else(|| Error::UnsafeEdit("structural cell XF dependency is absent".into()))
 }
 
 fn preflight_semantic(source: &Snapshot, patch: &SemanticPatch) -> Result<()> {
@@ -2020,9 +2442,14 @@ fn semantic_operations_overlap(left: &PatchOperation, right: &PatchOperation) ->
 
 fn semantic_operation_order(operation: &PatchOperation) -> u8 {
     if operation.op == "sheet.rename" {
-        2
+        3
+    } else if matches!(
+        operation.op.as_str(),
+        "sst.intern" | "sst.remove" | "xf.duplicate" | "xf.remove"
+    ) {
+        0
     } else {
-        u8::from(matches!(
+        1 + u8::from(matches!(
             operation.op.as_str(),
             "rows.insert" | "rows.delete" | "columns.insert" | "columns.delete"
         ))
@@ -2043,6 +2470,8 @@ fn apply_semantic_operation(
     sheet_names: &mut [String],
 ) -> Result<()> {
     match operation.op.as_str() {
+        "sst.intern" | "sst.remove" => apply_sst_semantic(transaction, operation),
+        "xf.duplicate" | "xf.remove" => apply_xf_semantic(transaction, operation),
         "cell.set" => apply_fixed_semantic(source, transaction, operation, sheet_names),
         "cell.structural" => {
             apply_structural_cell_semantic(source, transaction, operation, sheet_names)
@@ -2088,6 +2517,93 @@ fn apply_semantic_operation(
     }
 }
 
+fn apply_sst_semantic(transaction: &mut Transaction, operation: &PatchOperation) -> Result<()> {
+    let text = operation
+        .value
+        .as_str()
+        .ok_or_else(|| Error::InvalidData("SST resource value is not text".into()))?;
+    if operation.target != format!("resource/sst/{}", text_fingerprint(text)) {
+        return Err(Error::InvalidData(
+            "SST resource target is malformed".into(),
+        ));
+    }
+    let expected = operation
+        .preconditions
+        .get("present")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| Error::InvalidData("SST resource has no presence precondition".into()))?;
+    if transaction.has_shared_string(text) != expected {
+        return Err(Error::UnsafeEdit(
+            "SST resource precondition is stale".into(),
+        ));
+    }
+    transaction.stage_resource(ResourceChange::SharedString {
+        text: text.to_string(),
+        insert: operation.op == "sst.intern",
+    })
+}
+
+fn apply_xf_semantic(transaction: &mut Transaction, operation: &PatchOperation) -> Result<()> {
+    let encoded_index = operation
+        .target
+        .strip_prefix("resource/xf/")
+        .ok_or_else(|| Error::InvalidData("XF resource target is malformed".into()))?;
+    let index = encoded_index
+        .parse::<u16>()
+        .map(StyleIndex)
+        .map_err(|error| Error::InvalidData(format!("invalid XF resource index: {error}")))?;
+    if encoded_index != format!("{:05}", index.get()) {
+        return Err(Error::InvalidData(
+            "XF resource target is non-canonical".into(),
+        ));
+    }
+    let payload = operation
+        .value
+        .as_str()
+        .ok_or_else(|| Error::InvalidData("XF resource payload is not hexadecimal".into()))
+        .and_then(parse_hex)?;
+    let expected = operation
+        .preconditions
+        .get("present")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| Error::InvalidData("XF resource has no presence precondition".into()))?;
+    let present = transaction
+        .effective_xf_payload(index)
+        .is_some_and(|candidate| candidate == payload.as_slice());
+    if present != expected {
+        return Err(Error::UnsafeEdit(
+            "XF resource precondition is stale".into(),
+        ));
+    }
+    transaction.stage_resource(ResourceChange::ExtendedFormat {
+        index,
+        payload,
+        insert: operation.op == "xf.duplicate",
+    })
+}
+
+fn parse_hex(value: &str) -> Result<Vec<u8>> {
+    if !value.len().is_multiple_of(2)
+        || value
+            .bytes()
+            .any(|byte| !byte.is_ascii_digit() && !(b'a'..=b'f').contains(&byte))
+    {
+        return Err(Error::InvalidData(
+            "resource hexadecimal is non-canonical".into(),
+        ));
+    }
+    value
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let text = std::str::from_utf8(pair)
+                .map_err(|error| Error::InvalidData(format!("invalid resource hex: {error}")))?;
+            u8::from_str_radix(text, 16)
+                .map_err(|error| Error::InvalidData(format!("invalid resource hex: {error}")))
+        })
+        .collect()
+}
+
 fn apply_fixed_semantic(
     source: &Snapshot,
     transaction: &mut Transaction,
@@ -2111,11 +2627,17 @@ fn apply_fixed_semantic(
         ));
     }
     let (storage, value) = parse_cell_state(&operation.value)?;
-    let represented = target_storage(cell.storage, &value, &source.inner.shared_strings)?;
+    let shared_strings = transaction.effective_shared_strings();
+    let represented = target_storage(cell.storage, &value, &shared_strings)?;
     if represented != storage {
         return Err(Error::InvalidData(
             "cell patch target storage disagrees with its value".into(),
         ));
+    }
+    if matches!(cell.value, Value::FormulaCache(FormulaCache::String(_)))
+        || matches!(value, Value::FormulaCache(FormulaCache::String(_)))
+    {
+        return transaction.set_value(Selector::Position(sheet_position), reference, value);
     }
     transaction.stage(sheet_index, entry_index, storage, value)
 }
@@ -2155,7 +2677,11 @@ fn apply_structural_cell_semantic(
             .ok_or_else(|| {
                 Error::InvalidData("structural cell patch has no XF dependency".into())
             })?;
-        if xf_fingerprint(source, *style)? != expected_xf {
+        let actual_xf = transaction
+            .effective_xf_payload(*style)
+            .map(bytes_hex)
+            .ok_or_else(|| Error::UnsafeEdit("structural cell XF resource is absent".into()))?;
+        if actual_xf != expected_xf {
             return Err(Error::UnsafeEdit(
                 "structural cell XF resource dependency is stale".into(),
             ));
@@ -2163,7 +2689,26 @@ fn apply_structural_cell_semantic(
     }
     match (current, after) {
         (None, Some((storage, value, style))) => {
-            if storage_for_new_value(&value, &source.inner.shared_strings)? != storage {
+            if storage == Storage::MulRk {
+                let Value::Number(number) = value else {
+                    return Err(Error::InvalidData(
+                        "MulRk structural patch value is not numeric".into(),
+                    ));
+                };
+                if encode_rk(number).is_none() {
+                    return Err(Error::InvalidData(
+                        "MulRk structural patch value is not RK-representable".into(),
+                    ));
+                }
+                return transaction.stage_structural(StructuralChange::Cell {
+                    sheet: sheet_index,
+                    reference,
+                    before: None,
+                    after: Some((Storage::MulRk, Value::Number(number), style)),
+                });
+            }
+            let shared_strings = transaction.effective_shared_strings();
+            if storage_for_new_value(&value, &shared_strings)? != storage {
                 return Err(Error::InvalidData(
                     "structural cell storage disagrees with its value".into(),
                 ));
@@ -2172,16 +2717,32 @@ fn apply_structural_cell_semantic(
                 Selector::Position(sheet_position),
                 reference,
                 value,
-                StyleIndex::new(source, style.get())?,
+                style,
             )
         },
         (Some(_), None) => transaction.remove_cell(Selector::Position(sheet_position), reference),
         (Some(before), Some(after)) if before.0 == after.0 && values_equal(&before.1, &after.1) => {
-            transaction.set_style(
-                Selector::Position(sheet_position),
+            transaction.set_style(Selector::Position(sheet_position), reference, after.2)
+        },
+        (Some(before), Some(after))
+            if before.0 == Storage::Formula && after.0 == Storage::Formula =>
+        {
+            let Value::FormulaCache(cache) = &after.1 else {
+                return Err(Error::InvalidData(
+                    "Formula structural patch value is not a cache".into(),
+                ));
+            };
+            if !valid_formula_cache(cache) {
+                return Err(Error::InvalidData(
+                    "Formula structural patch cache is not representable".into(),
+                ));
+            }
+            transaction.stage_structural(StructuralChange::Cell {
+                sheet: sheet_index,
                 reference,
-                StyleIndex::new(source, after.2.get())?,
-            )
+                before: Some(before),
+                after: Some(after),
+            })
         },
         _ => Err(Error::InvalidData(
             "structural cell patch requests an unsupported replacement".into(),
@@ -2228,24 +2789,6 @@ fn optional_cell_state(state: Option<&(Storage, Value, StyleIndex)>) -> serde_js
             "value": encode_value(value),
         })
     })
-}
-
-fn xf_fingerprint(snapshot: &Snapshot, style: StyleIndex) -> Result<String> {
-    let bytes = snapshot
-        .inner
-        .xf_records
-        .get(usize::from(style.get()))
-        .ok_or_else(|| Error::UnsafeEdit("cell XF resource is absent".into()))?;
-    let mut encoded = String::new();
-    encoded
-        .try_reserve(bytes.len().saturating_mul(2))
-        .map_err(|_error| Error::Allocation("encoding XF dependency fingerprint"))?;
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    for byte in bytes {
-        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    Ok(encoded)
 }
 
 fn parse_optional_cell_state(
@@ -2552,8 +3095,54 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
     require_bof(first.payload(), WORKSHEET)?;
     let mut entries = Vec::new();
     let mut found_eof = false;
-    for record_result in records {
+    let mut pending_string_formula: Option<PendingStringFormula> = None;
+    while let Some(record_result) = records.next() {
         let record = record_result?;
+        if let Some(pending) = pending_string_formula.take() {
+            if record.kind().get() == STRING {
+                let mut continues = Vec::new();
+                let text = loop {
+                    match crate::utils::decode_string_record(record.payload(), &continues)? {
+                        crate::utils::StringRecordDecode::Complete(text) => break text,
+                        crate::utils::StringRecordDecode::NeedContinue => {
+                            let next = records.next().ok_or_else(|| Error::InvalidRecord {
+                                record_type: STRING,
+                                message: "formula String cache ends before its Continue records"
+                                    .into(),
+                            })??;
+                            if next.kind().get() != CONTINUE {
+                                return Err(Error::InvalidRecord {
+                                    record_type: next.kind().get(),
+                                    message: "formula String cache continuation is not Continue"
+                                        .into(),
+                                });
+                            }
+                            continues.push(next.payload().to_vec());
+                        },
+                    }
+                };
+                push_entry(
+                    &mut entries,
+                    Cell {
+                        reference: pending.reference,
+                        storage: Storage::Formula,
+                        style: pending.style,
+                        value: Value::FormulaCache(FormulaCache::String(text)),
+                    },
+                    Some(payload_offset(pending.kind_offset, 6)?),
+                    pending.kind_offset,
+                    None,
+                )?;
+                continue;
+            }
+            if !matches!(record.kind().get(), 0x0221 | 0x0236 | 0x04bc | 0x0091) {
+                return Err(Error::InvalidRecord {
+                    record_type: record.kind().get(),
+                    message: "string-valued Formula is not followed by its String record".into(),
+                });
+            }
+            pending_string_formula = Some(pending);
+        }
         if record.kind().get() == EOF {
             found_eof = true;
             break;
@@ -2662,7 +3251,10 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
                     Some(index),
                 )?;
             },
-            FORMULA => parse_formula_entry(record.payload(), kind_offset, &mut entries)?,
+            FORMULA => {
+                pending_string_formula =
+                    parse_formula_entry(record.payload(), kind_offset, &mut entries)?;
+            },
             _ => {},
         }
     }
@@ -2672,7 +3264,17 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
-fn parse_formula_entry(payload: &[u8], kind_offset: usize, entries: &mut Vec<Entry>) -> Result<()> {
+struct PendingStringFormula {
+    reference: Reference,
+    style: StyleIndex,
+    kind_offset: usize,
+}
+
+fn parse_formula_entry(
+    payload: &[u8],
+    kind_offset: usize,
+    entries: &mut Vec<Entry>,
+) -> Result<Option<PendingStringFormula>> {
     if payload.len() < 22 {
         return Err(Error::InvalidLength {
             expected: 22,
@@ -2693,7 +3295,11 @@ fn parse_formula_entry(payload: &[u8], kind_offset: usize, entries: &mut Vec<Ent
         crate::records::FormulaValue::Error(code) => FormulaCache::Error(CellError::new(code)?),
         crate::records::FormulaValue::Empty => FormulaCache::Empty,
         crate::records::FormulaValue::StringPending | crate::records::FormulaValue::String(_) => {
-            return Ok(());
+            return Ok(Some(PendingStringFormula {
+                reference: parse_reference(payload, FORMULA)?,
+                style: parse_style(payload, 4)?,
+                kind_offset,
+            }));
         },
     };
     push_entry(
@@ -2707,7 +3313,8 @@ fn parse_formula_entry(payload: &[u8], kind_offset: usize, entries: &mut Vec<Ent
         Some(payload_offset(kind_offset, 6)?),
         kind_offset,
         None,
-    )
+    )?;
+    Ok(None)
 }
 
 fn parse_mul_rk_entries(
@@ -2887,7 +3494,7 @@ fn storage_for_new_value(value: &Value, shared_strings: &[String]) -> Result<Sto
             Ok(Storage::LabelSst)
         },
         Value::Text(_) => Err(Error::UnsafeEdit(
-            "new BIFF8 text must already exist in the workbook SST".into(),
+            "new BIFF8 text is absent from the effective workbook SST".into(),
         )),
         Value::Number(_) => Err(Error::UnsupportedFeature(
             "BIFF8 Number insertion requires a normal IEEE-754 value or positive zero".into(),
@@ -2902,6 +3509,16 @@ fn valid_formula_cache(cache: &FormulaCache) -> bool {
     match cache {
         FormulaCache::Number(value) => valid_xnum(*value),
         FormulaCache::Boolean(_) | FormulaCache::Error(_) | FormulaCache::Empty => true,
+        FormulaCache::String(text) => {
+            let mut units = text.encode_utf16();
+            let count = units.clone().count();
+            let width = if units.all(|unit| unit <= 0xff) { 1 } else { 2 };
+            u16::try_from(count).is_ok()
+                && count
+                    .checked_mul(width)
+                    .and_then(|length| length.checked_add(3))
+                    .is_some_and(|length| length <= 8_224)
+        },
     }
 }
 
@@ -3028,6 +3645,45 @@ fn structural_changes_equal(left: &StructuralChange, right: &StructuralChange) -
     }
 }
 
+fn resource_changes_equal(left: &ResourceChange, right: &ResourceChange) -> bool {
+    match (left, right) {
+        (
+            ResourceChange::SharedString {
+                text: left_text,
+                insert: left_insert,
+            },
+            ResourceChange::SharedString {
+                text: right_text,
+                insert: right_insert,
+            },
+        ) => (left_text, left_insert) == (right_text, right_insert),
+        (
+            ResourceChange::ExtendedFormat {
+                index: left_index,
+                payload: left_payload,
+                insert: left_insert,
+            },
+            ResourceChange::ExtendedFormat {
+                index: right_index,
+                payload: right_payload,
+                insert: right_insert,
+            },
+        ) => (left_index, left_payload, left_insert) == (right_index, right_payload, right_insert),
+        _ => false,
+    }
+}
+
+fn resource_target(change: &ResourceChange) -> String {
+    match change {
+        ResourceChange::SharedString { text, .. } => {
+            format!("resource/sst/{}", text_fingerprint(text))
+        },
+        ResourceChange::ExtendedFormat { index, .. } => {
+            format!("resource/xf/{:05}", index.get())
+        },
+    }
+}
+
 fn optional_cell_states_equal(
     left: Option<&(Storage, Value, StyleIndex)>,
     right: Option<&(Storage, Value, StyleIndex)>,
@@ -3145,6 +3801,7 @@ fn encode_formula_cache(cache: &FormulaCache) -> [u8; 8] {
         FormulaCache::Boolean(value) => [1, 0, u8::from(*value), 0, 0, 0, 0xff, 0xff],
         FormulaCache::Error(error) => [2, 0, error.code(), 0, 0, 0, 0xff, 0xff],
         FormulaCache::Empty => [3, 0, 0, 0, 0, 0, 0xff, 0xff],
+        FormulaCache::String(_) => [0, 0, 0, 0, 0, 0, 0xff, 0xff],
     }
 }
 
@@ -3315,6 +3972,7 @@ fn encode_formula_cache_value(cache: &FormulaCache) -> serde_json::Value {
             serde_json::json!({"kind": "error", "code": error.code()})
         },
         FormulaCache::Empty => serde_json::json!({"kind": "empty"}),
+        FormulaCache::String(text) => serde_json::json!({"kind": "string", "data": text}),
     }
 }
 
@@ -3377,6 +4035,11 @@ fn parse_formula_cache_value(value: &serde_json::Value) -> Result<FormulaCache> 
             .ok_or_else(|| Error::InvalidData("formula Boolean cache is malformed".into())),
         Some("error") => parse_error_code(object).map(FormulaCache::Error),
         Some("empty") => Ok(FormulaCache::Empty),
+        Some("string") => object
+            .get("data")
+            .and_then(serde_json::Value::as_str)
+            .map(|text| FormulaCache::String(text.to_string()))
+            .ok_or_else(|| Error::InvalidData("formula string cache is malformed".into())),
         _ => Err(Error::InvalidData("formula cache kind is invalid".into())),
     }
 }
@@ -3556,6 +4219,42 @@ fn verify_structural_readback(
                 {
                     return Err(Error::UnsafeEdit(
                         "worksheet rename failed semantic readback".into(),
+                    ));
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
+fn verify_resource_readback(snapshot: &Snapshot, changes: &[ResourceChange]) -> Result<()> {
+    for change in changes {
+        match change {
+            ResourceChange::SharedString { text, insert } => {
+                let present = snapshot
+                    .inner
+                    .shared_strings
+                    .iter()
+                    .any(|candidate| candidate == text);
+                if present != *insert {
+                    return Err(Error::UnsafeEdit(
+                        "shared-string resource failed semantic readback".into(),
+                    ));
+                }
+            },
+            ResourceChange::ExtendedFormat {
+                index,
+                payload,
+                insert,
+            } => {
+                let present = snapshot
+                    .inner
+                    .xf_records
+                    .get(usize::from(index.get()))
+                    .is_some_and(|candidate| candidate == payload);
+                if present != *insert {
+                    return Err(Error::UnsafeEdit(
+                        "XF resource failed semantic readback".into(),
                     ));
                 }
             },

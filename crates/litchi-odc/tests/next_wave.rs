@@ -1,7 +1,7 @@
 use litchi_odc::{
     AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, Chart, ChartClass,
-    DataPointSpec, Definition, DefinitionSnapshot, History, Limits, Patch, SeriesSpec, StyleTarget,
-    Text, chart::Dimension, validate_range_list,
+    DataPointSpec, Definition, DefinitionSnapshot, ExactAttribute, ExactTarget, History, Limits,
+    Patch, SeriesSpec, StyleTarget, Text, chart::Dimension, validate_range_list,
 };
 use litchi_odf_common::core::{PackageWriter, Profile};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -136,6 +136,108 @@ fn opened_projection_refuses_noncanonical_xml_without_mutation() -> TestResult<(
         Some("exact-style")
     );
     assert_eq!(chart.as_bytes(), original);
+    Ok(())
+}
+
+#[test]
+fn noncanonical_chart_plot_and_series_attributes_use_checked_exact_spans() -> TestResult<()> {
+    let mut authored = definition();
+    authored.width = Some("10cm".into());
+    authored.height = Some("8cm".into());
+    authored.plot_area.cell_range_address = Some("Data.A1:.B4".into());
+    authored.plot_area.x = Some("1cm".into());
+    authored.plot_area.y = Some("2cm".into());
+    authored.plot_area.width = Some("9cm".into());
+    authored.plot_area.height = Some("7cm".into());
+    authored.plot_area.series[0].values_cell_range_address = Some("Data.B2:.B4".into());
+    authored.plot_area.series[0].label_cell_address = Some("Data.B1".into());
+    let canonical = litchi_odc::serialize_content(&authored)?;
+    let noncanonical = canonical.replacen(
+        "><office:body>",
+        ">\n<!-- retained producer extension boundary -->\n<office:body>",
+        1,
+    );
+    let source = Chart::from_bytes(raw_negative_package(&noncanonical)?)?;
+    assert!(source.definition().is_err());
+
+    let mut edit = source.edit();
+    edit.update_exact(
+        ExactTarget::Chart,
+        ExactAttribute::Class,
+        Some("chart:line".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Chart,
+        ExactAttribute::Width,
+        Some("11cm".into()),
+    )?;
+    edit.update_exact(ExactTarget::Chart, ExactAttribute::Height, None)?;
+    edit.update_exact(
+        ExactTarget::PlotArea,
+        ExactAttribute::CellRangeAddress,
+        Some("Data.A1:.C4".into()),
+    )?;
+    edit.update_exact(ExactTarget::PlotArea, ExactAttribute::X, Some("3cm".into()))?;
+    edit.update_exact(
+        ExactTarget::PlotArea,
+        ExactAttribute::StyleName,
+        Some("plot-style".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Series(0),
+        ExactAttribute::Class,
+        Some("chart:line".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Series(0),
+        ExactAttribute::ValuesCellRangeAddress,
+        Some("Data.C2:.C4".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Series(0),
+        ExactAttribute::AttachedAxis,
+        Some("y".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Series(0),
+        ExactAttribute::StyleName,
+        Some("series-style".into()),
+    )?;
+    let commit = edit.commit()?;
+    assert_eq!(commit.patch().exact_changes().len(), 10);
+    assert!(
+        commit
+            .chart()
+            .content_xml()
+            .contains("\n<!-- retained producer extension boundary -->\n")
+    );
+    assert!(commit.chart().content_xml().contains("svg:width=\"11cm\""));
+    assert!(!commit.chart().content_xml().contains("svg:height=\"8cm\""));
+    assert!(
+        commit
+            .chart()
+            .content_xml()
+            .contains("chart:style-name=\"plot-style\"")
+    );
+    assert!(
+        commit
+            .chart()
+            .content_xml()
+            .contains("chart:attached-axis=\"y\"")
+    );
+    assert_eq!(commit.chart().class()?, ChartClass::line());
+    assert_eq!(
+        commit.patch().inverse().apply(commit.chart())?.as_bytes(),
+        source.as_bytes()
+    );
+
+    let wire = commit.patch().to_bytes();
+    let decoded = Patch::from_bytes(&wire, source.limits())?;
+    assert_eq!(decoded.exact_changes().len(), 10);
+    assert_eq!(
+        decoded.apply(&source)?.as_bytes(),
+        commit.chart().as_bytes()
+    );
     Ok(())
 }
 

@@ -5,9 +5,16 @@ use crate::{
     frame::Frame, map::ImageMap, source::Source,
 };
 use litchi_core::{Error, Result};
+use quick_xml::{
+    XmlVersion,
+    events::Event,
+    name::{Namespace, ResolveResult},
+    reader::NsReader,
+};
 use std::{collections::BTreeMap, sync::Arc};
 
 const MIB: usize = 1024 * 1024;
+const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 
 /// Security and allocation limits for semantic planning and publication.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -255,6 +262,8 @@ pub enum ConflictKind {
     IncompatibleBase,
     Unsupported,
     Policy,
+    /// A referenced style or package member cannot be supplied losslessly.
+    MissingDependency,
 }
 
 /// One deterministic planning conflict. Planning never mutates an artifact.
@@ -526,8 +535,269 @@ impl SemanticPatch {
     /// Plans a three-way application or cross-artifact transfer to a package.
     #[must_use]
     pub fn plan_package(&self, current: &Image) -> SemanticPlan {
-        plan_operations(&self.operations, |key| package_value(current, key))
+        let mut plan = plan_operations(&self.operations, |key| package_value(current, key));
+        complete_package_dependencies(self, current, &mut plan);
+        plan.operations
+            .sort_unstable_by(|left, right| left.key.cmp(&right.key));
+        plan.conflicts
+            .sort_by(|left, right| left.key.cmp(&right.key));
+        plan
     }
+}
+
+fn complete_package_dependencies(patch: &SemanticPatch, current: &Image, plan: &mut SemanticPlan) {
+    let target_package = if patch.kind == ArtifactKind::Package {
+        Image::from_bytes(patch.target.as_ref().clone()).ok()
+    } else {
+        None
+    };
+    for operation in &patch.operations {
+        let OperationKey::Frame { frame, property } = operation.key() else {
+            continue;
+        };
+        match (property, operation.after()) {
+            (FrameProperty::Source, SemanticValue::Source(Source::Linked(href))) => {
+                complete_resource_dependency(
+                    patch,
+                    current,
+                    target_package.as_ref(),
+                    *frame,
+                    href,
+                    operation.key(),
+                    plan,
+                );
+            },
+            (FrameProperty::StyleName, SemanticValue::Text(Some(name))) => {
+                complete_style_dependency(
+                    current,
+                    target_package.as_ref(),
+                    name,
+                    "graphic",
+                    operation.key(),
+                    plan,
+                );
+            },
+            (FrameProperty::TextStyleName, SemanticValue::Text(Some(name))) => {
+                complete_style_dependency(
+                    current,
+                    target_package.as_ref(),
+                    name,
+                    "paragraph",
+                    operation.key(),
+                    plan,
+                );
+            },
+            _ => {},
+        }
+    }
+}
+
+fn complete_resource_dependency(
+    semantic_delta: &SemanticPatch,
+    current: &Image,
+    target: Option<&Image>,
+    frame: usize,
+    href: &str,
+    frame_key: &OperationKey,
+    plan: &mut SemanticPlan,
+) {
+    let target_resource = target.and_then(|image| {
+        image
+            .resources()
+            .iter()
+            .find(|resource| resource.frame() == frame && resource.href() == href)
+    });
+    let path = target_resource
+        .map(crate::resource::Resource::path)
+        .map(str::to_owned)
+        .or_else(|| local_package_path(href));
+    let Some(path) = path else {
+        return;
+    };
+    let key = OperationKey::Resource(path.clone());
+    if let Some(explicit) = semantic_delta
+        .operations
+        .iter()
+        .find(|item| item.key() == &key)
+    {
+        if matches!(explicit.after(), SemanticValue::Resource(Some(_))) {
+            return;
+        }
+        push_missing_dependency(plan, frame_key, explicit.after().clone());
+        return;
+    }
+    let current_value = resource_value(current, &path).ok();
+    let desired = target.and_then(|image| resource_value(image, &path).ok());
+    match (current_value, desired) {
+        (Some(actual), Some(expected)) if actual == expected => {},
+        (
+            Some(SemanticValue::Resource(None)),
+            Some(expected @ SemanticValue::Resource(Some(_))),
+        ) => {
+            plan.operations.push(SemanticOperation {
+                key,
+                before: SemanticValue::Resource(None),
+                after: expected,
+            });
+        },
+        (Some(actual), Some(expected)) => plan.conflicts.push(Conflict {
+            key: Some(key),
+            kind: ConflictKind::MissingDependency,
+            expected: None,
+            actual: Some(actual),
+            desired: Some(expected),
+        }),
+        (Some(SemanticValue::Resource(Some(_))), None) => {},
+        (Some(actual), None) => plan.conflicts.push(Conflict {
+            key: Some(key),
+            kind: ConflictKind::MissingDependency,
+            expected: None,
+            actual: Some(actual),
+            desired: Some(SemanticValue::Text(Some(href.to_owned()))),
+        }),
+        (None, _) => {
+            push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(href.into())));
+        },
+    }
+}
+
+fn complete_style_dependency(
+    current: &Image,
+    target: Option<&Image>,
+    name: &str,
+    family: &str,
+    frame_key: &OperationKey,
+    plan: &mut SemanticPlan,
+) {
+    if style_available_after_plan(current, plan, name, family) {
+        return;
+    }
+    let target_styles = target.and_then(Image::styles_xml);
+    if target_styles.is_some_and(|xml| has_style_definition(xml, name, family).unwrap_or(false))
+        && current.styles_xml().is_none()
+        && !plan
+            .operations
+            .iter()
+            .any(|operation| operation.key() == &OperationKey::Styles)
+    {
+        plan.operations.push(SemanticOperation {
+            key: OperationKey::Styles,
+            before: SemanticValue::Xml(None),
+            after: SemanticValue::Xml(target_styles.map(str::to_owned)),
+        });
+        return;
+    }
+    push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(name.to_owned())));
+}
+
+fn style_available_after_plan(
+    current: &Image,
+    plan: &SemanticPlan,
+    name: &str,
+    family: &str,
+) -> bool {
+    if has_style_definition(current.content_xml(), name, family).unwrap_or(false) {
+        return true;
+    }
+    let planned = plan
+        .operations
+        .iter()
+        .find(|operation| operation.key() == &OperationKey::Styles)
+        .and_then(|operation| match operation.after() {
+            SemanticValue::Xml(xml) => Some(xml.as_deref()),
+            SemanticValue::Text(_)
+            | SemanticValue::Unsigned(_)
+            | SemanticValue::Source(_)
+            | SemanticValue::ImageMap(_)
+            | SemanticValue::Resource(_) => None,
+        })
+        .unwrap_or_else(|| current.styles_xml());
+    planned.is_some_and(|xml| has_style_definition(xml, name, family).unwrap_or(false))
+}
+
+fn has_style_definition(xml: &str, name: &str, family: &str) -> Result<bool> {
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid ODI style dependency XML: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if bound_to(&namespace, STYLE_NAMESPACE)
+                    && element.local_name().as_ref() == b"style" =>
+            {
+                let mut style_name = None;
+                let mut style_family = None;
+                for raw in element.attributes() {
+                    let attribute = raw.map_err(|error| {
+                        invalid(format!("invalid ODI style dependency attribute: {error}"))
+                    })?;
+                    let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+                    if !bound_to(&resolved, STYLE_NAMESPACE) {
+                        continue;
+                    }
+                    let value = attribute
+                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        .map_err(|error| {
+                            invalid(format!("invalid ODI style dependency value: {error}"))
+                        })?
+                        .into_owned();
+                    match local.as_ref() {
+                        b"name" => style_name = Some(value),
+                        b"family" => style_family = Some(value),
+                        _ => {},
+                    }
+                }
+                if style_name.as_deref() == Some(name) && style_family.as_deref() == Some(family) {
+                    return Ok(true);
+                }
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODI style XML")),
+            Event::Eof => return Ok(false),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
+}
+
+fn local_package_path(href: &str) -> Option<String> {
+    let path = href.strip_prefix("./").unwrap_or(href);
+    (!path.is_empty()
+        && !is_external(path)
+        && !path.starts_with('#')
+        && !path
+            .chars()
+            .any(|character| matches!(character, '?' | '#' | '\\'))
+        && path
+            .split('/')
+            .all(|part| !part.is_empty() && !matches!(part, "." | "..")))
+    .then(|| path.to_owned())
+}
+
+fn push_missing_dependency(plan: &mut SemanticPlan, key: &OperationKey, desired: SemanticValue) {
+    if plan.conflicts.iter().any(|conflict| {
+        conflict.kind == ConflictKind::MissingDependency && conflict.key.as_ref() == Some(key)
+    }) {
+        return;
+    }
+    plan.conflicts.push(Conflict {
+        key: Some(key.clone()),
+        kind: ConflictKind::MissingDependency,
+        expected: None,
+        actual: None,
+        desired: Some(desired),
+    });
 }
 
 fn frame_operations(changes: &[FrameChange]) -> Vec<SemanticOperation> {
@@ -914,6 +1184,12 @@ fn validate_operations(operations: &[SemanticOperation], policy: &SecurityPolicy
     if operations.len() > policy.max_operations {
         return Err(invalid("ODI semantic operation count exceeds policy"));
     }
+    let operation_bytes = operations.iter().try_fold(0usize, |total, operation| {
+        total.checked_add(operation_size(operation))
+    });
+    if operation_bytes.is_none_or(|bytes| bytes > policy.max_patch_bytes) {
+        return Err(invalid("ODI semantic operation bytes exceed patch policy"));
+    }
     for operation in operations {
         for value in [operation.before(), operation.after()] {
             match value {
@@ -985,6 +1261,7 @@ fn validate_map(map: &ImageMap, policy: &SecurityPolicy) -> Result<()> {
             area.name(),
             area.link_type(),
             area.show(),
+            area.actuate(),
             area.title(),
             area.description(),
         ]

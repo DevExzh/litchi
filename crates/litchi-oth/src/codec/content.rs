@@ -56,11 +56,13 @@ pub(crate) enum BlockOrder {
 }
 
 pub(crate) struct ParagraphSite {
+    pub(crate) content: ReplacementSite,
     pub(crate) replacement: Option<ReplacementSite>,
     pub(crate) value: crate::paragraph::Paragraph,
 }
 
 pub(crate) struct HeadingSite {
+    pub(crate) content: ReplacementSite,
     pub(crate) replacement: Option<ReplacementSite>,
     pub(crate) value: crate::heading::Heading,
 }
@@ -75,6 +77,7 @@ pub(crate) struct ReplacementSite {
 pub(crate) struct Projection {
     pub(crate) bookmarks: Vec<crate::bookmark::Bookmark>,
     pub(crate) forms: Vec<crate::form::Form>,
+    pub(crate) forms_site: Option<ReplacementSite>,
     pub(crate) headings: Vec<HeadingSite>,
     pub(crate) lists: Vec<crate::list::List>,
     pub(crate) list_sites: Vec<ReplacementSite>,
@@ -329,6 +332,8 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
     let mut bookmarks = Vec::new();
     let mut bookmark_starts = BTreeMap::<String, crate::bookmark::Anchor>::new();
     let mut forms = Vec::new();
+    let mut forms_site = None;
+    let mut forms_start = None;
     let mut form_stack = Vec::<PendingForm>::new();
     let mut headings = Vec::new();
     let mut list_stack = Vec::<PendingList>::new();
@@ -345,6 +350,11 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
         match reader.read_event().map_err(|error| xml_error(&error))? {
             Event::Start(start) => {
                 let current = element(&reader, start.name());
+                if is_office_forms(&reader, start.name())
+                    && (forms_start.replace(event_start).is_some() || forms_site.is_some())
+                {
+                    return invalid("OTH office:forms container is duplicated");
+                }
                 inventory_resource(&reader, &start, current, &mut resources)?;
                 start_form(&reader, &start, current, &mut form_stack)?;
                 start_list(&reader, &start, current, event_start, &mut list_stack)?;
@@ -372,6 +382,16 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
             Event::Empty(start) => {
                 let current = element(&reader, start.name());
                 let event_end = source_offset(reader.buffer_position())?;
+                if is_office_forms(&reader, start.name()) {
+                    if forms_start.is_some() || forms_site.is_some() {
+                        return invalid("OTH office:forms container is duplicated");
+                    }
+                    forms_site = Some(ReplacementSite {
+                        prefix: String::new(),
+                        range: event_start..event_end,
+                        suffix: String::new(),
+                    });
+                }
                 inventory_resource(&reader, &start, current, &mut resources)?;
                 empty_form(&reader, &start, current, &mut form_stack, &mut forms)?;
                 empty_list(
@@ -392,7 +412,8 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                     let replacement = empty_replacement(xml, event_start..event_end, &start)?;
                     publish_block(
                         block,
-                        Some(replacement),
+                        Some(replacement.clone()),
+                        replacement,
                         &mut paragraphs,
                         &mut headings,
                         &mut order,
@@ -444,9 +465,15 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                         range: block.content_start..event_start,
                         suffix: String::new(),
                     });
+                    let content = ReplacementSite {
+                        prefix: String::new(),
+                        range: block.content_start..event_start,
+                        suffix: String::new(),
+                    };
                     publish_block(
                         block,
                         replacement,
+                        content,
                         &mut paragraphs,
                         &mut headings,
                         &mut order,
@@ -459,6 +486,16 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                     text_close = Some(event_start);
                 }
                 let event_end = source_offset(reader.buffer_position())?;
+                if is_office_forms(&reader, end.name()) {
+                    let start = forms_start.take().ok_or_else(|| {
+                        Error::InvalidFormat("OTH office:forms state is missing".to_string())
+                    })?;
+                    forms_site = Some(ReplacementSite {
+                        prefix: String::new(),
+                        range: start..event_end,
+                        suffix: String::new(),
+                    });
+                }
                 end_list(
                     current,
                     event_end,
@@ -476,6 +513,7 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                 return Ok(Projection {
                     bookmarks,
                     forms,
+                    forms_site,
                     headings,
                     lists,
                     list_sites,
@@ -1141,6 +1179,12 @@ fn element(reader: &NsReader<&[u8]>, name: QName<'_>) -> Element {
     }
 }
 
+fn is_office_forms(reader: &NsReader<&[u8]>, name: QName<'_>) -> bool {
+    let (namespace, local) = reader.resolver().resolve_element(name);
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == OFFICE_NAMESPACE)
+        && local.as_ref() == b"forms"
+}
+
 fn is_field(local: &[u8]) -> bool {
     matches!(
         local,
@@ -1197,6 +1241,7 @@ fn active_text(active: &mut Option<ActiveBlock>, value: &str) -> Result<()> {
 fn publish_block(
     block: ActiveBlock,
     replacement: Option<ReplacementSite>,
+    content: ReplacementSite,
     paragraphs: &mut Vec<ParagraphSite>,
     headings: &mut Vec<HeadingSite>,
     order: &mut Vec<BlockOrder>,
@@ -1211,6 +1256,7 @@ fn publish_block(
             reserve(order, "OTH block order")?;
             let index = paragraphs.len();
             paragraphs.push(ParagraphSite {
+                content,
                 replacement,
                 value: crate::paragraph::Paragraph::projected(
                     block.text,
@@ -1234,6 +1280,7 @@ fn publish_block(
             reserve(order, "OTH block order")?;
             let index = headings.len();
             headings.push(HeadingSite {
+                content,
                 replacement,
                 value: crate::heading::Heading::projected(
                     block.level,

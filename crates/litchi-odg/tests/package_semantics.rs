@@ -6,9 +6,10 @@ use litchi_odf_common::{
     core::{OwnedPackage, PackageWriter},
 };
 use litchi_odg::{
-    Drawing, FormControl, PackageDurablePatch, PackageMergePlan,
+    Drawing, FormControl, PackageDurablePatch, PackageMergePlan, PackageSecurityWritePolicy,
     page::Page,
     shape::{Shape, ShapeKind},
+    style::Style,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -341,6 +342,39 @@ fn signed_and_encrypted_security_state_is_inert_and_rewrite_is_refused() {
         edit.set_shape_text(0, 0, "must refuse").unwrap();
         assert!(edit.commit().is_err());
     }
+
+    let signed = Drawing::from_bytes(raw_security_fixture(false, true)).unwrap();
+    let mut explicit =
+        signed.edit_with_security_policy(PackageSecurityWritePolicy::RemoveSignatures);
+    explicit.set_shape_text(0, 0, "signature removed").unwrap();
+    let commit = explicit.commit().unwrap();
+    assert!(!commit.snapshot().security().is_signed());
+    let durable = commit.patch().durable().unwrap();
+    assert!(durable.apply(signed.snapshot()).is_err());
+    assert_eq!(
+        durable
+            .apply_with_security_policy(
+                signed.snapshot(),
+                PackageSecurityWritePolicy::RemoveSignatures,
+            )
+            .unwrap()
+            .as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+    assert_eq!(
+        durable
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        signed.as_bytes()
+    );
+
+    let encrypted = Drawing::from_bytes(raw_security_fixture(true, false)).unwrap();
+    let mut still_refused =
+        encrypted.edit_with_security_policy(PackageSecurityWritePolicy::RemoveSignatures);
+    still_refused.set_shape_text(0, 0, "no decryption").unwrap();
+    assert!(still_refused.commit().is_err());
 }
 
 #[test]
@@ -357,9 +391,19 @@ fn hostile_raw_package_corpus_is_bounded_and_never_partially_opened() {
         "</office:drawing>",
         "<draw:layer-set><draw:layer draw:name=\"outside\"/></draw:layer-set></office:drawing>",
     );
+    let active_style = CONTENT
+        .replace(
+            r#"xmlns:xml="http://www.w3.org/XML/1998/namespace""#,
+            r#"xmlns:xml="http://www.w3.org/XML/1998/namespace" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0""#,
+        )
+        .replace(
+            "<office:body>",
+            r#"<office:automatic-styles><style:style style:name="active" style:family="graphic"><script:event-listener/></style:style></office:automatic-styles><office:body>"#,
+        );
     for malformed in [duplicate_drawing, nested_page, layer_outside_page] {
         assert!(Drawing::from_bytes(raw_negative_fixture_package(&malformed)).is_err());
     }
+    assert!(Drawing::from_bytes(raw_negative_fixture_package(&active_style)).is_err());
 
     let prefix = CONTENT.replace("</draw:page>", "");
     let deep = format!(
@@ -493,8 +537,14 @@ fn form_controls_remain_inert_but_their_references_are_editable() {
 fn form_model_crud_is_inert_dependency_checked_and_durable() {
     let source = Drawing::from_bytes(package(CONTENT)).unwrap();
     let mut edit = source.edit();
-    edit.add_form_control(&FormControl::new("control1").with_name("Button"))
-        .unwrap();
+    edit.add_form_control(
+        &FormControl::new("control1")
+            .with_name("Button")
+            .with_element("checkbox")
+            .with_attribute("form:label", "Arbitrary label")
+            .with_attribute("form:disabled", "true"),
+    )
+    .unwrap();
     edit.add_shape(
         0,
         Shape::new(ShapeKind::Control)
@@ -504,6 +554,14 @@ fn form_model_crud_is_inert_dependency_checked_and_durable() {
     .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(commit.snapshot().form_controls()[0].id(), "control1");
+    assert_eq!(commit.snapshot().form_controls()[0].element(), "checkbox");
+    assert_eq!(
+        commit.snapshot().form_controls()[0]
+            .attributes()
+            .get("form:label")
+            .map(String::as_str),
+        Some("Arbitrary label")
+    );
     assert_eq!(
         commit.snapshot().pages()[0].shapes()[2].control_reference(),
         Some("control1")
@@ -522,6 +580,47 @@ fn form_model_crud_is_inert_dependency_checked_and_durable() {
     removal.remove_form_control("control1").unwrap();
     let removed = removal.commit().unwrap();
     assert!(removed.snapshot().form_controls().is_empty());
+}
+
+#[test]
+fn arbitrary_style_properties_have_dependency_checked_crud_and_exact_inverse() {
+    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let style = Style::new("custom-fill", "graphic")
+        .with_property("draw:fill", "solid")
+        .with_property("draw:fill-color", "#12ab34")
+        .with_property("fo:opacity", "75%");
+    let mut edit = source.edit();
+    edit.put_style(&style).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(
+        commit
+            .snapshot()
+            .style_definitions()
+            .iter()
+            .any(|candidate| candidate == &style)
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
+    );
+
+    let mut removal = commit.snapshot().edit();
+    assert_eq!(removal.remove_style("custom-fill").unwrap(), style);
+    assert!(
+        removal
+            .commit()
+            .unwrap()
+            .snapshot()
+            .style_definitions()
+            .is_empty()
+    );
 }
 
 #[test]

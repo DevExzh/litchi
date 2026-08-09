@@ -1,4 +1,4 @@
-//! Unified source-checked ODP slide, media, chart, design, annotation, and RDF edits.
+//! Unified source-checked ODP slide, rich-content, media, chart, design, annotation, and RDF edits.
 
 use super::mutable::MutablePresentation;
 use crate::core::OwnedPackage;
@@ -39,6 +39,8 @@ pub enum Domain {
     Design,
     /// Slide- or shape-anchored annotations.
     Annotations,
+    /// Rich text boxes, tables, and inert form controls.
+    Content,
 }
 
 /// Conservative non-mutating merge assessment for two package patches.
@@ -157,6 +159,7 @@ impl Snapshot {
             charts: None,
             design: None,
             annotations: None,
+            content: None,
             media_bytes: 0,
             resource_bytes: self.resource_bytes,
             source_resource_bytes: self.resource_bytes,
@@ -203,6 +206,7 @@ pub struct Transaction {
     charts: Option<ChartDraft>,
     design: Option<DesignDraft>,
     annotations: Option<AnnotationDraft>,
+    content: Option<ContentDraft>,
     media_bytes: usize,
     resource_bytes: usize,
     source_resource_bytes: usize,
@@ -374,6 +378,11 @@ struct AnnotationDraft {
     original: Vec<crate::annotation::Info>,
     annotations: Vec<crate::annotation::Info>,
     operations: Vec<AnnotationOperation>,
+}
+
+struct ContentDraft {
+    bytes: Arc<Vec<u8>>,
+    operations: Vec<crate::content::Operation>,
 }
 
 impl Transaction {
@@ -585,6 +594,148 @@ impl Transaction {
         Ok(reference)
     }
 
+    /// Add a named common rich-text box to an exact presentation page.
+    ///
+    /// The object is inserted as a compact source-backed fragment, so opened
+    /// pages do not need to be regenerated and unrelated markup is preserved.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid page, duplicate name, malformed package, or limit.
+    pub fn add_text_box<'a, P>(&mut self, page: P, text_box: &crate::content::TextBox) -> Result<()>
+    where
+        P: Into<crate::charts::Page<'a>>,
+    {
+        let page_index = self.content_page_index(page.into())?;
+        self.stage_content(crate::content::Operation::AddObject {
+            page: page_index,
+            kind: crate::content::ObjectKind::TextBox,
+            name: text_box.name().to_string(),
+            xml: text_box.xml()?,
+        })
+    }
+
+    /// Replace a named rich-text box, optionally changing its stable name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous name, collision, malformed package, or limit.
+    pub fn replace_text_box(
+        &mut self,
+        name: &str,
+        text_box: &crate::content::TextBox,
+    ) -> Result<()> {
+        self.stage_content(crate::content::Operation::ReplaceObject {
+            kind: crate::content::ObjectKind::TextBox,
+            name: name.to_string(),
+            new_name: text_box.name().to_string(),
+            xml: text_box.xml()?,
+        })
+    }
+
+    /// Remove a named rich-text box.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous name or malformed package.
+    pub fn remove_text_box(&mut self, name: &str) -> Result<()> {
+        self.stage_content(crate::content::Operation::RemoveObject {
+            kind: crate::content::ObjectKind::TextBox,
+            name: name.to_string(),
+        })
+    }
+
+    /// Add a typed rectangular table to an exact presentation page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid page, duplicate name, malformed package, or limit.
+    pub fn add_table<'a, P>(&mut self, page: P, table: &crate::content::Table) -> Result<()>
+    where
+        P: Into<crate::charts::Page<'a>>,
+    {
+        let page_index = self.content_page_index(page.into())?;
+        self.stage_content(crate::content::Operation::AddObject {
+            page: page_index,
+            kind: crate::content::ObjectKind::Table,
+            name: table.name().to_string(),
+            xml: table.xml()?,
+        })
+    }
+
+    /// Replace a named typed table, optionally changing its stable name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous name, collision, malformed package, or limit.
+    pub fn replace_table(&mut self, name: &str, table: &crate::content::Table) -> Result<()> {
+        self.stage_content(crate::content::Operation::ReplaceObject {
+            kind: crate::content::ObjectKind::Table,
+            name: name.to_string(),
+            new_name: table.name().to_string(),
+            xml: table.xml()?,
+        })
+    }
+
+    /// Remove a named typed table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous name or malformed package.
+    pub fn remove_table(&mut self, name: &str) -> Result<()> {
+        self.stage_content(crate::content::Operation::RemoveObject {
+            kind: crate::content::ObjectKind::Table,
+            name: name.to_string(),
+        })
+    }
+
+    /// Add an inert typed form declaration and its visual control atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid page, duplicate name, malformed package, or limit.
+    pub fn add_form_control<'a, P>(
+        &mut self,
+        page: P,
+        control: &crate::content::FormControl,
+    ) -> Result<()>
+    where
+        P: Into<crate::charts::Page<'a>>,
+    {
+        let page_index = self.content_page_index(page.into())?;
+        self.stage_content(crate::content::Operation::AddControl {
+            page: page_index,
+            control: control.clone(),
+        })
+    }
+
+    /// Replace an inert form declaration and visual control as one operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous name, collision, malformed package, or limit.
+    pub fn replace_form_control(
+        &mut self,
+        name: &str,
+        control: &crate::content::FormControl,
+    ) -> Result<()> {
+        self.stage_content(crate::content::Operation::ReplaceControl {
+            name: name.to_string(),
+            control: control.clone(),
+        })
+    }
+
+    /// Remove an inert form declaration and its visual control atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous name or malformed package.
+    pub fn remove_form_control(&mut self, name: &str) -> Result<()> {
+        self.stage_content(crate::content::Operation::RemoveControl {
+            name: name.to_string(),
+        })
+    }
+
     /// Inspect the RDF metadata graphs in the current transaction draft.
     ///
     /// The inventory is loaded lazily so slide-only transactions do not reject
@@ -792,6 +943,96 @@ impl Transaction {
         S: Into<crate::charts::Selector<'a>>,
     {
         self.replace_chart(selector, crate::charts::Part::from_definition(definition)?)
+    }
+
+    /// Append one typed chart series without replacing the rest of the chart part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous chart, missing plot area, invalid series, or limit.
+    pub fn add_chart_series<'a, S>(
+        &mut self,
+        selector: S,
+        series: &crate::charts::SeriesSpec,
+    ) -> Result<()>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+    {
+        let owned_selector = ChartSelector::from_borrowed(selector.into());
+        let snapshot = self.chart_snapshot()?;
+        let chart = snapshot
+            .get(owned_selector.borrowed())?
+            .ok_or_else(|| invalid_error("ODP chart selector did not match"))?;
+        let part = chart.part().with_series_added(series)?;
+        self.replace_chart(owned_selector.borrowed(), part)
+    }
+
+    /// Replace one physical chart series by checked zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous chart, out-of-range series, invalid value, or limit.
+    pub fn replace_chart_series<'a, S>(
+        &mut self,
+        selector: S,
+        series_index: usize,
+        series: &crate::charts::SeriesSpec,
+    ) -> Result<()>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+    {
+        let owned_selector = ChartSelector::from_borrowed(selector.into());
+        let snapshot = self.chart_snapshot()?;
+        let chart = snapshot
+            .get(owned_selector.borrowed())?
+            .ok_or_else(|| invalid_error("ODP chart selector did not match"))?;
+        let part = chart.part().with_series_replaced(series_index, series)?;
+        self.replace_chart(owned_selector.borrowed(), part)
+    }
+
+    /// Remove one physical chart series by checked zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous chart, out-of-range series, malformed XML, or limit.
+    pub fn remove_chart_series<'a, S>(&mut self, selector: S, series_index: usize) -> Result<()>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+    {
+        let owned_selector = ChartSelector::from_borrowed(selector.into());
+        let snapshot = self.chart_snapshot()?;
+        let chart = snapshot
+            .get(owned_selector.borrowed())?
+            .ok_or_else(|| invalid_error("ODP chart selector did not match"))?;
+        let part = chart.part().with_series_removed(series_index)?;
+        self.replace_chart(owned_selector.borrowed(), part)
+    }
+
+    /// Replace one physical cached-table cell by checked row and column positions.
+    ///
+    /// Header rows are included in row indexing. Repeated XML runs remain
+    /// physical entries and are not expanded implicitly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing chart/table, out-of-range coordinate, invalid cell, or limit.
+    pub fn replace_chart_cached_cell<'a, S>(
+        &mut self,
+        selector: S,
+        row: usize,
+        column: usize,
+        cell: &crate::charts::CachedCell,
+    ) -> Result<()>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+    {
+        let owned_selector = ChartSelector::from_borrowed(selector.into());
+        let snapshot = self.chart_snapshot()?;
+        let chart = snapshot
+            .get(owned_selector.borrowed())?
+            .ok_or_else(|| invalid_error("ODP chart selector did not match"))?;
+        let part = chart.part().with_cached_cell_replaced(row, column, cell)?;
+        self.replace_chart(owned_selector.borrowed(), part)
     }
 
     /// Remove one embedded chart selected by exact name or checked position.
@@ -1156,6 +1397,10 @@ impl Transaction {
             .annotations
             .as_ref()
             .is_some_and(|draft| !draft.operations.is_empty());
+        let content_changed = self
+            .content
+            .as_ref()
+            .is_some_and(|draft| !draft.operations.is_empty());
         let mut domains = Vec::new();
         if self.changed {
             domains.push(Domain::Slides);
@@ -1172,11 +1417,15 @@ impl Transaction {
         if annotations_changed {
             domains.push(Domain::Annotations);
         }
+        if content_changed {
+            domains.push(Domain::Content);
+        }
         if !self.changed
             && !rdf_changed
             && !charts_changed
             && !design_changed
             && !annotations_changed
+            && !content_changed
         {
             return Ok(Commit::unchanged(self.source));
         }
@@ -1244,6 +1493,28 @@ impl Transaction {
                 }
             } else {
                 bytes = Arc::clone(&charts.bytes);
+            }
+        }
+        if let Some(content) = &self.content
+            && !content.operations.is_empty()
+        {
+            if self.changed
+                || design_changed
+                || annotations_changed
+                || rdf_changed
+                || charts_changed
+            {
+                for operation in &content.operations {
+                    let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
+                    bytes = Arc::new(crate::content::apply(&package, operation)?);
+                    if bytes.len() > MAX_PACKAGE_BYTES {
+                        return invalid(
+                            "ODP semantic-content transaction exceeds the 128 MiB package limit",
+                        );
+                    }
+                }
+            } else {
+                bytes = Arc::clone(&content.bytes);
             }
         }
         let reopened = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
@@ -1487,6 +1758,47 @@ impl Transaction {
                 operations: Vec::new(),
             });
         }
+        Ok(())
+    }
+
+    fn content_page_index(&mut self, page: crate::charts::Page<'_>) -> Result<usize> {
+        let bytes = self.content_bytes()?;
+        let package = OwnedPackage::from_shared_bytes(bytes)?;
+        let content = String::from_utf8(package.get_file("content.xml")?)
+            .map_err(|source| invalid_error(format!("ODP content.xml is not UTF-8: {source}")))?;
+        crate::charts::page_index(&content, page)
+    }
+
+    fn content_bytes(&mut self) -> Result<Arc<Vec<u8>>> {
+        if let Some(content) = &self.content {
+            return Ok(Arc::clone(&content.bytes));
+        }
+        let bytes = if self.changed {
+            Arc::new(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)
+        } else {
+            Arc::clone(&self.source.bytes)
+        };
+        self.content = Some(ContentDraft {
+            bytes: Arc::clone(&bytes),
+            operations: Vec::new(),
+        });
+        Ok(bytes)
+    }
+
+    fn stage_content(&mut self, operation: crate::content::Operation) -> Result<()> {
+        let current = self.content_bytes()?;
+        let package = OwnedPackage::from_shared_bytes(current)?;
+        let bytes = Arc::new(crate::content::apply(&package, &operation)?);
+        if bytes.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP semantic-content transaction exceeds the 128 MiB package limit");
+        }
+        Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+        let draft = self
+            .content
+            .as_mut()
+            .ok_or_else(|| invalid_error("ODP semantic-content draft initialization failed"))?;
+        draft.bytes = bytes;
+        draft.operations.push(operation);
         Ok(())
     }
 
@@ -2126,12 +2438,13 @@ fn domain_bits(domains: &[Domain]) -> u8 {
             Domain::Charts => 1 << 2,
             Domain::Design => 1 << 3,
             Domain::Annotations => 1 << 4,
+            Domain::Content => 1 << 5,
         }
     })
 }
 
 fn domains_from_bits(bits: u8) -> Result<Vec<Domain>> {
-    if bits & !0b1_1111 != 0 {
+    if bits & !0b11_1111 != 0 {
         return invalid("ODP durable patch contains an unknown semantic domain");
     }
     let mut domains = Vec::new();
@@ -2141,6 +2454,7 @@ fn domains_from_bits(bits: u8) -> Result<Vec<Domain>> {
         (1 << 2, Domain::Charts),
         (1 << 3, Domain::Design),
         (1 << 4, Domain::Annotations),
+        (1 << 5, Domain::Content),
     ] {
         if bits & mask != 0 {
             domains.push(domain);

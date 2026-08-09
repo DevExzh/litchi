@@ -6,7 +6,11 @@
 
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_xlsb::Workbook;
-use litchi_xlsb::cell_values::{Reference, TransferLimits, Value, WorkbookHistory, WorkbookPatch};
+use litchi_xlsb::cell_values::{
+    AuthoredStyle, CellFormula, Reference, TransferLimits, Value, WorkbookHistory, WorkbookPatch,
+};
+use litchi_xlsb::package::{SharedString, SharedStringRun};
+use litchi_xlsb::styles::{Alignment, Fill, Font, HorizontalAlignment, VerticalAlignment};
 use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 use std::io::Cursor;
@@ -83,6 +87,105 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
             .cell(destination)
             .expect("unique destination")
             .is_some()
+    );
+}
+
+#[test]
+fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
+    let mut workbook = producer_workbook("Target", None);
+    let style = AuthoredStyle {
+        font: Font {
+            name: "Arial".to_string(),
+            size: 12.0,
+            color: Some(0xff_20_40_80),
+            bold: true,
+            italic: false,
+            underline: false,
+            strike: false,
+        },
+        fill: Fill {
+            pattern_type: 1,
+            fg_color: Some(0xff_f0_e0_20),
+            bg_color: None,
+        },
+        number_format: Some("0.0000".to_string()),
+        alignment: Some(Alignment {
+            horizontal: HorizontalAlignment::Center,
+            vertical: VerticalAlignment::Center,
+            rotation: 0,
+            indent: 0,
+            text_direction: 0,
+            wrap_text: true,
+            shrink_to_fit: false,
+        }),
+        ..AuthoredStyle::default()
+    };
+    let shared_ref = Reference::new(1, 1).expect("shared reference");
+    let rich_ref = Reference::new(1, 2).expect("rich reference");
+    let formula_ref = Reference::new(1, 3).expect("formula reference");
+    let string = SharedString {
+        text: "authored rich value".to_string(),
+        runs: vec![SharedStringRun {
+            character_index: 0,
+            font_id: u16::MAX,
+        }],
+        phonetic: None,
+    };
+    let mut edit = workbook.edit_workbook_structure().expect("root edit");
+    edit.insert_shared_string(0, shared_ref, string.clone(), &style)
+        .expect("SST authoring");
+    edit.insert_rich_string(0, rich_ref, string, &style)
+        .expect("rich-string authoring");
+    edit.insert_formula_number(
+        0,
+        formula_ref,
+        2.0,
+        CellFormula::new(0, vec![0x1e, 2, 0], vec![]).expect("constant formula"),
+        &style,
+    )
+    .expect("formula authoring");
+    let commit = edit.commit().expect("root commit");
+    let bytes = commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable resources");
+    let patch = WorkbookPatch::from_bytes(&bytes, TransferLimits::DEFAULT)
+        .expect("durable resource replay");
+    patch.apply(&mut workbook).expect("publish resources");
+
+    let snapshot = workbook.cell_values(0).expect("authored snapshot");
+    assert!(matches!(
+        snapshot
+            .cell(shared_ref)
+            .expect("lookup")
+            .expect("shared")
+            .value(),
+        Value::SharedStringIndex(_)
+    ));
+    assert!(matches!(
+        snapshot
+            .cell(rich_ref)
+            .expect("lookup")
+            .expect("rich")
+            .value(),
+        Value::RichString(_)
+    ));
+    assert_eq!(
+        snapshot
+            .cell(formula_ref)
+            .expect("lookup")
+            .expect("formula")
+            .value(),
+        &Value::FormulaNumberCache(2.0)
+    );
+    assert!(workbook.styles().get_font(1).is_some());
+    let mut reopened_bytes = Cursor::new(Vec::new());
+    workbook.save(&mut reopened_bytes).expect("save authored");
+    let reopened =
+        Workbook::new(Cursor::new(reopened_bytes.into_inner())).expect("reopen authored");
+    assert_eq!(
+        reopened.cell_values(0).expect("reopen cells").cells().len(),
+        3
     );
 }
 

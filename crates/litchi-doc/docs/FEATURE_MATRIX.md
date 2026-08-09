@@ -61,15 +61,19 @@ equal-length Unicode overwrites in auxiliary stories, direct
 bold/italic/underline, non-destructive revision-mark disposition, and passive
 `ObjInfo` display changes atomically. It appends Unicode pieces, rebuilds
 CLX/CHPX data, shifts modeled CP/PLCF tables, updates story counts, delegates
-ObjectPool metadata to its dedicated owner, and performs both CFB and full DOC
-reopen validation before publication. Structural table edits, field nesting or
+`ObjectPool` metadata to its dedicated owner, and performs both CFB and full
+DOC reopen validation before publication. Managed embedded add/remove/transfer
+also closes the field PLCF, CHPX picture reference, exact preview PICF/Data
+block, standalone bounded object CFB, regenerated receiver FC/CP offsets, and
+storage-ID collision check. Structural table edits, field nesting or
 delimiter changes, destructive revision dispositions, auxiliary-story length
 changes, mixed character formatting, interior modeled CP boundaries, and known
 unmodeled CP-indexed structures are typed refusals. The same semantic changes
 drive source-checked reversible patches, deterministic durable patches,
-disjoint composition, three-way planning, dependency-free inert text transfer,
-and bounded undo/redo history. OfficeArt, drawing payload, and resource transfer
-remain outside this transaction's dependency closure. Selection uses the
+disjoint composition, three-way planning, inert text and managed-resource
+transfer, and bounded undo/redo history. Inline/floating drawing graphs and
+producer-defined object controls outside the managed embedded closure receive
+specific typed refusals rather than partial copying. Selection uses the
 format-neutral `litchi_core::Position`, with collection resolution returning a
 typed not-found refusal.
 
@@ -94,7 +98,7 @@ typed not-found refusal.
 | Reserved user-defined hyperlink metadata | ✅ | ✅ | ✅ | `[MS-OSHARED]` §§2.3.3.1.18-21 and §2.4.2 define the typed `VtHyperlink`/vector/blob forms and hash used by `_PID_LINKBASE` and `_PID_HLINKS`. They are named values in the `UserDefinedProperties` section of `DocumentSummaryInformation`, never PIDDSI `0x15`. Shared `Properties` lazily decodes only the named value requested, while shared `Edit` applies caller-bounded typed writes for blob size, link count, and UTF-16 strings; these bounds apply to the typed overlay and secondary decoding after generic property-set parsing, not initial property-stream allocation. `Package::user_defined_hyperlinks()` exposes possible `FieldCandidate` values rather than asserting an association: `dwApp` can be an `FcCompressed` or collide across the seven field stories. The caller must select an exact candidate with `resolve_field` before a changed write may canonically order entries per `[MS-DOC]` §2.4.7: Main, Footnote, Header, Comment, Endnote, Textbox, HeaderTextbox, then decreasing `aFld` index. An unresolved changed write refuses; an exact no-op remains preservable. OfficeArt, direct-picture, and ambiguous data remain inert and source-relative. This is an existing-artifact property-set transaction, not a claim that fresh-document generation automatically emits the properties. Targets and locations remain raw inert strings: Litchi never parses, normalizes, resolves, fetches, opens, or executes them. |
 | Encryption stream and password-to-open profiles | ✅ | ✅ | ✅ | The supported DOC encryption profiles cover the implemented XOR/RC4-compatible modes and typed password errors; unsupported profiles fail explicitly |
 | XML signatures storage and signatures stream | ✅ | ✅ | ✅ | Trust-neutral CFB signature verification and transactional signing/editing are exposed; certificate trust and revocation are not established |
-| ObjectPool and embedded OLE/package objects | ✅ | ✅ | ✅ | `embedded_object::transaction::{Snapshot, Transaction, Commit, Patch}` provides source-checked, atomic add/remove/reorder/replace operations plus typed ODT/OLEDS metadata edits; unknown streams and inert payloads are preserved and objects are never activated or opened |
+| ObjectPool and embedded OLE/package objects | ✅ | ✅ | ✅ | `embedded_object::transaction::{Snapshot, Transaction, Commit, Patch}` provides source-checked, atomic add/remove/reorder/replace operations plus typed ODT/OLEDS metadata edits; unknown streams and inert payloads are preserved and objects are never activated or opened. The ordinary `body_text` root exports and transfers the bounded standalone CFB plus exact preview block, regenerating field/CHPX/Data/CLX/PLCF receiver references under collision checks and blob-backed durable inversion. |
 | Macros storage and VBA project payload | ✅ | ✅ | ✅ | Bounded MS-OVBA compressed-container, dir, PROJECT, module, and cache-free source metadata are read and authored; code is never compiled or executed |
 | Information Rights Management Data Space and protected content | 🟡 | ✅ | ❌ | `Package::data_spaces` exposes the validated, inert `litchi_doc::spaces::Graph` from the shared MS-OFFCRYPTO owner, including legacy-binary IRM transform/license topology, labels, and integrity sidecars; rights evaluation, decryption, and protected-content access remain outside the API |
 | Unknown streams and storages | 🟡 | ✅ | 🟡 | Package-preserving editors can retain unrelated CFB topology where supported, but an arbitrary stream has no DOC semantic model or write guarantee |
@@ -104,7 +108,7 @@ typed not-found refusal.
 | Feature family | Status | Read | Write | Notes |
 |----------------|--------|------|-------|-------|
 | CP, PLC, STTB, SPRM/PRL, and property storage primitives | ✅ | ✅ | ✅ | [MS-DOC] 2.2 defines character positions, piece and property storage, string tables, and single-property modifiers used by the typed model |
-| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds bounded story/paragraph, simple table-cell and cached-field-result text, direct bold/italic/underline, safe revision-mark disposition, and embedded-display metadata to one immutable root transaction. Modeled CLX/CHPX/PLCF/FIB closure, full reopen validation, reversible and durable patches, disjoint composition, three-way planning, dependency-free text transfer, and bounded history are covered; structural, destructive, drawing/resource-transfer, and unmodeled dependencies are refused before mutation. |
+| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds bounded story/paragraph, simple table-cell and cached-field-result text, direct bold/italic/underline, safe revision-mark disposition, embedded-display metadata, and managed embedded-resource add/remove/transfer to one immutable root transaction. Modeled CLX/CHPX/PLCF/FIB plus field/preview/Data/ObjectPool closure, full reopen validation, reversible and blob-backed durable patches, disjoint composition, three-way planning, dependency-aware transfer, and bounded history are covered; structural, destructive, unsupported OfficeArt graphs, storage collisions, and unmodeled dependencies are refused before mutation. |
 | Main, footnote, endnote, header, comment, textbox, and header-textbox parts | ✅ | ✅ | ✅ | [MS-DOC] 2.3 story ranges and the corresponding PLCs are exposed through typed document, note, comment, header/footer, picture, shape, and textbox APIs |
 | Bookmark PLCs and names | ✅ | ✅ | ✅ | Range and point bookmarks are typed and editable, including repair/validation behavior for malformed ranges |
 | Field PLCs and non-Plcfld text-only fields | ✅ | ✅ | ✅ | Native field delimiters, instruction/result text, marker positions, nesting, and the five text-only field families are reconstructed and authored with balanced graphs |

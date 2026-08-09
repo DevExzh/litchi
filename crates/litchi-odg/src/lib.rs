@@ -23,13 +23,14 @@ pub use facade::{
     PageStyleChange as PackagePageStyleChange, Patch as PackagePatch,
     PathChange as PackagePathChange, PreparedEdit as PackagePreparedEdit,
     ResourceChange as PackageResourceChange, SecurityStatus as PackageSecurityStatus,
-    ShapeTransfer as PackageShapeTransfer, Snapshot as PackageSnapshot,
-    StructureChange as PackageStructureChange, StyleChange as PackageStyleChange,
-    TextChange as PackageTextChange, Transaction as PackageTransaction,
-    TransferResource as PackageTransferResource,
+    SecurityWritePolicy as PackageSecurityWritePolicy, ShapeTransfer as PackageShapeTransfer,
+    Snapshot as PackageSnapshot, StructureChange as PackageStructureChange,
+    StyleChange as PackageStyleChange, TextChange as PackageTextChange,
+    Transaction as PackageTransaction, TransferControl as PackageTransferControl,
+    TransferResource as PackageTransferResource, TransferStyle as PackageTransferStyle,
 };
 pub use flat::{
     FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,
     TextChange,
 };
-pub use model::{FormControl, form, layer, page, resource, shape};
+pub use model::{FormControl, form, layer, page, resource, shape, style};

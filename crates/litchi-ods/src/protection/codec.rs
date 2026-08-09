@@ -78,13 +78,17 @@ impl Location {
         let mut loext_prefix = None;
 
         loop {
-            let event_start = reader.buffer_position() as usize;
+            let event_start = usize::try_from(reader.buffer_position()).map_err(|_error| {
+                Error::InvalidFormat("protection XML position exceeds usize".to_string())
+            })?;
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
             let namespace = namespace_uri(&namespace);
             let event = event.into_owned();
-            let event_end = reader.buffer_position() as usize;
+            let event_end = usize::try_from(reader.buffer_position()).map_err(|_error| {
+                Error::InvalidFormat("protection XML position exceeds usize".to_string())
+            })?;
             match event {
                 Event::Start(element) => {
                     let info = element_location(source, &reader, &element, event_start, event_end)?;

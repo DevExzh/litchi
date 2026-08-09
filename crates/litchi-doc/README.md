@@ -42,16 +42,22 @@ table cells, simple cached field results, and revision marks. Its bounded
 immutable transaction can resize modeled main-story text, overwrite
 equal-length Unicode text in auxiliary stories, apply direct
 bold/italic/underline, dispose of non-destructive revision marks, and change
-passive embedded-object display metadata. It rebuilds CLX and CHPX FKPs, shifts
-the modeled CP/PLCF closure, updates FIB story counts, and fully reopens the CFB
-and DOC before publication. Source-checked in-memory and durable semantic
-patches, disjoint composition, three-way planning, dependency-free text
-transfer, and bounded undo/redo history use the same operation model.
+passive embedded-object display metadata. Managed embedded objects can also be
+added, removed, or transferred with their field PLCF, CHPX picture reference,
+exact `PICFAndOfficeArtData` preview, Data-stream offset, and bounded inert
+`ObjectPool` CFB regenerated as one dependency closure. It rebuilds CLX and
+CHPX FKPs, shifts the modeled CP/PLCF closure, updates FIB story counts, and
+fully reopens the CFB and DOC before publication. Source-checked in-memory and
+blob-backed durable semantic patches, disjoint composition, three-way planning,
+text and embedded-resource transfer, and bounded undo/redo history use the same
+operation model.
 Structural table edits, field delimiters or nesting, destructive revision
 dispositions, auxiliary-story length changes, mixed formatting, and unmodeled
-CP dependencies are typed refusals. OfficeArt, drawing payload, and resource
-transfer remain with their dedicated owners and are not silently copied
-through this text transaction. Selection uses the format-neutral, zero-based
+CP dependencies are typed refusals. Inline pictures, floating OfficeArt shapes,
+producer-defined object characters, and other active controls have specific
+dependency refusals when their coupled binary graphs cannot be rewritten; only
+the managed embedded-object closure above is copied. Selection uses the
+format-neutral, zero-based
 `litchi_core::Position`; resolving it against a source collection reports a
 typed not-found refusal.
 

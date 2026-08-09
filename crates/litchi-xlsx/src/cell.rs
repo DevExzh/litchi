@@ -1,6 +1,7 @@
 //! Exact cell states and sparse borrowed traversal.
 
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -15,6 +16,55 @@ use crate::merge;
 use crate::row;
 
 const MAX_CELL_CHARACTERS: usize = 32_767;
+
+/// Workbook-local lineage for opaque shared-string identities.
+#[derive(Debug)]
+pub(crate) struct SharedStringLineage;
+
+/// Opaque shared-string identity retained by semantic patch states.
+///
+/// The physical `SpreadsheetML` table index remains private. Keys are only
+/// comparable inside the workbook lineage that produced them.
+#[derive(Clone)]
+pub struct SharedStringKey {
+    raw: usize,
+    lineage: Arc<SharedStringLineage>,
+}
+
+impl SharedStringKey {
+    pub(crate) fn new(raw: usize, lineage: Arc<SharedStringLineage>) -> Self {
+        Self { raw, lineage }
+    }
+
+    pub(crate) const fn raw(&self) -> usize {
+        self.raw
+    }
+
+    pub(crate) fn rebind(&mut self, lineage: &Arc<SharedStringLineage>) {
+        self.lineage = Arc::clone(lineage);
+    }
+}
+
+impl PartialEq for SharedStringKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw == other.raw && Arc::ptr_eq(&self.lineage, &other.lineage)
+    }
+}
+
+impl Eq for SharedStringKey {}
+
+impl Hash for SharedStringKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.raw.hash(state);
+        Arc::as_ptr(&self.lineage).hash(state);
+    }
+}
+
+impl fmt::Debug for SharedStringKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("SharedStringKey(..)")
+    }
+}
 
 /// The stored state of one cell record.
 ///
@@ -558,6 +608,9 @@ pub(crate) struct Stored {
     // Retained for the shared-style facade. Native indexes never escape this
     // migration boundary.
     pub(crate) style: Option<u32>,
+    // Retained so same-workbook transfers can preserve the exact shared-string
+    // item, including rich-text runs, without exposing its physical index.
+    pub(crate) shared_string: Option<usize>,
     #[allow(
         dead_code,
         reason = "the cached column supports internal sparse-cell indexing"

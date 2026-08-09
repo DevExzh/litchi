@@ -1,6 +1,6 @@
 //! Durable semantic patches, disjoint composition, and bounded history.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 use std::sync::Arc;
 
@@ -14,14 +14,22 @@ use serde_json::Value;
 
 use super::{
     Commit, CompositionLimits, Edit, HistoryLimits, MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS,
-    Operation, Patch, RevisionKind, Snapshot, TransactionError, TransactionResult,
+    Operation, Patch, RevisionKind, Snapshot, TransactionError, TransactionResult, TransferGraph,
+    TransferPart, TransferRelationship,
 };
 
 const FORMAT_NAME: &str = "litchi-docx/document";
 const RESTORE_OPERATION: &str = "document.restore";
+const RESTORE_TRANSFER_INSERT: &str = "document.restore-transfer.insert";
+const RESTORE_TRANSFER_REMOVE: &str = "document.restore-transfer.remove";
 
 #[derive(Clone, PartialEq, Eq)]
 struct Lineage(Arc<Vec<u8>>);
+
+struct TransferGraphDecoder<'a> {
+    bytes: &'a [u8],
+    offset: usize,
+}
 
 /// One independently prepared DOCX document edit.
 pub struct PreparedEdit {
@@ -229,6 +237,17 @@ impl fmt::Debug for ThreeWayPlan {
 /// Explicit byte-budgeted undo/redo history for document snapshots.
 pub struct History {
     inner: litchi_core::patch::History<Snapshot>,
+    undo_graph: VecDeque<Option<HistoryGraphTransition>>,
+    redo_graph: VecDeque<Option<HistoryGraphTransition>>,
+    pending_graph: Option<(HistoryGraphTransition, bool)>,
+}
+
+#[derive(Clone)]
+pub(crate) struct HistoryGraphTransition {
+    pub(crate) graph: Arc<TransferGraph>,
+    pub(crate) before_digest: Arc<str>,
+    pub(crate) after_digest: Arc<str>,
+    pub(crate) forward_insert: bool,
 }
 
 impl History {
@@ -237,6 +256,9 @@ impl History {
     pub fn new(snapshot: Snapshot, limits: HistoryLimits) -> Self {
         Self {
             inner: litchi_core::patch::History::new(snapshot, limits),
+            undo_graph: VecDeque::new(),
+            redo_graph: VecDeque::new(),
+            pending_graph: None,
         }
     }
 
@@ -271,13 +293,7 @@ impl History {
     }
 
     pub(crate) fn ensure_can_record(&self, commit: &Commit) -> TransactionResult<()> {
-        let bytes = u64::try_from(commit.snapshot().xml_bytes().len()).map_err(|_error| {
-            TransactionError::Limit {
-                resource: "history transition bytes",
-                max: usize::MAX,
-                actual: commit.snapshot().xml_bytes().len(),
-            }
-        })?;
+        let bytes = history_weight(commit)?;
         if bytes > self.limits().max_weight() {
             return Err(litchi_core::patch::PatchError::HistoryWeight {
                 observed: bytes,
@@ -288,33 +304,61 @@ impl History {
         Ok(())
     }
 
-    /// Record a commit using its exact published XML size as transition weight.
+    pub(crate) fn take_graph_transition(&mut self) -> Option<(HistoryGraphTransition, bool)> {
+        self.pending_graph.take()
+    }
+
+    /// Record a commit using its exact published XML and dependency-graph
+    /// size as transition weight.
     ///
     /// # Errors
     ///
     /// Returns a history-weight error without changing history when the
-    /// published snapshot alone exceeds the configured byte budget.
+    /// published transition alone exceeds the configured byte budget.
     pub fn record(&mut self, commit: Commit) -> TransactionResult<Vec<Snapshot>> {
-        let weight = u64::try_from(commit.snapshot().xml_bytes().len()).map_err(|_error| {
-            TransactionError::Limit {
-                resource: "history transition bytes",
-                max: usize::MAX,
-                actual: commit.snapshot().xml_bytes().len(),
-            }
-        })?;
-        self.inner
+        let weight = history_weight(&commit)?;
+        let graph = history_graph_transition(commit.patch.operations())?;
+        let invalidated_redo = self.redo_graph.len();
+        let discarded = self
+            .inner
             .record(commit.snapshot, weight)
-            .map_err(TransactionError::from)
+            .map_err(TransactionError::from)?;
+        self.pending_graph = None;
+        self.redo_graph.clear();
+        self.undo_graph.push_back(graph);
+        let evicted = discarded.len().saturating_sub(invalidated_redo);
+        for _ in 0..evicted {
+            let _discarded = self.undo_graph.pop_front();
+        }
+        Ok(discarded)
     }
 
     /// Move one retained transition backward.
     pub fn undo(&mut self) -> bool {
-        self.inner.undo()
+        if !self.inner.undo() {
+            return false;
+        }
+        let Some(graph) = self.undo_graph.pop_back() else {
+            let _restored = self.inner.redo();
+            return false;
+        };
+        self.pending_graph = graph.clone().map(|transition| (transition, false));
+        self.redo_graph.push_back(graph);
+        true
     }
 
     /// Move one retained transition forward.
     pub fn redo(&mut self) -> bool {
-        self.inner.redo()
+        if !self.inner.redo() {
+            return false;
+        }
+        let Some(graph) = self.redo_graph.pop_back() else {
+            let _restored = self.inner.undo();
+            return false;
+        };
+        self.pending_graph = graph.clone().map(|transition| (transition, true));
+        self.undo_graph.push_back(graph);
+        true
     }
 }
 
@@ -411,14 +455,14 @@ impl Snapshot {
         if patch
             .operations()
             .iter()
-            .all(|operation| operation.op == RESTORE_OPERATION)
+            .all(|operation| is_restore_operation(&operation.op))
         {
             return restore_snapshot(patch);
         }
         if patch
             .operations()
             .iter()
-            .any(|operation| operation.op == RESTORE_OPERATION)
+            .any(|operation| is_restore_operation(&operation.op))
         {
             return Err(invalid_durable("invalid semantic blob bundle"));
         }
@@ -501,6 +545,18 @@ impl Patch {
             self.operations
                 .iter()
                 .map(|operation| {
+                    let inverse = restore_transfer_operation(
+                        limits,
+                        operation,
+                        &reverse_artifact,
+                        &source_blob,
+                        &mut reverse_blobs,
+                    )?
+                    .unwrap_or(restore_operation(
+                        limits,
+                        &reverse_artifact,
+                        &source_blob,
+                    )?);
                     Ok(ReversibleOperation::new(
                         durable_operation(
                             limits,
@@ -509,7 +565,7 @@ impl Patch {
                             &reverse_artifact,
                             &mut forward_blobs,
                         )?,
-                        restore_operation(limits, &reverse_artifact, &source_blob)?,
+                        inverse,
                     ))
                 })
                 .collect::<Result<Vec<_>, litchi_core::patch::PatchError>>()?
@@ -523,6 +579,192 @@ impl Patch {
         )
         .map_err(TransactionError::from)
     }
+}
+
+impl<'a> TransferGraphDecoder<'a> {
+    fn new(bytes: &'a [u8]) -> TransactionResult<Self> {
+        if !bytes.starts_with(b"LDXG1") {
+            return Err(invalid_durable("invalid transfer graph header"));
+        }
+        Ok(Self { bytes, offset: 5 })
+    }
+
+    fn count(&mut self, resource: &'static str, max: usize) -> TransactionResult<usize> {
+        let count_bytes = self.take(8)?;
+        let encoded = u64::from_le_bytes(
+            count_bytes
+                .try_into()
+                .map_err(|_error| invalid_durable("invalid transfer graph count"))?,
+        );
+        let count = usize::try_from(encoded)
+            .map_err(|_error| invalid_durable("transfer graph count does not fit usize"))?;
+        if count > max {
+            return Err(TransactionError::Limit {
+                resource,
+                max,
+                actual: count,
+            });
+        }
+        Ok(count)
+    }
+
+    fn bytes(&mut self) -> TransactionResult<&'a [u8]> {
+        let length = self.count("field bytes", 64 * 1024 * 1024)?;
+        self.take(length)
+    }
+
+    fn string(&mut self) -> TransactionResult<String> {
+        std::str::from_utf8(self.bytes()?)
+            .map(str::to_owned)
+            .map_err(|_error| invalid_durable("transfer graph string is not UTF-8"))
+    }
+
+    fn relationship(&mut self) -> TransactionResult<TransferRelationship> {
+        let id = self.string()?;
+        let relationship_type = self.string()?;
+        let target = self.string()?;
+        let external = match self.take(1)? {
+            [0] => false,
+            [1] => true,
+            _ => return Err(invalid_durable("invalid transfer relationship mode")),
+        };
+        Ok(TransferRelationship {
+            id,
+            relationship_type,
+            target,
+            external,
+        })
+    }
+
+    fn take(&mut self, length: usize) -> TransactionResult<&'a [u8]> {
+        let end = self
+            .offset
+            .checked_add(length)
+            .ok_or_else(|| invalid_durable("transfer graph offset overflowed"))?;
+        let value = self
+            .bytes
+            .get(self.offset..end)
+            .ok_or_else(|| invalid_durable("truncated transfer graph"))?;
+        self.offset = end;
+        Ok(value)
+    }
+
+    fn finish(self) -> TransactionResult<()> {
+        if self.offset != self.bytes.len() {
+            return Err(invalid_durable("transfer graph has trailing bytes"));
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn durable_transfer_operations<Mode>(
+    patch: &CorePatch<Mode>,
+) -> TransactionResult<Vec<Operation>> {
+    patch
+        .operations()
+        .iter()
+        .filter(|operation| {
+            matches!(
+                operation.op.as_str(),
+                "paragraph.transfer.insert"
+                    | "paragraph.transfer.remove"
+                    | RESTORE_TRANSFER_INSERT
+                    | RESTORE_TRANSFER_REMOVE
+            )
+        })
+        .map(|operation| {
+            if matches!(
+                operation.op.as_str(),
+                RESTORE_TRANSFER_INSERT | RESTORE_TRANSFER_REMOVE
+            ) {
+                parse_restore_transfer_operation(operation, patch.blobs())
+            } else {
+                parse_durable_operation(operation, patch.blobs())
+            }
+        })
+        .collect()
+}
+
+fn history_weight(commit: &Commit) -> TransactionResult<u64> {
+    let mut bytes = u64::try_from(commit.snapshot().xml_bytes().len()).map_err(|_error| {
+        TransactionError::Limit {
+            resource: "history transition bytes",
+            max: usize::MAX,
+            actual: commit.snapshot().xml_bytes().len(),
+        }
+    })?;
+    if let Some(transition) = history_graph_transition(commit.patch.operations())? {
+        for part in transition.graph.parts.iter() {
+            let part_bytes =
+                u64::try_from(part.blob.len()).map_err(|_error| TransactionError::Limit {
+                    resource: "history dependency bytes",
+                    max: usize::MAX,
+                    actual: part.blob.len(),
+                })?;
+            bytes = bytes
+                .checked_add(part_bytes)
+                .ok_or(TransactionError::Limit {
+                    resource: "history transition bytes",
+                    max: usize::MAX,
+                    actual: usize::MAX,
+                })?;
+        }
+    }
+    Ok(bytes)
+}
+
+fn history_graph_transition(
+    operations: &[Operation],
+) -> TransactionResult<Option<HistoryGraphTransition>> {
+    let mut selected = None;
+    for operation in operations {
+        let candidate = match operation {
+            Operation::InsertTransferredParagraph {
+                dependency_digest,
+                inverse_dependency_digest,
+                graph,
+                ..
+            } if !graph.is_empty() => Some(HistoryGraphTransition {
+                graph: Arc::clone(graph),
+                before_digest: Arc::clone(dependency_digest),
+                after_digest: Arc::clone(inverse_dependency_digest),
+                forward_insert: true,
+            }),
+            Operation::RemoveTransferredParagraph {
+                dependency_digest,
+                inverse_dependency_digest,
+                graph,
+                ..
+            } if !graph.is_empty() => Some(HistoryGraphTransition {
+                graph: Arc::clone(graph),
+                before_digest: Arc::clone(dependency_digest),
+                after_digest: Arc::clone(inverse_dependency_digest),
+                forward_insert: false,
+            }),
+            Operation::InsertTransferredParagraph { .. }
+            | Operation::RemoveTransferredParagraph { .. }
+            | Operation::ReplaceParagraphText { .. }
+            | Operation::ReplaceHyperlinkText { .. }
+            | Operation::ReplaceRunText { .. }
+            | Operation::ReplaceSimpleFieldText { .. }
+            | Operation::ReplaceComplexFieldText { .. }
+            | Operation::ReplaceRevisionText { .. }
+            | Operation::ReplaceContentControlText { .. }
+            | Operation::ReplaceCellText { .. }
+            | Operation::ReplaceCellParagraphText { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. } => None,
+        };
+        if let Some(selected_transition) = candidate {
+            if selected.is_some() {
+                return Err(invalid_durable(
+                    "history cannot retain multiple dependency subgraphs",
+                ));
+            }
+            selected = Some(selected_transition);
+        }
+    }
+    Ok(selected)
 }
 
 fn operation_effects(
@@ -566,6 +808,17 @@ fn operation_effects(
                 reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
                 writes.push(format!(
                     "body/paragraph:{}/field:{}/result-text",
+                    paragraph.get(),
+                    field.get()
+                ));
+            },
+            Operation::ReplaceComplexFieldText {
+                paragraph, field, ..
+            } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/complex-field:{}/result-text",
                     paragraph.get(),
                     field.get()
                 ));
@@ -713,6 +966,23 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Operation::ReplaceComplexFieldText {
+            paragraph,
+            field,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "field.complex-result-text.replace",
+                format!(
+                    "paragraph:{}/complex-field:{}",
+                    paragraph.get(),
+                    field.get()
+                ),
+                Value::String(after.clone()),
+            )
+        },
         Operation::ReplaceRevisionText {
             paragraph,
             kind,
@@ -801,11 +1071,24 @@ fn durable_operation(
             position,
             xml,
             dependency_digest,
+            inverse_dependency_digest,
+            graph,
         } => {
             preconditions.insert(
                 "dependency_sha256".to_owned(),
                 Value::String(dependency_digest.to_string()),
             );
+            preconditions.insert(
+                "inverse_dependency_sha256".to_owned(),
+                Value::String(inverse_dependency_digest.to_string()),
+            );
+            if !graph.is_empty() {
+                let graph_identifier = blobs.insert(&encode_transfer_graph(graph)?)?;
+                preconditions.insert(
+                    "graph_sha256".to_owned(),
+                    Value::String(graph_identifier.as_hex()),
+                );
+            }
             let identifier = blobs.insert(xml.as_slice())?;
             (
                 "paragraph.transfer.insert",
@@ -817,11 +1100,24 @@ fn durable_operation(
             position,
             xml,
             dependency_digest,
+            inverse_dependency_digest,
+            graph,
         } => {
             preconditions.insert(
                 "dependency_sha256".to_owned(),
                 Value::String(dependency_digest.to_string()),
             );
+            preconditions.insert(
+                "inverse_dependency_sha256".to_owned(),
+                Value::String(inverse_dependency_digest.to_string()),
+            );
+            if !graph.is_empty() {
+                let graph_identifier = blobs.insert(&encode_transfer_graph(graph)?)?;
+                preconditions.insert(
+                    "graph_sha256".to_owned(),
+                    Value::String(graph_identifier.as_hex()),
+                );
+            }
             let identifier = blobs.insert(xml.as_slice())?;
             (
                 "paragraph.transfer.remove",
@@ -866,11 +1162,183 @@ fn restore_operation(
     )
 }
 
+fn restore_transfer_operation(
+    limits: PatchLimits,
+    operation: &Operation,
+    artifact: &str,
+    target: &BlobId,
+    blobs: &mut BlobBundle,
+) -> Result<Option<PatchOperation>, litchi_core::patch::PatchError> {
+    let (name, dependency, inverse_dependency, graph) = match operation {
+        Operation::InsertTransferredParagraph {
+            dependency_digest,
+            inverse_dependency_digest,
+            graph,
+            ..
+        } if !graph.is_empty() => (
+            RESTORE_TRANSFER_REMOVE,
+            inverse_dependency_digest,
+            dependency_digest,
+            graph,
+        ),
+        Operation::RemoveTransferredParagraph {
+            dependency_digest,
+            inverse_dependency_digest,
+            graph,
+            ..
+        } if !graph.is_empty() => (
+            RESTORE_TRANSFER_INSERT,
+            inverse_dependency_digest,
+            dependency_digest,
+            graph,
+        ),
+        Operation::InsertTransferredParagraph { .. }
+        | Operation::RemoveTransferredParagraph { .. }
+        | Operation::ReplaceParagraphText { .. }
+        | Operation::ReplaceHyperlinkText { .. }
+        | Operation::ReplaceRunText { .. }
+        | Operation::ReplaceSimpleFieldText { .. }
+        | Operation::ReplaceComplexFieldText { .. }
+        | Operation::ReplaceRevisionText { .. }
+        | Operation::ReplaceContentControlText { .. }
+        | Operation::ReplaceCellText { .. }
+        | Operation::ReplaceCellParagraphText { .. }
+        | Operation::InsertParagraph { .. }
+        | Operation::RemoveParagraph { .. } => return Ok(None),
+    };
+    let graph_identifier = blobs.insert(encode_transfer_graph(graph)?)?;
+    let mut preconditions = artifact_precondition(artifact);
+    preconditions.insert(
+        "dependency_sha256".to_owned(),
+        Value::String(dependency.to_string()),
+    );
+    preconditions.insert(
+        "inverse_dependency_sha256".to_owned(),
+        Value::String(inverse_dependency.to_string()),
+    );
+    preconditions.insert(
+        "graph_sha256".to_owned(),
+        Value::String(graph_identifier.as_hex()),
+    );
+    PatchOperation::new(
+        limits,
+        name,
+        "document",
+        preconditions,
+        Value::String(target.as_hex()),
+    )
+    .map(Some)
+}
+
+fn is_restore_operation(name: &str) -> bool {
+    matches!(
+        name,
+        RESTORE_OPERATION | RESTORE_TRANSFER_INSERT | RESTORE_TRANSFER_REMOVE
+    )
+}
+
 fn artifact_precondition(artifact: &str) -> BTreeMap<String, Value> {
     BTreeMap::from([(
         "artifact_sha256".to_owned(),
         Value::String(artifact.to_owned()),
     )])
+}
+
+fn encode_transfer_graph(graph: &TransferGraph) -> Result<Vec<u8>, litchi_core::patch::PatchError> {
+    let mut output = b"LDXG1".to_vec();
+    put_transfer_count(&mut output, graph.main_relationships.len())?;
+    for relationship in graph.main_relationships.iter() {
+        encode_transfer_relationship(&mut output, relationship)?;
+    }
+    put_transfer_count(&mut output, graph.parts.len())?;
+    for part in graph.parts.iter() {
+        put_transfer_bytes(&mut output, part.name.as_bytes())?;
+        put_transfer_bytes(&mut output, part.content_type.as_bytes())?;
+        put_transfer_bytes(&mut output, part.blob.as_slice())?;
+        put_transfer_count(&mut output, part.relationships.len())?;
+        for relationship in part.relationships.iter() {
+            encode_transfer_relationship(&mut output, relationship)?;
+        }
+    }
+    Ok(output)
+}
+
+fn encode_transfer_relationship(
+    output: &mut Vec<u8>,
+    relationship: &TransferRelationship,
+) -> Result<(), litchi_core::patch::PatchError> {
+    put_transfer_bytes(output, relationship.id.as_bytes())?;
+    put_transfer_bytes(output, relationship.relationship_type.as_bytes())?;
+    put_transfer_bytes(output, relationship.target.as_bytes())?;
+    output.push(u8::from(relationship.external));
+    Ok(())
+}
+
+fn put_transfer_count(
+    output: &mut Vec<u8>,
+    value: usize,
+) -> Result<(), litchi_core::patch::PatchError> {
+    let encoded_value =
+        u64::try_from(value).map_err(|_error| litchi_core::patch::PatchError::Allocation)?;
+    output.extend_from_slice(&encoded_value.to_le_bytes());
+    Ok(())
+}
+
+fn put_transfer_bytes(
+    output: &mut Vec<u8>,
+    value: &[u8],
+) -> Result<(), litchi_core::patch::PatchError> {
+    put_transfer_count(output, value.len())?;
+    output.extend_from_slice(value);
+    Ok(())
+}
+
+fn decode_transfer_graph(bytes: &[u8]) -> TransactionResult<TransferGraph> {
+    let mut decoder = TransferGraphDecoder::new(bytes)?;
+    let main_count = decoder.count("main relationships", 64)?;
+    let mut main_relationships = Vec::new();
+    main_relationships
+        .try_reserve_exact(main_count)
+        .map_err(|_error| invalid_durable("transfer graph allocation failed"))?;
+    for _ in 0..main_count {
+        main_relationships.push(decoder.relationship()?);
+    }
+    let part_count = decoder.count("parts", 256)?;
+    let mut parts = Vec::new();
+    parts
+        .try_reserve_exact(part_count)
+        .map_err(|_error| invalid_durable("transfer graph allocation failed"))?;
+    let mut total_bytes = 0usize;
+    for _ in 0..part_count {
+        let name = decoder.string()?;
+        let content_type = decoder.string()?;
+        let blob = decoder.bytes()?.to_vec();
+        total_bytes = total_bytes
+            .checked_add(blob.len())
+            .ok_or_else(|| invalid_durable("transfer graph byte count overflowed"))?;
+        if total_bytes > 64 * 1024 * 1024 {
+            return Err(invalid_durable("transfer graph bytes exceed limit"));
+        }
+        let relationship_count = decoder.count("part relationships", 256)?;
+        let mut relationships = Vec::new();
+        relationships
+            .try_reserve_exact(relationship_count)
+            .map_err(|_error| invalid_durable("transfer graph allocation failed"))?;
+        for _ in 0..relationship_count {
+            relationships.push(decoder.relationship()?);
+        }
+        parts.push(TransferPart {
+            name,
+            content_type,
+            blob: Arc::new(blob),
+            relationships: relationships.into(),
+        });
+    }
+    decoder.finish()?;
+    Ok(TransferGraph {
+        main_relationships: main_relationships.into(),
+        parts: parts.into(),
+    })
 }
 
 fn parse_durable_operation(
@@ -921,6 +1389,16 @@ fn parse_durable_operation(
         "field.result-text.replace" if operation.preconditions.len() == 3 => {
             let (paragraph, field) = parse_paragraph_child_target(&operation.target, "/field:")?;
             Ok(Operation::ReplaceSimpleFieldText {
+                paragraph,
+                field,
+                before: before()?,
+                after: after()?,
+            })
+        },
+        "field.complex-result-text.replace" if operation.preconditions.len() == 3 => {
+            let (paragraph, field) =
+                parse_paragraph_child_target(&operation.target, "/complex-field:")?;
+            Ok(Operation::ReplaceComplexFieldText {
                 paragraph,
                 field,
                 before: before()?,
@@ -988,7 +1466,7 @@ fn parse_durable_operation(
             })
         },
         "paragraph.transfer.insert" | "paragraph.transfer.remove"
-            if operation.preconditions.len() == 3 =>
+            if matches!(operation.preconditions.len(), 4 | 5) =>
         {
             let identifier = operation
                 .value
@@ -1008,18 +1486,46 @@ fn parse_durable_operation(
                 .and_then(Value::as_str)
                 .map(Arc::<str>::from)
                 .ok_or_else(|| invalid_durable("missing transfer dependency precondition"))?;
+            let inverse_dependency_digest = operation
+                .preconditions
+                .get("inverse_dependency_sha256")
+                .and_then(Value::as_str)
+                .map(Arc::<str>::from)
+                .ok_or_else(|| {
+                    invalid_durable("missing inverse transfer dependency precondition")
+                })?;
+            let graph = if let Some(graph_identifier) = operation
+                .preconditions
+                .get("graph_sha256")
+                .and_then(Value::as_str)
+            {
+                let graph_blob_id = blobs
+                    .ids()
+                    .find(|candidate| candidate.as_hex() == graph_identifier)
+                    .ok_or_else(|| invalid_durable("missing transfer graph blob"))?;
+                let graph_bytes = blobs
+                    .get(graph_blob_id)
+                    .ok_or_else(|| invalid_durable("missing transfer graph blob"))?;
+                Arc::new(decode_transfer_graph(graph_bytes)?)
+            } else {
+                Arc::new(TransferGraph::empty())
+            };
             let position = parse_single_target(&operation.target, "paragraph:")?;
             if operation.op == "paragraph.transfer.insert" {
                 Ok(Operation::InsertTransferredParagraph {
                     position,
                     xml,
                     dependency_digest,
+                    inverse_dependency_digest,
+                    graph,
                 })
             } else {
                 Ok(Operation::RemoveTransferredParagraph {
                     position,
                     xml,
                     dependency_digest,
+                    inverse_dependency_digest,
+                    graph,
                 })
             }
         },
@@ -1027,24 +1533,83 @@ fn parse_durable_operation(
     }
 }
 
-fn validate_semantic_blobs<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<()> {
-    let referenced = patch
-        .operations()
-        .iter()
-        .filter(|operation| {
-            matches!(
-                operation.op.as_str(),
-                "paragraph.transfer.insert" | "paragraph.transfer.remove"
-            )
+fn parse_restore_transfer_operation(
+    operation: &PatchOperation,
+    blobs: &BlobBundle,
+) -> TransactionResult<Operation> {
+    if operation.target != "document" || operation.preconditions.len() != 4 {
+        return Err(invalid_durable("invalid restore transfer operation"));
+    }
+    let dependency_digest = operation
+        .preconditions
+        .get("dependency_sha256")
+        .and_then(Value::as_str)
+        .map(Arc::<str>::from)
+        .ok_or_else(|| invalid_durable("missing restore transfer dependency"))?;
+    let inverse_dependency_digest = operation
+        .preconditions
+        .get("inverse_dependency_sha256")
+        .and_then(Value::as_str)
+        .map(Arc::<str>::from)
+        .ok_or_else(|| invalid_durable("missing inverse restore transfer dependency"))?;
+    let graph_identifier = operation
+        .preconditions
+        .get("graph_sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid_durable("missing restore transfer graph"))?;
+    let blob_id = blobs
+        .ids()
+        .find(|candidate| candidate.as_hex() == graph_identifier)
+        .ok_or_else(|| invalid_durable("missing restore transfer graph blob"))?;
+    let graph =
+        Arc::new(decode_transfer_graph(blobs.get(blob_id).ok_or_else(
+            || invalid_durable("missing restore transfer graph blob"),
+        )?)?);
+    let xml = Arc::new(Vec::new());
+    if operation.op == RESTORE_TRANSFER_INSERT {
+        Ok(Operation::InsertTransferredParagraph {
+            position: Position::new(0),
+            xml,
+            dependency_digest,
+            inverse_dependency_digest,
+            graph,
         })
-        .map(|operation| {
+    } else if operation.op == RESTORE_TRANSFER_REMOVE {
+        Ok(Operation::RemoveTransferredParagraph {
+            position: Position::new(0),
+            xml,
+            dependency_digest,
+            inverse_dependency_digest,
+            graph,
+        })
+    } else {
+        Err(invalid_durable("invalid restore transfer vocabulary"))
+    }
+}
+
+fn validate_semantic_blobs<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<()> {
+    let mut referenced = BTreeSet::new();
+    for operation in patch.operations().iter().filter(|operation| {
+        matches!(
+            operation.op.as_str(),
+            "paragraph.transfer.insert" | "paragraph.transfer.remove"
+        )
+    }) {
+        referenced.insert(
             operation
                 .value
                 .as_str()
                 .map(str::to_owned)
-                .ok_or_else(|| invalid_durable("transfer value must be a blob identifier"))
-        })
-        .collect::<TransactionResult<BTreeSet<_>>>()?;
+                .ok_or_else(|| invalid_durable("transfer value must be a blob identifier"))?,
+        );
+        if let Some(identifier) = operation
+            .preconditions
+            .get("graph_sha256")
+            .and_then(Value::as_str)
+        {
+            referenced.insert(identifier.to_owned());
+        }
+    }
     if referenced.len() != patch.blobs().len()
         || patch
             .blobs()
@@ -1073,16 +1638,17 @@ fn common_target_artifact<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<&s
 }
 
 fn restore_snapshot<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<Snapshot> {
-    if patch.blobs().len() != 1 {
-        return Err(invalid_durable("restore requires exactly one artifact"));
-    }
     let identifier = patch.operations()[0]
         .value
         .as_str()
         .ok_or_else(|| invalid_durable("restore target must be a blob identifier"))?;
     if patch.operations().iter().any(|operation| {
         operation.target != "document"
-            || operation.preconditions.len() != 1
+            || (operation.op == RESTORE_OPERATION && operation.preconditions.len() != 1)
+            || (matches!(
+                operation.op.as_str(),
+                RESTORE_TRANSFER_INSERT | RESTORE_TRANSFER_REMOVE
+            ) && operation.preconditions.len() != 4)
             || operation.value.as_str() != Some(identifier)
     }) {
         return Err(invalid_durable("inconsistent restore operations"));
@@ -1090,10 +1656,25 @@ fn restore_snapshot<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<Snapshot
     let blob_id = patch
         .blobs()
         .ids()
-        .next()
+        .find(|candidate| candidate.as_hex() == identifier)
         .ok_or_else(|| invalid_durable("missing restore artifact"))?;
-    if blob_id.as_hex() != identifier {
-        return Err(invalid_durable("restore artifact identifier mismatch"));
+    let mut referenced = BTreeSet::from([identifier.to_owned()]);
+    for operation in patch.operations() {
+        if let Some(graph) = operation
+            .preconditions
+            .get("graph_sha256")
+            .and_then(Value::as_str)
+        {
+            referenced.insert(graph.to_owned());
+        }
+    }
+    if referenced.len() != patch.blobs().len()
+        || patch
+            .blobs()
+            .ids()
+            .any(|candidate| !referenced.contains(&candidate.as_hex()))
+    {
+        return Err(invalid_durable("restore has unreferenced artifacts"));
     }
     let bytes = patch
         .blobs()

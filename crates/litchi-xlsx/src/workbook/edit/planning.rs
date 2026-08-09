@@ -151,6 +151,24 @@ fn effects(edit: &Edit) -> (Vec<String>, Vec<String>) {
     if edit.panes.is_some() {
         writes.push("workbook/task-panes".to_owned());
     }
+    if edit.defined_names.is_some() {
+        reads.push("workbook/tab-order".to_owned());
+        reads.push("workbook/sheet-count".to_owned());
+        reads.extend(
+            edit.base
+                .inner
+                .sheets
+                .iter()
+                .enumerate()
+                .flat_map(|(position, _)| {
+                    [
+                        format!("sheet/{position}/owner"),
+                        format!("sheet/{position}/name"),
+                    ]
+                }),
+        );
+        writes.push("workbook/defined-names".to_owned());
+    }
     if edit.active.is_some() {
         writes.push("workbook/active-tab".to_owned());
     }
@@ -161,11 +179,16 @@ fn effects(edit: &Edit) -> (Vec<String>, Vec<String>) {
     {
         writes.push("workbook/tab-order".to_owned());
     }
+    if !edit.removed.is_empty() || !edit.added.is_empty() {
+        writes.push("workbook/sheet-count".to_owned());
+    }
     for position in &edit.removed {
         writes.push(format!("sheet/{position}/owner"));
     }
     for (position, actions) in &edit.sheets {
-        reads.push(format!("sheet/{position}/owner"));
+        if edit.defined_names.is_none() {
+            reads.push(format!("sheet/{position}/owner"));
+        }
         if let Some(name) = &actions.rename {
             writes.push(format!("sheet/{position}/name"));
             writes.push(format!("workbook/name/{}", name.identity_key()));

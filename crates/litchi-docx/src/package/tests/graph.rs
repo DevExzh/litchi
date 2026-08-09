@@ -437,21 +437,87 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         stale_xml
     );
 
-    let mismatched = transfer_package(
+    let mut mismatched = transfer_package(
         receiver_xml,
         "receiverLink",
         "receiverImage",
         b"different image",
     );
-    assert!(matches!(
-        mismatched.plan_paragraph_transfer_from(&donor, litchi_core::Position::new(0)),
-        Err(crate::document::TransactionError::Transfer(
-            crate::document::TransferRefusal::MissingEquivalentDependency { .. }
-        ))
-    ));
+    let mismatched_before = document_relationship_inventory(&mismatched);
+    let mismatched_source = mismatched.document_snapshot().unwrap();
+    let copied_plan = mismatched
+        .plan_paragraph_transfer_from(&donor, litchi_core::Position::new(0))
+        .unwrap();
+    let mut copied_edit = mismatched_source.edit();
+    copied_edit
+        .insert_paragraph_transfer(litchi_core::Position::new(1), &copied_plan)
+        .unwrap();
+    let copied_commit = copied_edit.commit().unwrap();
+    let copied_durable = copied_commit.patch().to_durable(patch_limits).unwrap();
+    let mut copied_history =
+        mismatched_source.history(litchi_core::patch::HistoryLimits::new(4, 4 * 1024 * 1024));
+    mismatched
+        .publish_document_commit_with_history(copied_commit, &mut copied_history)
+        .unwrap();
+    let copied_image = PackURI::new("/word/media/shared-transfer1.png").unwrap();
+    let copied_metadata = PackURI::new("/word/media/shared-meta-transfer1.xml").unwrap();
+    assert_eq!(
+        mismatched.opc.get_part(&copied_image).unwrap().blob(),
+        b"same image"
+    );
+    assert_eq!(
+        mismatched.opc.get_part(&copied_metadata).unwrap().blob(),
+        b"<metadata source=\"nested\"/>"
+    );
+    assert_eq!(
+        mismatched
+            .opc
+            .get_part(&copied_image)
+            .unwrap()
+            .rels()
+            .get("nestedMetadata")
+            .unwrap()
+            .target_partname()
+            .unwrap(),
+        copied_metadata
+    );
+    assert_ne!(
+        document_relationship_inventory(&mismatched),
+        mismatched_before
+    );
+    assert!(mismatched.undo_document(&mut copied_history).unwrap());
+    assert!(mismatched.opc.get_part(&copied_image).is_err());
+    assert!(mismatched.opc.get_part(&copied_metadata).is_err());
     assert_eq!(
         mismatched.document_snapshot().unwrap().xml_bytes(),
         receiver_xml
+    );
+    assert_eq!(
+        document_relationship_inventory(&mismatched),
+        mismatched_before
+    );
+    assert!(mismatched.redo_document(&mut copied_history).unwrap());
+    assert_eq!(
+        mismatched.opc.get_part(&copied_image).unwrap().blob(),
+        b"same image"
+    );
+    assert!(mismatched.undo_document(&mut copied_history).unwrap());
+    mismatched
+        .apply_durable_document_patch(&copied_durable)
+        .unwrap();
+    assert_eq!(
+        mismatched.opc.get_part(&copied_image).unwrap().blob(),
+        b"same image"
+    );
+    assert!(mismatched.opc.get_part(&copied_metadata).is_ok());
+    mismatched
+        .apply_durable_document_patch(&copied_durable.inverse())
+        .unwrap();
+    assert!(mismatched.opc.get_part(&copied_image).is_err());
+    assert!(mismatched.opc.get_part(&copied_metadata).is_err());
+    assert_eq!(
+        document_relationship_inventory(&mismatched),
+        mismatched_before
     );
 
     let mut ambiguous =
@@ -485,6 +551,7 @@ fn transfer_package(
 ) -> Package {
     let document_uri = PackURI::new("/word/document.xml").unwrap();
     let image_uri = PackURI::new("/word/media/shared.png").unwrap();
+    let metadata_uri = PackURI::new("/word/media/shared-meta.xml").unwrap();
     let mut package = Package::new().unwrap();
     package
         .edit_opc(|opc| {
@@ -495,6 +562,21 @@ fn transfer_package(
                     image.to_vec(),
                 )))?;
             }
+            if opc.get_part(&metadata_uri).is_err() {
+                opc.try_add_part(Box::new(BlobPart::new(
+                    metadata_uri.clone(),
+                    "application/xml".to_owned(),
+                    b"<metadata source=\"nested\"/>".to_vec(),
+                )))?;
+            }
+            opc.get_part_mut(&image_uri)?
+                .rels_mut()
+                .try_add_relationship(
+                    "urn:litchi:test:image-metadata".to_owned(),
+                    "shared-meta.xml".to_owned(),
+                    "nestedMetadata".to_owned(),
+                    TargetMode::Internal,
+                )?;
             let main = opc.get_part_mut(&document_uri)?;
             main.set_blob(document_xml.to_vec());
             main.rels_mut().try_add_relationship(

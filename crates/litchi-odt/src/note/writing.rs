@@ -63,13 +63,21 @@ impl Note {
 /// the ordinal. The helper never evaluates fields, follows links, or executes
 /// scripts embedded elsewhere in the ODF package.
 pub fn insert_note_xml(xml: &str, paragraph_index: usize, note: &Note) -> Result<String> {
+    insert_note_fragment_xml(xml, paragraph_index, &note.to_xml_fragment()?)
+}
+
+pub(crate) fn insert_note_fragment_xml(
+    xml: &str,
+    paragraph_index: usize,
+    fragment: &str,
+) -> Result<String> {
+    validate_note_fragment(fragment)?;
     let scan = validated_scan(xml)?;
     let paragraph = scan.paragraphs.get(paragraph_index).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "note paragraph index {paragraph_index} is out of bounds"
         ))
     })?;
-    let fragment = note.to_xml_fragment()?;
     match paragraph {
         ParagraphSite::Paired {
             close_start,
@@ -77,7 +85,7 @@ pub fn insert_note_xml(xml: &str, paragraph_index: usize, note: &Note) -> Result
         } => Ok(format!(
             "{}{}{}",
             &xml[..*close_start],
-            bind_fragment_if_needed(fragment, *requires_text_binding),
+            bind_fragment_if_needed(fragment.to_owned(), *requires_text_binding),
             &xml[*close_start..]
         )),
         ParagraphSite::Empty {
@@ -86,7 +94,7 @@ pub fn insert_note_xml(xml: &str, paragraph_index: usize, note: &Note) -> Result
             qname,
             requires_text_binding,
         } => {
-            let fragment = bind_fragment_if_needed(fragment, *requires_text_binding);
+            let fragment = bind_fragment_if_needed(fragment.to_owned(), *requires_text_binding);
             expand_empty_paragraph(xml, *start, *end, qname, &fragment)
         },
     }
@@ -97,19 +105,52 @@ pub fn insert_note_xml(xml: &str, paragraph_index: usize, note: &Note) -> Result
 /// The replacement writes the public note model, including validated structured
 /// body content when the replacement has one.
 pub fn replace_note_xml(xml: &str, note_index: usize, replacement: &Note) -> Result<String> {
+    replace_note_fragment_xml(xml, note_index, &replacement.to_xml_fragment()?)
+}
+
+pub(crate) fn replace_note_fragment_xml(
+    xml: &str,
+    note_index: usize,
+    fragment: &str,
+) -> Result<String> {
+    validate_note_fragment(fragment)?;
     let scan = validated_scan(xml)?;
     let site = scan
         .notes
         .get(note_index)
         .ok_or_else(|| Error::InvalidFormat(format!("note index {note_index} is out of bounds")))?;
-    let fragment =
-        bind_fragment_if_needed(replacement.to_xml_fragment()?, site.requires_text_binding);
+    let fragment = bind_fragment_if_needed(fragment.to_owned(), site.requires_text_binding);
     Ok(format!(
         "{}{}{}",
         &xml[..site.span.start],
         fragment,
         &xml[site.span.end..]
     ))
+}
+
+pub(crate) fn validate_note_fragment(fragment: &str) -> Result<()> {
+    const PREFIX: &str = r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#;
+    const SUFFIX: &str = "</office:text>";
+    let mut wrapped = String::new();
+    wrapped
+        .try_reserve_exact(PREFIX.len() + fragment.len() + SUFFIX.len())
+        .map_err(|source| Error::Allocation {
+            resource: "note fragment validation",
+            source,
+        })?;
+    wrapped.push_str(PREFIX);
+    wrapped.push_str(fragment);
+    wrapped.push_str(SUFFIX);
+    let scan = validated_scan(&wrapped)?;
+    if scan.notes.len() != 1
+        || scan.notes[0].span.start != PREFIX.len()
+        || scan.notes[0].span.end != PREFIX.len() + fragment.len()
+    {
+        return Err(Error::InvalidFormat(
+            "note fragment must contain exactly one text:note".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Remove one `text:note` selected in document order.

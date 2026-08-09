@@ -17,6 +17,7 @@ use crate::namespace::{
 };
 use crate::paragraph::Paragraph;
 
+pub(crate) use durable::durable_transfer_operations;
 pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
 pub use litchi_core::patch::{
     CompositionLimits, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
@@ -46,6 +47,8 @@ pub enum Refusal {
     RunNotFound,
     /// The selected simple field does not exist.
     FieldNotFound,
+    /// The selected begin/separate/end complex field does not exist.
+    ComplexFieldNotFound,
     /// The selected tracked insertion or deletion does not exist.
     RevisionNotFound,
     /// The selected direct inline content control does not exist.
@@ -65,6 +68,7 @@ impl std::fmt::Display for Refusal {
             Self::HyperlinkNotFound => "direct paragraph hyperlink was not found",
             Self::RunNotFound => "direct paragraph run was not found",
             Self::FieldNotFound => "direct simple field was not found",
+            Self::ComplexFieldNotFound => "complex field sequence was not found",
             Self::RevisionNotFound => "direct tracked revision was not found",
             Self::ContentControlNotFound => "direct inline content control was not found",
             Self::CellNotFound => "table cell was not found",
@@ -91,14 +95,24 @@ pub struct ParagraphTransfer {
     target: Arc<Vec<u8>>,
     fragment: Arc<Vec<u8>>,
     dependency_digest: Arc<str>,
+    inverse_dependency_digest: Arc<str>,
+    graph: Arc<TransferGraph>,
 }
 
 impl ParagraphTransfer {
-    pub(crate) fn new(target: Arc<Vec<u8>>, fragment: Vec<u8>, dependency_digest: String) -> Self {
+    pub(crate) fn new(
+        target: Arc<Vec<u8>>,
+        fragment: Vec<u8>,
+        dependency_digest: String,
+        inverse_dependency_digest: String,
+        graph: TransferGraph,
+    ) -> Self {
         Self {
             target,
             fragment: Arc::new(fragment),
             dependency_digest: dependency_digest.into(),
+            inverse_dependency_digest: inverse_dependency_digest.into(),
+            graph: Arc::new(graph),
         }
     }
 
@@ -107,6 +121,45 @@ impl ParagraphTransfer {
     pub fn xml_bytes(&self) -> &[u8] {
         self.fragment.as_slice()
     }
+}
+
+/// Opaque dependency subgraph carried by a paragraph-transfer operation.
+///
+/// Package planning and publication own its bounded contents; callers retain
+/// it only when inspecting or replaying a native operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransferGraph {
+    pub(crate) main_relationships: Arc<[TransferRelationship]>,
+    pub(crate) parts: Arc<[TransferPart]>,
+}
+
+impl TransferGraph {
+    pub(crate) fn empty() -> Self {
+        Self {
+            main_relationships: Arc::new([]),
+            parts: Arc::new([]),
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.main_relationships.is_empty() && self.parts.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TransferPart {
+    pub(crate) name: String,
+    pub(crate) content_type: String,
+    pub(crate) blob: Arc<Vec<u8>>,
+    pub(crate) relationships: Arc<[TransferRelationship]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TransferRelationship {
+    pub(crate) id: String,
+    pub(crate) relationship_type: String,
+    pub(crate) target: String,
+    pub(crate) external: bool,
 }
 
 impl RevisionKind {
@@ -361,6 +414,17 @@ pub enum Operation {
         /// Text produced by the operation.
         after: String,
     },
+    /// Replace the displayed result of one run-delimited complex field.
+    ReplaceComplexFieldText {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Position among complex field begin markers.
+        field: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
     /// Replace inert text inside one direct tracked revision wrapper.
     ReplaceRevisionText {
         /// Direct-body paragraph position.
@@ -435,6 +499,10 @@ pub enum Operation {
         xml: Arc<Vec<u8>>,
         /// Exact receiver relationship/resource inventory required at publish.
         dependency_digest: Arc<str>,
+        /// Exact graph digest required by the inverse removal.
+        inverse_dependency_digest: Arc<str>,
+        /// Complete receiver-local dependency closure added by publication.
+        graph: Arc<TransferGraph>,
     },
     /// Remove the exact transferred paragraph fragment.
     RemoveTransferredParagraph {
@@ -444,6 +512,10 @@ pub enum Operation {
         xml: Arc<Vec<u8>>,
         /// Exact receiver relationship/resource inventory required at publish.
         dependency_digest: Arc<str>,
+        /// Exact graph digest required by the inverse insertion.
+        inverse_dependency_digest: Arc<str>,
+        /// Complete receiver-local dependency closure removed by publication.
+        graph: Arc<TransferGraph>,
     },
 }
 
@@ -487,6 +559,17 @@ impl Operation {
                 before,
                 after,
             } => Self::ReplaceSimpleFieldText {
+                paragraph: *paragraph,
+                field: *field,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ReplaceComplexFieldText {
+                paragraph,
+                field,
+                before,
+                after,
+            } => Self::ReplaceComplexFieldText {
                 paragraph: *paragraph,
                 field: *field,
                 before: after.clone(),
@@ -556,19 +639,27 @@ impl Operation {
                 position,
                 xml,
                 dependency_digest,
+                inverse_dependency_digest,
+                graph,
             } => Self::RemoveTransferredParagraph {
                 position: *position,
                 xml: Arc::clone(xml),
-                dependency_digest: Arc::clone(dependency_digest),
+                dependency_digest: Arc::clone(inverse_dependency_digest),
+                inverse_dependency_digest: Arc::clone(dependency_digest),
+                graph: Arc::clone(graph),
             },
             Self::RemoveTransferredParagraph {
                 position,
                 xml,
                 dependency_digest,
+                inverse_dependency_digest,
+                graph,
             } => Self::InsertTransferredParagraph {
                 position: *position,
                 xml: Arc::clone(xml),
-                dependency_digest: Arc::clone(dependency_digest),
+                dependency_digest: Arc::clone(inverse_dependency_digest),
+                inverse_dependency_digest: Arc::clone(dependency_digest),
+                graph: Arc::clone(graph),
             },
         }
     }
@@ -756,9 +847,10 @@ impl Edit {
         Ok(self)
     }
 
-    /// Replace text in one direct run while retaining its `w:rPr`, drawings,
-    /// and opaque run children. This provides a checked edit seam inside a
-    /// paragraph that also contains fields, hyperlinks, or revision wrappers.
+    /// Replace text and structural characters in one direct run while
+    /// retaining its `w:rPr`, drawings, and opaque run children. Tabs, line
+    /// breaks, carriage returns, non-breaking hyphens, and soft hyphens map to
+    /// their native `WordprocessingML` run elements.
     ///
     /// # Errors
     ///
@@ -813,6 +905,82 @@ impl Edit {
                 after,
             },
         )
+    }
+
+    /// Replace the result text between one complex field's direct-run
+    /// `begin`/`separate`/`end` markers. Instruction and marker runs remain
+    /// exact; nested complex fields inside the selected result are refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot.
+    pub fn replace_complex_field_result_text(
+        &mut self,
+        paragraph: Position,
+        field: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        self.reserve_operation()?;
+        let text = authored_text.into();
+        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let replacement_text_bytes = self.checked_text_total(text.len())?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let result_range = select_complex_field_result(paragraph_xml, field).map_err(|reason| {
+            TransactionError::Refused {
+                position: paragraph.get(),
+                reason,
+            }
+        })?;
+        let start = checked_relative_start(paragraph_start, result_range)?;
+        let end = checked_relative_end(paragraph_start, result_range)?;
+        let result_xml = checked_slice(
+            self.projected.xml_bytes(),
+            start,
+            end,
+            "complex field result",
+        )?;
+        let (before, replacement) =
+            rewrite_run_region(result_xml, &text).map_err(|reason| TransactionError::Refused {
+                position: paragraph.get(),
+                reason,
+            })?;
+        if before == text {
+            return Ok(self);
+        }
+        let candidate = Snapshot::from_xml(replace_range(
+            self.projected.xml_bytes(),
+            start,
+            end,
+            &replacement,
+        )?)?;
+        let actual = selected_complex_field_result_text(&candidate, paragraph, field)?;
+        if actual != text {
+            return Err(crate::Error::InvalidFormat(
+                "complex field result edit failed semantic readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::ReplaceComplexFieldText {
+            paragraph,
+            field,
+            before,
+            after: text,
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
     }
 
     /// Replace inert text inside one direct tracked insertion or deletion.
@@ -1149,6 +1317,8 @@ impl Edit {
             position,
             Arc::clone(&plan.fragment),
             Arc::clone(&plan.dependency_digest),
+            Arc::clone(&plan.inverse_dependency_digest),
+            Arc::clone(&plan.graph),
         )
     }
 
@@ -1218,6 +1388,19 @@ impl Edit {
                     return Err(TransactionError::SemanticPrecondition);
                 }
                 self.replace_simple_field_text(*paragraph, *field, after.clone())
+            },
+            Operation::ReplaceComplexFieldText {
+                paragraph,
+                field,
+                before,
+                after,
+            } => {
+                if selected_complex_field_result_text(&self.projected, *paragraph, *field)?
+                    != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_complex_field_result_text(*paragraph, *field, after.clone())
             },
             Operation::ReplaceRevisionText {
                 paragraph,
@@ -1293,16 +1476,28 @@ impl Edit {
                 position,
                 xml,
                 dependency_digest,
+                inverse_dependency_digest,
+                graph,
             } => self.insert_transferred_paragraph(
                 *position,
                 Arc::clone(xml),
                 Arc::clone(dependency_digest),
+                Arc::clone(inverse_dependency_digest),
+                Arc::clone(graph),
             ),
             Operation::RemoveTransferredParagraph {
                 position,
                 xml,
                 dependency_digest,
-            } => self.remove_transferred_paragraph(*position, xml, dependency_digest),
+                inverse_dependency_digest,
+                graph,
+            } => self.remove_transferred_paragraph(
+                *position,
+                xml,
+                dependency_digest,
+                inverse_dependency_digest,
+                graph,
+            ),
         }
     }
 
@@ -1341,6 +1536,8 @@ impl Edit {
         position: Position,
         xml: Arc<Vec<u8>>,
         dependency_digest: Arc<str>,
+        inverse_dependency_digest: Arc<str>,
+        graph: Arc<TransferGraph>,
     ) -> TransactionResult<&mut Self> {
         self.reserve_operation()?;
         let count = self.projected.paragraph_count();
@@ -1379,6 +1576,8 @@ impl Edit {
             position,
             xml,
             dependency_digest,
+            inverse_dependency_digest,
+            graph,
         });
         self.projected = candidate;
         Ok(self)
@@ -1389,6 +1588,8 @@ impl Edit {
         position: Position,
         xml: &Arc<Vec<u8>>,
         dependency_digest: &Arc<str>,
+        inverse_dependency_digest: &Arc<str>,
+        graph: &Arc<TransferGraph>,
     ) -> TransactionResult<&mut Self> {
         self.reserve_operation()?;
         let range = self.range(position)?;
@@ -1404,6 +1605,8 @@ impl Edit {
             position,
             xml: Arc::clone(xml),
             dependency_digest: Arc::clone(dependency_digest),
+            inverse_dependency_digest: Arc::clone(inverse_dependency_digest),
+            graph: Arc::clone(graph),
         });
         self.projected = candidate;
         Ok(self)
@@ -1419,7 +1622,12 @@ impl Edit {
         operation: impl FnOnce(String, String) -> Operation,
     ) -> TransactionResult<&mut Self> {
         self.reserve_operation()?;
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        let validation = if child_name == b"r" {
+            validate_authored_run_content(&text)
+        } else {
+            validate_authored_text(&text)
+        };
+        validation.map_err(|reason| TransactionError::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -1714,6 +1922,13 @@ struct TextSlot {
     prefix: Vec<u8>,
     local_name: Vec<u8>,
     characters: usize,
+}
+
+#[derive(Clone, Copy)]
+enum ComplexFieldMarker {
+    Begin,
+    Separate,
+    End,
 }
 
 enum FragmentPrefix {
@@ -2052,6 +2267,21 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
                             local_name: element.local_name().as_ref().to_vec(),
                             characters: 0,
                         });
+                    } else if let Some(character) =
+                        structural_run_character(&namespace, element.name(), &fragment_prefix)
+                    {
+                        let prefix = element
+                            .name()
+                            .prefix()
+                            .map_or_else(Vec::new, |value| value.into_inner().to_vec());
+                        text.push(character);
+                        slots.push(TextSlot {
+                            start: event_start,
+                            end: event_end,
+                            prefix,
+                            local_name: element.local_name().as_ref().to_vec(),
+                            characters: 1,
+                        });
                     } else if is_structural_run_text(&namespace, element.name(), &fragment_prefix) {
                         return Err(Refusal::ComplexRun);
                     }
@@ -2238,7 +2468,7 @@ fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionR
         replacements.push((
             slot.start,
             slot.end,
-            text_element_named(&slot.prefix, &slot.local_name, &value).into_bytes(),
+            run_content_fragment(&slot.prefix, &slot.local_name, &value).into_bytes(),
         ));
     }
     replace_ranges(xml, &replacements)
@@ -2287,6 +2517,172 @@ fn is_structural_run_text(
     ]
     .into_iter()
     .any(|local| is_transaction_fragment_word_name(namespace, name, local, fragment_prefix))
+}
+
+fn structural_run_character(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &FragmentPrefix,
+) -> Option<char> {
+    [
+        (b"tab".as_slice(), '\t'),
+        (b"br".as_slice(), '\n'),
+        (b"cr".as_slice(), '\r'),
+        (b"noBreakHyphen".as_slice(), '\u{2011}'),
+        (b"softHyphen".as_slice(), '\u{00AD}'),
+    ]
+    .into_iter()
+    .find_map(|(local, character)| {
+        is_transaction_fragment_word_name(namespace, name, local, fragment_prefix)
+            .then_some(character)
+    })
+}
+
+fn select_complex_field_result(xml: &[u8], position: Position) -> Result<Range, Refusal> {
+    let mut active = Vec::<(usize, Option<usize>)>::new();
+    let mut field_index = 0usize;
+    for run_index in 0..MAX_OPERATIONS {
+        let Ok(run) = select_direct_child(
+            xml,
+            b"p",
+            b"r",
+            Position::new(run_index),
+            Refusal::RunNotFound,
+        ) else {
+            break;
+        };
+        let start = usize::try_from(run.start).map_err(|_error| Refusal::ComplexContent)?;
+        let end = start
+            .checked_add(usize::try_from(run.length).map_err(|_error| Refusal::ComplexContent)?)
+            .ok_or(Refusal::ComplexContent)?;
+        let marker = complex_field_marker(xml.get(start..end).ok_or(Refusal::ComplexContent)?)?;
+        match marker {
+            Some(ComplexFieldMarker::Begin) => {
+                active.push((field_index, None));
+                field_index = field_index.checked_add(1).ok_or(Refusal::ComplexContent)?;
+            },
+            Some(ComplexFieldMarker::Separate) => {
+                let Some((_index, result_start)) = active.last_mut() else {
+                    return Err(Refusal::ComplexContent);
+                };
+                if result_start.replace(end).is_some() {
+                    return Err(Refusal::ComplexContent);
+                }
+            },
+            Some(ComplexFieldMarker::End) => {
+                let Some((index, result_start)) = active.pop() else {
+                    return Err(Refusal::ComplexContent);
+                };
+                if index == position.get() {
+                    let resolved_start = result_start.ok_or(Refusal::ComplexContent)?;
+                    return checked_range(resolved_start, start)
+                        .map_err(|_error| Refusal::ComplexContent);
+                }
+            },
+            None => {},
+        }
+    }
+    Err(Refusal::ComplexFieldNotFound)
+}
+
+fn complex_field_marker(xml: &[u8]) -> Result<Option<ComplexFieldMarker>, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut fragment_prefix = FragmentPrefix::Unseen;
+    loop {
+        let raw = reader
+            .read_event()
+            .map_err(|_error| Refusal::ComplexContent)?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(raw);
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if matches!(fragment_prefix, FragmentPrefix::Unseen) {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                }
+                if is_transaction_fragment_word_name(
+                    &namespace,
+                    element.name(),
+                    b"fldChar",
+                    &fragment_prefix,
+                ) {
+                    let value = element
+                        .attributes()
+                        .filter_map(Result::ok)
+                        .find(|attribute| attribute.key.local_name().as_ref() == b"fldCharType")
+                        .ok_or(Refusal::ComplexContent)?
+                        .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                        .map_err(|_error| Refusal::ComplexContent)?;
+                    return match value.as_ref() {
+                        "begin" => Ok(Some(ComplexFieldMarker::Begin)),
+                        "separate" => Ok(Some(ComplexFieldMarker::Separate)),
+                        "end" => Ok(Some(ComplexFieldMarker::End)),
+                        _ => Err(Refusal::ComplexContent),
+                    };
+                }
+            },
+            Event::Eof => return Ok(None),
+            Event::DocType(_) | Event::PI(_) => return Err(Refusal::ComplexContent),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn rewrite_run_region(xml: &[u8], text: &str) -> Result<(String, Vec<u8>), Refusal> {
+    let (wrapper, prefix_length, suffix_length, owner) = scan_run_region(xml)?;
+    let replacement =
+        rewrite_text_owner(&wrapper, &owner, text).map_err(|_error| Refusal::ComplexContent)?;
+    let end = replacement
+        .len()
+        .checked_sub(suffix_length)
+        .ok_or(Refusal::ComplexContent)?;
+    Ok((
+        owner.text,
+        replacement
+            .get(prefix_length..end)
+            .ok_or(Refusal::ComplexContent)?
+            .to_vec(),
+    ))
+}
+
+fn scan_run_region(xml: &[u8]) -> Result<(Vec<u8>, usize, usize, TextOwner), Refusal> {
+    let first = xml
+        .iter()
+        .position(|byte| *byte == b'<')
+        .ok_or(Refusal::ComplexRun)?;
+    let name_end = xml
+        .get(first + 1..)
+        .ok_or(Refusal::ComplexRun)?
+        .iter()
+        .position(|byte| matches!(*byte, b':' | b' ' | b'>' | b'/'))
+        .ok_or(Refusal::ComplexRun)?
+        .checked_add(first + 1)
+        .ok_or(Refusal::ComplexRun)?;
+    let prefix = if xml.get(name_end) == Some(&b':') {
+        xml.get(first + 1..name_end).ok_or(Refusal::ComplexRun)?
+    } else {
+        &[]
+    };
+    let prefix_text = std::str::from_utf8(prefix).map_err(|_error| Refusal::ComplexRun)?;
+    let (open, close) = if prefix_text.is_empty() {
+        ("<region>".to_owned(), "</region>".to_owned())
+    } else {
+        (
+            format!("<{prefix_text}:region>"),
+            format!("</{prefix_text}:region>"),
+        )
+    };
+    let mut wrapper = Vec::with_capacity(open.len() + xml.len() + close.len());
+    wrapper.extend_from_slice(open.as_bytes());
+    wrapper.extend_from_slice(xml);
+    wrapper.extend_from_slice(close.as_bytes());
+    let owner = scan_text_owner(&wrapper, b"region")?;
+    Ok((wrapper, open.len(), close.len(), owner))
 }
 
 fn select_direct_child(
@@ -2618,6 +3014,49 @@ fn selected_direct_paragraph_owner_text(
     })
 }
 
+fn selected_complex_field_result_text(
+    snapshot: &Snapshot,
+    paragraph: Position,
+    field: Position,
+) -> TransactionResult<String> {
+    let paragraph_range =
+        snapshot
+            .paragraphs
+            .get(paragraph.get())
+            .copied()
+            .ok_or(TransactionError::OutOfBounds {
+                position: paragraph.get(),
+                len: snapshot.paragraph_count(),
+            })?;
+    let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+    let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+    let paragraph_xml = checked_slice(
+        snapshot.xml_bytes(),
+        paragraph_start,
+        paragraph_end,
+        "paragraph",
+    )?;
+    let result_range = select_complex_field_result(paragraph_xml, field).map_err(|reason| {
+        TransactionError::Refused {
+            position: paragraph.get(),
+            reason,
+        }
+    })?;
+    let start = checked_relative_start(paragraph_start, result_range)?;
+    let end = checked_relative_end(paragraph_start, result_range)?;
+    scan_run_region(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "complex field result",
+    )?)
+    .map(|(_wrapper, _prefix_length, _suffix_length, owner)| owner.text)
+    .map_err(|reason| TransactionError::Refused {
+        position: paragraph.get(),
+        reason,
+    })
+}
+
 fn select_content_control_content(
     snapshot: &Snapshot,
     paragraph: Position,
@@ -2818,6 +3257,58 @@ fn validate_authored_text(text: &str) -> Result<(), Refusal> {
         return Err(Refusal::StructuralText);
     }
     Ok(())
+}
+
+fn validate_authored_run_content(text: &str) -> Result<(), Refusal> {
+    if text.chars().any(|character| {
+        !matches!(character, '\u{9}' | '\u{A}' | '\u{D}' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}')
+    }) {
+        return Err(Refusal::StructuralText);
+    }
+    Ok(())
+}
+
+fn run_content_fragment(prefix: &[u8], original_local_name: &[u8], text: &str) -> String {
+    let text_local_name = if original_local_name == b"delText" {
+        b"delText".as_slice()
+    } else {
+        b"t".as_slice()
+    };
+    if text.is_empty() {
+        return text_element_named(prefix, text_local_name, "");
+    }
+    let mut output = String::new();
+    let mut plain = String::new();
+    for character in text.chars() {
+        let structural = match character {
+            '\t' => Some("tab"),
+            '\n' => Some("br"),
+            '\r' => Some("cr"),
+            '\u{2011}' => Some("noBreakHyphen"),
+            '\u{00AD}' => Some("softHyphen"),
+            _ => None,
+        };
+        if let Some(local_name) = structural {
+            if !plain.is_empty() {
+                output.push_str(&text_element_named(prefix, text_local_name, &plain));
+                plain.clear();
+            }
+            let prefix_text = String::from_utf8_lossy(prefix);
+            output.push('<');
+            if !prefix_text.is_empty() {
+                output.push_str(&prefix_text);
+                output.push(':');
+            }
+            output.push_str(local_name);
+            output.push_str("/>");
+        } else {
+            plain.push(character);
+        }
+    }
+    if !plain.is_empty() {
+        output.push_str(&text_element_named(prefix, text_local_name, &plain));
+    }
+    output
 }
 
 fn text_element(prefix: &[u8], text: &str) -> String {
@@ -3086,7 +3577,7 @@ mod tests {
     fn rich_owner_edits_are_compact_durable_and_exactly_reversible() {
         let source = Snapshot::from_xml(
             format!(
-                "<w:document xmlns:w=\"{WORD}\">\n  <w:body>\n    <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>direct</w:t><x:keep xmlns:x=\"urn:test\"/></w:r><w:fldSimple w:instr=\" AUTHOR \"><w:r><w:rPr><w:i/></w:rPr><w:t>field</w:t></w:r></w:fldSimple><w:ins w:id=\"7\" w:author=\"A\"><w:r><w:t>added</w:t></w:r></w:ins><w:del w:id=\"8\" w:author=\"A\"><w:r><w:delText>gone &amp; old</w:delText></w:r></w:del><w:sdt><w:sdtPr><w:tag w:val=\"kept\"/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:smallCaps/></w:rPr><w:t>control</w:t></w:r></w:sdtContent></w:sdt></w:p>\n    <w:tbl><w:tr><w:tc><w:tcPr><w:shd w:fill=\"00FF00\"/></w:tcPr><w:p><w:r><w:t>first</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>nested kept</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:rPr><w:u/></w:rPr><w:t>second</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\n    <w:sectPr/>\n  </w:body>\n</w:document>"
+                "<w:document xmlns:w=\"{WORD}\">\n  <w:body>\n    <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>direct</w:t><x:keep xmlns:x=\"urn:test\"/></w:r><w:fldSimple w:instr=\" AUTHOR \"><w:r><w:rPr><w:i/></w:rPr><w:t>field</w:t></w:r></w:fldSimple><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> DATE </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:rPr><w:color w:val=\"FF0000\"/></w:rPr><w:t>complex result</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><w:ins w:id=\"7\" w:author=\"A\"><w:r><w:t>added</w:t></w:r></w:ins><w:del w:id=\"8\" w:author=\"A\"><w:r><w:delText>gone &amp; old</w:delText></w:r></w:del><w:sdt><w:sdtPr><w:tag w:val=\"kept\"/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:smallCaps/></w:rPr><w:t>control</w:t></w:r></w:sdtContent></w:sdt></w:p>\n    <w:tbl><w:tr><w:tc><w:tcPr><w:shd w:fill=\"00FF00\"/></w:tcPr><w:p><w:r><w:t>first</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>nested kept</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:rPr><w:u/></w:rPr><w:t>second</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\n    <w:sectPr/>\n  </w:body>\n</w:document>"
             )
             .into_bytes(),
         )
@@ -3095,6 +3586,12 @@ mod tests {
         edit.replace_run_text(Position::new(0), Position::new(0), " run & entity ")
             .unwrap()
             .replace_simple_field_text(Position::new(0), Position::new(0), "new field")
+            .unwrap()
+            .replace_complex_field_result_text(
+                Position::new(0),
+                Position::new(0),
+                "new complex result",
+            )
             .unwrap()
             .replace_revision_text(
                 Position::new(0),
@@ -3127,6 +3624,12 @@ mod tests {
             "<w:rPr><w:b/></w:rPr>",
             "<x:keep xmlns:x=\"urn:test\"/>",
             "w:instr=\" AUTHOR \"",
+            "<w:fldChar w:fldCharType=\"begin\"/>",
+            "<w:instrText> DATE </w:instrText>",
+            "<w:fldChar w:fldCharType=\"separate\"/>",
+            "<w:rPr><w:color w:val=\"FF0000\"/></w:rPr>",
+            "<w:t>new complex result</w:t>",
+            "<w:fldChar w:fldCharType=\"end\"/>",
             "<w:ins w:id=\"7\" w:author=\"A\">",
             "<w:del w:id=\"8\" w:author=\"A\">",
             "<w:delText>new deletion</w:delText>",
@@ -3345,16 +3848,18 @@ mod tests {
     }
 
     #[test]
-    fn adversarial_complex_cells_and_structural_run_text_are_atomic_refusals() {
+    fn structural_run_text_is_native_and_complex_cells_remain_atomic_refusals() {
         let source = Snapshot::from_xml(document(
             "<w:p><w:r><w:t>safe</w:t><w:br/></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
         ))
         .unwrap();
         let mut edit = source.edit();
-        assert!(
-            edit.replace_paragraph_text(Position::new(0), "unsafe flatten")
-                .is_err()
-        );
+        edit.replace_run_text(
+            Position::new(0),
+            Position::new(0),
+            "safe\tline\nsoft\u{2011}hyphen\u{00ad}",
+        )
+        .unwrap();
         assert!(
             edit.replace_table_cell_text(
                 Position::new(0),
@@ -3364,6 +3869,16 @@ mod tests {
             )
             .is_err()
         );
-        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        let xml = std::str::from_utf8(edit.projected().xml_bytes()).unwrap();
+        for structural in [
+            "<w:tab/>",
+            "<w:br/>",
+            "<w:noBreakHyphen/>",
+            "<w:softHyphen/>",
+        ] {
+            assert!(xml.contains(structural));
+        }
+        assert!(xml.contains("<w:r>"));
+        assert_ne!(edit.projected().xml_bytes(), source.xml_bytes());
     }
 }

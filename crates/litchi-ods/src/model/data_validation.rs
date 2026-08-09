@@ -1,5 +1,10 @@
 //! ODF spreadsheet content-validation definitions.
 
+#![allow(
+    clippy::expect_used,
+    reason = "streaming parser expectations follow immediately checked validation and message-listener states"
+)]
+
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};

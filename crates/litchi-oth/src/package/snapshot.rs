@@ -16,7 +16,9 @@ const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 struct State {
     bookmarks: Vec<crate::bookmark::Bookmark>,
     forms: Vec<crate::form::Form>,
+    forms_site: Option<crate::codec::ReplacementSite>,
     headings: Vec<crate::heading::Heading>,
+    heading_content_sites: Vec<crate::codec::ReplacementSite>,
     heading_replacement_sites: Vec<Option<crate::codec::ReplacementSite>>,
     lists: Vec<crate::list::List>,
     list_sites: Vec<crate::codec::ReplacementSite>,
@@ -24,6 +26,7 @@ struct State {
     order: Vec<crate::codec::BlockOrder>,
     package: Package,
     paragraphs: Vec<crate::paragraph::Paragraph>,
+    paragraph_content_sites: Vec<crate::codec::ReplacementSite>,
     replacement_sites: Vec<Option<crate::codec::ReplacementSite>>,
     resources: Vec<crate::resource::Resource>,
     styles: Vec<crate::style::Style>,
@@ -77,11 +80,18 @@ impl Snapshot {
         };
         let projection = crate::codec::project(package.content_xml())?;
         let mut headings = Vec::new();
+        let mut heading_content_sites = Vec::new();
         let mut heading_replacement_sites = Vec::new();
         headings
             .try_reserve(projection.headings.len())
             .map_err(|source| Error::Allocation {
                 resource: "OTH heading snapshot",
+                source,
+            })?;
+        heading_content_sites
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading content edit sites",
                 source,
             })?;
         heading_replacement_sites
@@ -91,15 +101,23 @@ impl Snapshot {
                 source,
             })?;
         for site in projection.headings {
+            heading_content_sites.push(site.content);
             headings.push(site.value);
             heading_replacement_sites.push(site.replacement);
         }
         let mut paragraphs = Vec::new();
+        let mut paragraph_content_sites = Vec::new();
         let mut replacement_sites = Vec::new();
         paragraphs
             .try_reserve(projection.paragraphs.len())
             .map_err(|source| Error::Allocation {
                 resource: "OTH paragraph snapshot",
+                source,
+            })?;
+        paragraph_content_sites
+            .try_reserve(projection.paragraphs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH paragraph content edit sites",
                 source,
             })?;
         replacement_sites
@@ -109,6 +127,7 @@ impl Snapshot {
                 source,
             })?;
         for site in projection.paragraphs {
+            paragraph_content_sites.push(site.content);
             paragraphs.push(site.value);
             replacement_sites.push(site.replacement);
         }
@@ -123,7 +142,9 @@ impl Snapshot {
         Ok(Self(Arc::new(State {
             bookmarks: projection.bookmarks,
             forms: projection.forms,
+            forms_site: projection.forms_site,
             headings,
+            heading_content_sites,
             heading_replacement_sites,
             lists: projection.lists,
             list_sites: projection.list_sites,
@@ -131,6 +152,7 @@ impl Snapshot {
             order: projection.order,
             package,
             paragraphs,
+            paragraph_content_sites,
             replacement_sites,
             resources: projection.resources,
             styles,
@@ -201,6 +223,10 @@ impl Snapshot {
         &self.0.forms
     }
 
+    pub(crate) fn forms_site(&self) -> Option<&crate::codec::ReplacementSite> {
+        self.0.forms_site.as_ref()
+    }
+
     pub(crate) fn styles(&self) -> &[crate::style::Style] {
         &self.0.styles
     }
@@ -221,6 +247,20 @@ impl Snapshot {
             .heading_replacement_sites
             .get(index)
             .and_then(Option::as_ref)
+    }
+
+    pub(crate) fn paragraph_content_site(
+        &self,
+        index: usize,
+    ) -> Option<&crate::codec::ReplacementSite> {
+        self.0.paragraph_content_sites.get(index)
+    }
+
+    pub(crate) fn heading_content_site(
+        &self,
+        index: usize,
+    ) -> Option<&crate::codec::ReplacementSite> {
+        self.0.heading_content_sites.get(index)
     }
 
     pub(crate) fn text_close(&self) -> usize {

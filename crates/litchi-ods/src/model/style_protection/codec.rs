@@ -15,6 +15,12 @@ use quick_xml::{
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Range;
 
+fn checked_position(reader: &NsReader<&[u8]>) -> Result<usize> {
+    usize::try_from(reader.buffer_position()).map_err(|_error| {
+        Error::InvalidFormat("style-protection XML position exceeds usize".to_string())
+    })
+}
+
 /// # Errors
 ///
 /// Returns an error when the value cannot be serialized.
@@ -146,14 +152,14 @@ fn managed_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticStyles
     let mut ranges = Vec::new();
     let mut insertion = None;
     loop {
-        let event_start = reader.buffer_position() as usize;
+        let event_start = checked_position(&reader)?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
         let is_style_namespace = is_namespace(&namespace, STYLE_NAMESPACE);
         let is_office_namespace = is_namespace(&namespace, OFFICE_NAMESPACE);
         let event = event.into_owned();
-        let event_end = reader.buffer_position() as usize;
+        let event_end = checked_position(&reader)?;
         match event {
             Event::DocType(_) => {
                 return Err(Error::InvalidFormat(
@@ -184,7 +190,7 @@ fn managed_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticStyles
                             )?
                             .is_some())
                 {
-                    candidate.as_mut().expect("checked candidate").2 = true;
+                    mark_managed_candidate(&mut candidate)?;
                 }
                 depth += 1;
             },
@@ -214,7 +220,7 @@ fn managed_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticStyles
                             )?
                             .is_some())
                 {
-                    candidate.as_mut().expect("checked candidate").2 = true;
+                    mark_managed_candidate(&mut candidate)?;
                 }
             },
             Event::End(element) => {
@@ -388,14 +394,14 @@ fn conditional_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticSt
     let mut ranges = Vec::new();
     let mut insertion = None;
     loop {
-        let event_start = reader.buffer_position() as usize;
+        let event_start = checked_position(&reader)?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
         let is_style_namespace = is_namespace(&namespace, STYLE_NAMESPACE);
         let is_office_namespace = is_namespace(&namespace, OFFICE_NAMESPACE);
         let event = event.into_owned();
-        let event_end = reader.buffer_position() as usize;
+        let event_end = checked_position(&reader)?;
         match event {
             Event::DocType(_) => {
                 return Err(Error::InvalidFormat(
@@ -418,7 +424,7 @@ fn conditional_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticSt
                     && is_style_namespace
                     && element.local_name().as_ref() == b"map"
                 {
-                    candidate.as_mut().expect("checked candidate").2 = true;
+                    mark_managed_candidate(&mut candidate)?;
                 }
                 depth += 1;
             },
@@ -440,7 +446,7 @@ fn conditional_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticSt
                     && is_style_namespace
                     && element.local_name().as_ref() == b"map"
                 {
-                    candidate.as_mut().expect("checked candidate").2 = true;
+                    mark_managed_candidate(&mut candidate)?;
                 }
             },
             Event::End(element) => {
@@ -578,13 +584,13 @@ fn extract_office_fragment(
     let mut depth = 0usize;
 
     loop {
-        let event_start = reader.buffer_position() as usize;
+        let event_start = checked_position(&reader)?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
         let is_office_namespace = is_namespace(&namespace, OFFICE_NAMESPACE);
         let event = event.into_owned();
-        let event_end = reader.buffer_position() as usize;
+        let event_end = checked_position(&reader)?;
         match event {
             Event::Start(element)
                 if is_office_namespace && element.local_name().as_ref() == b"document-content" =>
@@ -627,7 +633,11 @@ fn extract_office_fragment(
                             "malformed office:{fragment_name} element"
                         )));
                     }
-                    let start = range_start.take().expect("checked range");
+                    let start = range_start.take().ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "missing office:{fragment_name} fragment start"
+                        ))
+                    })?;
                     return Ok(Some(PreservedXmlFragment {
                         xml: xml[start..event_end].to_string(),
                         namespaces,
@@ -654,6 +664,14 @@ fn extract_office_fragment(
         )));
     }
     Ok(None)
+}
+
+fn mark_managed_candidate(candidate: &mut Option<(usize, bool, bool)>) -> Result<()> {
+    let (_, _, managed) = candidate.as_mut().ok_or_else(|| {
+        Error::InvalidFormat("managed automatic style has no owning style".to_string())
+    })?;
+    *managed = true;
+    Ok(())
 }
 
 fn collect_namespaces(

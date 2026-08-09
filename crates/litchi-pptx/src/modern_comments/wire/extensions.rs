@@ -29,19 +29,19 @@ pub(crate) fn parse_extensions(xml: Option<&[u8]>) -> Result<List> {
         let uri = attribute(&child.attributes, "uri", true)?
             .ok_or_else(|| invalid("modern comment extension requires uri"))?
             .to_owned();
-        let payloads = scan_with_context(
+        let child_scan = scan_with_context(
             &child.xml,
             "modern comment extension",
             &root_scan.namespaces,
-        )?
-        .children;
+        )?;
+        let payloads = &child_scan.children;
         let payload = if payloads.len() == 1 {
             let payload = &payloads[0];
             if payload.namespace == P228 && payload.local == "taskDetails" {
-                let xml = scan_with_context(&payload.xml, "task details", &root_scan.namespaces)?;
+                let xml = scan_with_context(&payload.xml, "task details", &child_scan.namespaces)?;
                 Payload::TaskDetails(parse_task_details(&xml.root.xml)?)
             } else if payload.namespace == P223 && payload.local == "reactions" {
-                let xml = scan_with_context(&payload.xml, "reactions", &root_scan.namespaces)?;
+                let xml = scan_with_context(&payload.xml, "reactions", &child_scan.namespaces)?;
                 Payload::Reactions(parse_reactions(&xml.root.xml)?)
             } else {
                 Payload::Opaque(OpaqueXml::new(child.xml.clone())?)
@@ -65,11 +65,32 @@ pub(crate) fn write_extensions(value: &List) -> Result<Option<Vec<u8>>> {
     if value.entries.is_empty() {
         return Ok(None);
     }
+    let has_task_details = value
+        .entries
+        .iter()
+        .any(|entry| matches!(&entry.payload, Payload::TaskDetails(_)));
+    let has_reactions = value
+        .entries
+        .iter()
+        .any(|entry| matches!(&entry.payload, Payload::Reactions(_)));
+    if value.namespace_declarations.iter().any(|declaration| {
+        (has_task_details && declaration.prefix == "p228" && declaration.uri != P228)
+            || (has_reactions && declaration.prefix == "p223" && declaration.uri != P223)
+    }) {
+        return Err(invalid(
+            "modern comment typed extension prefix has a conflicting namespace",
+        ));
+    }
     let prefix = if value.root_prefix.is_empty() {
         "p188"
     } else {
         value.root_prefix.as_str()
     };
+    if (has_task_details && prefix == "p228") || (has_reactions && prefix == "p223") {
+        return Err(invalid(
+            "modern comment extension root prefix conflicts with a typed payload",
+        ));
+    }
     let mut out = Vec::new();
     open(&mut out, prefix, "extLst");
     out.extend_from_slice(b" xmlns:");
@@ -78,8 +99,22 @@ pub(crate) fn write_extensions(value: &List) -> Result<Option<Vec<u8>>> {
     out.extend_from_slice(
         b" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"",
     );
+    if has_task_details {
+        out.extend_from_slice(
+            b" xmlns:p228=\"http://schemas.microsoft.com/office/powerpoint/2022/08/main\"",
+        );
+    }
+    if has_reactions {
+        out.extend_from_slice(
+            b" xmlns:p223=\"http://schemas.microsoft.com/office/powerpoint/2022/03/main\"",
+        );
+    }
     for declaration in &value.namespace_declarations {
-        if declaration.prefix == prefix || (declaration.prefix == "p" && declaration.uri == P) {
+        if declaration.prefix == prefix
+            || (declaration.prefix == "p" && declaration.uri == P)
+            || (declaration.prefix == "p228" && declaration.uri == P228)
+            || (declaration.prefix == "p223" && declaration.uri == P223)
+        {
             continue;
         }
         super::xml::namespaces(&mut out, std::slice::from_ref(declaration));

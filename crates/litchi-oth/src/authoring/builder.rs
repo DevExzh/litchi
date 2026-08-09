@@ -3,7 +3,7 @@
 use litchi_core::{Error, Result};
 use litchi_odf_common::{compact_xml, core::PackageWriter};
 
-const CONTENT_PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4"><office:body><office:text>"#;
+const CONTENT_PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:text>"#;
 const CONTENT_SUFFIX: &str = "</office:text></office:body></office:document-content>";
 
 /// Detached builder; publication validates through the package facade.
@@ -198,6 +198,142 @@ pub(crate) fn render_fragment(blocks: &[crate::ContentBlock]) -> Result<String> 
         .ok_or_else(|| {
             Error::InvalidFormat("OTH rendered fragment envelope is invalid".to_string())
         })
+}
+
+pub(crate) fn render_inline(items: &[crate::inline::Content]) -> Result<(String, String)> {
+    let mut xml = String::new();
+    let mut text = String::new();
+    for item in items {
+        match item {
+            crate::inline::Content::Text(value) => {
+                xml.push_str(&quick_xml::escape::escape(value));
+                text.push_str(value);
+            },
+            crate::inline::Content::Link(link) => {
+                xml.push_str("<text:a xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xlink:href=\"");
+                xml.push_str(&quick_xml::escape::escape(link.href()));
+                xml.push_str("\">");
+                xml.push_str(&quick_xml::escape::escape(link.label()));
+                xml.push_str("</text:a>");
+                text.push_str(link.label());
+            },
+            crate::inline::Content::Span(span) => {
+                xml.push_str("<text:span xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" text:style-name=\"");
+                xml.push_str(&quick_xml::escape::escape(span.style_name()));
+                xml.push_str("\">");
+                xml.push_str(&quick_xml::escape::escape(span.text()));
+                xml.push_str("</text:span>");
+                text.push_str(span.text());
+            },
+            crate::inline::Content::Field(field) => {
+                let local = field_local(field.kind())?;
+                xml.push_str("<text:");
+                xml.push_str(local);
+                xml.push_str(" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"");
+                if let Some(name) = field.name() {
+                    xml.push_str(" text:name=\"");
+                    xml.push_str(&quick_xml::escape::escape(name));
+                    xml.push('"');
+                }
+                if let Some(value) = field.value() {
+                    xml.push_str(" office:string-value=\"");
+                    xml.push_str(&quick_xml::escape::escape(value));
+                    xml.push('"');
+                }
+                if field.is_fixed() {
+                    xml.push_str(" text:fixed=\"true\"");
+                }
+                xml.push('>');
+                xml.push_str(&quick_xml::escape::escape(field.display()));
+                xml.push_str("</text:");
+                xml.push_str(local);
+                xml.push('>');
+                text.push_str(field.display());
+            },
+            crate::inline::Content::BookmarkPoint(name) => {
+                push_bookmark(&mut xml, "bookmark", name);
+            },
+            crate::inline::Content::BookmarkRangeStart(name) => {
+                push_bookmark(&mut xml, "bookmark-start", name);
+            },
+            crate::inline::Content::BookmarkRangeEnd(name) => {
+                push_bookmark(&mut xml, "bookmark-end", name);
+            },
+        }
+    }
+    Ok((xml, text))
+}
+
+pub(crate) fn render_forms(forms: &[crate::form::Form]) -> Result<String> {
+    if forms.is_empty() {
+        return Ok(String::new());
+    }
+    let mut xml = String::from(
+        "<office:forms xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:form=\"urn:oasis:names:tc:opendocument:xmlns:form:1.0\">",
+    );
+    for form in forms {
+        xml.push_str("<form:form");
+        if let Some(name) = form.name() {
+            xml.push_str(" form:name=\"");
+            xml.push_str(&quick_xml::escape::escape(name));
+            xml.push('"');
+        }
+        xml.push('>');
+        for control in form.controls() {
+            if control.kind().is_empty()
+                || !control
+                    .kind()
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+            {
+                return Err(Error::InvalidFormat(
+                    "OTH form control kind is not a safe XML local name".to_string(),
+                ));
+            }
+            xml.push_str("<form:");
+            xml.push_str(control.kind());
+            if let Some(id) = control.id() {
+                xml.push_str(" form:id=\"");
+                xml.push_str(&quick_xml::escape::escape(id));
+                xml.push('"');
+            }
+            if let Some(name) = control.name() {
+                xml.push_str(" form:name=\"");
+                xml.push_str(&quick_xml::escape::escape(name));
+                xml.push('"');
+            }
+            xml.push_str("/>");
+        }
+        xml.push_str("</form:form>");
+    }
+    xml.push_str("</office:forms>");
+    Ok(xml)
+}
+
+fn push_bookmark(output: &mut String, local: &str, name: &str) {
+    output.push_str("<text:");
+    output.push_str(local);
+    output.push_str(" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\"");
+    output.push_str(" text:name=\"");
+    output.push_str(&quick_xml::escape::escape(name));
+    output.push_str("\"/>");
+}
+
+fn field_local(kind: &crate::field::Kind) -> Result<&str> {
+    match kind {
+        crate::field::Kind::Date => Ok("date"),
+        crate::field::Kind::Time => Ok("time"),
+        crate::field::Kind::PageNumber => Ok("page-number"),
+        crate::field::Kind::PageCount => Ok("page-count"),
+        crate::field::Kind::Title => Ok("title"),
+        crate::field::Kind::Subject => Ok("subject"),
+        crate::field::Kind::AuthorName => Ok("author-name"),
+        crate::field::Kind::User => Ok("user-field-get"),
+        crate::field::Kind::Variable => Ok("variable-get"),
+        crate::field::Kind::Other(_) => Err(Error::InvalidFormat(
+            "OTH authored inline field kind is unsupported".to_string(),
+        )),
+    }
 }
 
 fn render_list(output: &mut String, list: &crate::list::List) {

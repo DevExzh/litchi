@@ -7,7 +7,9 @@ use litchi_core::{HistoryLimits, Metadata, Position};
 use litchi_oth::{
     Block, Builder, History, JoinFailure, Patch, SecurityPolicy, Template, TransferPolicy,
     TransferSelector, field,
+    form::{Control, Form},
     heading::Heading,
+    inline::{Content as Inline, Field as InlineField, Span},
     link::Link,
     list::{Item, List},
     paragraph::Paragraph,
@@ -578,6 +580,136 @@ fn heading_list_durable_and_merge_workflows_are_source_checked() {
 }
 
 #[test]
+fn rich_inline_crud_is_durable_reversible_and_reopened() {
+    let source = structural_source();
+    let content = [
+        Inline::text("before "),
+        Inline::bookmark("point"),
+        Inline::Link(Link::new("https://example.test/oth", "linked")),
+        Inline::Span(Span::new("Strong", " styled")),
+        Inline::Field(
+            InlineField::new(field::Kind::Date, " today")
+                .with_value("2026-08-10")
+                .fixed(),
+        ),
+        Inline::bookmark_start("range"),
+        Inline::text(" ranged"),
+        Inline::bookmark_end("range"),
+    ];
+    let mut edit = source.edit();
+    edit.set_paragraph_inline(Position::new(0), &content)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let body = commit.template().text_body().unwrap();
+    let paragraph = &body.paragraphs()[0];
+    assert_eq!(paragraph.text(), "before linked styled today ranged");
+    assert_eq!(paragraph.links()[0].href(), "https://example.test/oth");
+    assert_eq!(paragraph.formatting_runs()[0].style_name(), "Strong");
+    assert!(matches!(paragraph.fields()[0].kind(), field::Kind::Date));
+    assert_eq!(body.bookmarks().len(), 2);
+    assert!(!commit.template().content_xml().contains(">\n<"));
+
+    let wire = commit.patch().to_bytes().unwrap();
+    let durable = Patch::from_bytes(&wire).unwrap();
+    assert_eq!(durable.inline_changes().len(), 1);
+    assert_eq!(
+        durable.apply(&source).unwrap().as_bytes(),
+        commit.template().as_bytes()
+    );
+    let inverse_wire = durable.inverse().to_bytes().unwrap();
+    let inverse = Patch::from_bytes(&inverse_wire).unwrap();
+    assert_eq!(
+        inverse.apply(commit.template()).unwrap().as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn inert_form_catalog_crud_is_durable_and_atomic() {
+    let source = structural_source();
+    let search =
+        Form::new("Search").with_control(Control::new("text").with_id("query").with_name("q"));
+    let mut create = source.edit();
+    create.set_forms(&[search]).unwrap();
+    let created = create.commit().unwrap();
+    assert_eq!(created.template().text_body().unwrap().forms().len(), 1);
+    assert_eq!(
+        created.template().text_body().unwrap().forms()[0].controls()[0].id(),
+        Some("query")
+    );
+    let durable = Patch::from_bytes(&created.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(durable.forms_change().unwrap().after().len(), 1);
+
+    let updated_form = Form::new("Search").with_control(Control::new("button").with_name("go"));
+    let mut update = created.template().edit();
+    update.set_forms(&[updated_form]).unwrap();
+    let updated = update.commit().unwrap();
+    assert_eq!(
+        updated.template().text_body().unwrap().forms()[0].controls()[0].kind(),
+        "button"
+    );
+
+    let mut remove = updated.template().edit();
+    remove.set_forms(&[]).unwrap();
+    let removed = remove.commit().unwrap();
+    assert!(removed.template().text_body().unwrap().forms().is_empty());
+    assert_eq!(
+        removed
+            .patch()
+            .inverse()
+            .apply(removed.template())
+            .unwrap()
+            .as_bytes(),
+        updated.template().as_bytes()
+    );
+}
+
+#[test]
+fn isolated_nested_list_replace_remove_is_durable() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text>"#,
+        r#"<text:list><text:list-item><text:p>outer</text:p><text:list><text:list-item><text:p>inner</text:p></text:list-item></text:list></text:list-item></text:list>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let source =
+        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
+    assert_eq!(source.text_body().unwrap().lists()[0].level(), 2);
+    let mut replacement_edit = source.edit();
+    replacement_edit
+        .set_list(
+            Position::new(0),
+            List::new([Item::new(Paragraph::new("nested replacement"))]),
+        )
+        .unwrap();
+    let replacement_commit = replacement_edit.commit().unwrap();
+    assert_eq!(
+        replacement_commit.template().text_body().unwrap().lists()[0].level(),
+        2
+    );
+    assert_eq!(
+        replacement_commit.template().text_body().unwrap().lists()[0].items()[0].paragraphs()[0]
+            .text(),
+        "nested replacement"
+    );
+    let durable = Patch::from_bytes(&replacement_commit.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(durable.list_changes()[0].before().unwrap().level(), 2);
+
+    let mut removal_edit = source.edit();
+    removal_edit.remove_list(Position::new(0)).unwrap();
+    let removal_commit = removal_edit.commit().unwrap();
+    assert_eq!(
+        removal_commit.template().text_body().unwrap().lists().len(),
+        1
+    );
+    assert_eq!(
+        removal_commit.template().text_body().unwrap().lists()[0].level(),
+        1
+    );
+}
+
+#[test]
 fn metadata_and_styles_are_durable_and_reversible() {
     let source = structural_source();
     let metadata = Metadata {
@@ -822,6 +954,24 @@ fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
     assert_eq!(commit.template().meta_xml(), source.meta_xml());
     assert_eq!(commit.template().styles_xml(), source.styles_xml());
     assert!(commit.template().styles_xml().is_some());
+    let mut rich_edit = commit.template().edit();
+    rich_edit
+        .set_paragraph_inline(
+            Position::new(0),
+            &[
+                Inline::bookmark("writer-web"),
+                Inline::text("Web "),
+                Inline::Link(Link::new("https://example.test/writer", "template")),
+            ],
+        )
+        .unwrap();
+    let rich_commit = rich_edit.commit().unwrap();
+    let rich_reopen = Template::from_bytes(rich_commit.template().as_bytes().to_vec()).unwrap();
+    assert_eq!(
+        rich_reopen.text_body().unwrap().paragraphs()[0].text(),
+        "Web template"
+    );
+    assert_eq!(rich_reopen.text_body().unwrap().bookmarks().len(), 1);
     assert_eq!(
         commit
             .patch()

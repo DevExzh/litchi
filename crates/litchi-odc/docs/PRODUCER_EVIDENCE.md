@@ -4,8 +4,10 @@ Checked on 2026-08-10 for the ODC remediation review.
 
 No genuine standalone producer-created `.odc` or `.fodc` is available in the
 checked-in corpus, repository history, or the local user filesystem. The local
-environment also has no `libreoffice` or `soffice` executable, so it cannot
-create and resave a standalone chart through LibreOffice for this review.
+environment also has no LibreOffice/OpenOffice, Calligra, or OnlyOffice desktop
+producer executable, no usable UNO Python bridge, and no installed local
+producer package. It therefore cannot create and resave a standalone chart
+through a native chart producer for this review.
 
 The repository does contain genuine LibreOffice chart subdocuments inside
 producer-created `.fods` and `.fodt` files. Those embedded XML fragments are

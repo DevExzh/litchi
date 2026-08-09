@@ -13,7 +13,7 @@ pub(crate) use model::{
     Active, Create, Dialect, MAX_ACTIVE_TAB, MAX_SHEET_ID, MAX_SHEETS, Order, Plan, Remove, Rename,
     State, Tab,
 };
-pub(crate) use package::{append, remove, rewrite};
+pub(crate) use package::{append, remove, replace_defined_names, rewrite};
 
 #[cfg(test)]
 mod tests {

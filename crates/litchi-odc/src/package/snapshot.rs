@@ -225,7 +225,7 @@ fn publish_content_splice<W: Write>(
         ));
     }
     let mut publication = XmlSplicePublication::new(source_part.clone());
-    for splice in patch.axis_tag_splices()? {
+    for splice in patch.tag_splices()? {
         let proof = source_part.checked_range(splice.range, &splice.expected)?;
         let fragment = if splice.replacement.ends_with(b"/>") {
             AuthoredXmlFragment::markup(splice.replacement)?

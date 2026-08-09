@@ -11,6 +11,7 @@ pub mod annotation;
 pub mod authoring;
 pub mod charts;
 pub mod codec;
+pub mod content;
 pub mod facade;
 pub mod handout_master;
 pub mod model;

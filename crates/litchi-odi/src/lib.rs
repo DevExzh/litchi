@@ -7,9 +7,8 @@
 )]
 #![allow(
     clippy::arbitrary_source_item_ordering,
-    clippy::map_err_ignore,
     clippy::shadow_reuse,
-    reason = "image codecs follow ODF traversal order and normalize dependency errors at the facade boundary"
+    reason = "image codecs follow ODF traversal order and keep source/target names aligned with ODF traversal"
 )]
 
 mod authoring;

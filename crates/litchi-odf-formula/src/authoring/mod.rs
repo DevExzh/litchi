@@ -1,6 +1,7 @@
 //! Typed `MathML` constructors and Formula package authoring.
 
 mod constructors;
+pub mod content;
 
 use litchi_core::Result;
 
@@ -8,9 +9,8 @@ use crate::model::Element;
 
 pub use constructors::{
     Display, Variant, document_root, fenced, fraction, identifier, identifier_with_variant,
-    literal_text, number, operator, over, root, row, semantics, semantics_with_opaque_starmath,
-    semantics_with_starmath, square_root, string_literal, sub_superscript, subscript, superscript,
-    table, under, under_over,
+    literal_text, number, operator, over, root, row, semantics, square_root, string_literal,
+    sub_superscript, subscript, superscript, table, under, under_over,
 };
 
 /// Build a Formula package from an inert `MathML` root.

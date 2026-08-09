@@ -325,6 +325,7 @@ impl<'snapshot> Iterator for Inlines<'snapshot> {
 /// A borrowed reference-graph entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Reference<'snapshot> {
+    source: &'snapshot str,
     record: &'snapshot ReferenceRecord,
 }
 
@@ -353,6 +354,12 @@ impl Reference<'_> {
         self.record.range.clone()
     }
 
+    /// Exact Markdown source represented by this reference use or definition.
+    #[must_use]
+    pub fn source(&self) -> &str {
+        &self.source[self.record.range.clone()]
+    }
+
     /// Optional interpreted source title.
     #[must_use]
     pub fn title(&self) -> Option<&str> {
@@ -363,6 +370,7 @@ impl Reference<'_> {
 /// Iterator over the source-ordered reference graph.
 #[derive(Clone, Debug)]
 pub struct References<'snapshot> {
+    source: &'snapshot str,
     records: std::slice::Iter<'snapshot, ReferenceRecord>,
 }
 
@@ -372,7 +380,10 @@ impl<'snapshot> Iterator for References<'snapshot> {
     type Item = Reference<'snapshot>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.records.next().map(|record| Reference { record })
+        self.records.next().map(|record| Reference {
+            source: self.source,
+            record,
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -521,6 +532,7 @@ impl Snapshot {
     #[must_use]
     pub fn references(&self) -> References<'_> {
         References {
+            source: &self.state.source,
             records: self.state.references.iter(),
         }
     }

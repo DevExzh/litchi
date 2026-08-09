@@ -6,8 +6,8 @@ pub use litchi_core::patch::HistoryLimits;
 pub use snapshot::{
     Change, Commit, ControlReferenceChange, DurablePatch, GeometryChange, JoinedEdits, LayerChange,
     Lineage, MergePlan, NameChange, PageNameChange, PageStyleChange, Patch, PathChange,
-    PreparedEdit, ResourceChange, SecurityStatus, ShapeTransfer, Snapshot,
+    PreparedEdit, ResourceChange, SecurityStatus, SecurityWritePolicy, ShapeTransfer, Snapshot,
     SnapshotHistory as History, StructureChange, StyleChange, TextChange, Transaction,
-    TransferResource,
+    TransferControl, TransferResource, TransferStyle,
 };
 pub(crate) use snapshot::{MIMETYPE, TEMPLATE_MIMETYPE};

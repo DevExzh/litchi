@@ -8,10 +8,12 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{ops::Range, sync::Arc};
+use std::{collections::BTreeSet, ops::Range, sync::Arc};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const CHART: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
+const SVG: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
+const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const MAX_NAME_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug)]
@@ -19,8 +21,26 @@ struct State {
     bytes: Vec<u8>,
     chart: Element,
     axes: Vec<AxisRecord>,
+    chart_tag: EditableTag,
+    plot_tag: EditableTag,
+    series_tags: Vec<EditableTag>,
     root_kind: RootKind,
     limits: crate::Limits,
+}
+
+#[derive(Clone, Debug)]
+struct EditableTag {
+    tag: Range<usize>,
+    prefix: Option<String>,
+    attributes: Vec<AttributeRecord>,
+}
+
+#[derive(Clone, Debug)]
+struct AttributeRecord {
+    attribute: ExactAttribute,
+    value: String,
+    value_span: Range<usize>,
+    attribute_span: Range<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -99,12 +119,27 @@ impl FlatChart {
         self.0.limits
     }
 
+    /// Return one controlled attribute value after namespace resolution.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector or target/attribute pairing.
+    pub fn exact_value(
+        &self,
+        target: ExactTarget,
+        attribute: ExactAttribute,
+    ) -> Result<Option<&str>> {
+        validate_exact_pair(target, attribute)?;
+        Ok(self.tag(target)?.value(attribute))
+    }
+
     /// Starts a detached transaction bound to this source snapshot.
     #[must_use]
     pub fn edit(&self) -> FlatChartEdit {
         FlatChartEdit {
             source: self.clone(),
             changes: Vec::new(),
+            exact_changes: Vec::new(),
         }
     }
 
@@ -120,6 +155,99 @@ impl FlatChart {
             .get(index)
             .map(|axis| axis.name.as_deref())
             .ok_or_else(|| invalid_error("flat ODC axis selector is out of bounds"))
+    }
+
+    fn tag(&self, target: ExactTarget) -> Result<&EditableTag> {
+        match target {
+            ExactTarget::Chart => Ok(&self.0.chart_tag),
+            ExactTarget::PlotArea => Ok(&self.0.plot_tag),
+            ExactTarget::Series(index) => self
+                .0
+                .series_tags
+                .get(index)
+                .ok_or_else(|| invalid_error("flat ODC series selector is out of bounds")),
+        }
+    }
+}
+
+impl EditableTag {
+    fn value(&self, attribute: ExactAttribute) -> Option<&str> {
+        self.attributes
+            .iter()
+            .find(|record| record.attribute == attribute)
+            .map(|record| record.value.as_str())
+    }
+
+    fn record(&self, attribute: ExactAttribute) -> Option<&AttributeRecord> {
+        self.attributes
+            .iter()
+            .find(|record| record.attribute == attribute)
+    }
+}
+
+/// A byte-preserving exact-edit target outside the axis compatibility surface.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ExactTarget {
+    /// The root `chart:chart` element.
+    Chart,
+    /// The chart's single `chart:plot-area` element.
+    PlotArea,
+    /// A direct plot-area series selected by zero-based position.
+    Series(usize),
+}
+
+/// A controlled chart attribute supported by exact-span editing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ExactAttribute {
+    Class,
+    StyleName,
+    Width,
+    Height,
+    X,
+    Y,
+    CellRangeAddress,
+    ValuesCellRangeAddress,
+    LabelCellAddress,
+    AttachedAxis,
+}
+
+/// One validated exact-span attribute change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExactChange {
+    target: ExactTarget,
+    attribute: ExactAttribute,
+    before: Option<String>,
+    after: Option<String>,
+}
+
+impl ExactChange {
+    pub(crate) fn new_inverse(change: &Self) -> Self {
+        Self {
+            target: change.target,
+            attribute: change.attribute,
+            before: change.after.clone(),
+            after: change.before.clone(),
+        }
+    }
+
+    #[must_use]
+    pub const fn target(&self) -> ExactTarget {
+        self.target
+    }
+
+    #[must_use]
+    pub const fn attribute(&self) -> ExactAttribute {
+        self.attribute
+    }
+
+    #[must_use]
+    pub fn before(&self) -> Option<&str> {
+        self.before.as_deref()
+    }
+
+    #[must_use]
+    pub fn after(&self) -> Option<&str> {
+        self.after.as_deref()
     }
 }
 
@@ -179,9 +307,65 @@ impl AxisUpdate {
 pub struct FlatChartEdit {
     source: FlatChart,
     changes: Vec<AxisChange>,
+    exact_changes: Vec<ExactChange>,
 }
 
 impl FlatChartEdit {
+    /// Stage a controlled attribute edit on the chart, plot area, or a series.
+    ///
+    /// `None` removes an existing optional attribute. Adding an absent
+    /// attribute is supported only for chart-namespace attributes whose
+    /// namespace prefix is proven by the selected element name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid target/attribute pair, selector, value,
+    /// or a namespace insertion that cannot be represented losslessly.
+    pub fn update_exact(
+        &mut self,
+        target: ExactTarget,
+        attribute: ExactAttribute,
+        after: Option<String>,
+    ) -> Result<()> {
+        validate_exact_pair(target, attribute)?;
+        if after.as_ref().is_some_and(|value| {
+            value.len() > MAX_NAME_BYTES || value.len() > self.source.0.limits.max_scalar_bytes()
+        }) {
+            return Err(invalid_error("flat ODC attribute exceeds its byte limit"));
+        }
+        let tag = self.source.tag(target)?;
+        let before = tag.value(attribute).map(str::to_owned);
+        let current = self
+            .exact_changes
+            .iter()
+            .find(|change| change.target == target && change.attribute == attribute)
+            .map_or_else(|| before.clone(), |change| change.after.clone());
+        if current == after {
+            return Ok(());
+        }
+        if before == after {
+            self.exact_changes
+                .retain(|change| change.target != target || change.attribute != attribute);
+            return Ok(());
+        }
+        let change = ExactChange {
+            target,
+            attribute,
+            before,
+            after,
+        };
+        if let Some(slot) = self
+            .exact_changes
+            .iter_mut()
+            .find(|candidate| candidate.target == target && candidate.attribute == attribute)
+        {
+            *slot = change;
+        } else {
+            self.exact_changes.push(change);
+        }
+        Ok(())
+    }
+
     /// Stages an axis update by plot-area axis index.
     ///
     /// # Errors
@@ -243,8 +427,12 @@ impl FlatChartEdit {
     /// Returns an error when a change cannot be applied losslessly or the
     /// candidate fails structural validation and typed readback.
     pub fn commit(self) -> Result<FlatChartCommit> {
-        let FlatChartEdit { source, changes } = self;
-        let mut replacements = Vec::with_capacity(changes.len());
+        let FlatChartEdit {
+            source,
+            changes,
+            exact_changes,
+        } = self;
+        let mut replacements = Vec::with_capacity(changes.len() + exact_changes.len());
         for change in &changes {
             let axis = &source.0.axes[change.index];
             if change.before != change.after {
@@ -270,6 +458,16 @@ impl FlatChartEdit {
                 )?;
             }
         }
+        for change in &exact_changes {
+            let tag = source.tag(change.target)?;
+            stage_exact_attribute(
+                &source,
+                tag,
+                change.attribute,
+                change.after.as_ref(),
+                &mut replacements,
+            )?;
+        }
         replacements.sort_unstable_by_key(|replacement| std::cmp::Reverse(replacement.range.start));
         let mut bytes = source.as_bytes().to_vec();
         let mut previous = bytes.len();
@@ -294,12 +492,18 @@ impl FlatChartEdit {
                 return Err(invalid_error("flat ODC style edit failed typed readback"));
             }
         }
+        for change in &exact_changes {
+            if snapshot.tag(change.target)?.value(change.attribute) != change.after.as_deref() {
+                return Err(invalid_error("flat ODC exact edit failed typed readback"));
+            }
+        }
         Ok(FlatChartCommit {
             snapshot: snapshot.clone(),
             patch: FlatChartPatch {
                 source,
                 target: snapshot,
                 changes,
+                exact_changes,
             },
         })
     }
@@ -345,6 +549,7 @@ pub struct FlatChartPatch {
     source: FlatChart,
     target: FlatChart,
     changes: Vec<AxisChange>,
+    exact_changes: Vec<ExactChange>,
 }
 
 impl PartialEq for FlatChartPatch {
@@ -352,6 +557,7 @@ impl PartialEq for FlatChartPatch {
         self.source.as_bytes() == other.source.as_bytes()
             && self.target.as_bytes() == other.target.as_bytes()
             && self.changes == other.changes
+            && self.exact_changes == other.exact_changes
     }
 }
 
@@ -370,20 +576,49 @@ impl FlatChartPatch {
         &self.changes
     }
 
-    pub(crate) fn axis_tag_splices(&self) -> Result<Vec<AxisTagSplice>> {
+    /// Returns the ordered chart, plot-area, and series attribute changes.
+    #[must_use]
+    pub fn exact_changes(&self) -> &[ExactChange] {
+        &self.exact_changes
+    }
+
+    pub(crate) fn tag_splices(&self) -> Result<Vec<TagSplice>> {
         if self.source.0.axes.len() != self.target.0.axes.len() {
             return Err(invalid_error(
                 "flat ODC axis splice changed the axis inventory",
             ));
         }
-        let mut splices = Vec::with_capacity(self.changes.len());
-        for change in &self.changes {
-            let source_axis = &self.source.0.axes[change.index];
-            let target_axis = &self.target.0.axes[change.index];
-            splices.push(AxisTagSplice {
-                range: source_axis.tag.clone(),
-                expected: self.source.as_bytes()[source_axis.tag.clone()].to_vec(),
-                replacement: self.target.as_bytes()[target_axis.tag.clone()].to_vec(),
+        if self.source.0.series_tags.len() != self.target.0.series_tags.len() {
+            return Err(invalid_error(
+                "flat ODC splice changed the series inventory",
+            ));
+        }
+        let mut targets = self
+            .changes
+            .iter()
+            .map(|change| SpliceTarget::Axis(change.index))
+            .chain(
+                self.exact_changes
+                    .iter()
+                    .map(|change| SpliceTarget::Exact(change.target)),
+            )
+            .collect::<BTreeSet<_>>();
+        let mut splices = Vec::with_capacity(targets.len());
+        for splice_target in std::mem::take(&mut targets) {
+            let (source_tag, target_tag) = match splice_target {
+                SpliceTarget::Axis(index) => (
+                    self.source.0.axes[index].tag.clone(),
+                    self.target.0.axes[index].tag.clone(),
+                ),
+                SpliceTarget::Exact(exact_target) => (
+                    self.source.tag(exact_target)?.tag.clone(),
+                    self.target.tag(exact_target)?.tag.clone(),
+                ),
+            };
+            splices.push(TagSplice {
+                range: source_tag.clone(),
+                expected: self.source.as_bytes()[source_tag].to_vec(),
+                replacement: self.target.as_bytes()[target_tag].to_vec(),
             });
         }
         let mut rebuilt = self.source.as_bytes().to_vec();
@@ -393,7 +628,7 @@ impl FlatChartPatch {
         }
         if rebuilt != self.target.as_bytes() {
             return Err(invalid_error(
-                "flat ODC axis splice does not reproduce its committed target",
+                "flat ODC tag splice does not reproduce its committed target",
             ));
         }
         Ok(splices)
@@ -422,6 +657,16 @@ impl FlatChartPatch {
                     after: change.before.clone(),
                     before_style_name: change.after_style_name.clone(),
                     after_style_name: change.before_style_name.clone(),
+                })
+                .collect(),
+            exact_changes: self
+                .exact_changes
+                .iter()
+                .map(|change| ExactChange {
+                    target: change.target,
+                    attribute: change.attribute,
+                    before: change.after.clone(),
+                    after: change.before.clone(),
                 })
                 .collect(),
         }
@@ -518,10 +763,16 @@ struct Replacement {
     value: Vec<u8>,
 }
 
-pub(crate) struct AxisTagSplice {
+pub(crate) struct TagSplice {
     pub(crate) range: Range<usize>,
     pub(crate) expected: Vec<u8>,
     pub(crate) replacement: Vec<u8>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum SpliceTarget {
+    Axis(usize),
+    Exact(ExactTarget),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -535,6 +786,119 @@ enum NamespaceKind {
     Office,
     Chart,
     Other,
+}
+
+pub(crate) fn exact_changes_between(source: &FlatChart, target: &FlatChart) -> Vec<ExactChange> {
+    if source.0.series_tags.len() != target.0.series_tags.len() {
+        return Vec::new();
+    }
+    let targets = std::iter::once(ExactTarget::Chart)
+        .chain(std::iter::once(ExactTarget::PlotArea))
+        .chain((0..source.0.series_tags.len()).map(ExactTarget::Series));
+    let mut changes = Vec::new();
+    for exact_target in targets {
+        let Ok(source_tag) = source.tag(exact_target) else {
+            continue;
+        };
+        let Ok(target_tag) = target.tag(exact_target) else {
+            continue;
+        };
+        let attributes = source_tag
+            .attributes
+            .iter()
+            .map(|record| record.attribute)
+            .chain(target_tag.attributes.iter().map(|record| record.attribute))
+            .collect::<BTreeSet<_>>();
+        for attribute in attributes {
+            let before = source_tag.value(attribute).map(str::to_owned);
+            let after = target_tag.value(attribute).map(str::to_owned);
+            if before != after {
+                changes.push(ExactChange {
+                    target: exact_target,
+                    attribute,
+                    before,
+                    after,
+                });
+            }
+        }
+    }
+    changes
+}
+
+fn validate_exact_pair(target: ExactTarget, attribute: ExactAttribute) -> Result<()> {
+    let valid = match target {
+        ExactTarget::Chart => matches!(
+            attribute,
+            ExactAttribute::Class
+                | ExactAttribute::StyleName
+                | ExactAttribute::Width
+                | ExactAttribute::Height
+        ),
+        ExactTarget::PlotArea => matches!(
+            attribute,
+            ExactAttribute::StyleName
+                | ExactAttribute::CellRangeAddress
+                | ExactAttribute::X
+                | ExactAttribute::Y
+                | ExactAttribute::Width
+                | ExactAttribute::Height
+        ),
+        ExactTarget::Series(_) => matches!(
+            attribute,
+            ExactAttribute::Class
+                | ExactAttribute::StyleName
+                | ExactAttribute::ValuesCellRangeAddress
+                | ExactAttribute::LabelCellAddress
+                | ExactAttribute::AttachedAxis
+        ),
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(invalid_error(
+            "flat ODC attribute is not valid for the selected element",
+        ))
+    }
+}
+
+fn exact_attribute(namespace: &ResolveResult<'_>, local: &[u8]) -> Option<ExactAttribute> {
+    if resolved(namespace, CHART) {
+        match local {
+            b"class" => Some(ExactAttribute::Class),
+            b"style-name" => Some(ExactAttribute::StyleName),
+            b"values-cell-range-address" => Some(ExactAttribute::ValuesCellRangeAddress),
+            b"label-cell-address" => Some(ExactAttribute::LabelCellAddress),
+            b"attached-axis" => Some(ExactAttribute::AttachedAxis),
+            _ => None,
+        }
+    } else if resolved(namespace, SVG) {
+        match local {
+            b"width" => Some(ExactAttribute::Width),
+            b"height" => Some(ExactAttribute::Height),
+            b"x" => Some(ExactAttribute::X),
+            b"y" => Some(ExactAttribute::Y),
+            _ => None,
+        }
+    } else if resolved(namespace, TABLE) && local == b"cell-range-address" {
+        Some(ExactAttribute::CellRangeAddress)
+    } else {
+        None
+    }
+}
+
+fn attribute_name(attribute: ExactAttribute) -> (&'static [u8], &'static str) {
+    match attribute {
+        ExactAttribute::Class => (CHART, "class"),
+        ExactAttribute::StyleName => (CHART, "style-name"),
+        ExactAttribute::Width => (SVG, "width"),
+        ExactAttribute::Height => (SVG, "height"),
+        ExactAttribute::X => (SVG, "x"),
+        ExactAttribute::Y => (SVG, "y"),
+        ExactAttribute::CellRangeAddress => (TABLE, "cell-range-address"),
+        ExactAttribute::ValuesCellRangeAddress => (CHART, "values-cell-range-address"),
+        ExactAttribute::LabelCellAddress => (CHART, "label-cell-address"),
+        ExactAttribute::AttachedAxis => (CHART, "attached-axis"),
+    }
 }
 
 fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<State> {
@@ -567,6 +931,9 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
     let mut root_start_name = None;
     let mut root_end_name = None;
     let mut axes = Vec::new();
+    let mut chart_tag = None;
+    let mut plot_tag = None;
+    let mut series_tags = Vec::new();
 
     loop {
         let event_start = usize::try_from(reader.buffer_position())
@@ -616,12 +983,28 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                     }
                     chart_seen = true;
                     chart_depth = Some(event_depth);
+                    chart_tag = Some(record_editable_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        ExactTarget::Chart,
+                        limits,
+                    )?);
                 } else if namespace == NamespaceKind::Chart && local.as_ref() == b"plot-area" {
                     if chart_depth != Some(event_depth - 1) || plot_seen {
                         return Err(invalid_error("chart:plot-area is misplaced or duplicated"));
                     }
                     plot_seen = true;
                     plot_depth = Some(event_depth);
+                    plot_tag = Some(record_editable_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        ExactTarget::PlotArea,
+                        limits,
+                    )?);
                 } else if namespace == NamespaceKind::Chart
                     && local.as_ref() == b"axis"
                     && plot_depth == Some(event_depth - 1)
@@ -634,6 +1017,19 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         &mut axes,
                         limits,
                     )?;
+                } else if namespace == NamespaceKind::Chart
+                    && local.as_ref() == b"series"
+                    && plot_depth == Some(event_depth - 1)
+                {
+                    let index = series_tags.len();
+                    series_tags.push(record_editable_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        ExactTarget::Series(index),
+                        limits,
+                    )?);
                 }
                 depth = event_depth;
             },
@@ -652,6 +1048,14 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         return Err(invalid_error("chart:plot-area is misplaced or duplicated"));
                     }
                     plot_seen = true;
+                    plot_tag = Some(record_editable_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        ExactTarget::PlotArea,
+                        limits,
+                    )?);
                 }
                 if namespace == NamespaceKind::Chart
                     && local.as_ref() == b"axis"
@@ -665,6 +1069,20 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         &mut axes,
                         limits,
                     )?;
+                }
+                if namespace == NamespaceKind::Chart
+                    && local.as_ref() == b"series"
+                    && plot_depth == Some(event_depth - 1)
+                {
+                    let index = series_tags.len();
+                    series_tags.push(record_editable_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        ExactTarget::Series(index),
+                        limits,
+                    )?);
                 }
             },
             Event::End(element) => {
@@ -765,8 +1183,68 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
         bytes,
         chart,
         axes,
+        chart_tag: chart_tag.ok_or_else(|| invalid_error("flat ODC chart tag is missing"))?,
+        plot_tag: plot_tag.ok_or_else(|| invalid_error("flat ODC plot-area tag is missing"))?,
+        series_tags,
         root_kind,
         limits,
+    })
+}
+
+fn record_editable_tag(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    tag: Range<usize>,
+    bytes: &[u8],
+    target: ExactTarget,
+    limits: crate::Limits,
+) -> Result<EditableTag> {
+    let mut attributes = Vec::new();
+    for attribute_result in element.attributes().with_checks(true) {
+        let source_attribute = attribute_result
+            .map_err(|error| invalid_error(format!("invalid flat ODC attribute: {error}")))?;
+        let (namespace, local) = reader.resolver().resolve_attribute(source_attribute.key);
+        let Some(attribute) = exact_attribute(&namespace, local.as_ref()) else {
+            continue;
+        };
+        if validate_exact_pair(target, attribute).is_err() {
+            continue;
+        }
+        if attributes
+            .iter()
+            .any(|record: &AttributeRecord| record.attribute == attribute)
+        {
+            return Err(invalid_error(
+                "flat ODC element has a duplicate controlled attribute",
+            ));
+        }
+        let value = source_attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| invalid_error(format!("invalid flat ODC attribute value: {error}")))?
+            .into_owned();
+        if value.len() > MAX_NAME_BYTES || value.len() > limits.max_scalar_bytes() {
+            return Err(invalid_error("flat ODC attribute exceeds its byte limit"));
+        }
+        let (value_span, attribute_span) =
+            attribute_spans(&bytes[tag.clone()], source_attribute.key.as_ref())?;
+        attributes.push(AttributeRecord {
+            attribute,
+            value,
+            value_span: tag.start + value_span.start..tag.start + value_span.end,
+            attribute_span: tag.start + attribute_span.start..tag.start + attribute_span.end,
+        });
+    }
+    let prefix = element
+        .name()
+        .as_ref()
+        .split(|byte| *byte == b':')
+        .next()
+        .filter(|_| element.name().as_ref().contains(&b':'))
+        .map(|value| String::from_utf8_lossy(value).into_owned());
+    Ok(EditableTag {
+        tag,
+        prefix,
+        attributes,
     })
 }
 
@@ -895,6 +1373,47 @@ fn stage_axis_attribute(
         (None, Some(_), None) | (Some(_), None, Some(_)) => {
             return Err(invalid_error("flat ODC axis attribute span is incomplete"));
         },
+    }
+    Ok(())
+}
+
+fn stage_exact_attribute(
+    source: &FlatChart,
+    tag: &EditableTag,
+    attribute: ExactAttribute,
+    after: Option<&String>,
+    replacements: &mut Vec<Replacement>,
+) -> Result<()> {
+    let existing_record = tag.record(attribute);
+    match (after, existing_record) {
+        (Some(new_value), Some(attribute_record)) => replacements.push(Replacement {
+            range: attribute_record.value_span.clone(),
+            value: escape_attribute(new_value).into_bytes(),
+        }),
+        (None, Some(attribute_record)) => replacements.push(Replacement {
+            range: attribute_record.attribute_span.clone(),
+            value: Vec::new(),
+        }),
+        (Some(new_value), None) => {
+            let (namespace, local) = attribute_name(attribute);
+            if namespace != CHART {
+                return Err(Error::Unsupported(format!(
+                    "cannot add {local} without a lossless namespace-prefix proof"
+                )));
+            }
+            let prefix = tag.prefix.as_deref().ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "cannot add chart:{local} without a lossless chart namespace prefix"
+                ))
+            })?;
+            let relative = insertion_offset(&source.as_bytes()[tag.tag.clone()])?;
+            replacements.push(Replacement {
+                range: tag.tag.start + relative..tag.tag.start + relative,
+                value: format!(" {prefix}:{local}=\"{}\"", escape_attribute(new_value))
+                    .into_bytes(),
+            });
+        },
+        (None, None) => {},
     }
     Ok(())
 }

@@ -1,6 +1,6 @@
 //! Detached composition of ordinary presentation-domain edits.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 
@@ -213,6 +213,282 @@ impl Transaction {
             .get_part_mut(&selected_slide.part_name)?
             .set_blob(xml);
         Ok(true)
+    }
+
+    /// Add a plain `DrawingML` text box without rebuilding the surrounding slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid text, geometry, malformed slide XML, or an
+    /// exhausted non-visual shape-ID space.
+    pub fn add_text_box<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        text: impl AsRef<str>,
+        bounds: (i64, i64, i64, i64),
+    ) -> Result<u32> {
+        let selected = self.resolve_slide(slide.into())?;
+        let owner = self.working.get_part(&selected.part_name)?;
+        let scene = crate::shape::Scene::read(owner.blob())?;
+        let shape_id = next_shape_id(&scene, "text box")?;
+        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let fragment = text_box_fragment(
+            text.as_ref(),
+            bounds,
+            shape_id,
+            conformance,
+            self.source.limits,
+        )?;
+        self.append_checked_shape(&selected, shape_id, fragment.as_bytes())?;
+        Ok(shape_id)
+    }
+
+    /// Add a rectangular preset shape with an optional six-digit sRGB fill.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid geometry/fill, malformed slide XML, or an
+    /// exhausted non-visual shape-ID space.
+    pub fn add_rectangle<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        bounds: (i64, i64, i64, i64),
+        fill_color: Option<&str>,
+    ) -> Result<u32> {
+        self.add_preset_shape(slide.into(), "rect", "Rectangle", bounds, fill_color)
+    }
+
+    /// Add an elliptical preset shape with an optional six-digit sRGB fill.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid geometry/fill, malformed slide XML, or an
+    /// exhausted non-visual shape-ID space.
+    pub fn add_ellipse<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        bounds: (i64, i64, i64, i64),
+        fill_color: Option<&str>,
+    ) -> Result<u32> {
+        self.add_preset_shape(slide.into(), "ellipse", "Ellipse", bounds, fill_color)
+    }
+
+    /// Add one visible picture and its collision-safe inert image part.
+    ///
+    /// The resource must use an `image/*` content type and a `/ppt/media/`
+    /// preferred part name. Its bytes are retained inertly and never decoded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid resource metadata, empty/oversized data,
+    /// invalid geometry, malformed slide XML, or an exhausted shape-ID space.
+    pub fn add_picture<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        name: impl AsRef<str>,
+        resource: &crate::media_parts::Resource,
+        bounds: (i64, i64, i64, i64),
+    ) -> Result<u32> {
+        let selected = self.resolve_slide(slide.into())?;
+        validate_bounds(bounds, "picture")?;
+        validate_shape_text(name.as_ref(), self.source.limits, "picture name")?;
+        if resource.data.is_empty() {
+            return Err(invalid(
+                "opened-presentation picture resource cannot be empty",
+            ));
+        }
+        if resource.data.len() > self.source.limits.max_patch_bytes() {
+            return Err(Error::Limit {
+                resource: "opened-presentation picture bytes",
+                limit: self.source.limits.max_patch_bytes(),
+            });
+        }
+        if !resource.content_type.starts_with("image/") {
+            return Err(invalid(
+                "opened-presentation picture resource must use an image content type",
+            ));
+        }
+        let preferred = PackURI::new(&resource.part_name).map_err(Error::Invalid)?;
+        if !preferred.as_str().starts_with("/ppt/media/") {
+            return Err(invalid(
+                "opened-presentation picture resource must use a /ppt/media/ part name",
+            ));
+        }
+        let owner = self.working.get_part(&selected.part_name)?;
+        let scene = crate::shape::Scene::read(owner.blob())?;
+        let shape_id = next_shape_id(&scene, "picture")?;
+        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let reserved: HashSet<_> = self
+            .working
+            .iter_parts()
+            .map(|part| part.partname().clone())
+            .collect();
+        let part_name = available_transfer_name(&preferred, &reserved)?;
+        let mut candidate = self.working.clone();
+        candidate.try_add_part(Box::new(BlobPart::new(
+            part_name.clone(),
+            resource.content_type.clone(),
+            resource.data.as_slice().to_vec(),
+        )))?;
+        let target = part_name.relative_ref(selected.part_name.base_uri());
+        let relationship_id = candidate
+            .get_part_mut(&selected.part_name)?
+            .relate_to(&target, conformance_image_relationship(conformance));
+        let fragment = picture_fragment(
+            name.as_ref(),
+            bounds,
+            shape_id,
+            &relationship_id,
+            conformance,
+        );
+        let xml = super::xml::append_shape(
+            candidate.get_part(&selected.part_name)?.blob(),
+            fragment.as_bytes(),
+        )?;
+        ensure_shape_id(&xml, shape_id, "picture")?;
+        candidate.get_part_mut(&selected.part_name)?.set_blob(xml);
+        self.working = candidate;
+        Ok(shape_id)
+    }
+
+    /// Remove one top-level shape and any relationship closure made unreachable.
+    ///
+    /// Relationships still referenced elsewhere on the slide and parts shared
+    /// from any package owner are retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous selector or malformed shape and
+    /// relationship topology.
+    pub fn remove_shape<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let key = shape.into();
+        let owner = self.working.get_part(&selected.part_name)?;
+        let scene = crate::shape::Scene::read(owner.blob())?;
+        let _shape = scene.shape(key)?;
+        let span = crate::tag::shape::selected_raw_span(owner.blob(), key)?;
+        let removed_relationships = shape_relationship_ids(&owner.blob()[span.clone()])?;
+        let mut xml = Vec::with_capacity(owner.blob().len().saturating_sub(span.len()));
+        xml.extend_from_slice(&owner.blob()[..span.start]);
+        xml.extend_from_slice(&owner.blob()[span.end..]);
+        let retained_relationships = shape_relationship_ids(&xml)?;
+        let mut candidate = self.working.clone();
+        let mut dependency_roots = Vec::new();
+        {
+            let owner = candidate.get_part_mut(&selected.part_name)?;
+            owner.set_blob(xml);
+            for relationship_id in removed_relationships {
+                if retained_relationships.contains(&relationship_id) {
+                    continue;
+                }
+                let Some(relationship) = owner.rels_mut().remove(&relationship_id) else {
+                    continue;
+                };
+                if !relationship.is_external() {
+                    dependency_roots.push(relationship.target_partname()?);
+                }
+            }
+        }
+        remove_unreferenced_dependencies(&mut candidate, dependency_roots)?;
+        self.working = candidate;
+        Ok(true)
+    }
+
+    /// Copy one common top-level shape and every internal relationship target
+    /// reachable from it into a destination slide.
+    ///
+    /// Part collisions, relationship IDs, and the destination shape identity
+    /// are remapped deterministically. Groups, connectors, and unknown shapes
+    /// are refused because their internal identity references are not safely
+    /// generalizable.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsupported shapes, malformed XML/relationships,
+    /// missing dependencies, or exceeded transaction bounds.
+    pub fn transfer_shape<'ss, 'sk, 'ds>(
+        &mut self,
+        source: &Snapshot,
+        source_slide: impl Into<crate::slide::Key<'ss>>,
+        source_shape: impl Into<crate::shape::Key<'sk>>,
+        destination_slide: impl Into<crate::slide::Key<'ds>>,
+    ) -> Result<u32> {
+        let source_slide = resolve_snapshot_slide(source, source_slide.into())?;
+        let destination = self.resolve_slide(destination_slide.into())?;
+        let source_owner = source.package.get_part(&source_slide.part_name)?;
+        let source_scene = crate::shape::Scene::read(source_owner.blob())?;
+        let key = source_shape.into();
+        let shape = source_scene.shape(key)?;
+        if matches!(
+            shape,
+            crate::shape::Shape::Group(_)
+                | crate::shape::Shape::Connector(_)
+                | crate::shape::Shape::Unknown(_)
+        ) {
+            return Err(invalid(
+                "opened-presentation cannot safely transfer this shape kind",
+            ));
+        }
+        let span = crate::tag::shape::selected_raw_span(source_owner.blob(), key)?;
+        let fragment = &source_owner.blob()[span];
+        let relationship_ids = shape_relationship_ids(fragment)?;
+        let mut roots = Vec::new();
+        let mut relationships = Vec::new();
+        for relationship_id in relationship_ids {
+            let relationship = source_owner.rels().get(&relationship_id).ok_or_else(|| {
+                invalid(format!(
+                    "opened-presentation transferred shape relationship {relationship_id} is missing"
+                ))
+            })?;
+            if !relationship.is_external() {
+                roots.push(relationship.target_partname()?);
+            }
+            relationships.push(relationship.clone());
+        }
+        let mapping = plan_transfer_roots(
+            source.package.as_ref(),
+            &self.working,
+            roots,
+            self.source.limits.max_parts(),
+        )?;
+        let mut candidate = self.working.clone();
+        publish_transfer(source.package.as_ref(), &mut candidate, &mapping)?;
+        let destination_scene =
+            crate::shape::Scene::read(candidate.get_part(&destination.part_name)?.blob())?;
+        let shape_id = next_shape_id(&destination_scene, "transferred shape")?;
+        let mut relationship_mapping = HashMap::new();
+        for relationship in relationships {
+            let target = if relationship.is_external() {
+                relationship.target_ref().to_owned()
+            } else {
+                let source_target = relationship.target_partname()?;
+                let copied_target = mapping.get(&source_target).ok_or_else(|| {
+                    invalid("opened-presentation transferred shape dependency is missing")
+                })?;
+                copied_target.relative_ref(destination.part_name.base_uri())
+            };
+            let new_id = candidate
+                .get_part_mut(&destination.part_name)?
+                .relate_to(&target, relationship.reltype());
+            relationship_mapping.insert(relationship.r_id().to_owned(), new_id);
+        }
+        let name = format!("{} Copy {shape_id}", shape.name().unwrap_or("Shape"));
+        let fragment =
+            super::xml::remap_shape_fragment(fragment, shape_id, &name, &relationship_mapping)?;
+        let xml = super::xml::append_shape(
+            candidate.get_part(&destination.part_name)?.blob(),
+            &fragment,
+        )?;
+        ensure_shape_id(&xml, shape_id, "transferred shape")?;
+        candidate
+            .get_part_mut(&destination.part_name)?
+            .set_blob(xml);
+        self.working = candidate;
+        Ok(shape_id)
     }
 
     /// Replace the existing notes text owned by one checked slide.
@@ -454,6 +730,307 @@ impl Transaction {
         )
     }
 
+    /// Add a typed `PowerPoint` 2018 modern-comment author.
+    ///
+    /// A missing author part and presentation relationship are allocated
+    /// collision-safely by the modern-comment owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for duplicate/invalid authors or a malformed graph.
+    pub fn add_modern_comment_author(
+        &mut self,
+        author: crate::modern_comments::Author,
+    ) -> Result<crate::modern_comments::AuthorPart> {
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::add_modern_comment_author(&mut candidate, author)?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Replace a modern-comment author without changing its stable GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an identity mismatch, unresolved references, or a
+    /// malformed modern-comment graph.
+    pub fn replace_modern_comment_author(
+        &mut self,
+        author_id: &str,
+        replacement: crate::modern_comments::Author,
+    ) -> Result<bool> {
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::replace_modern_comment_author(
+            &mut candidate,
+            author_id,
+            replacement,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Remove one unreferenced modern-comment author.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error while any modeled comment/reply still references the
+    /// author or when the graph is malformed.
+    pub fn remove_modern_comment_author(&mut self, author_id: &str) -> Result<bool> {
+        let mut candidate = self.working.clone();
+        let result =
+            crate::modern_comments::remove_modern_comment_author(&mut candidate, author_id)?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Reorder all modern-comment authors by a complete stable-GUID list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unknown, duplicate, or incomplete identities.
+    pub fn reorder_modern_comment_authors(
+        &mut self,
+        ordered_author_ids: &[String],
+    ) -> Result<Vec<crate::modern_comments::Author>> {
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::reorder_modern_comment_authors(
+            &mut candidate,
+            ordered_author_ids,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Add a typed `PowerPoint` 2018 modern comment to one selected slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unresolved authors, duplicate identities, invalid
+    /// extension payloads, or a malformed package graph.
+    pub fn add_modern_comment<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        comment: crate::modern_comments::Comment,
+    ) -> Result<crate::modern_comments::Part> {
+        let selected = self.resolve_slide(slide.into())?;
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::add_modern_comment(
+            &mut candidate,
+            &selected.part_name,
+            comment,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Replace one modern comment without changing its stable GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an identity mismatch, invalid author/extension
+    /// references, or a malformed package graph.
+    pub fn replace_modern_comment<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        comment_id: &str,
+        replacement: crate::modern_comments::Comment,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::replace_modern_comment(
+            &mut candidate,
+            &selected.part_name,
+            comment_id,
+            replacement,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Reorder all modern comments on one slide by a complete stable-GUID list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unknown, duplicate, or incomplete identities.
+    pub fn reorder_modern_comments<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        ordered_comment_ids: &[String],
+    ) -> Result<Vec<crate::modern_comments::Comment>> {
+        let selected = self.resolve_slide(slide.into())?;
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::reorder_modern_comments(
+            &mut candidate,
+            &selected.part_name,
+            ordered_comment_ids,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Add a stable-ID reply to one modern-comment thread.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing thread/author, duplicate reply identity,
+    /// invalid extensions, or a malformed package graph.
+    pub fn add_modern_comment_reply<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        comment_id: &str,
+        reply: crate::modern_comments::Reply,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::add_modern_comment_reply(
+            &mut candidate,
+            &selected.part_name,
+            comment_id,
+            reply,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Replace one modern-comment reply without changing its stable GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an identity mismatch, unresolved author, invalid
+    /// extensions, or a malformed graph.
+    pub fn replace_modern_comment_reply<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        comment_id: &str,
+        reply_id: &str,
+        replacement: crate::modern_comments::Reply,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::replace_modern_comment_reply(
+            &mut candidate,
+            &selected.part_name,
+            comment_id,
+            reply_id,
+            replacement,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Update typed task/reaction extensions on one modern comment while
+    /// retaining opaque extension entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/malformed thread or invalid extension.
+    pub fn update_modern_comment_extensions<'s, F>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        comment_id: &str,
+        update: F,
+    ) -> Result<bool>
+    where
+        F: FnOnce(&mut crate::modern_comments::semantic::extensions::List),
+    {
+        let selected = self.resolve_slide(slide.into())?;
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::update_modern_comment_extensions(
+            &mut candidate,
+            &selected.part_name,
+            comment_id,
+            update,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Update typed reaction extensions on one modern-comment reply while
+    /// retaining opaque extension entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/malformed reply or invalid extension.
+    pub fn update_modern_comment_reply_extensions<'s, F>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        comment_id: &str,
+        reply_id: &str,
+        update: F,
+    ) -> Result<bool>
+    where
+        F: FnOnce(&mut crate::modern_comments::semantic::extensions::List),
+    {
+        let selected = self.resolve_slide(slide.into())?;
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::update_modern_comment_reply_extensions(
+            &mut candidate,
+            &selected.part_name,
+            comment_id,
+            reply_id,
+            update,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Remove one modern comment and its empty per-slide part when unshared.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the modern-comment graph is malformed.
+    pub fn remove_modern_comment<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        comment_id: &str,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::remove_modern_comment(
+            &mut candidate,
+            &selected.part_name,
+            comment_id,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
+    /// Remove one modern-comment reply by stable identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the modern-comment graph is malformed.
+    pub fn remove_modern_comment_reply<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        comment_id: &str,
+        reply_id: &str,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let mut candidate = self.working.clone();
+        let result = crate::modern_comments::remove_modern_comment_reply(
+            &mut candidate,
+            &selected.part_name,
+            comment_id,
+            reply_id,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(result)
+    }
+
     /// Copy one internal relationship target and its complete dependency closure.
     ///
     /// Part-name collisions are deterministically remapped, relationship IDs
@@ -537,6 +1114,38 @@ impl Transaction {
     #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
+    }
+
+    fn add_preset_shape(
+        &mut self,
+        slide: crate::slide::Key<'_>,
+        preset: &str,
+        label: &str,
+        bounds: (i64, i64, i64, i64),
+        fill_color: Option<&str>,
+    ) -> Result<u32> {
+        let selected = self.resolve_slide(slide)?;
+        let owner = self.working.get_part(&selected.part_name)?;
+        let scene = crate::shape::Scene::read(owner.blob())?;
+        let shape_id = next_shape_id(&scene, label)?;
+        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let fragment =
+            preset_shape_fragment(preset, label, bounds, fill_color, shape_id, conformance)?;
+        self.append_checked_shape(&selected, shape_id, fragment.as_bytes())?;
+        Ok(shape_id)
+    }
+
+    fn append_checked_shape(
+        &mut self,
+        slide: &Slide,
+        shape_id: u32,
+        fragment: &[u8],
+    ) -> Result<()> {
+        let xml =
+            super::xml::append_shape(self.working.get_part(&slide.part_name)?.blob(), fragment)?;
+        ensure_shape_id(&xml, shape_id, "shape")?;
+        self.working.get_part_mut(&slide.part_name)?.set_blob(xml);
+        Ok(())
     }
 
     fn resolve_slide(&self, key: crate::slide::Key<'_>) -> Result<Slide> {
@@ -661,6 +1270,200 @@ fn next_shape_id(scene: &crate::shape::Scene<'_>, label: &str) -> Result<u32> {
         .ok_or_else(|| invalid(format!("opened-presentation {label} shape ID overflow")))
 }
 
+fn resolve_snapshot_slide(source: &Snapshot, key: crate::slide::Key<'_>) -> Result<Slide> {
+    match key {
+        crate::slide::Key::Index(index) => {
+            source
+                .slides
+                .get(index)
+                .cloned()
+                .ok_or(Error::SlideIndexOutOfBounds {
+                    index,
+                    len: source.slides.len(),
+                })
+        },
+        crate::slide::Key::Name(name) => {
+            let matches: Vec<_> = source
+                .slides
+                .iter()
+                .filter(|slide| slide.name == name)
+                .cloned()
+                .collect();
+            match matches.as_slice() {
+                [slide] => Ok(slide.clone()),
+                [] => Err(Error::SlideNameNotFound(name.to_owned())),
+                _ => Err(Error::AmbiguousSlideName {
+                    name: name.to_owned(),
+                    matches: matches.len(),
+                }),
+            }
+        },
+    }
+}
+
+fn ensure_shape_id(xml: &[u8], shape_id: u32, label: &str) -> Result<()> {
+    let scene = crate::shape::Scene::read(xml)?;
+    if scene.iter().any(|shape| shape.id() == Some(shape_id)) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "opened-presentation {label} did not round-trip semantically"
+        )))
+    }
+}
+
+fn validate_bounds((_, _, width, height): (i64, i64, i64, i64), label: &str) -> Result<()> {
+    if width <= 0 || height <= 0 {
+        Err(invalid(format!(
+            "opened-presentation {label} extents must be positive"
+        )))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_shape_text(text: &str, limits: super::Limits, label: &str) -> Result<()> {
+    if text.len() > limits.max_text_bytes() {
+        return Err(Error::Limit {
+            resource: "opened-presentation shape text bytes",
+            limit: limits.max_text_bytes(),
+        });
+    }
+    if !text.chars().all(is_xml_char) {
+        return Err(invalid(format!(
+            "opened-presentation {label} contains an invalid XML character"
+        )));
+    }
+    Ok(())
+}
+
+fn conformance_namespaces(
+    conformance: crate::media_parts::Conformance,
+) -> (&'static str, &'static str, &'static str) {
+    match conformance {
+        crate::media_parts::Conformance::Transitional => (
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        ),
+        crate::media_parts::Conformance::Strict => (
+            "http://purl.oclc.org/ooxml/presentationml/main",
+            "http://purl.oclc.org/ooxml/drawingml/main",
+            "http://purl.oclc.org/ooxml/officeDocument/relationships",
+        ),
+    }
+}
+
+fn conformance_image_relationship(conformance: crate::media_parts::Conformance) -> &'static str {
+    match conformance {
+        crate::media_parts::Conformance::Transitional => {
+            litchi_opc::constants::relationship_type::IMAGE
+        },
+        crate::media_parts::Conformance::Strict => {
+            litchi_opc::constants::relationship_type::STRICT_IMAGE
+        },
+    }
+}
+
+fn text_box_fragment(
+    text: &str,
+    bounds: (i64, i64, i64, i64),
+    shape_id: u32,
+    conformance: crate::media_parts::Conformance,
+    limits: super::Limits,
+) -> Result<String> {
+    validate_bounds(bounds, "text box")?;
+    validate_shape_text(text, limits, "text box")?;
+    let (pml, dml, _) = conformance_namespaces(conformance);
+    let (x, y, width, height) = bounds;
+    Ok(format!(
+        "<p:sp xmlns:p=\"{pml}\" xmlns:a=\"{dml}\"><p:nvSpPr><p:cNvPr id=\"{shape_id}\" name=\"Text Box {shape_id}\"/><p:cNvSpPr txBox=\"1\"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x=\"{x}\" y=\"{y}\"/><a:ext cx=\"{width}\" cy=\"{height}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap=\"square\"/><a:lstStyle/><a:p><a:r><a:t xml:space=\"preserve\">{}</a:t></a:r><a:endParaRPr/></a:p></p:txBody></p:sp>",
+        quick_xml::escape::escape(text)
+    ))
+}
+
+fn preset_shape_fragment(
+    preset: &str,
+    label: &str,
+    bounds: (i64, i64, i64, i64),
+    fill_color: Option<&str>,
+    shape_id: u32,
+    conformance: crate::media_parts::Conformance,
+) -> Result<String> {
+    validate_bounds(bounds, label)?;
+    if !matches!(preset, "rect" | "ellipse") {
+        return Err(invalid("opened-presentation preset shape is unsupported"));
+    }
+    if fill_color.is_some_and(|color| {
+        color.len() != 6 || !color.bytes().all(|byte| byte.is_ascii_hexdigit())
+    }) {
+        return Err(invalid(
+            "opened-presentation preset fill must be six hexadecimal digits",
+        ));
+    }
+    let (pml, dml, _) = conformance_namespaces(conformance);
+    let (x, y, width, height) = bounds;
+    let fill = fill_color.map_or_else(
+        || "<a:noFill/>".to_owned(),
+        |color| format!("<a:solidFill><a:srgbClr val=\"{color}\"/></a:solidFill>"),
+    );
+    Ok(format!(
+        "<p:sp xmlns:p=\"{pml}\" xmlns:a=\"{dml}\"><p:nvSpPr><p:cNvPr id=\"{shape_id}\" name=\"{label} {shape_id}\"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x=\"{x}\" y=\"{y}\"/><a:ext cx=\"{width}\" cy=\"{height}\"/></a:xfrm><a:prstGeom prst=\"{preset}\"><a:avLst/></a:prstGeom>{fill}</p:spPr></p:sp>"
+    ))
+}
+
+fn picture_fragment(
+    name: &str,
+    bounds: (i64, i64, i64, i64),
+    shape_id: u32,
+    relationship_id: &str,
+    conformance: crate::media_parts::Conformance,
+) -> String {
+    let (pml, dml, rel) = conformance_namespaces(conformance);
+    let (x, y, width, height) = bounds;
+    format!(
+        "<p:pic xmlns:p=\"{pml}\" xmlns:a=\"{dml}\" xmlns:r=\"{rel}\"><p:nvPicPr><p:cNvPr id=\"{shape_id}\" name=\"{}\"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed=\"{relationship_id}\"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x=\"{x}\" y=\"{y}\"/><a:ext cx=\"{width}\" cy=\"{height}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></p:spPr></p:pic>",
+        quick_xml::escape::escape(name)
+    )
+}
+
+fn shape_relationship_ids(fragment: &[u8]) -> Result<BTreeSet<String>> {
+    let mut reader = quick_xml::Reader::from_reader(fragment);
+    reader.config_mut().trim_text(false);
+    let mut relationships = BTreeSet::new();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            quick_xml::events::Event::Start(element) | quick_xml::events::Event::Empty(element) => {
+                for attribute in element.attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    let key = attribute.key.as_ref();
+                    if !key.starts_with(b"r:") || !matches!(&key[2..], b"id" | b"embed" | b"link") {
+                        continue;
+                    }
+                    let value = attribute
+                        .decoded_and_normalized_value(
+                            quick_xml::XmlVersion::Implicit1_0,
+                            reader.decoder(),
+                        )
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    relationships.insert(value.into_owned());
+                }
+            },
+            quick_xml::events::Event::DocType(_) => {
+                return Err(invalid(
+                    "opened-presentation shape contains an unsupported document type",
+                ));
+            },
+            quick_xml::events::Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(relationships)
+}
+
 fn table_fragment(
     cells: &[Vec<String>],
     (x, y, width, height): (i64, i64, i64, i64),
@@ -748,7 +1551,16 @@ fn plan_transfer(
     root: &PackURI,
     limit: usize,
 ) -> Result<HashMap<PackURI, PackURI>> {
-    let mut queue = VecDeque::from([root.clone()]);
+    plan_transfer_roots(source, destination, vec![root.clone()], limit)
+}
+
+fn plan_transfer_roots(
+    source: &OpcPackage,
+    destination: &OpcPackage,
+    roots: Vec<PackURI>,
+    limit: usize,
+) -> Result<HashMap<PackURI, PackURI>> {
+    let mut queue = VecDeque::from(roots);
     let mut seen = HashSet::new();
     while let Some(name) = queue.pop_front() {
         if !seen.insert(name.clone()) {

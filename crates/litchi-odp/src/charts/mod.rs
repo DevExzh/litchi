@@ -11,6 +11,8 @@ mod package;
 mod snapshot;
 mod transaction;
 
+pub(crate) use codec::{locate_pages, page_index};
+
 #[cfg(test)]
 mod tests;
 
@@ -18,7 +20,7 @@ pub use model::{Chart, Limits, Page, Part, Selector, Storage};
 pub use snapshot::{Commit, Diagnostics, Edit, Patch, Snapshot};
 pub use transaction::{Commit as InventoryCommit, Editor, Inventory, Transaction};
 
-pub use litchi_odf_common::chart::authoring::Definition;
+pub use litchi_odf_common::chart::authoring::{CachedCell, Definition, SeriesSpec};
 pub use litchi_odf_common::chart::{Axis, DataPoint, Element, Grid, Legend, PlotArea, Series};
 
 pub(crate) fn inventory(

@@ -1,5 +1,10 @@
 //! Namespace-aware XML parsing and serialization for spreadsheet tracked changes.
 
+#![allow(
+    clippy::expect_used,
+    reason = "expectations follow checked fixed-arity records and an active XML owner stack"
+)]
+
 use super::model::{
     Acceptance, Cell, CellAddress, CellValue, Change, Changes, ContentChange, CutOff, Deletion,
     Dimension, Info, Insertion, Integer, Metadata, Movement, NestedDeletion, PositiveInteger,

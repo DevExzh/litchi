@@ -2,6 +2,9 @@
 
 mod writing;
 
+pub(crate) use writing::{
+    insert_note_fragment_xml, replace_note_fragment_xml, validate_note_fragment,
+};
 pub use writing::{insert_note_xml, remove_note_xml, replace_note_xml};
 
 use crate::elements::field::NoteBodyContent;

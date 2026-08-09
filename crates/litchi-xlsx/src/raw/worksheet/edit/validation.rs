@@ -155,6 +155,9 @@ pub(super) fn validate_actions(
         if let Some(Payload::Set(content)) = action.payload() {
             content.validate_for_write()?;
         }
+        if let Some(Payload::SharedString { text, .. }) = action.payload() {
+            crate::Content::Value(crate::Value::Text(text.clone())).validate_for_write()?;
+        }
     }
     Ok(())
 }

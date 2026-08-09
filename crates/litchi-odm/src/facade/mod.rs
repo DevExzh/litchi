@@ -186,6 +186,12 @@ impl Master {
         self.package.section_tree()
     }
 
+    /// Returns common direct master-body structures in authored order.
+    #[must_use]
+    pub fn structure(&self) -> &crate::structure::Structure {
+        self.package.structure()
+    }
+
     /// Returns named style definitions from `content.xml` and `styles.xml`.
     #[must_use]
     pub fn styles(&self) -> &[crate::style::Definition] {
@@ -196,6 +202,12 @@ impl Master {
     #[must_use]
     pub fn resources(&self) -> &crate::resource::Graph {
         self.package.resources()
+    }
+
+    /// Returns signatures, encryption, and inert active-content inventory.
+    #[must_use]
+    pub fn security(&self) -> &crate::security::State {
+        self.package.security()
     }
 
     /// Starts one atomic metadata, section, style, and resource transaction.

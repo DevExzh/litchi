@@ -175,8 +175,46 @@ fn cross_drawing_group_transfer_carries_layers_resources_and_durable_inverse() {
     );
 
     let collision = drawing_with_resource(DESTINATION, Some(b"different"));
-    let mut refused = collision.edit();
-    assert!(refused.insert_shape_transfer(0, 0, &transfer).is_err());
+    let mut remapped = collision.edit();
+    remapped.insert_shape_transfer(0, 0, &transfer).unwrap();
+    let remapped = remapped.commit().unwrap();
+    assert!(remapped.snapshot().content_xml().contains("_litchi_"));
+    assert_eq!(
+        remapped.snapshot().resource_bytes(0).unwrap().as_deref(),
+        Some(&b"transfer bytes"[..])
+    );
+}
+
+#[test]
+fn cross_drawing_transfer_copies_and_remaps_arbitrary_style_definitions() {
+    const SOURCE: &str = r##"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:automatic-styles><style:style style:name="gr1" style:family="graphic"><style:graphic-properties draw:fill="solid" draw:fill-color="#ff0000"/></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Source"><draw:rect draw:name="Styled" draw:style-name="gr1"/></draw:page></office:drawing></office:body></office:document-content>"##;
+    const DESTINATION: &str = r##"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:automatic-styles><style:style style:name="gr1" style:family="graphic"><style:graphic-properties draw:fill="solid" draw:fill-color="#0000ff"/></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Destination"/></office:drawing></office:body></office:document-content>"##;
+    let source = drawing_with_resource(SOURCE, None);
+    let destination = drawing_with_resource(DESTINATION, None);
+    let transfer = source.snapshot().prepare_shape_transfer(0, 0).unwrap();
+    assert_eq!(transfer.style_definitions()[0].name(), "gr1");
+
+    let mut edit = destination.edit();
+    edit.insert_shape_transfer(0, 0, &transfer).unwrap();
+    let commit = edit.commit().unwrap();
+    let shape_style = commit.snapshot().pages()[0].shapes()[0]
+        .style_name()
+        .unwrap();
+    assert!(shape_style.starts_with("gr1_litchi_"));
+    assert!(commit.snapshot().style_definitions().iter().any(|style| {
+        style.name() == shape_style && style.property("draw:fill-color") == Some("#ff0000")
+    }));
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        destination.as_bytes()
+    );
 }
 
 #[test]

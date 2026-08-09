@@ -384,7 +384,8 @@ pub(super) fn resolve_namespace(value: ResolveResult<'_>) -> Result<String> {
         ResolveResult::Bound(Namespace(value)) => {
             String::from_utf8(value.to_vec()).map_err(xml_error)
         },
-        ResolveResult::Unknown(_) | ResolveResult::Unbound => {
+        ResolveResult::Unbound => Ok(String::new()),
+        ResolveResult::Unknown(_) => {
             Err(invalid("modern comment XML uses an unresolved namespace"))
         },
     }

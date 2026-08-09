@@ -12,6 +12,15 @@ use crate::error::{Result, invalid};
 use crate::formula::{Cache, Formula, Kind};
 
 pub(super) fn materialize(raw: RawCell, strings: Option<&[Text]>) -> Result<Stored> {
+    let shared_string =
+        if raw.formula.is_none() && raw.inline.is_none() && raw.cell_type.as_deref() == Some("s") {
+            raw.value
+                .as_deref()
+                .map(parse_shared_string_index)
+                .transpose()?
+        } else {
+            None
+        };
     let unknown_cell_type = raw
         .cell_type
         .as_deref()
@@ -64,6 +73,7 @@ pub(super) fn materialize(raw: RawCell, strings: Option<&[Text]>) -> Result<Stor
         address: raw.address,
         cell,
         style: raw.style,
+        shared_string,
         cell_metadata: raw.cell_metadata,
         value_metadata: raw.value_metadata,
     })
@@ -88,10 +98,7 @@ fn parse_value(
         },
         Some("d") => Date::new(value).map(Value::Date).map(Some),
         Some("s") => {
-            let index = value
-                .trim()
-                .parse::<usize>()
-                .map_err(|_| invalid(format!("invalid shared-string index '{value}'")))?;
+            let index = parse_shared_string_index(value)?;
             let strings = strings.ok_or_else(|| {
                 invalid("worksheet uses shared strings but the workbook has no shared-string part")
             })?;
@@ -116,6 +123,13 @@ fn parse_value(
             "unsupported worksheet cell type '{other}'"
         ))),
     }
+}
+
+fn parse_shared_string_index(value: &str) -> Result<usize> {
+    value
+        .trim()
+        .parse::<usize>()
+        .map_err(|_| invalid(format!("invalid shared-string index '{value}'")))
 }
 
 pub(super) fn resolve_shared_formulas(cells: &mut [RawCell]) -> Result<()> {

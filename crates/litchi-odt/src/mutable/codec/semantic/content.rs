@@ -45,6 +45,18 @@ impl MutableDocument {
         Ok(())
     }
 
+    pub(crate) fn insert_note_fragment(
+        &mut self,
+        paragraph_index: usize,
+        fragment: &str,
+    ) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            crate::note::insert_note_fragment_xml(xml, paragraph_index, fragment)
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+
     /// Replace one note selected in document order and return its old semantic value.
     ///
     /// Replacement emits the public note model, including validated structured
@@ -61,6 +73,18 @@ impl MutableDocument {
             self.with_content_xml(|xml| crate::replace_note_xml(xml, note_index, replacement))?;
         self.content_xml = Some(updated);
         Ok(old)
+    }
+
+    pub(crate) fn replace_note_fragment(
+        &mut self,
+        note_index: usize,
+        fragment: &str,
+    ) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            crate::note::replace_note_fragment_xml(xml, note_index, fragment)
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
     }
 
     /// Remove one note selected in document order and return its old semantic value.

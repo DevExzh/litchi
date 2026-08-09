@@ -37,12 +37,14 @@ pub(crate) fn read(source: &str, dialect: Dialect, limits: ReadLimits) -> Result
     for block in &mut blocks {
         expand_indented_start(source, block);
     }
+    nest_contained_link_definitions(&mut blocks)?;
     blocks.sort_unstable_by(|left, right| {
         left.range
             .start
             .cmp(&right.range.start)
             .then_with(|| left.range.end.cmp(&right.range.end))
     });
+    normalize_adjacent_block_whitespace(source, &mut blocks);
     references.sort_by(|left, right| {
         left.range
             .start
@@ -65,6 +67,105 @@ pub(crate) fn read(source: &str, dialect: Dialect, limits: ReadLimits) -> Result
             limits,
         }),
     })
+}
+
+fn normalize_adjacent_block_whitespace(source: &str, blocks: &mut [BlockRecord]) {
+    for current_index in 1..blocks.len() {
+        let current_start = blocks[current_index].range.start;
+        let previous = &mut blocks[current_index.saturating_sub(1)];
+        if previous.range.end <= current_start {
+            continue;
+        }
+        let structural_end = previous
+            .descendants
+            .iter()
+            .map(|nested| nested.range.end)
+            .chain(previous.inlines.iter().map(|inline| inline.range.end))
+            .max()
+            .unwrap_or(previous.range.start);
+        if structural_end <= current_start
+            && source
+                .get(current_start..previous.range.end)
+                .is_some_and(|overlap| overlap.bytes().all(|byte| byte.is_ascii_whitespace()))
+        {
+            previous.range.end = current_start;
+        }
+    }
+}
+
+fn nest_contained_link_definitions(blocks: &mut Vec<BlockRecord>) -> Result<(), Error> {
+    let original = std::mem::take(blocks);
+    let mut roots = Vec::new();
+    let mut definitions = Vec::new();
+    roots
+        .try_reserve_exact(original.len())
+        .map_err(|source| Error::Allocation {
+            resource: "Markdown top-level block normalization",
+            source,
+        })?;
+    definitions
+        .try_reserve_exact(original.len())
+        .map_err(|source| Error::Allocation {
+            resource: "Markdown nested link-definition normalization",
+            source,
+        })?;
+    for block in original {
+        if block.kind == BlockKind::LinkDefinition {
+            definitions.push(block);
+        } else {
+            roots.push(block);
+        }
+    }
+
+    for definition in definitions {
+        let candidate_owner_index = roots
+            .iter()
+            .enumerate()
+            .filter(|(_, block)| {
+                block.range.start <= definition.range.start
+                    && definition.range.end <= block.range.end
+            })
+            .min_by_key(|(_, block)| block.range.end.saturating_sub(block.range.start))
+            .map(|(index, _)| index);
+        let Some(owner_index) = candidate_owner_index else {
+            roots.push(definition);
+            continue;
+        };
+
+        let root = &mut roots[owner_index];
+        let depth = root
+            .descendants
+            .iter()
+            .filter(|nested| {
+                nested.range.start <= definition.range.start
+                    && definition.range.end <= nested.range.end
+            })
+            .map(|nested| nested.depth.saturating_add(1))
+            .max()
+            .unwrap_or(1);
+        let mut descendants = std::mem::take(&mut root.descendants).into_vec();
+        descendants
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "Markdown nested link-definition index",
+                source,
+            })?;
+        descendants.push(NestedBlockRecord {
+            kind: BlockKind::LinkDefinition,
+            range: definition.range,
+            depth,
+        });
+        descendants.sort_by(|left, right| {
+            left.range
+                .start
+                .cmp(&right.range.start)
+                .then_with(|| left.depth.cmp(&right.depth))
+                .then_with(|| right.range.end.cmp(&left.range.end))
+        });
+        root.descendants = descendants.into_boxed_slice();
+    }
+    *blocks = roots;
+    Ok(())
 }
 
 fn expand_indented_start(source: &str, block: &mut BlockRecord) {

@@ -57,6 +57,12 @@ pub fn validate_protection_style_document(
     Ok(())
 }
 
+fn active_style(current: &mut Option<StyleBuilder>) -> Result<&mut StyleBuilder> {
+    current.as_mut().ok_or_else(|| {
+        Error::InvalidFormat("style child has no owning table-cell style".to_string())
+    })
+}
+
 impl CellStyleRegistry {
     pub(crate) fn parse(named_styles: Option<&str>, content: &str) -> Result<Self> {
         let mut registry = Self::default();
@@ -179,7 +185,7 @@ impl CellStyleRegistry {
                     }
                     let rule = parse_conditional_rule(&reader, &element)?;
                     self.record_conditional_rule(&rule)?;
-                    let builder = current.as_mut().expect("checked style");
+                    let builder = active_style(&mut current)?;
                     if builder.conditional_rules.len() >= MAX_RULES_PER_STYLE {
                         return Err(Error::InvalidFormat(format!(
                             "table-cell style exceeds the {MAX_RULES_PER_STYLE} conditional rule limit"
@@ -202,7 +208,7 @@ impl CellStyleRegistry {
                     }
                     let rule = parse_conditional_rule(&reader, &element)?;
                     self.record_conditional_rule(&rule)?;
-                    let builder = current.as_mut().expect("checked style");
+                    let builder = active_style(&mut current)?;
                     if builder.conditional_rules.len() >= MAX_RULES_PER_STYLE {
                         return Err(Error::InvalidFormat(format!(
                             "table-cell style exceeds the {MAX_RULES_PER_STYLE} conditional rule limit"
@@ -224,7 +230,7 @@ impl CellStyleRegistry {
                     )?
                     .map(|value| Protection::parse(&value))
                     .transpose()?;
-                    let builder = current.as_mut().expect("checked style");
+                    let builder = active_style(&mut current)?;
                     if builder.protection.is_some() && protection.is_some() {
                         return Err(Error::InvalidFormat(
                             "duplicate style:cell-protect property".to_string(),
@@ -279,7 +285,12 @@ impl CellStyleRegistry {
                     if depth > 0 {
                         depth -= 1;
                     } else {
-                        self.finish(current.take().expect("checked style"))?;
+                        let builder = current.take().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "closing table-cell style has no active definition".to_string(),
+                            )
+                        })?;
+                        self.finish(builder)?;
                     }
                 },
                 Event::End(_) if current.is_some() && depth > 0 => depth -= 1,
@@ -344,10 +355,11 @@ impl CellStyleRegistry {
             if last_position.get(name.as_str()) != Some(&index) {
                 continue;
             }
-            let definition = self
-                .styles
-                .get(name)
-                .expect("style order references registry");
+            let definition = self.styles.get(name).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "table-cell style order references missing definition '{name}'"
+                ))
+            })?;
             if !definition.is_common
                 && let Some(protection) = definition.protection
             {

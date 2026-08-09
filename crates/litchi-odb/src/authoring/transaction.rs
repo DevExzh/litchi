@@ -10,6 +10,7 @@
 )]
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::package::edit::Addition;
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -95,6 +96,8 @@ pub struct Edit<'source> {
     content: String,
     changes: Vec<Change>,
     legacy_query: Option<QueryChange>,
+    payload_additions: Vec<Addition>,
+    payload_directories: Vec<(String, String)>,
 }
 
 impl<'source> Edit<'source> {
@@ -105,6 +108,8 @@ impl<'source> Edit<'source> {
             content: source.content_xml().to_owned(),
             changes: Vec::new(),
             legacy_query: None,
+            payload_additions: Vec::new(),
+            payload_directories: Vec::new(),
         }
     }
 
@@ -325,7 +330,8 @@ impl<'source> Edit<'source> {
     }
 
     /// Copies one unambiguous inert form/report declaration from another
-    /// snapshot without following its component link.
+    /// snapshot. A local linked package subtree is copied byte-for-byte to the
+    /// same path; an external IRI remains inert and is never followed.
     ///
     /// # Errors
     ///
@@ -349,7 +355,101 @@ impl<'source> Edit<'source> {
             return invalid("ODB transfer component selector is ambiguous");
         }
         let component = component.clone();
-        self.stage_atomically(|candidate| candidate.add_component(component))
+        self.stage_atomically(|candidate| {
+            candidate.stage_component_payload(source, &component, None)?;
+            candidate.add_component(component)
+        })
+    }
+
+    /// Copies one component and explicitly remaps its local linked package
+    /// subtree to `destination_href`.
+    ///
+    /// The destination must be a relative package path and must not collide
+    /// with an existing or already-staged member. External IRIs are never
+    /// dereferenced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an absent/ambiguous component, an external source
+    /// IRI, an unsafe destination, a missing payload, or a package collision.
+    pub fn transfer_component_from_to(
+        &mut self,
+        source: &Database,
+        kind: ComponentKind,
+        name: &str,
+        destination_href: &str,
+    ) -> Result<()> {
+        let catalog = source.catalog()?;
+        let mut matches = catalog
+            .components()
+            .iter()
+            .filter(|component| component.kind() == kind && component.name() == Some(name));
+        let component = matches.next().ok_or_else(|| {
+            Error::InvalidFormat("ODB transfer component does not exist".to_string())
+        })?;
+        if matches.next().is_some() {
+            return invalid("ODB transfer component selector is ambiguous");
+        }
+        let component = component.clone();
+        self.stage_atomically(|candidate| {
+            candidate.stage_component_payload(source, &component, Some(destination_href))?;
+            candidate.add_component(component.with_href(destination_href))
+        })
+    }
+
+    fn stage_component_payload(
+        &mut self,
+        source: &Database,
+        component: &Component,
+        destination_href: Option<&str>,
+    ) -> Result<()> {
+        if source.protection_status()?.is_encrypted() {
+            return Err(Error::Unsupported(
+                "ODB component payload transfer from an encrypted donor is refused".to_string(),
+            ));
+        }
+        let Some(source_href) = component.href() else {
+            if destination_href.is_some() {
+                return invalid("ODB component has no linked package payload to remap");
+            }
+            return Ok(());
+        };
+        let Some(source_prefix) = local_component_prefix(source_href)? else {
+            if destination_href.is_some() {
+                return invalid("ODB external component IRI cannot be remapped or followed");
+            }
+            return Ok(());
+        };
+        let destination = destination_href.unwrap_or(source_href);
+        let destination_prefix = local_component_prefix(destination)?.ok_or_else(|| {
+            Error::InvalidFormat(
+                "ODB component payload destination must be a relative package path".to_string(),
+            )
+        })?;
+        if self
+            .source
+            .package
+            .contains_package_prefix(&destination_prefix)?
+            || self
+                .payload_additions
+                .iter()
+                .any(|addition| addition.path.starts_with(&destination_prefix))
+            || self
+                .payload_directories
+                .iter()
+                .any(|(path, _)| path.starts_with(&destination_prefix))
+        {
+            return invalid("ODB component payload destination already exists");
+        }
+        let (additions, directories) = source
+            .package
+            .component_payload(&source_prefix, &destination_prefix)?;
+        if additions.is_empty() && directories.is_empty() {
+            return invalid("ODB linked component package payload does not exist");
+        }
+        self.payload_additions.extend(additions);
+        self.payload_directories.extend(directories);
+        Ok(())
     }
 
     /// Copies one exact, compact, inert producer-extension subtree.
@@ -1323,7 +1423,10 @@ impl<'source> Edit<'source> {
     /// Atomically rebuilds, fully reopens, and semantically verifies the
     /// candidate package.
     pub fn commit(self) -> Result<Commit> {
-        if self.content == self.source.content_xml() {
+        if self.content == self.source.content_xml()
+            && self.payload_additions.is_empty()
+            && self.payload_directories.is_empty()
+        {
             return Ok(Commit::unchanged(self.source.clone()));
         }
         let protection = self.source.protection_status()?;
@@ -1349,7 +1452,11 @@ impl<'source> Edit<'source> {
         }
         crate::codec::validate(&self.content)?;
         let snapshot = Database {
-            package: self.source.package.rebuild_with_content(&self.content)?,
+            package: self.source.package.rebuild_with_content_and_additions(
+                &self.content,
+                self.payload_additions,
+                self.payload_directories,
+            )?,
         };
         snapshot.catalog()?;
         if protection.is_signed()
@@ -2686,6 +2793,29 @@ fn validate_component(component: &Component) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn local_component_prefix(href: &str) -> Result<Option<String>> {
+    if href.contains(':') || href.starts_with('#') {
+        return Ok(None);
+    }
+    if href.is_empty()
+        || href.starts_with('/')
+        || href.contains('\\')
+        || href.contains('?')
+        || href.contains('#')
+    {
+        return invalid("ODB component package path is not a safe relative path");
+    }
+    let path = href.trim_end_matches('/');
+    if path.is_empty()
+        || path
+            .split('/')
+            .any(|segment| segment.is_empty() || matches!(segment, "." | ".."))
+    {
+        return invalid("ODB component package path is not a safe relative path");
+    }
+    Ok(Some(format!("{path}/")))
 }
 
 fn validate_name(value: &str, kind: &str) -> Result<()> {

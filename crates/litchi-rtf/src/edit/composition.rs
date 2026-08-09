@@ -294,6 +294,11 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
     let mut reads = Vec::new();
     let mut writes = Vec::new();
     for operation in operations {
+        if operation.is_root_transfer() {
+            reads.push("rtf:ordinary-root".to_string());
+            writes.push("rtf:ordinary-root".to_string());
+            continue;
+        }
         reads.push("body:structure".to_string());
         writes.extend(operation.effect_keys());
     }

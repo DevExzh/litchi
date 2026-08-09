@@ -1,12 +1,13 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
-use litchi_core::Position;
+use litchi_core::{HistoryLimits, Position};
 use litchi_odf_common::core::PackageWriter;
 use litchi_odm::{
     Master,
     style::Origin,
     transaction::{
-        Conflict, MergeError, ResourceSpec, SectionSpec, SecurityPolicy, StyleSpec, SubdocumentSpec,
+        ActiveContentPolicy, Conflict, MergeError, ResourceSpec, SectionSpec, SecurityPolicy,
+        StyleSpec, SubdocumentSpec,
     },
 };
 
@@ -54,6 +55,22 @@ fn source() -> Master {
         .unwrap();
     writer
         .add_file_with_media_type("Pictures/cover.png", b"cover", "image/png")
+        .unwrap();
+    Master::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+}
+
+fn master_from_parts(content: &str, styles: &str, chapter: &[u8]) -> Master {
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(MIME).unwrap();
+    writer.add_file("content.xml", content.as_bytes()).unwrap();
+    writer.add_file("styles.xml", styles.as_bytes()).unwrap();
+    writer.add_file("meta.xml", META.as_bytes()).unwrap();
+    writer
+        .add_file_with_media_type(
+            "Chapters/a.odt",
+            chapter,
+            "application/vnd.oasis.opendocument.text",
+        )
         .unwrap();
     Master::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
 }
@@ -468,4 +485,155 @@ fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
         |conflict| matches!(conflict, Conflict::SectionName(name) if name == "Same destination")
     ));
     assert!(!named_conflict_plan.can_commit());
+}
+
+#[test]
+fn common_master_structure_local_references_and_active_write_policy_are_explicit() {
+    use litchi_odm::{
+        security::ActiveKind,
+        structure::{IndexKind, Kind},
+    };
+
+    let content = concat!(
+        r#"<?xml version="1.0"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
+        r#"<office:body><office:text><text:p>front</text:p><text:table-of-content/>"#,
+        r#"<text:section text:name="Target"><text:p>target</text:p></text:section>"#,
+        r#"<text:section text:name="LocalSource"><text:section-source text:section-name="Target"/>"#,
+        r#"</text:section><text:section text:name="Dde"><office:dde-source/></text:section>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let master = master_from_parts(content, STYLES, b"chapter");
+    assert_eq!(
+        master.structure().items(),
+        &[
+            Kind::Paragraph,
+            Kind::GeneratedIndex(IndexKind::TableOfContents),
+            Kind::Section(Position::new(0)),
+            Kind::Section(Position::new(1)),
+            Kind::Section(Position::new(2)),
+        ]
+    );
+    let local = &master.section_tree().local_references()[0];
+    assert_eq!(local.owner(), Position::new(1));
+    assert_eq!(local.target_name(), "Target");
+    assert_eq!(local.target(), Some(Position::new(0)));
+    assert_eq!(
+        master
+            .section_tree()
+            .get(Position::new(1))
+            .unwrap()
+            .local_reference(),
+        Some(Position::new(0))
+    );
+    assert!(
+        master
+            .section_tree()
+            .get(Position::new(2))
+            .unwrap()
+            .has_dde_source()
+    );
+    assert!(
+        master
+            .security()
+            .active_content()
+            .iter()
+            .any(|item| item.kind() == ActiveKind::Dde)
+    );
+
+    let no_op = master.edit().commit().unwrap();
+    assert_eq!(no_op.snapshot().as_bytes(), master.as_bytes());
+    let mut refused = master.edit();
+    refused.set_title("refused").unwrap();
+    assert!(refused.commit().is_err());
+    let policy = SecurityPolicy::strict().with_active_content(ActiveContentPolicy::PreserveInert);
+    let mut preserved = master.edit_with_policy(policy);
+    preserved.set_title("preserved inertly").unwrap();
+    let changed = preserved.commit().unwrap().into_snapshot();
+    assert!(changed.content_xml().contains("office:dde-source"));
+    assert!(Master::from_bytes(changed.as_bytes().to_vec()).is_ok());
+}
+
+#[test]
+fn collision_safe_transfer_renames_complete_style_and_resource_closures_atomically() {
+    let source_content = concat!(
+        r#"<?xml version="1.0"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+        r#"xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:automatic-styles>"#,
+        r##"<style:style style:name="BaseSection" style:family="section"><style:section-properties fo:background-color="#ffffff"/></style:style>"##,
+        r#"<style:style style:name="ImportedSection" style:family="section" style:parent-style-name="BaseSection"><style:section-properties fo:margin-left="1cm"/></style:style>"#,
+        r#"</office:automatic-styles><office:body><office:text><text:section text:name="Source" text:style-name="ImportedSection"><text:section-source xlink:href="Chapters/a.odt"/></text:section></office:text></office:body></office:document-content>"#,
+    );
+    let destination_content = concat!(
+        r#"<?xml version="1.0"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+        r#"xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:automatic-styles>"#,
+        r##"<style:style style:name="BaseSection" style:family="section"><style:section-properties fo:background-color="#ff0000"/></style:style>"##,
+        r#"<style:style style:name="ImportedSection" style:family="section" style:parent-style-name="BaseSection"><style:section-properties fo:margin-left="2cm"/></style:style>"#,
+        r#"</office:automatic-styles><office:body><office:text><text:p>destination</text:p></office:text></office:body></office:document-content>"#,
+    );
+    let source = master_from_parts(source_content, STYLES, b"source chapter");
+    let destination = master_from_parts(destination_content, STYLES, b"occupied chapter");
+    let mut edit = destination.edit();
+    edit.transfer_linked_section(&source, Position::new(0), "Imported", "Chapters/a.odt")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let changed = commit.snapshot();
+    let imported = changed
+        .section_tree()
+        .sections()
+        .iter()
+        .find(|section| section.name() == "Imported")
+        .unwrap();
+    assert_eq!(imported.style_name(), Some("ImportedSection__import1"));
+    let reference = &changed.subdocuments()[imported.reference().unwrap().get()];
+    assert_eq!(reference.href(), "Chapters/a__import1.odt");
+    assert!(
+        changed
+            .styles()
+            .iter()
+            .any(|style| { style.name() == "BaseSection__import1" && style.parent().is_none() })
+    );
+    assert!(changed.styles().iter().any(|style| {
+        style.name() == "ImportedSection__import1" && style.parent() == Some("BaseSection__import1")
+    }));
+    assert!(changed.content_xml().contains("fo:margin-left=\"1cm\""));
+    assert_eq!(
+        commit.patch().inverse().apply(changed).unwrap().as_bytes(),
+        destination.as_bytes()
+    );
+
+    let mut history = destination.history(HistoryLimits::new(4, u64::MAX));
+    history.record(&commit).unwrap();
+    assert!(history.undo());
+    assert_eq!(history.current().as_bytes(), destination.as_bytes());
+    assert!(history.redo());
+    assert_eq!(history.current().as_bytes(), changed.as_bytes());
+
+    let mut title = destination.edit();
+    title.set_title("parallel metadata").unwrap();
+    let title = title.commit().unwrap();
+    let merged = commit
+        .patch()
+        .plan_three_way(title.patch())
+        .unwrap()
+        .commit()
+        .unwrap()
+        .apply(&destination)
+        .unwrap();
+    assert_eq!(merged.title(), Some("parallel metadata"));
+    assert!(
+        merged
+            .section_tree()
+            .sections()
+            .iter()
+            .any(|section| section.name() == "Imported")
+    );
+    assert!(Master::from_bytes(merged.as_bytes().to_vec()).is_ok());
 }

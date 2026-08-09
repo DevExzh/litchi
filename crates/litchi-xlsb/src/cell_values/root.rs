@@ -14,7 +14,7 @@
     reason = "new workbook transaction code uses checked wire conversions and explicit validation"
 )]
 
-use super::{Reference, TransferLimits, Value};
+use super::{CellFormula, Reference, TransferLimits, Value};
 use crate::Workbook;
 use crate::package::error::{Error, Result};
 use crate::raw::{Header, Limits as RawLimits, Records, Writer, kind};
@@ -24,6 +24,33 @@ use std::sync::Arc;
 
 const MAGIC: &[u8; 8] = b"LCXBWRP1";
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
+
+/// Typed resources for one newly authored cell XF.
+#[derive(Debug, Clone)]
+pub struct AuthoredStyle {
+    /// Font interned into `BrtBeginFonts`.
+    pub font: crate::styles::Font,
+    /// Pattern fill interned into `BrtBeginFills`.
+    pub fill: crate::styles::Fill,
+    /// Border interned into `BrtBeginBorders`.
+    pub border: crate::styles::Border,
+    /// Optional custom number-format code, interned by semantic code equality.
+    pub number_format: Option<String>,
+    /// Optional compact alignment fields stored in the new cell XF.
+    pub alignment: Option<crate::styles::Alignment>,
+}
+
+impl Default for AuthoredStyle {
+    fn default() -> Self {
+        Self {
+            font: crate::styles::Font::default(),
+            fill: crate::styles::Fill::default(),
+            border: crate::styles::Border::default(),
+            number_format: None,
+            alignment: None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Operation {
@@ -120,6 +147,99 @@ impl WorkbookEdit {
         candidate.push(operation.clone());
         let _validated_candidate = replay(&self.before, &candidate)?;
         self.stage(operation)
+    }
+
+    /// Author a new SST-backed cell and its complete typed style resources.
+    ///
+    /// Formatting and phonetic runs are normalized to the authored font so no
+    /// caller-supplied workbook index can escape into the candidate.
+    pub fn insert_shared_string(
+        &mut self,
+        sheet: usize,
+        reference: Reference,
+        string: crate::package::SharedString,
+        style: &AuthoredStyle,
+    ) -> Result<()> {
+        self.insert_authored_string(sheet, reference, string, style, true)
+    }
+
+    /// Author a new inline `BrtCellRString` and its typed style resources.
+    pub fn insert_rich_string(
+        &mut self,
+        sheet: usize,
+        reference: Reference,
+        string: crate::package::SharedString,
+        style: &AuthoredStyle,
+    ) -> Result<()> {
+        self.insert_authored_string(sheet, reference, string, style, false)
+    }
+
+    /// Author a numeric formula cell with inert tokens and typed style closure.
+    ///
+    /// Formula name, sheet, external-link, and table indexes are resolved
+    /// against the target during detached planning and complete readback.
+    pub fn insert_formula_number(
+        &mut self,
+        sheet: usize,
+        reference: Reference,
+        cache: f64,
+        formula: CellFormula,
+        style: &AuthoredStyle,
+    ) -> Result<()> {
+        if !cache.is_finite() {
+            return Err(Error::InvalidFormat(
+                "formula cached number must be finite".to_string(),
+            ));
+        }
+        let mut donor = workbook_from_bytes(&self.before)?;
+        let style_index = author_style(&mut donor, style)?;
+        insert_candidate_cell(
+            &mut donor,
+            sheet,
+            reference,
+            style_index,
+            Value::FormulaNumberCache(cache),
+            Some(formula),
+        )?;
+        self.transfer_cell(&donor, sheet, reference, sheet, reference)
+    }
+
+    fn insert_authored_string(
+        &mut self,
+        sheet: usize,
+        reference: Reference,
+        mut string: crate::package::SharedString,
+        style: &AuthoredStyle,
+        shared: bool,
+    ) -> Result<()> {
+        let mut donor = workbook_from_bytes(&self.before)?;
+        let style_index = author_style(&mut donor, style)?;
+        let font_id = donor
+            .styles()
+            .get_cell_format(usize::try_from(style_index.get()).map_err(|error| {
+                Error::InvalidFormat(format!("authored style index overflow: {error}"))
+            })?)
+            .ok_or_else(|| Error::InvalidFormat("authored cell XF is absent".to_string()))?
+            .font_id;
+        let font_id = u16::try_from(font_id).map_err(|error| {
+            Error::InvalidFormat(format!("authored font index exceeds u16: {error}"))
+        })?;
+        for run in &mut string.runs {
+            run.font_id = font_id;
+        }
+        if let Some(phonetic) = &mut string.phonetic {
+            phonetic.font_id = font_id;
+        }
+        let value = if shared {
+            let mut package = donor.package.clone();
+            let index = super::resources::intern_shared_string_for_new_cell(&mut package, &string)?;
+            donor = Workbook::from_opc_package(package)?;
+            Value::SharedStringIndex(index)
+        } else {
+            Value::RichString(string)
+        };
+        insert_candidate_cell(&mut donor, sheet, reference, style_index, value, None)?;
+        self.transfer_cell(&donor, sheet, reference, sheet, reference)
     }
 
     /// Validate all staged operations and produce an immutable durable patch.
@@ -606,6 +726,37 @@ fn replay(before: &[u8], operations: &[Operation]) -> Result<Vec<u8>> {
     }
     validate_all_worksheets(&workbook)?;
     workbook_bytes(&workbook)
+}
+
+fn author_style(workbook: &mut Workbook, style: &AuthoredStyle) -> Result<super::StyleIndex> {
+    let plan = super::resources::plan_style(style)?;
+    let mut package = workbook.package.clone();
+    let index = super::resources::intern_style_plan(&mut package, &plan)?;
+    package.unsign();
+    *workbook = Workbook::from_opc_package(package)?;
+    Ok(index)
+}
+
+fn insert_candidate_cell(
+    workbook: &mut Workbook,
+    sheet: usize,
+    reference: Reference,
+    style: super::StyleIndex,
+    value: Value,
+    formula: Option<CellFormula>,
+) -> Result<()> {
+    let uri = workbook.worksheet_uri(sheet)?;
+    let mut package = workbook.package.clone();
+    let mut edit = super::workbook::read(&package, &uri)?.edit();
+    if let Some(formula) = formula {
+        edit.insert_formula(reference, style, value, formula)?;
+    } else {
+        edit.insert(reference, style, value)?;
+    }
+    let commit = edit.commit()?;
+    let _snapshot = super::workbook::apply(&mut package, &uri, &commit)?;
+    *workbook = Workbook::from_opc_package(package)?;
+    Ok(())
 }
 
 fn transfer_cell(

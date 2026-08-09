@@ -17,10 +17,10 @@ use crate::package::{Error as PackageError, Result};
 use crate::sprm_operations::{
     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_RMARK,
     SPRM_C_F_RMARK_DEL, SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK,
-    SPRM_C_IDSL_RMARK_DEL, SPRM_C_KUL, SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90,
-    SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_F_IN_TABLE,
-    SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT, SPRM_P_PROP_RMARK90, SPRM_P_WALL,
-    SPRM_T_PROP_RMARK, SPRM_T_RSID, SPRM_T_WALL,
+    SPRM_C_IDSL_RMARK_DEL, SPRM_C_KUL, SPRM_C_PIC_LOCATION, SPRM_C_PROP_RMARK_CURRENT,
+    SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT, SPRM_C_WALL,
+    SPRM_P_F_IN_TABLE, SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT, SPRM_P_PROP_RMARK90,
+    SPRM_P_WALL, SPRM_T_PROP_RMARK, SPRM_T_RSID, SPRM_T_WALL,
 };
 use crate::writer::ChpxFkpBuilder;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
@@ -577,6 +577,36 @@ impl RevisionEditor {
             .rev()
             .find(|sprm| sprm.opcode == SPRM_P_F_IN_TABLE)
             .is_some_and(|sprm| sprm.operand_byte() == Some(1)))
+    }
+
+    /// Resolves the exact Data-stream offset carried by
+    /// `sprmCPicLocation` on one special picture/object character.
+    pub(crate) fn picture_location_at_cp(&self, cp: u32) -> Result<u32> {
+        let end = cp
+            .checked_add(1)
+            .ok_or_else(|| corrupted("picture CP overflow"))?;
+        let intervals = self.fc_intervals(cp, end)?;
+        if intervals.len() != 1 {
+            return Err(corrupted(
+                "picture character crosses physical text intervals",
+            ));
+        }
+        let (start, finish) = intervals[0];
+        let run = self
+            .chpx
+            .iter()
+            .find(|run| run.start <= start && finish <= run.end)
+            .ok_or_else(|| corrupted("picture character has no CHPX run"))?;
+        let sprm = strict_sprms(&run.grpprl)?
+            .into_iter()
+            .rev()
+            .find(|sprm| sprm.opcode == SPRM_C_PIC_LOCATION)
+            .ok_or_else(|| corrupted("picture character has no sprmCPicLocation"))?;
+        let bytes: [u8; 4] = sprm
+            .operand_bytes()
+            .try_into()
+            .map_err(|_| corrupted("sprmCPicLocation operand is invalid"))?;
+        Ok(u32::from_le_bytes(bytes))
     }
 
     /// Main-story length in MS-DOC CP (UTF-16 code-unit) coordinates.

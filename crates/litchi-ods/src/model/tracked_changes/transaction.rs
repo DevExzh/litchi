@@ -1,5 +1,10 @@
 //! Source-bound tracked-change snapshots, inert edits, and reversible patches.
 
+#![allow(
+    clippy::expect_used,
+    reason = "expectations access indexes and owners established by the preceding bounded validation pass"
+)]
+
 use super::model::{RelationKind, Resources};
 use super::{Acceptance, Change, Changes, Limits, codec};
 use litchi_core::{Error, Result};
@@ -133,7 +138,7 @@ struct RelationKinds(u8);
 
 impl RelationKinds {
     fn insert(&mut self, kind: RelationKind) {
-        self.0 |= 1 << kind as u8;
+        self.0 |= 1 << kind.bit();
     }
 
     fn union(&mut self, other: Self) {
@@ -150,7 +155,7 @@ impl RelationKinds {
             RelationKind::Previous,
         ]
         .into_iter()
-        .find(|kind| self.0 & (1 << *kind as u8) != 0)
+        .find(|kind| self.0 & (1 << kind.bit()) != 0)
         .expect("non-empty tracked-change relation mask")
     }
 }

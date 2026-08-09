@@ -20,7 +20,10 @@ fn validated_formula_package_round_trips_without_losing_xml() {
     );
     assert!(!formula.is_template());
     assert_eq!(formula.root().kind(), Kind::Math);
-    assert_eq!(formula.starmath_source().as_deref(), Some("x + 1"));
+    assert_eq!(
+        formula.starmath().expect("StarMath").opaque().source(),
+        "x + 1"
+    );
     assert_eq!(formula.content_xml().expect("content XML"), MATHML);
 
     let reopened = Formula::from_bytes(formula.to_bytes()).expect("reopen formula");

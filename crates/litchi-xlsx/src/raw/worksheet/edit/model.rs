@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use litchi_sheet::{COLUMNS, Cell as Address, Column, ROWS, Rect, Row};
 
-use crate::cell::Content;
+use crate::cell::{Content, Text};
 use crate::column::Width;
 use crate::error::{Result, invalid};
 use crate::layout::{self, Descent};
@@ -14,6 +14,11 @@ use crate::row::Height;
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Payload {
     Set(Content),
+    /// Reuse one exact workbook shared-string item, retaining rich runs.
+    SharedString {
+        index: usize,
+        text: Text,
+    },
     /// Ensure an explicit empty cell record exists.
     Clear,
     /// Clear only when another effect or the base snapshot retains the cell.
@@ -82,8 +87,10 @@ impl Action {
     pub(crate) const fn creates_missing(&self) -> bool {
         match self {
             Self::Update { payload, style } => {
-                matches!(payload, Some(Payload::Set(_) | Payload::Clear))
-                    || matches!(style, Some(StyleEffect::Set(_)))
+                matches!(
+                    payload,
+                    Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::Clear)
+                ) || matches!(style, Some(StyleEffect::Set(_)))
             },
             Self::Remove => false,
         }

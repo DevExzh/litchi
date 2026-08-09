@@ -61,6 +61,7 @@ enum CellTransfer {
 pub struct Edit {
     pub(in crate::workbook::edit) base: Workbook,
     pub(in crate::workbook::edit) panes: Option<PanesAction>,
+    pub(in crate::workbook::edit) defined_names: Option<Box<[raw::DefinedName]>>,
     pub(in crate::workbook::edit) active: Option<Target>,
     pub(in crate::workbook::edit) order: Option<OrderPlan>,
     pub(in crate::workbook::edit) sheets: BTreeMap<usize, SheetActions>,
@@ -74,6 +75,7 @@ impl Edit {
         Ok(Self {
             base,
             panes: None,
+            defined_names: None,
             active: None,
             order: None,
             sheets: BTreeMap::new(),
@@ -103,6 +105,34 @@ impl Edit {
         guard::no_removal(self, "task panes")?;
         self.panes = Some(PanesAction::Remove);
         Ok(self)
+    }
+
+    /// Replace the complete inert workbook defined-name catalog.
+    ///
+    /// The staged catalog is validated against the current sheet count and
+    /// rewritten without rebuilding unrelated workbook XML. Structural tab
+    /// edits are deliberately kept separate so local scopes cannot silently
+    /// change meaning.
+    pub fn replace_defined_names(&mut self, names: Vec<raw::DefinedName>) -> Result<&mut Self> {
+        guard::no_removal(self, "defined names")?;
+        let workbook = self
+            .base
+            .inner
+            .package
+            .get_part(&self.base.inner.workbook_uri)?;
+        let candidate = raw::catalog_edit::replace_defined_names(workbook.blob(), &names)?;
+        let parsed = raw::parse_catalog(&candidate)?;
+        if parsed.defined_names != names {
+            return Err(invalid("defined-name authoring verification failed"));
+        }
+        self.defined_names = (names.as_slice() != self.base.inner.defined_names.as_ref())
+            .then(|| names.into_boxed_slice());
+        Ok(self)
+    }
+
+    /// Remove every direct workbook defined name.
+    pub fn clear_defined_names(&mut self) -> Result<&mut Self> {
+        self.replace_defined_names(Vec::new())
     }
 
     /// Append a validated worksheet and borrow its transaction-local editor.
@@ -315,11 +345,13 @@ impl Edit {
     ///
     /// Scalar formulas are translated from each source coordinate to its
     /// corresponding target coordinate and their stale caches are discarded.
-    /// Shared-string text is copied as owned semantic text, while local style
-    /// handles retain their validated workbook style-table lineage. Range-owned
-    /// formulas, unknown cell encodings, and merged regions are refused rather
-    /// than partially copied. An exact same-sheet, same-range transfer is a
-    /// semantic no-op.
+    /// Shared-string identity is retained exactly, including rich-text runs,
+    /// while local style handles retain their validated workbook style-table
+    /// lineage. Range-owned formulas, unknown cell encodings, and merged
+    /// regions are refused rather than partially copied. An exact same-sheet,
+    /// same-range transfer is a semantic no-op. Worksheets that own DrawingML
+    /// graphs are atomically refused until anchor-aware graph cloning can prove
+    /// complete relationship closure.
     ///
     /// # Errors
     ///
@@ -397,6 +429,8 @@ impl Edit {
         }
         self.ensure_unmerged_transfer(&source_sheet, source_range)?;
         self.ensure_unmerged_transfer(&target_sheet, target_range)?;
+        self.ensure_no_drawing_transfer(&source_sheet)?;
+        self.ensure_no_drawing_transfer(&target_sheet)?;
         self.ensure_no_range_formula_transfer(&source_sheet, source_range)?;
         self.ensure_no_range_formula_transfer(&target_sheet, target_range)?;
 
@@ -477,6 +511,7 @@ impl Edit {
             self.removed
                 .len()
                 .saturating_add(usize::from(self.panes.is_some()))
+                .saturating_add(usize::from(self.defined_names.is_some()))
                 .saturating_add(usize::from(self.active.is_some()))
                 .saturating_add(
                     self.order
@@ -501,6 +536,7 @@ impl Edit {
     pub fn is_empty(&self) -> bool {
         self.active.is_none()
             && self.panes.is_none()
+            && self.defined_names.is_none()
             && self
                 .order
                 .as_ref()
@@ -528,6 +564,15 @@ impl Edit {
                 rejected: Box::new(other),
             });
         }
+        if (self.defined_names.is_some()
+            && (other.defined_names.is_some() || other.has_defined_name_scope_changes()))
+            || (other.defined_names.is_some() && self.has_defined_name_scope_changes())
+        {
+            return Err(JoinError {
+                failure: JoinFailure::DefinedNames,
+                rejected: Box::new(other),
+            });
+        }
         let conflicts = self.conflicts_with(&other);
         if !conflicts.is_empty() {
             return Err(JoinError {
@@ -539,6 +584,9 @@ impl Edit {
         let added_offset = self.added.len();
         if self.panes.is_none() {
             self.panes = other.panes;
+        }
+        if self.defined_names.is_none() {
+            self.defined_names = other.defined_names;
         }
         if self.active.is_none() {
             self.active = other.active.map(|target| match target {
@@ -632,52 +680,25 @@ impl Edit {
         let Self {
             base,
             panes: requested_panes,
+            defined_names: requested_defined_names,
             active: requested_active,
             order: requested_order,
             mut sheets,
             added,
             removed: _,
         } = self;
-        let validates_web = requested_panes.is_some()
-            || sheets.values().any(|actions| actions.web.is_some())
-            || added.iter().any(|sheet| sheet.actions.web.is_some());
-        let web_refs = if validates_web {
-            let final_panes = match &requested_panes {
-                Some(PanesAction::Put { panes, .. }) => Some(panes),
-                Some(PanesAction::Remove) => None,
-                None => base.task_panes()?,
-            };
-            Some(match final_panes {
-                Some(panes) => crate::web::Refs::from_panes(panes)?,
-                None => crate::web::Refs::new(std::iter::empty::<&str>())?,
-            })
-        } else {
-            None
-        };
-        if let Some(refs) = &web_refs {
-            for (position, data) in base.inner.sheets.iter().enumerate() {
-                if data.kind != WorksheetKind::Worksheet {
-                    continue;
-                }
-                if let Some(bindings) = sheets
-                    .get(&position)
-                    .and_then(|actions| actions.web.as_ref())
-                {
-                    codec::check_web_bindings(refs, &data.name, bindings)?;
-                } else {
-                    let sheet = Worksheet {
-                        owner: Arc::clone(&base.inner),
-                        data: Arc::clone(data),
-                    };
-                    codec::check_web_bindings(refs, &data.name, sheet.web_bindings()?)?;
-                }
-            }
-            for sheet in &added {
-                if let Some(bindings) = &sheet.actions.web {
-                    codec::check_web_bindings(refs, sheet.name.as_str(), bindings)?;
-                }
-            }
+        if requested_defined_names.is_some()
+            && (requested_order
+                .as_ref()
+                .is_some_and(OrderPlan::is_effective)
+                || !added.is_empty()
+                || sheets.values().any(|actions| actions.rename.is_some()))
+        {
+            return Err(Error::Unsupported {
+                feature: "combining defined-name replacement with structural sheet edits",
+            });
         }
+        validate_web_edit(&base, requested_panes.as_ref(), &sheets, &added)?;
         let mut changes = Vec::new();
         let mut package_changes = Vec::new();
         let mut parts = Vec::new();
@@ -1561,6 +1582,7 @@ impl Edit {
             || effective_order.is_some()
             || !created.is_empty()
             || needs_recalculation
+            || requested_defined_names.is_some()
         {
             let workbook_part = base.inner.package.get_part(&base.inner.workbook_uri)?;
             let before = workbook_part.blob_arc();
@@ -1768,11 +1790,23 @@ impl Edit {
             if needs_recalculation {
                 after = raw::recalc::invalidate(&after)?;
             }
+            if let Some(names) = &requested_defined_names {
+                after = raw::catalog_edit::replace_defined_names(&after, names)?;
+            }
             if after.as_slice() != before.as_slice() {
                 after = raw::compact::changed(&after, "compact changed workbook output")?;
             }
-            if has_existing_catalog_edit || !created.is_empty() || active_change.is_some() {
+            if has_existing_catalog_edit
+                || !created.is_empty()
+                || active_change.is_some()
+                || requested_defined_names.is_some()
+            {
                 let catalog = raw::parse_catalog(&after)?;
+                if let Some(expected) = &requested_defined_names
+                    && catalog.defined_names.as_slice() != expected.as_ref()
+                {
+                    return Err(invalid("workbook defined-name edit verification failed"));
+                }
                 if Some(catalog.active_sheet_index) != final_active_position {
                     return Err(invalid("workbook active-tab edit verification failed"));
                 }
@@ -1875,6 +1909,15 @@ impl Edit {
                     after: Arc::new(after),
                 });
             }
+        }
+
+        if let Some(after) = requested_defined_names
+            && after.as_ref() != base.inner.defined_names.as_ref()
+        {
+            package_changes.push(PackageChange::DefinedNames {
+                before: base.inner.defined_names.clone(),
+                after,
+            });
         }
 
         let mut graph = Vec::new();
@@ -2154,6 +2197,22 @@ impl Edit {
         Ok(())
     }
 
+    fn ensure_no_drawing_transfer(&self, sheet: &Worksheet) -> Result<()> {
+        use litchi_opc::constants::relationship_type as rt;
+
+        let part = self.base.inner.package.get_part(&sheet.data.part_uri)?;
+        if part
+            .rels()
+            .iter()
+            .any(|relationship| matches!(relationship.reltype(), rt::DRAWING | rt::STRICT_DRAWING))
+        {
+            return Err(Error::Unsupported {
+                feature: "copying cells on a worksheet with drawing dependencies",
+            });
+        }
+        Ok(())
+    }
+
     pub(super) fn set_visibility(&mut self, position: usize, action: TabAction) {
         self.sheets.entry(position).or_default().visibility = Some(action);
     }
@@ -2366,10 +2425,18 @@ impl Edit {
 
     pub(in crate::workbook::edit) fn has_non_removal(&self) -> bool {
         self.panes.is_some()
+            || self.defined_names.is_some()
             || self.active.is_some()
             || self.order.as_ref().is_some_and(OrderPlan::is_effective)
             || self.sheets.values().any(|actions| !actions.is_empty())
             || !self.added.is_empty()
+    }
+
+    fn has_defined_name_scope_changes(&self) -> bool {
+        !self.removed.is_empty()
+            || !self.added.is_empty()
+            || self.order.as_ref().is_some_and(OrderPlan::is_effective)
+            || self.sheets.values().any(|actions| actions.rename.is_some())
     }
 
     pub(in crate::workbook::edit) fn remove_block(&self, reason: RemoveBlock, part: &str) -> Error {
@@ -2389,18 +2456,73 @@ impl Edit {
     }
 }
 
+fn validate_web_edit(
+    base: &Workbook,
+    requested_panes: Option<&PanesAction>,
+    sheets: &BTreeMap<usize, SheetActions>,
+    added: &[Added],
+) -> Result<()> {
+    let validates_web = requested_panes.is_some()
+        || sheets.values().any(|actions| actions.web.is_some())
+        || added.iter().any(|sheet| sheet.actions.web.is_some());
+    if !validates_web {
+        return Ok(());
+    }
+    let final_panes = match requested_panes {
+        Some(PanesAction::Put { panes, .. }) => Some(panes),
+        Some(PanesAction::Remove) => None,
+        None => base.task_panes()?,
+    };
+    let refs = match final_panes {
+        Some(panes) => crate::web::Refs::from_panes(panes)?,
+        None => crate::web::Refs::new(std::iter::empty::<&str>())?,
+    };
+    for (position, data) in base.inner.sheets.iter().enumerate() {
+        if data.kind != WorksheetKind::Worksheet {
+            continue;
+        }
+        if let Some(bindings) = sheets
+            .get(&position)
+            .and_then(|actions| actions.web.as_ref())
+        {
+            codec::check_web_bindings(&refs, &data.name, bindings)?;
+        } else {
+            let sheet = Worksheet {
+                owner: Arc::clone(&base.inner),
+                data: Arc::clone(data),
+            };
+            codec::check_web_bindings(&refs, &data.name, sheet.web_bindings()?)?;
+        }
+    }
+    for sheet in added {
+        if let Some(bindings) = &sheet.actions.web {
+            codec::check_web_bindings(&refs, sheet.name.as_str(), bindings)?;
+        }
+    }
+    Ok(())
+}
+
 fn transfer_action(state: State, source: Address, target: Address) -> Result<Action> {
-    let State::Cell { content, style } = state else {
+    let State::Cell {
+        content,
+        style,
+        shared_string,
+    } = state
+    else {
         return Ok(Action::Remove);
     };
-    let payload = match content {
-        Cell::Empty => Payload::Clear,
-        Cell::Value(value) => {
+    let payload = match (content, shared_string) {
+        (Cell::Empty, _) => Payload::Clear,
+        (Cell::Value(crate::Value::Text(text)), Some(shared_string)) => Payload::SharedString {
+            index: shared_string.raw(),
+            text,
+        },
+        (Cell::Value(value), _) => {
             let content = Content::Value(value);
             content.validate_for_write()?;
             Payload::Set(content)
         },
-        Cell::Formula(formula) => {
+        (Cell::Formula(formula), _) => {
             if !matches!(formula.kind(), FormulaKind::Scalar) {
                 return Err(Error::Unsupported {
                     feature: "copying range-owned formulas",
@@ -2415,7 +2537,7 @@ fn transfer_action(state: State, source: Address, target: Address) -> Result<Act
             );
             Payload::Set(Content::Formula(Formula::new(translated)?))
         },
-        Cell::Unknown(_) => {
+        (Cell::Unknown(_), _) => {
             return Err(Error::Unsupported {
                 feature: "copying unmodeled cell encodings",
             });

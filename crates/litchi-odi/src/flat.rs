@@ -1153,8 +1153,10 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                 if namespace == NamespaceKind::Draw && local.as_ref() == b"frame" {
                     let z_index = attribute_value(&reader, &element, DRAW, b"z-index")?
                         .map(|value| {
-                            value.parse::<u32>().map_err(|_| {
-                                invalid("ODI draw:frame draw:z-index is not a non-negative integer")
+                            value.parse::<u32>().map_err(|error| {
+                                invalid(format!(
+                                    "ODI draw:frame draw:z-index is not a non-negative integer: {error}"
+                                ))
                             })
                         })
                         .transpose()?;
@@ -1760,6 +1762,7 @@ fn parse_area(
             no_href,
             link_type: attribute_value(reader, element, XLINK, b"type")?,
             show: attribute_value(reader, element, XLINK, b"show")?,
+            actuate: attribute_value(reader, element, XLINK, b"actuate")?,
             title: None,
             description: None,
         },

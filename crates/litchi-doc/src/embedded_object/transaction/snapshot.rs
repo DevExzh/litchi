@@ -1,7 +1,7 @@
 //! Immutable DOC/ObjectPool snapshots.
 
 use super::super::Limits;
-use super::super::model::{Editor, Inventory, Reference};
+use super::super::model::{Editor, Inventory, Reference, WriteOptions};
 use super::Transaction;
 use crate::package::Result;
 use std::sync::Arc;
@@ -81,6 +81,21 @@ impl Snapshot {
     /// `ObjectPool` storage.
     pub fn objects(&self) -> Result<Vec<Reference>> {
         self.editor.objects()
+    }
+
+    /// Exports one managed object as a bounded inert transfer closure.
+    ///
+    /// The closure contains the standalone object CFB and its exact preview
+    /// block. Source-local CPs, FCs, field PLCFs, and storage names are not
+    /// exposed; the receiving DOC owner regenerates them for
+    /// `destination_storage_id`.
+    pub fn export_for_transfer(
+        &self,
+        storage_id: u32,
+        destination_storage_id: u32,
+    ) -> Result<WriteOptions> {
+        self.editor
+            .export_for_transfer(storage_id, destination_storage_id)
     }
 
     /// Starts an independent clone-staged transaction.
