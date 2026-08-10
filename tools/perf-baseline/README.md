@@ -22,9 +22,9 @@ default 36 cases / 198 records.
 
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
-range cases, two execution-scaling cases, 19 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, seven RTF semantic cases, and 21 ODF semantic cases
-are opt-in, for 107 selectable cases in total:
+range cases, two execution-scaling cases, one XLSX commit/read attribution case,
+19 native OLE2 semantic cases, 16 DOCX/PPTX semantic cases, seven RTF semantic
+cases, and 21 ODF semantic cases are opt-in, for 108 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -398,6 +398,10 @@ remain distinguishable.
   update before timing, then time commit alone or commit plus public
   `write_to`; the resulting patch, workbook semantics, and save bytes are
   verified.
+- `xlsx_one_cell_commit_first_read`: prepare the same fixed update before
+  timing, then time commit plus the first public read of that cell. This
+  attributes duplicate validation/materialization work without changing the
+  36-case default matrix.
 - `xlsx_one_percent_commit` / `xlsx_one_percent_commit_save`: do the same for
   the shape's deterministic ~1% update set (2 / 41 / 1,311 cells).
 - `xlsx_source_open`: open `SourceBackedWorkbook` over the instrumented

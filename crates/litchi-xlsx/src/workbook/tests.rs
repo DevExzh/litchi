@@ -720,3 +720,59 @@ fn package_with_cells() -> OpcPackage {
     package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
     package
 }
+
+#[test]
+fn validated_worksheet_store_adoption_requires_exact_bytes_and_lineage() {
+    use super::model::ValidatedWorksheetStore;
+
+    let source = Workbook::new().expect("source workbook");
+    let uri = source.inner.sheets[0].part_uri.clone();
+
+    let same_lineage =
+        Workbook::from_package_with_styles(source.inner.package.clone(), Some(&source))
+            .expect("same-lineage target");
+    let equal_but_distinct = Arc::new(
+        same_lineage
+            .inner
+            .package
+            .get_part(&uri)
+            .expect("worksheet part")
+            .blob()
+            .to_vec(),
+    );
+    let store = crate::raw::worksheet::parse(&equal_but_distinct, || source.inner.shared_strings())
+        .expect("worksheet store");
+    same_lineage
+        .adopt_validated_worksheet_stores(
+            &source,
+            vec![ValidatedWorksheetStore {
+                uri: uri.clone(),
+                content: equal_but_distinct,
+                store,
+            }],
+        )
+        .expect("skip byte-mismatched cache");
+    assert!(same_lineage.inner.sheets[0].cells.get().is_none());
+
+    let distinct_lineage =
+        Workbook::from_package(source.inner.package.clone()).expect("distinct-lineage target");
+    let exact_content = distinct_lineage
+        .inner
+        .package
+        .get_part(&uri)
+        .expect("worksheet part")
+        .blob_arc();
+    let store = crate::raw::worksheet::parse(&exact_content, || source.inner.shared_strings())
+        .expect("worksheet store");
+    distinct_lineage
+        .adopt_validated_worksheet_stores(
+            &source,
+            vec![ValidatedWorksheetStore {
+                uri,
+                content: exact_content,
+                store,
+            }],
+        )
+        .expect("skip lineage-mismatched cache");
+    assert!(distinct_lineage.inner.sheets[0].cells.get().is_none());
+}

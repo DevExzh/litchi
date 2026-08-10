@@ -693,6 +693,10 @@ impl Extents {
 }
 
 impl Store {
+    pub(crate) const fn stored_cell_count(&self) -> usize {
+        self.cells.len()
+    }
+
     pub(crate) fn from_unsorted(
         mut cells: Vec<Stored>,
         mut rows: Vec<row::Stored>,
