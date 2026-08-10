@@ -186,6 +186,11 @@ PAGES_SOURCE_ROOT = Path("crates/litchi-pages/src")
 PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE = (
     PAGES_SOURCE_ROOT / "package" / "page_layout.rs"
 )
+PAGES_PAGE_LAYOUT_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "page_layout.rs"
+PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCES = (
+    PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE,
+    PAGES_PAGE_LAYOUT_SEMANTIC_SOURCE,
+)
 PAGES_PAGE_LAYOUT_EXPORT_SOURCES = (
     PAGES_SOURCE_ROOT / "lib.rs",
     PAGES_SOURCE_ROOT / "package.rs",
@@ -200,12 +205,59 @@ PAGES_PAGE_LAYOUT_PUBLIC_MARKERS = frozenset(
         "PageLayoutPatch",
     }
 )
+RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS = (
+    "document_options",
+    "set_document_options",
+    "footnote_settings",
+    "set_footnote_settings",
+)
+RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS
+)
+RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_SOURCES = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "document_options.rs",
+    IWA_PAGES_SOURCE_ROOT / "editor" / "document_options" / "wire.rs",
+    IWA_PAGES_SOURCE_ROOT / "editor" / "footnote_settings.rs",
+)
+RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_MODULES = (
+    "document_options",
+    "footnote_settings",
+)
+PAGES_DOCUMENT_SETTINGS_IMPLEMENTATION_SOURCES = (
+    PAGES_SOURCE_ROOT / "document_settings.rs",
+    PAGES_SOURCE_ROOT / "package" / "document_settings.rs",
+)
+PAGES_DOCUMENT_SETTINGS_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+)
+PAGES_DOCUMENT_SETTINGS_PUBLIC_MARKERS = frozenset(
+    {
+        "DocumentSettings",
+        "DocumentSettingsCommit",
+        "DocumentSettingsDiagnostics",
+        "DocumentSettingsEdit",
+        "DocumentSettingsError",
+        "DocumentSettingsLimitKind",
+        "DocumentSettingsPatch",
+    }
+)
 IWA_PAGES_PAGE_LAYOUT_MODULE = re.compile(
     r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
     r"mod[ \t\r\n]+(?:r#)?page_layout\b[ \t\r\n]*(?:;|\{)",
     re.MULTILINE,
 )
+IWA_PAGES_DOCUMENT_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(document_options|footnote_settings)\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
 CAMEL_CASE_WORD = re.compile(r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|[0-9]+")
+RUST_BYTE_SLICE = re.compile(
+    r"&[ \t\r\n]*(?:'[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]+)?"
+    r"(?:mut[ \t\r\n]+)?\[[ \t\r\n]*u8[ \t\r\n]*\]"
+)
 FACADE_DEFAULT_FEATURE = "default"
 FACADE_ALL_FEATURE = "all"
 FACADE_SOURCE_ROOT = Path("crates/litchi/src")
@@ -1258,6 +1310,11 @@ def _iwork_public_leak(identifier: str) -> str | None:
     for part in identifier.split("_"):
         words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
     if any(
+        words[index] == "source" and words[index + 1] in {"byte", "bytes"}
+        for index in range(len(words) - 1)
+    ):
+        return "raw source bytes"
+    if any(
         word in {"guid", "guids", "id", "ids", "identifier", "identifiers", "uuid", "uuids"}
         for word in words
     ):
@@ -1302,6 +1359,19 @@ def _is_pages_page_layout_public_declaration(
     }
     return bool(identifiers & PAGES_PAGE_LAYOUT_PUBLIC_MARKERS) or any(
         "page_layout" in identifier.lower() for identifier in identifiers
+    )
+
+
+def _is_pages_document_settings_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(identifiers & PAGES_DOCUMENT_SETTINGS_PUBLIC_MARKERS) or any(
+        "document_settings" in identifier.lower() for identifier in identifiers
     )
 
 
@@ -1488,8 +1558,11 @@ def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[st
     source_root = root / PAGES_SOURCE_ROOT
     if not source_root.is_dir():
         return []
-    implementation_source = root / PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE
-    dedicated_sources = {implementation_source} if implementation_source.is_file() else set()
+    dedicated_sources = {
+        root / path
+        for path in PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
     export_sources = {
         root / path for path in PAGES_PAGE_LAYOUT_EXPORT_SOURCES if (root / path).is_file()
     }
@@ -1522,6 +1595,121 @@ def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[st
                 violations.append(
                     "focused litchi-pages page-layout public API exposes "
                     f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages page-layout public API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_pages_document_settings_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep retired Pages document-settings APIs and modules out of the host."""
+
+    violations: list[str] = []
+    for retired in RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_SOURCES:
+        path = root / retired
+        if path.exists():
+            violations.append(
+                "retired litchi-iwa Pages document-settings source returned: "
+                + str(retired)
+            )
+
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Pages document-settings method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    editor_path = root / IWA_PAGES_EDITOR_SOURCE
+    if editor_path.is_file():
+        source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+        for match in IWA_PAGES_DOCUMENT_SETTINGS_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Pages document-settings module "
+                f"{match.group(1)}: {IWA_PAGES_EDITOR_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_pages_document_settings_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Reject physical details from the combined document-settings facade."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in PAGES_DOCUMENT_SETTINGS_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    export_sources = {
+        root / path
+        for path in PAGES_DOCUMENT_SETTINGS_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for declaration, line_number, complete_source_scope in declarations:
+            if not _is_pages_document_settings_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if identifier in PAGES_DOCUMENT_SETTINGS_PUBLIC_MARKERS:
+                    violations.append(
+                        "focused litchi-pages document-settings public API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _iwork_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-pages document-settings public API exposes "
+                    f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages document-settings public API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
                 )
 
     return sorted(set(violations))
@@ -1795,6 +1983,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_lock_facade_source_topology()
         + audit_iwa_pages_page_layout_source_topology()
         + audit_pages_page_layout_facade_source_topology()
+        + audit_iwa_pages_document_settings_source_topology()
+        + audit_pages_document_settings_facade_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

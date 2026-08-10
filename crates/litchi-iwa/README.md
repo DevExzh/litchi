@@ -1119,11 +1119,6 @@ if let Some(sheet) = numbers.sheets()?.first()
 numbers.save("updated.numbers")?;
 
 let mut pages = PagesEditor::open("input.pages")?;
-let mut document_options = pages.document_options()?;
-document_options.set_facing_pages(Some(true));
-document_options.set_automatic_hyphenation(Some(true));
-document_options.set_ligatures_enabled(Some(false));
-pages.set_document_options(document_options)?;
 let section_id = pages.sections()[0].object_id;
 // Selector-first section-text editing now lives in litchi-pages; see
 // litchi-pages/examples/edit_section_text.rs. The legacy raw-ID path remains
@@ -1286,6 +1281,57 @@ keynote.remove_slide(copy.index)?;
 keynote.save("updated.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+### Pages document and footnote settings use one focused transaction
+
+Document visibility, facing-page, hyphenation, and ligature options share one
+focused transaction with footnote formatter settings. Use the semantic
+`litchi_pages::document_settings::Settings` value; it exposes neither native
+identifiers nor raw records. Packages and commits are immutable, so carry
+`commit.package()` into any later transaction.
+
+```rust,no_run
+use litchi_pages::{
+    Package,
+    document_settings::Settings,
+    footnote::{self, Format, Kind},
+};
+
+let package = Package::open("input.pages")?;
+let current = package.document_settings()?;
+
+let mut options = current.options();
+options.set_facing_pages(Some(true));
+options.set_automatic_hyphenation(Some(true));
+options.set_ligatures_enabled(Some(false));
+
+let footnotes = footnote::Settings {
+    kind: Some(Kind::Footnotes),
+    format: Some(Format::Roman),
+    ..current.footnotes()
+};
+let settings = Settings::new(options, footnotes)?;
+
+let commit = package
+    .edit_document_settings()?
+    .set(settings)
+    .commit()?;
+assert_eq!(commit.package().document_settings()?, settings);
+
+let restored = commit
+    .package()
+    .apply_document_settings(&commit.patch().inverse())?;
+assert_eq!(restored.package().source_bytes(), package.source_bytes());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Unchanged settings retain the original source allocation. A changed commit
+requires an exact flat package: normalized legacy sources can be read but a
+changed edit returns `litchi_pages::document_settings::Error::UnsupportedSource`.
+Changed commits invalidate the private layout cache, remove stale root previews,
+and fully reopen the candidate; the inverse patch restores the exact original
+package. See `litchi-pages/examples/edit_document_settings.rs` for the complete
+file-to-file publication workflow.
 
 ### Pages page layout uses the focused package transaction
 
@@ -1619,9 +1665,13 @@ changed nested-`Index.zip` packages still require the migration host.
 Changed no-root/fallback bodies are likewise unsupported until their physical
 ownership has an explicit preservation-safe mutation boundary.
 
-The legacy `PagesEditor` still owns document body/header/footer visibility,
-facing-page layout, automatic hyphenation, and ligature options; absent values
-retain Pages' effective defaults. See `edit_pages_document_options`.
+`litchi-pages::document_settings` owns document body/header/footer visibility,
+facing-page layout, automatic hyphenation, ligatures, and footnote formatter
+settings. Its composite `Package` transaction preserves optional native
+presence, validates known formatter values, requires an exact source for a
+changed edit, invalidates dependent layout caches and stale previews, and
+supports exact inverse patches. See
+`litchi-pages/examples/edit_document_settings.rs`.
 Page dimensions, margins, scale, orientation, and vertical-layout flags belong
 to the selector-free, document-wide `litchi-pages::Package` transaction shown
 above and in `litchi-pages/examples/edit_page_layout.rs`. That transaction

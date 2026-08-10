@@ -1165,6 +1165,11 @@ class BoundaryPolicyTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            semantic = root / boundaries.PAGES_PAGE_LAYOUT_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub fn page_layout(source_bytes: &[u8]) -> SourceBytes {}\n",
+                encoding="utf-8",
+            )
             lib_export, package_export = (
                 root / path for path in boundaries.PAGES_PAGE_LAYOUT_EXPORT_SOURCES
             )
@@ -1218,6 +1223,15 @@ class BoundaryPolicyTests(unittest.TestCase):
                         "focused litchi-pages page-layout public API exposes "
                         "archive/IWA type PageLayoutArchive: "
                         "crates/litchi-pages/src/lib.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "raw source bytes source_bytes: "
+                        "crates/litchi-pages/src/page_layout.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "raw byte slice &[u8]: "
+                        "crates/litchi-pages/src/page_layout.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "raw source bytes SourceBytes: "
+                        "crates/litchi-pages/src/page_layout.rs:1",
                     ]
                 ),
             )
@@ -1266,7 +1280,17 @@ class BoundaryPolicyTests(unittest.TestCase):
             lib_export.write_text(safe_exports, encoding="utf-8")
             low_level = root / boundaries.PAGES_SOURCE_ROOT / "page_layout.rs"
             low_level.write_text(
-                "pub fn page_layout(object_id: u64) -> DocumentArchive { todo!() }\n",
+                "\n".join(
+                    [
+                        "pub fn page_layout(input: InputBytes, byte_count: usize) "
+                        "-> OutputBytes { todo!() }",
+                        "fn private_source_bytes(source_bytes: &[u8]) -> SourceBytes "
+                        "{ todo!() }",
+                        "pub(crate) fn restricted_source_bytes(source_bytes: &[u8]) "
+                        "-> SourceBytes { todo!() }",
+                    ]
+                )
+                + "\n",
                 encoding="utf-8",
             )
             unrelated_owner = root / "crates/litchi-keynote/src/package/page_layout.rs"
@@ -1278,6 +1302,396 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(
                 boundaries.audit_pages_page_layout_facade_source_topology(root), []
+            )
+
+    def test_retired_iwa_pages_document_settings_method_inventory_is_exact(
+        self,
+    ) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS,
+            (
+                "document_options",
+                "set_document_options",
+                "footnote_settings",
+                "set_footnote_settings",
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_MODULES,
+            ("document_options", "footnote_settings"),
+        )
+
+    def test_retired_iwa_pages_document_settings_surface_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            nested = root / boundaries.IWA_PAGES_SOURCE_ROOT / "legacy/settings.rs"
+            nested.parent.mkdir(parents=True)
+            declarations = [
+                ("document_options", "fn r#document_options() {}"),
+                (
+                    "set_document_options",
+                    "pub(crate) async unsafe fn set_document_options() {}",
+                ),
+                (
+                    "footnote_settings",
+                    'pub(in crate::pages) const unsafe extern "C" fn '
+                    "footnote_settings() {}",
+                ),
+                (
+                    "set_footnote_settings",
+                    "pub(super) fn r#set_footnote_settings() {}",
+                ),
+            ]
+            nested.write_text(
+                "\n".join(declaration for _, declaration in declarations) + "\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_PAGES_EDITOR_SOURCE
+            editor.write_text(
+                "pub(crate) mod r#document_options;\n"
+                "pub mod footnote_settings {}\n",
+                encoding="utf-8",
+            )
+            for retired in boundaries.RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_SOURCES:
+                path = root / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// retired owner returned\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_document_settings_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Pages document-settings method "
+                        f"{name}: crates/litchi-iwa/src/pages/legacy/settings.rs:"
+                        f"{index}"
+                        for index, (name, _) in enumerate(declarations, start=1)
+                    ]
+                    + [
+                        "retired litchi-iwa Pages document-settings module "
+                        "document_options: crates/litchi-iwa/src/pages/editor.rs:1",
+                        "retired litchi-iwa Pages document-settings module "
+                        "footnote_settings: crates/litchi-iwa/src/pages/editor.rs:2",
+                    ]
+                    + [
+                        "retired litchi-iwa Pages document-settings source returned: "
+                        f"{retired}"
+                        for retired in boundaries.RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_SOURCES
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_pages_document_settings_module_declaration_variants(
+        self,
+    ) -> None:
+        for module in boundaries.RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_MODULES:
+            for declaration in (
+                f"mod {module};",
+                f"pub(crate) mod {module};",
+                f"pub mod r#{module};",
+                f"mod\n{module}\n{{}}",
+            ):
+                with self.subTest(module=module, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        editor = root / boundaries.IWA_PAGES_EDITOR_SOURCE
+                        editor.parent.mkdir(parents=True)
+                        editor.write_text(declaration + "\n", encoding="utf-8")
+
+                        self.assertEqual(
+                            boundaries.audit_iwa_pages_document_settings_source_topology(
+                                root
+                            ),
+                            [
+                                "retired litchi-iwa Pages document-settings module "
+                                f"{module}: crates/litchi-iwa/src/pages/editor.rs:1"
+                            ],
+                        )
+
+    def test_iwa_pages_document_settings_policy_ignores_trivia_near_names_and_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "legacy/settings_old.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "\n".join(
+                    [
+                        "// pub fn document_options() {}",
+                        'const NOTE: &str = "fn set_document_options() {}";',
+                        "/* fn footnote_settings() {}",
+                        "   /* fn set_footnote_settings() {} */",
+                        "   fn document_options() {} */",
+                        'const RAW_NOTE: &str = r###"fn footnote_settings() {}"###;',
+                        "pub fn document_options_snapshot() {}",
+                        "pub fn reset_document_options() {}",
+                        "pub fn footnote_settings_snapshot() {}",
+                        "pub fn set_footnote_settings_for_section() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_PAGES_EDITOR_SOURCE
+            editor.write_text(
+                "\n".join(
+                    [
+                        "// mod document_options;",
+                        'const NOTE: &str = "mod footnote_settings;";',
+                        "/* mod document_options; */",
+                        'const RAW_NOTE: &str = r#"mod footnote_settings;"#;',
+                        "mod document_options_legacy;",
+                        "mod footnote_settings_legacy;",
+                        "use crate::document_options;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            declarations = "\n".join(
+                f"pub fn {name}() {{}}"
+                for name in boundaries.RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS
+            ) + "\n"
+            for relative in (
+                Path("crates/litchi-pages/src/package/document_settings.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/document_settings.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(declarations, encoding="utf-8")
+            non_rust = root / boundaries.IWA_PAGES_SOURCE_ROOT / "document_options.txt"
+            non_rust.write_text(declarations, encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_document_settings_source_topology(root), []
+            )
+
+    def test_focused_pages_document_settings_public_api_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.PAGES_DOCUMENT_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "pub fn document_settings(source_bytes: &[u8], object_id: u64) "
+                        "-> DocumentArchive {}",
+                        "pub type Patch = buffa::DocumentArchiveView;",
+                        "impl prost::Message for document_settings::Edit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub type Commit = IWorkPackage;",
+                        "pub type Diagnostics = litchi_iwa_core::RawObject;",
+                        "pub type Error = SourceBytes;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_DOCUMENT_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub use litchi_iwa_protos::document_settings::GeneratedArchive;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub type document_settings_limit = prost_types::MessageInfo;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_document_settings_facade_source_topology(
+                root
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-pages document-settings public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type DocumentArchive",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type IWorkPackage",
+                "archive/IWA type litchi_iwa_core",
+                "native object RawObject",
+                "raw source bytes SourceBytes",
+                "archive/IWA type litchi_iwa_protos",
+                "archive/IWA type GeneratedArchive",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+            )
+            self.assertEqual(len(violations), len(expected_fragments))
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused document-settings leak: {fragment}",
+                    )
+
+    def test_focused_pages_document_settings_api_ignores_semantic_and_private_code(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.PAGES_DOCUMENT_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "// pub fn document_settings(object_id: ObjectId) {}",
+                        'const NOTE: &str = "pub type DocumentSettingsPatch = DocumentArchive";',
+                        "/* impl buffa::Message for DocumentSettingsEdit {} */",
+                        "// pub struct DocumentSettings;",
+                        'const FLAT_NOTE: &str = "pub type DocumentSettings = Settings";',
+                        "pub struct Options;",
+                        "pub struct FootnoteSettings;",
+                        "pub struct Settings;",
+                        "pub struct DocumentSettingsSnapshot;",
+                        "pub fn document_settings(options: Options, footnotes: FootnoteSettings, "
+                        "input: InputBytes, byte_count: usize) -> OutputBytes { todo!() }",
+                        "fn private_source_bytes(source_bytes: &[u8], object_id: u64) "
+                        "-> SourceBytes { todo!() }",
+                        "pub(crate) fn restricted_settings(archive: DocumentArchive) {}",
+                        "struct DocumentSettings;",
+                        "pub(crate) struct DocumentSettings;",
+                        "struct DocumentSettingsEdit;",
+                        "pub(crate) struct DocumentSettingsPatch;",
+                        "impl prost::Message for Unrelated {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub struct Edit;",
+                        "pub struct Patch;",
+                        "pub struct Commit;",
+                        "pub struct Diagnostics;",
+                        "pub struct Error;",
+                        "pub struct LimitKind;",
+                        "impl Edit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_DOCUMENT_SETTINGS_EXPORT_SOURCES
+            )
+            safe_exports = (
+                "pub use crate::document_settings::{Options, FootnoteSettings, Settings};\n"
+                "pub use package::document_settings::{Edit, Patch, Commit, Diagnostics, "
+                "Error, LimitKind};\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+                "pub type DocumentSettingCommit = litchi_iwa_core::RawObject;\n"
+            )
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            package_export.write_text(safe_exports, encoding="utf-8")
+            other_owner = root / "crates/litchi-keynote/src/document_settings.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub struct DocumentSettings;\n"
+                "pub type DocumentSettingsPatch = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_document_settings_facade_source_topology(root), []
+            )
+
+    def test_focused_pages_document_settings_public_api_rejects_flat_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.PAGES_DOCUMENT_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct DocumentSettings;\n"
+                "pub struct DocumentSettingsEdit;\n"
+                "pub type DocumentSettingsPatch = Patch;\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub type DocumentSettingsCommit = Commit;\n"
+                "pub type DocumentSettingsDiagnostics = Diagnostics;\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_DOCUMENT_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub use crate::document_settings::Error as DocumentSettingsError;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use package::document_settings::LimitKind "
+                "as DocumentSettingsLimitKind;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_document_settings_facade_source_topology(root),
+                sorted(
+                    [
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettings: "
+                        "crates/litchi-pages/src/document_settings.rs:1",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsEdit: "
+                        "crates/litchi-pages/src/document_settings.rs:2",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsPatch: "
+                        "crates/litchi-pages/src/document_settings.rs:3",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsCommit: "
+                        "crates/litchi-pages/src/package/document_settings.rs:1",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsDiagnostics: "
+                        "crates/litchi-pages/src/package/document_settings.rs:2",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsError: "
+                        "crates/litchi-pages/src/lib.rs:1",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsLimitKind: "
+                        "crates/litchi-pages/src/package.rs:1",
+                    ]
+                ),
             )
 
     def test_legacy_xlsb_sheet_view_names_and_methods_are_forbidden(self) -> None:

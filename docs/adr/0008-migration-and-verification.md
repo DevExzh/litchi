@@ -8329,3 +8329,141 @@ nor is every transitive allocation proven fallible. In particular, the shared
 archive encoder still deep-clones retained `ArchiveInfo` metadata through an
 infallible path. Exact source bytes remain an ordinary `Package` API, and the
 flattened `PageLayout*` names remain focused-module naming debt.
+
+## 2026-08-10 amendment: combined Pages document-settings cutover
+
+Pages document visibility/layout options and footnote formatting now migrate as
+one immutable transaction because the native format stores both in a single
+settings owner. The archive-free `document_settings::Settings` combines
+`document_options::Options` with `footnote::Settings`; its public focused module
+uses the canonical short `Edit`, `Commit`, `Patch`, `Diagnostics`, `Error`, and
+`LimitKind` names. `Package::document_settings`, `edit_document_settings`, and
+`apply_document_settings` are the only new package entry points. Their focused
+method/type signatures and errors expose no raw ID, member name, message type,
+generated type, field number, source byte slice, or retained patch artifact.
+
+The exact rooted read graph is:
+
+1. resolve the unique object 1 and unique type-10000 `TP.DocumentArchive`;
+2. strictly decode required local `TP.DocumentArchive.settings` field 7, prove
+   one aggregate reference and optional unique path-`[7]` field metadata;
+3. resolve that nonzero identifier to exactly one object and exactly one
+   type-10012 `TP.SettingsArchive`; and
+4. decode fields 1, 2, 3, 9, 10, and 30 through 34 under one aggregate byte,
+   field, work, and nesting budget.
+
+The root preflight also checks required document `super` and singular body and
+section edges without claiming their payloads. The settings field mapping is
+body 1, headers 2, footers 3, hyphenation 9, `use_ligatures` 10, footnote kind
+30, format 31, numbering 32, gap 33, and facing pages 34. Raw preflight rejects
+duplicates, wrong wire types, noncanonical varints, invalid Booleans,
+non-sign-extended `int32`, zero or external references, ambiguous owners,
+contradictory reference metadata, selected merge/diff records, and
+noncanonical selected component framing. It then forces both the document
+settings-reference lazy view and all ten `PagesSettingsArchive` scalar fields;
+the complete Buffa snapshot must equal preflight and the archive-free semantic
+value. Valid newer enum integers map to canonical `Unknown` variants, while a
+caller cannot construct an `Unknown` wrapper for a known value.
+
+This supersedes the shared projection's page-layout-only 122,114-byte/124-KiB
+record. The five generated body/layout/settings files total 174,682 bytes under
+a 176-KiB cap and have deterministic aggregate SHA-256
+`7618a60db84b87e28eea67a8acd85ce8eb19513cf4cee7654c1c4e78f405f824`.
+The build rejects any repeated-view or production-encoding surface. Document
+`super`, repeated section tables, unknown fields, raw headers, and all
+preservation state remain outside Buffa and caller-owned.
+
+A changed commit raw-splices only the ten selected settings scalars with exact
+presence. It rewrites the settings-owner component and reuses the page-layout
+vertical's rooted document-super/view-state/type-210/type-10147 cache proof.
+The transaction removes only the rooted layout-state edge and its proven
+metadata, leaves the opaque cache object and detached/unrooted candidates
+untouched, and deletes root `preview.jpg`, `preview-micro.jpg`, and
+`preview-web.jpg`. Settings and cache roots can share one component or occupy
+two, while ZIP deletions are counted separately. Every accepted unselected
+object/message/header, unrelated metadata reference, component, and retained
+ZIP record remains exact.
+
+Canonical unknown scalar fields remain exact through changed publication.
+Bounded canonical protobuf groups are readable and retained by exact no-ops,
+but a group-bearing settings payload is rejected for a changed splice because
+no group-aware rewriter is owned. Noncanonical encodings are rejected even for
+reads. Changed publication fully reopens under retained limits and verifies the
+combined settings, absent cache edge and previews, stable statistics, and
+unchanged section names, types, headings, paragraphs, storages, and page counts.
+
+No-op ordering is deliberate: once the rooted settings value was read to begin
+the edit, an equal `Settings` commit shares the exact source allocation before
+cache traversal, preserves field presence/caches/previews, and reports zero
+components, zero deletions, and no full reparse. A no-op patch needs only exact
+artifact identity. Changed patches retain exact source and target artifacts;
+application checks exact bytes and semantic/cache/preview preconditions, then
+reopens the stored target rather than reassembling it. Replay, source tamper,
+an inverse on the source, and competing patches conflict. A valid inverse
+restores the exact original artifact.
+
+Migration is intentionally combined and immutable:
+
+- `PagesEditor::document_options()` becomes
+  `Package::document_settings()?.options()`.
+- `PagesEditor::footnote_settings()` becomes
+  `Package::document_settings()?.footnotes()`.
+- Either old setter becomes a read of the composite `Settings`, replacement of
+  only `options` or `footnotes`, then
+  `package.edit_document_settings()?.set(settings).commit()?`.
+- A later transaction begins from `commit.package()` or
+  `commit.into_package()`; the source package is never mutated.
+- Changed-output comparisons permit the declared cache-edge and root-preview
+  removal. Exact no-ops remain byte-identical.
+
+The four host getter/setter methods, `document_options.rs`, its nested
+`wire.rs`, `footnote_settings.rs`, two host examples, and duplicate host tests
+are removed rather than shimmed. One focused example validates all ten semantic
+choices, publishes via a synced sibling temporary with no clobber, and can emit
+an exact inverse. Legacy nested `Index.zip` sources retain reads and exact
+no-ops, but a changed edit returns `UnsupportedSource`; the old host's changed
+normalization is deliberately not compatibility behavior. Boundary policy
+ratchets all four methods, both module declarations, all three retired files,
+and native/IWA/protobuf/source-byte leakage from the semantic and transaction
+facades.
+
+The final deterministic gate passes 108/108 Pages tests and doctests, including
+14/14 combined transaction tests, 4/4 strict codec tests, and 6/6 root-facade
+tests. Package check, strict no-dependency Clippy with warnings denied, strict
+documentation, and 70/70 boundary-policy regressions pass. The live boundary
+command remains red only for 14 unrelated pre-existing soapberry-zip and
+xml-minifier declarations. The focused fuzz target compiles and its explicit
+no-op and changed smoke inputs pass. The sanitizer-backed campaign cannot start
+under the installed stable toolchain because cargo-fuzz requires
+`-Zsanitizer=address` and nightly is unavailable.
+
+The native gate used a fresh Apple Pages-authored file containing a real
+footnote. Source and Rust-candidate SHA-256 values are
+`9da01e2805459e05450551827140069eefe8049aeeacc7625d3c62d7e00ffeab` and
+`3d052e7f1ec86e57ea0553e46f628de1d9fa5bdda615ded9410fca29c93f0995`.
+The focused edit reported `changed=true`, two touched components, and three
+deleted root previews; its inverse restored the source exactly. Apple Pages
+14.4 (7043.0.93) opened the Rust candidate with no warning, repair, recovery,
+or conversion. Its UI and focused readback showed body/header/footer enabled,
+facing pages enabled, hyphenation and ligatures disabled, and Footnotes with
+Roman markers, restart each page, and an 18-point gap. All three body markers
+and the note text remained exact.
+
+Native Save As, close, and exact-file reopen were warning-free and reconfirmed
+the same settings and text. Save As regenerated all three root previews and
+produced SHA-256
+`803167e2479c459f9a33c8ecfc4d713f596fdc5d5d337090ab3c90e467a0cba6`.
+A focused same-settings commit on that artifact reported unchanged, zero
+components, and zero deletions and produced the same hash exactly; applying its
+no-op inverse did likewise.
+
+This gate does not close aggregate transaction peak-memory or total-work
+accounting, the shared encoder's infallible retained-`ArchiveInfo` clone, the
+complete fallible-allocation audit, group-aware changed splicing, exact
+streaming and partial-output accounting, or a library-owned atomic durable
+filesystem replacement. The process-local patch still lacks a stable versioned
+serialization, semantic operation/read-write sets, composition, three-way
+merge, and bounded history. Exact source bytes remain ordinary `Package`
+surface. The opaque cache object and remaining Pages settings/render state are
+not claimed. No manifest edge or ordered debt changes; the current inventory
+remains 64 packages, 235 internal declarations, and 14 ordered debts.

@@ -19,6 +19,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
     println!("cargo:rerun-if-changed=src/table_info_codec.rs");
 
@@ -266,10 +268,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_pages_section_projection_budget(&buffa_pages_section_out_directory)?;
 
-    // Pages root/body traversal needs only two root references, scalar page
-    // layout, and one streamed section-boundary entry. The enclosing section
-    // table stays out of generated code, and strict preflight owns every
-    // ingress limit.
+    // Pages root/body traversal needs only three root references, scalar page
+    // layout/document settings, and one streamed section-boundary entry. The
+    // enclosing section table stays out of generated code, and strict
+    // preflight owns every ingress limit.
     let buffa_pages_body_out_directory =
         PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-body");
     buffa_build::Config::new()
@@ -571,10 +573,11 @@ fn enforce_pages_body_projection_provenance(
     projection_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
     const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
-    const TP_FIELDS: [&str; 14] = [
+    const TP_FIELDS: [&str; 15] = [
         "required .TSA.DocumentArchive super = 15;",
         "optional .TSP.Reference body_storage = 4;",
         "optional .TSP.Reference section = 5;",
+        "optional .TSP.Reference settings = 7;",
         "optional float page_width = 30;",
         "optional float page_height = 31;",
         "optional float left_margin = 32;",
@@ -587,11 +590,24 @@ fn enforce_pages_body_projection_provenance(
         "optional bool lays_out_body_vertically = 39;",
         "optional uint32 orientation = 42 [default = 0];",
     ];
+    const TP_SETTINGS_FIELDS: [&str; 10] = [
+        "optional bool body = 1 [default = true];",
+        "optional bool headers = 2 [default = true];",
+        "optional bool footers = 3 [default = true];",
+        "optional bool hyphenation = 9 [default = false];",
+        "optional bool use_ligatures = 10 [default = false];",
+        "optional .TP.SettingsArchive.FootnoteKind footnote_kind = 30;",
+        "optional .TP.SettingsArchive.FootnoteFormat footnote_format = 31;",
+        "optional .TP.SettingsArchive.FootnoteNumbering footnote_numbering = 32;",
+        "optional int32 footnote_gap = 33;",
+        "optional bool facing_pages = 34 [default = false];",
+    ];
     const TSWP_BOUNDARY: &str = "message ObjectAttribute {\n    required uint32 character_index = 1;\n    optional .TSP.Reference object = 2;\n  }";
     const PROJECTION_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
-    const PROJECTION_DOCUMENT: &str = "message PagesDocumentBodyArchive {\n  optional .LitchiIwaProjection.Reference body_storage = 4;\n  optional .LitchiIwaProjection.Reference initial_section = 5;\n  optional float page_width = 30;\n  optional float page_height = 31;\n  optional float left_margin = 32;\n  optional float right_margin = 33;\n  optional float top_margin = 34;\n  optional float bottom_margin = 35;\n  optional float header_margin = 36;\n  optional float footer_margin = 37;\n  optional float page_scale = 38;\n  optional bool lays_out_body_vertically = 39;\n  optional uint32 orientation = 42 [default = 0];\n}";
+    const PROJECTION_DOCUMENT: &str = "message PagesDocumentBodyArchive {\n  optional .LitchiIwaProjection.Reference body_storage = 4;\n  optional .LitchiIwaProjection.Reference initial_section = 5;\n  optional .LitchiIwaProjection.Reference settings = 7;\n  optional float page_width = 30;\n  optional float page_height = 31;\n  optional float left_margin = 32;\n  optional float right_margin = 33;\n  optional float top_margin = 34;\n  optional float bottom_margin = 35;\n  optional float header_margin = 36;\n  optional float footer_margin = 37;\n  optional float page_scale = 38;\n  optional bool lays_out_body_vertically = 39;\n  optional uint32 orientation = 42 [default = 0];\n}";
+    const PROJECTION_SETTINGS: &str = "message PagesSettingsArchive {\n  optional bool body = 1 [default = true];\n  optional bool headers = 2 [default = true];\n  optional bool footers = 3 [default = true];\n  optional bool hyphenation = 9 [default = false];\n  optional bool use_ligatures = 10 [default = false];\n  optional int32 footnote_kind = 30;\n  optional int32 footnote_format = 31;\n  optional int32 footnote_numbering = 32;\n  optional int32 footnote_gap = 33;\n  optional bool facing_pages = 34 [default = false];\n}";
     const PROJECTION_BOUNDARY: &str = "message PagesSectionBoundaryEntry {\n  required uint32 character_index = 1;\n  optional .LitchiIwaProjection.Reference section = 2;\n}";
-    const ROUTER_DECLARATIONS: [&str; 9] = [
+    const BODY_ROUTER_DECLARATIONS: [&str; 9] = [
         "const DOCUMENT_BODY_STORAGE_FIELD: u32 = 4;",
         "const DOCUMENT_INITIAL_SECTION_FIELD: u32 = 5;",
         "const DOCUMENT_SUPER_FIELD: u32 = 15;",
@@ -602,6 +618,43 @@ fn enforce_pages_body_projection_provenance(
         "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
         "const MAX_RECURSION_LIMIT: u32 = 64;",
     ];
+    const LAYOUT_ROUTER_DECLARATIONS: [&str; 15] = [
+        "const SUPER: u32 = 15;",
+        "const BODY_STORAGE: u32 = 4;",
+        "const INITIAL_SECTION: u32 = 5;",
+        "const WIDTH: u32 = 30;",
+        "const HEIGHT: u32 = 31;",
+        "const LEFT: u32 = 32;",
+        "const RIGHT: u32 = 33;",
+        "const TOP: u32 = 34;",
+        "const BOTTOM: u32 = 35;",
+        "const HEADER: u32 = 36;",
+        "const FOOTER: u32 = 37;",
+        "const SCALE: u32 = 38;",
+        "const VERTICAL: u32 = 39;",
+        "const ORIENTATION: u32 = 42;",
+        "const MAX_RECURSION: u32 = 64;",
+    ];
+    const SETTINGS_ROUTER_DECLARATIONS: [&str; 18] = [
+        "const ROOT_SUPER: u32 = 15;",
+        "const ROOT_SETTINGS: u32 = 7;",
+        "const ROOT_BODY_STORAGE: u32 = 4;",
+        "const ROOT_INITIAL_SECTION: u32 = 5;",
+        "const REFERENCE_IDENTIFIER: u32 = 1;",
+        "const REFERENCE_TYPE: u32 = 2;",
+        "const REFERENCE_EXTERNAL: u32 = 3;",
+        "const SETTINGS_BODY: u32 = 1;",
+        "const SETTINGS_HEADERS: u32 = 2;",
+        "const SETTINGS_FOOTERS: u32 = 3;",
+        "const SETTINGS_HYPHENATION: u32 = 9;",
+        "const SETTINGS_USE_LIGATURES: u32 = 10;",
+        "const SETTINGS_FOOTNOTE_KIND: u32 = 30;",
+        "const SETTINGS_FOOTNOTE_FORMAT: u32 = 31;",
+        "const SETTINGS_FOOTNOTE_NUMBERING: u32 = 32;",
+        "const SETTINGS_FOOTNOTE_GAP: u32 = 33;",
+        "const SETTINGS_FACING_PAGES: u32 = 34;",
+        "const MAX_RECURSION: u32 = 64;",
+    ];
 
     let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
     let pages = fs::read_to_string(proto_directory.join("TPArchives.proto"))?;
@@ -611,26 +664,52 @@ fn enforce_pages_body_projection_provenance(
     let production_codec = codec
         .split_once("#[cfg(test)]")
         .map_or(codec.as_str(), |(production, _tests)| production);
+    let settings_codec = fs::read_to_string("src/pages_document_settings_codec.rs")?;
+    let production_settings_codec = settings_codec
+        .split_once("#[cfg(test)]")
+        .map_or(settings_codec.as_str(), |(production, _tests)| production);
+    let layout_codec = fs::read_to_string("src/pages_page_layout_codec.rs")?;
+    let production_layout_codec = layout_codec
+        .split_once("#[cfg(test)]")
+        .map_or(layout_codec.as_str(), |(production, _tests)| production);
     if tsp.matches(TSP_REFERENCE).count() != 1
         || !TP_FIELDS
+            .iter()
+            .all(|declaration| pages.matches(declaration).count() == 1)
+        || !TP_SETTINGS_FIELDS
             .iter()
             .all(|declaration| pages.matches(declaration).count() == 1)
         || text.matches(TSWP_BOUNDARY).count() != 1
         || projection.matches(PROJECTION_REFERENCE).count() != 1
         || projection.matches(PROJECTION_DOCUMENT).count() != 1
+        || projection.matches(PROJECTION_SETTINGS).count() != 1
         || projection.matches(PROJECTION_BOUNDARY).count() != 1
-        || !ROUTER_DECLARATIONS
+        || !BODY_ROUTER_DECLARATIONS
             .iter()
             .all(|declaration| codec.matches(declaration).count() == 1)
+        || !LAYOUT_ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| layout_codec.matches(declaration).count() == 1)
+        || !SETTINGS_ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| settings_codec.matches(declaration).count() == 1)
         || projection.len() > 3 * 1024
         || projection.contains("repeated ")
         || production_codec.contains("to_owned_message")
         || production_codec.contains("encode_to_vec")
         || production_codec.contains("try_encode")
         || production_codec.contains(".encode(")
+        || production_settings_codec.contains("to_owned_message")
+        || production_settings_codec.contains("encode_to_vec")
+        || production_settings_codec.contains("try_encode")
+        || production_settings_codec.contains(".encode(")
+        || production_layout_codec.contains("to_owned_message")
+        || production_layout_codec.contains("encode_to_vec")
+        || production_layout_codec.contains("try_encode")
+        || production_layout_codec.contains(".encode(")
     {
         return Err(
-            "derived Pages body/layout projection/router drifted from canonical TP/TSWP/TSP fields, exceeded its 3 KiB source budget, introduced generated repeated storage, or added production encoding"
+            "derived Pages body/layout/settings projection or codec drifted from canonical TP/TSWP/TSP fields, exceeded its 3 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
     }
@@ -1254,11 +1333,11 @@ fn enforce_pages_section_projection_budget(directory: &Path) -> Result<(), Box<d
 
 fn enforce_pages_body_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: usize = 5;
-    // Buffa 0.9.1 emits 122,114 bytes for the body references, streamed
-    // section-boundary entry, and scalar page layout. Leave only a small
-    // generator/formatter allowance so another schema closure cannot enter
-    // this focused projection unnoticed.
-    const MAX_GENERATED_BYTES: u64 = 124 * 1024;
+    // Buffa 0.9.1 emits 174,682 bytes for body/settings references, the
+    // streamed section-boundary entry, and selected scalar settings/layout.
+    // Leave only a small generator/formatter allowance so another schema
+    // closure cannot enter this focused projection unnoticed.
+    const MAX_GENERATED_BYTES: u64 = 176 * 1024;
 
     let mut files = 0usize;
     let mut bytes = 0u64;
@@ -1288,7 +1367,7 @@ fn enforce_pages_body_projection_budget(directory: &Path) -> Result<(), Box<dyn 
         || generated_repeated_view_mentions != 0
     {
         return Err(format!(
-            "Pages body/layout projection generated {files} files/{bytes} bytes/{generated_repeated_view_mentions} RepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+            "Pages body/layout/settings projection generated {files} files/{bytes} bytes/{generated_repeated_view_mentions} RepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

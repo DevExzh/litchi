@@ -522,6 +522,11 @@ pub mod pages_body_codec;
 #[doc(hidden)]
 pub mod pages_page_layout_codec;
 
+/// Internal strict Pages document-settings projection. Generated types remain
+/// private and caller-owned raw bytes stay authoritative.
+#[doc(hidden)]
+pub mod pages_document_settings_codec;
+
 /// Internal Keynote slide-transition projection implemented by a private
 /// Buffa lazy-view sidecar. Generated types remain inaccessible downstream.
 #[doc(hidden)]
