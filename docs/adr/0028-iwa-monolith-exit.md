@@ -2046,3 +2046,87 @@ sanitizer-backed fuzz evidence. The boundary unit suite passes 138/138; live
 slide-number host, placeholder host, and focused audits are clean. The full
 checker reports only the unchanged 14 dependency-policy baselines. Native and
 exact-artifact compatibility gates are final.
+
+## 2026-08-11 amendment: focused Keynote soundtrack-settings exit
+
+Soundtrack playback settings have crossed the format boundary into canonical
+`soundtrack::{Mode, Settings, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` plus the Package read/edit/apply methods. This supersedes the older
+claim that all soundtrack mutation remains in the monolithic editor, but only
+for optional volume and mode. Soundtrack item/media CRUD, creation, allocation,
+and reclamation remain distinct host responsibilities.
+
+The focused owner proves the unique Document field-2 -> Show field-17 ->
+type-21 Soundtrack rooted chain and its exact aggregate/field reference
+metadata. It rejects zero/external/aliased references, duplicate selected
+messages, merge/diff state, malformed component framing, and changed
+non-exact/legacy provenance. A missing soundtrack is readable as absence but
+cannot be synthesized by this edit.
+
+Strict raw decoding owns canonical field-1 fixed64 volume, field-2 signed mode,
+and streamed nonzero field-3 data references. It forces and cross-checks a
+scalar Buffa lazy projection, then proves field-3 order against aggregate and
+field metadata plus PackageMetadata component/data ownership and unique safe
+`Data/` members. The generated closure is five files/27,753 bytes, zero
+repeated views, within 32 KiB, with digest
+`458206e0b57d8ec5ae4c3fc706bf793ccd385ab867b7e92ac30d66ab1858b4d3`.
+There is no generated encoder or repeated media collection in production.
+
+The codec's byte/field/work/nesting/media report is merged with bounded rooted
+graph, references, metadata, component, compression/output, reassembly, reopen,
+and exact-delta work. Fallible allocation and content-redacted typed errors are
+part of the publication contract, but this amendment does not declare the
+shared memory/work/output review complete.
+
+No-op publication shares exact source and skips rewrite/reopen. A changed
+commit rewrites one soundtrack component, reopens the candidate, and verifies
+that only field 1, field 2, the selected message length, and corresponding
+selected ZIP CRC/size/offset bookkeeping differ. Apply authorizes exact source
+and retained target; inverse restores exact bytes.
+Patches remain process-local and output is through `write_to`.
+
+This playback-only cut preserves all root previews, slides, ViewState,
+slide/node caches, soundtrack field-3 ordering and bytes, PackageMetadata and
+data-reference declarations, data assets, and unknown records. The retained
+IWA item APIs, `KeynoteSoundtrackItemInfo`, `soundtrack_items` module and
+example/tests, creation paths, and their necessary shared wire/media code are
+not retired.
+
+Compatibility was exercised from Apple-resaved 506,640-byte
+`69795554212651b261f5ffd71dd5cf511544f285cab680d724a9de7d3f04b14d`.
+Rust's same-size Loop/0.35 candidate
+`6367e38a2edeebe6e65b148d0fd2aae555ee219dc1a65c339954047eb533ce1a`
+changed only `Index/Document.iwa`; inverse restored the source. Keynote opened
+warning-free, displayed Loop/0.3499999940395355 and `ringin` 00:00:01, and
+played it. Native Save As produced 506,651-byte
+`e264f4e714b0c44fca420b2c7b43e18f2ed1be99a766d25fe901f68d5f8bc299`.
+The media file remained exact at
+`5a08f48c4f86074e14a763d4f19f49ca31196a7a5f52fb48960e76b6f3d3d96b`,
+the slide and three previews remained exact, and the normalized post-native
+restage was a byte-exact no-op.
+
+The exact exit deletes
+`KeynoteEditor::{soundtrack_settings, set_soundtrack_settings}`, the whole
+68-line `soundtrack.rs` editor source/module, settings-only
+`patch_soundtrack_wire`, the dead decoded-native soundtrack-record field, two
+whole settings tests and exclusive support (157 test lines), and the 29-line
+direct mutation example. Production changes by +2/-91 lines. The inspector and
+README migrate to the focused Package. The soundtrack-item CRUD/module,
+`KeynoteSoundtrackItemInfo`, shared wire/media paths, creation, lifecycle,
+example, and tests remain; this is not an item/media host exit.
+
+No manifest dependency changes. Debt 014 (`litchi-iwa -> litchi-keynote`)
+remains, as do 64 workspace packages, 235 internal declarations, 14
+`litchi-iwa` dependency declarations, and 14 ordered debts.
+
+The exit gate passes 5/5 soundtrack codec, 1/1 focused scaling unit, 4/4
+focused settings, 99/99 Keynote library, 10/10 `--features keynote` facade,
+and 8/8 doctests. Keynote
+all-target, warning-denied Clippy/rustdoc, focused and retained examples, host,
+formatting, and diff checks are green. Performance review found no P0/P1 issue;
+the test-only `media.rs` regression drives realistic 4,096/8,192
+metadata/media states through the real streaming path. Reference count doubles
+exactly and fields/work/references stay within 2.3x; no wall-clock performance
+claim is made. Boundary tests pass 152/152, host and focused audits each report
+zero diagnostics, and the full checker reports only the unchanged 14 baselines: six
+dev-only annotation findings and eight edge classifications.

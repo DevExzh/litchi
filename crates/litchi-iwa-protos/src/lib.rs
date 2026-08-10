@@ -285,6 +285,29 @@ mod buffa_keynote_slide_number_generated {
     ));
 }
 
+/// Private Buffa lazy views for focused Keynote soundtrack settings.
+#[doc(hidden)]
+mod buffa_keynote_soundtrack_settings_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        clippy::all,
+        clippy::allow_attributes_without_reason,
+        clippy::arbitrary_source_item_ordering,
+        clippy::map_err_ignore,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        non_snake_case,
+        reason = "Buffa generated projection is private implementation detail."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-soundtrack-settings/iwa_keynote_soundtrack_settings_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for `TST.TableInfoArchive.table_model`.
 ///
 /// The required drawable base archive and all unselected table metadata remain
@@ -569,6 +592,10 @@ pub mod keynote_speaker_notes_codec;
 /// private; the attachment table is borrowed raw source bytes.
 #[doc(hidden)]
 pub mod keynote_slide_number_codec;
+
+/// Internal strict Keynote soundtrack-settings projection.
+#[doc(hidden)]
+pub mod keynote_soundtrack_settings_codec;
 
 /// Internal Numbers TableInfo model-reference projection implemented by a
 /// private strict Buffa lazy-view sidecar. Generated types remain inaccessible

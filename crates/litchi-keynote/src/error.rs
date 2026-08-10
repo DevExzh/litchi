@@ -45,6 +45,12 @@ pub enum Error {
     /// A known native enum value was represented by its lossless unknown form.
     #[error("Keynote mode must use its canonical variant for a known native value")]
     NonCanonicalMode,
+    /// A soundtrack volume was NaN or infinite.
+    #[error("Keynote soundtrack volume must be finite")]
+    NonFiniteSoundtrackVolume,
+    /// A soundtrack volume was outside the native inclusive range.
+    #[error("Keynote soundtrack volume must be between zero and one")]
+    SoundtrackVolumeOutOfRange,
     /// A known transition effect identifier was represented by its unknown form.
     #[error("Keynote transition effect must use its canonical variant for a known identifier")]
     NonCanonicalEffect,

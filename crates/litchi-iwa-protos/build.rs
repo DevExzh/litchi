@@ -19,6 +19,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_number_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_soundtrack_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
@@ -54,6 +55,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_keynote_slide_number_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_keynote_soundtrack_settings_projection_provenance(
         proto_directory,
         buffa_projection_directory,
     )?;
@@ -300,6 +305,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_slide_number_projection_budget(&buffa_keynote_slide_number_out_directory)?;
+
+    let buffa_keynote_soundtrack_settings_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-soundtrack-settings");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNSoundtrackSettingsArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_soundtrack_settings_out_directory)
+        .include_file("iwa_keynote_soundtrack_settings_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_soundtrack_settings_projection_budget(
+        &buffa_keynote_soundtrack_settings_out_directory,
+    )?;
 
     // Keynote slide transitions use only a small nested scalar path.  The
     // source archive remains authoritative for preservation; Buffa supplies a
@@ -1232,6 +1256,42 @@ fn enforce_keynote_slide_number_projection_provenance(
     Ok(())
 }
 
+fn enforce_keynote_soundtrack_settings_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const SHOW: &str = "optional .TSP.Reference soundtrack = 17;";
+    const SOUNDTRACK: [&str; 3] = [
+        "optional double volume = 1;",
+        "optional .KN.Soundtrack.SoundtrackMode mode = 2 [default = kKNSoundtrackModePlayOnce];",
+        "repeated .TSP.DataReference movie_media = 3;",
+    ];
+    let keynote = fs::read_to_string(proto_directory.join("KNArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("KNSoundtrackSettingsArchive.proto"))?;
+    let codec = fs::read_to_string("src/keynote_soundtrack_settings_codec.rs")?;
+    let production = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(body, _)| body);
+    if keynote.matches(SHOW).count() != 1
+        || !SOUNDTRACK
+            .iter()
+            .all(|field| keynote.matches(field).count() == 1)
+        || projection.contains("repeated ")
+        || projection.len() > 2 * 1024
+        || production.contains("RepeatedView")
+        || production.contains("LazyRepeatedView")
+        || production.contains("encode_to_vec")
+        || production.contains("try_encode")
+        || production.contains(".encode(")
+        || !fs::read_to_string("src/lib.rs")?
+            .contains("mod buffa_keynote_soundtrack_settings_generated")
+    {
+        return Err("derived Keynote soundtrack-settings projection drifted from Show/Soundtrack scalar routes, introduced generated repeated storage or production encoding, or lost its private boundary".into());
+    }
+    Ok(())
+}
+
 fn enforce_keynote_slide_transition_projection_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
@@ -1749,6 +1809,42 @@ fn enforce_keynote_slide_number_projection_budget(directory: &Path) -> Result<()
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
     {
         return Err(format!("Keynote slide-number projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views").into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_soundtrack_settings_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // Buffa 0.9.1 emits 27,753 bytes for this scalar-only five-file closure.
+    const MAX_GENERATED_BYTES: u64 = 32 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!("Keynote soundtrack-settings projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views").into());
     }
     Ok(())
 }

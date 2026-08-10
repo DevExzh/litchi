@@ -210,6 +210,57 @@ restores the exact source. Use
 `litchi-keynote/examples/edit_slide_number_visibility.rs` for distinct-output,
 sibling-temporary, no-clobber publication with `Package::write_to`.
 
+## Focused Keynote soundtrack playback edits
+
+With the `keynote` feature enabled, `litchi::keynote::soundtrack` provides the
+immutable playback-settings transaction for an existing soundtrack. `None`
+from `soundtrack_settings()` means the soundtrack object is absent, while
+`Some(Settings::default())` means it exists with both optional values absent.
+The transaction exposes semantic mode and volume settings with direct `Edit`,
+`Patch`, `Commit`, diagnostics, error, and limit types; native identifiers are
+never exposed.
+
+```rust,no_run
+use std::io;
+
+use litchi::keynote::{
+    Package,
+    soundtrack::{Mode, Settings},
+};
+
+let package = Package::open("input.key")?;
+let before = package
+    .soundtrack_settings()?
+    .ok_or_else(|| io::Error::other("presentation has no soundtrack"))?;
+let mut settings: Settings = before;
+settings.set_volume(Some(0.35))?;
+settings.set_mode(Some(Mode::Loop))?;
+let commit = package.edit_soundtrack_settings()?.set(settings).commit()?;
+assert!(commit.diagnostics().changed());
+assert_eq!(commit.diagnostics().touched_components(), 1);
+
+let restored = commit
+    .package()
+    .apply_soundtrack_settings(&commit.patch().inverse())?;
+assert_eq!(restored.package().soundtrack_settings()?, Some(before));
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Passing `None` to either settings setter clears native presence, and
+`Mode::Unknown` retains future native values (known values use named variants).
+An unchanged edit is exact no-op. A changed edit rewrites only the owning
+soundtrack component, fully reopens its candidate without invalidating
+rendering previews, and its inverse applies only to the exact committed
+snapshot. Media entries, assets, ordering, and references remain in the legacy
+migration host's retained collection scope. Use
+`litchi-keynote/examples/edit_soundtrack_settings.rs` for synchronized,
+distinct-output, no-clobber publication through `Package::write_to`.
+
 ## Focused Numbers table-header edits
 
 Enable the `numbers` feature to use the focused immutable Numbers package API

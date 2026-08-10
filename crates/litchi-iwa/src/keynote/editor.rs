@@ -5297,7 +5297,6 @@ mod slide_style_graph;
 mod slide_style_metadata;
 mod slide_style_registry;
 mod slide_tables;
-mod soundtrack;
 mod soundtrack_items;
 mod soundtrack_wire;
 mod text_box_create;

@@ -737,3 +737,125 @@ gates, and native interoperability. The boundary unit suite passed 138/138;
 the live slide-number host, placeholder host, and focused boundary audits were
 empty, while the full checker retained only the unchanged 14 dependency-policy
 baselines.
+
+## 2026-08-11 amendment: Keynote soundtrack settings
+
+The focused immutable transaction is rooted directly in
+`litchi_keynote::soundtrack::{Mode, Settings, Edit, Patch, Commit, Diagnostics,
+Error, LimitKind}`. `Package::{soundtrack_settings, edit_soundtrack_settings,
+apply_soundtrack_settings}` read, stage, commit, and apply one presentation's
+existing playback settings without exposing a native identifier, component
+name, reference payload, or source bytes. `Edit::settings` returns the staged
+value; consuming, infallible `Edit::set` replaces it, and consuming
+`Edit::commit` publishes only after exact verification. An absent soundtrack
+reads as `Ok(None)` and edit returns `Error::SoundtrackNotFound`; an existing
+soundtrack with both scalar fields absent reads as `Some(Settings::default())`.
+The transaction neither creates nor deletes a soundtrack object or media item.
+
+`Settings` preserves the independent presence of optional volume and mode.
+Volume must be finite and in `0.0..=1.0`; `Mode::{PlayOnce, Loop, DoNotPlay}`
+are the canonical known values, while `Mode::Unknown(i32)` round-trips a
+genuinely future discriminant and rejects a known value hidden inside
+`Unknown`. `Settings::{set_volume, set_mode}` validate before changing the
+value. Their semantic validation errors remain at the crate boundary; the
+transaction's `soundtrack::Error` separately reports absent/invalid/unsupported
+sources, typed resource and allocation failures, verification failure, and
+exact-source patch conflict without leaking content.
+
+Selection proves one rooted Document object 1 field 2 reference to the Show,
+then one nonexternal Show type-2 field 17 reference to a unique type-21
+Soundtrack object. Soundtrack field 1 is optional fixed64 volume and field 2 is
+optional varint mode. Changed admission additionally proves exact aggregate
+and any field-local object-reference metadata for the Document/Show route,
+canonical selected-message framing, no merge/base/diff state, disjoint use of
+the soundtrack identifier in other known Show and slide-tree reference roles,
+and a valid selected-component media closure. Physical nested `Index.zip`
+sources remain readable and support exact no-op commits, but a change returns
+`Error::UnsupportedSource` under Preserve.
+
+Soundtrack field 3 remains the ordered media collection and is not an editable
+settings field. Each strict field-3 payload must be a canonical nonzero local
+data reference whose order and multiplicity equal the selected message's
+aggregate and any field-3 data-reference metadata. For populated media,
+the package-metadata component must identify the selected component, each data
+reference must name a rooted data record and one package member, and the
+soundtrack owner's recorded occurrence count must agree. These proofs admit a
+settings rewrite; they do not transfer ownership of soundtrack media creation,
+replacement, ordering, removal, or resource garbage collection.
+
+A changed commit rewrites exactly the component containing the selected
+Soundtrack object and reports one touched component. Present fields 1/2 are
+replaced in place, cleared values remove only their selected records, and
+newly present values are appended canonically in field order. Field 3, unknown
+fields, every other message and object in that component, message metadata
+apart from the selected payload length, and all other package members remain
+exact; only necessary ZIP checksum, size, and offset bookkeeping may differ.
+No rendering cache is invalidated and all root previews are retained. Complete
+candidate reopen checks the requested settings, rooted source contract, exact
+field-1/2 delta, media closure, and package locality before returning.
+
+No-op commit and no-op apply share the immutable source, report zero touched
+components, and skip changed-only physical admission and reopen. Changed apply
+first authorizes the exact retained source artifact and prior semantic value,
+then reopens and verifies the retained target once. `Patch::inverse` swaps the
+complete process-local source and target artifacts in constant shared-handle
+work, so inverse restores all original field presence, unknown bytes, ZIP
+records, and package members exactly. The patch has no stable semantic
+serialization, composition, merge, read/write sets, bounded history, or
+library-owned atomic durable publication; `Package::write_to` remains the
+bounded output boundary.
+
+The private Buffa projection contains only Soundtrack fields 1/2. A strict
+handwritten pass validates those scalars, streams field-3 data references
+through a bounded visitor without retaining an input-width vector, and must
+agree with the Buffa scalar snapshot. Production generated code exposes no
+repeated view or encoder. The deterministic closure is five generated files
+and 27,753 bytes under a 32-KiB cap, with aggregate SHA-256
+`458206e0b57d8ec5ae4c3fc706bf793ccd385ab867b7e92ac30d66ab1858b4d3`.
+Typed byte/field/work/nesting and semantic-reference ceilings are enforced;
+the codec's successful field/work report and streamed media counts contribute
+to the transaction budget. The final performance review found no P0 or P1
+issue. A test-only scaling gate in the media validator exercises realistic
+4,096- and 8,192-record metadata/media states through the real streaming path:
+references double exactly, while measured fields, work, and references each
+remain within 2.3 times the smaller case. This structural gate uses no
+wall-clock threshold and changes no production path.
+
+The populated native gate began from the Apple-resaved 506,640-byte source
+SHA-256
+`69795554212651b261f5ffd71dd5cf511544f285cab680d724a9de7d3f04b14d`.
+Rust changed it to Loop with volume `0.35`, producing a 506,640-byte candidate
+SHA-256
+`6367e38a2edeebe6e65b148d0fd2aae555ee219dc1a65c339954047eb533ce1a`;
+only `Index/Document.iwa` differed and inverse restored the exact source.
+Keynote opened the candidate without warning, reported Loop and volume
+`0.3499999940395355` in the Audio UI, retained the one-second `ringin` item,
+and played it. Save As produced a 506,651-byte artifact SHA-256
+`e264f4e714b0c44fca420b2c7b43e18f2ed1be99a766d25fe901f68d5f8bc299`.
+Every root preview and `Data/ringin-9075.m4a` stayed exact; the media SHA-256
+was `5a08f48c4f86074e14a763d4f19f49ca31196a7a5f52fb48960e76b6f3d3d96b`.
+Reopening the native-resaved artifact and restaging its normalized volume was
+an exact no-op.
+
+The completed host cut retires the two direct
+`KeynoteEditor::{soundtrack_settings, set_soundtrack_settings}` methods and the
+whole 68-line `keynote/editor/soundtrack.rs` settings module. The production
+host diff is exactly two insertions and 91 deletions, including removal of the
+settings-only parts of the shared wire module and its module declaration. It
+also deletes 157 lines of direct host settings tests and the complete 29-line
+`edit_keynote_soundtrack.rs` legacy example. The structure inspector and host
+README migrate settings reads and examples to the focused `Package` API rather
+than retaining a compatibility shim.
+
+The ordered `KeynoteEditor` soundtrack-item
+read/add/insert/replace/move/remove CRUD, `KeynoteSoundtrackItemInfo`, the
+media-item example, soundtrack creation, and the shared wire lookup,
+media-reference, metadata-repair, and replacement substrate remain. This cut
+retires settings ownership only; it does not move or delete media-item CRUD.
+The frozen gates passed 5/5 codec tests, the 1/1 focused scaling unit gate, 4/4
+focused soundtrack-settings integration tests, 99/99 Keynote library tests,
+10/10 facade tests, and 8/8 doctests. Formatting, strict library checks,
+all-target checks, example builds, the live host audit, and the final diff
+check also passed. The boundary unit suite passed 152/152; the live host and
+focused audits were empty, while the full checker retained only the unchanged
+14 baselines: six development-only annotations and eight edge classifications.

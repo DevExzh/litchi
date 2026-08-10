@@ -117,6 +117,87 @@ fn show_settings_transaction_is_available_through_the_root_facade()
 }
 
 #[test]
+fn soundtrack_settings_transaction_reaches_the_root_facade()
+-> Result<(), Box<dyn std::error::Error>> {
+    use litchi::keynote::soundtrack::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Mode, Patch, Settings,
+    };
+
+    assert_send_sync::<Mode>();
+    assert_send_sync::<Settings>();
+    assert_send_sync::<Edit<'static>>();
+    assert_send_sync::<Patch>();
+    assert_send_sync::<Commit>();
+    assert_send_sync::<Diagnostics>();
+    assert_send_sync::<Error>();
+    assert_send_sync::<LimitKind>();
+
+    let package = Package::open(fixture_path())?;
+    let source = package.exact_bytes();
+    let before = package
+        .soundtrack_settings()?
+        .ok_or_else(|| io::Error::other("native Keynote file has no soundtrack"))?;
+
+    let edit = package.edit_soundtrack_settings()?;
+    assert_eq!(edit.settings(), before);
+    let edit_debug = format!("{edit:?}");
+    assert!(!edit_debug.contains("identifier"));
+    assert!(!edit_debug.contains(".iwa"));
+
+    let noop = edit.set(before).commit()?;
+    assert_eq!(noop.patch().before(), before);
+    assert_eq!(noop.patch().after(), before);
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.diagnostics().touched_components(), 0);
+    assert!(!noop.diagnostics().full_reparse_performed());
+    assert_eq!(noop.package().exact_bytes(), source);
+
+    let mut after = before;
+    let replacement = if before.mode() == Some(Mode::Loop) {
+        Mode::PlayOnce
+    } else {
+        Mode::Loop
+    };
+    after.set_mode(Some(replacement))?;
+    let changed = package.edit_soundtrack_settings()?.set(after).commit()?;
+    assert_eq!(changed.patch().before(), before);
+    assert_eq!(changed.patch().after(), after);
+    assert!(!changed.patch().is_noop());
+    assert!(changed.diagnostics().changed());
+    assert_eq!(changed.diagnostics().touched_components(), 1);
+    assert!(changed.diagnostics().full_reparse_performed());
+    assert_eq!(changed.package().soundtrack_settings()?, Some(after));
+    assert_eq!(package.exact_bytes(), source);
+    assert_ne!(changed.package().exact_bytes(), source);
+    let patch_debug = format!("{:?}", changed.patch());
+    assert!(!patch_debug.contains("identifier"));
+    assert!(!patch_debug.contains(".iwa"));
+
+    let applied = package.apply_soundtrack_settings(changed.patch())?;
+    assert!(applied.diagnostics().changed());
+    assert_eq!(applied.diagnostics().touched_components(), 1);
+    assert!(applied.diagnostics().full_reparse_performed());
+    assert_eq!(applied.package().soundtrack_settings()?, Some(after));
+    assert_eq!(
+        applied.package().exact_bytes(),
+        changed.package().exact_bytes()
+    );
+    assert!(matches!(
+        changed.package().apply_soundtrack_settings(changed.patch()),
+        Err(Error::PatchConflict)
+    ));
+
+    let restored = changed
+        .package()
+        .apply_soundtrack_settings(&changed.patch().inverse())?;
+    assert!(restored.diagnostics().changed());
+    assert_eq!(restored.package().soundtrack_settings()?, Some(before));
+    assert_eq!(restored.package().exact_bytes(), source);
+    Ok(())
+}
+
+#[test]
 fn slide_transition_transaction_is_available_through_the_root_facade()
 -> Result<(), Box<dyn std::error::Error>> {
     use litchi::keynote::transition::{

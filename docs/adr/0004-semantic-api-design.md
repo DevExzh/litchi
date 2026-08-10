@@ -1344,3 +1344,87 @@ facade, 22/22 preview, and 7/7 doctest cases; ADR 0003 records the nonnumeric
 strict, fuzz, patch, and native gates. The boundary unit suite passed 138/138;
 live slide-number host, placeholder host, and focused audits were empty, and
 the full checker retained only the unchanged 14 dependency-policy baselines.
+
+## 2026-08-11 amendment: focused Keynote soundtrack-settings API
+
+The canonical surface is the direct namespace
+`litchi_keynote::soundtrack::{Mode, Settings, Edit, Patch, Commit, Diagnostics,
+Error, LimitKind}` plus
+`Package::{soundtrack_settings, edit_soundtrack_settings,
+apply_soundtrack_settings}`. It supersedes this ADR's earlier assignment of
+playback-settings graph lookup and mutation to `litchi-iwa`; media-resource
+ownership and ordered item CRUD remain there. No nested `settings` module,
+flat `SoundtrackSettings*` transaction aliases, root aliases, raw identifiers,
+component paths, reference payloads, or package source bytes enter the public
+surface.
+
+`Package::soundtrack_settings` returns `Result<Option<Settings>, Error>`:
+`None` means there is no rooted soundtrack, while `Some(Settings::default())`
+means a soundtrack exists with both optional playback fields absent.
+`Package::edit_soundtrack_settings` returns a fallible edit of that singleton
+or `Error::SoundtrackNotFound`. `Edit::settings` observes the staged value;
+consuming `Edit::set(self, Settings) -> Self` is infallible because `Settings`
+is already validated, and consuming `commit` returns the immutable verified
+package, exact patch, and diagnostics. Exact application is a method on the
+immutable source `Package`, not a mutable editor facade.
+
+`Settings` owns only independently optional volume and mode. `None` preserves
+field absence rather than spelling zero or a default. Finite `0.0..=1.0`
+volume and named known `Mode` variants are checked semantic values;
+`Mode::Unknown(i32)` preserves genuinely future values but cannot disguise a
+known discriminant. Media filenames, durations, bytes, ordered entries,
+package identifiers, and data-reference metadata remain deliberately absent.
+The transaction error and `LimitKind` expose only redacted categories and
+bounded measurements.
+
+The physical owner is the unique nonexternal Show field-17 reference reached
+from rooted Document object 1 field 2; it resolves to one type-21 Soundtrack.
+Only optional Soundtrack field 1 (volume) and field 2 (mode) form the semantic
+write set. Field 3 and its exact raw reference payloads, order, multiplicity,
+aggregate and any field-local metadata, package-metadata ownership counts,
+data records, and package members form a retained validation closure, not a
+second API feature.
+The transaction cannot create a missing soundtrack or add, reorder, replace,
+remove, or garbage-collect a soundtrack item.
+
+A semantic no-op shares the exact source and skips changed-only guards and
+reopen. A change rewrites only the selected Soundtrack component, preserves
+all media and previews, and reopens the full candidate. Exact-source apply
+rejects a different source or prior semantic value; inverse restores the
+complete original package. `Patch` is a process-local two-artifact capability,
+not a serialized operation log or durable save protocol. Changed physical
+nested `Index.zip` sources return `UnsupportedSource` under Preserve, while
+reads and no-ops retain their exact representation.
+
+The private generated projection contains only scalar fields 1/2. The strict
+codec validates them and streams field-3 identifiers under the same bounded
+decode, then cross-checks the Buffa snapshot. The five-file closure is 27,753
+bytes under 32 KiB and has aggregate SHA-256
+`458206e0b57d8ec5ae4c3fc706bf793ccd385ab867b7e92ac30d66ab1858b4d3`;
+production generated code contains no repeated view or encoder. Typed limits
+and aggregate transaction budgeting are part of the API contract. The frozen
+performance review found no P0/P1 issue. A test-only real-streaming-path gate
+compares realistic 4,096- and 8,192-record metadata/media states: reference
+count doubles exactly and fields, work, and references remain within a 2.3
+ratio, without a wall-clock assertion or production-path change.
+
+The populated Rust/native evidence in ADR 0003 proves exact inverse, single-
+component locality, preview and media preservation, warning-free Keynote
+open/playback, native Save As/reopen, and an exact post-native no-op at the
+normalized volume. It does not establish a settings right to mutate field 3.
+
+The completed retirement removes both direct `KeynoteEditor` settings methods,
+the whole 68-line settings module, settings-only shared-wire code and module
+declaration for an exact production diff of two insertions and 91 deletions,
+157 lines of direct host settings tests, and the complete 29-line legacy
+example. The structure inspector and README now use the focused `Package` API.
+No host settings alias or shim remains.
+
+The `KeynoteEditor` item CRUD, `KeynoteSoundtrackItemInfo`, media example,
+creation, and shared soundtrack wire/media substrate remain intentionally. The
+accepted frozen gates are 5/5 codec, 1/1 focused scaling unit, 4/4 focused
+settings integration, 99/99 Keynote library, 10/10 facade, and 8/8 doctest
+cases, plus formatting, strict library, all-target, example, live-host, and
+diff checks. The boundary unit suite passed 152/152; live host and focused
+audits were empty, and the full checker retained only the unchanged 14
+baselines: six development-only annotations and eight edge classifications.

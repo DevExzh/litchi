@@ -15,11 +15,12 @@ yet moved to a concrete format crate.
 New semantic code belongs in `litchi-pages`, `litchi-numbers`, or
 `litchi-keynote`; use `litchi::iwork` for a supported cross-format snapshot.
 In particular, ordinary Keynote slide title, body, and speaker-notes reads or
-edits must use `litchi-keynote::Package` and `SlideSelector`, and
-presentation-wide dimensions and playback settings must use
-`litchi_keynote::show`, not `litchi_iwa::Document` or `KeynoteEditor`. The
-concrete package keeps native identifiers and raw records private, validates
-semantic ownership, and creates exact-source checked commits.
+edits must use `litchi-keynote::Package` and `SlideSelector`. Presentation-wide
+dimensions and show playback flags use `litchi_keynote::show`; playback mode
+and volume for an existing soundtrack use `litchi_keynote::soundtrack`, not
+`litchi_iwa::Document` or `KeynoteEditor`. The concrete package keeps native
+identifiers and raw records private, validates semantic ownership, and creates
+exact-source checked commits.
 
 ```rust,no_run
 use litchi_keynote::{Package, SlideSelector};
@@ -1218,12 +1219,6 @@ if let Some(text_box) = keynote
 keynote.set_slide_name(0, Some("Opening"))?;
 let layout = keynote.default_slide_layout()?;
 keynote.add_slide(layout)?;
-let mut soundtrack = keynote
-    .soundtrack_settings()?
-    .ok_or("presentation has no soundtrack object")?;
-soundtrack.mode = Some(litchi_keynote::soundtrack::Mode::Loop);
-soundtrack.volume = Some(0.8);
-keynote.set_soundtrack_settings(soundtrack)?;
 if let Some(drawable) = keynote.slide_drawables(0)?.first() {
     keynote.set_slide_drawable_comment(0, drawable.object_id, "Review this slide object")?;
     let _comment = keynote.slide_drawable_comment(0, drawable.object_id)?;
@@ -1709,6 +1704,65 @@ See `litchi-keynote/examples/edit_slide_number_visibility.rs` for safe,
 distinct-output sibling-temp publication with `Package::write_to` and
 no-clobber publication.
 
+### Keynote soundtrack playback is a focused transaction
+
+Playback mode and volume for an existing soundtrack are no longer
+`KeynoteEditor` settings mutations. Use
+`litchi_keynote::soundtrack::{Mode, Settings, Edit, Patch, Commit,
+Diagnostics, Error, LimitKind}` with the immutable
+`Package::{soundtrack_settings, edit_soundtrack_settings,
+apply_soundtrack_settings}` transaction. A read of `None` means no soundtrack
+object exists; `Some(Settings::default())` means it exists with both optional
+playback values absent. An edit never creates or deletes a soundtrack object.
+
+```rust,no_run
+use std::io;
+
+use litchi_keynote::{
+    Package,
+    soundtrack::{Mode, Settings},
+};
+
+let package = Package::open("input.key")?;
+let before = package
+    .soundtrack_settings()?
+    .ok_or_else(|| io::Error::other("presentation has no soundtrack"))?;
+let mut settings: Settings = before;
+settings.set_volume(Some(0.35))?;
+settings.set_mode(Some(Mode::Loop))?;
+
+let commit = package.edit_soundtrack_settings()?.set(settings).commit()?;
+assert!(commit.diagnostics().changed());
+assert_eq!(commit.diagnostics().touched_components(), 1);
+assert_eq!(commit.package().soundtrack_settings()?, Some(settings));
+
+let restored = commit
+    .package()
+    .apply_soundtrack_settings(&commit.patch().inverse())?;
+assert_eq!(restored.package().soundtrack_settings()?, Some(before));
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`None` passed to `Settings::set_mode` or `Settings::set_volume` clears native
+presence rather than setting a default. `Mode::Unknown(value)` preserves a
+genuinely future native mode; known values must use their named variants. An
+unchanged commit is an exact no-op. A changed commit rewrites only its owning
+soundtrack component, fully reopens the candidate, and leaves rendering
+previews intact; its inverse is accepted only by the exact committed package
+snapshot. See `litchi-keynote/examples/edit_soundtrack_settings.rs` for
+distinct-output, sibling-temporary, synchronized, no-clobber publication
+through `Package::write_to`.
+
+This focused transaction owns only playback mode and volume. The migration
+host still owns soundtrack-media item and asset operations (including their
+ordering and references); use its retained media-item compatibility APIs when
+that collection itself must change.
+
 Keynote slide skip/include, ordering, and modern transition transactions have
 focused `litchi-keynote` package-owner paths. Transition transactions use
 `litchi_keynote::transition::{Edit, Patch, Commit, Diagnostics, Error,
@@ -2011,13 +2065,12 @@ curves, text delivery, motion blur, travel distance, animation color, seeds,
 detail, curve theme names, and right-to-left writing direction. Validated raw
 records preserve unknown nested extensions at the slide, transition,
 attributes, and animation-attributes levels.
-Soundtrack playback values are owned by the archive-free
-`litchi_keynote::soundtrack::{Mode, Settings}` module. `Mode` preserves future
-native discriminants and `Settings` validates finite `0.0..=1.0` volume values;
-the IWA editor keeps soundtrack media references, package identifiers,
-unknown fields, and transactional wire replacement private to the package
-adapter. Settings edits therefore never rebuild or reorder the media
-collection.
+Soundtrack playback settings are owned by the focused
+`litchi_keynote::soundtrack` package transaction, which edits only optional
+mode and finite `0.0..=1.0` volume values and preserves future mode values.
+It does not expose, rebuild, or reorder soundtrack media. The IWA migration
+host deliberately retains media-item and asset CRUD, including their native
+references and ordering; that scope is separate from playback settings.
 The host can still enumerate slide-owned `TSWP.ShapeInfoArchive` storages for
 legacy compatibility, including title, body, and ordinary text-box
 classification. Its generic storage operations are raw-ID migration surfaces,
