@@ -1486,7 +1486,7 @@ fn enforce_keynote_slide_transition_projection_budget(
     directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: usize = 5;
-    // Buffa 0.9.1 emits 207,203 bytes for the five scalar-only message
+    // Buffa 0.9.1 emits 208,052 bytes for the five scalar-only message
     // shells. Leave a small codegen/formatter allowance without permitting a
     // second schema closure to slip in unnoticed.
     const MAX_GENERATED_BYTES: u64 = 224 * 1024;

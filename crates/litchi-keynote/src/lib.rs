@@ -76,7 +76,7 @@
 //! ```no_run
 //! use std::io;
 //!
-//! use litchi_keynote::{Effect, Package};
+//! use litchi_keynote::{Package, transition::Effect};
 //!
 //! let package = Package::open("input.key")?;
 //! let before = package
@@ -85,8 +85,7 @@
 //! let mut replacement = before.clone();
 //! replacement.set_effect(Some(Effect::Dissolve))?;
 //!
-//! let mut edit = package.edit_slide_transition("Appendix")?;
-//! edit.set_transition(replacement)?;
+//! let edit = package.edit_slide_transition("Appendix")?.set(replacement)?;
 //! let commit = edit.commit()?;
 //! assert_eq!(
 //!     commit.package().slide_transition("Appendix")?,
@@ -98,8 +97,7 @@
 //!     .apply_slide_transition(&commit.patch().inverse())?;
 //! assert_eq!(restored.package().slide_transition("Appendix")?, Some(before));
 //!
-//! let mut clear = restored.package().edit_slide_transition("Appendix")?;
-//! clear.clear()?;
+//! let clear = restored.package().edit_slide_transition("Appendix")?.clear()?;
 //! let cleared = clear.commit()?;
 //! assert_eq!(cleared.package().slide_transition("Appendix")?.unwrap().effect(), Some(&Effect::None));
 //! # Ok::<(), Box<dyn std::error::Error>>(())
@@ -205,12 +203,11 @@ pub use package::{
     SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
     SlideNotesPatch, SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError,
     SlideOrderLimitKind, SlideOrderPatch, SlideTextCommit, SlideTextDiagnostics, SlideTextEdit,
-    SlideTextError, SlideTextLimitKind, SlideTextPatch, SlideTextRole, SlideTransitionCommit,
-    SlideTransitionDiagnostics, SlideTransitionEdit, SlideTransitionError,
-    SlideTransitionLimitKind, SlideTransitionPatch, Stats, TextStorageFailure, WriteError,
+    SlideTextError, SlideTextLimitKind, SlideTextPatch, SlideTextRole, Stats, TextStorageFailure,
+    WriteError,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::MovieKind;
 pub use slide::{Slide, Transition};
 pub use time::Seconds;
-pub use transition::Effect;
+pub(crate) use transition::Effect;

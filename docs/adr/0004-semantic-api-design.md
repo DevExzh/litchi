@@ -1040,3 +1040,54 @@ publish through the existing bounded package writer.
 private `rename_table_in_package` helper remains solely for cross-format Pages
 and Keynote table creation/edit flows. That internal dependency does not
 authorize public raw-ID naming entry points or weaken this deletion gate.
+
+## 2026-08-10 amendment: canonical Keynote transition transaction surface
+
+This amendment supersedes the earlier transition compatibility paragraph. The
+canonical public family is
+`litchi_keynote::transition::{Settings, Edit, Patch, Commit, Diagnostics,
+Error, LimitKind}` alongside the existing transition semantic value types.
+`Package::{slide_transition, edit_slide_transition, apply_slide_transition}`
+are the selector-first entry points. Flat `SlideTransition*` transaction
+aliases, transition transaction root aliases or globs, and the root `Effect`
+alias are removed; callers use the contextual `transition` module.
+
+Exact navigator-name or checked-position selectors replace host numeric slide
+indices. Public signatures expose no native identity, component/member name,
+generated message, raw field, source bytes, or retained artifact accessor.
+`Edit::settings` borrows the selected optional value; consuming `Edit::set`
+replaces one existing modern envelope, while consuming `Edit::clear` stages the
+modern no-effect value. An absent transition is readable as `None`, cannot be
+synthesized by `set`, and makes `clear` an idempotent exact no-op. Transaction
+errors and `Debug` output remain content-redacted; invalid semantic settings
+retain their typed archive-free cause.
+
+Changed admission is deliberately selected and focused rather than a general
+eager parse of unrelated slides. It proves the rooted Show/SlideTree,
+SlideNode, and SlideArchive chain, exact reference metadata, strict semantic
+and marker agreement, canonical framing, and absence of selected merge/base/
+diff state. Rooted ownership uses indexed `O(slides log objects)` lookups under
+an aggregate `LimitKind::WireWork` charge, while one shared nested codec budget
+governs fields and work across the complete transition projection. Only the
+selected transition subtree and a conditionally changed node marker may differ;
+one or two selected components are rewritten once and then reopened with exact
+locality verification. No-op, exact apply, conflict, and inverse behavior
+follows ADR 0003's immutable two-artifact contract.
+
+The focused API writes existing unambiguous modern envelopes only. Legacy
+database-field transition state remains readable and no-op-preservable but is
+not promoted through a changed transaction. Physical legacy nested packages
+remain readable and exact on no-op paths; changed publication returns
+`transition::Error::UnsupportedSource`. `Package::write_to` remains the bounded
+exact-output seam and does not turn the process-local patch into durable or
+atomic publication.
+
+`KeynoteEditor::{slide_transition, set_slide_transition,
+clear_slide_transition}`, the lifecycle module/source, their five whole direct
+mutation tests, and the three clear/edit/set-effect host examples are retired
+without aliases or shims. The host's `KeynoteSlideInfo.transition` snapshot
+field, slide readers, and `transition_wire.rs` remain for
+`KeynoteEditor::slides()` aggregate decoding and no-op validation. Creation
+separately retains `creation.rs::transition()` and the creation example. This
+is therefore public legacy editor retirement, not deletion of all host
+transition vocabulary or creation ownership.

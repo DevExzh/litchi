@@ -8781,3 +8781,130 @@ proof, stable versioned patch serialization with semantic operations,
 read/write sets, composition, merge, and bounded history, and library-owned
 atomic durable filesystem replacement. Patches retain both complete artifacts
 in memory; `write_to` is streaming, not durable publication.
+
+## 2026-08-10 amendment: Keynote transition editor cutover
+
+Keynote transition callers now use the archive-free semantic values and
+canonical `transition::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`
+types through `Package::slide_transition`, `edit_slide_transition`, and
+`apply_slide_transition`. Exact name or checked position selectors replace
+host slide indices at the API boundary. The focused signatures contain no
+native ID, component/member name, generated/Prost/Buffa/wire type, raw slice,
+or retained artifact accessor; returned packages are emitted with
+`Package::write_to`.
+
+Changed admission proves the complete selected owner chain:
+
+1. the unique rooted Show contains the selected SlideNode reference in its
+   SlideTree slides path `[3, 2]`;
+2. that node has one expected SlideNode message and one required local field-2
+   reference to the selected SlideArchive;
+3. both edges resolve uniquely, occur once in aggregate metadata, and have at
+   most one matching path-local metadata record with no competing path; and
+4. the selected SlideArchive has one expected message whose strict transition
+   projection equals the archive-free value, while the selected node's strict
+   field-7 marker agrees with transition effect presence.
+
+The ownership scan walks the rooted Show slide-node list once and uses the
+package's sorted, globally unique object index for each node lookup. The audit
+is `O(slides log objects)` and charges aggregate node-message and local
+reference-payload bytes to `LimitKind::WireWork`; it does not reset a work
+allowance for each candidate node.
+
+Strict raw preflight runs before the five-message private Buffa lazy-view
+projection. The 2,347-byte derived schema is checked against the canonical KN
+declarations, contains neither repeated generated storage nor a production
+encoder, and produces five files/208,052 bytes under the 224 KiB limit. Buffa
+is a borrowed semantic cross-check; the validated raw messages remain the
+preservation and splice authority. The strict decoder shares one aggregate
+field budget and one strict-plus-Buffa work budget across the selected
+SlideArchive, transition, attributes, and animation envelopes instead of
+granting each nested envelope a new ceiling.
+
+Changed-only guards reject noncanonical object framing and selected
+`should_merge`, base-message, diff/merge-version, diff-field-path,
+fields-to-remove, or diff-read-version state. The rewrite changes only the
+SlideArchive field-4 transition subtree and, if effect presence changes, the
+SlideNode field-7 marker. Co-located owners require one rewritten component;
+split owners require at most two, and each component is parsed/reassembled
+once. Candidate reopen under retained limits re-proves ownership, semantic
+state, marker consistency, object/message metadata, and byte locality.
+
+All unselected ZIP members, IWA objects/messages, raw unknown fields, reference
+metadata, the three root previews, `Index/ViewState.iwa`, and slide/node
+playback caches remain exact. This playback-only transaction deliberately does
+not invoke root-preview deletion. An equal edit shares the source and does no
+reassembly/reopen. `Edit::clear` uses Keynote's modern no-effect
+settings when an editable envelope exists; if the selected transition is
+already absent, clear is an idempotent exact no-op and does not invent a native
+owner. Changed apply checks the exact complete source and semantic/ownership
+preconditions, then reopens the patch's stored target. Replay, tamper, wrong
+source, and inverse-on-source conflict; valid inverse-on-target restores the
+complete source exactly.
+
+Legacy nested physical packages remain readable and exact on no-op paths. A
+changed set/clear returns `transition::Error::UnsupportedSource` instead of
+normalizing their physical provenance.
+
+Migration removes exactly:
+
+- `KeynoteEditor::slide_transition`, `set_slide_transition`, and
+  `clear_slide_transition`;
+- the `transition_lifecycle` module declaration and
+  `keynote/editor/transition_lifecycle.rs`;
+- `clear_keynote_transition.rs`, `edit_keynote_transition.rs`, and
+  `set_keynote_transition_effect.rs`; and
+- five whole direct host mutation tests covering lifecycle, custom/animation
+  parameters, marker synchronization, and transition/locality CRUD.
+
+The focused `edit_slide_transition` example owns selector-first immutable
+mutation and exact inverse output. This is not deletion of every host read or
+creation seam: `KeynoteSlideInfo.transition` and host slide readers remain;
+`transition_wire.rs` is retained for `KeynoteEditor::slides()` aggregate
+decoding and no-op validation, while creation uses the separate
+`creation.rs::transition()` helper and retained `create_keynote_transition`
+workflow. Across the exact three methods, module/source, three examples, and
+five tests, host transition scope changes by +120/-998 lines, net -878.
+
+No manifest edge or debt item closes. Debt 014
+(`litchi-iwa -> litchi-keynote`) remains. Topology stays at 64 workspace
+packages, 235 internal dependency declarations, 14 `litchi-iwa` dependency
+declarations, and 14 ordered debts.
+
+Verification passes 8/8 focused transition integration tests, 79/79 Keynote
+library tests, warning-denied 6/6 doctests, 7/7 root-facade tests with
+`--features keynote`, 6/6 transition-codec tests, and the retained host
+transition conversion/reader suites at 3/3 and 7/7. The shared common batch
+gate passes 10/10 focused and 140/140 full tests plus strict library Clippy;
+the archive exact-artifact gate reports 79 unit and 2 integration tests.
+`cargo check -p litchi-keynote --all-targets` and
+`cargo check -p litchi-iwa --lib`, the host no-run gate, formatting, and
+focused diff checks pass. The boundary regression suite passes 101/101. Every
+fuzz bin checks, and stable
+control-flow smokes for generated no-op, fixed clear, and fixed set completed
+six bounded runs each. Expected missing-sanitizer-symbol warnings mean these
+were not sanitizer-backed runs.
+
+The final Computer Use gate ran Apple Keynote 14.4 (7043.0.93) on disposable
+copies of source SHA-256
+`ab186d8d59c858e1b3c2596fd45463cec75ddd92e9fda9032da656a940e68dca`.
+Pristine Rust Magic Move and clear candidates reproduced SHA-256
+`d5d24386cb544374f4c26da4349f7be961be34180a4536578616886a56af8c1a`
+and `5235a3d03dbabced6d06a03b4873826da8602d97f478c61f6467b35d732a08e5`;
+their public inverses each restored the exact source. Both candidates opened
+without repair, recovery, conversion, or warning. The inspector showed Magic
+Move, 2 seconds, Automatic, and a 2.25-second delay before Save As and after
+close/exact-path reopen. Clear showed No Transition Effect while preserving
+Automatic and the 2.25-second delay through the same lifecycle.
+
+Native resaves were respectively
+`dda5049cf431b5c88ea0a9fb209c67edc0d7f0764c23a17eb4e9fdf947d786f6`
+and `784069ca8bd2729829bcf204cccdced93f7fbea2b5f8c6b3e4965b47ef423e94`.
+Equal restaging over both native artifacts reported `changed=false`,
+`touched_components=0`, and byte-exact output/comparison; each no-op inverse
+was exact at the same native hash. Remaining shared debt is aggregate
+transaction peak-memory/total-work accounting, complete fallible-allocation
+proof, process-local complete-source/target patches without stable semantic
+serialization/read-write sets/composition/merge/history, library-owned atomic
+durable save, and sanitizer-backed fuzzing. `write_to` is exact output, not a
+flush/sync/rename durability primitive.

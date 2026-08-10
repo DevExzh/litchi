@@ -192,6 +192,160 @@ KEYNOTE_SHOW_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:show|show_settings)"
     r"[ \t\r\n]*::"
 )
+RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHODS = (
+    "slide_transition",
+    "set_slide_transition",
+    "clear_slide_transition",
+)
+RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHODS
+)
+RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_SOURCES = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "transition_lifecycle.rs",
+)
+RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_MODULES = ("transition_lifecycle",)
+RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_EXAMPLES = (
+    Path("crates/litchi-iwa/examples/clear_keynote_transition.rs"),
+    Path("crates/litchi-iwa/examples/edit_keynote_transition.rs"),
+    Path("crates/litchi-iwa/examples/set_keynote_transition_effect.rs"),
+)
+IWA_KEYNOTE_SLIDE_TRANSITION_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(transition_lifecycle)\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+IWA_KEYNOTE_README_SLIDE_TRANSITION_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:keynote|editor|reopened)"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>slide_transition|set_slide_transition|clear_slide_transition)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])"
+        r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?(?P<method>slide_transition|set_slide_transition|clear_slide_transition)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>set_slide_transition|clear_slide_transition)"
+        r"\b[ \t\r\n]*\("
+    ),
+)
+IWA_KEYNOTE_README_SLIDE_TRANSITION_EXAMPLE = re.compile(
+    r"(?<![A-Za-z0-9_])(?P<example>"
+    r"clear_keynote_transition|edit_keynote_transition|set_keynote_transition_effect"
+    r")(?:\.rs)?(?![A-Za-z0-9_])"
+)
+KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "transition.rs",
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_transition.rs",
+)
+KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+)
+KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+KEYNOTE_SLIDE_TRANSITION_SEMANTIC_TYPES = (
+    "Acceleration",
+    "AccelerationKind",
+    "AnimationParameters",
+    "CustomParameters",
+    "Direction",
+    "Effect",
+    "MosaicType",
+    "Settings",
+    "SettingsBuilder",
+    "TextDelivery",
+    "TextDeliveryKind",
+    "TimingCurveSlot",
+)
+KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES = frozenset(
+    KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+)
+KEYNOTE_SLIDE_TRANSITION_FLAT_ALIAS_PREFIXES = (
+    "SlideTransition",
+    "Transition",
+)
+KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in KEYNOTE_SLIDE_TRANSITION_FLAT_ALIAS_PREFIXES
+    for suffix in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES
+)
+KEYNOTE_SLIDE_TRANSITION_ROOT_ALIASES = frozenset(
+    KEYNOTE_SLIDE_TRANSITION_SEMANTIC_TYPES
+    + KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+)
+KEYNOTE_SLIDE_TRANSITION_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:transition|slide_transition)"
+    r"[ \t\r\n]*::"
+)
+PUBLIC_KEYNOTE_PACKAGE_SLIDE_TRANSITION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?slide_transition\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_KEYNOTE_TRANSITION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transition\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+KEYNOTE_SLIDE_TRANSITION_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "EntryEdit",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+        "TransitionSettingsSnapshot",
+    }
+)
+KEYNOTE_SLIDE_TRANSITION_WIRE_TYPES = frozenset(
+    {
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_TRANSITION_SEMANTIC_IDENTIFIER_NAMES = frozenset(
+    {
+        "MAX_IDENTIFIER_BYTES",
+        "from_identifier",
+        "identifier",
+        "identifiers",
+    }
+)
+KEYNOTE_SLIDE_TRANSITION_SEMANTIC_OBJECT_NAMES = frozenset(
+    {
+        "BY_OBJECT_DELIVERY",
+        "ByObject",
+        "magic_move_fade_unmatched_objects",
+        "set_magic_move_fade_unmatched_objects",
+    }
+)
+KEYNOTE_SLIDE_TRANSITION_SEMANTIC_OPAQUE_PAYLOAD_MEMBERS = frozenset(
+    {
+        "color_payload",
+        "set_color_payload",
+        "set_timing_curve_payload",
+        "timing_curve_payload",
+        "timing_curve_payloads",
+    }
+)
 IWA_NUMBERS_SOURCE_ROOT = Path("crates/litchi-iwa/src/numbers")
 IWA_NUMBERS_SEMANTIC_WORKBOOK_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "workbook.rs"
@@ -1606,6 +1760,87 @@ def _is_keynote_show_settings_public_declaration(
     ) or _keynote_show_owner_declaration(declaration)
 
 
+def _keynote_slide_transition_public_leak(
+    identifier: str, *, semantic_source: bool
+) -> str | None:
+    """Classify implementation vocabulary in the focused transition API."""
+
+    if (
+        semantic_source
+        and identifier
+        in (
+            KEYNOTE_SLIDE_TRANSITION_SEMANTIC_IDENTIFIER_NAMES
+            | KEYNOTE_SLIDE_TRANSITION_SEMANTIC_OBJECT_NAMES
+        )
+    ):
+        return None
+    if identifier in KEYNOTE_SLIDE_TRANSITION_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in KEYNOTE_SLIDE_TRANSITION_WIRE_TYPES:
+        return "wire type"
+    return _iwork_public_leak(identifier)
+
+
+def _keynote_slide_transition_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return KEYNOTE_SLIDE_TRANSITION_OWNER_PATH.search(declaration) is not None or any(
+        identifier
+        in {"apply_slide_transition", "edit_slide_transition", "slide_transition"}
+        for identifier in identifiers
+    )
+
+
+def _is_keynote_slide_transition_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(identifiers & KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES) or (
+        _keynote_slide_transition_owner_declaration(declaration)
+    )
+
+
+def _keynote_slide_transition_canonical_exports(source: str) -> frozenset[str]:
+    """Return exact short transition types publicly defined or reexported."""
+
+    exported: set[str] = set()
+    for declaration, _ in _rust_public_declarations(source):
+        identifiers = [
+            match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+        ]
+        if identifiers[:2] == ["pub", "use"]:
+            code = declaration
+            for alias in re.finditer(
+                r"(?<![A-Za-z0-9_#])(?:r#)?([A-Za-z_][A-Za-z0-9_]*)"
+                r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)",
+                code,
+            ):
+                original, public_name = alias.groups()
+                if public_name in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES:
+                    exported.add(public_name)
+                if original in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES:
+                    code = code[: alias.start(1)] + (" " * len(original)) + code[alias.end(1) :]
+            exported.update(
+                match.group(1)
+                for match in RUST_IDENTIFIER.finditer(code)
+                if match.group(1) in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES
+            )
+            continue
+        item = re.match(
+            r"^[ \t]*pub[ \t\r\n]+(?:struct|enum|type|trait|union)"
+            r"[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)",
+            declaration,
+        )
+        if item is not None and item.group(1) in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES:
+            exported.add(item.group(1))
+    return frozenset(exported)
+
+
 def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
     """Prevent retired Keynote function declarations from returning to the host."""
 
@@ -1778,6 +2013,232 @@ def audit_keynote_show_settings_facade_source_topology(
                 )
                 violations.append(
                     "focused litchi-keynote show-settings public API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_slide_transition_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep retired Keynote transition mutations out of their former host."""
+
+    violations: list[str] = []
+    for retired in RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_SOURCES:
+        if (root / retired).exists():
+            violations.append(
+                "retired litchi-iwa Keynote slide-transition source returned: "
+                + str(retired)
+            )
+    for retired in RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_EXAMPLES:
+        if (root / retired).exists():
+            violations.append(
+                "retired litchi-iwa Keynote slide-transition example returned: "
+                + str(retired)
+            )
+
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Keynote slide-transition method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    editor_path = root / IWA_KEYNOTE_EDITOR_SOURCE
+    if editor_path.is_file():
+        source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+        for match in IWA_KEYNOTE_SLIDE_TRANSITION_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-transition module "
+                f"{match.group(1)}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
+
+    readme_path = root / IWA_KEYNOTE_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_KEYNOTE_README_SLIDE_TRANSITION_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-transition README call "
+                    f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
+                )
+        for match in IWA_KEYNOTE_README_SLIDE_TRANSITION_EXAMPLE.finditer(source):
+            line_number = source.count("\n", 0, match.start("example")) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-transition README example reference "
+                f"{match.group('example')}: {IWA_KEYNOTE_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_transition_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the canonical nested, archive-free slide-transition API."""
+
+    source_root = root / KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    export_sources = {
+        root / path
+        for path in KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    semantic_source = root / KEYNOTE_SOURCE_ROOT / "transition.rs"
+    violations: list[str] = []
+
+    canonical_exports = (
+        _keynote_slide_transition_canonical_exports(
+            semantic_source.read_text(encoding="utf-8")
+        )
+        if semantic_source.is_file()
+        else frozenset()
+    )
+    for name in KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-keynote slide-transition public API is missing "
+            f"canonical transition type {name}: "
+            f"{KEYNOTE_SOURCE_ROOT / 'transition.rs'}"
+        )
+
+    lib_export = root / KEYNOTE_SOURCE_ROOT / "lib.rs"
+    lib_source = (
+        _mask_rust_non_code(lib_export.read_text(encoding="utf-8"))
+        if lib_export.is_file()
+        else ""
+    )
+    if PUBLIC_KEYNOTE_TRANSITION_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-keynote slide-transition public API is missing "
+            "canonical root transition module: "
+            f"{KEYNOTE_SOURCE_ROOT / 'lib.rs'}"
+        )
+
+    package_export = root / KEYNOTE_SOURCE_ROOT / "package.rs"
+    if package_export.is_file():
+        package_source = _mask_rust_non_code(
+            package_export.read_text(encoding="utf-8")
+        )
+        for match in PUBLIC_KEYNOTE_PACKAGE_SLIDE_TRANSITION_MODULE.finditer(
+            package_source
+        ):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-keynote slide-transition public API exposes duplicate "
+                "package::slide_transition module: "
+                f"{package_export.relative_to(root)}:{line_number}"
+            )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_keynote_slide_transition_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            owner_declaration = _keynote_slide_transition_owner_declaration(
+                declaration
+            )
+            declaration_identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = declaration_identifiers[:2] in (
+                ["pub", "type"],
+                ["pub", "use"],
+            )
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and declaration_identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-transition public API retains "
+                    "root aliases via transition glob: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if (
+                    public_declaration
+                    and identifier in KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES
+                ):
+                    violations.append(
+                        "focused litchi-keynote slide-transition public API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and owner_declaration
+                    and public_use_or_type
+                    and identifier in KEYNOTE_SLIDE_TRANSITION_ROOT_ALIASES
+                ):
+                    violations.append(
+                        "focused litchi-keynote slide-transition public API "
+                        f"retains root alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _keynote_slide_transition_public_leak(
+                    identifier, semantic_source=path == semantic_source
+                )
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-keynote slide-transition public API exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+            allow_opaque_payload = path == semantic_source and bool(
+                set(declaration_identifiers)
+                & KEYNOTE_SLIDE_TRANSITION_SEMANTIC_OPAQUE_PAYLOAD_MEMBERS
+            )
+            if allow_opaque_payload:
+                continue
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-keynote slide-transition public API exposes "
                     f"raw byte slice {byte_slice}: "
                     f"{path.relative_to(root)}:{byte_slice_line}"
                 )
@@ -2527,6 +2988,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_source_topology()
         + audit_iwa_keynote_show_settings_source_topology()
         + audit_keynote_show_settings_facade_source_topology()
+        + audit_iwa_keynote_slide_transition_source_topology()
+        + audit_keynote_slide_transition_facade_source_topology()
         + audit_iwa_numbers_names_source_topology()
         + audit_numbers_names_facade_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()

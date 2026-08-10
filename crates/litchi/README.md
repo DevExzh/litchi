@@ -72,6 +72,49 @@ Macros, VBA, ActiveX, controls, OLE objects, and embedded code are only ever
 retained as inert blobs when exposed or preserved. Litchi never executes or
 activates them.
 
+## Focused Keynote transition edits
+
+Enable the `keynote` feature to use the focused Keynote package API through
+`litchi::keynote`. Transitions are selected by semantic slide name or position;
+native identifiers are never exposed. Only an existing modern transition
+envelope is editable, and `clear` is idempotent while retaining Keynote's
+native no-effect envelope.
+
+```toml
+[dependencies]
+litchi = { version = "0", default-features = false, features = ["keynote"] }
+```
+
+```rust,no_run
+use std::io;
+
+use litchi::keynote::{
+    Package, SlideSelector,
+    transition::Effect,
+};
+
+let package = Package::open("input.key")?;
+let selector = SlideSelector::name("Appendix");
+let mut settings = package
+    .slide_transition(selector)?
+    .ok_or_else(|| io::Error::other("slide has no modern transition"))?;
+settings.set_effect(Some(Effect::Dissolve))?;
+let commit = package.edit_slide_transition(selector)?.set(settings)?.commit()?;
+
+let restored = commit
+    .package()
+    .apply_slide_transition(&commit.patch().inverse())?;
+let mut output = Vec::new();
+restored.package().write_to(&mut output)?;
+assert!(!output.is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+For safe filesystem publication, use
+`litchi-keynote/examples/edit_slide_transition.rs`, which writes a distinct
+output through `Package::write_to` into a synchronized sibling temporary file
+and publishes it without clobbering an existing target.
+
 ## Feature Flags
 
 Default features are empty. Enable only what the application needs; spelling

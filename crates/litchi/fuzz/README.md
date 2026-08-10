@@ -25,6 +25,13 @@ strict reads, exact-source patch application and conflicts, inversion, typed
 limits, content-redacted failures, public in-memory `write_to` verification,
 and exact byte restoration without writing a package to disk.
 
+`keynote_slide_transition` is the focused selector-first transition target.
+It offers arbitrary bytes to bounded Keynote ingress and interprets a finite
+prefix as no-op, set, or clear commands for the first slide in native
+`basic.key`. It covers strict reads, diagnostics, unrelated show-settings
+locality, exact-source application and conflicts, inversion, typed limits,
+redaction, and exact restoration using only the public package writer.
+
 `numbers_table_lock` is the focused interactive table-lock target. It offers
 arbitrary bytes to checked Numbers package ingress and also interprets them as
 bounded selector and lock-state commands against the native `basic.numbers`
@@ -72,6 +79,11 @@ concentrate effort on deep-message operations.
 profile. Settings commands consume only a fixed prefix; keep `-max_len` at 512
 bytes so arbitrary ingress remains active while every input also reaches the
 fixed native transaction.
+
+`keynote_slide_transition` also reuses this finite Keynote profile. Selector,
+transition, and validation commands consume at most 512 input bytes; keep
+`-max_len` at 512 so malformed ingress remains bounded while every input also
+reaches the native transition transaction.
 
 `numbers_table_lock` accepts at most 512 KiB of source bytes, 128 package
 entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
@@ -146,6 +158,13 @@ Run the focused Keynote show-settings target:
 
 ```sh
 cargo +nightly fuzz run keynote_show_settings -- \
+  -max_len=512 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Keynote slide-transition target:
+
+```sh
+cargo +nightly fuzz run keynote_slide_transition -- \
   -max_len=512 -timeout=10 -rss_limit_mb=2048
 ```
 

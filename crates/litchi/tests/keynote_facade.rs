@@ -116,24 +116,70 @@ fn show_settings_transaction_is_available_through_the_root_facade()
 #[test]
 fn slide_transition_transaction_is_available_through_the_root_facade()
 -> Result<(), Box<dyn std::error::Error>> {
+    use litchi::keynote::transition::{
+        Commit, Diagnostics, Edit, Effect, Error, LimitKind, Patch, Settings,
+    };
+
+    assert_send_sync::<Settings>();
+    assert_send_sync::<Edit<'static>>();
+    assert_send_sync::<Patch>();
+    assert_send_sync::<Commit>();
+    assert_send_sync::<Diagnostics>();
+    assert_send_sync::<Error>();
+    assert_send_sync::<LimitKind>();
+
     let package = Package::open(fixture_path())?;
     let source_snapshot = package.exact_bytes();
     let selector = SlideSelector::index(0);
-    let transition = package
+    let before = package
         .slide_transition(selector)?
         .ok_or_else(|| io::Error::other("native Keynote file has no editable transition"))?;
-    let mut edit = package.edit_slide_transition(selector)?;
-    edit.set_transition(transition)?;
-    let commit = edit.commit()?;
 
-    assert!(commit.patch().is_noop());
-    assert!(!commit.diagnostics().changed());
-    assert_eq!(commit.package().exact_bytes(), source_snapshot);
+    let noop = package
+        .edit_slide_transition(selector)?
+        .set(before.clone())?
+        .commit()?;
+    assert_eq!(noop.patch().before(), Some(&before));
+    assert_eq!(noop.patch().after(), Some(&before));
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.diagnostics().touched_components(), 0);
+    assert!(!noop.diagnostics().full_reparse_performed());
+    assert_eq!(noop.package().exact_bytes(), source_snapshot);
 
-    let reapplied = package.apply_slide_transition(commit.patch())?;
-    assert!(reapplied.patch().is_noop());
-    assert!(!reapplied.diagnostics().changed());
-    assert_eq!(reapplied.package().exact_bytes(), source_snapshot);
+    let mut after = before.clone();
+    let replacement = if after.effect() == Some(&Effect::Dissolve) {
+        Effect::None
+    } else {
+        Effect::Dissolve
+    };
+    after.set_effect(Some(replacement))?;
+    let changed = package
+        .edit_slide_transition(selector)?
+        .set(after.clone())?
+        .commit()?;
+    assert_eq!(changed.patch().before(), Some(&before));
+    assert_eq!(changed.patch().after(), Some(&after));
+    assert!(!changed.patch().is_noop());
+    assert!(changed.diagnostics().changed());
+    assert!(changed.diagnostics().touched_components() >= 1);
+    assert!(changed.diagnostics().full_reparse_performed());
+    assert_eq!(changed.package().slide_transition(selector)?, Some(after));
+    assert_eq!(package.exact_bytes(), source_snapshot);
+    assert_ne!(changed.package().exact_bytes(), source_snapshot);
+
+    let reapplied = package.apply_slide_transition(changed.patch())?;
+    assert!(reapplied.diagnostics().changed());
+    assert_eq!(
+        reapplied.package().exact_bytes(),
+        changed.package().exact_bytes()
+    );
+
+    let inverse = changed.patch().inverse();
+    let restored = changed.package().apply_slide_transition(&inverse)?;
+    assert!(restored.diagnostics().changed());
+    assert_eq!(restored.package().slide_transition(selector)?, Some(before));
+    assert_eq!(restored.package().exact_bytes(), source_snapshot);
     Ok(())
 }
 

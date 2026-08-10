@@ -303,3 +303,66 @@ tests, and the raw-ID `rename_numbers_items` example are deleted rather than
 shimmed. The private cross-format `rename_table_in_package` helper remains for
 Pages and Keynote table creation/edit flows; its retention is not retention of
 the retired public Numbers rename API.
+
+## 2026-08-10 amendment: hardened Keynote slide-transition transaction
+
+This amendment supersedes the earlier flat transaction names and host-retention
+claim for slide-transition mutation. Exact-name or checked-position selection
+resolves one slide against an immutable package. The consuming
+`transition::Edit::{set, clear}` methods stage a complete archive-free value;
+`set` requires an existing modern envelope and never synthesizes one. `clear`
+retains an existing modern envelope in Keynote's no-effect representation,
+including its delay, automatic-start, random-seed, and writing-direction
+semantics. Clearing an already absent transition is idempotent and remains
+absent.
+
+An equal edit, including absent `clear`, is an exact no-op. It shares the source
+artifact, reports zero touched components, and skips changed-only ownership,
+framing, reassembly, and reopen work. A changed edit proves the rooted Document
+to Show edge, the Show/SlideTree path `[3, 2]` to the selected SlideNode, and
+that node's field-2 reference to the selected SlideArchive. Each nonzero edge,
+component/object, and expected typed message must be unique. The rooted owner
+proof uses the package's sorted object locator for indexed
+`O(slides log objects)` lookup and charges aggregate node/reference work to
+`LimitKind::WireWork`. Aggregate reference metadata is exact and optional
+field-local metadata, when present, must match the one followed path. Strict
+transition and node-marker views must agree with the selected semantic state;
+one shared field/work budget governs the transition codec's complete nested
+preflight rather than resetting at each descended payload.
+
+Changed-only guards reject noncanonical selected component/object framing,
+group-bearing selected payloads, merge/base/diff metadata, aliased ownership,
+and mixed modern/legacy transition fields. The mutation closure contains only
+the selected SlideArchive field-4 transition subtree and, when effect presence
+changes, the selected SlideNode field-7 marker. Co-located owners rewrite one
+component and split owners rewrite two, each exactly once. Retained-limit
+candidate reopening re-proves selected ownership, requested settings, marker
+agreement, and exact locality; all unselected members, objects, messages,
+unknown fields, reference metadata, previews, and caches remain exact.
+
+`transition::Patch` privately retains complete immutable source and target
+artifacts, the selected semantic before/after values, and private owner
+preconditions. Exact bytes and semantic/ownership preconditions, not diagnostic
+fingerprints, authorize application. A no-op apply shares the source; a changed
+apply reopens and verifies the retained target; replay, tamper, and the wrong
+source conflict. `inverse` swaps shared artifacts and semantic preconditions so
+a valid inverse-on-target restores the accepted source byte for byte.
+
+Preserve policy keeps physical legacy nested-`Index.zip` sources readable and
+exact on no-op paths, while a changed edit returns
+`transition::Error::UnsupportedSource`. Legacy database-field transition
+representations may be read and retained by a no-op but are not writable by the
+focused transaction; a mixed modern/legacy changed owner is invalid rather
+than normalized. These process-local two-artifact patches are reversible but
+neither compact nor durable. ADR 0003's stable semantic operation encoding,
+read/write sets, deterministic serialization, composition, merge, bounded
+history, and library-owned atomic durable publication remain deferred.
+
+The host methods `KeynoteEditor::{slide_transition, set_slide_transition,
+clear_slide_transition}`, the `transition_lifecycle` module/source, their
+five whole direct mutation tests, and the clear/edit/set-effect host examples
+are deleted rather than shimmed. This retires direct host editing, not
+transition snapshot or creation support. `KeynoteSlideInfo.transition` and
+`transition_wire.rs` remain for `KeynoteEditor::slides()` aggregate decoding
+and no-op validation; the separate `creation.rs::transition()` helper and the
+`create_keynote_transition` workflow remain for creation.

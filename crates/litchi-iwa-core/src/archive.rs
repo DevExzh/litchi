@@ -1226,6 +1226,120 @@ impl Archive {
         Ok(archive)
     }
 
+    /// Validate canonical object framing against the decompressed source.
+    ///
+    /// This opt-in check requires every object-header length prefix to use the
+    /// shortest protobuf varint encoding. It also requires the parsed source
+    /// provenance to describe one exact, contiguous partition of
+    /// `decompressed_source`: each header starts where the preceding object's
+    /// payload ends, each `header_length` includes exactly its prefix and raw
+    /// `ArchiveInfo`, each `data_offset` immediately follows that header, and
+    /// the final payload ends at the end of the supplied source.
+    ///
+    /// Header contents are neither decoded nor re-encoded, so unknown fields,
+    /// field ordering, and noncanonical encodings *inside* an `ArchiveInfo`
+    /// remain accepted and untouched. [`Self::parse`] deliberately remains
+    /// permissive about overlong object length prefixes; format mutations can
+    /// call this method when they require an unambiguous byte-splice boundary.
+    ///
+    /// The check performs no allocation and runs in O(objects + messages)
+    /// time, visiting metadata only to verify each recorded payload extent.
+    pub fn validate_canonical_object_framing(&self, decompressed_source: &[u8]) -> Result<()> {
+        let source_length = u64::try_from(decompressed_source.len())
+            .map_err(|_| Error::invalid_archive(0, "source length exceeds u64"))?;
+        let mut expected_object_offset = 0u64;
+
+        for (object_index, object) in self.objects.iter().enumerate() {
+            if object.header_offset != expected_object_offset {
+                return Err(Error::invalid_archive(
+                    object_index,
+                    "object header offset does not follow the preceding payload",
+                ));
+            }
+            let header_offset = usize::try_from(object.header_offset).map_err(|_| {
+                Error::invalid_archive(object_index, "object header offset exceeds usize")
+            })?;
+            let remaining = decompressed_source.get(header_offset..).ok_or_else(|| {
+                Error::invalid_archive(header_offset, "object header offset exceeds source")
+            })?;
+            let (raw_header_length, prefix_length) = decode_varint(remaining)?;
+            let header_length = usize::try_from(raw_header_length).map_err(|_| {
+                Error::invalid_archive(header_offset, "header length exceeds usize")
+            })?;
+            if prefix_length != varint_len(header_length)? {
+                return Err(Error::invalid_archive(
+                    header_offset,
+                    "object header length prefix is not canonical",
+                ));
+            }
+
+            let framed_header_length = prefix_length
+                .checked_add(header_length)
+                .ok_or_else(|| Error::invalid_archive(header_offset, "header range overflow"))?;
+            let data_offset = header_offset
+                .checked_add(framed_header_length)
+                .ok_or_else(|| Error::invalid_archive(header_offset, "header range overflow"))?;
+            if data_offset > decompressed_source.len() {
+                return Err(Error::invalid_archive(
+                    header_offset,
+                    "truncated ArchiveInfo header",
+                ));
+            }
+            let framed_header_length_u64 = u64::try_from(framed_header_length).map_err(|_| {
+                Error::invalid_archive(header_offset, "framed header length exceeds u64")
+            })?;
+            let data_offset_u64 = u64::try_from(data_offset)
+                .map_err(|_| Error::invalid_archive(header_offset, "data offset exceeds u64"))?;
+            if object.header_length != framed_header_length_u64 {
+                return Err(Error::invalid_archive(
+                    header_offset,
+                    "recorded header length does not match source framing",
+                ));
+            }
+            if object.data_offset != data_offset_u64 {
+                return Err(Error::invalid_archive(
+                    header_offset,
+                    "recorded data offset does not follow the source header",
+                ));
+            }
+
+            let mut metadata_payload_length = 0u64;
+            for message_info in &object.archive_info.message_infos {
+                metadata_payload_length = metadata_payload_length
+                    .checked_add(u64::from(message_info.length))
+                    .ok_or_else(|| {
+                        Error::invalid_archive(data_offset, "metadata payload length overflow")
+                    })?;
+            }
+            if object.data_length != metadata_payload_length {
+                return Err(Error::invalid_archive(
+                    data_offset,
+                    "recorded data length does not match message metadata",
+                ));
+            }
+            let data_end = object
+                .data_offset
+                .checked_add(metadata_payload_length)
+                .ok_or_else(|| Error::invalid_archive(data_offset, "payload range overflow"))?;
+            if data_end > source_length {
+                return Err(Error::invalid_archive(
+                    data_offset,
+                    "truncated message payload",
+                ));
+            }
+            expected_object_offset = data_end;
+        }
+
+        if expected_object_offset != source_length {
+            let offset = usize::try_from(expected_object_offset).unwrap_or(usize::MAX);
+            return Err(Error::invalid_archive(
+                offset,
+                "source contains bytes not described by archive objects",
+            ));
+        }
+        Ok(())
+    }
+
     /// Serialize this archive as a decompressed IWA stream.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.to_bytes_with_limits(Limits::default())
@@ -3102,6 +3216,172 @@ mod tests {
         assert!(object.original_header.is_none());
         assert!(object.original_canonical_header.is_none());
         assert_eq!(parsed.to_bytes()?, encoded);
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_object_framing_accepts_unknown_raw_archive_info_bytes() -> Result<()> {
+        let fixture = reference_pruning_fixture()?;
+        let archive = Archive::parse(&fixture.source)?;
+        archive.validate_canonical_object_framing(&fixture.source)?;
+        assert_eq!(archive.to_bytes()?, fixture.source);
+        assert_eq!(
+            archive.objects[0].original_header.as_deref(),
+            Some(fixture.header.as_slice())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_object_framing_rejects_overlong_prefix_on_any_object() -> Result<()> {
+        let canonical = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 2,
+                        data: vec![3],
+                    }],
+                )?,
+                ArchiveObject::new(
+                    4,
+                    vec![RawMessage {
+                        type_: 5,
+                        data: vec![6, 7],
+                    }],
+                )?,
+            ],
+        }
+        .to_bytes()?;
+        let parsed = Archive::parse(&canonical)?;
+        parsed.validate_canonical_object_framing(&canonical)?;
+        let second_offset = usize::try_from(parsed.objects[1].header_offset)
+            .map_err(|_| Error::invalid_archive(0, "test offset exceeds usize"))?;
+        let (header_length, prefix_length) = super::decode_varint(
+            canonical
+                .get(second_offset..)
+                .ok_or_else(|| Error::invalid_archive(0, "test object offset is invalid"))?,
+        )?;
+        assert_eq!(prefix_length, 1);
+        assert!(header_length < 0x80);
+
+        let mut overlong = Vec::new();
+        overlong
+            .try_reserve_exact(canonical.len() + 1)
+            .map_err(|_| Error::allocation("test overlong archive", canonical.len() + 1))?;
+        overlong.extend_from_slice(&canonical[..second_offset]);
+        overlong.push(canonical[second_offset] | 0x80);
+        overlong.push(0);
+        overlong.extend_from_slice(&canonical[second_offset + 1..]);
+
+        // Parsing remains deliberately permissive; only the opt-in framing
+        // validator refuses the overlong second-object prefix.
+        let permissive = Archive::parse(&overlong)?;
+        assert!(
+            permissive
+                .validate_canonical_object_framing(&overlong)
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_object_framing_rejects_truncated_source_regions() -> Result<()> {
+        let source = Archive {
+            objects: vec![ArchiveObject::new(
+                1,
+                vec![RawMessage {
+                    type_: 2,
+                    data: vec![3, 4, 5],
+                }],
+            )?],
+        }
+        .to_bytes()?;
+        let archive = Archive::parse(&source)?;
+        let data_offset = usize::try_from(archive.objects[0].data_offset)
+            .map_err(|_| Error::invalid_archive(0, "test data offset exceeds usize"))?;
+
+        let truncated_prefix = [source[0] | 0x80];
+        assert!(
+            archive
+                .validate_canonical_object_framing(&truncated_prefix)
+                .is_err()
+        );
+        assert!(
+            archive
+                .validate_canonical_object_framing(&source[..data_offset - 1])
+                .is_err()
+        );
+        assert!(
+            archive
+                .validate_canonical_object_framing(&source[..source.len() - 1])
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_object_framing_rejects_inexact_offsets_and_extents() -> Result<()> {
+        let source = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 2,
+                        data: vec![3],
+                    }],
+                )?,
+                ArchiveObject::new(
+                    4,
+                    vec![RawMessage {
+                        type_: 5,
+                        data: vec![6, 7],
+                    }],
+                )?,
+            ],
+        }
+        .to_bytes()?;
+        let archive = Archive::parse(&source)?;
+
+        let mut wrong_header_offset = archive.clone();
+        wrong_header_offset.objects[1].header_offset += 1;
+        assert!(
+            wrong_header_offset
+                .validate_canonical_object_framing(&source)
+                .is_err()
+        );
+
+        let mut wrong_header_length = archive.clone();
+        wrong_header_length.objects[0].header_length += 1;
+        assert!(
+            wrong_header_length
+                .validate_canonical_object_framing(&source)
+                .is_err()
+        );
+
+        let mut wrong_data_offset = archive.clone();
+        wrong_data_offset.objects[0].data_offset += 1;
+        assert!(
+            wrong_data_offset
+                .validate_canonical_object_framing(&source)
+                .is_err()
+        );
+
+        let mut wrong_data_length = archive.clone();
+        wrong_data_length.objects[0].data_length += 1;
+        assert!(
+            wrong_data_length
+                .validate_canonical_object_framing(&source)
+                .is_err()
+        );
+
+        let mut trailing = source.clone();
+        trailing.push(0);
+        assert!(
+            archive
+                .validate_canonical_object_framing(&trailing)
+                .is_err()
+        );
         Ok(())
     }
 

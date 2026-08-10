@@ -1,6 +1,8 @@
 //! Keynote transition vocabulary independent of archive and wire models.
 
-use crate::{Error, Result};
+use crate::Result;
+
+pub use crate::package::slide_transition::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 const NONE_EFFECT: &str = "none";
 const DISSOLVE_EFFECT: &str = "apple:dissolve";
@@ -88,8 +90,8 @@ impl Effect {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NonCanonicalEffect`] when `identifier` names a known
-    /// effect, or [`Error::NulString`] when it contains a NUL byte.
+    /// Returns [`crate::Error::NonCanonicalEffect`] when `identifier` names a known
+    /// effect, or [`crate::Error::NulString`] when it contains a NUL byte.
     pub fn unknown(identifier: impl AsRef<str>) -> Result<Self> {
         let identifier_text = identifier.as_ref();
         Self::validate_identifier(identifier_text)?;
@@ -97,7 +99,7 @@ impl Effect {
             identifier_text,
             NONE_EFFECT | DISSOLVE_EFFECT | MAGIC_MOVE_EFFECT
         ) {
-            return Err(Error::NonCanonicalEffect);
+            return Err(crate::Error::NonCanonicalEffect);
         }
         Ok(Self::Unknown {
             identifier: identifier_text.into(),
@@ -135,26 +137,26 @@ impl Effect {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NulString`] when the identifier contains a NUL byte or
-    /// [`Error::NonCanonicalEffect`] when an unknown value shadows a named
+    /// Returns [`crate::Error::NulString`] when the identifier contains a NUL byte or
+    /// [`crate::Error::NonCanonicalEffect`] when an unknown value shadows a named
     /// native effect.
     pub fn validate(&self) -> Result<()> {
         Self::validate_identifier(self.identifier())?;
         if !self.is_canonical() {
-            return Err(Error::NonCanonicalEffect);
+            return Err(crate::Error::NonCanonicalEffect);
         }
         Ok(())
     }
 
     fn validate_identifier(identifier: &str) -> Result<()> {
         if identifier.is_empty() {
-            return Err(Error::EmptyIdentifier);
+            return Err(crate::Error::EmptyIdentifier);
         }
         if identifier.len() > MAX_IDENTIFIER_BYTES {
-            return Err(Error::IdentifierTooLarge);
+            return Err(crate::Error::IdentifierTooLarge);
         }
         if identifier.contains('\0') {
-            return Err(Error::NulString);
+            return Err(crate::Error::NulString);
         }
         Ok(())
     }
@@ -418,11 +420,11 @@ impl AnimationParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidDetail`] for a non-finite detail value or
-    /// [`Error::NulString`] for a theme name containing a NUL byte.
+    /// Returns [`crate::Error::InvalidDetail`] for a non-finite detail value or
+    /// [`crate::Error::NulString`] for a theme name containing a NUL byte.
     pub fn validate(&self) -> Result<()> {
         if self.detail.is_some_and(|value| !value.is_finite()) {
-            return Err(Error::InvalidDetail);
+            return Err(crate::Error::InvalidDetail);
         }
         if self
             .color_payload
@@ -434,7 +436,7 @@ impl AnimationParameters {
                 .flatten()
                 .any(|payload| payload.len() > MAX_OPAQUE_PAYLOAD_BYTES)
         {
-            return Err(Error::PayloadTooLarge);
+            return Err(crate::Error::PayloadTooLarge);
         }
         if self
             .timing_curve_theme_names
@@ -448,9 +450,9 @@ impl AnimationParameters {
                 .flatten()
                 .any(|name| name.len() > MAX_IDENTIFIER_BYTES)
             {
-                Err(Error::IdentifierTooLarge)
+                Err(crate::Error::IdentifierTooLarge)
             } else {
-                Err(Error::NulString)
+                Err(crate::Error::NulString)
             };
         }
         Ok(())
@@ -466,7 +468,7 @@ impl AnimationParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::PayloadTooLarge`] when `payload` exceeds the bounded
+    /// Returns [`crate::Error::PayloadTooLarge`] when `payload` exceeds the bounded
     /// semantic storage budget.
     pub fn set_color_payload(&mut self, payload: Option<&[u8]>) -> Result<()> {
         let replacement = bounded_payload(payload)?;
@@ -490,7 +492,7 @@ impl AnimationParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::PayloadTooLarge`] when `payload` exceeds the bounded
+    /// Returns [`crate::Error::PayloadTooLarge`] when `payload` exceeds the bounded
     /// semantic storage budget.
     pub fn set_timing_curve_payload(
         &mut self,
@@ -523,12 +525,12 @@ impl AnimationParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidDetail`] when `value` is non-finite.
+    /// Returns [`crate::Error::InvalidDetail`] when `value` is non-finite.
     pub const fn set_detail(&mut self, value: Option<f64>) -> Result<()> {
         if let Some(detail) = value
             && !detail.is_finite()
         {
-            return Err(Error::InvalidDetail);
+            return Err(crate::Error::InvalidDetail);
         }
         self.detail = value;
         Ok(())
@@ -550,7 +552,7 @@ impl AnimationParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::IdentifierTooLarge`] or [`Error::NulString`] when the
+    /// Returns [`crate::Error::IdentifierTooLarge`] or [`crate::Error::NulString`] when the
     /// candidate name cannot be represented by the semantic text field.
     pub fn set_timing_curve_theme_name(
         &mut self,
@@ -624,7 +626,7 @@ impl CustomParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidCustomFloat`] when `value` is non-finite.
+    /// Returns [`crate::Error::InvalidCustomFloat`] when `value` is non-finite.
     pub const fn set_twist(&mut self, value: Option<f32>) -> Result<()> {
         if let Err(error) = validate_custom_float(value) {
             return Err(error);
@@ -720,7 +722,7 @@ impl CustomParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidCustomFloat`] when `value` is non-finite.
+    /// Returns [`crate::Error::InvalidCustomFloat`] when `value` is non-finite.
     pub const fn set_travel_distance(&mut self, value: Option<f32>) -> Result<()> {
         if let Err(error) = validate_custom_float(value) {
             return Err(error);
@@ -733,7 +735,7 @@ impl CustomParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidCustomFloat`] when a custom value is NaN or
+    /// Returns [`crate::Error::InvalidCustomFloat`] when a custom value is NaN or
     /// infinite. Unknown integer discriminators remain valid and lossless.
     pub fn validate(&self) -> Result<()> {
         if self
@@ -742,7 +744,7 @@ impl CustomParameters {
             .chain(self.travel_distance)
             .any(|value| !value.is_finite())
         {
-            return Err(Error::InvalidCustomFloat);
+            return Err(crate::Error::InvalidCustomFloat);
         }
         Ok(())
     }
@@ -806,7 +808,7 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::IdentifierTooLarge`] or [`Error::NulString`] when the
+    /// Returns [`crate::Error::IdentifierTooLarge`] or [`crate::Error::NulString`] when the
     /// candidate name cannot be represented by the semantic text field.
     pub fn set_animation_type(&mut self, value: Option<&str>) -> Result<()> {
         let replacement = bounded_text(value)?;
@@ -845,10 +847,10 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidDuration`] when `value` is non-finite or
+    /// Returns [`crate::Error::InvalidDuration`] when `value` is non-finite or
     /// negative.
     pub const fn set_duration(&mut self, value: Option<f64>) -> Result<()> {
-        if let Err(error) = validate_non_negative(value, Error::InvalidDuration) {
+        if let Err(error) = validate_non_negative(value, crate::Error::InvalidDuration) {
             return Err(error);
         }
         self.duration = value;
@@ -876,9 +878,9 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidDelay`] when `value` is non-finite or negative.
+    /// Returns [`crate::Error::InvalidDelay`] when `value` is non-finite or negative.
     pub const fn set_delay(&mut self, value: Option<f64>) -> Result<()> {
-        if let Err(error) = validate_non_negative(value, Error::InvalidDelay) {
+        if let Err(error) = validate_non_negative(value, crate::Error::InvalidDelay) {
             return Err(error);
         }
         self.delay = value;
@@ -924,7 +926,7 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidCustomFloat`] when `value` contains a non-finite
+    /// Returns [`crate::Error::InvalidCustomFloat`] when `value` contains a non-finite
     /// custom floating-point value.
     pub fn set_custom_parameters(&mut self, value: CustomParameters) -> Result<()> {
         value.validate()?;
@@ -950,13 +952,13 @@ impl Settings {
             .duration
             .is_some_and(|value| !value.is_finite() || value < 0.0)
         {
-            return Err(Error::InvalidDuration);
+            return Err(crate::Error::InvalidDuration);
         }
         if self
             .delay
             .is_some_and(|value| !value.is_finite() || value < 0.0)
         {
-            return Err(Error::InvalidDelay);
+            return Err(crate::Error::InvalidDelay);
         }
         if self
             .animation_type
@@ -968,9 +970,9 @@ impl Settings {
                 .as_deref()
                 .is_some_and(|value| value.len() > MAX_IDENTIFIER_BYTES)
             {
-                Err(Error::IdentifierTooLarge)
+                Err(crate::Error::IdentifierTooLarge)
             } else {
-                Err(Error::NulString)
+                Err(crate::Error::NulString)
             };
         }
         if let Some(effect) = &self.effect {
@@ -998,7 +1000,7 @@ impl SettingsBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::IdentifierTooLarge`] or [`Error::NulString`] for an
+    /// Returns [`crate::Error::IdentifierTooLarge`] or [`crate::Error::NulString`] for an
     /// invalid candidate name.
     pub fn animation_type(mut self, value: Option<&str>) -> Result<Self> {
         self.settings.set_animation_type(value)?;
@@ -1019,7 +1021,7 @@ impl SettingsBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidDuration`] for a non-finite or negative value.
+    /// Returns [`crate::Error::InvalidDuration`] for a non-finite or negative value.
     pub fn duration(mut self, value: Option<f64>) -> Result<Self> {
         self.settings.set_duration(value)?;
         Ok(self)
@@ -1036,7 +1038,7 @@ impl SettingsBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidDelay`] for a non-finite or negative value.
+    /// Returns [`crate::Error::InvalidDelay`] for a non-finite or negative value.
     pub fn delay(mut self, value: Option<f64>) -> Result<Self> {
         self.settings.set_delay(value)?;
         Ok(self)
@@ -1064,7 +1066,7 @@ impl SettingsBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidCustomFloat`] for a non-finite custom value.
+    /// Returns [`crate::Error::InvalidCustomFloat`] for a non-finite custom value.
     pub fn custom_parameters(mut self, value: CustomParameters) -> Result<Self> {
         self.settings.set_custom_parameters(value)?;
         Ok(self)
@@ -1087,7 +1089,7 @@ fn bounded_payload(candidate: Option<&[u8]>) -> Result<Option<Box<[u8]>>> {
         return Ok(None);
     };
     if bytes.len() > MAX_OPAQUE_PAYLOAD_BYTES {
-        return Err(Error::PayloadTooLarge);
+        return Err(crate::Error::PayloadTooLarge);
     }
     Ok(Some(bytes.to_vec().into_boxed_slice()))
 }
@@ -1097,10 +1099,10 @@ fn bounded_text(candidate: Option<&str>) -> Result<Option<Box<str>>> {
         return Ok(None);
     };
     if text.len() > MAX_IDENTIFIER_BYTES {
-        return Err(Error::IdentifierTooLarge);
+        return Err(crate::Error::IdentifierTooLarge);
     }
     if text.contains('\0') {
-        return Err(Error::NulString);
+        return Err(crate::Error::NulString);
     }
     Ok(Some(text.into()))
 }
@@ -1110,12 +1112,12 @@ const fn validate_custom_float(candidate: Option<f32>) -> Result<()> {
         return Ok(());
     };
     if !number.is_finite() {
-        return Err(Error::InvalidCustomFloat);
+        return Err(crate::Error::InvalidCustomFloat);
     }
     Ok(())
 }
 
-const fn validate_non_negative(candidate: Option<f64>, error: Error) -> Result<()> {
+const fn validate_non_negative(candidate: Option<f64>, error: crate::Error) -> Result<()> {
     let Some(number) = candidate else {
         return Ok(());
     };
@@ -1132,7 +1134,6 @@ mod tests {
     use super::{
         AnimationParameters, CustomParameters, Effect, Settings, TextDelivery, TimingCurveSlot,
     };
-    use crate::Error;
 
     #[test]
     fn effects_map_native_identifiers_losslessly() {
@@ -1152,7 +1153,10 @@ mod tests {
             "apple:dissolve",
             "apple:magic-move-implied-motion-path",
         ] {
-            assert_eq!(Effect::unknown(identifier), Err(Error::NonCanonicalEffect));
+            assert_eq!(
+                Effect::unknown(identifier),
+                Err(crate::Error::NonCanonicalEffect)
+            );
         }
         assert!(
             Effect::unknown("com.example.future")
@@ -1231,19 +1235,22 @@ mod tests {
         for value in [-0.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert_eq!(
                 settings.set_duration(Some(value)),
-                Err(Error::InvalidDuration)
+                Err(crate::Error::InvalidDuration)
             );
             assert_eq!(settings.duration(), Some(1.25));
         }
         settings.set_delay(Some(0.75)).unwrap();
         for value in [-0.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            assert_eq!(settings.set_delay(Some(value)), Err(Error::InvalidDelay));
+            assert_eq!(
+                settings.set_delay(Some(value)),
+                Err(crate::Error::InvalidDelay)
+            );
             assert_eq!(settings.delay(), Some(0.75));
         }
         settings.set_animation_type(Some("old-animation")).unwrap();
         assert_eq!(
             settings.set_animation_type(Some("bad\0name")),
-            Err(Error::NulString)
+            Err(crate::Error::NulString)
         );
         assert_eq!(settings.animation_type(), Some("old-animation"));
 
@@ -1252,7 +1259,7 @@ mod tests {
         for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
             assert_eq!(
                 custom_parameters.set_twist(Some(value)),
-                Err(Error::InvalidCustomFloat)
+                Err(crate::Error::InvalidCustomFloat)
             );
             assert_eq!(custom_parameters.twist(), Some(0.25));
         }
@@ -1260,7 +1267,7 @@ mod tests {
         for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
             assert_eq!(
                 custom_parameters.set_travel_distance(Some(value)),
-                Err(Error::InvalidCustomFloat)
+                Err(crate::Error::InvalidCustomFloat)
             );
             assert_eq!(custom_parameters.travel_distance(), Some(3.5));
         }
@@ -1270,14 +1277,14 @@ mod tests {
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert_eq!(
                 animation_parameters.set_detail(Some(value)),
-                Err(Error::InvalidDetail)
+                Err(crate::Error::InvalidDetail)
             );
             assert_eq!(animation_parameters.detail(), Some(0.5));
         }
         assert_eq!(
             animation_parameters
                 .set_timing_curve_theme_name(TimingCurveSlot::Third, Some("bad\0name"),),
-            Err(Error::NulString)
+            Err(crate::Error::NulString)
         );
         assert_eq!(
             animation_parameters.timing_curve_theme_name(TimingCurveSlot::Third),
@@ -1287,27 +1294,33 @@ mod tests {
 
     #[test]
     fn transition_owned_storage_is_bounded_before_publication() {
-        assert_eq!(Effect::unknown(""), Err(Error::EmptyIdentifier),);
+        assert_eq!(Effect::unknown(""), Err(crate::Error::EmptyIdentifier),);
 
         let mut settings = Settings::new();
         let long_identifier = "x".repeat(super::MAX_IDENTIFIER_BYTES + 1);
         assert_eq!(
             settings.set_animation_type(Some(&long_identifier)),
-            Err(Error::IdentifierTooLarge)
+            Err(crate::Error::IdentifierTooLarge)
         );
 
         let mut animation_parameters = AnimationParameters::new();
         let long_payload = vec![0; super::MAX_OPAQUE_PAYLOAD_BYTES + 1];
         assert_eq!(
             animation_parameters.set_color_payload(Some(&long_payload)),
-            Err(Error::PayloadTooLarge)
+            Err(crate::Error::PayloadTooLarge)
         );
     }
 
     #[test]
     fn effect_constructors_validate_canonical_and_nul_rules() {
-        assert_eq!(Effect::unknown("none"), Err(Error::NonCanonicalEffect));
-        assert_eq!(Effect::unknown("future\0effect"), Err(Error::NulString));
+        assert_eq!(
+            Effect::unknown("none"),
+            Err(crate::Error::NonCanonicalEffect)
+        );
+        assert_eq!(
+            Effect::unknown("future\0effect"),
+            Err(crate::Error::NulString)
+        );
         assert_eq!(
             Effect::unknown("com.example.future")
                 .as_ref()

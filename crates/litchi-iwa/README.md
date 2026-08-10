@@ -161,11 +161,10 @@ println!("objects: {}", stats.total_objects);
   move/reorder operations, validated raw CRUD for unmapped native build parameters,
   component UUIDs,
   and slide-node cache maintenance
-- `litchi-keynote::Package` selector-first modern slide-transition reads and
-  exact-source set/clear transactions with reversible patches. A private Buffa
-  lazy view projects known fields, while validated raw records remain the
-  preservation authority; legacy `litchi-iwa` Keynote transition compatibility
-  APIs remain available.
+- `litchi-keynote::transition` selector-first modern slide-transition reads
+  and exact-source set/clear transactions with reversible patches. A private
+  Buffa lazy view projects known fields, while validated raw records remain the
+  preservation authority.
 - Typed direct-drawable comment CRUD with Pages document-reachability,
   Numbers sheet-ownership, and Keynote slide-ownership guards
 - Native Numbers cell-comment and direct-reply CRUD with table-list refcounts,
@@ -766,6 +765,19 @@ The source-building and graph-editor APIs below remain in the migration host.
 For ordinary text in an existing presentation—its slide title, body, or
 speaker notes—use the `litchi-keynote::Package` workflow shown above instead
 of a `KeynoteEditor` raw-ID operation.
+
+Builder-only work stays in the host, then hands the completed artifact to the
+focused package API for a transition edit. The handoff has no native IDs:
+
+```rust,no_run
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_keynote::Package;
+
+let keynote = KeynoteDocumentBuilder::new().title("Draft").build()?;
+let package = Package::from_bytes(&keynote.to_bytes()?)?;
+# let _ = package;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
 The builder materializes Keynote's modern storage-less slide-number placeholder
 graph in both the theme layout and live slide. It can be initially visible or
@@ -1520,18 +1532,23 @@ the library's durable atomic-save contract. Never use a truncating
 write to replace an existing Keynote package.
 
 Keynote slide skip/include, ordering, and modern transition transactions have
-focused `litchi-keynote` package-owner paths. Use exact-name or typed-position
-`SlideSelector` values; transition edits read their current settings, replace
-them or clear them to Keynote's native `none` representation, and carry an
+focused `litchi-keynote` package-owner paths. Transition transactions use
+`litchi_keynote::transition::{Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` and exact-name or typed-position `SlideSelector` values; native
+IDs never enter the API. Only an existing modern transition envelope is
+editable. `clear` is idempotent and retains Keynote's native no-effect
+envelope rather than deleting or synthesizing one. Commits carry an
 exact-source-checked inverse patch. A private Buffa lazy view projects known
 native fields, while bounded raw-record rewriting preserves accepted source
-bytes. The legacy `litchi-iwa` Keynote compatibility editor, including its
-transition APIs, remains available while migration continues.
+bytes.
 
 ```rust,no_run
 use std::io;
 
-use litchi_keynote::{Effect, Package, SlideSelector};
+use litchi_keynote::{
+    Package, SlideSelector,
+    transition::Effect,
+};
 
 let package = Package::open("input.key")?;
 let selector = SlideSelector::name("Opening");
@@ -1540,22 +1557,37 @@ let mut settings = package
     .ok_or_else(|| io::Error::other("slide has no modern transition"))?;
 settings.set_effect(Some(Effect::Dissolve))?;
 
-let mut edit = package.edit_slide_transition(selector)?;
-edit.set_transition(settings)?;
-let commit = edit.commit()?;
+let commit = package.edit_slide_transition(selector)?.set(settings)?.commit()?;
 
-let mut clear = commit.package().edit_slide_transition(selector)?;
-clear.clear()?;
-let cleared = clear.commit()?;
+let cleared = commit
+    .package()
+    .edit_slide_transition(selector)?
+    .clear()?
+    .commit()?;
+assert_eq!(
+    cleared.package().slide_transition(selector)?.unwrap().effect(),
+    Some(&Effect::None),
+);
+let cleared_again = cleared
+    .package()
+    .edit_slide_transition(selector)?
+    .clear()?
+    .commit()?;
+assert!(!cleared_again.diagnostics().changed());
 let restored = cleared
     .package()
     .apply_slide_transition(&cleared.patch().inverse())?;
-assert_eq!(
-    restored.package().slide_transition(selector)?,
-    cleared.patch().before().cloned(),
-);
+assert_eq!(restored.package().slide_transition(selector)?, commit.patch().after().cloned());
+let mut output = Vec::new();
+cleared_again.package().write_to(&mut output)?;
+assert!(!output.is_empty());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+See `litchi-keynote/examples/edit_slide_transition.rs` for the focused
+distinct-output workflow, which streams the committed package through
+`Package::write_to` into a synchronized sibling temporary file before
+no-clobber publication.
 
 Text ranges use UTF-16 indexes, matching iWork's attribute tables. Shared
 `TSWP.StorageArchive` edits patch only text chunks and affected attribute
@@ -1796,18 +1828,12 @@ or rebuild that legacy layout. See
 sibling-temporary, no-clobber publication.
 
 Slide skip state and navigator name remain bounded compatibility-editor
-operations. Modern slide-transition transactions are also available from
-`litchi_keynote::Package`: selectors never expose native identities;
-exact-source commits and their inverse patches reopen and verify the complete
-candidate; and a clear emits Keynote's real `none` representation while
-retaining start timing and the native random seed.
-The private Buffa projection exposes typed None, Dissolve, Magic Move, and
-future effects plus twist, mosaic, bounce, Magic Move fading, timing curves,
-text delivery, motion blur, travel distance, animation color, seeds, detail,
-curve theme names, and right-to-left writing direction. Validated raw records
-preserve unknown nested extensions at the slide, transition, attributes, and
-animation-attributes levels. The older `litchi-iwa` transition API remains a
-compatibility surface; this Package transaction does not claim it was removed.
+operations. The focused transition API exposes typed None, Dissolve, Magic
+Move, and future effects plus twist, mosaic, bounce, Magic Move fading, timing
+curves, text delivery, motion blur, travel distance, animation color, seeds,
+detail, curve theme names, and right-to-left writing direction. Validated raw
+records preserve unknown nested extensions at the slide, transition,
+attributes, and animation-attributes levels.
 Soundtrack playback values are owned by the archive-free
 `litchi_keynote::soundtrack::{Mode, Settings}` module. `Mode` preserves future
 native discriminants and `Settings` validates finite `0.0..=1.0` volume values;
