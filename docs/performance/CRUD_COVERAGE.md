@@ -29,7 +29,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests plus exact untouched opaque ODS-row preservation during a neighboring cell edit; broader format-semantic extension corpora remain missing |
-| Replace one low-level Part, preserve the rest | Covered for owned same-topology OPC | Changes 0008/0021 test raw framing, fallback, shared changed-payload ownership and matched save behavior; source-backed editing remains missing |
+| Replace one low-level Part, preserve the rest | Covered for owned same-topology OPC | Changes 0008/0021/0022 test raw framing, fallback, shared changed-payload ownership, validated local-span movement and matched save behavior; source-backed editing remains missing |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
@@ -84,6 +84,10 @@ real-producer, security, or preservation coverage.
 Change 0021 removes the measured 4.19 MiB changed-Part handoff copy from owned
 same-topology OPC publication. It does not complete source-backed editing,
 unknown-extension semantic corpora, or the broader OOXML CRUD rows above.
+
+Change 0022 removes the separate 4.20 MiB post-validation generated-local-span
+copy. The complete generated archive is still validated before output, and the
+required compression buffer remains; this is not broader OOXML CRUD coverage.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
