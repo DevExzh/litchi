@@ -35,6 +35,7 @@ is still not broad program or CRUD coverage.
 | ODT consuming full-text blocks | Repeated large full-text p50 **-3.25%**, mean **-4.81%**; allocation calls **-15.48%**, temporary allocations **-45.52%** | Private full-text mode only; structured queries remain near neutral; unchanged open +3.94% p50/+4.17% mean and +10.95% p99 disclosed |
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
+| Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
 | Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
@@ -119,6 +120,12 @@ batches ordinary stream replacement; its primary raw reports are
 [`after A`](results/abba-doc-stream-batch-one-edit-after-a.json), with the
 complete record in
 [`change 0017`](changes/0017-doc-batched-stream-publication.md).
+
+The later XLS terminal-render handoff was measured and fully reverted. Its
+large changed-save p50 improved only 0.39%, while four repeated exact-no-op
+cycles regressed 22.00% p50 and 16.69% mean. The profile, equality prototype,
+allocation evidence and rejection gate are in
+[`change 0028`](changes/0028-xls-terminal-render-handoff-rejected.md).
 
 The native PPT root-snapshot evidence is retained as four short ABBA cycles
 under `results/abba-ppt-slide-order-root-repeat-*.json`. Reader/edit guards,
@@ -488,8 +495,10 @@ coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS
 editor-reuse, DOC batched-publication, PPT root-open reuse and direct PPT
 text-edit resolver reuse follow-ups.
 Remaining native work requires new attribution inside the retained final
-owner/public-reader validation layers. ODT full-text block ownership is
-accepted, and repeated ODS facade cell lookup now has a bounded lazy index, but
+owner/public-reader validation layers. The rejected XLS terminal-render
+handoff is not a reusable shortcut for those checks. ODT full-text block
+ownership is accepted, and repeated ODS facade cell lookup now has a bounded
+lazy index, but
 broader ODF source-backed reads, repeated ODT/ODP semantic scans, package-parse reuse,
 unchanged ZIP-member publication and structural-edit profiles remain open.
 XLSX changed-sheet validation can now seed a bounded first-read cache, but bulk
