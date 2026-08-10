@@ -290,6 +290,12 @@ ODT/ODS/ODP semantic cases. It remains an incomplete program and CRUD matrix.
   scans. Large full-text p50 falls **27.08%** and large one-edit/save p50 falls
   **25.79%**; open moves +3.41%, peak heap is flat and RSS +0.32% (flat). See
   [`0013`](changes/0013-rtf-semantic-baseline-and-text-paths.md).
+- Existing ODT documents now hand their private immutable package allocation to
+  transaction snapshots by shared handle instead of copying the archive.
+  Medium/large no-op edit-save p50 falls **27.05% / 18.51%**; exactly two
+  allocations and one package copy disappear per snapshot, while open and
+  changed edit-save guardrails remain within 3% and peak heap/RSS stay flat.
+  See [`0014`](changes/0014-odt-shared-snapshot-bytes.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

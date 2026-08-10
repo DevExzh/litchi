@@ -69,9 +69,9 @@ impl Snapshot {
 
     /// Captures the exact bytes backing an already validated document.
     pub fn from_document(document: &Document) -> Result<Self> {
-        let bytes = copy_bytes(document.original_bytes())?;
+        ensure_package_size(document.original_bytes().len(), "ODT transaction package")?;
         Ok(Self {
-            bytes: Arc::new(bytes),
+            bytes: document.transaction_package().shared_bytes(),
         })
     }
 
@@ -4720,5 +4720,24 @@ fn ensure_editable_envelope(snapshot: &Snapshot) -> Result<()> {
             "packaged ODT transactions preserve signed snapshots only as exact no-ops".to_string(),
         )),
         EnvelopeKind::Plain => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snapshot_from_document_shares_exact_package_allocation() -> Result<()> {
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("shared snapshot")?;
+        let document = Document::from_bytes(mutable.to_bytes()?)?;
+        let package_bytes = document.transaction_package().shared_bytes();
+
+        let snapshot = Snapshot::from_document(&document)?;
+
+        assert!(Arc::ptr_eq(&snapshot.bytes, &package_bytes));
+        assert_eq!(snapshot.as_bytes(), document.original_bytes());
+        Ok(())
     }
 }

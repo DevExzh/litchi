@@ -1,6 +1,6 @@
 # Performance CRUD coverage
 
-Date: 2026-08-10
+Date: 2026-08-11
 
 This is a coverage map, not a completion claim. It compares the 88 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
@@ -41,27 +41,32 @@ semantic conversion remain.
 
 ## Highest-return next cases
 
-1. Measure ODT transaction snapshot handoff from existing shared immutable
-   bytes instead of cloning the complete package.
-2. Add semantic DOC/XLS/PPT open/edit/save baselines before any further CFB
+1. Add semantic DOC/XLS/PPT open/edit/save baselines before any further CFB
    owned-stream experiment; retain the rejected DOC move as a guardrail.
-3. Extend native RTF coverage to formatting/media, compressed and legacy-code-
+2. Extend native RTF coverage to formatting/media, compressed and legacy-code-
    page input, malformed/security cases, real producers and broad edits.
-4. Separate logical authoring/append time from final serialization and reopen
+3. Separate logical authoring/append time from final serialization and reopen
    for DOCX, PPTX and XLSX.
-5. XLSX bulk update plus distinct clear/remove/hide behavior.
-6. Unknown OOXML extension and media preservation during a known semantic edit.
-7. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
+4. XLSX bulk update plus distinct clear/remove/hide behavior.
+5. Unknown OOXML extension and media preservation during a known semantic edit.
+6. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
    including stale-base and conflict cases.
-8. PPTX dependency-closure transfer and slide split/removal with charts, media,
+7. PPTX dependency-closure transfer and slide split/removal with charts, media,
    themes and collision names.
-9. Validate/security matrix for valid, malformed-within-limits, encrypted,
+8. Validate/security matrix for valid, malformed-within-limits, encrypted,
    macro-enabled, protected and external-link fixtures.
-10. Smart detection versus prepared-source reuse. OOXML smart results retain an
+9. Smart detection versus prepared-source reuse. OOXML smart results retain an
    adoptable parsed OPC package; ODF detection/handoff remains unmeasured.
-11. Broaden ODF beyond generated text/grid/deck cases: 1% and bulk edits,
+10. Broaden ODF beyond generated text/grid/deck cases: source-backed selectors,
+   changed publication, 1% and bulk edits,
    unknown extensions, real producers, media, security and source-backed I/O.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
+
+The former first item is complete for existing-document ODT transaction
+snapshots: change 0014 removes one archive copy and two allocations per
+snapshot while retaining the exact no-op, limits, envelope, patch, and readback
+contracts. Direct byte ingress and changed publication remain covered by item
+10 rather than being implied complete.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

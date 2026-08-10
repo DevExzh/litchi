@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0013`](changes/0013-rtf-semantic-baseline-and-text-paths.md)
+Evidence through: [`change 0014`](changes/0014-odt-shared-snapshot-bytes.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -143,6 +143,15 @@ crate-private facade constructor. Large no-op edit/save p50 falls 11.78%; the
 large changed case improves 2.06% because full spreadsheet rewrite/readback
 dominates. Exact source bytes, resource bounds and facade readback remain.
 
+ODT transaction snapshots created from an already validated `Document`
+previously allocated and copied the complete package solely to establish the
+snapshot owner. They now clone the package's private immutable `Arc` after the
+same transaction size check. Large no-op edit/save p50 falls 18.51%, and
+Heaptrack attributes exactly two fewer allocations and no package copy to each
+snapshot; changed edit/save and unrelated open guardrails remain within 3%.
+Direct snapshot byte ingress, full changed-package publication/readback, and
+signed/encrypted envelope behavior are unchanged.
+
 ## Legacy CFB data path
 
 ```text
@@ -237,7 +246,7 @@ pattern elsewhere.
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
 | 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers, and child lookup descends the validated tree by cached exact keys. | Add deep-directory, MiniFAT-heavy, concurrent-read, and real DOC/XLS/PPT scenarios beyond the measured synthetic wide-root and writer corpora. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
-| 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable; implemented without changing readback. | Broader ODF source-backed read and unchanged-member publication profiles. |
+| 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable. Measured for ODT existing-document snapshots: one package clone and two allocations per handoff were removable. Both are implemented without changing readback or source lineage. | Broader ODF source-backed read and unchanged-member publication profiles. |
 | 14 | Confirmed for DOCX direct-body batches: repeated full XML rebuild/parse work was removable while retaining ordinary durable operations and complete readback. | Real-producer/extension/security corpora and broader structural/bulk edit semantics. |
 | 15 | Measured and implemented for RTF full-text and text-only edit/save paths: temporary fragment/property vectors and per-character ASCII writes were removable. | Extend the accepted native matrix to formatting/media, compressed/code-page, malformed/security, real-producer and broad edit scenarios. |
 
@@ -260,7 +269,7 @@ The order below is provisional until baseline measurements are recorded.
 | 11 | Extend ODF beyond the accepted ODS snapshot reuse: source-backed selectors and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Public semantic baselines now exist; exact no-op and full readback must remain. |
 | 12 | Add native RTF public semantic cases and remove measured full-text/edit work. | RTF open/list/full-text/stream-save/no-op/one-edit. | Low-medium | Implemented; cached text and native forward-only output contracts remain. See change 0013. |
 | 13 | Add legacy DOC/XLS/PPT semantic open/edit/save baselines before further CFB ownership experiments. | OLE2 document CRUD rather than substrate-only insertion. | Medium | Positional CFB exists; the previous DOC move regression requires end-to-end guardrails. |
-| 14 | Measure ODT snapshot handoff from existing shared transaction bytes. | ODT no-op and changed edit/save. | Low-medium | Preserve source lineage, limits, complete readback and exact no-op bytes. |
+| 14 | Share existing ODT transaction bytes when a validated document creates a snapshot. | ODT no-op and changed edit/save. | Low-medium | Implemented with private `Arc` identity proof; no-op p50 -18.51% large, guardrails within 3%. See change 0014. |
 | 15 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
 
 ## Evidence still missing
