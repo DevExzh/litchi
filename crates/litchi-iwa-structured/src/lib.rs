@@ -10,7 +10,10 @@
 use std::fmt;
 use std::sync::Arc;
 
-use litchi_keynote::{AnimationType, Document as KeynoteDocument, Effect, Slide};
+use litchi_keynote::build::AnimationType;
+use litchi_keynote::document::Document as KeynoteDocument;
+use litchi_keynote::slide::Slide;
+use litchi_keynote::transition::Effect;
 use litchi_numbers::Table;
 use litchi_numbers::cell::Value;
 use litchi_pages::{Document as PagesDocument, Section};
@@ -1031,16 +1034,16 @@ mod tests {
                 panic!("unknown transition identifier should be valid: {error}")
             });
             let mut slide = Slide::builder(0);
-            slide.push_build(litchi_keynote::Build::new(
+            slide.push_build(litchi_keynote::build::Build::new(
                 animation,
                 litchi_keynote::Seconds::ZERO,
             ));
-            slide.set_transition(Some(litchi_keynote::Transition::new(
+            slide.set_transition(Some(litchi_keynote::slide::Transition::new(
                 effect,
                 litchi_keynote::Seconds::ZERO,
             )));
 
-            let mut show = litchi_keynote::Show::builder();
+            let mut show = litchi_keynote::show::Show::builder();
             show.set_title(Some(SHOW_TITLE.to_owned()));
             show.push_slide(slide.build());
             KeynoteDocument::from_show(show.build())
@@ -1068,11 +1071,11 @@ mod tests {
     #[test]
     fn static_keynote_effect_names_do_not_consume_owned_text_budget() {
         let mut slide = Slide::builder(0);
-        slide.push_build(litchi_keynote::Build::new(
+        slide.push_build(litchi_keynote::build::Build::new(
             AnimationType::Appear,
             litchi_keynote::Seconds::ZERO,
         ));
-        slide.set_transition(Some(litchi_keynote::Transition::new(
+        slide.set_transition(Some(litchi_keynote::slide::Transition::new(
             Effect::Dissolve,
             litchi_keynote::Seconds::ZERO,
         )));
@@ -1412,7 +1415,7 @@ mod tests {
     fn document_backed_snapshots_reuse_leaf_allocations() {
         let mut slide = Slide::builder(0);
         slide.set_title(Some("Shared slide".to_owned()));
-        let mut show = litchi_keynote::Show::builder();
+        let mut show = litchi_keynote::show::Show::builder();
         show.push_slide(slide.build());
         let keynote = KeynoteDocument::from_show(show.build());
         let slide_ptr = keynote.slides().as_ptr();

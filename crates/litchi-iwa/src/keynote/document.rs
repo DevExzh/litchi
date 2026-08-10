@@ -11,8 +11,12 @@ use crate::detect::detect_application_from_document;
 use crate::object_index::ObjectIndex;
 use crate::text::TextExtractor;
 use crate::{Error, Result};
-use litchi_keynote::{AnimationType, Build, Document, Effect, Seconds, Show, Slide, Transition};
-use litchi_keynote::{Mode, Settings, Size};
+use litchi_keynote::Seconds;
+use litchi_keynote::build::{AnimationType, Build};
+use litchi_keynote::document::Document;
+use litchi_keynote::show::{Mode, Settings, Show, Size};
+use litchi_keynote::slide::{Slide, Transition};
+use litchi_keynote::transition::Effect;
 
 /// High-level interface for Keynote documents
 #[derive(Debug, Clone)]

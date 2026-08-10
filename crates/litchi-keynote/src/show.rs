@@ -1,10 +1,19 @@
 //! Keynote show settings and immutable presentation snapshots.
+//!
+//! [`Size`], [`Mode`], and [`Settings`] are valid-by-construction semantic
+//! values. Their constructors and setters use [`crate::Error`] and
+//! [`crate::Result`] for invalid dimensions, delays, or noncanonical modes.
+//! In contrast, [`Edit`], [`Patch`], [`Commit`], and the corresponding
+//! [`crate::Package`] methods use this module's [`Error`] for package
+//! projection, transaction, and publication failures. The two error domains
+//! intentionally remain distinct.
 
 use std::collections::TryReserveError;
+use std::result::Result;
 
-use crate::{
-    Error, Result, Seconds, Slide, SlideSelector, SlideSelectorError, SlideSelectorResult,
-};
+use crate::{Seconds, Slide, SlideSelector, SlideSelectorError, SlideSelectorResult};
+
+pub use crate::package::show_settings::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 const NORMAL_MODE: i32 = 0;
 const SELF_PLAYING_MODE: i32 = 1;
@@ -22,13 +31,13 @@ impl Size {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidDimensions`] when either dimension is not
+    /// Returns [`crate::Error::InvalidDimensions`] when either dimension is not
     /// finite and strictly positive.
-    pub const fn new(width: f32, height: f32) -> Result<Self> {
+    pub const fn new(width: f32, height: f32) -> crate::Result<Self> {
         if width.is_finite() && width > 0.0 && height.is_finite() && height > 0.0 {
             Ok(Self { width, height })
         } else {
-            Err(Error::InvalidDimensions)
+            Err(crate::Error::InvalidDimensions)
         }
     }
 
@@ -85,11 +94,13 @@ impl Mode {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NonCanonicalMode`] when `raw` is already assigned to a
+    /// Returns [`crate::Error::NonCanonicalMode`] when `raw` is already assigned to a
     /// named mode.
-    pub const fn unknown(raw: i32) -> Result<Self> {
+    pub const fn unknown(raw: i32) -> crate::Result<Self> {
         match raw {
-            NORMAL_MODE | SELF_PLAYING_MODE | LINKS_ONLY_MODE => Err(Error::NonCanonicalMode),
+            NORMAL_MODE | SELF_PLAYING_MODE | LINKS_ONLY_MODE => {
+                Err(crate::Error::NonCanonicalMode)
+            },
             other => Ok(Self::Unknown(other)),
         }
     }
@@ -233,11 +244,11 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NonCanonicalMode`] when a known native value is passed
+    /// Returns [`crate::Error::NonCanonicalMode`] when a known native value is passed
     /// through [`Mode::Unknown`].
-    pub fn set_mode(&mut self, mode: Option<Mode>) -> Result<()> {
+    pub fn set_mode(&mut self, mode: Option<Mode>) -> crate::Result<()> {
         if mode.is_some_and(|value| !value.is_canonical()) {
-            return Err(Error::NonCanonicalMode);
+            return Err(crate::Error::NonCanonicalMode);
         }
         self.mode = mode;
         Ok(())
@@ -303,10 +314,10 @@ impl Settings {
     /// # Errors
     ///
     /// Returns a typed semantic error when the size or mode is invalid.
-    pub fn validate(self) -> Result<()> {
+    pub fn validate(self) -> crate::Result<()> {
         Size::new(self.size.width, self.size.height)?;
         if self.mode.is_some_and(|value| !value.is_canonical()) {
-            return Err(Error::NonCanonicalMode);
+            return Err(crate::Error::NonCanonicalMode);
         }
         Ok(())
     }
@@ -442,10 +453,7 @@ impl Builder {
         self.title = title.map(String::into_boxed_str);
     }
 
-    pub(crate) fn try_reserve_slides(
-        &mut self,
-        additional: usize,
-    ) -> std::result::Result<(), TryReserveError> {
+    pub(crate) fn try_reserve_slides(&mut self, additional: usize) -> Result<(), TryReserveError> {
         self.slides.try_reserve_exact(additional)
     }
 
@@ -476,7 +484,7 @@ mod tests {
     use crate::Slide;
 
     #[test]
-    fn size_and_modes_are_checked_and_lossless() -> Result<()> {
+    fn size_and_modes_are_checked_and_lossless() -> crate::Result<()> {
         for (width, height) in [
             (0.0, 1.0),
             (-1.0, 1.0),
@@ -488,7 +496,10 @@ mod tests {
             (1.0, f32::INFINITY),
             (1.0, f32::NEG_INFINITY),
         ] {
-            assert_eq!(Size::new(width, height), Err(Error::InvalidDimensions));
+            assert_eq!(
+                Size::new(width, height),
+                Err(crate::Error::InvalidDimensions)
+            );
         }
         for raw in [0, 1, 2, 19, -1] {
             assert_eq!(Mode::from_raw(raw).as_raw(), raw);
@@ -498,7 +509,7 @@ mod tests {
         assert_eq!(settings.mode(), Some(Mode::SelfPlaying));
         assert_eq!(
             settings.set_mode(Some(Mode::Unknown(1))),
-            Err(Error::NonCanonicalMode)
+            Err(crate::Error::NonCanonicalMode)
         );
         Ok(())
     }
@@ -522,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    fn builder_reservations_preserve_slide_order() -> std::result::Result<(), TryReserveError> {
+    fn builder_reservations_preserve_slide_order() -> Result<(), TryReserveError> {
         let mut builder = Show::builder();
         builder.try_reserve_slides(0)?;
         builder.try_reserve_slides(2)?;
@@ -577,9 +588,9 @@ mod tests {
     #[test]
     fn slides_prefer_names_and_retain_unambiguous_position_selectors() {
         let unnamed = Slide::builder(7).build();
-        let mut named = Slide::builder(8);
-        named.set_name(Some("Agenda".to_owned()));
-        let named = named.build();
+        let mut named_builder = Slide::builder(8);
+        named_builder.set_name(Some("Agenda".to_owned()));
+        let named = named_builder.build();
 
         assert_eq!(unnamed.selector(), SlideSelector::index(7));
         assert_eq!(named.selector(), SlideSelector::name("Agenda"));

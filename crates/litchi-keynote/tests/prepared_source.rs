@@ -6,6 +6,12 @@ use std::sync::Arc;
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_keynote::{Package, SemanticLimits};
 
+fn exact_bytes(package: &Package) -> Result<Vec<u8>, litchi_keynote::WriteError> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote/basic.key")
 }
@@ -21,8 +27,7 @@ fn prepared_source_handoff_preserves_bytes_and_semantics() -> Result<(), Box<dyn
     let package = Package::__from_prepared_source(prepared, SemanticLimits::default())?;
     let direct = Package::from_bytes(&source)?;
 
-    assert_eq!(package.source_bytes().as_ptr(), source.as_ptr());
-    assert_eq!(package.source_bytes().len(), source.len());
+    assert_eq!(exact_bytes(&package)?, source.as_ref());
     assert_eq!(package.show()?, direct.show()?);
     assert_eq!(
         package.semantic_snapshot()?.slides().as_ptr(),

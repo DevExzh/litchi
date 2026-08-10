@@ -14,6 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={PROTO_DIRECTORY}");
     println!("cargo:rerun-if-changed={BUFFA_PROJECTION_DIRECTORY}");
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_document_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
@@ -23,6 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
     println!("cargo:rerun-if-changed=src/table_info_codec.rs");
+    println!("cargo:rerun-if-changed=src/lib.rs");
 
     let mut proto_files = fs::read_dir(proto_directory)?
         .map(|directory_entry| directory_entry.map(|entry| entry.path()))
@@ -389,17 +391,53 @@ fn enforce_keynote_document_projection_provenance(
     const PROJECTION_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
     const PROJECTION_DOCUMENT: &str =
         "message KeynoteDocumentArchive {\n  required .LitchiIwaProjection.Reference show = 2;\n}";
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_keynote_document_generated {",
+        "\"/buffa-keynote-document/iwa_keynote_document_buffa_protos.rs\"",
+    ];
 
     let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
     let keynote = fs::read_to_string(proto_directory.join("KNArchives.proto"))?;
     let projection = fs::read_to_string(projection_directory.join("KNDocumentArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let expected_projection_schema = [
+        "syntax = \"proto2\";",
+        "package LitchiIwaProjection;",
+        PROJECTION_REFERENCE,
+        PROJECTION_DOCUMENT,
+    ]
+    .join("\n")
+    .lines()
+    .map(str::trim)
+    .collect::<Vec<_>>()
+    .join("\n");
+    let codec = fs::read_to_string("src/keynote_document_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    let lib = fs::read_to_string("src/lib.rs")?;
     if tsp.matches(TSP_REFERENCE).count() != 1
         || keynote.matches(KN_DOCUMENT).count() != 1
         || projection.matches(PROJECTION_REFERENCE).count() != 1
         || projection.matches(PROJECTION_DOCUMENT).count() != 1
+        || projection_schema != expected_projection_schema
+        || projection.len() > 1024
+        || projection.contains("repeated ")
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
     {
         return Err(
-            "derived Keynote document projection is out of sync with KN.DocumentArchive.show or TSP.Reference.identifier"
+            "derived Keynote document/root codec drifted from KN.DocumentArchive.show or TSP.Reference.identifier, exceeded its 1 KiB source budget, exposed generated code, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
     }
@@ -474,6 +512,10 @@ fn enforce_keynote_show_projection_provenance(
     const PROJECTION_SIZE: &str =
         "message Size {\n  required float width = 1;\n  required float height = 2;\n}";
     const PROJECTION_SHOW: &str = "message KeynoteShowArchive {\n  optional .LitchiIwaProjection.Reference ui_state = 1;\n  required .LitchiIwaProjection.Reference theme = 2;\n  required .LitchiIwaProjection.Size size = 4;\n  required .LitchiIwaProjection.Reference stylesheet = 5;\n  optional bool slide_numbers_visible = 6;\n  optional .LitchiIwaProjection.Reference recording = 7;\n  optional bool loop_presentation = 8;\n  optional int32 mode = 9 [default = 0];\n  optional double autoplay_transition_delay = 10 [default = 5];\n  optional double autoplay_build_delay = 11 [default = 2];\n  optional bool idle_timer_active = 15;\n  optional double idle_timer_delay = 16 [default = 900];\n  optional .LitchiIwaProjection.Reference soundtrack = 17;\n  optional bool automatically_plays_upon_open = 18;\n  optional .LitchiIwaProjection.Reference slide_list = 19;\n}";
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_keynote_show_generated {",
+        "\"/buffa-keynote-show/iwa_keynote_show_buffa_protos.rs\"",
+    ];
     const ROUTER_DECLARATIONS: [&str; 23] = [
         "const SHOW_UI_STATE_FIELD: u32 = 1;",
         "const SHOW_THEME_FIELD: u32 = 2;",
@@ -503,10 +545,29 @@ fn enforce_keynote_show_projection_provenance(
     let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
     let keynote = fs::read_to_string(proto_directory.join("KNArchives.proto"))?;
     let projection = fs::read_to_string(projection_directory.join("KNShowArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let expected_projection_schema = [
+        "syntax = \"proto2\";",
+        "package LitchiIwaProjection;",
+        PROJECTION_REFERENCE,
+        PROJECTION_SIZE,
+        PROJECTION_SHOW,
+    ]
+    .join("\n")
+    .lines()
+    .map(str::trim)
+    .collect::<Vec<_>>()
+    .join("\n");
     let router = fs::read_to_string("src/keynote_show_codec.rs")?;
     let production_router = router
         .split_once("#[cfg(test)]")
         .map_or(router.as_str(), |(production, _tests)| production);
+    let lib = fs::read_to_string("src/lib.rs")?;
     if tsp.matches(TSP_REFERENCE).count() != 1
         || tsp.matches(TSP_SIZE).count() != 1
         || keynote.matches(KN_SLIDE_TREE).count() != 1
@@ -514,9 +575,13 @@ fn enforce_keynote_show_projection_provenance(
         || projection.matches(PROJECTION_REFERENCE).count() != 1
         || projection.matches(PROJECTION_SIZE).count() != 1
         || projection.matches(PROJECTION_SHOW).count() != 1
+        || projection_schema != expected_projection_schema
         || !ROUTER_DECLARATIONS
             .iter()
             .all(|declaration| router.matches(declaration).count() == 1)
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
         || projection.len() > 2 * 1024
         || projection.contains("repeated ")
         || production_router.contains("to_owned_message")
@@ -1059,10 +1124,15 @@ fn enforce_group_node_category_projection_budget(directory: &Path) -> Result<(),
 
 fn enforce_keynote_document_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: usize = 5;
-    const MAX_GENERATED_BYTES: u64 = 64 * 1024;
+    // Buffa 0.9.1 emits 58,630 bytes for the singular show-reference path.
+    // Keep the allowance narrow so an unreviewed closure cannot enter the
+    // root projection.
+    const MAX_GENERATED_BYTES: u64 = 60 * 1024;
 
     let mut files = 0usize;
     let mut bytes = 0u64;
+    let mut generated_repeated_views = 0usize;
+    let mut generated_lazy_repeated_views = 0usize;
     for entry_result in fs::read_dir(directory)? {
         let entry = entry_result?;
         if !entry.file_type()?.is_file() {
@@ -1074,11 +1144,22 @@ fn enforce_keynote_document_projection_budget(directory: &Path) -> Result<(), Bo
         bytes = bytes
             .checked_add(entry.metadata()?.len())
             .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        generated_repeated_views = generated_repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        generated_lazy_repeated_views = generated_lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
     }
 
-    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES {
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || generated_repeated_views != 0
+        || generated_lazy_repeated_views != 0
+    {
         return Err(format!(
-            "Keynote document projection generated {files} files/{bytes} bytes; expected {EXPECTED_FILES} files and at most {MAX_GENERATED_BYTES} bytes"
+            "Keynote document projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }
@@ -1137,6 +1218,7 @@ fn enforce_keynote_show_projection_budget(directory: &Path) -> Result<(), Box<dy
     let mut files = 0usize;
     let mut bytes = 0u64;
     let mut generated_repeated_views = 0usize;
+    let mut generated_lazy_repeated_views = 0usize;
     for entry_result in fs::read_dir(directory)? {
         let entry = entry_result?;
         if !entry.file_type()?.is_file() {
@@ -1148,18 +1230,22 @@ fn enforce_keynote_show_projection_budget(directory: &Path) -> Result<(), Box<dy
         bytes = bytes
             .checked_add(entry.metadata()?.len())
             .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
         generated_repeated_views = generated_repeated_views
-            .checked_add(
-                fs::read_to_string(entry.path())?
-                    .matches("LazyRepeatedView")
-                    .count(),
-            )
+            .checked_add(generated.matches("RepeatedView").count())
             .ok_or("generated repeated-view count overflow")?;
+        generated_lazy_repeated_views = generated_lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
     }
 
-    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || generated_repeated_views != 0
+        || generated_lazy_repeated_views != 0
+    {
         return Err(format!(
-            "Keynote show projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+            "Keynote show projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

@@ -1833,6 +1833,12 @@ mod tests {
     use super::*;
     use litchi_keynote::{Package as FocusedKeynotePackage, SlideSelector};
 
+    fn focused_bytes(package: &FocusedKeynotePackage) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes).unwrap();
+        bytes
+    }
+
     #[test]
     fn generated_theme_exposes_distinct_canonical_list_presets() {
         let package = KeynoteDocumentBuilder::new().build_package().unwrap();
@@ -2033,7 +2039,7 @@ mod tests {
         let mut notes = body.package().edit_slide_notes(selector).unwrap();
         notes.set("Notes").unwrap();
         let notes = notes.commit().unwrap();
-        let reopened = KeynoteEditor::from_bytes(notes.package().source_bytes()).unwrap();
+        let reopened = KeynoteEditor::from_bytes(&focused_bytes(notes.package())).unwrap();
         let slide = &reopened.slides().unwrap()[0];
         assert_eq!(slide.title.as_deref(), Some("Updated"));
         assert_eq!(slide.body.as_deref(), Some("Body"));
@@ -2063,7 +2069,7 @@ mod tests {
         notes.set("Created notes").unwrap();
         let notes = notes.commit().unwrap();
 
-        let mut editor = KeynoteEditor::from_bytes(notes.package().source_bytes()).unwrap();
+        let mut editor = KeynoteEditor::from_bytes(&focused_bytes(notes.package())).unwrap();
         let slides = editor.slides().unwrap();
         let created = &slides[1];
         assert_eq!(created.title.as_deref(), Some("Second — 東京"));
@@ -2123,7 +2129,7 @@ mod tests {
         body.set("Numbered slide body").unwrap();
         let body = body.commit().unwrap();
 
-        let mut reopened = KeynoteEditor::from_bytes(body.package().source_bytes()).unwrap();
+        let mut reopened = KeynoteEditor::from_bytes(&focused_bytes(body.package())).unwrap();
         assert_eq!(
             reopened
                 .slides()

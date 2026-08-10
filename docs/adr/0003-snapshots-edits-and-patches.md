@@ -217,3 +217,44 @@ The inverse restores the accepted source artifact byte for byte, and applying
 against any other exact artifact yields `PatchConflict`. This reversible patch
 is intentionally in-memory and does not yet satisfy the durable deterministic
 JSON envelope required for cross-process patch exchange.
+
+## 2026-08-10 amendment: hardened Keynote show-settings transaction
+
+This amendment supersedes the 2026-08-08 show-settings names and host-retention
+claim. `litchi_keynote::Package::{show_settings, edit_show_settings,
+apply_show_settings}` reads, stages, and applies the singleton value against an
+immutable package. The canonical focused vocabulary is
+`litchi_keynote::show::{Settings, Edit, Commit, Patch, Diagnostics, Error,
+LimitKind}`; the flat `ShowSettings*` transaction names are not root aliases.
+The family remains separate from skip-state and slide-order, and its public
+method/type signatures expose no native identity, component/member name,
+generated message, raw field, source bytes, or retained artifact accessor.
+
+No-op and changed transaction rules remain exact-source rules. An equal edit
+shares the original source allocation, reports zero components and deletions,
+and skips cache inspection, reassembly, and reopen. A real edit rewrites the
+unique Show-owner component and publishes only after a retained-limit full
+reopen and semantic/ownership verification. Size or slide-number changes may
+delete zero to three root previews; playback-only changes preserve them, and
+both paths preserve slide components and slide-node caches. Exact source bytes,
+not the compact diagnostic fingerprint, authorize patch application, and a
+valid inverse restores the complete accepted source artifact.
+
+The explicit Preserve policy admits reads and exact no-ops for physical legacy
+nested-`Index.zip` sources but returns `show::Error::UnsupportedSource` for a
+change; semantic-only prepared sources and a changed null-root Show are also
+unsupported. The former normalizing fallback is deliberately deleted rather
+than silently changing physical provenance. The direct host mutation surface
+`KeynoteEditor::{show_settings, set_show_settings}`, its private
+`editor::show_settings` module and source, `examples/edit_keynote_show.rs`, and
+their direct mutation tests are removed rather than shimmed. This is not all
+Show ownership: read-only `KeynoteDocument::show` still decodes a Prost
+`KN.ShowArchive`, and other host creation and graph paths remain.
+
+`show::Patch` retains complete immutable source and target artifacts behind
+process-local shared allocations. Clone and inversion are `O(1)` shared-handle
+operations, while equality and exact-artifact authorization can read
+`O(package bytes)`. It is reversible in memory but neither compact nor durable.
+It does not yet satisfy ADR 0003's versioned format-independent semantic
+operation model, read/write sets, deterministic JSON/blob serialization,
+composition, three-way merge, or bounded history.

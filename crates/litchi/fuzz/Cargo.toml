@@ -28,6 +28,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_show_settings"
+path = "fuzz_targets/keynote_show_settings.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_lock"
 path = "fuzz_targets/numbers_table_lock.rs"
 test = false

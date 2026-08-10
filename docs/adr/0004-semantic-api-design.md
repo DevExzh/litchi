@@ -962,3 +962,38 @@ edit headers, footers, floating text, or text boxes; normalize legacy nested
 packages; change a no-root/fallback body whose physical ownership is not
 rooted; serialize durable patches; or publish files atomically. Those remain
 separate capabilities and migration gates.
+
+## 2026-08-10 amendment: hardened Keynote show-settings semantic surface
+
+This amendment supersedes the 2026-08-08 show-settings naming and compatibility
+claims. The supported entry points are
+`litchi_keynote::Package::{show_settings, edit_show_settings,
+apply_show_settings}`, and the canonical focused family is
+`litchi_keynote::show::{Settings, Edit, Commit, Patch, Diagnostics, Error,
+LimitKind}`. Flat `ShowSettings*` transaction names are not re-exported from the
+crate root. The public method/type signatures expose no native identity,
+component/member name, generated message, raw field, source bytes, or retained
+artifact accessor. The consuming `Edit::set` keeps immutable chaining explicit;
+`Package::write_to` is the bounded exact-output seam, not patch-byte exposure.
+
+The semantic value remains the singleton checked size and optional presentation
+settings already described. A null root show reads as `Settings::default()`
+but cannot be changed by this API because it does not allocate or register a
+Show owner. Under the explicit Preserve policy, a physical legacy nested
+`Index.zip` source remains readable and supports an exact no-op, but a changed
+edit returns `show::Error::UnsupportedSource`. The former host normalization is
+not compatibility behavior for this focused surface.
+
+Accordingly, `KeynoteEditor::{show_settings, set_show_settings}`, the private
+`editor::show_settings` module/source, the host `edit_keynote_show` example,
+and direct editor mutation tests are deleted rather than retained behind a
+shim. This retires the direct editor mutation API, not all Show reads: the
+host's read-only `KeynoteDocument::show` still returns a Prost-backed
+`KN.ShowArchive`, and other creation and graph consumers remain migration work.
+
+`show::Patch` is an exact-source, reversible, process-local value that privately
+retains complete source and target artifacts. It is not a compact or durable
+patch encoding. ADR 0003's versioned deterministic serialization, semantic
+operations and read/write sets, composition, three-way merge, and bounded
+history remain deferred rather than implied by `inverse` or exact patch
+application.

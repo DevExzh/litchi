@@ -29,7 +29,6 @@ const TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
 const TEST_SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
 const TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
 const TEST_SLIDE_NUMBER_PLACEHOLDER_ID: u64 = 70;
-const TEST_SHOW_MODE_FIELD: u32 = 9;
 const TEST_SHOW_SOUNDTRACK_FIELD: u32 = 17;
 const TEST_SOUNDTRACK_ID: u64 = 80;
 const TEST_SOUNDTRACK_MESSAGE_TYPE: u32 = 21;
@@ -3139,32 +3138,8 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
 }
 
 #[test]
-fn show_settings_and_transitions_are_transactional() {
+fn transition_update_is_transactional() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut settings = editor.show_settings().unwrap();
-    settings.set_size(Size::new(1_920.0, 1_080.0).unwrap());
-    settings.set_slide_numbers_visible(Some(true));
-    settings.set_loop_presentation(Some(true));
-    settings.set_mode(Some(Mode::SelfPlaying)).unwrap();
-    settings.set_autoplay_transition_delay(Some(Seconds::new(3.5).unwrap()));
-    settings.set_autoplay_build_delay(Some(Seconds::new(1.25).unwrap()));
-    settings.set_idle_timer_active(Some(true));
-    settings.set_idle_timer_delay(Some(Seconds::new(60.0).unwrap()));
-    settings.set_automatically_plays_upon_open(Some(false));
-    let before = editor.to_bytes().unwrap();
-    assert!(Size::new(f32::NAN, 1_080.0).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-    assert!(settings.set_mode(Some(Mode::Unknown(1))).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-    editor.set_show_settings(settings).unwrap();
-    assert_eq!(editor.show_settings().unwrap(), settings);
-    for mode in [Mode::Normal, Mode::LinksOnly, Mode::Unknown(19)] {
-        settings.set_mode(Some(mode)).unwrap();
-        editor.set_show_settings(settings).unwrap();
-        let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        assert_eq!(reparsed.show_settings().unwrap(), settings);
-    }
-
     let mut transition = editor.slides().unwrap()[0].transition.clone().unwrap();
     transition.set_duration(Some(2.5)).unwrap();
     transition.set_delay(Some(1.0)).unwrap();
@@ -3185,7 +3160,6 @@ fn show_settings_and_transitions_are_transactional() {
     );
 
     let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(reparsed.show_settings().unwrap(), settings);
     assert_eq!(
         reparsed.slides().unwrap()[0].transition.as_ref(),
         Some(&transition)
@@ -4315,7 +4289,7 @@ fn transition_animation_parameters_reject_malformed_wire() {
 }
 
 #[test]
-fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
+fn transition_and_slide_name_updates_preserve_unknown_wire_and_restore_exact_components() {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -4379,21 +4353,7 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
         .unwrap()
         .to_bytes()
         .unwrap();
-    let original_show = editor.show_settings().unwrap();
     let original_transition = editor.slides().unwrap()[0].transition.clone().unwrap();
-
-    let mut changed_show = original_show;
-    changed_show.set_size(Size::new(1_920.0, 1_080.0).unwrap());
-    changed_show.set_slide_numbers_visible(Some(true));
-    changed_show.set_loop_presentation(Some(true));
-    changed_show.set_mode(Some(Mode::SelfPlaying)).unwrap();
-    changed_show.set_autoplay_transition_delay(Some(Seconds::new(3.5).unwrap()));
-    changed_show.set_autoplay_build_delay(Some(Seconds::new(1.25).unwrap()));
-    changed_show.set_idle_timer_active(Some(true));
-    changed_show.set_idle_timer_delay(Some(Seconds::new(60.0).unwrap()));
-    changed_show.set_automatically_plays_upon_open(Some(true));
-    editor.set_show_settings(changed_show).unwrap();
-    editor.set_show_settings(original_show).unwrap();
 
     let mut changed_transition = original_transition.clone();
     changed_transition
@@ -4429,46 +4389,6 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
             .unwrap(),
         slide_before
     );
-}
-
-#[test]
-fn show_update_rejects_duplicate_scalar_fields_transactionally() {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(2).unwrap();
-            let mut message = object.messages[0].clone();
-            append_unknown_varint(&mut message.data, 8, 0);
-            append_unknown_varint(&mut message.data, 8, 1);
-            Ok(object.replace_message(0, message).map(|_| ())?)
-        })
-        .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
-    let before = editor.to_bytes().unwrap();
-    let mut settings = editor.show_settings().unwrap();
-    settings.set_loop_presentation(Some(false));
-    assert!(editor.set_show_settings(settings).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-}
-
-#[test]
-fn show_update_rejects_duplicate_mode_fields_transactionally() {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(2).unwrap();
-            let mut message = object.messages[0].clone();
-            append_unknown_varint(&mut message.data, TEST_SHOW_MODE_FIELD, 0);
-            append_unknown_varint(&mut message.data, TEST_SHOW_MODE_FIELD, 1);
-            Ok(object.replace_message(0, message).map(|_| ())?)
-        })
-        .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
-    let before = editor.to_bytes().unwrap();
-    let mut settings = editor.show_settings().unwrap();
-    settings.set_mode(Some(Mode::LinksOnly)).unwrap();
-    assert!(editor.set_show_settings(settings).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]
@@ -5496,7 +5416,9 @@ fn duplicates_slide_graph_with_independent_objects() {
     let mut notes = title.package().edit_slide_notes(selector).unwrap();
     notes.set("Independent notes").unwrap();
     let notes = notes.commit().unwrap();
-    let mut editor = KeynoteEditor::from_bytes(notes.package().source_bytes()).unwrap();
+    let mut bytes = Vec::new();
+    notes.package().write_to(&mut bytes).unwrap();
+    let mut editor = KeynoteEditor::from_bytes(&bytes).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(slides.len(), 3);
     assert_eq!(slides[0].title.as_deref(), Some("Old title"));

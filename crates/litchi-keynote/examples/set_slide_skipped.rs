@@ -7,7 +7,6 @@
 
 use std::error::Error;
 use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::PathBuf;
 
 use litchi_keynote::{Package, SlideSelector};
@@ -48,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .write(true)
         .create_new(true)
         .open(output)?;
-    destination.write_all(commit.package().source_bytes())?;
+    commit.package().write_to(&mut destination)?;
     destination.sync_all()?;
     println!(
         "slide {}: skipped {} -> {}; changed={}, touched_components={}",

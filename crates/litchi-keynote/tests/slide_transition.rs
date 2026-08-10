@@ -36,6 +36,19 @@ const SLIDE_MESSAGE_TYPE: u32 = 5;
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+trait ExactPackageBytes {
+    fn exact_bytes(&self) -> &'static [u8];
+}
+
+impl ExactPackageBytes for Package {
+    fn exact_bytes(&self) -> &'static [u8] {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts every package byte");
+        Box::leak(bytes.into_boxed_slice())
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Malformation {
     Canonical,
@@ -744,13 +757,13 @@ fn presence_future_values_stale_cache_and_noop_are_exact() -> TestResult<()> {
     let package = Package::from_bytes(&bytes)?;
     assert_transition_projection_accepts(&bytes)?;
     assert_eq!(package.slide_transition("Alpha")?, Some(settings.clone()));
-    let pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let mut noop = package.edit_slide_transition("Alpha")?;
     noop.set_transition(settings.clone())?;
     let commit = noop.commit()?;
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.package().source_bytes().as_ptr(), pointer);
-    assert_eq!(commit.package().source_bytes(), bytes);
+    assert_eq!(commit.package().exact_bytes(), source_snapshot);
+    assert_eq!(commit.package().exact_bytes(), bytes);
 
     let mut clear_edit = package.edit_slide_transition("Alpha")?;
     clear_edit.clear()?;
@@ -796,7 +809,7 @@ fn selector_patch_inverse_unknowns_and_cache_reconciliation_are_transactional() 
     );
     assert_eq!(
         normalize_message_length(&object_header(
-            commit.package().source_bytes(),
+            commit.package().exact_bytes(),
             "Index/Slide-4.iwa",
             FIRST_SLIDE
         )?)?,
@@ -809,14 +822,14 @@ fn selector_patch_inverse_unknowns_and_cache_reconciliation_are_transactional() 
     );
     assert_ne!(
         component_payload(
-            commit.package().source_bytes(),
+            commit.package().exact_bytes(),
             "Index/Slide-4.iwa",
             FIRST_SLIDE
         )?,
         first_before
     );
     let first_after = component_payload(
-        commit.package().source_bytes(),
+        commit.package().exact_bytes(),
         "Index/Slide-4.iwa",
         FIRST_SLIDE,
     )?;
@@ -833,17 +846,17 @@ fn selector_patch_inverse_unknowns_and_cache_reconciliation_are_transactional() 
     }
     assert_eq!(
         component_payload(
-            commit.package().source_bytes(),
+            commit.package().exact_bytes(),
             "Index/Slide-6.iwa",
             SECOND_SLIDE
         )?,
         second_before
     );
-    assert_untouched_members(&bytes, commit.package().source_bytes())?;
+    assert_untouched_members(&bytes, commit.package().exact_bytes())?;
     let applied = package.apply_slide_transition(commit.patch())?;
     assert_eq!(
-        applied.package().source_bytes(),
-        commit.package().source_bytes()
+        applied.package().exact_bytes(),
+        commit.package().exact_bytes()
     );
     let inverse = commit.patch().inverse();
     assert_eq!(inverse.inverse(), commit.patch().clone());
@@ -852,7 +865,7 @@ fn selector_patch_inverse_unknowns_and_cache_reconciliation_are_transactional() 
             .package()
             .apply_slide_transition(&inverse)?
             .package()
-            .source_bytes(),
+            .exact_bytes(),
         bytes
     );
     let unrelated = Package::from_bytes(&package_bytes(
@@ -944,7 +957,7 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
             package.slide_transition("Alpha"),
             Err(SlideTransitionError::InvalidSource)
         ));
-        assert_eq!(package.source_bytes(), bytes);
+        assert_eq!(package.exact_bytes(), bytes);
     }
 
     let stale = Package::from_bytes(&package_bytes(
@@ -970,7 +983,7 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
             node_package.edit_slide_transition("Alpha"),
             Err(SlideTransitionError::InvalidSource)
         ));
-        assert_eq!(node_package.source_bytes(), node_bytes);
+        assert_eq!(node_package.exact_bytes(), node_bytes);
     }
 
     let legacy = Package::from_bytes(&legacy_package_bytes(&flat)?)?;
@@ -987,7 +1000,7 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     let unrestricted = Package::from_bytes(&flat)?;
     let mut edit = unrestricted.edit_slide_transition("Alpha")?;
     edit.set_transition(full_settings()?)?;
-    let target_len = edit.commit()?.package().source_bytes().len();
+    let target_len = edit.commit()?.package().exact_bytes().len();
     let limits = Limits::new(
         u64::try_from(target_len - 1)?,
         8,

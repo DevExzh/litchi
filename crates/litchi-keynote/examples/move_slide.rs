@@ -2,7 +2,6 @@
 
 use std::env;
 use std::fs::OpenOptions;
-use std::io::Write as _;
 
 use litchi_keynote::{Package, Position, SlideSelector};
 
@@ -33,18 +32,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     }
     let commit = edit.commit()?;
-    write_new(&output, commit.package().source_bytes())?;
+    write_new(&output, commit.package())?;
     if let Some(inverse_path) = inverse_output {
         let inverse = commit.patch().inverse();
         let restored = commit.package().apply_slide_order(&inverse)?;
-        write_new(&inverse_path, restored.package().source_bytes())?;
+        write_new(&inverse_path, restored.package())?;
     }
     Ok(())
 }
 
-fn write_new(path: &str, bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn write_new(path: &str, package: &Package) -> Result<(), Box<dyn std::error::Error>> {
     let mut destination_file = OpenOptions::new().write(true).create_new(true).open(path)?;
-    destination_file.write_all(bytes)?;
+    package.write_to(&mut destination_file)?;
     destination_file.sync_all()?;
     Ok(())
 }

@@ -38,6 +38,19 @@ const SIBLING: &str = "2026-08-09 sibling text";
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+trait ExactPackageBytes {
+    fn exact_bytes(&self) -> &'static [u8];
+}
+
+impl ExactPackageBytes for Package {
+    fn exact_bytes(&self) -> &'static [u8] {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts every package byte");
+        Box::leak(bytes.into_boxed_slice())
+    }
+}
+
 fn reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
         identifier,
@@ -853,17 +866,17 @@ fn native_fixture_changed_title_commits_and_inverse_restores_exact_bytes() -> Te
         Some(replacement.to_owned())
     );
     assert_eq!(commit.package().slide_body(SlideSelector::index(0))?, body);
-    assert_ne!(commit.package().source_bytes(), bytes);
-    assert_root_previews_absent(commit.package().source_bytes())?;
-    assert_first_slide_node_cache_invalidated(commit.package().source_bytes())?;
+    assert_ne!(commit.package().exact_bytes(), bytes);
+    assert_root_previews_absent(commit.package().exact_bytes())?;
+    assert_first_slide_node_cache_invalidated(commit.package().exact_bytes())?;
     assert!(commit.package().text()?.contains("2026-08-07"));
 
     let restored = commit
         .package()
         .apply_slide_text(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
-    assert_root_previews_restored(&bytes, restored.package().source_bytes())?;
-    assert_first_slide_node_restored(&bytes, restored.package().source_bytes())?;
+    assert_eq!(restored.package().exact_bytes(), bytes);
+    assert_root_previews_restored(&bytes, restored.package().exact_bytes())?;
+    assert_first_slide_node_restored(&bytes, restored.package().exact_bytes())?;
     assert_eq!(
         restored.package().slide_title(SlideSelector::index(0))?,
         Some(before)
@@ -892,7 +905,7 @@ fn deprecated_storage_must_duplicate_the_mandatory_owned_storage() -> TestResult
             .package()
             .apply_slide_text(&commit.patch().inverse())?
             .package()
-            .source_bytes(),
+            .exact_bytes(),
         matching
     );
 
@@ -902,7 +915,7 @@ fn deprecated_storage_must_duplicate_the_mandatory_owned_storage() -> TestResult
         mismatch_package.edit_slide_title("Agenda"),
         Err(SlideTextError::DependentContent | SlideTextError::InvalidSource)
     ));
-    assert_eq!(mismatch_package.source_bytes(), mismatch);
+    assert_eq!(mismatch_package.exact_bytes(), mismatch);
 
     let deprecated_only = with_title_storage_topology(&bytes, None, Some(TITLE_STORAGE))?;
     let deprecated_only_package = Package::from_bytes(&deprecated_only)?;
@@ -910,7 +923,7 @@ fn deprecated_storage_must_duplicate_the_mandatory_owned_storage() -> TestResult
         deprecated_only_package.edit_slide_title("Agenda"),
         Err(SlideTextError::InvalidSource)
     ));
-    assert_eq!(deprecated_only_package.source_bytes(), deprecated_only);
+    assert_eq!(deprecated_only_package.exact_bytes(), deprecated_only);
     Ok(())
 }
 
@@ -953,22 +966,22 @@ fn unrelated_zero_placeholder_is_invisible_and_preserved_by_title_and_body_commi
         assert!(!commit.package().text()?.contains(marker));
         assert_eq!(
             message_payload(
-                commit.package().source_bytes(),
+                commit.package().exact_bytes(),
                 UNRELATED_PLACEHOLDER,
                 PLACEHOLDER_MESSAGE_TYPE,
             )?,
             source_payload
         );
         assert_eq!(
-            message_payload(commit.package().source_bytes(), UNRELATED_PLACEHOLDER, 777)?,
+            message_payload(commit.package().exact_bytes(), UNRELATED_PLACEHOLDER, 777)?,
             source_before
         );
         assert_eq!(
-            message_payload(commit.package().source_bytes(), UNRELATED_PLACEHOLDER, 778)?,
+            message_payload(commit.package().exact_bytes(), UNRELATED_PLACEHOLDER, 778)?,
             source_after
         );
         assert_eq!(
-            object_header(commit.package().source_bytes(), UNRELATED_PLACEHOLDER)?,
+            object_header(commit.package().exact_bytes(), UNRELATED_PLACEHOLDER)?,
             source_header
         );
     }
@@ -990,7 +1003,7 @@ fn unrelated_placeholder_cannot_alias_selected_storage_by_modern_or_legacy_edge(
             edit.commit(),
             Err(SlideTextError::DependentContent)
         ));
-        assert_eq!(package.source_bytes(), adversarial);
+        assert_eq!(package.exact_bytes(), adversarial);
     }
     Ok(())
 }
@@ -999,7 +1012,7 @@ fn unrelated_placeholder_cannot_alias_selected_storage_by_modern_or_legacy_edge(
 fn selector_first_utf16_operations_cover_both_roles() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let untouched_body = package.slide_body("Agenda")?;
     let untouched_sibling = message_payload(&bytes, SIBLING_STORAGE, STORAGE_MESSAGE_TYPE)?;
 
@@ -1026,14 +1039,14 @@ fn selector_first_utf16_operations_cover_both_roles() -> TestResult<()> {
     assert_eq!(commit.package().slide_body("Agenda")?, untouched_body);
     assert_eq!(
         message_payload(
-            commit.package().source_bytes(),
+            commit.package().exact_bytes(),
             SIBLING_STORAGE,
             STORAGE_MESSAGE_TYPE
         )?,
         untouched_sibling
     );
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.exact_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
 
     let mut insert = package.edit_slide_body("Agenda")?;
     insert.insert(TextPosition::ZERO, "Intro: ")?;
@@ -1074,7 +1087,7 @@ fn selector_first_utf16_operations_cover_both_roles() -> TestResult<()> {
 fn utf16_boundaries_selector_and_staging_errors_leave_source_unchanged() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
 
     assert!(matches!(
         package.edit_slide_title("Missing"),
@@ -1114,8 +1127,8 @@ fn utf16_boundaries_selector_and_staging_errors_leave_source_unchanged() -> Test
         one_operation.insert(TextPosition::ZERO, "second"),
         Err(SlideTextError::OperationAlreadyStaged)
     ));
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.exact_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
     Ok(())
 }
 
@@ -1123,7 +1136,7 @@ fn utf16_boundaries_selector_and_staging_errors_leave_source_unchanged() -> Test
 fn semantic_noops_share_the_exact_source_allocation_for_each_role() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
 
     for (role, text) in [(SlideTextRole::Title, TITLE), (SlideTextRole::Body, BODY)] {
         let mut edit = package.edit_slide_text("Agenda", role)?;
@@ -1134,16 +1147,16 @@ fn semantic_noops_share_the_exact_source_allocation_for_each_role() -> TestResul
         assert!(!commit.diagnostics().changed());
         assert_eq!(commit.diagnostics().touched_components(), 0);
         assert!(!commit.diagnostics().full_reparse_performed());
-        assert_eq!(commit.package().source_bytes(), bytes);
-        assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+        assert_eq!(commit.package().exact_bytes(), bytes);
+        assert_eq!(commit.package().exact_bytes(), source_snapshot);
         let applied = package.apply_slide_text(commit.patch())?;
         assert!(applied.patch().is_noop());
-        assert_eq!(applied.package().source_bytes().as_ptr(), source_pointer);
+        assert_eq!(applied.package().exact_bytes(), source_snapshot);
     }
 
     let unstaged = package.edit_slide_title("Agenda")?.commit()?;
     assert!(unstaged.patch().is_noop());
-    assert_eq!(unstaged.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(unstaged.package().exact_bytes(), source_snapshot);
     Ok(())
 }
 
@@ -1169,15 +1182,15 @@ fn empty_unicode_and_large_values_round_trip_and_reverse_exactly() -> TestResult
             package
                 .apply_slide_text(commit.patch())?
                 .package()
-                .source_bytes(),
-            commit.package().source_bytes()
+                .exact_bytes(),
+            commit.package().exact_bytes()
         );
         assert_eq!(
             commit
                 .package()
                 .apply_slide_text(&commit.patch().inverse())?
                 .package()
-                .source_bytes(),
+                .exact_bytes(),
             bytes
         );
     }
@@ -1214,7 +1227,7 @@ fn stale_and_replayed_patches_fail_with_patch_conflict() -> TestResult<()> {
             .package()
             .apply_slide_text(&first.patch().inverse())?
             .package()
-            .source_bytes(),
+            .exact_bytes(),
         bytes
     );
     Ok(())
@@ -1224,7 +1237,7 @@ fn stale_and_replayed_patches_fail_with_patch_conflict() -> TestResult<()> {
 fn changed_text_preserves_unknowns_scope_siblings_and_exact_inverse() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let source_owner = message_payload(&bytes, TITLE_OWNER, PLACEHOLDER_MESSAGE_TYPE)?;
     let source_storage = message_payload(&bytes, TITLE_STORAGE, STORAGE_MESSAGE_TYPE)?;
     let source_before_storage = message_payload(&bytes, TITLE_STORAGE, 779)?;
@@ -1240,7 +1253,7 @@ fn changed_text_preserves_unknowns_scope_siblings_and_exact_inverse() -> TestRes
     assert!(!edit_debug.contains("Agenda"));
     assert!(!edit_debug.contains("Index/"));
     let commit = edit.commit()?;
-    let target = commit.package().source_bytes();
+    let target = commit.package().exact_bytes();
     assert_document_changed_previews_removed_and_other_entries_preserved(&bytes, target)?;
     assert_first_slide_node_cache_invalidated(target)?;
     assert_eq!(
@@ -1273,11 +1286,11 @@ fn changed_text_preserves_unknowns_scope_siblings_and_exact_inverse() -> TestRes
         raw_fields(&target_header, 99)?,
         raw_fields(&source_header, 99)?
     );
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.exact_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
 
     let applied = package.apply_slide_text(commit.patch())?;
-    assert_eq!(applied.package().source_bytes(), target);
+    assert_eq!(applied.package().exact_bytes(), target);
     let inverse = commit.patch().inverse();
     assert_eq!(inverse.role(), SlideTextRole::Title);
     assert_eq!(inverse.before(), commit.patch().after());
@@ -1292,9 +1305,9 @@ fn changed_text_preserves_unknowns_scope_siblings_and_exact_inverse() -> TestRes
     );
     assert_eq!(inverse.inverse(), commit.patch().clone());
     let restored = commit.package().apply_slide_text(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), bytes);
-    assert_root_previews_restored(&bytes, restored.package().source_bytes())?;
-    assert_first_slide_node_restored(&bytes, restored.package().source_bytes())?;
+    assert_eq!(restored.package().exact_bytes(), bytes);
+    assert_root_previews_restored(&bytes, restored.package().exact_bytes())?;
+    assert_first_slide_node_restored(&bytes, restored.package().exact_bytes())?;
     assert_eq!(
         restored.package().slide_title("Agenda")?,
         Some(TITLE.to_owned())
@@ -1346,7 +1359,7 @@ fn canonical_unknowns_nested_in_owned_storage_references_are_preserved() -> Test
 
     assert_eq!(
         message_payload(
-            commit.package().source_bytes(),
+            commit.package().exact_bytes(),
             TITLE_OWNER,
             PLACEHOLDER_MESSAGE_TYPE
         )?,
@@ -1357,7 +1370,7 @@ fn canonical_unknowns_nested_in_owned_storage_references_are_preserved() -> Test
             .package()
             .apply_slide_text(&commit.patch().inverse())?
             .package()
-            .source_bytes(),
+            .exact_bytes(),
         bytes
     );
     Ok(())
@@ -1404,7 +1417,7 @@ fn duplicate_slide_names_are_typed_as_ambiguous_without_affecting_positions() ->
         package.slide_title(SlideSelector::index(1))?,
         Some(String::new())
     );
-    assert_eq!(package.source_bytes(), duplicate_name);
+    assert_eq!(package.exact_bytes(), duplicate_name);
     Ok(())
 }
 
@@ -1440,7 +1453,7 @@ fn explicit_placeholder_kinds_are_role_checked_for_both_roles() -> TestResult<()
                     .package()
                     .apply_slide_text(&commit.patch().inverse())?
                     .package()
-                    .source_bytes(),
+                    .exact_bytes(),
                 compatible
             );
         }
@@ -1451,7 +1464,7 @@ fn explicit_placeholder_kinds_are_role_checked_for_both_roles() -> TestResult<()
                 package.edit_slide_text("Agenda", role),
                 Err(SlideTextError::DependentContent)
             ));
-            assert_eq!(package.source_bytes(), contradictory);
+            assert_eq!(package.exact_bytes(), contradictory);
         }
     }
     Ok(())
@@ -1489,7 +1502,7 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
         package.edit_slide_body("Agenda"),
         Err(SlideTextError::InvalidSource)
     ));
-    assert_eq!(package.source_bytes(), duplicate_body_payload);
+    assert_eq!(package.exact_bytes(), duplicate_body_payload);
 
     let duplicate_field_path = rewrite_document(&bytes, |archive| {
         let object = archive
@@ -1509,7 +1522,7 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
         edit.commit(),
         Err(SlideTextError::DependentContent)
     ));
-    assert_eq!(package.source_bytes(), duplicate_field_path);
+    assert_eq!(package.exact_bytes(), duplicate_field_path);
     Ok(())
 }
 
@@ -1545,7 +1558,7 @@ fn selected_storage_merge_and_diff_metadata_refuse_changed_commits() -> TestResu
             edit.commit(),
             Err(SlideTextError::DependentContent)
         ));
-        assert_eq!(package.source_bytes(), adversarial);
+        assert_eq!(package.exact_bytes(), adversarial);
     }
     Ok(())
 }
@@ -1686,7 +1699,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
             matches!(result, Err(SlideTextError::InvalidSource)),
             "unexpected malformed slide-text result: {result:?}"
         );
-        assert_eq!(package.source_bytes(), malformed_bytes);
+        assert_eq!(package.exact_bytes(), malformed_bytes);
     }
 
     let alias = rewrite_document(&bytes, |archive| {
@@ -1710,7 +1723,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
         edit.commit(),
         Err(SlideTextError::DependentContent)
     ));
-    assert_eq!(package.source_bytes(), alias);
+    assert_eq!(package.exact_bytes(), alias);
     Ok(())
 }
 
@@ -1743,15 +1756,15 @@ fn exact_noop_commit_and_apply_do_not_require_mutation_ownership() -> TestResult
 
     for adversarial in [malformed_metadata, aliased_storage] {
         let package = Package::from_bytes(&adversarial)?;
-        let source_pointer = package.source_bytes().as_ptr();
+        let source_snapshot = package.exact_bytes();
         let mut edit = package.edit_slide_title("Agenda")?;
         edit.set(TITLE)?;
         let commit = edit.commit()?;
         assert!(commit.patch().is_noop());
-        assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+        assert_eq!(commit.package().exact_bytes(), source_snapshot);
         let replay = package.apply_slide_text(commit.patch())?;
         assert!(replay.patch().is_noop());
-        assert_eq!(replay.package().source_bytes().as_ptr(), source_pointer);
+        assert_eq!(replay.package().exact_bytes(), source_snapshot);
     }
     Ok(())
 }
@@ -1764,7 +1777,7 @@ fn unrelated_noncanonical_object_prefix_is_refused_before_rewrite() -> TestResul
     let mut edit = package.edit_slide_title("Agenda")?;
     edit.set("must not canonicalize an unrelated object frame")?;
     assert!(matches!(edit.commit(), Err(SlideTextError::InvalidSource)));
-    assert_eq!(package.source_bytes(), noncanonical);
+    assert_eq!(package.exact_bytes(), noncanonical);
     Ok(())
 }
 
@@ -1794,7 +1807,7 @@ fn ownership_metadata_and_dependent_text_are_proven_before_publish() -> TestResu
         let mut edit = package.edit_slide_title("Agenda")?;
         edit.set("ownership must be proven")?;
         assert!(matches!(edit.commit(), Err(SlideTextError::InvalidSource)));
-        assert_eq!(package.source_bytes(), malformed_bytes);
+        assert_eq!(package.exact_bytes(), malformed_bytes);
     }
 
     let dependent = synthetic_package(true)?;
@@ -1918,7 +1931,7 @@ fn candidate_text_limit_is_checked_when_staging_with_exact_amounts() -> TestResu
         } if observed == u64::try_from(TITLE.len() + 1)?
             && maximum == u64::try_from(TITLE.len())?
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     Ok(())
 }
 
@@ -1946,6 +1959,6 @@ fn changed_slide_text_respects_the_retained_output_limit() -> TestResult<()> {
             ..
         })
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     Ok(())
 }

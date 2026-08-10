@@ -793,6 +793,556 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_iwa_keynote_source_topology(root), [])
 
+    def test_retired_iwa_keynote_show_settings_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_METHODS,
+            ("show_settings", "set_show_settings"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_MODULES,
+            ("show_settings",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/editor/show_settings.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_EXAMPLE,
+            Path("crates/litchi-iwa/examples/edit_keynote_show.rs"),
+        )
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_README,
+            Path("crates/litchi-iwa/README.md"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SHOW_SETTINGS_FLAT_ALIASES,
+            frozenset(
+                {
+                    "ShowSettings",
+                    "ShowSettingsEdit",
+                    "ShowSettingsPatch",
+                    "ShowSettingsCommit",
+                    "ShowSettingsDiagnostics",
+                    "ShowSettingsError",
+                    "ShowSettingsLimitKind",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SHOW_SETTINGS_SHORT_NAMES,
+            frozenset(
+                {
+                    "Mode",
+                    "Settings",
+                    "Size",
+                    "Show",
+                    "Edit",
+                    "Patch",
+                    "Commit",
+                    "Diagnostics",
+                    "Error",
+                    "LimitKind",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SHOW_SETTINGS_FLAT_SEMANTIC_ALIASES,
+            frozenset({"Mode", "Settings", "Show", "Size"}),
+        )
+
+    def test_retired_iwa_keynote_show_settings_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            nested = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/settings.rs"
+            nested.parent.mkdir(parents=True)
+            nested.write_text(
+                "fn r#show_settings() {}\n"
+                "pub(in crate::keynote) async unsafe fn set_show_settings() {}\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.write_text("pub(crate) mod r#show_settings;\n", encoding="utf-8")
+            retired = root / boundaries.RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_SOURCE
+            retired.parent.mkdir(parents=True, exist_ok=True)
+            retired.write_text("// retired owner returned\n", encoding="utf-8")
+            example = root / boundaries.RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text("// retired example returned\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_show_settings_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote show-settings method "
+                        "show_settings: "
+                        "crates/litchi-iwa/src/keynote/legacy/settings.rs:1",
+                        "retired litchi-iwa Keynote show-settings method "
+                        "set_show_settings: "
+                        "crates/litchi-iwa/src/keynote/legacy/settings.rs:2",
+                        "retired litchi-iwa Keynote show-settings module show_settings: "
+                        "crates/litchi-iwa/src/keynote/editor.rs:1",
+                        "retired litchi-iwa Keynote show-settings source returned: "
+                        "crates/litchi-iwa/src/keynote/editor/show_settings.rs",
+                        "retired litchi-iwa Keynote show-settings example returned: "
+                        "crates/litchi-iwa/examples/edit_keynote_show.rs",
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_keynote_show_settings_module_declaration_variants(
+        self,
+    ) -> None:
+        for declaration in (
+            "mod show_settings;",
+            "pub(crate) mod show_settings;",
+            "pub(super) mod r#show_settings {}",
+            "pub(in crate::keynote)\nmod\nr#show_settings\n{}",
+            "pub mod show_settings { pub struct Legacy; }",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+                    editor.parent.mkdir(parents=True)
+                    editor.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_iwa_keynote_show_settings_source_topology(
+                            root
+                        ),
+                        [
+                            "retired litchi-iwa Keynote show-settings module "
+                            "show_settings: "
+                            "crates/litchi-iwa/src/keynote/editor.rs:1"
+                        ],
+                    )
+
+    def test_iwa_keynote_show_settings_policy_ignores_trivia_near_names_and_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/settings_old.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "\n".join(
+                    [
+                        "// pub fn show_settings() {}",
+                        'const NOTE: &str = "fn set_show_settings() {}";',
+                        "/* fn show_settings() {}",
+                        "   /* fn set_show_settings() {} */",
+                        "   fn show_settings() {} */",
+                        'const RAW_NOTE: &str = r###"fn set_show_settings() {}"###;',
+                        "pub fn show_settings_snapshot() {}",
+                        "pub fn reset_show_settings() {}",
+                        "pub fn set_show_settings_for_show() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.write_text(
+                "\n".join(
+                    [
+                        "// mod show_settings;",
+                        'const NOTE: &str = "mod show_settings;";',
+                        "/* mod show_settings;",
+                        "   /* pub mod r#show_settings {} */",
+                        "*/",
+                        'const RAW_NOTE: &str = r#"mod show_settings;"#;',
+                        "mod show_settings_legacy;",
+                        "use crate::show_settings;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            declarations = (
+                "pub fn show_settings() {}\npub fn set_show_settings() {}\n"
+            )
+            for relative in (
+                Path("crates/litchi-keynote/src/package/show_settings.rs"),
+                Path("crates/litchi-iwa/src/pages/editor/show_settings.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(declarations, encoding="utf-8")
+            non_rust = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "show_settings.txt"
+            non_rust.write_text(declarations, encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_show_settings_source_topology(root), []
+            )
+
+    def test_retired_iwa_keynote_show_settings_readme_calls_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "\n".join(
+                    [
+                        "let current = keynote",
+                        "    .",
+                        "    r#show_settings",
+                        "    (",
+                        "let updated = package",
+                        "    .r#set_show_settings",
+                        "    (",
+                        "let direct = crate::keynote::KeynoteEditor",
+                        "    ::",
+                        "    show_settings(",
+                        "let direct = r#KeynoteEditor::r#set_show_settings(",
+                        "let current = editor.show_settings(",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_show_settings_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote show-settings README call "
+                        "show_settings: crates/litchi-iwa/README.md:3",
+                        "retired litchi-iwa Keynote show-settings README call "
+                        "set_show_settings: crates/litchi-iwa/README.md:6",
+                        "retired litchi-iwa Keynote show-settings README call "
+                        "show_settings: crates/litchi-iwa/README.md:10",
+                        "retired litchi-iwa Keynote show-settings README call "
+                        "set_show_settings: crates/litchi-iwa/README.md:11",
+                        "retired litchi-iwa Keynote show-settings README call "
+                        "show_settings: crates/litchi-iwa/README.md:12",
+                    ]
+                ),
+            )
+
+    def test_iwa_keynote_show_settings_readme_call_policy_ignores_safe_text(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.parent.mkdir(parents=True)
+            safe_text = "\n".join(
+                [
+                    "The show_settings and set_show_settings names are retired.",
+                    "Use `show_settings` rather than `.show_settings`.",
+                    "show_settings(",
+                    "set_show_settings(",
+                    "editor.show_settings_snapshot(",
+                    "editor.set_show_settings_for_show(",
+                    "KeynoteEditor::show_settings_snapshot(",
+                    "Package::show_settings(",
+                    "Package::set_show_settings(",
+                    "package.show_settings(",
+                    "show.show_settings(",
+                ]
+            ) + "\n"
+            readme.write_text(safe_text, encoding="utf-8")
+            for relative in (
+                Path("README.md"),
+                Path("crates/litchi-keynote/README.md"),
+                Path("crates/litchi-iwa/examples/README.md"),
+            ):
+                other = root / relative
+                other.parent.mkdir(parents=True, exist_ok=True)
+                other.write_text(
+                    "editor.show_settings(\neditor.set_show_settings(\n",
+                    encoding="utf-8",
+                )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_show_settings_source_topology(root), []
+            )
+
+    def test_focused_keynote_show_settings_public_api_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "pub fn show_settings(r#source_bytes: &[u8], r#object_id: u64) "
+                        "-> ShowArchive {}",
+                        "pub type Patch = buffa::ShowArchiveView;",
+                        "impl prost::Message for show::Edit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub type Commit = IWorkPackage;\n"
+                "pub type Diagnostics = litchi_iwa_core::RawObject;\n"
+                "pub type Error = SourceBytes;\n"
+                "pub type Settings = SourceCatalog;\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub use litchi_iwa_protos::show::GeneratedArchive as Patch;\n"
+                "pub type Patch = crate::show::GeneratedSettings;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub type LimitKind = "
+                "crate::show::LimitKind<prost_types::MessageInfo>;\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_keynote_show_settings_facade_source_topology(root)
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-keynote show-settings public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type ShowArchive",
+                "protobuf type buffa",
+                "archive/IWA type ShowArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type IWorkPackage",
+                "archive/IWA type litchi_iwa_core",
+                "native object RawObject",
+                "raw source bytes SourceBytes",
+                "archive/IWA type SourceCatalog",
+                "archive/IWA type litchi_iwa_protos",
+                "archive/IWA type GeneratedArchive",
+                "generated type GeneratedSettings",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+            )
+            self.assertEqual(len(violations), len(expected_fragments))
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused show-settings leak: {fragment}",
+                    )
+
+    def test_focused_keynote_show_settings_api_ignores_nested_and_private_code(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "// pub type ShowSettings = ShowArchive;",
+                        'const NOTE: &str = "pub struct ShowSettingsEdit;";',
+                        "/* pub type ShowSettingsPatch = buffa::ShowArchiveView; */",
+                        "pub struct Mode;",
+                        "pub struct Settings;",
+                        "pub struct Size;",
+                        "pub struct Show;",
+                        "pub struct Edit;",
+                        "pub struct Patch;",
+                        "pub struct Commit;",
+                        "pub struct Diagnostics;",
+                        "pub struct Error;",
+                        "pub struct LimitKind;",
+                        "pub fn show(settings: Settings, input: InputBytes, "
+                        "byte_count: usize) -> OutputBytes { todo!() }",
+                        "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                        "-> SourceBytes { todo!() }",
+                        "pub(crate) fn restricted(archive: ShowArchive) {}",
+                        "struct ShowSettings;",
+                        "pub(crate) struct ShowSettingsEdit;",
+                        "pub(super) type ShowSettingsPatch = Patch;",
+                        "pub(in crate) struct ShowSettingsCommit;",
+                        "impl ShowSettingsEdit {}",
+                        "impl prost::Message for Unrelated {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "struct ShowSettingsDiagnostics;\n"
+                "pub(crate) struct ShowSettingsError;\n"
+                "pub(super) type ShowSettingsLimitKind = LimitKind;\n"
+                "impl ShowSettingsPatch {}\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES
+            )
+            canonical_exports = (
+                "pub mod show;\n"
+                "// pub use crate::show::{Mode, Settings};\n"
+                'const SHOW_NOTE: &str = "pub use crate::show::{Show, Size};";\n'
+                "pub fn show_settings(settings: show::Settings, mode: show::Mode, "
+                "size: show::Size) -> show::Show { todo!() }\n"
+                "use crate::show::Mode;\n"
+                "pub(crate) use crate::show::Settings;\n"
+                "pub(super) type Show = crate::show::Show;\n"
+                "pub(in crate) use crate::show::Size;\n"
+                "pub(crate) use crate::show::*;\n"
+                "pub use crate::render::{Mode, Settings};\n"
+                "pub use crate::render::*;\n"
+                "pub type Show = crate::presentation::Show;\n"
+                "pub use crate::geometry::Size;\n"
+                "pub fn unrelated(object_id: u64) -> ShowArchive { todo!() }\n"
+                "pub struct ShowSetting;\n"
+                "pub struct ShowSettingsSnapshot;\n"
+            )
+            lib_export.write_text(canonical_exports, encoding="utf-8")
+            package_export.write_text(canonical_exports, encoding="utf-8")
+            other_owner = root / "crates/litchi-pages/src/show.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub struct ShowSettings;\n"
+                "pub type ShowSettingsPatch = litchi_iwa_core::RawObject;\n"
+                "pub use crate::show::{Mode, Settings, Show, Size};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_show_settings_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_keynote_show_settings_exports_reject_flat_semantic_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            lib_export.write_text(
+                "pub use crate::show::{Mode, Settings as Settings};\n"
+                "pub type Show = crate::show::Show;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::show_settings::Size;\n"
+                "pub use crate::show::*;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_show_settings_facade_source_topology(root),
+                sorted(
+                    [
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic alias Mode: "
+                        "crates/litchi-keynote/src/lib.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic alias Settings: "
+                        "crates/litchi-keynote/src/lib.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic alias Show: "
+                        "crates/litchi-keynote/src/lib.rs:2",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic alias Size: "
+                        "crates/litchi-keynote/src/package.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic aliases via show glob: "
+                        "crates/litchi-keynote/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_keynote_show_settings_public_api_rejects_flat_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct ShowSettings;\n"
+                "pub struct ShowSettingsEdit;\n"
+                "pub type ShowSettingsPatch = Patch;\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub type ShowSettingsCommit = Commit;\n"
+                "pub type ShowSettingsDiagnostics = Diagnostics;\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub use crate::show::Error as ShowSettingsError;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::show::LimitKind as ShowSettingsLimitKind;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_show_settings_facade_source_topology(root),
+                sorted(
+                    [
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettings: "
+                        "crates/litchi-keynote/src/show.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsEdit: "
+                        "crates/litchi-keynote/src/show.rs:2",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsPatch: "
+                        "crates/litchi-keynote/src/show.rs:3",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsCommit: "
+                        "crates/litchi-keynote/src/package/show_settings.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsDiagnostics: "
+                        "crates/litchi-keynote/src/package/show_settings.rs:2",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsError: "
+                        "crates/litchi-keynote/src/lib.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsLimitKind: "
+                        "crates/litchi-keynote/src/package.rs:1",
+                    ]
+                ),
+            )
+
     def test_retired_iwa_numbers_table_lock_method_inventory_is_exact(self) -> None:
         self.assertEqual(
             boundaries.RETIRED_IWA_NUMBERS_TABLE_LOCK_METHODS,

@@ -6,7 +6,8 @@
 
 mod edit;
 mod limits;
-mod show_settings;
+mod rendering_invalidation;
+pub(crate) mod show_settings;
 mod slide_notes;
 mod slide_order;
 mod slide_preview;
@@ -15,7 +16,7 @@ mod slide_transition;
 
 use std::fmt;
 use std::fs::File;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 #[cfg(test)]
@@ -41,18 +42,13 @@ use once_cell::sync::OnceCell;
 use prost::Message;
 use thiserror::Error;
 
-use crate::{
-    AnimationType, Build, Document, Effect, Mode, Seconds, Settings, Show, Size, Slide, Transition,
-};
+use crate::show::{Mode, Settings, Show, Size};
+use crate::{AnimationType, Build, Document, Effect, Seconds, Slide, Transition};
 
 pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
 pub use limits::{
     MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
     ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError,
-};
-pub use show_settings::{
-    ShowSettingsCommit, ShowSettingsDiagnostics, ShowSettingsEdit, ShowSettingsError,
-    ShowSettingsLimitKind, ShowSettingsPatch,
 };
 pub use slide_notes::{
     SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
@@ -233,6 +229,52 @@ pub enum ReadError {
     Metadata(#[from] plist::Error),
 }
 
+/// Failure while streaming an exact Keynote package artifact to a caller-owned sink.
+///
+/// Its `Display` and `Debug` representations report only the offset reached
+/// by prior conforming successful writes and the sink error kind; they never
+/// include package bytes or sink error text.
+#[derive(Error)]
+#[error("could not write Keynote package after {bytes_written} bytes ({kind:?})")]
+pub struct WriteError {
+    source: std::io::Error,
+    kind: std::io::ErrorKind,
+    bytes_written: usize,
+}
+
+impl fmt::Debug for WriteError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("WriteError")
+            .field("bytes_written", &self.bytes_written)
+            .field("io_error_kind", &self.kind)
+            .finish_non_exhaustive()
+    }
+}
+
+impl WriteError {
+    /// Return the byte offset reached by prior conforming successful writes.
+    ///
+    /// A `WriteZero` or trait-violating over-report is detected at this offset;
+    /// it does not establish how many bytes that call's sink actually accepted.
+    #[must_use]
+    pub const fn bytes_written(&self) -> usize {
+        self.bytes_written
+    }
+
+    /// Borrow the underlying sink error.
+    #[must_use]
+    pub const fn io_error(&self) -> &std::io::Error {
+        &self.source
+    }
+
+    /// Consume this error and return the underlying sink error.
+    #[must_use]
+    pub fn into_io_error(self) -> std::io::Error {
+        self.source
+    }
+}
+
 /// Why a recognized native Keynote text-storage payload was rejected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -266,9 +308,9 @@ impl fmt::Display for TextStorageFailure {
 
 /// Cheaply cloneable parsed Keynote package with a lazy semantic snapshot.
 ///
-/// The original package bytes remain available through [`Self::source_bytes`],
-/// so unsupported IWA members and unmodeled protobuf fields are retained even
-/// when callers inspect only the semantic presentation values.
+/// The original package artifact is retained exactly, so unsupported IWA
+/// members and unmodeled protobuf fields survive semantic inspection and can
+/// be streamed through [`Self::write_to`].
 #[derive(Clone)]
 pub struct Package {
     state: Arc<State>,
@@ -427,17 +469,6 @@ impl Package {
         Self::from_source_with_options(source, options)
     }
 
-    /// Parse Keynote package bytes supplied through an archive-oriented API.
-    ///
-    /// This is equivalent to [`Self::from_bytes`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `bytes` is not a bounded valid Keynote package.
-    pub fn from_archive_bytes(bytes: &[u8]) -> ReadResult<Self> {
-        Self::from_bytes(bytes)
-    }
-
     fn from_source_with_options(source: Arc<[u8]>, options: ReadOptions) -> ReadResult<Self> {
         let limits = options.archive();
         let source_catalog = SourceCatalog::from_shared_bytes_with_limits(source, limits)?;
@@ -552,10 +583,68 @@ impl Package {
         Edit::new(self)
     }
 
-    /// Borrow the original package bytes without normalizing unknown content.
+    /// Borrow exact package bytes for crate-internal preservation logic.
     #[must_use]
-    pub fn source_bytes(&self) -> &[u8] {
+    pub(crate) fn source_bytes(&self) -> &[u8] {
         self.state.source.source_bytes()
+    }
+
+    /// Write this exact immutable package artifact to a caller-owned sink.
+    ///
+    /// Unsupported ZIP members and unmodeled protobuf fields are emitted
+    /// unchanged. This method does not create another package-sized buffer and
+    /// does not flush `writer`.
+    ///
+    /// # Costs
+    ///
+    /// Streams the retained artifact once without allocating another
+    /// package-sized buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] with the byte offset reached by prior conforming
+    /// successful writes. A zero-length write or over-report is detected at
+    /// that offset; an over-report does not establish its actual accepted-byte
+    /// count.
+    pub fn write_to<W: Write + ?Sized>(&self, writer: &mut W) -> Result<(), WriteError> {
+        let source = self.source_bytes();
+        let mut bytes_written = 0_usize;
+        while bytes_written < source.len() {
+            let remaining = &source[bytes_written..];
+            match writer.write(remaining) {
+                Ok(0) => {
+                    return Err(WriteError {
+                        source: std::io::Error::new(
+                            std::io::ErrorKind::WriteZero,
+                            "sink accepted no package bytes",
+                        ),
+                        kind: std::io::ErrorKind::WriteZero,
+                        bytes_written,
+                    });
+                },
+                Ok(amount) if amount <= remaining.len() => bytes_written += amount,
+                Ok(_amount) => {
+                    return Err(WriteError {
+                        source: std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "sink reported accepting more bytes than supplied",
+                        ),
+                        kind: std::io::ErrorKind::InvalidData,
+                        bytes_written,
+                    });
+                },
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {},
+                Err(write_error) => {
+                    let kind = write_error.kind();
+                    return Err(WriteError {
+                        source: write_error,
+                        kind,
+                        bytes_written,
+                    });
+                },
+            }
+        }
+        Ok(())
     }
 
     /// Return the checked physical limits used when this package was parsed.
@@ -574,21 +663,6 @@ impl Package {
     #[must_use]
     pub fn semantic_limits(&self) -> SemanticLimits {
         self.state.options.semantic()
-    }
-
-    /// Return the count of parsed native IWA components.
-    #[must_use]
-    pub fn component_count(&self) -> usize {
-        self.state.source.components().len()
-    }
-
-    /// Iterate normalized names for all parsed native IWA components.
-    pub fn component_names(&self) -> impl Iterator<Item = &str> {
-        self.state
-            .source
-            .components()
-            .iter()
-            .map(litchi_iwa_archive::Component::name)
     }
 
     /// Extract reachable textual content in semantic presentation order.
@@ -1453,12 +1527,30 @@ fn decode_root_show_identifier(payload: &[u8], wire_limits: WireLimits) -> ReadR
     })?;
     keynote_document_codec::decode_show_identifier(
         payload,
-        keynote_document_codec::DecodeOptions::new(payload.len(), recursion_limit),
+        keynote_document_codec::DecodeOptions::new(payload.len(), recursion_limit)
+            .with_max_fields(wire_limits.max_fields())
+            .with_max_work_bytes(wire_limits.max_rewrite_work()),
     )
     .map_err(|error| {
-        ReadError::InvalidFormat(format!(
-            "Keynote root document projection is malformed: {error}"
-        ))
+        if let Some((observed, maximum)) = error.field_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Fields,
+                observed,
+                maximum,
+                path: SemanticPath::Package,
+            }
+        } else if let Some((observed, maximum)) = error.work_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Work,
+                observed,
+                maximum,
+                path: SemanticPath::Package,
+            }
+        } else {
+            ReadError::InvalidFormat(format!(
+                "Keynote root document projection is malformed: {error}"
+            ))
+        }
     })
 }
 
@@ -1476,7 +1568,9 @@ fn decode_show_snapshot(
             payload.len(),
             max_slide_references,
             recursion_limit,
-        ),
+        )
+        .with_max_fields(wire_limits.max_fields())
+        .with_max_work_bytes(wire_limits.max_rewrite_work()),
     )
     .map_err(|error| {
         if let Some((observed, maximum)) = error.slide_reference_limit_values() {
@@ -1485,6 +1579,42 @@ fn decode_show_snapshot(
                 observed,
                 maximum,
                 path: SemanticPath::Show,
+            }
+        } else if let Some((observed, maximum)) = error.field_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Fields,
+                observed,
+                maximum,
+                path: SemanticPath::Show,
+            }
+        } else if let Some((observed, maximum)) = error.work_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Work,
+                observed,
+                maximum,
+                path: SemanticPath::Show,
+            }
+        } else if let Some(limit) = error.wire_resource_limit() {
+            match limit {
+                keynote_show_codec::WireResourceLimit::Bytes { observed, maximum } => {
+                    ReadError::PayloadLimit {
+                        kind: PayloadLimitKind::Bytes,
+                        observed,
+                        maximum,
+                        path: SemanticPath::Show,
+                    }
+                },
+                keynote_show_codec::WireResourceLimit::Nesting { observed, maximum } => {
+                    ReadError::PayloadLimit {
+                        kind: PayloadLimitKind::Nesting,
+                        observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                        maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                        path: SemanticPath::Show,
+                    }
+                },
+                _ => ReadError::InvalidFormat(
+                    "Keynote show projection exceeded an unknown wire resource".to_owned(),
+                ),
             }
         } else if let Some(amount) = error.allocation_amount() {
             ReadError::Allocation {
@@ -1511,12 +1641,28 @@ fn decode_show_settings_snapshot(
             payload.len(),
             max_slide_references,
             recursion_limit,
-        ),
+        )
+        .with_max_fields(wire_limits.max_fields())
+        .with_max_work_bytes(wire_limits.max_rewrite_work()),
     )
     .map_err(|error| {
         if let Some((observed, maximum)) = error.slide_reference_limit_values() {
             ReadError::SemanticLimit {
                 kind: SemanticLimitKind::Slides,
+                observed,
+                maximum,
+                path: SemanticPath::Show,
+            }
+        } else if let Some((observed, maximum)) = error.field_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Fields,
+                observed,
+                maximum,
+                path: SemanticPath::Show,
+            }
+        } else if let Some((observed, maximum)) = error.work_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Work,
                 observed,
                 maximum,
                 path: SemanticPath::Show,
@@ -2691,12 +2837,77 @@ fn property(dictionary: &plist::Dictionary, key: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Write};
+    use std::io::{self, Cursor, Write};
     use std::sync::Barrier;
     use std::thread;
 
     use super::*;
     use tempfile::NamedTempFile;
+
+    struct FailingWriter {
+        accepted: usize,
+        remaining: usize,
+    }
+
+    impl Write for FailingWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.remaining == 0 {
+                return Err(io::Error::other("test sink failure"));
+            }
+            let amount = bytes.len().min(self.remaining);
+            self.accepted += amount;
+            self.remaining -= amount;
+            Ok(amount)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct InterruptedWriter {
+        interrupted: bool,
+        output: Vec<u8>,
+    }
+
+    impl Write for InterruptedWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if !self.interrupted {
+                self.interrupted = true;
+                return Err(io::Error::from(io::ErrorKind::Interrupted));
+            }
+            self.output.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct OverReportingWriter;
+
+    impl Write for OverReportingWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            Ok(bytes.len().saturating_add(1))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct ZeroWriter;
+
+    impl Write for ZeroWriter {
+        fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+            Ok(0)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
 
     fn assert_send_sync<T: Send + Sync>() {}
 
@@ -2719,6 +2930,52 @@ mod tests {
     #[test]
     fn package_handles_are_send_sync() {
         assert_send_sync::<Package>();
+        assert_send_sync::<WriteError>();
+    }
+
+    #[test]
+    fn write_to_streams_exact_bytes_and_reports_sink_progress()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = Package::open(native_fixture_path())?;
+        let mut output = Vec::new();
+        package.write_to(&mut output)?;
+        assert_eq!(output, package.source_bytes());
+
+        let mut failing = FailingWriter {
+            accepted: 0,
+            remaining: 17,
+        };
+        let Err(failing_error) = package.write_to(&mut failing) else {
+            panic!("the limited test sink must fail");
+        };
+        assert_eq!(failing_error.bytes_written(), 17);
+        assert_eq!(failing.accepted, 17);
+        assert_eq!(failing_error.io_error().kind(), io::ErrorKind::Other);
+        assert!(!format!("{failing_error:?}").contains("test sink failure"));
+        assert!(!failing_error.to_string().contains("test sink failure"));
+
+        let Err(over_reporting_error) = package.write_to(&mut OverReportingWriter) else {
+            panic!("an over-reporting sink must fail");
+        };
+        assert_eq!(over_reporting_error.bytes_written(), 0);
+        assert_eq!(
+            over_reporting_error.io_error().kind(),
+            io::ErrorKind::InvalidData
+        );
+
+        let Err(zero_write_error) = package.write_to(&mut ZeroWriter) else {
+            panic!("a zero-length write must fail");
+        };
+        assert_eq!(zero_write_error.bytes_written(), 0);
+        assert_eq!(zero_write_error.io_error().kind(), io::ErrorKind::WriteZero);
+
+        let mut interrupted = InterruptedWriter {
+            interrupted: false,
+            output: Vec::new(),
+        };
+        package.write_to(&mut interrupted)?;
+        assert_eq!(interrupted.output, package.source_bytes());
+        Ok(())
     }
 
     #[test]
@@ -2784,11 +3041,11 @@ mod tests {
         let pointers = thread::scope(|scope| {
             let mut handles = Vec::with_capacity(WORKERS);
             for _ in 0..WORKERS {
-                let package = package.snapshot();
-                let barrier = Arc::clone(&barrier);
+                let package_snapshot = package.snapshot();
+                let worker_barrier = Arc::clone(&barrier);
                 handles.push(scope.spawn(move || {
-                    barrier.wait();
-                    package
+                    worker_barrier.wait();
+                    package_snapshot
                         .slides()
                         .map(|slides| slides.as_ptr() as usize)
                         .map_err(|error| error.to_string())
@@ -2804,7 +3061,7 @@ mod tests {
             }
             Ok::<_, String>(pointers)
         })
-        .map_err(std::io::Error::other)?;
+        .map_err(io::Error::other)?;
 
         assert!(pointers.windows(2).all(|pair| pair[0] == pair[1]));
         assert_eq!(
@@ -2945,6 +3202,56 @@ mod tests {
             panic!("duplicate required identifiers must fail strict preflight");
         };
         assert!(matches!(error, ReadError::InvalidFormat(_)));
+    }
+
+    #[test]
+    fn settings_projection_threads_field_and_work_limits() -> Result<(), Box<dyn std::error::Error>>
+    {
+        const EXACT_FIELDS: usize = 10;
+        const EXACT_WORK: usize = 86;
+        let payload = [
+            0x12, 0x02, 0x08, 0x01, // theme reference
+            0x1a, 0x04, 0x0a, 0x02, 0x08, 0x07, // one slide reference
+            0x22, 0x0a, 0x0d, 0x00, 0x00, 0x80, 0x44, 0x15, 0x00, 0x00, 0x40, 0x44, // size
+            0x2a, 0x02, 0x08, 0x02, // stylesheet reference
+        ];
+        let exact = WireLimits::default()
+            .with_fields(EXACT_FIELDS)?
+            .with_rewrite_work(EXACT_WORK)?;
+        assert_eq!(
+            decode_show_settings_snapshot(&payload, 1, exact)?
+                .size()
+                .width()
+                .to_bits(),
+            1_024.0_f32.to_bits()
+        );
+
+        let fields = WireLimits::default()
+            .with_fields(EXACT_FIELDS - 1)?
+            .with_rewrite_work(EXACT_WORK)?;
+        assert!(matches!(
+            decode_show_settings_snapshot(&payload, 1, fields),
+            Err(ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Fields,
+                observed: EXACT_FIELDS,
+                maximum,
+                path: SemanticPath::Show,
+            }) if maximum == EXACT_FIELDS - 1
+        ));
+
+        let work = WireLimits::default()
+            .with_fields(EXACT_FIELDS)?
+            .with_rewrite_work(EXACT_WORK - 1)?;
+        assert!(matches!(
+            decode_show_settings_snapshot(&payload, 1, work),
+            Err(ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Work,
+                observed: EXACT_WORK,
+                maximum,
+                path: SemanticPath::Show,
+            }) if maximum == EXACT_WORK - 1
+        ));
+        Ok(())
     }
 
     #[test]

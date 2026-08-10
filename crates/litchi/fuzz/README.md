@@ -16,6 +16,15 @@ validation, set/clear/replace/insert/delete/no-op staging, exact-source patch
 application, inversion, and content-redacted errors. It never writes a package
 to disk.
 
+`keynote_show_settings` is the focused presentation-settings target. It offers
+arbitrary bytes to bounded Keynote package ingress and reuses a fixed prefix
+for no-op, playback-only, slide-number/size rendering, and combined commands
+against the native `basic.key` seed. The playback-only changed command asserts
+that public commit diagnostics report no deleted root previews. It covers
+strict reads, exact-source patch application and conflicts, inversion, typed
+limits, content-redacted failures, public in-memory `write_to` verification,
+and exact byte restoration without writing a package to disk.
+
 `numbers_table_lock` is the focused interactive table-lock target. It offers
 arbitrary bytes to checked Numbers package ingress and also interprets them as
 bounded selector and lock-state commands against the native `basic.numbers`
@@ -50,6 +59,11 @@ seed is embedded in the harness from the hash-verified source below; fuzzer
 input supplies only bounded transaction commands, of which at most 1 KiB
 becomes replacement text. Keep this target's `-max_len` at 4 KiB to
 concentrate effort on deep-message operations.
+
+`keynote_show_settings` reuses the same finite Keynote physical and semantic
+profile. Settings commands consume only a fixed prefix; keep `-max_len` at 512
+bytes so arbitrary ingress remains active while every input also reaches the
+fixed native transaction.
 
 `numbers_table_lock` accepts at most 512 KiB of source bytes, 128 package
 entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
@@ -114,6 +128,18 @@ Run the focused Keynote target without a checked-in duplicate corpus:
 cargo +nightly fuzz run keynote_slide_text -- \
   -max_len=4096 -timeout=10 -rss_limit_mb=2048
 ```
+
+Run the focused Keynote show-settings target:
+
+```sh
+cargo +nightly fuzz run keynote_show_settings -- \
+  -max_len=512 -timeout=10 -rss_limit_mb=2048
+```
+
+The `cargo +nightly fuzz run` commands are required for sanitizer-instrumented
+coverage. A stable `cargo run --bin <target> -- -runs=...` invocation is only
+a control-flow smoke test; on platforms without linked sanitizer runtimes it
+may print missing-symbol warnings and is not sanitizer evidence.
 
 Run the focused Numbers target without a checked-in duplicate corpus:
 

@@ -187,8 +187,8 @@ fn publish_and_reverse(package: &Package, result: Result<SlideTextCommit, SlideT
         .apply_slide_text(&patch)
         .unwrap_or_else(|error| panic!("fresh slide-text patch must apply: {error}"));
     assert_eq!(
-        applied.package().source_bytes(),
-        commit.package().source_bytes()
+        package_bytes(applied.package()),
+        package_bytes(commit.package())
     );
 
     if !patch.is_noop() {
@@ -204,7 +204,7 @@ fn publish_and_reverse(package: &Package, result: Result<SlideTextCommit, SlideT
         .package()
         .apply_slide_text(&inverse)
         .unwrap_or_else(|error| panic!("fresh slide-text inverse must apply: {error}"));
-    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(package_bytes(restored.package()), package_bytes(package));
     assert_eq!(
         restored
             .package()
@@ -313,6 +313,14 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
 
 fn control(data: &[u8], index: usize) -> u8 {
     data.get(index).copied().unwrap_or_default()
+}
+
+fn package_bytes(package: &Package) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    package
+        .write_to(&mut bytes)
+        .unwrap_or_else(|error| panic!("writing a package to memory must succeed: {error}"));
+    bytes
 }
 
 fn observe_result<T, E>(result: Result<T, E>)

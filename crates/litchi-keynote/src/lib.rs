@@ -11,7 +11,6 @@
 //!
 //! ```no_run
 //! use std::fs::OpenOptions;
-//! use std::io::Write as _;
 //!
 //! use litchi_keynote::{Package, SlideSelector};
 //!
@@ -23,7 +22,7 @@
 //!     .write(true)
 //!     .create_new(true)
 //!     .open("output.key")?;
-//! output.write_all(commit.package().source_bytes())?;
+//! commit.package().write_to(&mut output)?;
 //! output.sync_all()?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -41,7 +40,6 @@
 //! edit.move_slide(SlideSelector::name("Appendix"), Position::new(0))?;
 //! let commit = edit.commit()?;
 //! let restored = commit.package().apply_slide_order(&commit.patch().inverse())?;
-//! assert_eq!(restored.package().source_bytes(), package.source_bytes());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -51,20 +49,20 @@
 //! or generated protobuf values. Commits retain an exact reversible patch.
 //!
 //! ```no_run
-//! use litchi_keynote::{Mode, Package, Size};
+//! use litchi_keynote::{Package, show::{Mode, Size}};
 //!
 //! let package = Package::open("input.key")?;
 //! let before = package.show_settings()?;
-//! let mut edit = package.edit_show_settings()?;
-//! edit.settings_mut().set_size(Size::new(1920.0, 1080.0)?);
-//! edit.settings_mut().set_mode(Some(Mode::SelfPlaying))?;
-//! let commit = edit.commit()?;
+//! let edit = package.edit_show_settings()?;
+//! let mut settings = edit.settings();
+//! settings.set_size(Size::new(1920.0, 1080.0)?);
+//! settings.set_mode(Some(Mode::SelfPlaying))?;
+//! let commit = edit.set(settings).commit()?;
 //! assert_eq!(commit.package().show_settings()?.mode(), Some(Mode::SelfPlaying));
 //! let restored = commit
 //!     .package()
 //!     .apply_show_settings(&commit.patch().inverse())?;
 //! assert_eq!(restored.package().show_settings()?, before);
-//! assert_eq!(restored.package().source_bytes(), package.source_bytes());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -204,17 +202,14 @@ pub use package::{
     Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES,
     MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch, PayloadLimitKind,
     ReadError, ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError, SemanticPath,
-    ShowSettingsCommit, ShowSettingsDiagnostics, ShowSettingsEdit, ShowSettingsError,
-    ShowSettingsLimitKind, ShowSettingsPatch, SlideNotesCommit, SlideNotesDiagnostics,
-    SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
-    SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
-    SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
-    SlideTextPatch, SlideTextRole, SlideTransitionCommit, SlideTransitionDiagnostics,
-    SlideTransitionEdit, SlideTransitionError, SlideTransitionLimitKind, SlideTransitionPatch,
-    Stats, TextStorageFailure,
+    SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
+    SlideNotesPatch, SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError,
+    SlideOrderLimitKind, SlideOrderPatch, SlideTextCommit, SlideTextDiagnostics, SlideTextEdit,
+    SlideTextError, SlideTextLimitKind, SlideTextPatch, SlideTextRole, SlideTransitionCommit,
+    SlideTransitionDiagnostics, SlideTransitionEdit, SlideTransitionError,
+    SlideTransitionLimitKind, SlideTransitionPatch, Stats, TextStorageFailure, WriteError,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
-pub use show::{Mode, Settings, Show, Size};
 pub use slide::media::MovieKind;
 pub use slide::{Slide, Transition};
 pub use time::Seconds;

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::Show;
+use crate::show::Show;
 
 #[derive(Debug)]
 struct State {

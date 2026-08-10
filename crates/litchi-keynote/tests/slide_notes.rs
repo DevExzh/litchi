@@ -21,6 +21,19 @@ const PRIVATE_MARKER: &[u8] = b"private-keynote-notes-marker-2147483647";
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+trait ExactPackageBytes {
+    fn exact_bytes(&self) -> &'static [u8];
+}
+
+impl ExactPackageBytes for Package {
+    fn exact_bytes(&self) -> &'static [u8] {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts every package byte");
+        Box::leak(bytes.into_boxed_slice())
+    }
+}
+
 fn reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
         identifier,
@@ -379,7 +392,7 @@ fn selector_first_utf16_notes_operations_are_semantic_and_transactional() -> Tes
     );
     assert_eq!(package.slide_notes("No Notes")?, None);
 
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let untouched = package.show()?.slides()[1].clone();
     let span = TextSpan::from_utf16_indexes(8, 10)?;
     let mut edit = package.edit_slide_notes("Agenda")?;
@@ -400,8 +413,8 @@ fn selector_first_utf16_notes_operations_are_semantic_and_transactional() -> Tes
         Some("Speaker 東京😀 notes".to_owned())
     );
     assert_eq!(commit.package().show()?.slides()[1], untouched);
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.exact_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
 
     let mut insert = package.edit_slide_notes(SlideSelector::index(0))?;
     insert.insert(TextPosition::ZERO, "Intro: ")?;
@@ -446,7 +459,7 @@ fn selector_first_utf16_notes_operations_are_semantic_and_transactional() -> Tes
 fn selectors_utf16_boundaries_and_staging_errors_leave_source_unchanged() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
 
     assert!(matches!(
         package.edit_slide_notes("Missing"),
@@ -492,8 +505,8 @@ fn selectors_utf16_boundaries_and_staging_errors_leave_source_unchanged() -> Tes
         Err(SlideNotesError::OperationAlreadyStaged)
     ));
 
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.exact_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
     Ok(())
 }
 
@@ -501,7 +514,7 @@ fn selectors_utf16_boundaries_and_staging_errors_leave_source_unchanged() -> Tes
 fn semantic_noops_share_the_exact_source_allocation() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
 
     let mut edit = package.edit_slide_notes("Agenda")?;
     edit.set("Speaker 🚀 notes")?;
@@ -510,15 +523,15 @@ fn semantic_noops_share_the_exact_source_allocation() -> TestResult<()> {
     assert!(!commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().touched_components(), 0);
     assert!(!commit.diagnostics().full_reparse_performed());
-    assert_eq!(commit.package().source_bytes(), bytes);
-    assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(commit.package().exact_bytes(), bytes);
+    assert_eq!(commit.package().exact_bytes(), source_snapshot);
     let applied = package.apply_slide_notes(commit.patch())?;
     assert!(applied.patch().is_noop());
-    assert_eq!(applied.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(applied.package().exact_bytes(), source_snapshot);
 
     let unstaged = package.edit_slide_notes("Agenda")?.commit()?;
     assert!(unstaged.patch().is_noop());
-    assert_eq!(unstaged.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(unstaged.package().exact_bytes(), source_snapshot);
     Ok(())
 }
 
@@ -526,7 +539,7 @@ fn semantic_noops_share_the_exact_source_allocation() -> TestResult<()> {
 fn changed_notes_preserve_unknowns_scope_and_exact_inverse_application() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let source_note = message_payload(&bytes, NOTE_OBJECT, NOTE_MESSAGE_TYPE)?;
     let source_storage = message_payload(&bytes, NOTE_STORAGE, STORAGE_MESSAGE_TYPE)?;
     let source_before_note = message_payload(&bytes, NOTE_OBJECT, 777)?;
@@ -542,7 +555,7 @@ fn changed_notes_preserve_unknowns_scope_and_exact_inverse_application() -> Test
     assert!(!edit_debug.contains("Agenda"));
     assert!(!edit_debug.contains("Index/"));
     let commit = edit.commit()?;
-    let target = commit.package().source_bytes();
+    let target = commit.package().exact_bytes();
     assert_only_document_payload_changed(&bytes, target)?;
     assert_eq!(
         message_payload(target, NOTE_OBJECT, NOTE_MESSAGE_TYPE)?,
@@ -574,17 +587,17 @@ fn changed_notes_preserve_unknowns_scope_and_exact_inverse_application() -> Test
         raw_fields(&target_header, 99)?,
         raw_fields(&source_header, 99)?
     );
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.exact_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
 
     let applied = package.apply_slide_notes(commit.patch())?;
-    assert_eq!(applied.package().source_bytes(), target);
+    assert_eq!(applied.package().exact_bytes(), target);
     let inverse = commit.patch().inverse();
     assert_eq!(inverse.before(), commit.patch().after());
     assert_eq!(inverse.after(), commit.patch().before());
     assert_eq!(inverse.inverse(), commit.patch().clone());
     let restored = commit.package().apply_slide_notes(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(restored.package().exact_bytes(), bytes);
     assert_eq!(
         restored.package().slide_notes("Agenda")?,
         Some("Speaker 🚀 notes".to_owned())
@@ -800,7 +813,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
             matches!(result, Err(SlideNotesError::InvalidSource)),
             "unexpected malformed-notes result: {result:?}"
         );
-        assert_eq!(package.source_bytes(), malformed_bytes);
+        assert_eq!(package.exact_bytes(), malformed_bytes);
     }
     Ok(())
 }
@@ -845,7 +858,7 @@ fn note_graph_metadata_ownership_is_proven_before_rewriting() -> TestResult<()> 
         let mut edit = package.edit_slide_notes("Agenda")?;
         edit.set("ownership must be proven")?;
         assert!(matches!(edit.commit(), Err(SlideNotesError::InvalidSource)));
-        assert_eq!(package.source_bytes(), malformed_bytes);
+        assert_eq!(package.exact_bytes(), malformed_bytes);
     }
 
     let package = Package::from_bytes(&extra_owner)?;
@@ -855,7 +868,7 @@ fn note_graph_metadata_ownership_is_proven_before_rewriting() -> TestResult<()> 
         edit.commit(),
         Err(SlideNotesError::DependentContent)
     ));
-    assert_eq!(package.source_bytes(), extra_owner);
+    assert_eq!(package.exact_bytes(), extra_owner);
     Ok(())
 }
 
@@ -943,7 +956,7 @@ fn metadata_and_payload_ownership_aliases_fail_closed() -> TestResult<()> {
             edit.commit(),
             Err(SlideNotesError::DependentContent | SlideNotesError::InvalidSource)
         ));
-        assert_eq!(package.source_bytes(), adversarial);
+        assert_eq!(package.exact_bytes(), adversarial);
     }
     Ok(())
 }
@@ -967,7 +980,7 @@ fn exact_noop_and_replay_do_not_require_mutation_ownership() -> TestResult<()> {
     assert!(commit.patch().is_noop());
     let replay = package.apply_slide_notes(commit.patch())?;
     assert!(replay.patch().is_noop());
-    assert_eq!(replay.package().source_bytes(), malformed_metadata);
+    assert_eq!(replay.package().exact_bytes(), malformed_metadata);
     Ok(())
 }
 
@@ -979,7 +992,7 @@ fn unrelated_noncanonical_object_prefix_is_refused_before_rewrite() -> TestResul
     let mut edit = package.edit_slide_notes("Agenda")?;
     edit.set("must not canonicalize an unrelated object frame")?;
     assert!(matches!(edit.commit(), Err(SlideNotesError::InvalidSource)));
-    assert_eq!(package.source_bytes(), noncanonical);
+    assert_eq!(package.exact_bytes(), noncanonical);
     Ok(())
 }
 
@@ -993,7 +1006,7 @@ fn dependent_note_content_is_refused_without_blocking_unrelated_text() -> TestRe
         dependent.commit(),
         Err(SlideNotesError::DependentContent)
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
 
     let mut unrelated = package.edit_slide_notes("Agenda")?;
     unrelated.replace(TextSpan::from_utf16_indexes(0, 1)?, "X")?;
@@ -1020,6 +1033,6 @@ fn changed_notes_respect_the_retained_output_limit() -> TestResult<()> {
             ..
         })
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     Ok(())
 }

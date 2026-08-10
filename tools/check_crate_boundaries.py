@@ -97,6 +97,7 @@ FACADE_PACKAGE = "litchi"
 FACADE_REQUIRED_NORMAL_DEPENDENCIES = frozenset({"litchi-core"})
 RETIRED_FACADE_DEPENDENCIES = frozenset({"litchi-iwa"})
 IWA_KEYNOTE_SOURCE_ROOT = Path("crates/litchi-iwa/src/keynote")
+IWA_KEYNOTE_EDITOR_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "editor.rs"
 RETIRED_IWA_KEYNOTE_METHODS = (
     "set_slide_title",
     "replace_slide_title",
@@ -111,6 +112,86 @@ RETIRED_IWA_KEYNOTE_METHODS = (
     "slide_notes_storage",
 )
 RETIRED_IWA_KEYNOTE_METHOD_SET = frozenset(RETIRED_IWA_KEYNOTE_METHODS)
+RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_METHODS = (
+    "show_settings",
+    "set_show_settings",
+)
+RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_METHODS
+)
+RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "show_settings.rs"
+)
+RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_MODULES = ("show_settings",)
+RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_keynote_show.rs"
+)
+IWA_KEYNOTE_README = Path("crates/litchi-iwa/README.md")
+KEYNOTE_SOURCE_ROOT = Path("crates/litchi-keynote/src")
+KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "show.rs",
+    KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
+)
+KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+)
+KEYNOTE_SHOW_SETTINGS_FLAT_ALIASES = frozenset(
+    {
+        "ShowSettings",
+        "ShowSettingsCommit",
+        "ShowSettingsDiagnostics",
+        "ShowSettingsEdit",
+        "ShowSettingsError",
+        "ShowSettingsLimitKind",
+        "ShowSettingsPatch",
+    }
+)
+KEYNOTE_SHOW_SETTINGS_FLAT_SEMANTIC_ALIASES = frozenset(
+    {"Mode", "Settings", "Show", "Size"}
+)
+KEYNOTE_SHOW_SETTINGS_SHORT_NAMES = frozenset(
+    {
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Mode",
+        "Patch",
+        "Settings",
+        "Show",
+        "Size",
+    }
+)
+IWA_KEYNOTE_SHOW_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(show_settings)\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+IWA_KEYNOTE_README_SHOW_SETTINGS_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:keynote|editor)[ \t\r\n]*\."
+        r"[ \t\r\n]*(?:r#)?(?P<method>show_settings|set_show_settings)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])"
+        r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?(?P<method>show_settings|set_show_settings)\b"
+        r"[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>set_show_settings)\b[ \t\r\n]*\("
+    ),
+)
+KEYNOTE_SHOW_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:show|show_settings)"
+    r"[ \t\r\n]*::"
+)
 IWA_NUMBERS_SOURCE_ROOT = Path("crates/litchi-iwa/src/numbers")
 IWA_TABLE_LOCK_SOURCE = Path("crates/litchi-iwa/src/table_lock.rs")
 IWA_NUMBERS_TABLE_INFO_SOURCE = (
@@ -1304,7 +1385,7 @@ def _iwork_public_leak(identifier: str) -> str | None:
         return "archive/IWA type"
     if identifier in {"buffa", "prost", "prost_types"}:
         return "protobuf type"
-    if identifier == "IWorkPackage":
+    if identifier in {"IWorkPackage", "SourceCatalog"}:
         return "archive/IWA type"
     words: list[str] = []
     for part in identifier.split("_"):
@@ -1333,6 +1414,8 @@ def _iwork_public_leak(identifier: str) -> str | None:
         "raw" in words and identifier[:1].isupper()
     ):
         return "archive/IWA type"
+    if "generated" in words:
+        return "generated type"
     return None
 
 
@@ -1375,6 +1458,29 @@ def _is_pages_document_settings_public_declaration(
     )
 
 
+def _keynote_show_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return KEYNOTE_SHOW_OWNER_PATH.search(declaration) is not None or any(
+        "show_settings" in identifier.lower() for identifier in identifiers
+    )
+
+
+def _is_keynote_show_settings_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    identifier_set = set(identifiers)
+    return bool(
+        identifier_set & KEYNOTE_SHOW_SETTINGS_FLAT_ALIASES
+    ) or _keynote_show_owner_declaration(declaration)
+
+
 def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
     """Prevent retired Keynote function declarations from returning to the host."""
 
@@ -1392,6 +1498,164 @@ def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
                 "retired litchi-iwa Keynote method "
                 f"{name}: {path.relative_to(root)}:{line_number}"
             )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_show_settings_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep retired Keynote show-settings APIs and files out of the host."""
+
+    violations: list[str] = []
+    for retired, label in (
+        (RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_SOURCE, "source"),
+        (RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_EXAMPLE, "example"),
+    ):
+        if (root / retired).exists():
+            violations.append(
+                f"retired litchi-iwa Keynote show-settings {label} returned: {retired}"
+            )
+
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Keynote show-settings method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    editor_path = root / IWA_KEYNOTE_EDITOR_SOURCE
+    if editor_path.is_file():
+        source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+        for match in IWA_KEYNOTE_SHOW_SETTINGS_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote show-settings module "
+                f"{match.group(1)}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
+
+    readme_path = root / IWA_KEYNOTE_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_KEYNOTE_README_SHOW_SETTINGS_CALLS:
+            for match in pattern.finditer(source):
+                method_offset = match.start("method")
+                line_number = source.count("\n", 0, method_offset) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote show-settings README call "
+                    f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_show_settings_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the nested, archive-free Keynote show-settings facade."""
+
+    source_root = root / KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    export_sources = {
+        root / path
+        for path in KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_keynote_show_settings_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            show_owner_declaration = _keynote_show_owner_declaration(declaration)
+            declaration_identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                public_declaration
+                and path in export_sources
+                and show_owner_declaration
+                and declaration_identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote show-settings public API retains "
+                    "flat semantic aliases via show glob: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if (
+                    public_declaration
+                    and identifier in KEYNOTE_SHOW_SETTINGS_FLAT_ALIASES
+                ):
+                    violations.append(
+                        "focused litchi-keynote show-settings public API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and show_owner_declaration
+                    and declaration_identifiers[:2]
+                    in (["pub", "type"], ["pub", "use"])
+                    and identifier in KEYNOTE_SHOW_SETTINGS_FLAT_SEMANTIC_ALIASES
+                ):
+                    violations.append(
+                        "focused litchi-keynote show-settings public API "
+                        f"retains flat semantic alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _iwork_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-keynote show-settings public API exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-keynote show-settings public API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
 
     return sorted(set(violations))
 
@@ -1979,6 +2243,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
         + audit_iwa_keynote_source_topology()
+        + audit_iwa_keynote_show_settings_source_topology()
+        + audit_keynote_show_settings_facade_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
         + audit_iwa_pages_page_layout_source_topology()

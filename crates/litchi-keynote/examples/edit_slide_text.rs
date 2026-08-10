@@ -7,7 +7,7 @@
 
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
-use std::io::{self, Write as _};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use litchi_keynote::{Package, SlideSelector, SlideTextRole, TextSpan};
@@ -74,18 +74,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         .as_ref()
         .map(|_| commit.package().apply_slide_text(&commit.patch().inverse()))
         .transpose()?;
-    if inverse
-        .as_ref()
-        .is_some_and(|restored| restored.package().source_bytes() != package.source_bytes())
-    {
-        return Err(invalid_input(
-            "inverse patch did not restore the exact input package",
-        ));
+    if let Some(restored) = inverse.as_ref() {
+        if exact_bytes(restored.package())? != exact_bytes(&package)? {
+            return Err(invalid_input(
+                "inverse patch did not restore the exact input package",
+            ));
+        }
     }
 
-    save_new(&output, commit.package().source_bytes())?;
+    save_new(&output, commit.package())?;
     if let (Some(path), Some(restored)) = (inverse_output, inverse) {
-        save_new(&path, restored.package().source_bytes())?;
+        save_new(&path, restored.package())?;
     }
 
     println!(
@@ -188,18 +187,24 @@ fn parse_inverse_output(
 /// Publishes through a sibling temporary file without replacing an existing target.
 ///
 /// This example does not provide the library's durable atomic-save contract.
-fn save_new(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
+fn save_new(path: &Path, package: &Package) -> Result<(), Box<dyn Error>> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let mut temporary = NamedTempFile::new_in(parent)?;
-    temporary.write_all(bytes)?;
+    package.write_to(&mut temporary)?;
     temporary.as_file().sync_all()?;
     temporary
         .persist_noclobber(path)
         .map_err(|error| -> Box<dyn Error> { Box::new(error.error) })?;
     Ok(())
+}
+
+fn exact_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
 }
 
 fn invalid_input(message: impl Into<String>) -> Box<dyn Error> {

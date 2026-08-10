@@ -1,6 +1,5 @@
 //! Create a Keynote presentation with native slide numbers and no input file.
 
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
@@ -32,20 +31,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let title = title
         .commit()
         .map_err(|error| std::io::Error::other(format!("title commit failed: {error:?}")))?;
-    write_new(&output, title.package().source_bytes())?;
+    write_new(&output, title.package())?;
     Ok(())
 }
 
 /// Publishes through a sibling temporary file without replacing an existing target.
 ///
 /// This example does not provide the library's durable atomic-save contract.
-fn write_new(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn write_new(path: &Path, package: &Package) -> Result<(), Box<dyn std::error::Error>> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let mut temporary = NamedTempFile::new_in(parent)?;
-    temporary.write_all(bytes)?;
+    package.write_to(&mut temporary)?;
     temporary.as_file().sync_all()?;
     temporary
         .persist_noclobber(path)
