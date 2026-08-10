@@ -6,8 +6,8 @@ use litchi_iwa::numbers::{
     NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
     NumbersTableSortRule,
 };
-use litchi_numbers::TableSelector;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = std::env::args().skip(1);
@@ -35,8 +35,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut editor = NumbersEditor::open(source)?;
     let table = TableSelector::index(0);
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
     let body_sort_column = 1usize
-        .checked_sub(editor.table_header_settings(table)?.header_column_count())
+        .checked_sub(
+            package
+                .table_header_settings(SheetSelector::index(0), table)?
+                .header_column_count(),
+        )
         .ok_or("the sort column is inside the fixed header-column region")?;
     editor.remove_table_row(table, RowDeletion::body(0))?;
     editor.remove_table_column(table, ColumnDeletion::body(body_sort_column))?;

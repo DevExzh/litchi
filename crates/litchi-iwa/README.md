@@ -1046,15 +1046,9 @@ use litchi_iwa::keynote::{
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
     KeynoteSlideTextRole, KeynoteSwooshDirection,
 };
-use litchi_numbers::table::headers::Count as HeaderCount;
 
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
-let mut headers = numbers.table_header_settings(table.object_id)?;
-headers.header_rows = Some(HeaderCount::TWO);
-headers.footer_rows = Some(HeaderCount::ONE);
-headers.header_rows_frozen = Some(true);
-numbers.set_table_header_settings(table.object_id, headers)?;
 numbers.set_table_title_settings(
     table.object_id,
     TableTitleSettings::new(Some(true), Some(false)),
@@ -1453,6 +1447,79 @@ assert_eq!(restored_bytes, original);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+### Numbers table headers and footers use the focused package transaction
+
+Header rows and columns, footer rows, frozen headers, and print-time repeated
+headers are no longer `NumbersEditor` raw-ID operations. Use the immutable
+`Package` with a sheet selector and a table selector scoped to that sheet. The
+transaction vocabulary is
+`litchi_numbers::table::headers::transaction::{Edit, Patch, Commit, Diagnostics, Error, InvalidReason, LimitKind, Path}`.
+
+```rust,no_run
+use litchi_numbers::{
+    Package, SheetSelector, TableSelector,
+    table::headers::{Count, Settings},
+};
+
+let package = Package::open("input.numbers")?;
+let sheet = SheetSelector::name("Summary");
+let table = TableSelector::name("Revenue");
+
+let mut settings: Settings = package.table_header_settings(sheet, table)?;
+settings.header_rows = Some(Count::TWO);
+settings.header_columns = Some(Count::ONE);
+settings.footer_rows = Some(Count::ONE);
+settings.header_rows_frozen = Some(true);
+settings.header_columns_frozen = Some(false);
+settings.repeating_header_rows_enabled = Some(true);
+settings.repeating_header_columns_enabled = Some(false);
+
+let commit = package
+    .edit_table_headers(sheet, table)?
+    .set(settings)
+    .commit()?;
+
+assert_eq!(commit.package().table_header_settings(sheet, table)?, settings);
+assert!(commit.diagnostics().changed());
+
+let restored = commit
+    .package()
+    .apply_table_headers(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`Settings` preserves field presence: assigning `None` clears an explicitly
+stored field to native absence (with an effective count of zero or an effective
+boolean of `false`), while `Some(false)` explicitly stores a disabled freeze
+or repeat flag. Counts are checked in Numbers' native `1..=5` range, so
+`Some(Count::ONE)` represents one footer row. Replacing an edit with its
+unchanged `settings()` is an exact no-op; it shares the source package, reports
+`changed() == false`, and leaves previews and caches intact. A changed commit
+validates the selected table, removes stale root previews, and fully reopens
+the candidate; applying the exact-source-checked inverse restores the original
+package.
+
+Footer rows and row/column freeze flags are directly supported by this focused
+scope. The effective boolean accessors are a native-bool oracle: they report
+only the optional stored value (`None` is effectively `false`) and do not infer
+interactive state. The transaction deliberately refuses dependent topologies:
+any header/footer section-count change with an active pivot or group, a header
+row/column count change with a rooted header-name manager, or a repeat-flag
+change on a legacy sheet topology returns `Error::UnsupportedDependency`.
+
+Changed edits require an exact flat Numbers package. A legacy nested
+`Index.zip` can be read and a no-op preserved, but a changed transaction fails
+with `litchi_numbers::table::headers::transaction::Error::UnsupportedSource`
+rather than normalizing through the retired migration-host path. See
+`litchi-numbers/examples/edit_table_headers.rs` for a distinct-output workflow
+that streams with `Package::write_to` through a synchronized sibling temporary
+file and publishes without clobbering an existing target.
+
 ### Numbers sheet and table names use the focused package transaction
 
 Sheet and table names are no longer `NumbersEditor` raw-ID operations. Use
@@ -1643,12 +1710,11 @@ from scratch.
 
 Numbers table-model dimensions are patched at the protobuf wire level.
 Unrecognized Apple fields retain their bytes and position, while duplicate
-singular fields fail transactionally. Header rows, header columns, footer rows,
-freeze toggles, and print-time repeating-header toggles expose their native
-optional presence through typed settings; the validated count type matches
-Numbers' native 1–5 choices, with `None` representing zero. See
-`edit_numbers_table_headers`. Full-table sort rules have typed read, set, and
-clear APIs that preserve native rule extensions and reference-tracker metadata.
+singular fields fail transactionally. Focused header and footer transactions
+preserve their native optional presence; see
+`litchi-numbers/examples/edit_table_headers.rs`. Full-table sort rules have
+typed read, set, and clear APIs that preserve native rule extensions and
+reference-tracker metadata.
 They configure the order displayed in Numbers' **Organize → Sort** pane;
 executing that order remains Numbers' separate **Sort Now** action. Table
 resizing still updates tiles,

@@ -2047,3 +2047,145 @@ complete-artifact patches without stable semantic serialization/read-write
 sets/composition/merge/history, library-owned durable atomic publication, and
 a sanitizer-backed fuzz campaign. `write_to` itself does not flush, sync,
 rename, or make publication durable.
+
+## 2026-08-10 amendment: Numbers table-header host retirement
+
+This vertical does not create another header semantic model. The existing
+archive-free `table::headers::{Count, Settings}` remains authoritative for the
+`1..=5` nonzero count domain, optional count/Boolean presence, and effective
+values. The focused transaction extends that same module with canonical nested
+`table::headers::transaction::{Edit, Patch, Commit, Diagnostics, Error,
+LimitKind, Path, InvalidReason}` types. Package entry points are
+`table_header_settings(sheet, table)`, `edit_table_headers(sheet, table)`, and
+`apply_table_headers`; their focused signatures expose no native identifier,
+component/member name, generated/wire type, or raw source artifact. The table
+selector is sheet-scoped rather than drawn from the retired host's workbook-wide
+catalog. `Edit::settings` borrows the staged value, while infallible consuming
+`Edit::set(self, Settings) -> Self` replaces it against the immutable package.
+Exact output uses `Package::write_to`.
+
+Changed admission must prove the rooted Numbers owner chain from document
+field 1 through the selected Sheet/FormBasedSheet, its drawable path `[2]` or
+form path `[1, 2]` to TableInfo, and TableInfo field 2 to the selected
+TableModel. Each followed local reference must resolve uniquely with exact
+aggregate metadata and only optional matching field-path evidence. Competing
+rooted TableInfo ownership or selected-owner metadata contradiction fails
+closed; detached/unrooted pseudo-owners remain opaque and preserved.
+
+The selected table's interactive lock state is a changed-only refusal. Counts
+retain their checked native range, header rows plus footer rows may not exceed
+declared rows, and header columns may not exceed declared columns. The adapter
+preserves absence versus explicit values for TableModel fields 9, 10, 11,
+12, 13, 29, and 32, reject duplicate/wrong-wire/noncanonical selected fields,
+and bound all native traversal, projection, rewrite, and output work before
+publication.
+
+Strict raw preflight is cross-checked through a private Buffa lazy projection;
+the validated source record remains the rewrite/preservation owner. The
+generated closure is exactly five files/51,480 bytes, contains no repeated
+view, and has aggregate SHA-256
+`5a94caa4620c56bb464792084c01325cef01744bebac97ef948466b9dea105dd`.
+
+Dependency refusal is field-sensitive. A selected TableModel field-85 pivot
+reference blocks every changed edit. Presence of fields 81/84/86 or a nonempty
+field 83 blocks header-row/column count changes; active category/group state
+decoded through fields 81/83/86 also blocks section-count changes. Selected
+TableInfo role/alias fields 4/5/7/8/15/16/17 are strictly decoded: active
+header aliases gate header counts, while section-role fields 5/15/17 and true
+field 16 additionally gate footer/section counts. A rooted HeaderNameMgr blocks
+header counts, and repetition changes refuse deprecated sheet field 4. These
+cases return `Error::UnsupportedDependency`; footer, freeze, repetition, and
+dependency-free count edits remain in scope without partially normalizing
+native dependency structures.
+
+For those admitted edits, the selected TableModel header fields are the only
+IWA mutation authority and their component is rewritten once. This is not a
+claim that every native header-count edit is TableModel-only. A changed commit
+fully reopens and verifies the requested presence-sensitive settings and exact
+locality, then deletes each existing root `preview.jpg`, `preview-micro.jpg`,
+and `preview-web.jpg`
+because the table rendering changed. Preview deletions and touched components
+are diagnosed separately; `Index/ViewState.iwa`, unrelated ZIP/IWA state,
+unknown fields, and detached objects remain exact. A semantic no-op shares the
+source, preserves previews, reports zero physical work, and skips changed-only
+ownership/lock/reassembly/reopen work.
+
+Patch application is exact-source authorized: no-op apply shares the source;
+changed apply checks the retained selected source payload and conservatively
+preflights aggregate source-plus-target transaction work before reopening the
+retained target; inverse restores the complete source including previews.
+Patches remain process-local complete-artifact capabilities rather than durable
+serialized operations.
+
+The exact retirement inventory is the two public
+`NumbersEditor::{table_header_settings, set_table_header_settings}` methods,
+two whole dedicated mutation tests, one duplicated `Count` unit test, and
+`examples/edit_numbers_table_headers.rs`. Ten mixed Numbers structural/sort
+tests remain and use private package helpers; seven surviving creation/topology
+examples now cross a focused `Package` handoff. The `table_headers`
+module/source, its wire codec, attached read/set helpers, package bridge,
+row/column/sort callers, and Pages/Keynote owners all remain. This is public
+Numbers header-settings host retirement, not module or shared table-structure
+deletion.
+
+Compatibility is intentionally narrower than the retired setter. Rooted
+canonical and legacy TableInfo/TableModel roles are resolved through the graph;
+changed legacy nested physical packages return `UnsupportedSource` rather than
+being normalized. Reads and exact no-ops remain valid on locked tables, while
+changes refuse; admitted rendering changes delete root previews that the old
+setter retained. No manifest edge closes: debt 015 remains and topology stays
+at 64 packages, 235 internal dependency declarations, and 14 ordered debts.
+
+A native refusal oracle explains the dependency boundary. Apple Numbers 14.4
+(7043.0.93) changed source SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+to two header rows and two header columns without warning and preserved B2/B3.
+Its 136,213-byte save, SHA-256
+`5c2323b509e5ea9a975b5f254bbd46cf42657aa1c3858d2c7e98f30f07e4b40c`,
+changed TableModel, HeaderNameMgr, a new manager tile object, and CalcEngine
+formula/dependency state. This is evidence for fail-closed dependency refusal,
+not Rust count-parity or a passing writer gate.
+
+A separate freeze compatibility oracle toggled Freeze Header Rows off from the
+same pristine source, retained 1/1 header counts and B2/B3, and autosaved
+136,199 bytes at SHA-256
+`015568e6b922e80fbfb760491dc49994ccc2218356ed197131beb46c1bd75850`.
+Only TableModel 904538 field 12 changed from `Some(true)` to absent;
+HeaderNameMgr was exact. A native off-to-on control saved as
+`df44ed7d0b12c1d372dad7ad7361ed1140d41967921ee42b71a4072b78615721`.
+Both native saves regenerated equivalent ViewState topology/payload with newly
+allocated IDs, so this supports focused raw ViewState preservation but does
+not claim byte-equal native Save output.
+
+The focused transaction suite passes 6/6 with default features and 6/6 with
+`--no-default-features`; the filtered codec suite passes 4/4. Numbers
+`cargo check -p litchi-numbers --all-targets`, 2/2 root-facade tests with
+`--features numbers`, 113/113 boundary regressions, formatting, and diff checks
+pass. The
+`cargo test -p litchi-numbers --doc` gate reports one passing compile-fail case
+and one ignored example, and warning-denied no-dependency rustdoc passes.
+Strict Clippy reports
+no new header-file finding, but full-crate Clippy remains blocked by unrelated
+pre-existing codec/extractor/table warnings and is not claimed green.
+
+The `numbers_table_headers` fuzz target checks, and its stable fixed-input
+control-flow smoke completed eight runs over `basic.numbers`.
+Expected missing-sanitizer-symbol
+warnings mean this is neither fuzzing nor sanitizer evidence; no nightly
+`cargo-fuzz` run is claimed. The first smoke exposed an Archive `InputBytes`
+versus streaming `InputTooLarge` harness expectation, which was corrected
+before the green rerun.
+
+The focused CLI changed source SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+to `a8b88d21806b547a5265c60662610f68f524173cac1ca4252d368596c8ef8d2a`,
+reported `changed=true`, `touched_components=1`, and three deleted previews;
+its inverse restored the exact source hash. This is artifact/locality evidence,
+not a claim that the Rust candidate was opened in Numbers.
+
+Remaining debt includes aggregate transaction peak-memory/total-work and
+complete fallible-allocation accounting, process-local complete-artifact
+patches without stable semantic serialization/read-write sets/composition/
+merge/history, library-owned durable atomic publication, baseline Clippy
+cleanup, and a sanitizer-backed fuzz campaign. `write_to` does not itself
+flush, sync, rename, or make output durable.

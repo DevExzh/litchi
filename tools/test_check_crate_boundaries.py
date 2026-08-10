@@ -86,6 +86,43 @@ def add_keynote_slide_transition_canonical_scaffold(root: Path) -> None:
     lib_export.write_text(lib_source + "pub mod transition;\n", encoding="utf-8")
 
 
+def add_numbers_table_header_settings_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic_source = (
+        semantic.read_text(encoding="utf-8") if semantic.is_file() else ""
+    )
+    semantic.write_text(
+        semantic_source + "pub mod transaction;\n",
+        encoding="utf-8",
+    )
+    transaction = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE
+    transaction.parent.mkdir(parents=True, exist_ok=True)
+    transaction_source = (
+        transaction.read_text(encoding="utf-8") if transaction.is_file() else ""
+    )
+    transaction.write_text(
+        transaction_source
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES
+        ),
+        encoding="utf-8",
+    )
+    table_export = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[2]
+    table_export.parent.mkdir(parents=True, exist_ok=True)
+    table_source = (
+        table_export.read_text(encoding="utf-8") if table_export.is_file() else ""
+    )
+    table_export.write_text(table_source + "pub mod headers;\n", encoding="utf-8")
+    lib_export = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[0]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_source = (
+        lib_export.read_text(encoding="utf-8") if lib_export.is_file() else ""
+    )
+    lib_export.write_text(lib_source + "pub mod table;\n", encoding="utf-8")
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -2971,6 +3008,870 @@ class BoundaryPolicyTests(unittest.TestCase):
                         [
                             "focused litchi-numbers names public API exposes "
                             "duplicate package::names module: "
+                            "crates/litchi-numbers/src/package.rs:1"
+                        ],
+                    )
+
+    def test_numbers_table_header_settings_boundary_inventories_are_exact(
+        self,
+    ) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_METHODS,
+            ("table_header_settings", "set_table_header_settings"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_EXAMPLE,
+            Path("crates/litchi-iwa/examples/edit_numbers_table_headers.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES,
+            (
+                Path("crates/litchi-numbers/src/table/headers.rs"),
+                Path("crates/litchi-numbers/src/table/headers/transaction.rs"),
+                Path("crates/litchi-numbers/src/package/table_headers.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES,
+            (
+                Path("crates/litchi-numbers/src/lib.rs"),
+                Path("crates/litchi-numbers/src/package.rs"),
+                Path("crates/litchi-numbers/src/table.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES,
+            (
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "Error",
+                "LimitKind",
+                "Path",
+                "InvalidReason",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_PACKAGE_METHODS,
+            ("table_header_settings", "edit_table_headers", "apply_table_headers"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_TYPES,
+            ("Count", "Error", "Settings"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIAS_PREFIXES,
+            ("HeaderSettings", "TableHeader", "TableHeaders", "TableHeaderSettings"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIASES,
+            frozenset(
+                prefix + suffix
+                for prefix in (
+                    "HeaderSettings",
+                    "TableHeader",
+                    "TableHeaders",
+                    "TableHeaderSettings",
+                )
+                for suffix in (
+                    "Edit",
+                    "Patch",
+                    "Commit",
+                    "Diagnostics",
+                    "Error",
+                    "LimitKind",
+                    "Path",
+                    "InvalidReason",
+                )
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_SEMANTIC_ALIASES,
+            frozenset(
+                {
+                    "HeaderCount",
+                    "HeaderSettings",
+                    "TableHeaderCount",
+                    "TableHeaderSettings",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_ROOT_ALIASES,
+            frozenset(
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES
+                + boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_TYPES
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_PHYSICAL_TYPES,
+            frozenset(
+                {
+                    "Archive",
+                    "ComponentCatalog",
+                    "EntryEdit",
+                    "ExactArtifacts",
+                    "IWorkPackage",
+                    "PhysicalSource",
+                    "RawMessage",
+                    "Resolved",
+                    "SnappyStream",
+                    "SourceCatalog",
+                    "TableHeaderSettingsSnapshot",
+                    "TableInfoSnapshot",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_HEADER_SETTINGS_WIRE_TYPES,
+            frozenset(
+                {
+                    "DecodeOptions",
+                    "NestedFieldEdit",
+                    "NestedFieldReplacement",
+                    "WireDescent",
+                    "WireError",
+                    "WireLimits",
+                    "WireResourceLimit",
+                    "WireView",
+                }
+            ),
+        )
+
+    def test_retired_iwa_numbers_table_header_settings_surface_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_headers.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "fn r#table_header_settings() {}\n"
+                "pub(in crate::numbers) async unsafe fn set_table_header_settings() {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text("// retired example returned\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_header_settings_source_topology(
+                    root
+                ),
+                sorted(
+                    [
+                        "retired litchi-iwa Numbers table-header settings method "
+                        "table_header_settings: "
+                        "crates/litchi-iwa/src/numbers/editor/table_headers.rs:1",
+                        "retired litchi-iwa Numbers table-header settings method "
+                        "set_table_header_settings: "
+                        "crates/litchi-iwa/src/numbers/editor/table_headers.rs:2",
+                        "retired litchi-iwa Numbers table-header settings example "
+                        "returned: "
+                        "crates/litchi-iwa/examples/edit_numbers_table_headers.rs",
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_numbers_table_header_settings_readme_calls_and_example(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_NUMBERS_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "\n".join(
+                    [
+                        "let settings = numbers",
+                        "    .",
+                        "    r#table_header_settings",
+                        "    (",
+                        "numbers_editor.r#set_table_header_settings(",
+                        "crate::numbers::NumbersEditor",
+                        "    ::",
+                        "    set_table_header_settings(",
+                        "r#NumbersEditor::r#table_header_settings(",
+                        "Run `edit_numbers_table_headers`.",
+                        "cargo run --example edit_numbers_table_headers.rs",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_header_settings_source_topology(
+                    root
+                ),
+                sorted(
+                    [
+                        "retired litchi-iwa Numbers table-header settings README call "
+                        "table_header_settings: crates/litchi-iwa/README.md:3",
+                        "retired litchi-iwa Numbers table-header settings README call "
+                        "set_table_header_settings: crates/litchi-iwa/README.md:5",
+                        "retired litchi-iwa Numbers table-header settings README call "
+                        "set_table_header_settings: crates/litchi-iwa/README.md:8",
+                        "retired litchi-iwa Numbers table-header settings README call "
+                        "table_header_settings: crates/litchi-iwa/README.md:9",
+                        "retired litchi-iwa Numbers table-header settings README "
+                        "example reference edit_numbers_table_headers: "
+                        "crates/litchi-iwa/README.md:10",
+                        "retired litchi-iwa Numbers table-header settings README "
+                        "example reference edit_numbers_table_headers: "
+                        "crates/litchi-iwa/README.md:11",
+                    ]
+                ),
+            )
+
+    def test_iwa_numbers_table_header_settings_policy_ignores_safe_helpers_and_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_headers.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "\n".join(
+                    [
+                        "// pub fn table_header_settings() {}",
+                        'const NOTE: &str = "fn set_table_header_settings() {}";',
+                        "/* fn table_header_settings() {}",
+                        "   /* fn set_table_header_settings() {} */",
+                        "   fn table_header_settings() {} */",
+                        'const RAW_NOTE: &str = r###"fn set_table_header_settings() {}"###;',
+                        "pub(super) fn read_table_header_settings() {}",
+                        "pub(super) fn read_attached_table_header_settings() {}",
+                        "pub(super) fn set_attached_table_header_settings() {}",
+                        "pub(crate) fn table_header_settings_in_package() {}",
+                        "pub(crate) fn set_table_header_settings_in_package() {}",
+                        "pub(super) fn read_table_header_settings_wire() {}",
+                        "pub(super) fn write_table_header_settings_wire() {}",
+                        "pub fn table_header_settings_snapshot() {}",
+                        "pub fn set_table_header_settings_for_model() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_NUMBERS_README
+            readme.write_text(
+                "\n".join(
+                    [
+                        "The table_header_settings names are retired.",
+                        "Use `table_header_settings` rather than `.table_header_settings`.",
+                        "table_header_settings(",
+                        "set_table_header_settings(",
+                        "numbers.table_header_settings_snapshot(",
+                        "editor.set_table_header_settings_for_model(",
+                        "editor.table_header_settings(",
+                        "editor.set_table_header_settings(",
+                        "pages.table_header_settings(",
+                        "keynote.set_table_header_settings(",
+                        "package.table_header_settings(",
+                        "package.edit_table_headers(",
+                        "edit_numbers_table_header.rs",
+                        "edit_numbers_table_headers_old.rs",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            declarations = (
+                "pub fn table_header_settings() {}\n"
+                "pub fn set_table_header_settings() {}\n"
+            )
+            for relative in (
+                Path("crates/litchi-numbers/src/package/table_headers.rs"),
+                Path("crates/litchi-iwa/src/pages/editor/table_headers.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/table_headers.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(declarations, encoding="utf-8")
+            non_rust = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "table_headers.txt"
+            non_rust.write_text(declarations, encoding="utf-8")
+            near_example = (
+                root
+                / boundaries.RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_EXAMPLE.with_name(
+                    "edit_numbers_table_headers_old.rs"
+                )
+            )
+            near_example.parent.mkdir(parents=True, exist_ok=True)
+            near_example.write_text("// near example\n", encoding="utf-8")
+            for relative in (Path("README.md"), Path("crates/litchi-numbers/README.md")):
+                other = root / relative
+                other.parent.mkdir(parents=True, exist_ok=True)
+                other.write_text(
+                    "numbers.table_header_settings(\nedit_numbers_table_headers\n",
+                    encoding="utf-8",
+                )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_header_settings_source_topology(
+                    root
+                ),
+                [],
+            )
+    def test_focused_numbers_table_header_settings_requires_canonical_types(
+        self,
+    ) -> None:
+        for missing in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    semantic = (
+                        root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+                    )
+                    semantic.parent.mkdir(parents=True)
+                    semantic.write_text("pub mod transaction;\n", encoding="utf-8")
+                    transaction = (
+                        root
+                        / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE
+                    )
+                    transaction.parent.mkdir(parents=True, exist_ok=True)
+                    transaction.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    table_export = (
+                        root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[2]
+                    )
+                    table_export.write_text("pub mod headers;\n", encoding="utf-8")
+                    lib_export = (
+                        root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[0]
+                    )
+                    lib_export.write_text("pub mod table;\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-header settings public API "
+                            f"is missing canonical transaction type {missing}: "
+                            "crates/litchi-numbers/src/table/headers.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_header_settings_module_visibility(self) -> None:
+        missing_cases = (
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE,
+                (
+                    "",
+                    "mod transaction;\n",
+                    "pub(crate) mod transaction;\n",
+                    "pub(super) mod r#transaction {}\n",
+                    "// pub mod transaction;\n",
+                    'const NOTE: &str = "pub mod transaction;";\n',
+                ),
+                "focused litchi-numbers table-header settings public API is missing "
+                "canonical headers::transaction module: "
+                "crates/litchi-numbers/src/table/headers.rs",
+            ),
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[2],
+                (
+                    "",
+                    "mod headers;\n",
+                    "pub(crate) mod headers;\n",
+                    "pub(in crate) mod r#headers {}\n",
+                    "/* pub mod headers; */\n",
+                ),
+                "focused litchi-numbers table-header settings public API is missing "
+                "canonical table::headers module: crates/litchi-numbers/src/table.rs",
+            ),
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[0],
+                (
+                    "",
+                    "mod table;\n",
+                    "pub(crate) mod table;\n",
+                    "pub(super) mod r#table {}\n",
+                    'const RAW_NOTE: &str = r#"pub mod table;"#;\n',
+                ),
+                "focused litchi-numbers table-header settings public API is missing "
+                "canonical root table module: crates/litchi-numbers/src/lib.rs",
+            ),
+        )
+        for relative, declarations, diagnostic in missing_cases:
+            for declaration in declarations:
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_numbers_table_header_settings_canonical_scaffold(root)
+                        path = root / relative
+                        path.write_text(declaration, encoding="utf-8")
+
+                        self.assertEqual(
+                            boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                                root
+                            ),
+                            [diagnostic],
+                        )
+
+        accepted_cases = (
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE,
+                (
+                    "pub mod transaction;\n",
+                    "pub mod r#transaction;\n",
+                    "pub\nmod\nr#transaction\n;\n",
+                ),
+            ),
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[2],
+                (
+                    "pub mod headers;\n",
+                    "pub mod r#headers;\n",
+                    "pub mod headers {}\n",
+                    "pub\nmod\nr#headers\n{}\n",
+                ),
+            ),
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[0],
+                (
+                    "pub mod table;\n",
+                    "pub mod r#table;\n",
+                    "pub mod table {}\n",
+                    "pub\nmod\nr#table\n{}\n",
+                ),
+            ),
+        )
+        for relative, declarations in accepted_cases:
+            for declaration in declarations:
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_numbers_table_header_settings_canonical_scaffold(root)
+                        path = root / relative
+                        path.write_text(declaration, encoding="utf-8")
+
+                        self.assertEqual(
+                            boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                                root
+                            ),
+                            [],
+                        )
+
+    def test_focused_numbers_table_header_settings_accepts_inline_transaction(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub mod transaction {\n"
+                + "".join(
+                    f"    pub struct {name};\n"
+                    for name in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES
+                )
+                + "}\n",
+                encoding="utf-8",
+            )
+            table_export = (
+                root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[2]
+            )
+            table_export.write_text("pub mod headers;\n", encoding="utf-8")
+            lib_export = (
+                root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[0]
+            )
+            lib_export.write_text("pub mod table;\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_table_header_settings_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction, owner = (
+                root / path
+                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn headers(r#source_bytes: &[u8], r#object_id: u64, "
+                "archive_name: &str, component_name: &str, member_name: &str, "
+                "entry_name: &str) -> "
+                "(DocumentArchive, IWorkPackage, SourceCatalog) {}\n"
+                "pub type Count = buffa::DocumentArchiveView;\n"
+                "impl prost::Message for headers::Settings {}\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub type Edit = Archive;",
+                        "pub type Patch = ComponentCatalog;",
+                        "pub type Commit = EntryEdit;",
+                        "pub type Diagnostics = ExactArtifacts;",
+                        "pub type Error = IWorkPackage;",
+                        "pub type LimitKind = PhysicalSource;",
+                        "pub type Path = RawMessage;",
+                        "pub type InvalidReason = Resolved;",
+                        "pub type HeaderSnappy = SnappyStream;",
+                        "pub type HeaderCatalog = SourceCatalog;",
+                        "pub type HeaderSnapshot = TableHeaderSettingsSnapshot;",
+                        "pub type HeaderInfo = TableInfoSnapshot;",
+                        "pub type HeaderDecode = DecodeOptions;",
+                        "pub type HeaderFieldEdit = NestedFieldEdit;",
+                        "pub type HeaderReplacement = NestedFieldReplacement;",
+                        "pub type HeaderDescent = wire::WireDescent;",
+                        "pub type HeaderWireError = wire::WireError;",
+                        "pub type HeaderWireLimits = WireLimits;",
+                        "pub type HeaderWireResource = WireResourceLimit;",
+                        "pub type HeaderWireView = WireView;",
+                        "pub type HeaderNative = NativeObject;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "pub type HeaderOwner = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export, table_export = (
+                root / path
+                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub fn edit_table_headers("
+                "value: litchi_iwa_protos::GeneratedHeaderSettings) "
+                "-> table::headers::transaction::Edit {}\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub fn apply_table_headers(value: prost_types::MessageInfo) "
+                "-> table::headers::transaction::Commit {}\n",
+                encoding="utf-8",
+            )
+            table_export.write_text(
+                "pub fn table_header_settings(value: SourceBytes) "
+                "-> headers::Settings {}\n",
+                encoding="utf-8",
+            )
+            add_numbers_table_header_settings_canonical_scaffold(root)
+
+            violations = (
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                )
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-numbers table-header settings public API "
+                        "exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "physical package name archive_name",
+                "physical package name component_name",
+                "physical package name member_name",
+                "physical package name entry_name",
+                "archive/IWA type DocumentArchive",
+                "archive/IWA type IWorkPackage",
+                "archive/IWA type SourceCatalog",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type Archive",
+                "archive/IWA type ComponentCatalog",
+                "archive/IWA type EntryEdit",
+                "archive/IWA type ExactArtifacts",
+                "archive/IWA type PhysicalSource",
+                "archive/IWA type RawMessage",
+                "archive/IWA type Resolved",
+                "archive/IWA type SnappyStream",
+                "archive/IWA type TableHeaderSettingsSnapshot",
+                "archive/IWA type TableInfoSnapshot",
+                "wire type DecodeOptions",
+                "wire type NestedFieldEdit",
+                "wire type NestedFieldReplacement",
+                "wire type wire",
+                "wire type WireDescent",
+                "wire type WireError",
+                "wire type WireLimits",
+                "wire type WireResourceLimit",
+                "wire type WireView",
+                "native object NativeObject",
+                "archive/IWA type litchi_iwa_core",
+                "native object RawObject",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedHeaderSettings",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+                "raw source bytes SourceBytes",
+            )
+            self.assertEqual(len(violations), 44)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused table-header leak: {fragment}",
+                    )
+
+    def test_focused_numbers_table_header_settings_allows_nested_private_surfaces(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction, owner = (
+                root / path
+                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct Count;\n"
+                "pub struct Settings;\n"
+                "pub enum Error {}\n"
+                "// pub struct HeaderSettings;\n"
+                'const NOTE: &str = "pub type TableHeaderSettingsEdit = Archive";\n'
+                "/* pub struct TableHeaderCount; */\n"
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> SourceBytes { todo!() }\n"
+                "pub(crate) fn restricted(archive: DocumentArchive) {}\n",
+                encoding="utf-8",
+            )
+            all_flat_aliases = sorted(
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIASES
+                | boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_SEMANTIC_ALIASES
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    (
+                        "struct" if index % 2 == 0 else "pub(crate) struct"
+                    )
+                    + f" {name};"
+                    for index, name in enumerate(all_flat_aliases)
+                )
+                + "\nimpl TableHeaderSettingsEdit {}\n",
+                encoding="utf-8",
+            )
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "pub fn table_header_settings() -> table::headers::Settings { todo!() }\n"
+                "pub fn edit_table_headers() -> table::headers::transaction::Edit "
+                "{ todo!() }\n"
+                "pub fn apply_table_headers() -> table::headers::transaction::Commit "
+                "{ todo!() }\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export, table_export = (
+                root / path
+                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES
+            )
+            private_roots = "\n".join(
+                ("use" if index % 2 == 0 else "pub(crate) use")
+                + f" crate::table::headers::{name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_TABLE_HEADER_SETTINGS_ROOT_ALIASES)
+                )
+            )
+            safe_exports = (
+                "// pub use crate::table::headers::{Settings, Edit};\n"
+                'const NOTE: &str = "pub use crate::table::headers::*;";\n'
+                "pub fn table_header_settings() -> table::headers::Settings { todo!() }\n"
+                + private_roots
+                + "\npub(crate) use crate::table::headers::*;\n"
+                "pub use crate::layout::{Count, Settings, Edit, Patch, Commit, "
+                "Diagnostics, Error, LimitKind, Path, InvalidReason};\n"
+                "pub use crate::layout::*;\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+            )
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            table_export.write_text(safe_exports, encoding="utf-8")
+            package_export.write_text(
+                safe_exports
+                + "// pub mod table_headers;\n"
+                + 'const MODULE_NOTE: &str = "pub mod table_headers;";\n'
+                + 'const RAW_NOTE: &str = r#"pub mod r#table_headers {}"#;\n'
+                + "/* pub mod r#table_headers {} */\n"
+                + "mod table_headers;\n"
+                + "pub(crate) mod r#table_headers;\n"
+                + "pub(super) mod table_headers {}\n"
+                + "pub(in crate) mod table_headers;\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.NUMBERS_SOURCE_ROOT / "cell.rs"
+            nonfocused.write_text(
+                "\n".join(f"pub struct {name};" for name in all_flat_aliases)
+                + "\npub fn table_headers(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/table_headers.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "\n".join(f"pub struct {name};" for name in all_flat_aliases)
+                + "\npub use crate::table::headers::{Count, Settings, Edit, Patch};\n"
+                "pub fn table_headers(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_numbers_table_header_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_table_header_settings_rejects_all_flat_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES
+                + boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            aliases = sorted(
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIASES
+                | boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_SEMANTIC_ALIASES
+            )
+            for index, name in enumerate(aliases):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                if source_index == 0:
+                    declaration = f"pub struct {name};"
+                elif source_index == 1:
+                    declaration = f"pub type {name} = Edit;"
+                elif source_index == 2:
+                    declaration = f"pub enum {name} {{ Legacy }}"
+                else:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-numbers table-header settings public API retains "
+                    f"flat alias {name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_numbers_table_header_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                ),
+                sorted(expected),
+            )
+
+    def test_focused_numbers_table_header_settings_exports_reject_root_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export, table_export = (
+                root / path
+                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            aliases = sorted(boundaries.NUMBERS_TABLE_HEADER_SETTINGS_ROOT_ALIASES)
+            first = aliases[:3]
+            second = aliases[3:6]
+            third = aliases[6:]
+            lib_export.write_text(
+                "pub use crate::table::headers::{" + ", ".join(first) + "};\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::table_headers::{" + ", ".join(second) + "};\n"
+                "pub use crate::table_headers::*;\n",
+                encoding="utf-8",
+            )
+            table_export.write_text(
+                "pub use self::headers::{" + ", ".join(third) + "};\n",
+                encoding="utf-8",
+            )
+            add_numbers_table_header_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                ),
+                sorted(
+                    [
+                        *[
+                            "focused litchi-numbers table-header settings public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-numbers/src/lib.rs:1"
+                            for name in first
+                        ],
+                        *[
+                            "focused litchi-numbers table-header settings public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-numbers/src/package.rs:1"
+                            for name in second
+                        ],
+                        *[
+                            "focused litchi-numbers table-header settings public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-numbers/src/table.rs:1"
+                            for name in third
+                        ],
+                        "focused litchi-numbers table-header settings public API "
+                        "retains root aliases via table-header glob: "
+                        "crates/litchi-numbers/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_numbers_table_header_settings_rejects_public_package_module(
+        self,
+    ) -> None:
+        for declaration in (
+            "pub mod table_headers;",
+            "pub mod r#table_headers;",
+            "pub mod table_headers {}",
+            "pub\nmod\nr#table_headers\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    package_export = (
+                        root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[1]
+                    )
+                    package_export.parent.mkdir(parents=True)
+                    package_export.write_text(declaration + "\n", encoding="utf-8")
+                    add_numbers_table_header_settings_canonical_scaffold(root)
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-header settings public API "
+                            "exposes duplicate package::table_headers module: "
                             "crates/litchi-numbers/src/package.rs:1"
                         ],
                     )

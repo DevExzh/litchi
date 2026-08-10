@@ -4263,16 +4263,17 @@ fn row_insert_copy_on_writes_shared_formula_ast_and_remerges_on_delete() {
 
 #[test]
 fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
-    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor
-        .set_table_header_settings(
-            test_table_selector(&editor, 10),
-            HeaderSettings {
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let mut package = test_package_with_calculation_engine();
+    set_table_header_settings_in_package(
+        &mut package,
+        10,
+        HeaderSettings {
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
         .set_formula(
             10,
@@ -4363,16 +4364,17 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
     const RANGE_TILE_MESSAGE_TYPE: u32 = 4_010;
     const VERSIONED_ENGINE_ENTRY: &str = "Index/CalculationEngine-10-2.iwa";
 
-    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor
-        .set_table_header_settings(
-            test_table_selector(&editor, 10),
-            HeaderSettings {
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let mut package = test_package_with_calculation_engine();
+    set_table_header_settings_in_package(
+        &mut package,
+        10,
+        HeaderSettings {
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
     editor.set_cell(10, 2, 1, cell_number(3.0)).unwrap();
     editor
@@ -5165,18 +5167,19 @@ fn column_insert_then_delete_restores_exact_package_bytes() {
 
 #[test]
 fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
-    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor
-        .set_table_header_settings(
-            test_table_selector(&editor, 10),
-            HeaderSettings {
-                header_rows: Some(HeaderCount::ONE),
-                header_columns: Some(HeaderCount::ONE),
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let mut package = test_package_with_calculation_engine();
+    set_table_header_settings_in_package(
+        &mut package,
+        10,
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
     editor.set_cell(10, 2, 1, cell_number(3.0)).unwrap();
     editor
@@ -5202,9 +5205,7 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
         .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::header(1))
         .unwrap();
 
-    let settings = editor
-        .table_header_settings(test_table_selector(&editor, 10))
-        .unwrap();
+    let settings = table_header_settings_in_package(editor.package(), 10).unwrap();
     assert_eq!(settings.header_row_count(), 2);
     assert_eq!(settings.header_column_count(), 2);
     assert_eq!(settings.footer_row_count(), 1);
@@ -5225,16 +5226,17 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
 
 #[test]
 fn footer_insertions_do_not_expand_body_formula_ranges() {
-    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor
-        .set_table_header_settings(
-            test_table_selector(&editor, 10),
-            HeaderSettings {
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let mut package = test_package_with_calculation_engine();
+    set_table_header_settings_in_package(
+        &mut package,
+        10,
+        HeaderSettings {
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
     editor.set_cell(10, 2, 1, cell_number(3.0)).unwrap();
     editor
@@ -5257,8 +5259,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::footer(0))
         .unwrap();
     assert_eq!(
-        editor
-            .table_header_settings(test_table_selector(&editor, 10))
+        table_header_settings_in_package(editor.package(), 10)
             .unwrap()
             .footer_row_count(),
         2
@@ -5277,8 +5278,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::footer(1))
         .unwrap();
     assert_eq!(
-        editor
-            .table_header_settings(test_table_selector(&editor, 10))
+        table_header_settings_in_package(editor.package(), 10)
             .unwrap()
             .footer_row_count(),
         2
@@ -5303,9 +5303,7 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
     editor
         .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::header(0))
         .unwrap();
-    let settings = editor
-        .table_header_settings(test_table_selector(&editor, 10))
-        .unwrap();
+    let settings = table_header_settings_in_package(editor.package(), 10).unwrap();
     assert_eq!(settings.header_row_count(), 1);
     assert_eq!(settings.footer_row_count(), 1);
     assert_eq!(settings.header_column_count(), 1);
@@ -5342,18 +5340,19 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
 
 #[test]
 fn section_relative_deletions_target_fixed_regions_transactionally() {
-    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    editor
-        .set_table_header_settings(
-            test_table_selector(&editor, 10),
-            HeaderSettings {
-                header_rows: Some(HeaderCount::ONE),
-                header_columns: Some(HeaderCount::ONE),
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let mut package = test_package();
+    set_table_header_settings_in_package(
+        &mut package,
+        10,
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
         .set_cell(10, 0, 0, CellValue::Text("Header".to_owned()))
         .unwrap();
@@ -5374,9 +5373,7 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
         .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::header(0))
         .unwrap();
 
-    let settings = editor
-        .table_header_settings(test_table_selector(&editor, 10))
-        .unwrap();
+    let settings = table_header_settings_in_package(editor.package(), 10).unwrap();
     assert_eq!(settings.header_row_count(), 0);
     assert_eq!(settings.footer_row_count(), 0);
     assert_eq!(settings.header_column_count(), 0);
@@ -5520,146 +5517,6 @@ fn table_axis_delete_rejects_live_formula_references_transactionally() {
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
-}
-
-#[test]
-fn table_header_settings_are_typed_transactional_and_wire_exact() {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(10).unwrap();
-            let message = object.messages[0].clone();
-            let mut data = message.data;
-            append_unknown_varint(&mut data, 99, 990);
-            object.replace_message(
-                0,
-                RawMessage {
-                    type_: message.type_,
-                    data,
-                },
-            )?;
-            Ok(())
-        })
-        .unwrap();
-    let mut editor = NumbersEditor::from_package(package).unwrap();
-    let baseline = editor.to_bytes().unwrap();
-    assert_eq!(
-        editor
-            .table_header_settings(test_table_selector(&editor, 10))
-            .unwrap(),
-        HeaderSettings::default()
-    );
-
-    let settings = HeaderSettings {
-        header_rows: Some(HeaderCount::TWO),
-        header_columns: Some(HeaderCount::ONE),
-        footer_rows: Some(HeaderCount::ONE),
-        header_rows_frozen: Some(true),
-        header_columns_frozen: Some(false),
-        repeating_header_rows_enabled: Some(true),
-        repeating_header_columns_enabled: Some(false),
-    };
-    editor
-        .set_table_header_settings(test_table_selector(&editor, 10), settings)
-        .unwrap();
-    assert_eq!(
-        editor
-            .table_header_settings(test_table_selector(&editor, 10))
-            .unwrap(),
-        settings
-    );
-    assert_eq!(settings.header_row_count(), 2);
-    assert_eq!(settings.header_column_count(), 1);
-    assert_eq!(settings.footer_row_count(), 1);
-    assert!(settings.header_rows_are_frozen());
-    assert!(!settings.header_columns_are_frozen());
-    assert!(settings.repeats_header_rows());
-    assert!(!settings.repeats_header_columns());
-    let changed = editor.to_bytes().unwrap();
-    let reparsed = NumbersEditor::from_bytes(&changed).unwrap();
-    assert_eq!(
-        reparsed
-            .table_header_settings(test_table_selector(&reparsed, 10))
-            .unwrap(),
-        settings
-    );
-
-    editor
-        .set_table_header_settings(test_table_selector(&editor, 10), settings)
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), changed);
-    editor
-        .set_table_header_settings(test_table_selector(&editor, 10), HeaderSettings::default())
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    let before = editor.to_bytes().unwrap();
-    let too_many_rows = HeaderSettings {
-        header_rows: Some(HeaderCount::THREE),
-        footer_rows: Some(HeaderCount::TWO),
-        ..Default::default()
-    };
-    assert!(
-        editor
-            .set_table_header_settings(test_table_selector(&editor, 10), too_many_rows)
-            .is_err()
-    );
-    let too_many_columns = HeaderSettings {
-        header_columns: Some(HeaderCount::FIVE),
-        ..Default::default()
-    };
-    assert!(
-        editor
-            .set_table_header_settings(test_table_selector(&editor, 10), too_many_columns)
-            .is_err()
-    );
-    assert!(
-        editor
-            .table_header_settings(test_table_selector(&editor, u64::MAX))
-            .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), before);
-}
-
-#[test]
-fn table_header_settings_reject_malformed_wire_transactionally() {
-    for malformed in [vec![(9, 1), (9, 2)], vec![(12, 2)], vec![(29, 0), (29, 1)]] {
-        let mut package = test_package();
-        package
-            .update_archive("Index/Document.iwa", |archive| {
-                let object = archive.object_mut(10).unwrap();
-                let message = object.messages[0].clone();
-                let mut data = message.data;
-                for (field, value) in &malformed {
-                    append_unknown_varint(&mut data, *field, *value);
-                }
-                object.replace_message(
-                    0,
-                    RawMessage {
-                        type_: message.type_,
-                        data,
-                    },
-                )?;
-                Ok(())
-            })
-            .unwrap();
-        let mut editor = NumbersEditor::from_package(package).unwrap();
-        let before = editor.to_bytes().unwrap();
-        assert!(
-            editor
-                .table_header_settings(test_table_selector(&editor, 10))
-                .is_err()
-        );
-        assert!(
-            editor
-                .set_table_header_settings(
-                    test_table_selector(&editor, 10),
-                    HeaderSettings::default()
-                )
-                .is_err()
-        );
-        assert_eq!(editor.to_bytes().unwrap(), before);
-    }
 }
 
 #[test]
@@ -6172,21 +6029,23 @@ fn source_created_table_supports_sort_order_configuration_crud() {
 
 #[test]
 fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let editor = NumbersDocumentBuilder::new()
         .table_dimensions(6, 2)
         .build()
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
-    editor
-        .set_table_header_settings(
-            test_table_selector(&editor, table_id),
-            HeaderSettings {
-                header_rows: Some(HeaderCount::ONE),
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let mut package = editor.into_package();
+    set_table_header_settings_in_package(
+        &mut package,
+        table_id,
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
         .set_cells(
             table_id,
@@ -6589,21 +6448,23 @@ fn table_sort_rejects_missing_plain_text_storage_transactionally() {
 
 #[test]
 fn source_created_table_executes_sort_order_without_moving_headers_or_footers() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let editor = NumbersDocumentBuilder::new()
         .table_dimensions(5, 3)
         .build()
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
-    editor
-        .set_table_header_settings(
-            test_table_selector(&editor, table_id),
-            HeaderSettings {
-                header_rows: Some(HeaderCount::ONE),
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let mut package = editor.into_package();
+    set_table_header_settings_in_package(
+        &mut package,
+        table_id,
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
         .set_cells(
             table_id,
@@ -6714,21 +6575,23 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
 fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
     use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 
-    let mut editor = NumbersDocumentBuilder::new()
+    let editor = NumbersDocumentBuilder::new()
         .table_dimensions(5, 2)
         .build()
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
-    editor
-        .set_table_header_settings(
-            test_table_selector(&editor, table_id),
-            HeaderSettings {
-                header_rows: Some(HeaderCount::ONE),
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let mut package = editor.into_package();
+    set_table_header_settings_in_package(
+        &mut package,
+        table_id,
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
         .set_cells(
             table_id,
@@ -6929,16 +6792,16 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
             Ok(())
         })
         .unwrap();
+    set_table_header_settings_in_package(
+        &mut package,
+        10,
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor
-        .set_table_header_settings(
-            test_table_selector(&editor, 10),
-            HeaderSettings {
-                header_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
     editor
         .set_cells(
             10,

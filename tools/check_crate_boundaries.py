@@ -428,6 +428,152 @@ NUMBERS_NAMES_PHYSICAL_TYPES = frozenset(
 NUMBERS_NAMES_WIRE_TYPES = frozenset(
     {"WireDescent", "WireError", "WireLimits", "WireResourceLimit", "WireView"}
 )
+RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_METHODS = (
+    "table_header_settings",
+    "set_table_header_settings",
+)
+RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_METHODS
+)
+RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_numbers_table_headers.rs"
+)
+IWA_NUMBERS_README_TABLE_HEADER_SETTINGS_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:numbers|numbers_editor)"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>table_header_settings|set_table_header_settings)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])"
+        r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+        r"(?:r#)?NumbersEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?(?P<method>table_header_settings|set_table_header_settings)"
+        r"\b[ \t\r\n]*\("
+    ),
+)
+IWA_NUMBERS_README_TABLE_HEADER_SETTINGS_EXAMPLE = re.compile(
+    r"(?<![A-Za-z0-9_])(?P<example>edit_numbers_table_headers)(?:\.rs)?"
+    r"(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE = (
+    Path("crates/litchi-numbers/src/table/headers.rs")
+)
+NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE = Path(
+    "crates/litchi-numbers/src/table/headers/transaction.rs"
+)
+NUMBERS_TABLE_HEADER_SETTINGS_OWNER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_headers.rs"
+)
+NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES = (
+    NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE,
+    NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE,
+    NUMBERS_TABLE_HEADER_SETTINGS_OWNER_SOURCE,
+)
+NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES = (
+    Path("crates/litchi-numbers/src/lib.rs"),
+    Path("crates/litchi-numbers/src/package.rs"),
+    Path("crates/litchi-numbers/src/table.rs"),
+)
+NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+    "InvalidReason",
+)
+NUMBERS_TABLE_HEADER_SETTINGS_PACKAGE_METHODS = (
+    "table_header_settings",
+    "edit_table_headers",
+    "apply_table_headers",
+)
+NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_TYPES = (
+    "Count",
+    "Error",
+    "Settings",
+)
+NUMBERS_TABLE_HEADER_SETTINGS_SHORT_NAMES = frozenset(
+    NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES
+)
+NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIAS_PREFIXES = (
+    "HeaderSettings",
+    "TableHeader",
+    "TableHeaders",
+    "TableHeaderSettings",
+)
+NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIAS_PREFIXES
+    for suffix in NUMBERS_TABLE_HEADER_SETTINGS_SHORT_NAMES
+)
+NUMBERS_TABLE_HEADER_SETTINGS_FLAT_SEMANTIC_ALIASES = frozenset(
+    {
+        "HeaderCount",
+        "HeaderSettings",
+        "TableHeaderCount",
+        "TableHeaderSettings",
+    }
+)
+NUMBERS_TABLE_HEADER_SETTINGS_ROOT_ALIASES = frozenset(
+    NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES
+    + NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_TYPES
+)
+NUMBERS_TABLE_HEADER_SETTINGS_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_headers|headers)"
+    r"[ \t\r\n]*::"
+)
+PUBLIC_NUMBERS_PACKAGE_TABLE_HEADERS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_headers\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_HEADERS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?headers\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_HEADER_TRANSACTION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transaction\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_TABLE_HEADER_SETTINGS_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableHeaderSettingsSnapshot",
+        "TableInfoSnapshot",
+    }
+)
+NUMBERS_TABLE_HEADER_SETTINGS_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
 IWA_TABLE_LOCK_SOURCE = Path("crates/litchi-iwa/src/table_lock.rs")
 IWA_NUMBERS_TABLE_INFO_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "model.rs"
@@ -1613,6 +1759,34 @@ def _rust_named_struct_body(source: str, name: str) -> tuple[str, int] | None:
     return code[opening + 1 : cursor - 1], opening + 1
 
 
+def _rust_public_module_body(source: str, name: str) -> str | None:
+    """Return one unrestricted public inline module body, ignoring trivia."""
+
+    code = _mask_rust_non_code(source)
+    declaration = re.search(
+        rf"(?<![A-Za-z0-9_#])pub[ \t\r\n]+mod[ \t\r\n]+"
+        rf"(?:r#)?{re.escape(name)}\b",
+        code,
+    )
+    if declaration is None:
+        return None
+    opening = code.find("{", declaration.end())
+    semicolon = code.find(";", declaration.end())
+    if opening < 0 or (semicolon >= 0 and semicolon < opening):
+        return None
+    depth = 1
+    cursor = opening + 1
+    while cursor < len(code) and depth:
+        if code[cursor] == "{":
+            depth += 1
+        elif code[cursor] == "}":
+            depth -= 1
+        cursor += 1
+    if depth:
+        return None
+    return code[opening + 1 : cursor - 1]
+
+
 def _iwork_public_leak(identifier: str) -> str | None:
     """Classify physical vocabulary forbidden in focused iWork facades."""
 
@@ -1696,6 +1870,61 @@ def _is_numbers_names_public_declaration(
     return bool(identifiers & NUMBERS_NAMES_FLAT_ALIASES) or (
         _numbers_names_owner_declaration(declaration)
     )
+
+
+def _numbers_table_header_settings_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in header transactions."""
+
+    if identifier in NUMBERS_TABLE_HEADER_SETTINGS_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if (
+        identifier == "wire"
+        or identifier in NUMBERS_TABLE_HEADER_SETTINGS_WIRE_TYPES
+    ):
+        return "wire type"
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _numbers_table_header_settings_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return NUMBERS_TABLE_HEADER_SETTINGS_OWNER_PATH.search(
+        declaration
+    ) is not None or any(
+        identifier
+        in NUMBERS_TABLE_HEADER_SETTINGS_PACKAGE_METHODS
+        for identifier in identifiers
+    )
+
+
+def _is_numbers_table_header_settings_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers
+        & (
+            NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIASES
+            | NUMBERS_TABLE_HEADER_SETTINGS_FLAT_SEMANTIC_ALIASES
+        )
+    ) or _numbers_table_header_settings_owner_declaration(declaration)
 
 
 def _is_numbers_table_lock_public_declaration(
@@ -1805,8 +2034,10 @@ def _is_keynote_slide_transition_public_declaration(
     )
 
 
-def _keynote_slide_transition_canonical_exports(source: str) -> frozenset[str]:
-    """Return exact short transition types publicly defined or reexported."""
+def _rust_canonical_exports(
+    source: str, names: frozenset[str]
+) -> frozenset[str]:
+    """Return exact names publicly defined or reexported in one Rust scope."""
 
     exported: set[str] = set()
     for declaration, _ in _rust_public_declarations(source):
@@ -1821,14 +2052,18 @@ def _keynote_slide_transition_canonical_exports(source: str) -> frozenset[str]:
                 code,
             ):
                 original, public_name = alias.groups()
-                if public_name in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES:
+                if public_name in names:
                     exported.add(public_name)
-                if original in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES:
-                    code = code[: alias.start(1)] + (" " * len(original)) + code[alias.end(1) :]
+                if original in names:
+                    code = (
+                        code[: alias.start(1)]
+                        + (" " * len(original))
+                        + code[alias.end(1) :]
+                    )
             exported.update(
                 match.group(1)
                 for match in RUST_IDENTIFIER.finditer(code)
-                if match.group(1) in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES
+                if match.group(1) in names
             )
             continue
         item = re.match(
@@ -1836,7 +2071,7 @@ def _keynote_slide_transition_canonical_exports(source: str) -> frozenset[str]:
             r"[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)",
             declaration,
         )
-        if item is not None and item.group(1) in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES:
+        if item is not None and item.group(1) in names:
             exported.add(item.group(1))
     return frozenset(exported)
 
@@ -2103,8 +2338,9 @@ def audit_keynote_slide_transition_facade_source_topology(
     violations: list[str] = []
 
     canonical_exports = (
-        _keynote_slide_transition_canonical_exports(
-            semantic_source.read_text(encoding="utf-8")
+        _rust_canonical_exports(
+            semantic_source.read_text(encoding="utf-8"),
+            KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES,
         )
         if semantic_source.is_file()
         else frozenset()
@@ -2397,6 +2633,241 @@ def audit_numbers_names_facade_source_topology(root: Path = ROOT) -> list[str]:
                 violations.append(
                     "focused litchi-numbers names public API exposes "
                     f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_table_header_settings_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep retired Numbers table-header methods out of the host facade."""
+
+    violations: list[str] = []
+    example = root / RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_EXAMPLE
+    if example.exists():
+        violations.append(
+            "retired litchi-iwa Numbers table-header settings example returned: "
+            + str(RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_EXAMPLE)
+        )
+
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_NUMBERS_TABLE_HEADER_SETTINGS_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Numbers table-header settings method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    readme_path = root / IWA_NUMBERS_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_NUMBERS_README_TABLE_HEADER_SETTINGS_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers table-header settings README call "
+                    f"{match.group('method')}: {IWA_NUMBERS_README}:{line_number}"
+                )
+        for match in IWA_NUMBERS_README_TABLE_HEADER_SETTINGS_EXAMPLE.finditer(source):
+            line_number = source.count("\n", 0, match.start("example")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table-header settings README example "
+                f"reference {match.group('example')}: "
+                f"{IWA_NUMBERS_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_table_header_settings_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the nested, archive-free Numbers header transaction API."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    export_sources = {
+        root / path
+        for path in NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_HEADER_TRANSACTION_MODULE.search(
+        _mask_rust_non_code(semantic_source)
+    ) is None:
+        violations.append(
+            "focused litchi-numbers table-header settings public API is missing "
+            "canonical headers::transaction module: "
+            f"{NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE}"
+        )
+
+    transaction_body = _rust_public_module_body(semantic_source, "transaction")
+    external_transaction = root / NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE
+    transaction_source = (
+        transaction_body
+        if transaction_body is not None
+        else external_transaction.read_text(encoding="utf-8")
+        if external_transaction.is_file()
+        else ""
+    )
+    canonical_exports = _rust_canonical_exports(
+        transaction_source, NUMBERS_TABLE_HEADER_SETTINGS_SHORT_NAMES
+    )
+    for name in NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-numbers table-header settings public API is missing "
+            f"canonical transaction type {name}: "
+            f"{NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE}"
+        )
+
+    table_path = root / NUMBERS_SOURCE_ROOT / "table.rs"
+    table_source = (
+        _mask_rust_non_code(table_path.read_text(encoding="utf-8"))
+        if table_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_HEADERS_MODULE.search(table_source) is None:
+        violations.append(
+            "focused litchi-numbers table-header settings public API is missing "
+            "canonical table::headers module: "
+            f"{NUMBERS_SOURCE_ROOT / 'table.rs'}"
+        )
+
+    lib_path = root / NUMBERS_SOURCE_ROOT / "lib.rs"
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-numbers table-header settings public API is missing "
+            "canonical root table module: "
+            f"{NUMBERS_SOURCE_ROOT / 'lib.rs'}"
+        )
+
+    package_export = root / NUMBERS_SOURCE_ROOT / "package.rs"
+    if package_export.is_file():
+        package_source = _mask_rust_non_code(
+            package_export.read_text(encoding="utf-8")
+        )
+        for match in PUBLIC_NUMBERS_PACKAGE_TABLE_HEADERS_MODULE.finditer(
+            package_source
+        ):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers table-header settings public API exposes "
+                "duplicate package::table_headers module: "
+                f"{package_export.relative_to(root)}:{line_number}"
+            )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_numbers_table_header_settings_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            owner_declaration = _numbers_table_header_settings_owner_declaration(
+                declaration
+            )
+            declaration_identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = declaration_identifiers[:2] in (
+                ["pub", "type"],
+                ["pub", "use"],
+            )
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and declaration_identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-numbers table-header settings public API "
+                    "retains root aliases via table-header glob: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in (
+                    NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIASES
+                    | NUMBERS_TABLE_HEADER_SETTINGS_FLAT_SEMANTIC_ALIASES
+                ):
+                    violations.append(
+                        "focused litchi-numbers table-header settings public API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and owner_declaration
+                    and public_use_or_type
+                    and identifier in NUMBERS_TABLE_HEADER_SETTINGS_ROOT_ALIASES
+                ):
+                    violations.append(
+                        "focused litchi-numbers table-header settings public API "
+                        f"retains root alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_table_header_settings_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-numbers table-header settings public API "
+                    f"exposes {reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-numbers table-header settings public API "
+                    f"exposes raw byte slice {byte_slice}: "
                     f"{path.relative_to(root)}:{byte_slice_line}"
                 )
 
@@ -2992,6 +3463,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_slide_transition_facade_source_topology()
         + audit_iwa_numbers_names_source_topology()
         + audit_numbers_names_facade_source_topology()
+        + audit_iwa_numbers_table_header_settings_source_topology()
+        + audit_numbers_table_header_settings_facade_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
         + audit_iwa_pages_page_layout_source_topology()

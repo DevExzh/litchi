@@ -47,6 +47,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "numbers_table_headers"
+path = "fuzz_targets/numbers_table_headers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_names"
 path = "fuzz_targets/numbers_names.rs"
 test = false
