@@ -6,7 +6,7 @@
 //! `PP9SlideBinaryTagExtension`, `PP10SlideBinaryTagExtension`, and
 //! `PP12SlideBinaryTagExtension` (sections 2.5.23, 2.5.24, and 2.5.34).
 //!
-//! Every grammar slot retains its raw [`Record`]: parsing is strictly
+//! Every grammar slot retains its raw [`crate::Record`]: parsing is strictly
 //! ordered per the spec but completely inert, and serialization is byte-exact.
 //! Deeper field decoding deliberately stays with the dedicated piecemeal
 //! readers (`kinsoku.rs`, `broadcast.rs`, `html_publish.rs`,

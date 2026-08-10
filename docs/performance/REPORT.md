@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest tranche: `f12786397d3e677981ed3c441950f94fe6155d48`
+Production base for the latest tranche: `4a2020d5c61bb14eac6646b6b50c7f1fa46c8df5`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,10 +13,10 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **106 selectable cases**: 36 default cases and 198 default
+harness contains **107 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, 16
 opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, 21 opt-in
-ODT/ODS/ODP semantic cases, and 18 opt-in native DOC/XLS/PPT semantic cases. It
+ODT/ODS/ODP semantic cases, and 19 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
 | Change | Current evidence | Scope / limitation |
@@ -35,6 +35,7 @@ is still not broad program or CRUD coverage.
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
+| Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
 | ODS row-local publication | Large/medium one-cell edit-save p50 **-9.54% / -7.22%**; allocation calls **-5.85%**, peak heap **-27.18%** | Same-topology modeled rows only; structural edits fall back and touched opaque rows refuse |
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
@@ -115,6 +116,12 @@ batches ordinary stream replacement; its primary raw reports are
 complete record in
 [`change 0017`](changes/0017-doc-batched-stream-publication.md).
 
+The native PPT root-snapshot evidence is retained as four short ABBA cycles
+under `results/abba-ppt-slide-order-root-repeat-*.json`. Reader/edit guards,
+allocation attribution, RSS, counters, the disclosed initial selected-shape
+tail and its neutral repeat are summarized in
+[`change 0024`](changes/0024-ppt-slide-order-open-reuse.md).
+
 The ODS row-local publication evidence is
 [`before A`](results/abba-ods-row-splice-one-edit-before-a.json),
 [`after A`](results/abba-ods-row-splice-one-edit-after-a.json),
@@ -186,13 +193,15 @@ See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0020`](changes/0020-rtf-ascii-transport-batching.md), and
 [`0021`](changes/0021-opc-shared-regenerated-payload.md), and
 [`0022`](changes/0022-zip-generated-local-span-move.md), and
-[`0023`](changes/0023-odt-full-text-owned-blocks.md).
+[`0023`](changes/0023-odt-full-text-owned-blocks.md), and
+[`0024`](changes/0024-ppt-slide-order-open-reuse.md).
 
 Consolidated changed-crate tests passed, along with focused changed-crate
-warning-denied Clippy, rustdoc and formatter checks. The latest ODT tranche
-also compiled the ODF fuzz target offline. A workspace all-target/all-feature
-gate was not rerun because iWork was explicitly excluded while its crates are
-changing independently.
+warning-denied Clippy, rustdoc and formatter checks. The ODT tranche compiled
+the ODF fuzz target offline; the latest PPT tranche has no dedicated fuzz
+target in the current tree. A workspace all-target/all-feature gate was not
+rerun because iWork was explicitly excluded while its crates are changing
+independently.
 
 ## Accepted results
 
@@ -226,6 +235,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODT full text, 10,000 blocks | 4.127 ms | 3.993 ms | **-3.25% p50 / -4.81% mean** | Allocation calls -15.48%, temporary allocations -45.52%; peak heap/RSS flat; open guard disclosed |
 | Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
+| Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
 
 The underlying records are:
 
@@ -249,6 +259,7 @@ The underlying records are:
 - [`0021-opc-shared-regenerated-payload.md`](changes/0021-opc-shared-regenerated-payload.md)
 - [`0022-zip-generated-local-span-move.md`](changes/0022-zip-generated-local-span-move.md)
 - [`0023-odt-full-text-owned-blocks.md`](changes/0023-odt-full-text-owned-blocks.md)
+- [`0024-ppt-slide-order-open-reuse.md`](changes/0024-ppt-slide-order-open-reuse.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -350,7 +361,7 @@ ZIP layouts use the fully validated rewrite path before any sink output.
 
 ## Evidence and verification
 
-The standalone harness provides 106 selectable cases and a 198-record default
+The standalone harness provides 107 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora.
@@ -397,6 +408,10 @@ major hardware counters stay within 5%. Uninstrumented RSS is flat for both.
 The ODT full-text follow-up removes 420,019 allocation calls over ten samples,
 cuts temporary allocations 45.52%, task clock 2.39%, instructions 2.51% and
 cache misses 13.05%; peak heap and uninstrumented RSS remain flat.
+The PPT root-snapshot follow-up removes 45 allocation calls per open, cuts
+task clock 6.56%, instructions 9.57% and cycles 6.85%, and keeps peak heap and
+uninstrumented RSS flat. Its 15.00% cache-miss increase is disclosed rather
+than presented as a locality improvement.
 Lock-wait evidence remains missing.
 
 ## Remaining highest-impact work
@@ -417,9 +432,10 @@ and broad format-semantic CRUD coverage beyond the generated text/grid slices
 (bulk action distinctions, dependency-copy, merge/split, patch timing, repair,
 security, malformed and real-producer corpora, plus broader ODF and RTF
 coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS
-editor-reuse and DOC batched-publication follow-ups. Remaining native work
-requires new attribution inside the retained final owner/public-reader
-validation layers. ODT full-text block ownership is accepted, but broader ODF
+editor-reuse, DOC batched-publication, and PPT root-open reuse follow-ups.
+Remaining native work requires new attribution inside the retained final
+owner/public-reader validation layers. ODT full-text block ownership is
+accepted, but broader ODF
 source-backed reads, repeated ODT/ODP semantic scans, package-parse reuse,
 unchanged ZIP-member publication and structural-edit profiles remain open.
 The rejected direct ODS target-package and ODT final-document adoptions are not

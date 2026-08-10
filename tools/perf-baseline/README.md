@@ -22,9 +22,9 @@ default 36 cases / 198 records.
 
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
-range cases, two execution-scaling cases, 18 native OLE2 semantic cases, 16
+range cases, two execution-scaling cases, 19 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, seven RTF semantic cases, and 21 ODF semantic cases
-are opt-in, for 106 selectable cases in total:
+are opt-in, for 107 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -57,12 +57,12 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
 ```
 
 Run the complete native DOC/XLS/PPT semantic matrix over the same deterministic
-tiny and large writer artifacts (36 records):
+tiny and large writer artifacts (38 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 15 --writer-shape tiny,large \
-  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_semantic_full_text,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
+  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
   --json target/perf/ole2-semantic-baseline.json
 ```
 
@@ -369,6 +369,10 @@ remain distinguishable.
   `ppt_semantic_full_text`: enumerate slides, resolve one middle textbox, or
   extract all presentation text. The selected-shape path necessarily builds
   the public slide collection.
+- `ppt_slide_order_snapshot_open`: capture the public exact-source root
+  `slide_order::Snapshot`, including its complete package, live-document,
+  slide-order, and review-history validation. Generic public-reader semantic
+  verification remains outside timing.
 - `ppt_semantic_noop_edit_save` / `ppt_semantic_one_edit_save`: start from an
   already-open exact-source `slide_order::Snapshot`, publish zero or one
   middle-shape text replacement, and materialize owned bytes. The complete

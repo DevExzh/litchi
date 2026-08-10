@@ -94,7 +94,7 @@ impl HeaderFooter {
     /// Strictly parse one already-materialized `RT_HeadersFooters` record.
     ///
     /// The supplied scope is checked against the record instance. Direct-parent
-    /// placement is validated by [`HeaderFooters`] when parsing a
+    /// placement is validated by [`crate::HeaderFooters`] when parsing a
     /// complete presentation.
     ///
     /// # Errors

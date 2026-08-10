@@ -14,6 +14,12 @@ use std::sync::Arc;
 )]
 pub(crate) fn inspect_live_document(bytes: &[u8]) -> Result<(u32, Vec<u8>)> {
     let mut ole = OleFile::open(Cursor::new(bytes))?;
+    inspect_live_document_from_ole(&mut ole)
+}
+
+pub(crate) fn inspect_live_document_from_ole<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+) -> Result<(u32, Vec<u8>)> {
     let paths = ole.list_streams();
     let document_path = find_stream(&paths, "PowerPoint Document")?;
     let current_user_path = find_stream(&paths, "Current User")?;

@@ -17,7 +17,9 @@ mod tests;
 use super::{Collection, ExternalObject};
 use crate::embedded::storage::Storage;
 use crate::package::Error;
+use litchi_cfb::OleFile;
 use std::collections::{BTreeMap, HashSet};
+use std::io::{Read, Seek};
 use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -51,6 +53,12 @@ impl Editor {
     )]
     pub(crate) fn inspect_live_document(bytes: &[u8]) -> Result<(u32, Vec<u8>)> {
         lifecycle::inspect_live_document(bytes)
+    }
+
+    pub(crate) fn inspect_live_document_from_ole<R: Read + Seek>(
+        ole: &mut OleFile<R>,
+    ) -> Result<(u32, Vec<u8>)> {
+        lifecycle::open::inspect_live_document_from_ole(ole)
     }
 
     pub(crate) fn inspect_live_mapping(
