@@ -2,9 +2,9 @@
 //!
 //! A bounded raw-wire pass rejects ambiguous or non-canonical selected fields
 //! before Buffa observes them. Buffa then supplies borrowed lazy-view
-//! cross-checks for the slide's note edge and the note's storage edge. Unknown
-//! fields remain opaque in caller-owned source bytes and are never retained or
-//! re-encoded by this module.
+//! cross-checks for the slide's semantic note/title/body edges and the note's
+//! storage edge. Unknown fields remain opaque in caller-owned source bytes and
+//! are never retained or re-encoded by this module.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -19,6 +19,8 @@ use crate::buffa_keynote_speaker_notes_generated::LitchiIwaProjection as project
 
 const SLIDE_STYLE_FIELD: u32 = 1;
 const SLIDE_TRANSITION_FIELD: u32 = 4;
+const SLIDE_TITLE_PLACEHOLDER_FIELD: u32 = 5;
+const SLIDE_BODY_PLACEHOLDER_FIELD: u32 = 6;
 const SLIDE_NAME_FIELD: u32 = 10;
 const SLIDE_IN_DOCUMENT_FIELD: u32 = 19;
 const SLIDE_NOTE_FIELD: u32 = 27;
@@ -111,6 +113,8 @@ impl ReferenceSnapshot {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SlideNotesOwnerSnapshot<'source> {
     style: ReferenceSnapshot,
+    title_placeholder: Option<ReferenceSnapshot>,
+    body_placeholder: Option<ReferenceSnapshot>,
     name: Option<&'source str>,
     in_document: bool,
     note: Option<ReferenceSnapshot>,
@@ -121,6 +125,18 @@ impl<'source> SlideNotesOwnerSnapshot<'source> {
     #[must_use]
     pub const fn style(self) -> ReferenceSnapshot {
         self.style
+    }
+
+    /// Optional edge to the slide's semantic title placeholder.
+    #[must_use]
+    pub const fn title_placeholder(self) -> Option<ReferenceSnapshot> {
+        self.title_placeholder
+    }
+
+    /// Optional edge to the slide's semantic body placeholder.
+    #[must_use]
+    pub const fn body_placeholder(self) -> Option<ReferenceSnapshot> {
+        self.body_placeholder
     }
 
     /// Optional exact navigator name borrowed from source bytes.
@@ -162,9 +178,34 @@ pub struct DecodeError {
     kind: DecodeErrorKind,
 }
 
+/// A content-free wire-resource classification for [`DecodeError`].
+///
+/// Values describe only configured limits and aggregate byte counts; they
+/// never expose decoded protobuf field values or caller-owned source bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WireResourceLimit {
+    /// The input or configured message-byte ceiling could not be honored.
+    ///
+    /// `observed` is populated only when the complete input length was known
+    /// at the point it exceeded `maximum`.
+    Bytes {
+        observed: Option<usize>,
+        maximum: Option<usize>,
+    },
+    /// The configured or enforced protobuf nesting ceiling was exceeded.
+    ///
+    /// `observed` is populated only for an invalid configured ceiling; a
+    /// decoder recursion failure does not reveal a trustworthy exact depth.
+    Nesting {
+        observed: Option<u32>,
+        maximum: Option<u32>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DecodeErrorKind {
     Wire(buffa::DecodeError),
+    WireResourceLimit(WireResourceLimit),
     MissingRequired(&'static str),
     DuplicateSingular(&'static str),
     NonCanonical(&'static str),
@@ -177,7 +218,30 @@ enum DecodeErrorKind {
 
 impl DecodeError {
     fn recursion_limit() -> Self {
-        buffa::DecodeError::RecursionLimitExceeded.into()
+        Self::wire_resource_limit_error(WireResourceLimit::Nesting {
+            observed: None,
+            maximum: None,
+        })
+    }
+
+    const fn wire_resource_limit_error(limit: WireResourceLimit) -> Self {
+        Self {
+            kind: DecodeErrorKind::WireResourceLimit(limit),
+        }
+    }
+
+    fn with_recursion_limit_context(mut self, maximum: u32) -> Self {
+        if let DecodeErrorKind::WireResourceLimit(WireResourceLimit::Nesting {
+            observed,
+            maximum: None,
+        }) = self.kind
+        {
+            self.kind = DecodeErrorKind::WireResourceLimit(WireResourceLimit::Nesting {
+                observed,
+                maximum: Some(maximum),
+            });
+        }
+        self
     }
 
     const fn missing_required(field: &'static str) -> Self {
@@ -290,12 +354,30 @@ impl DecodeError {
         };
         Some((observed, maximum))
     }
+
+    /// Wire byte/nesting resource failure, independent of Buffa error text.
+    ///
+    /// This is intentionally content-free so format adapters can map trusted
+    /// resource-policy failures without exposing raw decoder internals.
+    #[must_use]
+    pub const fn wire_resource_limit(&self) -> Option<WireResourceLimit> {
+        let DecodeErrorKind::WireResourceLimit(limit) = self.kind else {
+            return None;
+        };
+        Some(limit)
+    }
 }
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             DecodeErrorKind::Wire(error) => error.fmt(formatter),
+            DecodeErrorKind::WireResourceLimit(WireResourceLimit::Bytes { .. }) => {
+                formatter.write_str("Keynote speaker-note wire byte limit exceeded")
+            },
+            DecodeErrorKind::WireResourceLimit(WireResourceLimit::Nesting { .. }) => {
+                formatter.write_str("Keynote speaker-note wire nesting limit exceeded")
+            },
             DecodeErrorKind::MissingRequired(field) => {
                 write!(formatter, "missing required field {field}")
             },
@@ -326,8 +408,17 @@ impl std::error::Error for DecodeError {}
 
 impl From<buffa::DecodeError> for DecodeError {
     fn from(error: buffa::DecodeError) -> Self {
-        Self {
-            kind: DecodeErrorKind::Wire(error),
+        match error {
+            buffa::DecodeError::MessageTooLarge => {
+                Self::wire_resource_limit_error(WireResourceLimit::Bytes {
+                    observed: None,
+                    maximum: None,
+                })
+            },
+            buffa::DecodeError::RecursionLimitExceeded => Self::recursion_limit(),
+            error => Self {
+                kind: DecodeErrorKind::Wire(error),
+            },
         }
     }
 }
@@ -343,10 +434,14 @@ pub fn decode_slide_notes_owner<'source>(
 ) -> Result<SlideNotesOwnerSnapshot<'source>, DecodeError> {
     validate_decode_input(source, options)?;
     let mut budget = Budget::new(options);
-    let strict = preflight_slide(source, options, &mut budget)?;
-    let view: projection::SlideArchiveLazyView<'source> =
-        options.buffa().decode_lazy_view(source)?;
-    let projected = force_slide_projection(&view)?;
+    let strict = preflight_slide(source, options, &mut budget)
+        .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?;
+    let view: projection::SlideArchiveLazyView<'source> = options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(DecodeError::from)?;
+    let projected = force_slide_projection(&view)
+        .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?;
     if projected != strict {
         return Err(DecodeError::projection());
     }
@@ -360,9 +455,14 @@ pub fn decode_note_owner(
 ) -> Result<NoteOwnerSnapshot, DecodeError> {
     validate_decode_input(source, options)?;
     let mut budget = Budget::new(options);
-    let strict = preflight_note(source, options, &mut budget)?;
-    let view: projection::NoteArchiveLazyView<'_> = options.buffa().decode_lazy_view(source)?;
-    let projected = force_note_projection(&view)?;
+    let strict = preflight_note(source, options, &mut budget)
+        .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?;
+    let view: projection::NoteArchiveLazyView<'_> = options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(DecodeError::from)?;
+    let projected = force_note_projection(&view)
+        .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?;
     if projected != strict {
         return Err(DecodeError::projection());
     }
@@ -397,15 +497,36 @@ pub fn decode_note_storage_reference(
 }
 
 fn validate_decode_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
-    let max_buffa_message_bytes = usize::try_from(buffa::MAX_MESSAGE_BYTES)
-        .map_err(|_conversion| buffa::DecodeError::MessageTooLarge)?;
-    if options.max_message_bytes > max_buffa_message_bytes
-        || source.len() > options.max_message_bytes
-    {
-        return Err(buffa::DecodeError::MessageTooLarge.into());
+    let max_buffa_message_bytes =
+        usize::try_from(buffa::MAX_MESSAGE_BYTES).map_err(|_conversion| {
+            DecodeError::wire_resource_limit_error(WireResourceLimit::Bytes {
+                observed: None,
+                maximum: None,
+            })
+        })?;
+    if options.max_message_bytes > max_buffa_message_bytes {
+        return Err(DecodeError::wire_resource_limit_error(
+            WireResourceLimit::Bytes {
+                observed: None,
+                maximum: Some(max_buffa_message_bytes),
+            },
+        ));
+    }
+    if source.len() > options.max_message_bytes {
+        return Err(DecodeError::wire_resource_limit_error(
+            WireResourceLimit::Bytes {
+                observed: Some(source.len()),
+                maximum: Some(options.max_message_bytes),
+            },
+        ));
     }
     if options.recursion_limit == 0 || options.recursion_limit > MAX_RECURSION_LIMIT {
-        return Err(DecodeError::recursion_limit());
+        return Err(DecodeError::wire_resource_limit_error(
+            WireResourceLimit::Nesting {
+                observed: Some(options.recursion_limit),
+                maximum: Some(MAX_RECURSION_LIMIT),
+            },
+        ));
     }
     Ok(())
 }
@@ -457,6 +578,8 @@ fn preflight_slide<'source>(
     let nested = options.descend()?;
     let mut style = None;
     let mut saw_transition = false;
+    let mut title_placeholder = None;
+    let mut body_placeholder = None;
     let mut name = None;
     let mut in_document = None;
     let mut note = None;
@@ -481,6 +604,30 @@ fn preflight_slide<'source>(
                 }
                 saw_transition = true;
                 preflight_transition(field.length_delimited()?, nested, budget)?;
+            },
+            SLIDE_TITLE_PLACEHOLDER_FIELD => {
+                if title_placeholder.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "KN.SlideArchive.titlePlaceholder",
+                    ));
+                }
+                title_placeholder = Some(preflight_reference(
+                    field.length_delimited()?,
+                    nested,
+                    budget,
+                )?);
+            },
+            SLIDE_BODY_PLACEHOLDER_FIELD => {
+                if body_placeholder.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "KN.SlideArchive.bodyPlaceholder",
+                    ));
+                }
+                body_placeholder = Some(preflight_reference(
+                    field.length_delimited()?,
+                    nested,
+                    budget,
+                )?);
             },
             SLIDE_NAME_FIELD => {
                 if name.is_some() {
@@ -512,8 +659,13 @@ fn preflight_slide<'source>(
             _ => {},
         }
     }
+    if !saw_transition {
+        return Err(DecodeError::missing_required("KN.SlideArchive.transition"));
+    }
     Ok(SlideNotesOwnerSnapshot {
         style: style.ok_or_else(|| DecodeError::missing_required("KN.SlideArchive.style"))?,
+        title_placeholder,
+        body_placeholder,
         name,
         in_document: in_document
             .ok_or_else(|| DecodeError::missing_required("KN.SlideArchive.inDocument"))?,
@@ -663,8 +815,20 @@ fn force_slide_projection<'source>(
         .get()?
         .map(|note| force_reference_projection(&note))
         .transpose()?;
+    let title_placeholder = view
+        .title_placeholder
+        .get()?
+        .map(|reference| force_reference_projection(&reference))
+        .transpose()?;
+    let body_placeholder = view
+        .body_placeholder
+        .get()?
+        .map(|reference| force_reference_projection(&reference))
+        .transpose()?;
     Ok(SlideNotesOwnerSnapshot {
         style,
+        title_placeholder,
+        body_placeholder,
         name: view.name,
         in_document: view.in_document,
         note,
@@ -927,8 +1091,9 @@ mod tests {
     use prost::Message as _;
 
     use super::{
-        DecodeOptions, NoteOwnerSnapshot, SlideNotesOwnerSnapshot, decode_note_owner,
-        decode_note_storage_reference, decode_slide_note_reference, decode_slide_notes_owner,
+        DecodeOptions, NoteOwnerSnapshot, SlideNotesOwnerSnapshot, WireResourceLimit,
+        decode_note_owner, decode_note_storage_reference, decode_slide_note_reference,
+        decode_slide_notes_owner,
     };
     use crate::{kn, tsp};
 
@@ -973,10 +1138,25 @@ mod tests {
     #[test]
     fn canonical_prost_slide_and_note_match_borrowed_projection()
     -> Result<(), Box<dyn std::error::Error>> {
-        let slide_source = slide(Some("Agenda 🚀"), Some(42)).encode_to_vec();
+        let mut native_slide = slide(Some("Agenda 🚀"), Some(42));
+        native_slide.title_placeholder = Some(reference(51));
+        native_slide.body_placeholder = Some(reference(52));
+        let slide_source = native_slide.encode_to_vec();
         let owner = decode_slide(&slide_source)?;
         assert_eq!(owner.style().identifier().get(), 11);
         assert_eq!(owner.style().deprecated_type(), Some(-7));
+        assert_eq!(
+            owner
+                .title_placeholder()
+                .map(|reference| reference.identifier().get()),
+            Some(51)
+        );
+        assert_eq!(
+            owner
+                .body_placeholder()
+                .map(|reference| reference.identifier().get()),
+            Some(52)
+        );
         assert_eq!(owner.name(), Some("Agenda 🚀"));
         assert!(owner.in_document());
         assert_eq!(
@@ -1006,6 +1186,8 @@ mod tests {
     fn absent_optional_name_and_note_are_preserved() -> Result<(), Box<dyn std::error::Error>> {
         let source = slide(None, None).encode_to_vec();
         let owner = decode_slide(&source)?;
+        assert_eq!(owner.title_placeholder(), None);
+        assert_eq!(owner.body_placeholder(), None);
         assert_eq!(owner.name(), None);
         assert_eq!(owner.note(), None);
         Ok(())
@@ -1019,6 +1201,14 @@ mod tests {
                 .expect_err("missing style")
                 .missing_required_field(),
             Some("KN.SlideArchive.style")
+        );
+
+        let missing_transition = [0x0a, 0x02, 0x08, 0x01, 0x98, 0x01, 0x01];
+        assert_eq!(
+            decode_slide(&missing_transition)
+                .expect_err("missing transition")
+                .missing_required_field(),
+            Some("KN.SlideArchive.transition")
         );
 
         let missing_attributes = [0x0a, 0x02, 0x08, 0x01, 0x22, 0x00, 0x98, 0x01, 0x01];
@@ -1056,6 +1246,17 @@ mod tests {
                 .expect_err("duplicate slide note")
                 .duplicate_singular_field(),
             Some("KN.SlideArchive.note")
+        );
+
+        let mut native_with_title = slide(None, None);
+        native_with_title.title_placeholder = Some(reference(51));
+        let mut duplicate_title_source = native_with_title.encode_to_vec();
+        duplicate_title_source.extend_from_slice(&[0x2a, 0x02, 0x08, 0x34]);
+        assert_eq!(
+            decode_slide(&duplicate_title_source)
+                .expect_err("duplicate title placeholder")
+                .duplicate_singular_field(),
+            Some("KN.SlideArchive.titlePlaceholder")
         );
 
         let duplicate_identifier = [0x0a, 0x04, 0x08, 0x01, 0x08, 0x02];
@@ -1110,17 +1311,55 @@ mod tests {
     }
 
     #[test]
+    fn selected_nested_unknown_fields_remain_opaque_when_lazy_views_are_forced()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // The title/body references each carry a future unknown scalar. Their
+        // lazy views are forced during the projection cross-check, so this
+        // covers opaque nested bytes rather than only unknown slide fields.
+        let source = [
+            0x0a, 0x02, 0x08, 0x0b, // style = reference(11)
+            0x22, 0x02, 0x12, 0x00, // transition.attributes = {}
+            0x2a, 0x05, 0x08, 0x33, 0xa0, 0x06, 0x01, // title = reference(51), unknown 100
+            0x32, 0x05, 0x08, 0x34, 0xa8, 0x06, 0x01, // body = reference(52), unknown 101
+            0x98, 0x01, 0x01, // in_document = true
+        ];
+        let owner = decode_slide(&source)?;
+        assert_eq!(
+            owner
+                .title_placeholder()
+                .map(|reference| reference.identifier().get()),
+            Some(51)
+        );
+        assert_eq!(
+            owner
+                .body_placeholder()
+                .map(|reference| reference.identifier().get()),
+            Some(52)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn exact_resource_limits_pass_and_one_less_fails() -> Result<(), Box<dyn std::error::Error>> {
-        let source = slide(None, Some(42)).encode_to_vec();
+        let mut native_slide = slide(None, Some(42));
+        native_slide.title_placeholder = Some(reference(51));
+        native_slide.body_placeholder = Some(reference(52));
+        let source = native_slide.encode_to_vec();
         let generous = options(&source, 3);
         let expected = decode_slide_notes_owner(&source, generous)?;
 
-        assert!(
-            decode_slide_notes_owner(
-                &source,
-                DecodeOptions::new(source.len() - 1, source.len(), source.len() * 8, 3),
-            )
-            .is_err()
+        let bytes_error = decode_slide_notes_owner(
+            &source,
+            DecodeOptions::new(source.len() - 1, source.len(), source.len() * 8, 3),
+        );
+        assert_eq!(
+            bytes_error
+                .expect_err("message bytes limit")
+                .wire_resource_limit(),
+            Some(WireResourceLimit::Bytes {
+                observed: Some(source.len()),
+                maximum: Some(source.len() - 1),
+            })
         );
 
         let field_error = decode_slide_notes_owner(
@@ -1147,14 +1386,37 @@ mod tests {
             .work_limit_values(),
             Some((exact_work, exact_work - 1))
         );
-        assert!(
-            decode_slide_notes_owner(
-                &source,
-                DecodeOptions::new(source.len(), source.len(), source.len() * 8, 1),
-            )
-            .is_err()
+        let nesting_error = decode_slide_notes_owner(
+            &source,
+            DecodeOptions::new(source.len(), source.len(), source.len() * 8, 1),
+        );
+        assert_eq!(
+            nesting_error
+                .expect_err("recursion limit")
+                .wire_resource_limit(),
+            Some(WireResourceLimit::Nesting {
+                observed: None,
+                maximum: Some(1),
+            })
         );
         Ok(())
+    }
+
+    #[test]
+    fn invalid_resource_policy_has_content_free_limit_classification() {
+        let source = slide(None, None).encode_to_vec();
+        let error = decode_slide_notes_owner(
+            &source,
+            DecodeOptions::new(source.len(), source.len(), source.len() * 8, 0),
+        )
+        .expect_err("zero recursion limit");
+        assert_eq!(
+            error.wire_resource_limit(),
+            Some(WireResourceLimit::Nesting {
+                observed: Some(0),
+                maximum: Some(64),
+            })
+        );
     }
 
     fn strict_work_for_slide(source: &[u8]) -> Result<usize, Box<dyn std::error::Error>> {
@@ -1162,12 +1424,20 @@ mod tests {
         let style = native.style.encode_to_vec();
         let transition = native.transition.encode_to_vec();
         let attributes = native.transition.attributes.encode_to_vec();
+        let title_placeholder = native
+            .title_placeholder
+            .map(|reference| reference.encode_to_vec());
+        let body_placeholder = native
+            .body_placeholder
+            .map(|reference| reference.encode_to_vec());
         let note = native.note.map(|reference| reference.encode_to_vec());
         Ok(source
             .len()
             .checked_add(style.len())
             .and_then(|value| value.checked_add(transition.len()))
             .and_then(|value| value.checked_add(attributes.len()))
+            .and_then(|value| value.checked_add(title_placeholder.as_ref().map_or(0, Vec::len)))
+            .and_then(|value| value.checked_add(body_placeholder.as_ref().map_or(0, Vec::len)))
             .and_then(|value| value.checked_add(note.as_ref().map_or(0, Vec::len)))
             .and_then(|value| value.checked_mul(2))
             .ok_or("test work overflow")?)

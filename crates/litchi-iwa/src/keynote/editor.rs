@@ -4696,63 +4696,6 @@ impl KeynoteEditor {
         Ok(removed)
     }
 
-    pub fn set_slide_title(&mut self, slide_index: usize, replacement: &str) -> Result<()> {
-        let storage_id = self.slide_storage(slide_index, true)?;
-        self.text.set_text(storage_id, replacement)
-    }
-
-    pub fn replace_slide_title(
-        &mut self,
-        slide_index: usize,
-        range: Range<usize>,
-        replacement: &str,
-    ) -> Result<()> {
-        let storage_id = self.slide_storage(slide_index, true)?;
-        self.text.replace_text(storage_id, range, replacement)
-    }
-
-    pub fn clear_slide_title(&mut self, slide_index: usize) -> Result<()> {
-        self.set_slide_title(slide_index, "")
-    }
-
-    pub fn set_slide_body(&mut self, slide_index: usize, replacement: &str) -> Result<()> {
-        let storage_id = self.slide_storage(slide_index, false)?;
-        self.text.set_text(storage_id, replacement)
-    }
-
-    pub fn replace_slide_body(
-        &mut self,
-        slide_index: usize,
-        range: Range<usize>,
-        replacement: &str,
-    ) -> Result<()> {
-        let storage_id = self.slide_storage(slide_index, false)?;
-        self.text.replace_text(storage_id, range, replacement)
-    }
-
-    pub fn clear_slide_body(&mut self, slide_index: usize) -> Result<()> {
-        self.set_slide_body(slide_index, "")
-    }
-
-    pub fn set_slide_notes(&mut self, slide_index: usize, replacement: &str) -> Result<()> {
-        let storage_id = self.slide_notes_storage(slide_index)?;
-        self.text.set_text(storage_id, replacement)
-    }
-
-    pub fn replace_slide_notes(
-        &mut self,
-        slide_index: usize,
-        range: Range<usize>,
-        replacement: &str,
-    ) -> Result<()> {
-        let storage_id = self.slide_notes_storage(slide_index)?;
-        self.text.replace_text(storage_id, range, replacement)
-    }
-
-    pub fn clear_slide_notes(&mut self, slide_index: usize) -> Result<()> {
-        self.set_slide_notes(slide_index, "")
-    }
-
     /// Set or clear a slide's optional navigator name.
     pub fn set_slide_name(&mut self, slide_index: usize, name: Option<&str>) -> Result<()> {
         if name.is_some_and(|name| name.contains('\0')) {
@@ -5304,41 +5247,6 @@ impl KeynoteEditor {
             storage_id: crate::text::native_storage_id(storage_id)?,
             object_ids,
             uuid_object_ids,
-        })
-    }
-
-    fn slide_storage(&self, slide_index: usize, title: bool) -> Result<TextStorageId> {
-        let slides = self.slides()?;
-        let slide = slides.get(slide_index).ok_or_else(|| {
-            Error::ParseError(format!(
-                "Keynote slide index {slide_index} is out of range for {} slides",
-                slides.len()
-            ))
-        })?;
-        let (kind, storage) = if title {
-            ("title", slide.title_storage_id)
-        } else {
-            ("body", slide.body_storage_id)
-        };
-        storage.ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote slide {slide_index} has no writable {kind} placeholder storage"
-            ))
-        })
-    }
-
-    fn slide_notes_storage(&self, slide_index: usize) -> Result<TextStorageId> {
-        let slides = self.slides()?;
-        let slide = slides.get(slide_index).ok_or_else(|| {
-            Error::ParseError(format!(
-                "Keynote slide index {slide_index} is out of range for {} slides",
-                slides.len()
-            ))
-        })?;
-        slide.notes_storage_id.ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote slide {slide_index} has no writable speaker-notes storage"
-            ))
         })
     }
 

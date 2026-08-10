@@ -1831,6 +1831,7 @@ fn shadow(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_keynote::{Package as FocusedKeynotePackage, SlideSelector};
 
     #[test]
     fn generated_theme_exposes_distinct_canonical_list_presets() {
@@ -1976,7 +1977,7 @@ mod tests {
 
     #[test]
     fn generated_presentation_round_trips_and_is_editable() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let editor = KeynoteDocumentBuilder::new()
             .title("Quarterly Review")
             .subtitle("Built without a template")
             .presenter_notes("Start with the result.")
@@ -1989,11 +1990,50 @@ mod tests {
         assert_eq!(slides[0].body.as_deref(), Some("Built without a template"));
         assert_eq!(slides[0].notes.as_deref(), Some("Start with the result."));
 
-        editor.set_slide_title(0, "Updated").unwrap();
-        editor.set_slide_body(0, "Body").unwrap();
-        editor.set_slide_notes(0, "Notes").unwrap();
-        let bytes = editor.to_bytes().unwrap();
-        let reopened = KeynoteEditor::from_bytes(&bytes).unwrap();
+        let focused = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        focused.validate().unwrap();
+        let selector = SlideSelector::index(0);
+        assert_eq!(
+            focused.slide_title(selector).unwrap().as_deref(),
+            Some("Quarterly Review")
+        );
+        assert_eq!(
+            focused.slide_body(selector).unwrap().as_deref(),
+            Some("Built without a template")
+        );
+        assert_eq!(
+            focused.slide_notes(selector).unwrap().as_deref(),
+            Some("Start with the result.")
+        );
+
+        let mut title = focused.edit_slide_title(selector).unwrap();
+        title.set("Updated").unwrap();
+        let title = title.commit().unwrap();
+        assert_eq!(
+            title.package().slide_body(selector).unwrap().as_deref(),
+            Some("Built without a template")
+        );
+        assert_eq!(
+            title.package().slide_notes(selector).unwrap().as_deref(),
+            Some("Start with the result.")
+        );
+
+        let mut body = title.package().edit_slide_body(selector).unwrap();
+        body.set("Body").unwrap();
+        let body = body.commit().unwrap();
+        assert_eq!(
+            body.package().slide_title(selector).unwrap().as_deref(),
+            Some("Updated")
+        );
+        assert_eq!(
+            body.package().slide_notes(selector).unwrap().as_deref(),
+            Some("Start with the result.")
+        );
+
+        let mut notes = body.package().edit_slide_notes(selector).unwrap();
+        notes.set("Notes").unwrap();
+        let notes = notes.commit().unwrap();
+        let reopened = KeynoteEditor::from_bytes(notes.package().source_bytes()).unwrap();
         let slide = &reopened.slides().unwrap()[0];
         assert_eq!(slide.title.as_deref(), Some("Updated"));
         assert_eq!(slide.body.as_deref(), Some("Body"));
@@ -2006,11 +2046,37 @@ mod tests {
         let layout = editor.default_slide_layout().unwrap();
         let created = editor.add_slide(layout).unwrap();
         assert_eq!(created.index, 1);
-        editor.set_slide_title(1, "Second").unwrap();
-        assert_eq!(editor.slides().unwrap()[1].title.as_deref(), Some("Second"));
+        assert_eq!(created.title.as_deref(), Some(""));
+        assert_eq!(created.body.as_deref(), Some(""));
+        assert_eq!(created.notes.as_deref(), Some(""));
+
+        let focused = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        focused.validate().unwrap();
+        let selector = SlideSelector::index(1);
+        let mut title = focused.edit_slide_title(selector).unwrap();
+        title.set("Second — 東京").unwrap();
+        let title = title.commit().unwrap();
+        let mut body = title.package().edit_slide_body(selector).unwrap();
+        body.set("Created body").unwrap();
+        let body = body.commit().unwrap();
+        let mut notes = body.package().edit_slide_notes(selector).unwrap();
+        notes.set("Created notes").unwrap();
+        let notes = notes.commit().unwrap();
+
+        let mut editor = KeynoteEditor::from_bytes(notes.package().source_bytes()).unwrap();
+        let slides = editor.slides().unwrap();
+        let created = &slides[1];
+        assert_eq!(created.title.as_deref(), Some("Second — 東京"));
+        assert_eq!(created.body.as_deref(), Some("Created body"));
+        assert_eq!(created.notes.as_deref(), Some("Created notes"));
+
         let removed = editor.remove_slide(0).unwrap();
         assert_eq!(removed.title.as_deref(), Some(DEFAULT_TITLE));
-        assert_eq!(editor.slides().unwrap().len(), 1);
+        let remaining = editor.slides().unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].title.as_deref(), Some("Second — 東京"));
+        assert_eq!(remaining[0].body.as_deref(), Some("Created body"));
+        assert_eq!(remaining[0].notes.as_deref(), Some("Created notes"));
     }
 
     #[test]
@@ -2050,7 +2116,14 @@ mod tests {
         );
         assert_eq!(visible.slide_text_storages(1).unwrap().len(), 2);
 
-        let reopened = KeynoteEditor::from_bytes(&visible.to_bytes().unwrap()).unwrap();
+        let focused = FocusedKeynotePackage::from_bytes(&visible.to_bytes().unwrap()).unwrap();
+        focused.validate().unwrap();
+        let selector = SlideSelector::index(1);
+        let mut body = focused.edit_slide_body(selector).unwrap();
+        body.set("Numbered slide body").unwrap();
+        let body = body.commit().unwrap();
+
+        let mut reopened = KeynoteEditor::from_bytes(body.package().source_bytes()).unwrap();
         assert_eq!(
             reopened
                 .slides()
@@ -2059,6 +2132,15 @@ mod tests {
                 .map(|slide| slide.is_slide_number_visible)
                 .collect::<Vec<_>>(),
             [Some(true), Some(true)]
+        );
+        assert_eq!(
+            reopened.slides().unwrap()[1].body.as_deref(),
+            Some("Numbered slide body")
+        );
+        reopened.set_slide_number_visible(1, false).unwrap();
+        assert_eq!(
+            reopened.slides().unwrap()[1].is_slide_number_visible,
+            Some(false)
         );
     }
 

@@ -96,12 +96,35 @@ LOCAL_CANONICAL_SHEET_VIEW_TYPE = re.compile(
 FACADE_PACKAGE = "litchi"
 FACADE_REQUIRED_NORMAL_DEPENDENCIES = frozenset({"litchi-core"})
 RETIRED_FACADE_DEPENDENCIES = frozenset({"litchi-iwa"})
+IWA_KEYNOTE_SOURCE_ROOT = Path("crates/litchi-iwa/src/keynote")
+RETIRED_IWA_KEYNOTE_METHODS = (
+    "set_slide_title",
+    "replace_slide_title",
+    "clear_slide_title",
+    "set_slide_body",
+    "replace_slide_body",
+    "clear_slide_body",
+    "set_slide_notes",
+    "replace_slide_notes",
+    "clear_slide_notes",
+    "slide_storage",
+    "slide_notes_storage",
+)
+RETIRED_IWA_KEYNOTE_METHOD_SET = frozenset(RETIRED_IWA_KEYNOTE_METHODS)
+RUST_FUNCTION_DECLARATION = re.compile(
+    r"(?<![A-Za-z0-9_])fn\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+)
 FACADE_DEFAULT_FEATURE = "default"
 FACADE_ALL_FEATURE = "all"
 FACADE_SOURCE_ROOT = Path("crates/litchi/src")
-PUBLIC_FACADE_IWA_MODULE = re.compile(r"^\s*pub(?:\([^)]*\))?\s+mod\s+iwa\b")
+PUBLIC_FACADE_IWA_MODULE = re.compile(
+    r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+mod[ \t\r\n]+iwa\b",
+    re.MULTILINE,
+)
 PUBLIC_FACADE_IWA_REEXPORT = re.compile(
-    r"^\s*pub(?:\([^)]*\))?\s+use\s+(?:(?:crate::)?iwa|litchi_iwa)\b"
+    r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+use[ \t\r\n]+"
+    r"(?:(?:crate[ \t\r\n]*::[ \t\r\n]*)?iwa|litchi_iwa)\b",
+    re.MULTILINE,
 )
 PUBLIC_XLSX_MODULE = re.compile(r"^\s*pub(?:\([^)]*\))?\s+mod\s+xlsx\s*;")
 PACKAGE_XLSX_PATH = re.compile(r"(?<![A-Za-z0-9_])package::xlsx\b")
@@ -876,19 +899,154 @@ def audit_litchi_facade_source_topology(root: Path = ROOT) -> list[str]:
 
     violations: list[str] = []
     for path in sorted(source_root.rglob("*.rs")):
-        for line_number, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
+        source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        for pattern, label in (
+            (PUBLIC_FACADE_IWA_MODULE, "module"),
+            (PUBLIC_FACADE_IWA_REEXPORT, "re-export"),
         ):
-            if PUBLIC_FACADE_IWA_MODULE.match(line):
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
                 violations.append(
-                    "retired litchi facade public iwa module: "
+                    f"retired litchi facade public iwa {label}: "
                     f"{path.relative_to(root)}:{line_number}"
                 )
-            if PUBLIC_FACADE_IWA_REEXPORT.match(line):
-                violations.append(
-                    "retired litchi facade public iwa re-export: "
-                    f"{path.relative_to(root)}:{line_number}"
-                )
+
+    return sorted(set(violations))
+
+
+def _mask_rust_non_code(source: str) -> str:
+    """Mask Rust comments and literals while preserving offsets and newlines."""
+
+    masked = list(source)
+
+    def mask(start: int, end: int) -> None:
+        for offset in range(start, end):
+            if masked[offset] != "\n":
+                masked[offset] = " "
+
+    def raw_string_end(start: int) -> int | None:
+        cursor = start
+        if source.startswith(("br", "cr"), cursor):
+            cursor += 2
+        elif source.startswith("r", cursor):
+            cursor += 1
+        else:
+            return None
+        hashes_start = cursor
+        while cursor < len(source) and source[cursor] == "#":
+            cursor += 1
+        if cursor >= len(source) or source[cursor] != '"':
+            return None
+        terminator = '"' + source[hashes_start:cursor]
+        closing = source.find(terminator, cursor + 1)
+        return len(source) if closing < 0 else closing + len(terminator)
+
+    def quoted_string_end(start: int) -> int:
+        cursor = start + 1
+        while cursor < len(source):
+            if source[cursor] == "\\":
+                cursor += 2
+            elif source[cursor] == '"':
+                return cursor + 1
+            else:
+                cursor += 1
+        return len(source)
+
+    def character_literal_end(start: int) -> int | None:
+        cursor = start + 1
+        if cursor >= len(source) or source[cursor] in ("\n", "\r", "'"):
+            return None
+        if source[cursor] == "\\":
+            cursor += 1
+            if cursor >= len(source):
+                return len(source)
+            if source[cursor] == "u" and cursor + 1 < len(source) and source[cursor + 1] == "{":
+                closing = source.find("}", cursor + 2)
+                if closing < 0:
+                    return len(source)
+                cursor = closing + 1
+            else:
+                cursor += 1
+        else:
+            cursor += 1
+        return cursor + 1 if cursor < len(source) and source[cursor] == "'" else None
+
+    cursor = 0
+    while cursor < len(source):
+        if source.startswith("//", cursor):
+            end = source.find("\n", cursor + 2)
+            end = len(source) if end < 0 else end
+            mask(cursor, end)
+            cursor = end
+            continue
+        if source.startswith("/*", cursor):
+            depth = 1
+            end = cursor + 2
+            while end < len(source) and depth:
+                if source.startswith("/*", end):
+                    depth += 1
+                    end += 2
+                elif source.startswith("*/", end):
+                    depth -= 1
+                    end += 2
+                else:
+                    end += 1
+            mask(cursor, end)
+            cursor = end
+            continue
+        raw_end = raw_string_end(cursor)
+        if raw_end is not None:
+            mask(cursor, raw_end)
+            cursor = raw_end
+            continue
+        if source[cursor] == '"':
+            end = quoted_string_end(cursor)
+            mask(cursor, end)
+            cursor = end
+            continue
+        if source[cursor] == "'":
+            end = character_literal_end(cursor)
+            if end is not None:
+                mask(cursor, end)
+                cursor = end
+                continue
+        cursor += 1
+
+    return "".join(masked)
+
+
+def _rust_function_declarations(source: str) -> list[tuple[str, int]]:
+    """Return exact Rust function declaration names and source line numbers."""
+
+    code = _mask_rust_non_code(source)
+    declarations: list[tuple[str, int]] = []
+    line_number = 1
+    previous_offset = 0
+    for match in RUST_FUNCTION_DECLARATION.finditer(code):
+        name_offset = match.start(1)
+        line_number += code.count("\n", previous_offset, name_offset)
+        declarations.append((match.group(1), line_number))
+        previous_offset = name_offset
+    return declarations
+
+
+def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
+    """Prevent retired Keynote function declarations from returning to the host."""
+
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    violations: list[str] = []
+    for path in sorted(source_root.rglob("*.rs")):
+        source = path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name not in RETIRED_IWA_KEYNOTE_METHOD_SET:
+                continue
+            violations.append(
+                "retired litchi-iwa Keynote method "
+                f"{name}: {path.relative_to(root)}:{line_number}"
+            )
 
     return sorted(set(violations))
 
@@ -1156,6 +1314,7 @@ def main(argv: list[str] | None = None) -> int:
         audit_manifest_inventory(snapshot)
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
+        + audit_iwa_keynote_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

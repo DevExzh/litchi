@@ -16,8 +16,13 @@ pub enum Slide {
     /// Apple Keynote slide
     #[cfg(feature = "keynote")]
     Keynote {
+        /// One-based position in the presentation, not a native Keynote object identifier.
         number: usize,
+        /// Optional developer-facing name shown in Keynote's slide navigator.
+        name: Option<String>,
+        /// Optional title that is visible on the slide canvas.
         title: Option<String>,
+        /// All modeled slide text in semantic order.
         text: String,
     },
     /// OpenDocument Presentation slide
@@ -50,9 +55,11 @@ impl Slide {
         }
     }
 
-    /// Get the slide number (1-based).
+    /// Get the slide's one-based position in the presentation.
     ///
-    /// Only available for .ppt format. Returns None for .pptx and .key files.
+    /// Available for legacy PowerPoint and Keynote slides. For Keynote this is
+    /// derived from presentation order and is not a native object identifier.
+    /// Returns `None` for PPTX and ODP slides.
     ///
     /// # Examples
     ///
@@ -75,6 +82,27 @@ impl Slide {
             Slide::Keynote { number, .. } => Some(*number),
             #[cfg(feature = "odp")]
             Slide::Odp(_) => None, // Slide numbers not currently exposed for ODP
+        }
+    }
+
+    /// Get the title visible on the slide canvas.
+    ///
+    /// Available for Keynote and ODP slides when a semantic title is present.
+    /// A Keynote title is distinct from its developer-facing navigator
+    /// [`name`](Self::name) and its one-based [`number`](Self::number).
+    /// Returns `None` for legacy PowerPoint and PPTX slides because their
+    /// current facade data does not model a distinct semantic title.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying format cannot provide its title.
+    pub fn title(&self) -> Result<Option<String>> {
+        match self {
+            Slide::Ppt(_) | Slide::Pptx(_) => Ok(None),
+            #[cfg(feature = "keynote")]
+            Slide::Keynote { title, .. } => Ok(title.clone()),
+            #[cfg(feature = "odp")]
+            Slide::Odp(slide) => Ok(slide.title()?.map(str::to_owned)),
         }
     }
 
@@ -106,9 +134,12 @@ impl Slide {
         }
     }
 
-    /// Get the slide name.
+    /// Get the slide's non-content name.
     ///
-    /// Only available for .pptx and .key formats. Returns None for .ppt files.
+    /// For Keynote this is the optional developer-facing navigator name, which
+    /// is distinct from both the one-based slide number and the title visible
+    /// on the slide canvas. Returns `None` when the format does not expose a
+    /// name or the slide has no name.
     ///
     /// # Examples
     ///
@@ -128,10 +159,37 @@ impl Slide {
             Slide::Ppt(_) => Ok(None),
             Slide::Pptx(data) => Ok(data.name.clone()),
             #[cfg(feature = "keynote")]
-            Slide::Keynote { title, .. } => Ok(title.clone()),
+            Slide::Keynote { name, .. } => Ok(name.clone()),
             #[cfg(feature = "odp")]
             Slide::Odp(_slide) => Ok(None), // ODP slides don't have names in the current API
         }
+    }
+}
+
+#[cfg(all(test, feature = "keynote"))]
+mod keynote_tests {
+    use super::Slide;
+
+    #[test]
+    fn keynote_identity_fields_remain_semantically_distinct() {
+        let slide = Slide::Keynote {
+            number: 2,
+            name: Some("Agenda".to_owned()),
+            title: Some("Quarterly results".to_owned()),
+            text: "Quarterly results\nRevenue increased".to_owned(),
+        };
+
+        assert_eq!(slide.number(), Some(2));
+        assert_eq!(slide.name().unwrap().as_deref(), Some("Agenda"));
+        assert_eq!(slide.title().unwrap().as_deref(), Some("Quarterly results"));
+        assert_eq!(
+            slide.text().unwrap(),
+            "Quarterly results\nRevenue increased"
+        );
+        let Slide::Keynote { title, .. } = slide else {
+            unreachable!("test value is a Keynote slide")
+        };
+        assert_eq!(title.as_deref(), Some("Quarterly results"));
     }
 }
 

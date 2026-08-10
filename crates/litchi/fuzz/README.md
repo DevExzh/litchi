@@ -7,11 +7,28 @@ package deliberately depends only on the root crate with the `iwork` feature;
 it must not acquire a dependency on the legacy `litchi-iwa` migration host or
 on an internal archive, protobuf, Buffa, or concrete-format crate.
 
-The harness uses tighter limits than the public defaults: 2 MiB of source
+`keynote_slide_text` is the focused title/body robustness target. It first
+offers arbitrary bytes to the bounded Keynote package ingress, then uses those
+same bytes as commands against the repository's native `basic.key` seed. This
+second path bypasses the low survival rate of CRC-protected ZIP mutation while
+still exercising both placeholder roles, semantic selectors, UTF-16 boundary
+validation, set/clear/replace/insert/delete/no-op staging, exact-source patch
+application, inversion, and content-redacted errors. It never writes a package
+to disk.
+
+`parse_iwork` uses tighter limits than the public defaults: 2 MiB of source
 bytes, 512 package entries, 8 MiB per expanded entry and decoded IWA item,
 32 MiB aggregate expanded bytes, 4,096 values of each semantic collection,
-and 4 MiB of retained text. Keep `-max_len` aligned with the 2 MiB source
+and 4 MiB of retained text. Keep its `-max_len` aligned with the 2 MiB source
 ceiling so oversized mutations do not consume fuzzing time.
+
+`keynote_slide_text` uses a narrower physical profile for its arbitrary-byte
+path: 1 MiB of source bytes, 256 package entries, 2 MiB per expanded entry and
+decoded IWA item, and 8 MiB aggregate expanded bytes. Its native `basic.key`
+seed is embedded in the harness from the hash-verified source below; fuzzer
+input supplies only bounded transaction commands, of which at most 1 KiB
+becomes replacement text. Keep this target's `-max_len` at 4 KiB to
+concentrate effort on deep-message operations.
 
 ## Native seed provenance
 
@@ -40,8 +57,15 @@ shasum -a 256 corpus/parse_iwork/basic.pages \
 Run the target with an address sanitizer and explicit process ceilings:
 
 ```sh
-cargo fuzz run parse_iwork corpus/parse_iwork -- \
+cargo +nightly fuzz run parse_iwork corpus/parse_iwork -- \
   -max_len=2097152 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Keynote target without a checked-in duplicate corpus:
+
+```sh
+cargo +nightly fuzz run keynote_slide_text -- \
+  -max_len=4096 -timeout=10 -rss_limit_mb=2048
 ```
 
 The native packages currently store ZIP members with CRC protection. Most

@@ -95,6 +95,28 @@ pub enum FieldType {
     Unrecognized(i32),
 }
 
+/// Data-reference removal policy for a header-preserving message replacement.
+///
+/// `Selected` removes every occurrence of the supplied identifiers from the
+/// target `MessageInfo` and all of its nested `FieldInfo` values. `All` clears
+/// every data reference in that same scope. Duplicate selected identifiers are
+/// harmless, and `Selected(&[])` is equivalent to `None`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataReferencePruning<'a> {
+    /// Preserve all data references.
+    None,
+    /// Remove every occurrence of these data-reference identifiers.
+    Selected(&'a [u64]),
+    /// Remove every data-reference identifier.
+    All,
+}
+
+impl DataReferencePruning<'_> {
+    const fn is_none(self) -> bool {
+        matches!(self, Self::None | Self::Selected([]))
+    }
+}
+
 impl FieldType {
     /// Project one raw protobuf enum value without losing unknown values.
     #[must_use]
@@ -815,15 +837,76 @@ impl ArchiveObject {
         identifiers: &[u64],
         limits: Limits,
     ) -> Result<RawMessage> {
-        if identifiers.is_empty() {
+        self.replace_message_pruning_references_preserving_header_with_limits(
+            index,
+            message,
+            identifiers,
+            DataReferencePruning::None,
+            limits,
+        )
+    }
+
+    /// Replace one payload and prune selected object references plus selected
+    /// or all data references while preserving every untouched header byte.
+    ///
+    /// Both reference kinds are pruned from the target `MessageInfo` and all
+    /// nested `FieldInfo` values. Packed and unpacked occurrences may be
+    /// mixed, and retained values keep their original order and encoding.
+    /// Duplicate selected identifiers are harmless. Empty object identifiers
+    /// together with [`DataReferencePruning::None`] or
+    /// [`DataReferencePruning::Selected`] containing an empty slice delegate
+    /// exactly to [`Self::replace_message_preserving_header`].
+    ///
+    /// The caller must prove that removing every supplied reference is valid
+    /// for the surrounding package graph; this physical primitive establishes
+    /// only bounded wire and neutral-metadata correctness.
+    pub fn replace_message_pruning_references_preserving_header(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        object_identifiers: &[u64],
+        data_references: DataReferencePruning<'_>,
+    ) -> Result<RawMessage> {
+        self.replace_message_pruning_references_preserving_header_with_limits(
+            index,
+            message,
+            object_identifiers,
+            data_references,
+            Limits::default(),
+        )
+    }
+
+    /// Replace one payload and prune object and data references while
+    /// preserving untouched `ArchiveInfo` bytes under explicit limits.
+    ///
+    /// The selector inputs, complete source wire tree, projected neutral
+    /// metadata, rewritten header, replacement payload, and enclosing object
+    /// are all validated before mutation, so every error is atomic.
+    pub fn replace_message_pruning_references_preserving_header_with_limits(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        object_identifiers: &[u64],
+        data_references: DataReferencePruning<'_>,
+        limits: Limits,
+    ) -> Result<RawMessage> {
+        if object_identifiers.is_empty() && data_references.is_none() {
             return self.replace_message_preserving_header_with_limits(index, message, limits);
         }
 
         let limits = limits.validate()?;
-        if identifiers.len() > limits.max_metadata_items() {
+        let data_identifier_count = match data_references {
+            DataReferencePruning::Selected(identifiers) => identifiers.len(),
+            DataReferencePruning::None | DataReferencePruning::All => 0,
+        };
+        let selector_count = object_identifiers
+            .len()
+            .checked_add(data_identifier_count)
+            .ok_or_else(|| Error::invalid_archive(index, "reference selector count overflow"))?;
+        if selector_count > limits.max_metadata_items() {
             return Err(limit(
                 LimitKind::MetadataItems,
-                identifiers.len(),
+                selector_count,
                 limits.max_metadata_items(),
             ));
         }
@@ -837,11 +920,38 @@ impl ArchiveObject {
             .map_err(|_| Error::invalid_archive(index, "message payload exceeds u32"))?;
         check_message_length(message.data.len(), limits)?;
 
-        let mut removals = HashSet::new();
-        removals.try_reserve(identifiers.len()).map_err(|_| {
-            Error::allocation("IWA object-reference removal set", identifiers.len())
-        })?;
-        removals.extend(identifiers.iter().copied());
+        let mut object_removals = HashSet::new();
+        object_removals
+            .try_reserve(object_identifiers.len())
+            .map_err(|_| {
+                Error::allocation("IWA object-reference removal set", object_identifiers.len())
+            })?;
+        object_removals.extend(object_identifiers.iter().copied());
+
+        let mut selected_data_removals = HashSet::new();
+        if let DataReferencePruning::Selected(identifiers) = data_references {
+            selected_data_removals
+                .try_reserve(identifiers.len())
+                .map_err(|_| {
+                    Error::allocation("IWA data-reference removal set", identifiers.len())
+                })?;
+            selected_data_removals.extend(identifiers.iter().copied());
+        }
+        let data_removals = match data_references {
+            DataReferencePruning::None | DataReferencePruning::Selected([]) => {
+                ReferenceRemovals::None
+            },
+            DataReferencePruning::Selected(_) => {
+                ReferenceRemovals::Selected(&selected_data_removals)
+            },
+            DataReferencePruning::All => ReferenceRemovals::All,
+        };
+
+        let object_removals = if object_identifiers.is_empty() {
+            ReferenceRemovals::None
+        } else {
+            ReferenceRemovals::Selected(&object_removals)
+        };
 
         let canonical_before = encode_archive_info(&self.archive_info, limits)?;
         let (source_header, retained_source_header) = match (
@@ -856,7 +966,7 @@ impl ArchiveObject {
         // The retained header may have been admitted by a broader profile.
         // Revalidate its complete nested wire tree under the caller's limits.
         preflight_header(source_header, HeaderKind::ArchiveInfo, limits)?;
-        let rewritten_header = rewrite_message_metadata_and_prune_object_references_in_header(
+        let rewritten_header = rewrite_message_metadata_and_prune_references_in_header(
             source_header,
             self.archive_info.message_infos.len(),
             index,
@@ -864,7 +974,8 @@ impl ArchiveObject {
             current_info.length,
             message.type_,
             replacement_length,
-            &removals,
+            object_removals,
+            data_removals,
             limits,
         )?;
 
@@ -875,7 +986,8 @@ impl ArchiveObject {
             index,
             message.type_,
             replacement_length,
-            &removals,
+            object_removals,
+            data_removals,
         )?;
         let canonical_after = encode_archive_info(&rewritten_info, limits)?;
         let retain_rewritten_header = retained_source_header && rewritten_header != canonical_after;
@@ -1306,6 +1418,27 @@ enum HeaderFieldRewrite {
     LengthDelimited(Vec<u8>),
 }
 
+#[derive(Clone, Copy)]
+enum ReferenceRemovals<'a> {
+    None,
+    Selected(&'a HashSet<u64>),
+    All,
+}
+
+impl ReferenceRemovals<'_> {
+    const fn is_none(self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    fn contains(self, identifier: u64) -> bool {
+        match self {
+            Self::None => false,
+            Self::Selected(identifiers) => identifiers.contains(&identifier),
+            Self::All => true,
+        }
+    }
+}
+
 fn rewrite_message_metadata_in_header(
     source: &[u8],
     message_index: usize,
@@ -1495,7 +1628,7 @@ fn rewrite_effective_message_scalars(
     clippy::too_many_arguments,
     reason = "the raw rewrite verifies source cardinality and both old and new required scalars"
 )]
-fn rewrite_message_metadata_and_prune_object_references_in_header(
+fn rewrite_message_metadata_and_prune_references_in_header(
     source: &[u8],
     expected_message_count: usize,
     message_index: usize,
@@ -1503,7 +1636,8 @@ fn rewrite_message_metadata_and_prune_object_references_in_header(
     current_length: u32,
     replacement_type: u32,
     replacement_length: u32,
-    removals: &HashSet<u64>,
+    object_removals: ReferenceRemovals<'_>,
+    data_removals: ReferenceRemovals<'_>,
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let wire_limits = header_wire_limits(limits)?;
@@ -1543,13 +1677,14 @@ fn rewrite_message_metadata_and_prune_object_references_in_header(
     let message_source = target_field
         .payload(source)
         .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
-    let Some(rewritten_message) = rewrite_effective_message_scalars_and_object_references(
+    let Some(rewritten_message) = rewrite_effective_message_scalars_and_references(
         message_source,
         current_type,
         current_length,
         replacement_type,
         replacement_length,
-        removals,
+        object_removals,
+        data_removals,
         wire_limits,
         limits,
         message_index,
@@ -1580,13 +1715,14 @@ fn rewrite_message_metadata_and_prune_object_references_in_header(
     clippy::too_many_arguments,
     reason = "the raw rewrite verifies both old and new required MessageInfo scalars"
 )]
-fn rewrite_effective_message_scalars_and_object_references(
+fn rewrite_effective_message_scalars_and_references(
     source: &[u8],
     current_type: u32,
     current_length: u32,
     replacement_type: u32,
     replacement_length: u32,
-    removals: &HashSet<u64>,
+    object_removals: ReferenceRemovals<'_>,
+    data_removals: ReferenceRemovals<'_>,
     wire_limits: WireLimits,
     limits: Limits,
     message_index: usize,
@@ -1642,9 +1778,10 @@ fn rewrite_effective_message_scalars_and_object_references(
                 let field_info = field
                     .payload(source)
                     .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
-                if let Some(rewritten) = rewrite_field_info_object_references(
+                if let Some(rewritten) = rewrite_field_info_references(
                     field_info,
-                    removals,
+                    object_removals,
+                    data_removals,
                     wire_limits,
                     limits,
                     message_index,
@@ -1657,9 +1794,13 @@ fn rewrite_effective_message_scalars_and_object_references(
                     )?;
                 }
             },
-            5 => {
+            5 if !object_removals.is_none() => {
                 let rewrite =
-                    rewrite_object_reference_field(source, field, removals, message_index)?;
+                    rewrite_reference_field(source, field, object_removals, message_index)?;
+                assign_header_field_rewrite(&mut rewrites, field_index, rewrite, message_index)?;
+            },
+            6 if !data_removals.is_none() => {
+                let rewrite = rewrite_reference_field(source, field, data_removals, message_index)?;
                 assign_header_field_rewrite(&mut rewrites, field_index, rewrite, message_index)?;
             },
             _ => {},
@@ -1684,9 +1825,10 @@ fn rewrite_effective_message_scalars_and_object_references(
     .map(Some)
 }
 
-fn rewrite_field_info_object_references(
+fn rewrite_field_info_references(
     source: &[u8],
-    removals: &HashSet<u64>,
+    object_removals: ReferenceRemovals<'_>,
+    data_removals: ReferenceRemovals<'_>,
     wire_limits: WireLimits,
     limits: Limits,
     message_index: usize,
@@ -1695,8 +1837,13 @@ fn rewrite_field_info_object_references(
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let mut rewrites = retained_field_rewrites(fields.len())?;
     for (field_index, field) in fields.iter().copied().enumerate() {
-        if field.number() == 4 {
-            let rewrite = rewrite_object_reference_field(source, field, removals, message_index)?;
+        let removals = match field.number() {
+            4 if !object_removals.is_none() => Some(object_removals),
+            5 if !data_removals.is_none() => Some(data_removals),
+            _ => None,
+        };
+        if let Some(removals) = removals {
+            let rewrite = rewrite_reference_field(source, field, removals, message_index)?;
             assign_header_field_rewrite(&mut rewrites, field_index, rewrite, message_index)?;
         }
     }
@@ -1759,10 +1906,10 @@ fn effective_required_varint_field(
     Ok(field_index)
 }
 
-fn rewrite_object_reference_field(
+fn rewrite_reference_field(
     source: &[u8],
     field: WireField,
-    removals: &HashSet<u64>,
+    removals: ReferenceRemovals<'_>,
     message_index: usize,
 ) -> Result<HeaderFieldRewrite> {
     let payload = field
@@ -1772,47 +1919,46 @@ fn rewrite_object_reference_field(
         0 => {
             let (value, encoded_length) = litchi_iwa_common::decode_varint_from_bytes(payload)
                 .map_err(|_| {
-                    Error::invalid_archive(message_index, "malformed unpacked object reference")
+                    Error::invalid_archive(message_index, "malformed unpacked reference")
                 })?;
             if encoded_length != payload.len() {
                 return Err(Error::invalid_archive(
                     message_index,
-                    "unpacked object reference has trailing bytes",
+                    "unpacked reference has trailing bytes",
                 ));
             }
-            Ok(if removals.contains(&value) {
+            Ok(if removals.contains(value) {
                 HeaderFieldRewrite::Remove
             } else {
                 HeaderFieldRewrite::Retain
             })
         },
-        2 => rewrite_packed_object_references(payload, removals, message_index),
+        2 => rewrite_packed_references(payload, removals, message_index),
         _ => Err(Error::invalid_archive(
             message_index,
-            "object-reference field has an ambiguous wire type",
+            "reference field has an ambiguous wire type",
         )),
     }
 }
 
-fn rewrite_packed_object_references(
+fn rewrite_packed_references(
     payload: &[u8],
-    removals: &HashSet<u64>,
+    removals: ReferenceRemovals<'_>,
     message_index: usize,
 ) -> Result<HeaderFieldRewrite> {
     let mut cursor = 0usize;
     let mut retained_length = 0usize;
     let mut changed = false;
     while cursor < payload.len() {
-        let (value, encoded_length) = litchi_iwa_common::decode_varint_from_bytes(
-            payload.get(cursor..).ok_or_else(|| {
-                Error::invalid_archive(message_index, "packed reference range is invalid")
-            })?,
-        )
-        .map_err(|_| Error::invalid_archive(message_index, "malformed packed object reference"))?;
+        let (value, encoded_length) =
+            litchi_iwa_common::decode_varint_from_bytes(payload.get(cursor..).ok_or_else(
+                || Error::invalid_archive(message_index, "packed reference range is invalid"),
+            )?)
+            .map_err(|_| Error::invalid_archive(message_index, "malformed packed reference"))?;
         let end = cursor.checked_add(encoded_length).ok_or_else(|| {
             Error::invalid_archive(message_index, "packed reference range overflow")
         })?;
-        if removals.contains(&value) {
+        if removals.contains(value) {
             changed = true;
         } else {
             retained_length = retained_length.checked_add(encoded_length).ok_or_else(|| {
@@ -1835,13 +1981,11 @@ fn rewrite_packed_object_references(
             Error::invalid_archive(message_index, "packed reference range is invalid")
         })?;
         let (value, encoded_length) = litchi_iwa_common::decode_varint_from_bytes(remaining)
-            .map_err(|_| {
-                Error::invalid_archive(message_index, "malformed packed object reference")
-            })?;
+            .map_err(|_| Error::invalid_archive(message_index, "malformed packed reference"))?;
         let end = cursor.checked_add(encoded_length).ok_or_else(|| {
             Error::invalid_archive(message_index, "packed reference range overflow")
         })?;
-        if !removals.contains(&value) {
+        if !removals.contains(value) {
             retained.extend_from_slice(payload.get(cursor..end).ok_or_else(|| {
                 Error::invalid_archive(message_index, "packed reference range is invalid")
             })?);
@@ -2125,7 +2269,8 @@ fn verify_pruned_archive_info(
     message_index: usize,
     replacement_type: u32,
     replacement_length: u32,
-    removals: &HashSet<u64>,
+    object_removals: ReferenceRemovals<'_>,
+    data_removals: ReferenceRemovals<'_>,
 ) -> Result<()> {
     if before.identifier != after.identifier
         || before.should_merge != after.should_merge
@@ -2161,7 +2306,8 @@ fn verify_pruned_archive_info(
         after_target,
         replacement_type,
         replacement_length,
-        removals,
+        object_removals,
+        data_removals,
         message_index,
     )
 }
@@ -2171,13 +2317,13 @@ fn verify_pruned_message_info(
     after: &MessageInfo,
     replacement_type: u32,
     replacement_length: u32,
-    removals: &HashSet<u64>,
+    object_removals: ReferenceRemovals<'_>,
+    data_removals: ReferenceRemovals<'_>,
     message_index: usize,
 ) -> Result<()> {
     if after.type_ != replacement_type
         || after.length != replacement_length
         || before.versions != after.versions
-        || before.data_references != after.data_references
         || before.base_message_index != after.base_message_index
         || before.diff_merge_version != after.diff_merge_version
         || before.diff_field_path != after.diff_field_path
@@ -2187,7 +2333,12 @@ fn verify_pruned_message_info(
         || !references_match_after_pruning(
             &before.object_references,
             &after.object_references,
-            removals,
+            object_removals,
+        )
+        || !references_match_after_pruning(
+            &before.data_references,
+            &after.data_references,
+            data_removals,
         )
     {
         return Err(Error::invalid_archive(
@@ -2200,7 +2351,6 @@ fn verify_pruned_message_info(
         if before_field.path != after_field.path
             || before_field.r#type != after_field.r#type
             || before_field.unknown_field_rule != after_field.unknown_field_rule
-            || before_field.data_references != after_field.data_references
             || before_field.known_field_rule != after_field.known_field_rule
             || before_field.known_field_version != after_field.known_field_version
             || before_field.known_field_feature_identifier
@@ -2208,7 +2358,12 @@ fn verify_pruned_message_info(
             || !references_match_after_pruning(
                 &before_field.object_references,
                 &after_field.object_references,
-                removals,
+                object_removals,
+            )
+            || !references_match_after_pruning(
+                &before_field.data_references,
+                &after_field.data_references,
+                data_removals,
             )
         {
             return Err(Error::invalid_archive(
@@ -2220,11 +2375,15 @@ fn verify_pruned_message_info(
     Ok(())
 }
 
-fn references_match_after_pruning(before: &[u64], after: &[u64], removals: &HashSet<u64>) -> bool {
+fn references_match_after_pruning(
+    before: &[u64],
+    after: &[u64],
+    removals: ReferenceRemovals<'_>,
+) -> bool {
     before
         .iter()
         .copied()
-        .filter(|identifier| !removals.contains(identifier))
+        .filter(|identifier| !removals.contains(*identifier))
         .eq(after.iter().copied())
 }
 
@@ -2903,8 +3062,8 @@ fn encode_varint(mut value: u64, output: &mut [u8; MAX_VARINT_BYTES]) -> &[u8] {
 #[cfg(test)]
 mod tests {
     use super::{
-        Archive, ArchiveObject, Error, RawMessage, encode_archive_info, encode_varint,
-        encode_varint_with_width,
+        Archive, ArchiveObject, DataReferencePruning, Error, FieldInfo, RawMessage,
+        encode_archive_info, encode_varint, encode_varint_with_width,
     };
     use crate::{LimitKind, Limits, Result};
 
@@ -2912,6 +3071,12 @@ mod tests {
         source: Vec<u8>,
         header: Vec<u8>,
         expected_header: Vec<u8>,
+    }
+
+    struct CombinedReferencePruningFixture {
+        source: Vec<u8>,
+        selected_header: Vec<u8>,
+        all_data_header: Vec<u8>,
     }
 
     #[test]
@@ -3154,6 +3319,409 @@ mod tests {
             assert_eq!(object, before);
         }
         Ok(())
+    }
+
+    #[test]
+    fn selected_object_and_data_pruning_preserves_raw_occurrences() -> Result<()> {
+        let fixture = combined_reference_pruning_fixture()?;
+        let mut archive = Archive::parse(&fixture.source)?;
+        let old = archive.objects[0].replace_message_pruning_references_preserving_header(
+            0,
+            RawMessage {
+                type_: 9,
+                data: vec![0x5a; 130],
+            },
+            &[10, 12, 10],
+            DataReferencePruning::Selected(&[20, 22, 20]),
+        )?;
+        assert_eq!(old.type_, 7);
+        assert_eq!(old.data, [0xde, 0xad, 0xbe]);
+
+        let encoded = archive.to_bytes()?;
+        let (header, payload) = split_test_archive(&encoded)?;
+        assert_eq!(header, fixture.selected_header);
+        assert_eq!(payload, vec![0x5a; 130]);
+
+        let info = &archive.objects[0].archive_info.message_infos[0];
+        assert_eq!(info.object_references, [13, 13, 13]);
+        assert_eq!(info.data_references, [21, 21, 21, 21]);
+        assert_eq!(info.field_infos[0].object_references, [100]);
+        assert_eq!(info.field_infos[0].data_references, [21, 21]);
+        assert_eq!(info.field_infos[1].object_references, [77]);
+        assert_eq!(info.field_infos[1].data_references, [31, 32, 33]);
+        assert_eq!(
+            archive.objects[0].original_header.as_deref(),
+            Some(fixture.selected_header.as_slice())
+        );
+
+        // A second parse proves that the raw result and its typed projection
+        // remain paired for future header-preserving edits.
+        let reparsed = Archive::parse(&encoded)?;
+        assert_eq!(reparsed.to_bytes()?, encoded);
+        Ok(())
+    }
+
+    #[test]
+    fn all_data_pruning_clears_aggregate_and_nested_references_only() -> Result<()> {
+        let fixture = combined_reference_pruning_fixture()?;
+        let mut archive = Archive::parse(&fixture.source)?;
+        archive.objects[0].replace_message_pruning_references_preserving_header(
+            0,
+            RawMessage {
+                type_: 9,
+                data: vec![0x5a; 130],
+            },
+            &[],
+            DataReferencePruning::All,
+        )?;
+
+        let encoded = archive.to_bytes()?;
+        let (header, _) = split_test_archive(&encoded)?;
+        assert_eq!(header, fixture.all_data_header);
+        let info = &archive.objects[0].archive_info.message_infos[0];
+        assert_eq!(info.object_references, [10, 10, 13, 13, 12, 13, 10]);
+        assert!(info.data_references.is_empty());
+        assert_eq!(info.field_infos[0].object_references, [10, 12, 100, 10]);
+        assert!(info.field_infos[0].data_references.is_empty());
+        assert_eq!(info.field_infos[1].object_references, [77]);
+        assert!(info.field_infos[1].data_references.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn data_pruning_zero_and_noop_policies_preserve_existing_behavior() -> Result<()> {
+        let fixture = combined_reference_pruning_fixture()?;
+        let parsed = Archive::parse(&fixture.source)?;
+        let replacement = RawMessage {
+            type_: 9,
+            data: vec![0x44; 130],
+        };
+        let mut delegated = parsed.objects[0].clone();
+        let mut preserving = parsed.objects[0].clone();
+        let delegated_old = delegated.replace_message_pruning_references_preserving_header(
+            0,
+            replacement.clone(),
+            &[],
+            DataReferencePruning::Selected(&[]),
+        )?;
+        let preserving_old = preserving.replace_message_preserving_header(0, replacement)?;
+        assert_eq!(delegated_old, preserving_old);
+        assert_eq!(delegated, preserving);
+
+        let mut unmatched = parsed.objects[0].clone();
+        let same = unmatched.messages[0].clone();
+        unmatched.replace_message_pruning_references_preserving_header(
+            0,
+            same,
+            &[u64::MAX],
+            DataReferencePruning::Selected(&[u64::MAX]),
+        )?;
+        assert_eq!(unmatched, parsed.objects[0]);
+        assert_eq!(
+            Archive {
+                objects: vec![unmatched],
+            }
+            .to_bytes()?,
+            fixture.source
+        );
+
+        let mut empty = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 2,
+                data: vec![3],
+            }],
+        )?;
+        let empty_before = Archive {
+            objects: vec![empty.clone()],
+        }
+        .to_bytes()?;
+        empty.replace_message_pruning_references_preserving_header(
+            0,
+            RawMessage {
+                type_: 2,
+                data: vec![3],
+            },
+            &[],
+            DataReferencePruning::All,
+        )?;
+        assert_eq!(
+            Archive {
+                objects: vec![empty],
+            }
+            .to_bytes()?,
+            empty_before
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_data_pruning_can_restore_exact_bytes_after_metadata_restore() -> Result<()> {
+        let original_message = RawMessage {
+            type_: 2,
+            data: vec![3, 4],
+        };
+        let mut object = ArchiveObject::new(1, vec![original_message.clone()])?;
+        let info = &mut object.archive_info.message_infos[0];
+        info.data_references.extend([7, 8]);
+        let mut field = FieldInfo::new(vec![1]);
+        field.data_references.extend([9, 10]);
+        info.field_infos.push(field);
+        let source = Archive {
+            objects: vec![object],
+        }
+        .to_bytes()?;
+        let mut edited = Archive::parse(&source)?;
+        let replacement = RawMessage {
+            type_: 9,
+            data: vec![5, 6, 7],
+        };
+        let old = edited.objects[0].replace_message_pruning_references_preserving_header(
+            0,
+            replacement.clone(),
+            &[],
+            DataReferencePruning::Selected(&[8, 10]),
+        )?;
+        assert_eq!(
+            edited.objects[0].archive_info.message_infos[0].data_references,
+            [7]
+        );
+        assert_eq!(
+            edited.objects[0].archive_info.message_infos[0].field_infos[0].data_references,
+            [9]
+        );
+
+        let edited_info = &mut edited.objects[0].archive_info.message_infos[0];
+        edited_info.data_references.insert(1, 8);
+        edited_info.field_infos[0].data_references.insert(1, 10);
+        let replaced = edited.objects[0].replace_message_preserving_header(0, old)?;
+        assert_eq!(replaced, replacement);
+        assert_eq!(edited.to_bytes()?, source);
+        Ok(())
+    }
+
+    #[test]
+    fn combined_reference_pruning_budgets_selectors_and_wire_work_atomically() -> Result<()> {
+        let fixture = combined_reference_pruning_fixture()?;
+        let mut archive = Archive::parse(&fixture.source)?;
+        let before = archive.objects[0].clone();
+        let selector_limits = Limits::default().with_metadata_items(2)?;
+        let selector_error = archive.objects[0]
+            .replace_message_pruning_references_preserving_header_with_limits(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: vec![0xde, 0xad, 0xbe],
+                },
+                &[10, 12],
+                DataReferencePruning::Selected(&[20]),
+                selector_limits,
+            )
+            .err();
+        assert!(matches!(
+            selector_error,
+            Some(Error::Limit {
+                kind: LimitKind::MetadataItems,
+                observed: 3,
+                maximum: 2,
+            })
+        ));
+        assert_eq!(archive.objects[0], before);
+
+        let wire_limits = Limits::default().with_header_fields(1)?;
+        let wire_error = archive.objects[0]
+            .replace_message_pruning_references_preserving_header_with_limits(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: vec![0xde, 0xad, 0xbe],
+                },
+                &[],
+                DataReferencePruning::All,
+                wire_limits,
+            )
+            .err();
+        assert!(matches!(
+            wire_error,
+            Some(Error::Limit {
+                kind: LimitKind::HeaderFields,
+                ..
+            })
+        ));
+        assert_eq!(archive.objects[0], before);
+        Ok(())
+    }
+
+    #[test]
+    fn ambiguous_or_malformed_data_reference_fields_are_rejected_atomically() -> Result<()> {
+        for malformed_message in [
+            vec![
+                0x08, 0x02, 0x12, 0x03, 0x01, 0x00, 0x05, 0x18, 0x01, 0x31, 1, 2, 3, 4, 5, 6, 7, 8,
+            ],
+            vec![
+                0x08, 0x02, 0x12, 0x03, 0x01, 0x00, 0x05, 0x18, 0x01, 0x32, 0x01, 0x80,
+            ],
+            vec![
+                0x08, 0x02, 0x12, 0x03, 0x01, 0x00, 0x05, 0x18, 0x01, 0x22, 0x0a, 0x0a, 0x00, 0x29,
+                1, 2, 3, 4, 5, 6, 7, 8,
+            ],
+        ] {
+            let mut object = ArchiveObject::new(
+                1,
+                vec![RawMessage {
+                    type_: 2,
+                    data: vec![0xcc],
+                }],
+            )?;
+            let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
+            let mut raw_header = vec![0x08, 0x01];
+            push_length_delimited(&mut raw_header, &[0x12], 1, &malformed_message)?;
+            object.original_header = Some(raw_header.into_boxed_slice());
+            object.original_canonical_header = Some(canonical.into_boxed_slice());
+            let before = object.clone();
+
+            let error = object
+                .replace_message_pruning_references_preserving_header(
+                    0,
+                    RawMessage {
+                        type_: 2,
+                        data: vec![0xdd],
+                    },
+                    &[],
+                    DataReferencePruning::All,
+                )
+                .err();
+            assert!(error.is_some());
+            assert_eq!(object, before);
+        }
+        Ok(())
+    }
+
+    fn combined_reference_pruning_fixture() -> Result<CombinedReferencePruningFixture> {
+        let source_message = combined_reference_message(7, 3, false, 0)?;
+        let selected_message = combined_reference_message(9, 130, true, 1)?;
+        let all_data_message = combined_reference_message(9, 130, false, 2)?;
+        let source_header = combined_reference_header(&source_message)?;
+        let selected_header = combined_reference_header(&selected_message)?;
+        let all_data_header = combined_reference_header(&all_data_message)?;
+
+        let mut source = Vec::new();
+        let mut prefix = [0u8; 10];
+        source.extend_from_slice(encode_varint(source_header.len() as u64, &mut prefix));
+        source.extend_from_slice(&source_header);
+        source.extend_from_slice(&[0xde, 0xad, 0xbe]);
+        Ok(CombinedReferencePruningFixture {
+            source,
+            selected_header,
+            all_data_header,
+        })
+    }
+
+    fn combined_reference_header(message: &[u8]) -> Result<Vec<u8>> {
+        let mut header = vec![
+            0x08, 0x01, 0x88, 0x00, 0xaa, 0x00, 0xd1, 0x06, 1, 2, 3, 4, 5, 6, 7, 8,
+        ];
+        push_length_delimited(&mut header, &[0x92, 0x00], 2, message)?;
+        header.extend_from_slice(&[0xda, 0x06, 0x81, 0x00, 0xee, 0x18, 0x81, 0x00]);
+        Ok(header)
+    }
+
+    // data_mode: 0 retains all data references, 1 prunes 20 and 22, and 2
+    // prunes all data references. Conditional construction keeps the exact
+    // expected raw bytes visible independently of the production rewriter.
+    fn combined_reference_message(
+        type_: u64,
+        length: u64,
+        prune_objects: bool,
+        data_mode: u8,
+    ) -> Result<Vec<u8>> {
+        let first_field = combined_first_field(prune_objects, data_mode)?;
+        let second_field = combined_second_field(data_mode)?;
+        let mut message = Vec::new();
+        message.extend_from_slice(&[0xcd, 0x0c, 9, 8, 7, 6]);
+        message.extend_from_slice(&[0x08, 0x01, 0x88, 0x00]);
+        push_test_varint(&mut message, type_, 2);
+        push_length_delimited(&mut message, &[0x12], 2, &[0x01, 0x00, 0x05])?;
+        message.extend_from_slice(&[0x18, 0x01, 0x98, 0x00]);
+        push_test_varint(&mut message, length, 2);
+
+        if prune_objects {
+            message.extend_from_slice(&[0x28, 0x0d, 0xa8, 0x00, 0x8d, 0x00]);
+            push_length_delimited(&mut message, &[0x2a], 2, &[0x0d])?;
+        } else {
+            message.extend_from_slice(&[
+                0x28, 0x8a, 0x00, 0xa8, 0x00, 0x8a, 0x00, 0x28, 0x0d, 0xa8, 0x00, 0x8d, 0x00,
+            ]);
+            push_length_delimited(&mut message, &[0x2a], 2, &[0x0c, 0x0d, 0x0a])?;
+        }
+        push_length_delimited(&mut message, &[0x2a], 2, &[])?;
+
+        match data_mode {
+            0 => {
+                message.extend_from_slice(&[
+                    0x30, 0x94, 0x00, 0xb0, 0x00, 0x94, 0x00, 0x30, 0x15, 0xb0, 0x00, 0x95, 0x00,
+                ]);
+                push_length_delimited(&mut message, &[0x32], 2, &[0x16, 0x15, 0x14, 0x15])?;
+            },
+            1 => {
+                message.extend_from_slice(&[0x30, 0x15, 0xb0, 0x00, 0x95, 0x00]);
+                push_length_delimited(&mut message, &[0x32], 2, &[0x15, 0x15])?;
+            },
+            2 => push_length_delimited(&mut message, &[0x32], 2, &[])?,
+            _ => return Err(Error::invalid_archive(0, "invalid test data pruning mode")),
+        }
+        push_length_delimited(&mut message, &[0x32], 2, &[])?;
+        push_length_delimited(&mut message, &[0xa2, 0x00], 2, &first_field)?;
+        push_length_delimited(&mut message, &[0x22], 2, &second_field)?;
+        push_length_delimited(&mut message, &[0xa2, 0x06], 2, &[0xfe, 0xed])?;
+        Ok(message)
+    }
+
+    fn combined_first_field(prune_objects: bool, data_mode: u8) -> Result<Vec<u8>> {
+        let mut field = vec![0xa0, 0x01, 0x81, 0x00];
+        push_length_delimited(&mut field, &[0x0a], 2, &[])?;
+        if prune_objects {
+            push_length_delimited(&mut field, &[0x22], 2, &[0xe4, 0x00])?;
+        } else {
+            field.extend_from_slice(&[0x20, 0x8a, 0x00]);
+            push_length_delimited(&mut field, &[0x22], 2, &[0x0c, 0xe4, 0x00, 0x0a])?;
+        }
+        match data_mode {
+            0 => {
+                field.extend_from_slice(&[0x28, 0x94, 0x00, 0xa8, 0x00, 0x95, 0x00]);
+                push_length_delimited(&mut field, &[0x2a], 2, &[0x14, 0x96, 0x00, 0x15, 0x14])?;
+            },
+            1 => {
+                field.extend_from_slice(&[0xa8, 0x00, 0x95, 0x00]);
+                push_length_delimited(&mut field, &[0x2a], 2, &[0x15])?;
+            },
+            2 => push_length_delimited(&mut field, &[0x2a], 2, &[])?,
+            _ => return Err(Error::invalid_archive(0, "invalid test data pruning mode")),
+        }
+        push_length_delimited(&mut field, &[0x2a], 2, &[])?;
+        push_length_delimited(&mut field, &[0xaa, 0x01], 2, &[0xde, 0xad])?;
+        Ok(field)
+    }
+
+    fn combined_second_field(data_mode: u8) -> Result<Vec<u8>> {
+        let mut field = Vec::new();
+        push_length_delimited(&mut field, &[0x0a], 1, &[])?;
+        field.extend_from_slice(&[0x20, 0x4d]);
+        match data_mode {
+            0 | 1 => {
+                field.extend_from_slice(&[0x28, 0x1f]);
+                push_length_delimited(&mut field, &[0xaa, 0x00], 2, &[0x20, 0x21])?;
+            },
+            2 => push_length_delimited(&mut field, &[0xaa, 0x00], 2, &[])?,
+            _ => return Err(Error::invalid_archive(0, "invalid test data pruning mode")),
+        }
+        field.extend_from_slice(&[0xb5, 0x0c, 1, 2, 3, 4]);
+        Ok(field)
+    }
+
+    fn push_test_varint(output: &mut Vec<u8>, value: u64, width: usize) {
+        let mut encoded = [0u8; 10];
+        output.extend_from_slice(encode_varint_with_width(value, width, &mut encoded));
     }
 
     fn reference_pruning_fixture() -> Result<ReferencePruningFixture> {

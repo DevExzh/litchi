@@ -423,15 +423,12 @@ impl Presentation {
                     .iter()
                     .enumerate()
                     .map(|(index, slide)| {
+                        let name = slide.name().map(str::to_owned);
                         let title = slide.title().map(str::to_owned);
-                        let content = slide.text_content().join("\n");
-                        let text = match &title {
-                            Some(title) if !content.is_empty() => format!("{title}\n\n{content}"),
-                            Some(title) => title.clone(),
-                            None => content,
-                        };
+                        let text = slide.plain_text();
                         Slide::Keynote {
                             number: index + 1,
+                            name,
                             title,
                             text,
                         }
@@ -588,6 +585,46 @@ impl Presentation {
                 .enumerate()
                 .map(|(idx, slide)| slide.text().map(|text| (idx + 1, text.to_string())))
                 .collect()
+        }
+    }
+}
+
+#[cfg(all(test, feature = "keynote"))]
+mod keynote_facade_tests {
+    use super::Presentation;
+    use crate::presentation::Slide;
+    use std::path::PathBuf;
+
+    fn fixture_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote/basic.key")
+    }
+
+    #[test]
+    fn slides_preserve_keynote_identity_and_plain_text_semantics() {
+        let path = fixture_path();
+        let native = litchi_keynote::Package::open(&path).expect("open native Keynote fixture");
+        let native_slides = native.slides().expect("read native Keynote slides");
+        let facade = Presentation::open(&path).expect("open Keynote through presentation facade");
+        let facade_slides = facade.slides().expect("read facade slides");
+
+        assert_eq!(facade_slides.len(), native_slides.len());
+        for (index, (facade_slide, native_slide)) in
+            facade_slides.iter().zip(native_slides).enumerate()
+        {
+            let Slide::Keynote {
+                number,
+                name,
+                title,
+                text,
+            } = facade_slide
+            else {
+                panic!("Keynote presentation yielded a non-Keynote facade slide")
+            };
+
+            assert_eq!(*number, index + 1);
+            assert_eq!(name.as_deref(), native_slide.name());
+            assert_eq!(title.as_deref(), native_slide.title());
+            assert_eq!(text, &native_slide.plain_text());
         }
     }
 }

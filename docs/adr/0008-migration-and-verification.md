@@ -7791,3 +7791,227 @@ publication, deep focused fuzzing, edit/save compatibility, or aggregate
 peak-memory work. In particular, root source preparation currently
 materializes unrelated ZIP members transiently and remains a measured memory
 debt.
+
+## 2026-08-09 amendment: Keynote title/body transaction gate
+
+The focused Keynote package now distinguishes title and body roles while also
+distinguishing an absent native placeholder from an existing empty storage.
+Selector-first reads and one-operation checked UTF-16 edits share one
+role-aware transaction. A changed edit commit proves exclusive graph
+ownership, rewrites the selected storage, invalidates the selected slide-node
+preview state, deletes root preview entries, reassembles the package, reopens
+it under the retained limits, and performs semantic and topology verification.
+The storage and slide node may share one IWA component or occupy two. A changed
+`apply_slide_text` does not reassemble: it exact-source checks the patch,
+reopens the patch's stored target bytes under the retained limits, runs the
+same verification, and reports the one- or two-component count retained from
+the originating edit. Exact edit no-ops rely on the immutable selected snapshot
+established when editing began; exact patch no-ops check artifact identity.
+Both share the source allocation, retain all preview/cache bytes, report zero
+components, and deliberately do no whole-source validation, reassembly, or
+candidate reopen. Inverse replay uses
+the same exact-source checked patch-apply path and restores the complete
+original artifact.
+
+The exact Buffa ownership seam consists of two projections. The existing
+speaker-notes codec now also exposes optional `KN.SlideArchive` field-5 title
+and field-6 body references while retaining its bounded style, transition,
+name, in-document, and note snapshot. The new placeholder codec follows
+`KN.PlaceholderArchive` through the required `TSWP.ShapeInfoArchive`,
+`TSD.ShapeArchive`, and empty `TSD.DrawableArchive` envelopes and returns only
+the optional `ShapeInfoArchive.owned_storage` field 4 and placeholder kind.
+The selected read forces the slide view. Package-wide ownership proof instead
+raw-scans fields 5 and 6 of every slide candidate and forces the slide Buffa
+view only for a candidate that references the selected placeholder. It
+raw-scans every placeholder candidate and forces the placeholder Buffa view
+only when a modern or deprecated edge can reference the selected storage. The
+shared bounded scanner also audits `ShapeInfoArchive.deprecated_storage` field
+2, `ShapeInfoArchive.text_flow` field 3, standalone shape-info references,
+embedded `TSP.Reference` metadata, and `NoteArchive.containedStorage` field 1.
+The alias scan does not force the Buffa `NoteArchive` view. The existing
+`litchi-iwa-text-wire` storage codec and raw splice remain the text-value seam.
+
+Schema-directed preflight rejects missing required envelopes, duplicate
+selected fields, wrong wire types, noncanonical protobuf framing, zero or
+malformed references, and resource overruns before Buffa values authorize the
+operation. Format-side checks separately reject contradictory role hints,
+shared ownership, aliases, dependent content, and noncanonical outer IWA object
+lengths. Buffa neither encodes the changed payload nor retains unknown content;
+accepted raw records remain authoritative.
+
+Changed publication has one deliberate preservation exception for rendered
+caches. A bounded raw `KN.SlideNodeArchive` rewrite removes fields 3 and 9
+`database_thumbnail`/`database_thumbnails`, field 10 `thumbnailSizes`, field 16
+`thumbnails`, and field 25 thumbnail digests; sets field 14
+`thumbnailsAreDirty` to true; removes the corresponding preview object
+references; and prunes only preview-owned aggregate and field data references.
+Proven unrelated data references are retained, while ambiguous aggregate-only
+ownership is rejected. Other slide-node fields remain raw-preserved. The
+selected `KN.SlideArchive` must not contain field 37
+`thumbnailTextForTitlePlaceholder` or field 38
+`thumbnailTextForBodyPlaceholder`; a changed commit fails closed until those
+separate string caches have a proven invalidation rule.
+
+`litchi_iwa_archive::package::Catalog::reassemble_with_deletions_to_bytes`
+provides the physical publication seam. It resolves edits and deletions by
+exact normalized name, rejects missing, duplicate, overlapping, legacy, or
+ZIP64 mutation shapes, bounds the complete output, permits deletion of an
+opaque member without decoding it, and preserves retained members' raw names,
+metadata, ordering, and compressed bytes. The Keynote transaction deletes each
+existing root `preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg` through
+that API. Preview entries are ZIP members rather than IWA components and are
+not included in `touched_components`. Native Keynote and package preview
+consumers can otherwise continue presenting pixels rendered before the text
+change. Storage, slide-node, and preview mutations become visible only together
+as one candidate artifact.
+
+Diagnostics are intentionally component-scoped. A changed edit commit and a
+changed forward or inverse patch application report `changed = true`,
+`touched_components = 1` or `2` from the originating edit, and
+`full_reparse_performed = true`. Root preview deletions do not increment the
+component count. Exact edit and patch no-ops report `false`, `0`, and `false`
+respectively.
+
+Verification admits only the selected storage rewrite, the selected slide-node
+cache invalidation, and deletion of those three root preview names. It requires
+the slide node to be observably dirty and free of preview references, all three root preview
+names to be absent, all other IWA objects to compare exactly, and unselected
+semantic slide state to remain unchanged. A changed inverse restores the exact
+source bytes, including any former root previews and slide-node cache records.
+
+The new placeholder projection generates exactly five files totaling 141,766
+bytes under a 144 KiB cap and contains no repeated view. Adding the two
+singular slide references leaves the existing slide-owner projection at five
+files and 162,241 bytes under its 168 KiB cap, also with no repeated view. The
+current focused inventory contains ten placeholder-codec tests, ten
+speaker-codec tests, 25 slide-text integration tests, and six Keynote
+doctests. Together they cover Prost parity; optional and unknown fields;
+required envelopes; nonzero, duplicate, noncanonical, and malformed
+references; exact resource ceilings; title/body role separation;
+absent-versus-empty state; UTF-16 operations and boundaries; exact no-op,
+conflict, and inverse behavior; raw/header/sibling preservation; ownership
+metadata and aliases; cache invalidation and root-preview deletion; content-free
+errors; and retained semantic/output limits. The archive package inventory also
+covers deletion-only and combined edit/deletion publication, opaque-member
+deletion, exact/disjoint selection, retained physical records, output limits,
+and the exact empty-mutation path. The final integrated run passed all 89 proto
+unit tests, all 72 Keynote library tests, all 25 slide-text integration tests,
+all six Keynote doctests, 78 archive tests, 42 core tests, seven root-facade
+tests, three focused root library tests, and 258 filtered migration-host
+Keynote regressions.
+
+The migration-host builder regression now focused-reads and sequentially edits
+title, body, and notes, asserts that the other roles remain untouched, and
+reopens the final values through the host. The add-slide regression covers a
+focused edit and reopen of the new title; the visible slide-number example is
+also in the verification inventory. The duplication fixture was hardened with
+a valid style and complete archive metadata before focused title and notes
+edits assert that the original slide is unchanged. Production ownership proof
+remains strict: zero required slide styles and missing ownership metadata are
+rejected rather than admitted as fixture compatibility.
+
+The host parity cut removes exactly `set_slide_title`,
+`replace_slide_title`, `clear_slide_title`, `set_slide_body`,
+`replace_slide_body`, `clear_slide_body`, `set_slide_notes`,
+`replace_slide_notes`, and `clear_slide_notes`, together with their two
+private storage-resolution helpers. Builder, add-slide, and duplication
+coverage use the focused semantic transactions for their replacement behavior,
+and the raw-index title/body example is replaced by the focused example. The
+wider host editor remains because its creation, placeholder
+visibility/layout, arbitrary text-box, generic text-storage, and other graph
+mutations have not moved.
+
+The root presentation facade also makes a separate intentional semantic
+correction. Public `Slide::Keynote` now retains navigator `name` and visible
+`title` as distinct fields, and its `text` uses Keynote's complete plain-text
+projection rather than omitting body storage. `Slide::name()` therefore returns
+the navigator name; callers that previously treated it as the canvas title use
+the new `Slide::title()` accessor. Downstream constructors or exhaustive
+destructures of the public struct variant must add the `name` field.
+
+Migration is explicit rather than aliased:
+
+- `set_slide_title(index, text)` and `set_slide_body(index, text)` become a
+  mutable local `SlideTextEdit` from `edit_slide_title(selector)` or
+  `edit_slide_body(selector)`, followed by `set(text)` and the consuming
+  `commit()` call.
+- `replace_slide_{title,body}(index, start..end, text)` becomes the matching
+  focused edit with `TextSpan::from_utf16_indexes(start, end)` and `replace`;
+  the indices remain UTF-16 code-unit positions but are now checked types.
+- `clear_slide_{title,body}` becomes `clear` on the matching focused edit.
+  The three notes operations use the corresponding `SlideNotesEdit` methods.
+- A numeric caller can use `Position::new(index)`; an exact navigator name is
+  preferred when it is the durable semantic selector. Missing, ambiguous,
+  contradictory, or shared ownership returns a focused error instead of
+  falling through to the generic storage editor.
+
+Each commit returns a new immutable `Package`; it does not mutate the package
+that began the edit. Sequential changes must therefore start the next edit
+from `commit.package()` or from `commit.into_package()`. This chaining rule is
+also why the removed mutable host methods are not source-compatible aliases.
+Changed-output compatibility is semantic rather than byte-local to the text
+storage: callers and differential tests must allow the declared selected
+slide-node cache invalidation and root-preview deletion. Exact no-ops remain
+byte-identical and do not invalidate caches.
+
+The native source was the 500,058-byte checked-in `basic.key` fixture with
+SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+Before the cache-invalidating release blocker was integrated, the focused
+example produced `title-rust.key` with SHA-256
+`9a093d1d99f533549038d14744af77262a51781d685558442e2526a7a66b502a`;
+its title inverse restored the exact source hash. Sequential title and body
+edits produced `title-body-rust.key` with SHA-256
+`02d95162b6bede695093f4e7cb7d7aff3f7a9217b70b13b691b231d2d0626318`;
+its body inverse restored the exact title-only hash. These hashes remain
+semantic text-splice and inverse evidence, but they are not byte-golden outputs
+for the current writer because they predate slide-node invalidation and root
+preview deletion.
+
+Computer Use opened the sequential Rust candidate in Apple Keynote without a
+repair, recovery, conversion, or warning prompt. Keynote displayed the exact
+title `Litchi title mutation 2026-08-09`, exact body `Litchi body mutation
+東京😀`, and untouched date `2026-08-07`. Native Save As, close, and exact-path
+reopen produced `title-body-native-resaved.key` with SHA-256
+`e34749fae1e112caf6a6b960da26433f6d92a8366e12f83b59cbef6b03b0b563`.
+Focused reread recovered both requested values, and same-value title and body
+commits each reported unchanged, touched zero components, skipped full
+reparse, and retained the exact native-resaved hash. This native run likewise
+predates the cache-hardening change: it proves canvas text and native
+open/save/reopen behavior for the splice, not the final cache-invalidating byte
+shape. A changed title/body writer must invalidate rendered caches even when
+semantic readback already shows the new string, because navigator and package
+preview surfaces are independently persisted native artifacts.
+The cache-hardened rerun used the same source and produced a title-only
+candidate with SHA-256
+`8cd82df9d83a6beea473efc2a7a5251f50fb0e9ad4198766a3d2b6eb6cf4bc32`
+and the sequential title/body candidate with SHA-256
+`f3b13cd5bd614d93493cc6780ff177e6a203d990d15b9d5c592687ef40a48263`.
+Both inverses restored their exact respective inputs. The forward candidate
+contained no root preview member and invalidated the selected slide-node cache.
+Computer Use opened it in Apple Keynote without repair, recovery, conversion,
+or warning; the navigator and canvas showed the exact title `Litchi native
+Keynote fixture — real-app 🚀`, exact body `Buffa native UI verification —
+東京😀`, and untouched date `2026-08-07`. Native Save As regenerated all three
+root preview members and produced SHA-256
+`cb3f9b05613505bb422942ca43e237a731454f58753ee65f26ae639187b96a6c`.
+Close and recent-path reopen were warning-free and displayed the same values.
+Focused same-value title and body commits on the native copy each reported
+unchanged, touched zero components, and reproduced that native hash exactly.
+
+The boundary-checker inventory contains 51 regressions, including the
+exact-declaration negative policy for the nine retired public methods and two
+retired private helpers; all 51 pass. The repository-wide policy command still
+reports 14 unrelated, pre-existing `soapberry-zip`/`xml-minifier` edge
+classification errors. The vertical changes no workspace membership or manifest edge, and
+the current metadata/policy inventory is 64 workspace packages, 235 internal
+dependency declarations, and 14 ordered migration debts.
+
+This gate is intentionally narrower than complete Keynote editing. It neither
+creates nor deletes title/body placeholders, edits arbitrary text boxes,
+serializes patches durably, publishes files atomically, converts the complete
+Keynote graph to Buffa, nor deletes `litchi-iwa`. `SlideTextError` retains
+typed limit kinds and observed/maximum counts, but does not yet retain the
+content-free semantic object path required by ADR 0005; adding a
+format-owned `SlideTextPath` and threading it through semantic, wire, archive,
+cache, and rewrite failures remains explicit follow-up debt.

@@ -3,7 +3,7 @@
 use std::io;
 use std::path::PathBuf;
 
-use litchi::keynote::{Package, Position, SlideNotesError, SlideSelector};
+use litchi::keynote::{Package, Position, SlideNotesError, SlideSelector, SlideTextRole, TextSpan};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote/basic.key")
@@ -120,5 +120,169 @@ fn slide_notes_transaction_is_available_through_the_root_facade()
         ));
         assert_eq!(package.source_bytes().as_ptr(), source_pointer);
     }
+    Ok(())
+}
+
+#[test]
+fn slide_text_transaction_is_available_through_the_root_facade()
+-> Result<(), Box<dyn std::error::Error>> {
+    let package = Package::open(fixture_path())?;
+    let source_pointer = package.source_bytes().as_ptr();
+    let source_bytes = package.source_bytes();
+
+    let title = package
+        .slide_text(SlideSelector::index(0), SlideTextRole::Title)?
+        .ok_or_else(|| io::Error::other("native Keynote file has no title placeholder"))?;
+    let body = package
+        .slide_text(SlideSelector::index(0), SlideTextRole::Body)?
+        .ok_or_else(|| io::Error::other("native Keynote file has no body placeholder"))?;
+    assert_eq!(title, "Litchi native Keynote fixture");
+    assert_eq!(body, "Buffa lazy-view migration verification");
+    assert!(!body.contains("2026-08-07"));
+    assert_eq!(
+        package.slide_title(SlideSelector::index(0))?,
+        Some(title.clone())
+    );
+    assert_eq!(
+        package.slide_body(SlideSelector::index(0))?,
+        Some(body.clone())
+    );
+
+    let mut no_op = package.edit_slide_title(SlideSelector::index(0))?;
+    no_op.set(&title)?;
+    let no_op = no_op.commit()?;
+    assert!(no_op.patch().is_noop());
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().source_bytes().as_ptr(), source_pointer);
+
+    let replacement = "Litchi native Keynote fixture — root facade";
+    let mut edit = package.edit_slide_text(SlideSelector::index(0), SlideTextRole::Title)?;
+    edit.set(replacement)?;
+    let changed = edit.commit()?;
+    assert_eq!(changed.patch().role(), SlideTextRole::Title);
+    assert_eq!(changed.patch().before(), title);
+    assert_eq!(changed.patch().after(), replacement);
+    assert!(changed.diagnostics().changed());
+    assert_eq!(
+        changed.package().slide_title(SlideSelector::index(0))?,
+        Some(replacement.to_owned())
+    );
+    assert_eq!(
+        changed.package().slide_body(SlideSelector::index(0))?,
+        Some(body.clone())
+    );
+
+    let inverse = changed.patch().inverse();
+    let restored = changed.package().apply_slide_text(&inverse)?;
+    assert_eq!(restored.package().source_bytes(), source_bytes);
+    assert_eq!(
+        restored.package().slide_title(SlideSelector::index(0))?,
+        Some(title)
+    );
+    assert_eq!(
+        restored.package().slide_body(SlideSelector::index(0))?,
+        Some(body)
+    );
+    Ok(())
+}
+
+#[test]
+fn slide_body_span_edit_uses_only_public_semantic_facade_types()
+-> Result<(), Box<dyn std::error::Error>> {
+    let package = Package::open(fixture_path())?;
+    let source_pointer = package.source_bytes().as_ptr();
+    let source_bytes = package.source_bytes();
+    let slides = package.slides()?;
+    let slide = slides
+        .first()
+        .ok_or_else(|| io::Error::other("native Keynote file has no slide"))?;
+    let selector = slide.position_selector();
+
+    let title = package
+        .slide_title(selector)?
+        .ok_or_else(|| io::Error::other("native Keynote file has no title placeholder"))?;
+    let body = package
+        .slide_body(selector)?
+        .ok_or_else(|| io::Error::other("native Keynote file has no body placeholder"))?;
+    let span = TextSpan::from_utf16_indexes(6, 15)?;
+    let mut edit = package.edit_slide_body(selector)?;
+    assert_eq!(edit.position(), Position::new(slide.index()));
+    assert_eq!(edit.role(), SlideTextRole::Body);
+    assert_eq!(edit.text(), body);
+    assert_eq!(edit.span(), None);
+    edit.replace(span, "selector-first")?;
+    assert_eq!(edit.span(), Some(span));
+    let edit_debug = format!("{edit:?}");
+    assert!(!edit_debug.contains("identifier"));
+    assert!(!edit_debug.contains(".iwa"));
+
+    let changed = edit.commit()?;
+    assert_eq!(changed.patch().position(), Position::new(slide.index()));
+    assert_eq!(changed.patch().role(), SlideTextRole::Body);
+    assert_eq!(changed.patch().span(), span);
+    assert_eq!(changed.patch().before(), body);
+    assert_eq!(
+        changed.patch().after(),
+        "Buffa selector-first migration verification"
+    );
+    assert!(changed.diagnostics().changed());
+    assert_eq!(changed.diagnostics().touched_components(), 2);
+    assert!(changed.diagnostics().full_reparse_performed());
+    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.source_bytes(), source_bytes);
+    assert_eq!(changed.package().slide_title(selector)?, Some(title));
+    assert_eq!(
+        changed.package().slide_body(selector)?,
+        Some("Buffa selector-first migration verification".to_owned())
+    );
+    let patch_debug = format!("{:?}", changed.patch());
+    assert!(!patch_debug.contains("identifier"));
+    assert!(!patch_debug.contains(".iwa"));
+
+    let restored = changed
+        .package()
+        .apply_slide_text(&changed.patch().inverse())?;
+    assert_eq!(restored.package().source_bytes(), source_bytes);
+    assert_eq!(restored.package().slide_body(selector)?, Some(body));
+    Ok(())
+}
+
+#[cfg(feature = "iwork")]
+#[test]
+fn focused_slide_text_edit_does_not_mutate_the_read_only_iwork_snapshot()
+-> Result<(), Box<dyn std::error::Error>> {
+    let package = Package::open(fixture_path())?;
+    let document = litchi::iwork::Document::from_bytes(package.source_bytes())?;
+    let snapshot = document.snapshot();
+    let original_slide = snapshot
+        .slide(0)
+        .ok_or_else(|| io::Error::other("root iWork snapshot has no slide"))?;
+    let original_title = original_slide
+        .title()
+        .ok_or_else(|| io::Error::other("root iWork snapshot has no slide title"))?
+        .to_owned();
+    assert_eq!(original_title, "Litchi native Keynote fixture");
+
+    let replacement = "Focused Keynote edit, immutable iWork view";
+    let mut edit = package.edit_slide_title(SlideSelector::index(0))?;
+    edit.set(replacement)?;
+    let changed = edit.commit()?;
+
+    let unchanged_slide = snapshot
+        .slide(0)
+        .ok_or_else(|| io::Error::other("retained iWork snapshot lost its slide"))?;
+    assert_eq!(unchanged_slide.title(), Some(original_title.as_str()));
+    let fresh_original_snapshot = document.snapshot();
+    let fresh_original_slide = fresh_original_snapshot
+        .slide(0)
+        .ok_or_else(|| io::Error::other("fresh iWork snapshot lost its slide"))?;
+    assert_eq!(fresh_original_slide.title(), Some(original_title.as_str()));
+
+    let candidate = litchi::iwork::Document::from_bytes(changed.package().source_bytes())?;
+    let candidate_snapshot = candidate.snapshot();
+    let candidate_slide = candidate_snapshot
+        .slide(0)
+        .ok_or_else(|| io::Error::other("edited iWork snapshot has no slide"))?;
+    assert_eq!(candidate_slide.title(), Some(replacement));
     Ok(())
 }

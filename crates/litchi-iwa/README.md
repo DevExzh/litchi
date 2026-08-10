@@ -1,15 +1,41 @@
 # litchi-iwa
 
-Apple iWork archive reader and writer for `.pages`, `.numbers`, and `.key` files.
+Legacy migration host for Apple iWork archive work on `.pages`, `.numbers`,
+and `.key` files.
 
 ## Overview
 
-`litchi-iwa` reads Apple iWork bundles using their IWA (iWork Archive)
-layout: a ZIP container holding Snappy-compressed, protobuf-encoded object
-streams along with media assets and metadata. It remains the migration host
-for editor capabilities that have not yet moved to the concrete format
-packages. New read-only semantic code should use `litchi::iwork`,
-`litchi-pages`, `litchi-numbers`, or `litchi-keynote`.
+`litchi-iwa` reads Apple iWork bundles using their IWA (iWork Archive) layout:
+a ZIP container holding Snappy-compressed, protobuf-encoded object streams
+along with media assets and metadata. It is the legacy migration host, not the
+supported format facade. Its remaining public surface is for raw archive and
+package work, compatibility adapters, and editor capabilities that have not
+yet moved to a concrete format crate.
+
+New semantic code belongs in `litchi-pages`, `litchi-numbers`, or
+`litchi-keynote`; use `litchi::iwork` for a supported cross-format snapshot.
+In particular, ordinary Keynote slide title, body, and speaker-notes reads or
+edits must use `litchi-keynote::Package` and `SlideSelector`, not
+`litchi_iwa::Document` or `KeynoteEditor`. The concrete package keeps native
+identifiers and raw records private, validates semantic ownership, and creates
+exact-source checked commits.
+
+```rust,no_run
+use litchi_keynote::{Package, SlideSelector};
+
+let package = Package::open("input.key")?;
+let mut edit = package.edit_slide_body(SlideSelector::index(0))?;
+edit.set("Updated body")?;
+let commit = edit.commit()?;
+assert!(!commit.package().source_bytes().is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+To publish a changed package, use the focused
+`litchi-keynote/examples/edit_slide_text.rs` workflow. It requires a distinct,
+new output path, writes a sibling temporary file, synchronizes it, and uses
+no-clobber publication; do not write `source_bytes()` directly to an existing
+path.
 
 ## Usage
 
@@ -17,6 +43,9 @@ packages. New read-only semantic code should use `litchi::iwork`,
 [dependencies]
 litchi-iwa = "0.0.1"
 ```
+
+The unified `Document` API below is retained for legacy compatibility
+inspection. It is not the entry point for new format-specific semantic code.
 
 ```rust
 use litchi_iwa::Document;
@@ -31,7 +60,8 @@ println!("objects: {}", stats.total_objects);
 
 ## Features
 
-- Parse Pages, Numbers, and Keynote bundles from a path or in-memory bytes
+- Legacy-compatible inspection of Pages, Numbers, and Keynote bundles from a
+  path or in-memory bytes
 - Build independent Pages, Numbers, and Keynote packages from typed IWA objects
   with no bundled template
 - Snappy decompression and protobuf decoding of `.iwa` streams
@@ -45,8 +75,10 @@ println!("objects: {}", stats.total_objects);
 - Transactional package-entry and IWA-component updates with atomic saves
 - Legacy nested `Index.zip` bundle import with byte-preserved assets and
   explicit password-protected document rejection
-- Semantic editors for Numbers sheets/tables/cells/formulas, Pages
-  body/header/footer/text-box text, and Keynote slides/placeholders/text boxes/speaker notes
+- Legacy host editors for Numbers sheets/tables/cells/formulas, Pages
+  body/header/footer/text-box text, and unmigrated Keynote slide graphs and
+  arbitrary text boxes. Selector-first Keynote title, body, and speaker-notes
+  text transactions are owned by `litchi-keynote::Package`.
 - `litchi-pages::Package` selector-first section-text reads and, for rooted
   exact sources with one unambiguous native body storage,
   set/clear/UTF-16-span transactions with reversible patches. Checked
@@ -106,7 +138,12 @@ println!("objects: {}", stats.total_objects);
 - Native Numbers cell-comment and direct-reply CRUD with table-list refcounts,
   copy-on-write threads, annotation authors, dates, and UUIDs
 
-## Semantic editing
+## Legacy and raw editing
+
+The examples in this section document remaining migration-host APIs. They are
+appropriate when a workflow explicitly needs an unmigrated editor capability
+or native/archive compatibility behavior. Do not use them as a substitute for
+the concrete Pages, Numbers, or Keynote package APIs.
 
 Native charts can be created directly from typed `ChartData` with
 `add_body_chart`, `add_sheet_chart`, or `add_slide_chart`; no source table or
@@ -690,7 +727,12 @@ numbers.save("created-with-audio.numbers")?;
 `duplicate_sheet_audio` follows Numbers' native 10-point placement while
 keeping the duplicate's audio bytes shared with the source.
 
-### Create Keynote presentations from scratch
+### Create Keynote presentations from scratch (legacy host scope)
+
+The source-building and graph-editor APIs below remain in the migration host.
+For ordinary text in an existing presentation—its slide title, body, or
+speaker notes—use the `litchi-keynote::Package` workflow shown above instead
+of a `KeynoteEditor` raw-ID operation.
 
 The builder materializes Keynote's modern storage-less slide-number placeholder
 graph in both the theme layout and live slide. It can be initially visible or
@@ -938,7 +980,12 @@ unknown movie-archive fields; the common builders reject invalid levels and
 trim ranges, and `MediaLoopMode::Unknown` allows a newer native repeat value to
 round-trip.
 
-### Edit existing documents
+### Edit existing documents through the migration host
+
+This compatibility example intentionally uses `KeynoteEditor` only for
+unmigrated operations and an ordinary `TextBox`. It does not demonstrate
+title, body, or speaker-notes editing: those semantic operations are owned by
+`litchi-keynote`.
 
 ```rust
 use litchi_iwa::numbers::{
@@ -1124,9 +1171,6 @@ if let Some(drawable) = pages.drawables()?.first() {
 pages.save("updated.pages")?;
 
 let mut keynote = KeynoteEditor::open("input.key")?;
-keynote.set_slide_title(0, "Updated title")?;
-keynote.set_slide_body(0, "Updated body")?;
-keynote.set_slide_notes(0, "Presenter cue")?;
 if let Some(text_box) = keynote
     .slide_text_storages(0)?
     .into_iter()
@@ -1147,8 +1191,7 @@ if let Some(text_box) = keynote
 keynote.set_slide_name(0, Some("Opening"))?;
 keynote.set_slide_number_visible(0, true)?;
 let layout = keynote.default_slide_layout()?;
-let fresh = keynote.add_slide(layout)?;
-keynote.set_slide_title(fresh.index, "New from theme")?;
+keynote.add_slide(layout)?;
 let mut show = keynote.show_settings()?;
 show.set_loop_presentation(Some(true));
 show.set_mode(Some(litchi_iwa::keynote::Mode::SelfPlaying))?;
@@ -1248,6 +1291,41 @@ keynote.remove_slide(copy.index)?;
 keynote.save("updated.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+Existing Keynote title, body, and speaker-notes storage is owned by the focused
+`litchi-keynote` package. Ordinary users must use these APIs rather than the
+legacy host's generic storage or raw-ID compatibility paths. They select slides
+by semantic position or navigator name, use checked UTF-16 spans, and publish
+immutable commits with exact-source-checked inverse patches. Private Buffa
+views validate native owner references while bounded raw-record rewriting
+preserves untouched bytes.
+
+```rust,no_run
+use litchi_keynote::{Package, SlideSelector};
+
+let package = Package::open("input.key")?;
+let selector = SlideSelector::index(0);
+
+let mut title = package.edit_slide_title(selector)?;
+title.set("Updated title")?;
+let title = title.commit()?;
+
+let mut body = title.package().edit_slide_body(selector)?;
+body.set("Updated body")?;
+let body = body.commit()?;
+
+let mut notes = body.package().edit_slide_notes(selector)?;
+notes.set("Presenter cue")?;
+let notes = notes.commit()?;
+assert!(!notes.package().source_bytes().is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Publish the resulting bytes through the focused
+`litchi-keynote/examples/edit_slide_text.rs` example or an equivalent
+new-output, sibling-temp, no-clobber operation. The example does not implement
+the library's durable atomic-save contract. Never use a truncating
+write to replace an existing Keynote package.
 
 Keynote slide skip/include, ordering, and modern transition transactions have
 focused `litchi-keynote` package-owner paths. Use exact-name or typed-position
@@ -1529,11 +1607,12 @@ the IWA editor keeps soundtrack media references, package identifiers,
 unknown fields, and transactional wire replacement private to the package
 adapter. Settings edits therefore never rebuild or reorder the media
 collection.
-Slide-owned `TSWP.ShapeInfoArchive` storages are enumerated in drawable order
-and classified as title, body, or ordinary text boxes. Their content supports
-UTF-16 range replacement, whole-value update, and clear operations while
-preserving unaffected style and annotation records. Duplicate drawable or
-cross-slide storage ownership is rejected before mutation.
+The host can still enumerate slide-owned `TSWP.ShapeInfoArchive` storages for
+legacy compatibility, including title, body, and ordinary text-box
+classification. Its generic storage operations are raw-ID migration surfaces,
+not the supported title/body/notes API; use `litchi-keynote::Package` for those
+ordinary semantic edits. Duplicate drawable or cross-slide storage ownership
+is rejected before host mutation.
 Ordinary text boxes can also be duplicated with independent shape, title and
 caption stand-ins, and storage objects, then deleted with inbound-reference
 checks. Both slide ownership and z-order lists are patched, the clone is offset
@@ -1660,7 +1739,12 @@ are not reachable from the application document root. `remove_unreferenced`
 removes only records absent from component records, message data references,
 and `DataMetadataMap`; referenced deletion is rejected transactionally.
 
-## Low-level CRUD
+## Low-level raw CRUD (migration and compatibility only)
+
+The `raw` namespace deliberately exposes native package and IWA primitives.
+It is not a stable semantic facade: callers must understand IWA object
+identities, message types, and preservation obligations. Concrete format APIs
+must not re-export these values.
 
 ```rust
 use litchi_iwa::raw::package::IWorkPackage;
@@ -1680,9 +1764,11 @@ package.save("updated.pages")?;
 ```
 
 Pre-iWork '13 single-file documents that wrap a directory-style bundle are
-expanded to the modern flat package layout on import. Their IWA components,
-operation log, media, previews, and metadata remain available under normalized
-paths, so semantic and low-level edits use the same APIs as current documents.
+normalized by this legacy host on import. Their IWA components, operation log,
+media, previews, and metadata remain available to its compatibility and raw
+APIs. This does not make normalized legacy sources generally editable through
+the concrete package crates: a changed selector-first transaction may return
+`UnsupportedSource` until it has an explicit preservation-safe owner.
 
 ## Build Requirements
 

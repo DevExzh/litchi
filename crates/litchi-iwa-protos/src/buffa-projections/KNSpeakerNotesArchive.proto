@@ -4,9 +4,10 @@
 // - `../protos/KNArchives.proto`: `KN.TransitionArchive`,
 //   `KN.SlideArchive`, and `KN.NoteArchive`.
 //
-// The transition attributes and all unselected slide fields stay opaque. The
-// Keynote adapter owns strict raw preflight and caller-owned source bytes are
-// the sole preservation representation.
+// The projection also carries the slide's semantic title/body placeholder
+// edges so focused adapters share one strict slide-envelope pass. Transition
+// attributes and all unselected fields stay opaque. Caller-owned source bytes
+// are the sole preservation representation.
 syntax = "proto2";
 
 package LitchiIwaProjection;
@@ -26,6 +27,8 @@ message TransitionArchive {
 message SlideArchive {
   required .LitchiIwaProjection.Reference style = 1;
   required .LitchiIwaProjection.TransitionArchive transition = 4;
+  optional .LitchiIwaProjection.Reference title_placeholder = 5;
+  optional .LitchiIwaProjection.Reference body_placeholder = 6;
   optional string name = 10;
   required bool in_document = 19;
   optional .LitchiIwaProjection.Reference note = 27;

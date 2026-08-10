@@ -20,6 +20,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "keynote_slide_text"
+path = "fuzz_targets/keynote_slide_text.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

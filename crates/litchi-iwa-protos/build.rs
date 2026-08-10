@@ -15,6 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={BUFFA_PROJECTION_DIRECTORY}");
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
@@ -37,6 +38,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_group_node_category_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_document_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_show_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_keynote_placeholder_text_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_keynote_speaker_notes_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -177,9 +182,31 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_keynote_show_projection_budget(&buffa_keynote_show_out_directory)?;
 
-    // Speaker-note ownership needs only two references, the slide's scalar
-    // selector fields, and the required transition envelope. Unknown slide
-    // and transition content remains byte-authoritative in caller-owned IWA.
+    // A semantic Keynote title/body edge ends at one placeholder's owned text
+    // storage through three required inheritance envelopes. Generate only
+    // that singular chain; source records remain the preservation authority.
+    let buffa_keynote_placeholder_text_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-placeholder-text");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNPlaceholderTextOwnerArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_placeholder_text_out_directory)
+        .include_file("iwa_keynote_placeholder_text_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_placeholder_text_projection_budget(
+        &buffa_keynote_placeholder_text_out_directory,
+    )?;
+
+    // Focused semantic slide ownership needs the note/title/body edges, the
+    // slide's scalar selector fields, and the required transition envelope.
+    // Unknown content remains byte-authoritative in caller-owned IWA.
     let buffa_keynote_speaker_notes_out_directory =
         PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-speaker-notes");
     buffa_build::Config::new()
@@ -589,6 +616,88 @@ fn enforce_pages_body_projection_provenance(
     Ok(())
 }
 
+fn enforce_keynote_placeholder_text_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const TSD_DRAWABLE: &str = "message DrawableArchive {";
+    const TSD_SHAPE_SUPER: &str = "required .TSD.DrawableArchive super = 1;";
+    const TSWP_SHAPE_INFO_FIELDS: [&str; 2] = [
+        "required .TSD.ShapeArchive super = 1;",
+        "optional .TSP.Reference owned_storage = 4;",
+    ];
+    const KN_PLACEHOLDER_FIELDS: [&str; 2] = [
+        "required .TSWP.ShapeInfoArchive super = 1;",
+        "optional .KN.PlaceholderArchive.Kind kind = 2 [default = kKindPlaceholder];",
+    ];
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message Reference {\n\
+required uint64 identifier = 1;\n\
+optional int32 deprecated_type = 2;\n\
+optional bool deprecated_is_external = 3;\n\
+}\n\
+message DrawableArchive {}\n\
+message ShapeArchive {\n\
+required .LitchiIwaProjection.DrawableArchive super = 1;\n\
+}\n\
+message ShapeInfoArchive {\n\
+required .LitchiIwaProjection.ShapeArchive super = 1;\n\
+optional .LitchiIwaProjection.Reference owned_storage = 4;\n\
+}\n\
+message PlaceholderArchive {\n\
+required .LitchiIwaProjection.ShapeInfoArchive super = 1;\n\
+optional int32 kind = 2 [default = 0];\n\
+}";
+
+    let reference_schema = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let drawable_schema = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let shape_info_schema = fs::read_to_string(proto_directory.join("TSWPArchives.proto"))?;
+    let keynote_schema = fs::read_to_string(proto_directory.join("KNArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("KNPlaceholderTextOwnerArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let shape_block = drawable_schema
+        .split_once("message ShapeArchive {")
+        .and_then(|(_prefix, remainder)| {
+            remainder.split_once("\n}\n\nmessage ConnectionLineArchive")
+        })
+        .map_or("", |(block, _suffix)| block);
+    let codec = fs::read_to_string("src/keynote_placeholder_text_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    if reference_schema.matches(TSP_REFERENCE).count() != 1
+        || drawable_schema.matches(TSD_DRAWABLE).count() != 1
+        || shape_block.matches(TSD_SHAPE_SUPER).count() != 1
+        || !TSWP_SHAPE_INFO_FIELDS
+            .iter()
+            .all(|declaration| shape_info_schema.matches(declaration).count() == 1)
+        || !KN_PLACEHOLDER_FIELDS
+            .iter()
+            .all(|declaration| keynote_schema.matches(declaration).count() == 1)
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Keynote placeholder-text projection drifted from the canonical KN/TSWP/TSD/TSP owner chain, exceeded its 2 KiB source budget, introduced generated repeated storage, or added production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn enforce_keynote_speaker_notes_projection_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
@@ -597,9 +706,11 @@ fn enforce_keynote_speaker_notes_projection_provenance(
     const KN_TRANSITION: &str = "message TransitionArchive {\n  required .KN.TransitionAttributesArchive attributes = 2;\n}";
     const KN_NOTE: &str =
         "message NoteArchive {\n  required .TSP.Reference containedStorage = 1;\n}";
-    const KN_SLIDE_FIELDS: [&str; 5] = [
+    const KN_SLIDE_FIELDS: [&str; 7] = [
         "required .TSP.Reference style = 1;",
         "required .KN.TransitionArchive transition = 4;",
+        "optional .TSP.Reference titlePlaceholder = 5;",
+        "optional .TSP.Reference bodyPlaceholder = 6;",
         "optional string name = 10;",
         "required bool inDocument = 19;",
         "optional .TSP.Reference note = 27;",
@@ -618,6 +729,8 @@ required .LitchiIwaProjection.TransitionAttributesArchive attributes = 2;\n\
 message SlideArchive {\n\
 required .LitchiIwaProjection.Reference style = 1;\n\
 required .LitchiIwaProjection.TransitionArchive transition = 4;\n\
+optional .LitchiIwaProjection.Reference title_placeholder = 5;\n\
+optional .LitchiIwaProjection.Reference body_placeholder = 6;\n\
 optional string name = 10;\n\
 required bool in_document = 19;\n\
 optional .LitchiIwaProjection.Reference note = 27;\n\
@@ -947,11 +1060,56 @@ fn enforce_keynote_show_projection_budget(directory: &Path) -> Result<(), Box<dy
     Ok(())
 }
 
+fn enforce_keynote_placeholder_text_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // Five singular shells keep codegen compact while leaving formatter and
+    // generator-version headroom. No input-width storage is generated.
+    const MAX_GENERATED_BYTES: u64 = 144 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut generated_repeated_views = 0usize;
+    let mut generated_lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        generated_repeated_views = generated_repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        generated_lazy_repeated_views = generated_lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || generated_repeated_views != 0
+        || generated_lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "Keynote placeholder-text projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn enforce_keynote_speaker_notes_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: usize = 5;
-    // Buffa 0.9.1 emits 151,735 bytes for these five singular message shells.
-    // The 160-KiB ceiling leaves about 8% codegen/formatter headroom.
-    const MAX_GENERATED_BYTES: u64 = 160 * 1024;
+    // Buffa 0.9.1 emits 162,241 bytes with the semantic placeholder refs. The
+    // 168-KiB ceiling leaves modest codegen/formatter headroom.
+    const MAX_GENERATED_BYTES: u64 = 168 * 1024;
 
     let mut files = 0usize;
     let mut bytes = 0u64;

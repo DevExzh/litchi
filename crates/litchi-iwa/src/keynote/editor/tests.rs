@@ -13,6 +13,7 @@ use litchi_keynote::transition::{
     Acceleration, AnimationParameters, CustomParameters, Direction, Effect, MosaicType, Settings,
     TextDelivery, TimingCurveSlot,
 };
+use litchi_keynote::{Package as FocusedKeynotePackage, SlideSelector};
 use std::time::Duration;
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -587,7 +588,7 @@ fn slide_background_rejects_invalid_inputs_transactionally() {
 }
 
 #[test]
-fn edits_title_and_body_by_slide_index() {
+fn reads_placeholder_text_and_edits_navigator_name_by_slide_index() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(slides.len(), 2);
@@ -595,21 +596,16 @@ fn edits_title_and_body_by_slide_index() {
     assert_eq!(slides[0].body.as_deref(), Some("Old body 🚀"));
     assert_eq!(slides[0].notes.as_deref(), Some("Speaker 🚀"));
 
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.replace_slide_body(0, 10..11, "x").is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-    editor.set_slide_title(0, "New title").unwrap();
-    editor.replace_slide_body(0, 9..11, "東京").unwrap();
-    editor.replace_slide_notes(0, 8..10, "東京").unwrap();
     editor.set_slide_name(0, Some("Agenda 🚀")).unwrap();
     let slides = editor.slides().unwrap();
-    assert_eq!(slides[0].title.as_deref(), Some("New title"));
-    assert_eq!(slides[0].body.as_deref(), Some("Old body 東京"));
-    assert_eq!(slides[0].notes.as_deref(), Some("Speaker 東京"));
+    assert_eq!(slides[0].title.as_deref(), Some("Old title"));
+    assert_eq!(slides[0].body.as_deref(), Some("Old body 🚀"));
+    assert_eq!(slides[0].notes.as_deref(), Some("Speaker 🚀"));
     assert_eq!(slides[0].name.as_deref(), Some("Agenda 🚀"));
 
-    assert!(editor.set_slide_title(2, "missing").is_err());
     let before = editor.to_bytes().unwrap();
+    assert!(editor.set_slide_name(2, Some("missing")).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(editor.set_slide_name(0, Some("bad\0name")).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
     editor.set_slide_name(0, None).unwrap();
@@ -5429,18 +5425,22 @@ fn duplicate_slide_tree_references_fail_transactionally() {
 
 #[test]
 fn duplicates_slide_graph_with_independent_objects() {
-    let mut package = test_package();
+    let mut package = test_package_with_slide_background();
     package
         .update_archive("Index/Slide-4.iwa", |archive| {
-            let object = archive.object_mut(4).unwrap();
-            object.archive_info.message_infos[0].object_references = vec![5];
-            object.archive_info.message_infos[0]
+            let slide_object = archive.object_mut(4).unwrap();
+            slide_object.archive_info.message_infos[0].object_references = vec![40, 5, 6, 15];
+            slide_object.archive_info.message_infos[0]
                 .field_infos
                 .push(FieldInfo {
                     path: FieldPath { path: vec![5] },
                     object_references: vec![5],
                     ..Default::default()
                 });
+            archive.object_mut(5).unwrap().archive_info.message_infos[0].object_references =
+                vec![7];
+            archive.object_mut(15).unwrap().archive_info.message_infos[0].object_references =
+                vec![16];
             Ok(())
         })
         .unwrap();
@@ -5479,8 +5479,24 @@ fn duplicates_slide_graph_with_independent_objects() {
         source_component
     );
 
-    editor.set_slide_title(1, "Independent copy").unwrap();
-    editor.set_slide_notes(1, "Independent notes").unwrap();
+    let focused = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    focused.validate().unwrap();
+    let selector = SlideSelector::index(1);
+    let mut title = focused.edit_slide_title(selector).unwrap();
+    title.set("Independent copy").unwrap();
+    let title = title.commit().unwrap();
+    assert_eq!(
+        title.package().slide_title(selector).unwrap().as_deref(),
+        Some("Independent copy")
+    );
+    assert_eq!(
+        title.package().slide_notes(selector).unwrap().as_deref(),
+        Some("Speaker 🚀")
+    );
+    let mut notes = title.package().edit_slide_notes(selector).unwrap();
+    notes.set("Independent notes").unwrap();
+    let notes = notes.commit().unwrap();
+    let mut editor = KeynoteEditor::from_bytes(notes.package().source_bytes()).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(slides.len(), 3);
     assert_eq!(slides[0].title.as_deref(), Some("Old title"));
