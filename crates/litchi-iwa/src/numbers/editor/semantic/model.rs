@@ -16,8 +16,6 @@ pub struct NumbersTableInfo {
     pub columns: usize,
     /// Effective alternating-row and automatic-sizing settings.
     pub appearance: TableAppearance,
-    /// Interactive editing lock shown in the Arrange inspector.
-    pub lock_state: TableLockState,
 }
 
 /// Stable identity and name of a sheet in workbook order.

@@ -89,8 +89,6 @@ use litchi_iwa_common::comment::{
     TableCellComment, TableCellReply, Uuid,
 };
 use litchi_iwa_common::table::cell::conditional_highlight::Rule;
-use litchi_iwa_common::table::lock::State as TableLockState;
-
 const MAX_TABLE_UIDS: usize = 1_100_000;
 const HEADER_BUCKET_ROWS: usize = 65_536;
 const FORMULA_DEPENDENCY_TILE_COLUMNS: u32 = 32;
@@ -199,7 +197,6 @@ mod table_duplicate;
 mod table_formula;
 mod table_headers;
 mod table_hidden_axes;
-mod table_lock;
 mod table_move;
 mod table_sort;
 mod table_sparse_storage;

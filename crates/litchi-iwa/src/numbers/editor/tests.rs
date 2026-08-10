@@ -9,7 +9,8 @@ use litchi_iwa_common::table::cell::{
     BorderSide,
     layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment},
 };
-use litchi_numbers::{SheetSelector, TableSelector};
+use litchi_numbers::table::lock::State as FocusedTableLockState;
+use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
 
 fn cell_number(value: f64) -> CellValue {
     CellValue::number(value).expect("finite test number")
@@ -2789,6 +2790,73 @@ fn renames_root_ordered_sheet_and_table() {
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
+    let editor = NumbersDocumentBuilder::new()
+        .table_name("Locked Table")
+        .table_dimensions(3, 2)
+        .build()
+        .unwrap();
+    let table = editor.tables().unwrap().remove(0);
+    let baseline = editor.to_bytes().unwrap();
+    let focused = FocusedNumbersPackage::from_bytes(&baseline).unwrap();
+    assert_eq!(
+        focused
+            .table_lock(SheetSelector::index(0), TableSelector::name(&table.name))
+            .unwrap(),
+        FocusedTableLockState::Unlocked
+    );
+    let mut lock = focused
+        .edit_table_lock(SheetSelector::index(0), TableSelector::name(&table.name))
+        .unwrap();
+    lock.lock();
+    let locked = lock.commit().unwrap();
+
+    let mut editor = NumbersEditor::from_bytes(locked.package().source_bytes()).unwrap();
+    let duplicate = editor
+        .duplicate_table(test_table_selector(&editor, table.object_id))
+        .unwrap();
+    let focused = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        focused
+            .table_lock(SheetSelector::index(0), TableSelector::index(1))
+            .unwrap(),
+        FocusedTableLockState::Locked
+    );
+
+    let mut unlock_duplicate = focused
+        .edit_table_lock(SheetSelector::index(0), TableSelector::index(1))
+        .unwrap();
+    unlock_duplicate.unlock();
+    let unlocked_duplicate = unlock_duplicate.commit().unwrap();
+    let mut editor =
+        NumbersEditor::from_bytes(unlocked_duplicate.package().source_bytes()).unwrap();
+    let focused = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        focused
+            .table_lock(SheetSelector::index(0), TableSelector::index(0))
+            .unwrap(),
+        FocusedTableLockState::Locked
+    );
+    assert_eq!(
+        focused
+            .table_lock(SheetSelector::index(0), TableSelector::index(1))
+            .unwrap(),
+        FocusedTableLockState::Unlocked
+    );
+
+    editor
+        .remove_table(test_table_selector(&editor, duplicate.object_id))
+        .unwrap();
+    let focused = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut unlock_original = focused
+        .edit_table_lock(SheetSelector::index(0), TableSelector::name(&table.name))
+        .unwrap();
+    unlock_original.unlock();
+    let restored = unlock_original.commit().unwrap();
+    assert_eq!(restored.package().source_bytes(), baseline);
 }
 
 #[test]

@@ -1,9 +1,11 @@
-//! Strict private Buffa projection for `TST.TableInfoArchive.table_model`.
+//! Strict private Buffa projection for `TST.TableInfoArchive` model ownership.
 //!
 //! The strict raw-wire pass canonicalizes every visited field framing before
 //! Buffa observes the source. It selects only the required model reference and
-//! its non-zero identifier; `super` and all unselected table metadata remain
-//! opaque caller-owned bytes and are never materialized or re-encoded.
+//! its non-zero identifier; strict preflight additionally projects the
+//! presence-preserving drawable lock state from the required `super` envelope.
+//! All other table metadata remains caller-owned bytes and is never
+//! materialized or re-encoded.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -18,6 +20,7 @@ use crate::buffa_table_info_generated::LitchiIwaProjection as projection;
 
 const TABLE_SUPER_FIELD: u32 = 1;
 const TABLE_MODEL_FIELD: u32 = 2;
+const DRAWABLE_LOCKED_FIELD: u32 = 5;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 const MAX_RECURSION_LIMIT: u32 = 64;
 
@@ -77,6 +80,29 @@ pub struct TableModelReference {
     identifier: NonZeroU64,
 }
 
+/// Generated-free facts from one `TST.TableInfoArchive`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableInfoSnapshot {
+    table_model: TableModelReference,
+    locked: Option<bool>,
+}
+
+impl TableInfoSnapshot {
+    /// Required non-zero native `TST.TableModelArchive` object reference.
+    #[must_use]
+    pub const fn table_model(self) -> TableModelReference {
+        self.table_model
+    }
+
+    /// Explicit `TSD.DrawableArchive.locked` state, preserving source presence.
+    ///
+    /// `None` means the native field was absent; it does not apply a UI default.
+    #[must_use]
+    pub const fn locked(self) -> Option<bool> {
+        self.locked
+    }
+}
+
 impl TableModelReference {
     /// Native model object identifier, proven non-zero by strict preflight.
     #[must_use]
@@ -91,9 +117,30 @@ pub struct DecodeError {
     kind: DecodeErrorKind,
 }
 
+/// A content-free wire-resource classification for [`DecodeError`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum WireResourceLimit {
+    /// The input or configured message-byte ceiling could not be honored.
+    Bytes {
+        /// Input length when it was known at the failure point.
+        observed: Option<usize>,
+        /// Applied byte ceiling when known.
+        maximum: Option<usize>,
+    },
+    /// The configured or enforced protobuf nesting ceiling was exceeded.
+    Nesting {
+        /// Configured nesting value when the profile itself was invalid.
+        observed: Option<u32>,
+        /// Applied nesting ceiling when known.
+        maximum: Option<u32>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DecodeErrorKind {
     Wire(buffa::DecodeError),
+    WireResourceLimit(WireResourceLimit),
     MissingRequired(&'static str),
     DuplicateSingular(&'static str),
     NonCanonical(&'static str),
@@ -105,7 +152,30 @@ enum DecodeErrorKind {
 
 impl DecodeError {
     fn recursion_limit() -> Self {
-        buffa::DecodeError::RecursionLimitExceeded.into()
+        Self::wire_resource_limit_error(WireResourceLimit::Nesting {
+            observed: None,
+            maximum: None,
+        })
+    }
+
+    const fn wire_resource_limit_error(limit: WireResourceLimit) -> Self {
+        Self {
+            kind: DecodeErrorKind::WireResourceLimit(limit),
+        }
+    }
+
+    fn with_recursion_limit_context(mut self, maximum: u32) -> Self {
+        if let DecodeErrorKind::WireResourceLimit(WireResourceLimit::Nesting {
+            observed,
+            maximum: None,
+        }) = self.kind
+        {
+            self.kind = DecodeErrorKind::WireResourceLimit(WireResourceLimit::Nesting {
+                observed,
+                maximum: Some(maximum),
+            });
+        }
+        self
     }
 
     const fn missing_required(field: &'static str) -> Self {
@@ -153,91 +223,64 @@ impl DecodeError {
     /// Required schema field absent from the source, when applicable.
     #[must_use]
     pub const fn missing_required_field(&self) -> Option<&'static str> {
-        match self.kind {
-            DecodeErrorKind::MissingRequired(field) => Some(field),
-            DecodeErrorKind::Wire(_)
-            | DecodeErrorKind::DuplicateSingular(_)
-            | DecodeErrorKind::NonCanonical(_)
-            | DecodeErrorKind::ZeroIdentifier(_)
-            | DecodeErrorKind::FieldLimit { .. }
-            | DecodeErrorKind::WorkLimit { .. }
-            | DecodeErrorKind::Projection => None,
-        }
+        let DecodeErrorKind::MissingRequired(field) = self.kind else {
+            return None;
+        };
+        Some(field)
     }
 
     /// Singular schema field repeated in the source, when applicable.
     #[must_use]
     pub const fn duplicate_singular_field(&self) -> Option<&'static str> {
-        match self.kind {
-            DecodeErrorKind::DuplicateSingular(field) => Some(field),
-            DecodeErrorKind::Wire(_)
-            | DecodeErrorKind::MissingRequired(_)
-            | DecodeErrorKind::NonCanonical(_)
-            | DecodeErrorKind::ZeroIdentifier(_)
-            | DecodeErrorKind::FieldLimit { .. }
-            | DecodeErrorKind::WorkLimit { .. }
-            | DecodeErrorKind::Projection => None,
-        }
+        let DecodeErrorKind::DuplicateSingular(field) = self.kind else {
+            return None;
+        };
+        Some(field)
     }
 
     /// Stable canonicality failure reason, when applicable.
     #[must_use]
     pub const fn noncanonical_reason(&self) -> Option<&'static str> {
-        match self.kind {
-            DecodeErrorKind::NonCanonical(reason) => Some(reason),
-            DecodeErrorKind::Wire(_)
-            | DecodeErrorKind::MissingRequired(_)
-            | DecodeErrorKind::DuplicateSingular(_)
-            | DecodeErrorKind::ZeroIdentifier(_)
-            | DecodeErrorKind::FieldLimit { .. }
-            | DecodeErrorKind::WorkLimit { .. }
-            | DecodeErrorKind::Projection => None,
-        }
+        let DecodeErrorKind::NonCanonical(reason) = self.kind else {
+            return None;
+        };
+        Some(reason)
     }
 
     /// Reference field carrying a forbidden zero identifier, when applicable.
     #[must_use]
     pub const fn zero_identifier_field(&self) -> Option<&'static str> {
-        match self.kind {
-            DecodeErrorKind::ZeroIdentifier(field) => Some(field),
-            DecodeErrorKind::Wire(_)
-            | DecodeErrorKind::MissingRequired(_)
-            | DecodeErrorKind::DuplicateSingular(_)
-            | DecodeErrorKind::NonCanonical(_)
-            | DecodeErrorKind::FieldLimit { .. }
-            | DecodeErrorKind::WorkLimit { .. }
-            | DecodeErrorKind::Projection => None,
-        }
+        let DecodeErrorKind::ZeroIdentifier(field) = self.kind else {
+            return None;
+        };
+        Some(field)
     }
 
     /// Observed and configured field counts for a field-limit failure.
     #[must_use]
     pub const fn field_limit_values(&self) -> Option<(usize, usize)> {
-        match self.kind {
-            DecodeErrorKind::FieldLimit { observed, maximum } => Some((observed, maximum)),
-            DecodeErrorKind::Wire(_)
-            | DecodeErrorKind::MissingRequired(_)
-            | DecodeErrorKind::DuplicateSingular(_)
-            | DecodeErrorKind::NonCanonical(_)
-            | DecodeErrorKind::ZeroIdentifier(_)
-            | DecodeErrorKind::WorkLimit { .. }
-            | DecodeErrorKind::Projection => None,
-        }
+        let DecodeErrorKind::FieldLimit { observed, maximum } = self.kind else {
+            return None;
+        };
+        Some((observed, maximum))
     }
 
     /// Observed and configured work bytes for a work-limit failure.
     #[must_use]
     pub const fn work_limit_values(&self) -> Option<(usize, usize)> {
-        match self.kind {
-            DecodeErrorKind::WorkLimit { observed, maximum } => Some((observed, maximum)),
-            DecodeErrorKind::Wire(_)
-            | DecodeErrorKind::MissingRequired(_)
-            | DecodeErrorKind::DuplicateSingular(_)
-            | DecodeErrorKind::NonCanonical(_)
-            | DecodeErrorKind::ZeroIdentifier(_)
-            | DecodeErrorKind::FieldLimit { .. }
-            | DecodeErrorKind::Projection => None,
-        }
+        let DecodeErrorKind::WorkLimit { observed, maximum } = self.kind else {
+            return None;
+        };
+        Some((observed, maximum))
+    }
+
+    /// Wire byte/nesting resource failure, independent of Buffa error text.
+    #[must_use]
+    pub const fn wire_resource_limit(&self) -> Option<WireResourceLimit> {
+        let DecodeErrorKind::WireResourceLimit(limit) = self.kind else {
+            return None;
+        };
+        Some(limit)
     }
 }
 
@@ -245,6 +288,12 @@ impl fmt::Display for DecodeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             DecodeErrorKind::Wire(error) => error.fmt(formatter),
+            DecodeErrorKind::WireResourceLimit(WireResourceLimit::Bytes { .. }) => {
+                formatter.write_str("Numbers TableInfo wire byte limit exceeded")
+            },
+            DecodeErrorKind::WireResourceLimit(WireResourceLimit::Nesting { .. }) => {
+                formatter.write_str("Numbers TableInfo wire nesting limit exceeded")
+            },
             DecodeErrorKind::MissingRequired(field) => {
                 write!(formatter, "missing required field {field}")
             },
@@ -274,29 +323,48 @@ impl std::error::Error for DecodeError {}
 
 impl From<buffa::DecodeError> for DecodeError {
     fn from(error: buffa::DecodeError) -> Self {
-        Self {
-            kind: DecodeErrorKind::Wire(error),
+        match error {
+            buffa::DecodeError::MessageTooLarge => {
+                Self::wire_resource_limit_error(WireResourceLimit::Bytes {
+                    observed: None,
+                    maximum: None,
+                })
+            },
+            buffa::DecodeError::RecursionLimitExceeded => Self::recursion_limit(),
+            error => Self {
+                kind: DecodeErrorKind::Wire(error),
+            },
         }
     }
 }
 
-/// Decode the required `TableInfo` table-model reference from preflighted bytes.
+/// Decode model ownership and drawable lock state from one `TableInfo` payload.
 ///
 /// Every root field is strictly scanned for canonical protobuf framing. The
-/// required opaque `super` envelope is checked only for unique
-/// length-delimited framing; field 2's deferred reference is then forced once
-/// after strict preflight. Both `super` and all unselected metadata remain
-/// opaque in the caller-owned source representation.
-pub fn decode_table_model_reference(
+/// required `super` envelope is strictly scanned for the optional lock field;
+/// field 2's deferred reference is then forced once after strict preflight.
+/// All unselected metadata remains opaque in the caller-owned source
+/// representation.
+pub fn decode_table_info(
     source: &[u8],
     options: DecodeOptions,
-) -> Result<TableModelReference, DecodeError> {
+) -> Result<TableInfoSnapshot, DecodeError> {
     validate_decode_input(source, options)?;
     let mut budget = Budget::new(options);
-    let strict = preflight_table_info(source, options, &mut budget)?;
+    let strict = preflight_table_info(source, options, &mut budget)
+        .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?;
 
-    let view: projection::TableInfoArchiveLazyView<'_> =
-        options.buffa().decode_lazy_view(source)?;
+    let view: projection::TableInfoArchiveLazyView<'_> = options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(DecodeError::from)
+        .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?;
+    let super_ = view
+        .super_
+        .get()
+        .map_err(DecodeError::from)
+        .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?
+        .ok_or_else(|| DecodeError::missing_required("TST.TableInfoArchive.super"))?;
     if !view.has_table_model() {
         return Err(DecodeError::missing_required(
             "TST.TableInfoArchive.table_model",
@@ -304,14 +372,20 @@ pub fn decode_table_model_reference(
     }
     let model = view
         .table_model
-        .get()?
+        .get()
+        .map_err(DecodeError::from)
+        .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?
         .ok_or_else(|| DecodeError::missing_required("TST.TableInfoArchive.table_model"))?;
     if !model.has_identifier() {
         return Err(DecodeError::missing_required("TSP.Reference.identifier"));
     }
-    let projected = TableModelReference {
+    let projected_model = TableModelReference {
         identifier: NonZeroU64::new(model.identifier)
             .ok_or_else(|| DecodeError::zero_identifier("TSP.Reference.identifier"))?,
+    };
+    let projected = TableInfoSnapshot {
+        table_model: projected_model,
+        locked: super_.locked,
     };
     if projected != strict {
         return Err(DecodeError::projection());
@@ -319,16 +393,47 @@ pub fn decode_table_model_reference(
     Ok(strict)
 }
 
+/// Decode only the required `TableInfo` table-model reference.
+///
+/// This compatibility convenience retains strict lock-state validation.
+pub fn decode_table_model_reference(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<TableModelReference, DecodeError> {
+    Ok(decode_table_info(source, options)?.table_model())
+}
+
 fn validate_decode_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
-    let max_buffa_message_bytes = usize::try_from(buffa::MAX_MESSAGE_BYTES)
-        .map_err(|_conversion| buffa::DecodeError::MessageTooLarge)?;
-    if options.max_message_bytes > max_buffa_message_bytes
-        || source.len() > options.max_message_bytes
-    {
-        return Err(buffa::DecodeError::MessageTooLarge.into());
+    let max_buffa_message_bytes =
+        usize::try_from(buffa::MAX_MESSAGE_BYTES).map_err(|_conversion| {
+            DecodeError::wire_resource_limit_error(WireResourceLimit::Bytes {
+                observed: None,
+                maximum: None,
+            })
+        })?;
+    if options.max_message_bytes > max_buffa_message_bytes {
+        return Err(DecodeError::wire_resource_limit_error(
+            WireResourceLimit::Bytes {
+                observed: None,
+                maximum: Some(max_buffa_message_bytes),
+            },
+        ));
+    }
+    if source.len() > options.max_message_bytes {
+        return Err(DecodeError::wire_resource_limit_error(
+            WireResourceLimit::Bytes {
+                observed: Some(source.len()),
+                maximum: Some(options.max_message_bytes),
+            },
+        ));
     }
     if options.recursion_limit == 0 || options.recursion_limit > MAX_RECURSION_LIMIT {
-        return Err(DecodeError::recursion_limit());
+        return Err(DecodeError::wire_resource_limit_error(
+            WireResourceLimit::Nesting {
+                observed: Some(options.recursion_limit),
+                maximum: Some(MAX_RECURSION_LIMIT),
+            },
+        ));
     }
     Ok(())
 }
@@ -375,10 +480,11 @@ fn preflight_table_info(
     source: &[u8],
     options: DecodeOptions,
     budget: &mut Budget,
-) -> Result<TableModelReference, DecodeError> {
+) -> Result<TableInfoSnapshot, DecodeError> {
     budget.charge_message(source.len())?;
     let nested_options = options.descend()?;
     let mut model = None;
+    let mut locked = None;
     let mut saw_super = false;
     let mut remaining = source;
     while let Some(field) = next_strict_field(&mut remaining, options, budget)? {
@@ -390,7 +496,11 @@ fn preflight_table_info(
                     ));
                 }
                 saw_super = true;
-                let _opaque_super = field.length_delimited()?;
+                locked = Some(preflight_drawable(
+                    field.length_delimited()?,
+                    nested_options,
+                    budget,
+                )?);
             },
             TABLE_MODEL_FIELD => {
                 if model.is_some() {
@@ -410,7 +520,33 @@ fn preflight_table_info(
     if !saw_super {
         return Err(DecodeError::missing_required("TST.TableInfoArchive.super"));
     }
-    model.ok_or_else(|| DecodeError::missing_required("TST.TableInfoArchive.table_model"))
+    Ok(TableInfoSnapshot {
+        table_model: model
+            .ok_or_else(|| DecodeError::missing_required("TST.TableInfoArchive.table_model"))?,
+        locked: locked.ok_or_else(DecodeError::projection)?,
+    })
+}
+
+fn preflight_drawable(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<Option<bool>, DecodeError> {
+    budget.charge_message(source.len())?;
+    let mut locked = None;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options, budget)? {
+        if field.number != DRAWABLE_LOCKED_FIELD {
+            continue;
+        }
+        if locked.is_some() {
+            return Err(DecodeError::duplicate_singular(
+                "TSD.DrawableArchive.locked",
+            ));
+        }
+        locked = Some(require_canonical_bool(field.varint()?)?);
+    }
+    Ok(locked)
 }
 
 fn preflight_reference(
@@ -437,6 +573,14 @@ fn preflight_reference(
         identifier: identifier
             .ok_or_else(|| DecodeError::missing_required("TSP.Reference.identifier"))?,
     })
+}
+
+fn require_canonical_bool(value: u64) -> Result<bool, DecodeError> {
+    match value {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(DecodeError::noncanonical("bool scalar is not zero or one")),
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -644,7 +788,10 @@ mod tests {
 
     use prost::Message as _;
 
-    use super::{DecodeOptions, TableModelReference, decode_table_model_reference};
+    use super::{
+        DecodeOptions, TableInfoSnapshot, TableModelReference, WireResourceLimit,
+        decode_table_info, decode_table_model_reference,
+    };
     use crate::{tsd, tsp, tst};
 
     fn options(source: &[u8]) -> DecodeOptions {
@@ -658,6 +805,10 @@ mod tests {
 
     fn decode(source: &[u8]) -> Result<TableModelReference, super::DecodeError> {
         decode_table_model_reference(source, options(source))
+    }
+
+    fn decode_snapshot(source: &[u8]) -> Result<TableInfoSnapshot, super::DecodeError> {
+        decode_table_info(source, options(source))
     }
 
     fn table_model_field(model: &[u8]) -> Vec<u8> {
@@ -692,10 +843,36 @@ mod tests {
     }
 
     #[test]
-    fn opaque_super_and_unselected_metadata_are_not_decoded()
+    fn prost_snapshot_matches_buffa_for_absent_false_and_true_drawable_locks()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for locked in [None, Some(false), Some(true)] {
+            let source = tst::TableInfoArchive {
+                super_: tsd::DrawableArchive {
+                    locked,
+                    ..Default::default()
+                },
+                table_model: tsp::Reference {
+                    identifier: 42,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+            .encode_to_vec();
+            let snapshot = decode_snapshot(&source)?;
+            assert_eq!(
+                snapshot.table_model().identifier(),
+                NonZeroU64::new(42).expect("non-zero test identifier")
+            );
+            assert_eq!(snapshot.locked(), locked);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn unselected_drawable_and_table_info_metadata_remain_opaque()
     -> Result<(), Box<dyn std::error::Error>> {
         let source = [
-            0x0a, 0x01, 0xff, // opaque DrawableArchive super
+            0x0a, 0x02, 0x18, 0x7f, // unselected DrawableArchive metadata
             0x12, 0x02, 0x08, 0x2a, // selected table-model reference
             0x1a, 0x01, 0xff, // opaque editing_state metadata
         ];
@@ -708,7 +885,7 @@ mod tests {
 
     #[test]
     fn required_and_unique_table_model_identifier_are_enforced() {
-        let error = decode(&[]).expect_err("missing opaque super envelope");
+        let error = decode(&[]).expect_err("missing drawable super envelope");
         assert_eq!(
             error.missing_required_field(),
             Some("TST.TableInfoArchive.super")
@@ -751,7 +928,7 @@ mod tests {
             table_model_field(&[0x08, 0x01]),
         ]
         .concat();
-        let error = decode(&duplicate_super).expect_err("duplicate opaque super envelope");
+        let error = decode(&duplicate_super).expect_err("duplicate drawable super envelope");
         assert_eq!(
             error.duplicate_singular_field(),
             Some("TST.TableInfoArchive.super")
@@ -777,6 +954,28 @@ mod tests {
 
         let malformed = [0x0a, 0x00, 0x12, 0x01, 0x08];
         assert!(decode(&malformed).is_err());
+
+        let duplicate_lock = [
+            0x0a, 0x04, 0x28, 0x00, 0x28, 0x01, // duplicate DrawableArchive.locked
+            0x12, 0x02, 0x08, 0x2a,
+        ];
+        assert_eq!(
+            decode(&duplicate_lock)
+                .expect_err("duplicate drawable lock")
+                .duplicate_singular_field(),
+            Some("TSD.DrawableArchive.locked")
+        );
+
+        let wrong_lock_wire = [0x0a, 0x02, 0x2a, 0x00, 0x12, 0x02, 0x08, 0x2a];
+        assert!(decode(&wrong_lock_wire).is_err());
+
+        let nonboolean_lock = [0x0a, 0x02, 0x28, 0x02, 0x12, 0x02, 0x08, 0x2a];
+        assert_eq!(
+            decode(&nonboolean_lock)
+                .expect_err("non-boolean drawable lock")
+                .noncanonical_reason(),
+            Some("bool scalar is not zero or one")
+        );
     }
 
     #[test]
@@ -784,7 +983,7 @@ mod tests {
         let overlong_super_length = [0x0a, 0x80, 0x00, 0x12, 0x02, 0x08, 0x2a];
         assert_eq!(
             decode(&overlong_super_length)
-                .expect_err("overlong opaque super length")
+                .expect_err("overlong drawable super length")
                 .noncanonical_reason(),
             Some("length-delimited size")
         );
@@ -820,6 +1019,14 @@ mod tests {
                 .noncanonical_reason(),
             Some("protobuf varint value")
         );
+
+        let noncanonical_lock = [0x0a, 0x03, 0x28, 0x81, 0x00, 0x12, 0x02, 0x08, 0x2a];
+        assert_eq!(
+            decode(&noncanonical_lock)
+                .expect_err("noncanonical drawable lock")
+                .noncanonical_reason(),
+            Some("protobuf varint value")
+        );
     }
 
     #[test]
@@ -831,9 +1038,14 @@ mod tests {
             decode_table_model_reference(&source, exact)?.identifier(),
             NonZeroU64::new(1).expect("non-zero test identifier")
         );
-        assert!(
+        assert_eq!(
             decode_table_model_reference(&source, DecodeOptions::new(source.len() - 1, 3, 16, 2))
-                .is_err()
+                .expect_err("byte cap")
+                .wire_resource_limit(),
+            Some(WireResourceLimit::Bytes {
+                observed: Some(source.len()),
+                maximum: Some(source.len() - 1),
+            })
         );
         assert_eq!(
             decode_table_model_reference(&source, DecodeOptions::new(source.len(), 2, 16, 2))
@@ -847,11 +1059,36 @@ mod tests {
                 .work_limit_values(),
             Some((16, 15))
         );
-        assert!(
+        assert_eq!(
             decode_table_model_reference(&source, DecodeOptions::new(source.len(), 3, 16, 0))
-                .is_err()
+                .expect_err("zero nesting cap")
+                .wire_resource_limit(),
+            Some(WireResourceLimit::Nesting {
+                observed: Some(0),
+                maximum: Some(64),
+            })
         );
         Ok(())
+    }
+
+    #[test]
+    fn exhausted_nested_wire_depth_has_a_typed_error() {
+        let source = [
+            0x0a, 0x02, 0x0b, 0x0c, // one unknown group in DrawableArchive
+            0x12, 0x02, 0x08, 0x01,
+        ];
+        assert_eq!(
+            decode_table_info(
+                &source,
+                DecodeOptions::new(source.len(), source.len(), source.len() * 4, 1),
+            )
+            .expect_err("nested wire depth")
+            .wire_resource_limit(),
+            Some(WireResourceLimit::Nesting {
+                observed: None,
+                maximum: Some(1),
+            })
+        );
     }
 
     #[test]

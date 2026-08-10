@@ -16,6 +16,13 @@ validation, set/clear/replace/insert/delete/no-op staging, exact-source patch
 application, inversion, and content-redacted errors. It never writes a package
 to disk.
 
+`numbers_table_lock` is the focused interactive table-lock target. It offers
+arbitrary bytes to checked Numbers package ingress and also interprets them as
+bounded selector and lock-state commands against the native `basic.numbers`
+seed. It covers name and index selectors, exact no-op and changed commits,
+exact-source patch conflicts, inversion, and content-redacted errors without
+writing a package to disk.
+
 `parse_iwork` uses tighter limits than the public defaults: 2 MiB of source
 bytes, 512 package entries, 8 MiB per expanded entry and decoded IWA item,
 32 MiB aggregate expanded bytes, 4,096 values of each semantic collection,
@@ -29,6 +36,20 @@ seed is embedded in the harness from the hash-verified source below; fuzzer
 input supplies only bounded transaction commands, of which at most 1 KiB
 becomes replacement text. Keep this target's `-max_len` at 4 KiB to
 concentrate effort on deep-message operations.
+
+`numbers_table_lock` accepts at most 512 KiB of source bytes, 128 package
+entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
+expanded bytes. Its semantic profile admits at most 4,096 objects, 128 sheets,
+512 tables, 8,192 references, 65,536 materialized cells, and 512 KiB of
+retained text. Fuzzer-derived selector names are limited to 512 input bytes;
+keep `-max_len` at 1 KiB so most work reaches the fixed native seed.
+
+All targets currently share this package's single `litchi` dependency with
+the `iwork` feature. Cargo unifies dependency features for the package, so the
+focused Keynote and Numbers binaries compile the complete root iWork feature
+set rather than isolated concrete-format graphs. Their source-level imports
+remain confined to the relevant public facade, but true dependency isolation
+requires separate owner-specific fuzz packages or dependencies.
 
 ## Native seed provenance
 
@@ -66,6 +87,13 @@ Run the focused Keynote target without a checked-in duplicate corpus:
 ```sh
 cargo +nightly fuzz run keynote_slide_text -- \
   -max_len=4096 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers target without a checked-in duplicate corpus:
+
+```sh
+cargo +nightly fuzz run numbers_table_lock -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
 The native packages currently store ZIP members with CRC protection. Most

@@ -111,9 +111,71 @@ RETIRED_IWA_KEYNOTE_METHODS = (
     "slide_notes_storage",
 )
 RETIRED_IWA_KEYNOTE_METHOD_SET = frozenset(RETIRED_IWA_KEYNOTE_METHODS)
+IWA_NUMBERS_SOURCE_ROOT = Path("crates/litchi-iwa/src/numbers")
+IWA_TABLE_LOCK_SOURCE = Path("crates/litchi-iwa/src/table_lock.rs")
+IWA_NUMBERS_TABLE_INFO_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "model.rs"
+)
+NUMBERS_SOURCE_ROOT = Path("crates/litchi-numbers/src")
+NUMBERS_TABLE_LOCK_IMPLEMENTATION_SOURCES = (
+    NUMBERS_SOURCE_ROOT / "package" / "table_lock.rs",
+    NUMBERS_SOURCE_ROOT / "table" / "lock.rs",
+)
+NUMBERS_TABLE_LOCK_EXPORT_SOURCES = (
+    NUMBERS_SOURCE_ROOT / "lib.rs",
+    NUMBERS_SOURCE_ROOT / "package.rs",
+    NUMBERS_SOURCE_ROOT / "table.rs",
+)
+RETIRED_IWA_NUMBERS_TABLE_LOCK_METHODS = (
+    "table_lock_state",
+    "set_table_lock_state",
+    "table_lock_context",
+    "set_table_lock_state_for_model",
+    "table_lock_state_for_model",
+)
+RETIRED_IWA_NUMBERS_HOST_TABLE_LOCK_METHODS = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_LOCK_METHODS[:3]
+)
+RETIRED_IWA_NUMBERS_SHARED_TABLE_LOCK_METHODS = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_LOCK_METHODS[3:]
+)
+RETIRED_IWA_NUMBERS_TABLE_INFO_FIELDS = frozenset({"lock_state"})
 RUST_FUNCTION_DECLARATION = re.compile(
     r"(?<![A-Za-z0-9_])fn\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
 )
+RUST_PUBLIC_DECLARATION = re.compile(
+    r"(?<![A-Za-z0-9_#])pub(?![ \t\r\n]*\()[ \t\r\n]+"
+    r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+)
+RUST_IMPL_DECLARATION = re.compile(r"^[ \t]*impl\b", re.MULTILINE)
+RUST_IDENTIFIER = re.compile(r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)")
+RUST_ITEM_KEYWORDS = frozenset(
+    {"const", "enum", "fn", "mod", "static", "struct", "trait", "type", "union", "use"}
+)
+RUST_FUNCTION_QUALIFIERS = frozenset({"async", "const", "extern", "unsafe"})
+RUST_BRACED_ITEM_KEYWORDS = frozenset({"enum", "trait"})
+RUST_SEMICOLON_ITEM_KEYWORDS = frozenset({"const", "mod", "static", "type", "use"})
+NUMBERS_TABLE_LOCK_PUBLIC_MARKERS = frozenset(
+    {
+        "LockState",
+        "State",
+        "TableLockCommit",
+        "TableLockDiagnostics",
+        "TableLockEdit",
+        "TableLockError",
+        "TableLockLimitKind",
+        "TableLockPatch",
+    }
+)
+NUMBERS_TABLE_LOCK_ALLOWED_COMMON_REEXPORT = (
+    "pub",
+    "use",
+    "litchi_iwa_common",
+    "table",
+    "lock",
+    "State",
+)
+CAMEL_CASE_WORD = re.compile(r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|[0-9]+")
 FACADE_DEFAULT_FEATURE = "default"
 FACADE_ALL_FEATURE = "all"
 FACADE_SOURCE_ROOT = Path("crates/litchi/src")
@@ -1030,6 +1092,173 @@ def _rust_function_declarations(source: str) -> list[tuple[str, int]]:
     return declarations
 
 
+def _rust_public_declarations(source: str) -> list[tuple[str, int]]:
+    """Return public Rust declaration text without descending into function bodies."""
+
+    code = _mask_rust_non_code(source)
+    declarations: list[tuple[str, int]] = []
+    for match in RUST_PUBLIC_DECLARATION.finditer(code):
+        leading_identifier = list(RUST_IDENTIFIER.finditer(match.group(0)))[-1].group(1)
+        item_keyword = (
+            leading_identifier if leading_identifier in RUST_ITEM_KEYWORDS else None
+        )
+        if leading_identifier in RUST_FUNCTION_QUALIFIERS:
+            for identifier_match in RUST_IDENTIFIER.finditer(code, match.end()):
+                identifier = identifier_match.group(1)
+                if identifier == "fn":
+                    item_keyword = identifier
+                elif leading_identifier == "const" and identifier not in RUST_FUNCTION_QUALIFIERS:
+                    item_keyword = "const"
+                elif identifier not in RUST_FUNCTION_QUALIFIERS:
+                    item_keyword = None
+                if identifier not in RUST_FUNCTION_QUALIFIERS:
+                    break
+        parentheses = 0
+        brackets = 0
+        cursor = match.end()
+        end = len(code)
+        while cursor < len(code):
+            character = code[cursor]
+            if character == "(":
+                parentheses += 1
+            elif character == ")" and parentheses:
+                parentheses -= 1
+            elif character == "[":
+                brackets += 1
+            elif character == "]" and brackets:
+                brackets -= 1
+            elif not parentheses and not brackets:
+                if character == ";":
+                    end = cursor + 1
+                    break
+                if character == "," and item_keyword is None:
+                    end = cursor + 1
+                    break
+                if character == "{":
+                    if item_keyword in RUST_SEMICOLON_ITEM_KEYWORDS:
+                        cursor += 1
+                        continue
+                    if item_keyword in RUST_BRACED_ITEM_KEYWORDS:
+                        depth = 1
+                        cursor += 1
+                        while cursor < len(code) and depth:
+                            if code[cursor] == "{":
+                                depth += 1
+                            elif code[cursor] == "}":
+                                depth -= 1
+                            cursor += 1
+                        end = cursor
+                    else:
+                        end = cursor
+                    break
+            cursor += 1
+        declarations.append(
+            (code[match.start() : end], code.count("\n", 0, match.start()) + 1)
+        )
+    return declarations
+
+
+def _rust_impl_headers(source: str) -> list[tuple[str, int]]:
+    """Return Rust impl headers, whose public trait relationships lack `pub`."""
+
+    code = _mask_rust_non_code(source)
+    headers: list[tuple[str, int]] = []
+    for match in RUST_IMPL_DECLARATION.finditer(code):
+        cursor = match.end()
+        parentheses = 0
+        brackets = 0
+        while cursor < len(code):
+            character = code[cursor]
+            if character == "(":
+                parentheses += 1
+            elif character == ")" and parentheses:
+                parentheses -= 1
+            elif character == "[":
+                brackets += 1
+            elif character == "]" and brackets:
+                brackets -= 1
+            elif character == "{" and not parentheses and not brackets:
+                break
+            cursor += 1
+        headers.append(
+            (
+                code[match.start() : cursor],
+                code.count("\n", 0, match.start()) + 1,
+            )
+        )
+    return headers
+
+
+def _rust_named_struct_body(source: str, name: str) -> tuple[str, int] | None:
+    """Return one exact struct body and its source offset, ignoring Rust trivia."""
+
+    code = _mask_rust_non_code(source)
+    declaration = re.search(
+        rf"(?<![A-Za-z0-9_])struct[ \t\r\n]+{re.escape(name)}\b", code
+    )
+    if declaration is None:
+        return None
+    opening = code.find("{", declaration.end())
+    semicolon = code.find(";", declaration.end())
+    if opening < 0 or (semicolon >= 0 and semicolon < opening):
+        return None
+    depth = 1
+    cursor = opening + 1
+    while cursor < len(code) and depth:
+        if code[cursor] == "{":
+            depth += 1
+        elif code[cursor] == "}":
+            depth -= 1
+        cursor += 1
+    if depth:
+        return None
+    return code[opening + 1 : cursor - 1], opening + 1
+
+
+def _numbers_table_lock_public_leak(identifier: str) -> str | None:
+    """Classify physical vocabulary forbidden in the focused lock facade."""
+
+    if identifier.startswith("litchi_iwa"):
+        return "archive/IWA type"
+    if identifier in {"prost", "prost_types"}:
+        return "protobuf type"
+    if identifier == "IWorkPackage":
+        return "archive/IWA type"
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"id", "ids", "identifier", "identifiers"} for word in words):
+        return "raw identifier"
+    if identifier[:1].islower() and any(
+        word in {"object", "objects"} for word in words
+    ):
+        return "native object"
+    if identifier[:1].isupper() and "object" in words:
+        return "native object"
+    if any(word in {"proto", "protobuf"} for word in words) or identifier.endswith(
+        "Message"
+    ):
+        return "protobuf type"
+    if identifier.endswith("Archive") or (
+        "raw" in words and identifier[:1].isupper()
+    ):
+        return "archive/IWA type"
+    return None
+
+
+def _is_numbers_table_lock_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(identifiers & NUMBERS_TABLE_LOCK_PUBLIC_MARKERS) or any(
+        "table_lock" in identifier.lower() for identifier in identifiers
+    )
+
+
 def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
     """Prevent retired Keynote function declarations from returning to the host."""
 
@@ -1047,6 +1276,126 @@ def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
                 "retired litchi-iwa Keynote method "
                 f"{name}: {path.relative_to(root)}:{line_number}"
             )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_table_lock_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep retired Numbers table-lock APIs out of their former host scopes."""
+
+    scoped_sources = (
+        (
+            root / IWA_NUMBERS_SOURCE_ROOT,
+            RETIRED_IWA_NUMBERS_HOST_TABLE_LOCK_METHODS,
+        ),
+        (
+            root / IWA_TABLE_LOCK_SOURCE,
+            RETIRED_IWA_NUMBERS_SHARED_TABLE_LOCK_METHODS,
+        ),
+    )
+    violations: list[str] = []
+    for source_path, retired_names in scoped_sources:
+        paths = (
+            sorted(source_path.rglob("*.rs"))
+            if source_path.is_dir()
+            else [source_path]
+            if source_path.is_file()
+            else []
+        )
+        for path in paths:
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in retired_names:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Numbers table-lock method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    table_info_path = root / IWA_NUMBERS_TABLE_INFO_SOURCE
+    if table_info_path.is_file():
+        source = table_info_path.read_text(encoding="utf-8")
+        body = _rust_named_struct_body(source, "NumbersTableInfo")
+        if body is not None:
+            body_source, body_offset = body
+            for name in sorted(RETIRED_IWA_NUMBERS_TABLE_INFO_FIELDS):
+                field = re.search(
+                    rf"(?<![A-Za-z0-9_#])pub(?![ \t\r\n]*\()[ \t\r\n]+"
+                    rf"(?:r#)?{re.escape(name)}[ \t\r\n]*:",
+                    body_source,
+                )
+                if field is None:
+                    continue
+                line_number = source.count("\n", 0, body_offset + field.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers table-info field "
+                    f"{name}: {table_info_path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_table_lock_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Reject physical identifiers and implementation types from the lock facade."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_TABLE_LOCK_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    export_sources = {
+        root / path for path in NUMBERS_TABLE_LOCK_EXPORT_SOURCES if (root / path).is_file()
+    }
+    violations: list[str] = []
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for declaration, line_number, complete_source_scope in declarations:
+            if not _is_numbers_table_lock_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            declaration_identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use = declaration_identifiers[:2] == ["pub", "use"]
+            if (
+                path == root / NUMBERS_SOURCE_ROOT / "table" / "lock.rs"
+                and tuple(declaration_identifiers)
+                == NUMBERS_TABLE_LOCK_ALLOWED_COMMON_REEXPORT
+            ):
+                continue
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                if public_use and not (
+                    identifier in NUMBERS_TABLE_LOCK_PUBLIC_MARKERS
+                    or "lock" in identifier.lower()
+                    or identifier.startswith("litchi_iwa")
+                    or identifier in {"prost", "prost_types"}
+                ):
+                    continue
+                reason = _numbers_table_lock_public_leak(identifier)
+                if reason is None:
+                    continue
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                violations.append(
+                    "focused litchi-numbers table-lock public API exposes "
+                    f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                )
 
     return sorted(set(violations))
 
@@ -1315,6 +1664,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
         + audit_iwa_keynote_source_topology()
+        + audit_iwa_numbers_table_lock_source_topology()
+        + audit_numbers_table_lock_facade_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

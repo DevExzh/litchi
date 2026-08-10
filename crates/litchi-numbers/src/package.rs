@@ -31,15 +31,16 @@ mod sheet;
     reason = "Private native tables retain sidecar helpers while the public surface exposes only semantic tables."
 )]
 mod table;
+mod table_lock;
 
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{Metadata, OpenOptions};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-use litchi_iwa_archive::ComponentCatalog;
+use litchi_iwa_archive::{ComponentCatalog, SourceCatalog};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
 use litchi_iwa_core::{Archive, RawMessage};
@@ -62,6 +63,10 @@ pub use limits::{
 };
 /// Physical ingress ceilings for a parsed Numbers package.
 pub use litchi_iwa_archive::Limits;
+pub use table_lock::{
+    TableLockCommit, TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind,
+    TableLockPatch,
+};
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const SHEET_MESSAGE_TYPE: u32 = 2;
@@ -204,6 +209,34 @@ pub enum Error {
     },
 }
 
+/// Failure while streaming an exact Numbers package artifact to a caller-owned sink.
+#[derive(Debug, Error)]
+#[error("could not write Numbers package after {bytes_written} bytes: {source}")]
+pub struct WriteError {
+    source: io::Error,
+    bytes_written: usize,
+}
+
+impl WriteError {
+    /// Return the number of package bytes accepted before the failure.
+    #[must_use]
+    pub const fn bytes_written(&self) -> usize {
+        self.bytes_written
+    }
+
+    /// Borrow the underlying sink error.
+    #[must_use]
+    pub const fn io_error(&self) -> &io::Error {
+        &self.source
+    }
+
+    /// Consume this error and return the underlying sink error.
+    #[must_use]
+    pub fn into_io_error(self) -> io::Error {
+        self.source
+    }
+}
+
 impl Error {
     /// Return the content-free bounded-resource classification, when present.
     ///
@@ -270,30 +303,54 @@ impl Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
-struct Components {
-    catalog: Arc<ComponentCatalog>,
+enum Components {
+    Physical(SourceCatalog),
+    #[cfg(feature = "internal-iwork-source")]
+    Semantic(Arc<ComponentCatalog>),
 }
 
 impl Components {
     fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
-        Ok(Self {
-            catalog: Arc::new(ComponentCatalog::from_bytes_with_limits(bytes, limits)?),
-        })
+        Ok(Self::Physical(SourceCatalog::from_bytes_with_limits(
+            bytes, limits,
+        )?))
+    }
+
+    fn from_shared_bytes(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
+        Ok(Self::Physical(
+            SourceCatalog::from_shared_bytes_with_limits(source, limits)?,
+        ))
     }
 
     #[cfg(feature = "internal-iwork-source")]
     fn from_catalog(catalog: Arc<ComponentCatalog>) -> Self {
-        Self { catalog }
+        Self::Semantic(catalog)
+    }
+
+    fn catalog(&self) -> &ComponentCatalog {
+        match self {
+            Self::Physical(source) => source.components(),
+            #[cfg(feature = "internal-iwork-source")]
+            Self::Semantic(catalog) => catalog,
+        }
+    }
+
+    fn physical(&self) -> Option<&SourceCatalog> {
+        match self {
+            Self::Physical(source) => Some(source),
+            #[cfg(feature = "internal-iwork-source")]
+            Self::Semantic(_) => None,
+        }
     }
 
     fn get_archive(&self, name: &str) -> Option<&Archive> {
-        self.catalog
+        self.catalog()
             .get(name)
             .map(litchi_iwa_archive::Component::archive)
     }
 
     fn iter_archives(&self) -> impl Iterator<Item = (&str, &Archive)> {
-        self.catalog
+        self.catalog()
             .iter()
             .map(|component| (component.name(), component.archive()))
     }
@@ -322,6 +379,7 @@ impl fmt::Debug for Package {
 
 #[derive(Debug)]
 struct State {
+    source: Arc<[u8]>,
     components: Components,
     index: Index,
     document: Document,
@@ -396,7 +454,7 @@ impl Package {
     /// the package cannot become a strict rooted semantic document.
     pub fn open_with_options(path: impl AsRef<Path>, options: ReadOptions) -> Result<Self> {
         let bytes = read_source(path.as_ref(), options.archive())?;
-        Self::from_bytes_with_options(&bytes, options)
+        Self::from_shared_bytes_with_options(bytes.into(), options)
     }
 
     /// Parse a Numbers package from an in-memory ZIP payload using defaults.
@@ -431,6 +489,23 @@ impl Package {
     /// contains ambiguous rooted ownership, or cannot be decoded as Numbers.
     pub fn from_bytes_with_options(bytes: &[u8], options: ReadOptions) -> Result<Self> {
         let components = Components::from_bytes(bytes, options.archive())?;
+        Self::from_components_with_options(components, options)
+    }
+
+    fn from_shared_bytes_with_options(source: Arc<[u8]>, options: ReadOptions) -> Result<Self> {
+        let components = Components::from_shared_bytes(source, options.archive())?;
+        Self::from_components_with_options(components, options)
+    }
+
+    fn from_components_with_options(components: Components, options: ReadOptions) -> Result<Self> {
+        let source = components
+            .physical()
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "semantic-only Numbers components cannot construct a package".to_owned(),
+                )
+            })?
+            .shared_source();
         validate_numbers_application(&components, options.archive())?;
         let semantic = options.semantic();
         let index = Index::from_components(&components, semantic.max_objects())?;
@@ -447,6 +522,7 @@ impl Package {
         )?;
         Ok(Self {
             state: Arc::new(State {
+                source,
                 components,
                 index,
                 document,
@@ -459,6 +535,65 @@ impl Package {
     #[must_use]
     pub fn snapshot(&self) -> Self {
         self.clone()
+    }
+
+    /// Borrow the exact immutable package source retained by this snapshot.
+    ///
+    /// Unsupported ZIP members and unmodeled protobuf fields remain in this
+    /// source even though the ordinary package API exposes semantic values.
+    #[must_use]
+    pub fn source_bytes(&self) -> &[u8] {
+        &self.state.source
+    }
+
+    /// Write this validated package artifact to a byte sink.
+    ///
+    /// The emitted bytes are the exact source retained by this immutable
+    /// snapshot, including unsupported ZIP members and unmodeled fields.
+    ///
+    /// # Costs
+    ///
+    /// Writes package bytes once without constructing another package buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error carrying the exact number of bytes accepted when the
+    /// caller-owned sink cannot accept the complete artifact.
+    pub fn write_to(&self, writer: &mut impl Write) -> std::result::Result<(), WriteError> {
+        let source = self.source_bytes();
+        let mut bytes_written = 0_usize;
+        while bytes_written < source.len() {
+            let remaining = &source[bytes_written..];
+            match writer.write(remaining) {
+                Ok(0) => {
+                    return Err(WriteError {
+                        source: io::Error::new(
+                            io::ErrorKind::WriteZero,
+                            "sink accepted no package bytes",
+                        ),
+                        bytes_written,
+                    });
+                },
+                Ok(amount) if amount <= remaining.len() => bytes_written += amount,
+                Ok(_amount) => {
+                    return Err(WriteError {
+                        source: io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "sink reported accepting more bytes than supplied",
+                        ),
+                        bytes_written,
+                    });
+                },
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
+                Err(source) => {
+                    return Err(WriteError {
+                        source,
+                        bytes_written,
+                    });
+                },
+            }
+        }
+        Ok(())
     }
 
     /// Borrow decoded semantic sheets in stable source order.
