@@ -14,6 +14,7 @@ use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
 
+use super::super::super::model::ValidatedWorksheetStore;
 use super::super::super::{Selector, Visibility, Workbook, Worksheet, WorksheetKind};
 use crate::Style;
 use crate::cell::{Cell, Content};
@@ -49,6 +50,8 @@ use super::worksheet::{NewSheet, TabEdit, WorksheetEdit};
 
 const MAX_CELL_TRANSFER: u64 = 65_536;
 const MAX_CELL_DEPENDENCY_SCAN: usize = 1_048_576;
+const MAX_VALIDATED_STORE_HANDOFF_CELLS: usize = 4_096;
+const MAX_VALIDATED_STORE_HANDOFF_BYTES: usize = 1_048_576;
 
 #[derive(Clone, Copy)]
 enum CellTransfer {
@@ -976,6 +979,7 @@ impl Edit {
         let mut changes = Vec::new();
         let mut package_changes = Vec::new();
         let mut parts = Vec::new();
+        let mut validated_worksheet_stores = Vec::new();
         let mut needs_recalculation = false;
         let mut drawing_graph = Vec::new();
 
@@ -1670,10 +1674,20 @@ impl Edit {
                     },
                 }
             }
+            let after = Arc::new(after);
+            if parsed.stored_cell_count() <= MAX_VALIDATED_STORE_HANDOFF_CELLS
+                && after.len() <= MAX_VALIDATED_STORE_HANDOFF_BYTES
+            {
+                validated_worksheet_stores.push(ValidatedWorksheetStore {
+                    uri: data.part_uri.clone(),
+                    content: Arc::clone(&after),
+                    store: parsed,
+                });
+            }
             parts.push(PartChange {
                 uri: data.part_uri.clone(),
                 before,
-                after: Arc::new(after),
+                after,
             });
         }
         if !drawings.is_empty() {
@@ -2369,6 +2383,7 @@ impl Edit {
         {
             codec::validate_web_integrity(&workbook)?;
         }
+        workbook.adopt_validated_worksheet_stores(&base, validated_worksheet_stores)?;
         Ok(Commit {
             workbook: workbook.clone(),
             patch: Patch {

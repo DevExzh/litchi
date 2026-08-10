@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 107 selectable
+This is a coverage map, not a completion claim. It compares the 108 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -99,6 +99,12 @@ Change 0024 removes one duplicate CFB index open from public PPT root
 slide-order capture. It retains independent live-document, slide-order,
 review-history and public-reader validation; it does not imply completion of
 PPT edit/publication, real-producer, security, or broader OLE2 CRUD coverage.
+
+Change 0025 adds a distinct XLSX commit-plus-first-read attribution case and
+reuses commit-time validation only for bounded changed worksheets with exact
+part and style/shared-string identity. The dense-wide handoff was rejected on
+peak memory and remains a cold-cache fallback; broader XLSX bulk, structural,
+source-backed and preservation scenarios remain open.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

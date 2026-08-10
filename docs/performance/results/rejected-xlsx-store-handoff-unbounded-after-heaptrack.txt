@@ -1,0 +1,2373 @@
+reading file "./heaptrack.litchi-perf-after-xlsx-store-handoff.1175142.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-after-xlsx-store-handoff --warmup 0 --samples 1 --case xlsx_one_cell_commit --xlsx-shape dense-wide --json after.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+5579520 calls to allocation functions with 0B peak consumption from
+quick_xml::events::Event::into_owned::h66cdc02723ba981e
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+393732 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+393732 calls with 0B peak consumption from:
+    _ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.16202468404383314481
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+262664 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+262664 calls with 0B peak consumption from:
+    _ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.16202468404383314481
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+196866 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 4069862 from 69 other places
+
+4594798 calls to allocation functions with 0B peak consumption from
+_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.16202468404383314481
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+656398 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+656398 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hca035b2c77307490
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hca035b2c77307490
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::h2f70f661d0858a1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 2297405 from 9 other places
+
+2966548 calls to allocation functions with 384B peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+131594 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    xml_minifier::audit::inspect_attributes::h21503e799ad44cc1
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    xml_minifier::audit::verify_with_policy::hf92fea616437bc28
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    xml_minifier::audit::verify_authored::h7669e88e64eefaaf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgwriter::PackageWriter::validate_authored_xml::h97ccb49f314affa7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgwriter::PublicationPlan::from_package::h9b3f11a307773bb4
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgwriter::PackageWriter::to_bytes::h985cb47b923794b1
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Workbook::to_bytes::he48444566972c1b6
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_ooxml_common::xml::unqualified_attribute_value::h46906c9ba11a09cd
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::validation::optional_u32::h01fc304e5b77fdcb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_ooxml_common::xml::unqualified_attribute_value::h46906c9ba11a09cd
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::validation::optional_u32::h01fc304e5b77fdcb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_ooxml_common::xml::unqualified_attribute_value::h46906c9ba11a09cd
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_ooxml_common::xml::unqualified_attribute_value::h46906c9ba11a09cd
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::validation::optional_u32::h01fc304e5b77fdcb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 2310666 from 605 other places
+
+2625604 calls to allocation functions with 0B peak consumption from
+litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+656398 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+656398 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 328211 from 3 other places
+
+1312796 calls to allocation functions with 0B peak consumption from
+litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::hf6360c759dd78bb5
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hca035b2c77307490
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hca035b2c77307490
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hca035b2c77307490
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::hca035b2c77307490
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+
+1050644 calls to allocation functions with 0B peak consumption from
+litchi_xlsx::raw::web::resolved_name::h142382e13fae37a5
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+131330 calls with 0B peak consumption from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131330 calls with 0B peak consumption from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131330 calls with 0B peak consumption from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131330 calls with 0B peak consumption from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131330 calls with 0B peak consumption from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 393994 from 7 other places
+
+992649 calls to allocation functions with 524.29K peak consumption from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 calls with 0B peak consumption from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::xlsx_address::haa193b074cd1aa07
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::push_text::h08688ce289ba0650
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 calls with 0B peak consumption from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::xlsx_address::haa193b074cd1aa07
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65793 calls with 0B peak consumption from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::BytesStart::push_attribute::h3a980508ff6dca3f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65793 calls with 0B peak consumption from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::BytesStart::push_attribute::h3a980508ff6dca3f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 467847 from 125 other places
+
+721958 calls to allocation functions with 0B peak consumption from
+litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan::hd3964c64ef6bdec2
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+6 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+6 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 12 from 2 other places
+
+656398 calls to allocation functions with 0B peak consumption from
+litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::he42510e030b774eb
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::h2f70f661d0858a1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+328199 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::parse::h2f70f661d0858a1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+
+528163 calls to allocation functions with 6B peak consumption from
+litchi_ooxml_common::xml::unqualified_attribute_value::h46906c9ba11a09cd
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::he42510e030b774eb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::h2f70f661d0858a1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address::hcd37792f510780da
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell::h220d293b974efc36
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan::hd3964c64ef6bdec2
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 calls with 0B peak consumption from:
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::hf6360c759dd78bb5
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hca035b2c77307490
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 134947 from 39 other places
+
+
+PEAK MEMORY CONSUMERS
+97.36M peak memory consumed over 133476 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h5315466ae9514398E.llvm.8265692055381676896
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+60.82M consumed over 1 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h693aacac72713671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+10.49M consumed over 14 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve::h336b065912802343
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish::h4521ed43d1a58d2b
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::he42510e030b774eb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::h2f70f661d0858a1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+8.39M consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve::h336b065912802343
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+7.86M consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve::h336b065912802343
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::hf6360c759dd78bb5
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hca035b2c77307490
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+7.86M consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve::h336b065912802343
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::he42510e030b774eb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::h2f70f661d0858a1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 1.94M from 157 other places
+
+823.44K peak memory consumed over 262147 calls from
+_RNvXsf_NtCslNYArtu3iFV_5alloc5boxedINtB5_3BoxeENtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+458.75K consumed over 65536 calls from:
+    litchi_xlsx::workbook::edit::model::State::after::ha32e359e75844b6a
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+364.69K consumed over 65536 calls from:
+    litchi_xlsx::workbook::edit::model::State::after::ha32e359e75844b6a
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 0B from 2 other places
+
+524.29K peak memory consumed over 992649 calls from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+524.29K consumed over 65536 calls from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::push_text::h08688ce289ba0650
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::he42510e030b774eb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::h2f70f661d0858a1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 0B from 125 other places
+
+458.75K peak memory consumed over 65537 calls from
+litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+458.75K consumed over 65536 calls from:
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+
+393.44K peak memory consumed over 197419 calls from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+393.22K consumed over 65536 calls from:
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+25B consumed over 1 calls from:
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+25B consumed over 1 calls from:
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+25B consumed over 1 calls from:
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+25B consumed over 1 calls from:
+    litchi_xlsx::workbook::package::validate_sheet_graph::hbcd07f9fd795c0d0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Workbook::from_package_with_styles::h95555769742293a0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Workbook::new::h13061a54b583fc70
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 126B from 138 other places
+
+364.70K peak memory consumed over 458752 calls from
+litchi_xlsx::cell::Number::new::hfb77da9981ae0804
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+364.69K consumed over 65536 calls from:
+    litchi_xlsx::raw::worksheet::semantic::parse_value::ha90fc5696454b527
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::semantic::materialize::h22911ac426dd71f0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::hf6360c759dd78bb5
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hca035b2c77307490
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+7B consumed over 65536 calls from:
+    litchi_xlsx::raw::worksheet::semantic::parse_value::ha90fc5696454b527
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::semantic::materialize::h22911ac426dd71f0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::he42510e030b774eb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::h2f70f661d0858a1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 0B from 1 other places
+
+73.73K peak memory consumed over 1 calls from
+0x7c3baf0b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+31.46K peak memory consumed over 9 calls from
+litchi_perf_baseline::main::h22cfe5a8bf7630cc
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+31.46K consumed over 1 calls from:
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 0B from 4 other places
+
+2.61K peak memory consumed over 68 calls from
+_ZN9hashbrown3raw13RawTableInner22fallible_with_capacity17hdad37e21853fbf80E.llvm.1422822162170782249
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+2.58K consumed over 8 calls from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h4fd1bf7041e06d72
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h018c3f9fb7e15c86
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::h5a140f3127b1b19a
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::he42510e030b774eb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::h2f70f661d0858a1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+36B consumed over 1 calls from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h4fd1bf7041e06d72
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 0B from 13 other places
+
+1.92K peak memory consumed over 393226 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h74ba8c770cd99f88E.llvm.16524085293122261568
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+1.92K consumed over 1 calls from:
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::add_placed::h7706f1cf7d626ef0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 0B from 9 other places
+
+
+MOST TEMPORARY ALLOCATIONS
+2118334 temporary allocations of 2966548 allocations in total (71.41%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+131594 temporary allocations of 131594 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    xml_minifier::audit::inspect_attributes::h21503e799ad44cc1
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    xml_minifier::audit::verify_with_policy::hf92fea616437bc28
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    xml_minifier::audit::verify_authored::h7669e88e64eefaaf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgwriter::PackageWriter::validate_authored_xml::h97ccb49f314affa7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgwriter::PublicationPlan::from_package::h9b3f11a307773bb4
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgwriter::PackageWriter::to_bytes::h985cb47b923794b1
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Workbook::to_bytes::he48444566972c1b6
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 temporary allocations of 131072 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_ooxml_common::xml::unqualified_attribute_value::h46906c9ba11a09cd
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::validation::optional_u32::h01fc304e5b77fdcb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 temporary allocations of 131072 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_ooxml_common::xml::unqualified_attribute_value::h46906c9ba11a09cd
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::validation::optional_u32::h01fc304e5b77fdcb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 temporary allocations of 131072 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_ooxml_common::xml::unqualified_attribute_value::h46906c9ba11a09cd
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 temporary allocations of 131072 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_ooxml_common::xml::unqualified_attribute_value::h46906c9ba11a09cd
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::validation::optional_u32::h01fc304e5b77fdcb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::haebce457fb1d213f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hd5ee97d9e1a9e998
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h9acd248eaa705cd0
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::parse::hc7941d1a4e1a7165
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Worksheet::store::h075bad6415c58aad
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 1.46M from 605 other places
+
+525322 temporary allocations of 1050644 allocations in total (50.00%) from
+litchi_xlsx::raw::web::resolved_name::h142382e13fae37a5
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+131330 temporary allocations of 131330 allocations in total (100.00%) from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131330 temporary allocations of 131330 allocations in total (100.00%) from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131330 temporary allocations of 131330 allocations in total (100.00%) from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131330 temporary allocations of 131330 allocations in total (100.00%) from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_xlsx::raw::web::read::h2e164a5fa7c6d565
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 1B from 7 other places
+
+524812 temporary allocations of 5579520 allocations in total (9.41%) from
+quick_xml::events::Event::into_owned::h66cdc02723ba981e
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+196866 temporary allocations of 196866 allocations in total (100.00%) from:
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+196866 temporary allocations of 196866 allocations in total (100.00%) from:
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65538 temporary allocations of 131332 allocations in total (49.90%) from:
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65538 temporary allocations of 131332 allocations in total (49.90%) from:
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+2 temporary allocations of 6 allocations in total (33.33%) from:
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 2B from 69 other places
+
+262144 temporary allocations of 262145 allocations in total (100.00%) from
+_RNvXs1F_NtCslNYArtu3iFV_5alloc6stringlNtB6_12SpecToString14spec_to_string
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 temporary allocations of 131072 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+131072 temporary allocations of 131072 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_xlsx_cells::h9da96ad5676d3671
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+
+131592 temporary allocations of 131592 allocations in total (100.00%) from
+quick_xml::events::BytesStart::push_attribute::h3a980508ff6dca3f
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+65793 temporary allocations of 65793 allocations in total (100.00%) from:
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65793 temporary allocations of 65793 allocations in total (100.00%) from:
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+3 temporary allocations of 3 allocations in total (100.00%) from:
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 1B from 1 other places
+
+131589 temporary allocations of 262663 allocations in total (50.10%) from
+aho_corasick::automaton::Automaton::try_replace_all::h34a9253857d5107e
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 temporary allocations of 65536 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::wire::write_attribute::hfb8fb45704a70351
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::wire::write_tag::h5d6846e50ab96461
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_action::h9114253e79d99392
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_row::h137e6bfb83294318
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 temporary allocations of 65536 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::wire::write_attribute::hfb8fb45704a70351
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::wire::write_tag::h5d6846e50ab96461
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_action::h9114253e79d99392
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_row::h137e6bfb83294318
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+256 temporary allocations of 256 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::wire::write_attribute::hfb8fb45704a70351
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::wire::write_tag::h5d6846e50ab96461
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_row::h137e6bfb83294318
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+256 temporary allocations of 256 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::wire::write_attribute::hfb8fb45704a70351
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::wire::write_tag::h5d6846e50ab96461
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_row::h137e6bfb83294318
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+2 temporary allocations of 3 allocations in total (66.67%) from:
+    litchi_xlsx::raw::catalog_edit::codec::write_tag::he75d112040d51a53
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::catalog_edit::package::append::hce4d3e5208c64267
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 3B from 6 other places
+
+131209 temporary allocations of 992649 allocations in total (13.22%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+65559 temporary allocations of 65793 allocations in total (99.64%) from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::BytesStart::push_attribute::h3a980508ff6dca3f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65559 temporary allocations of 65793 allocations in total (99.64%) from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::BytesStart::push_attribute::h3a980508ff6dca3f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+4 temporary allocations of 4 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::packuri::PackURI::rels_uri::h12a2aad81da76eac
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgreader::PackageReader::load_rels_lazy::h7c838a4f1c610016
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::h986e4014b673c123
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::h9ad6d55fc2c1c9f9
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::h27322cef717de13d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::package::OpcPackage::from_owned_phys_reader::h9f55a50a10574b10
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::package::OpcPackage::from_vec_with_limits::h742c5df4ddffc027
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Workbook::from_bytes::hf5e871b222954703
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+4 temporary allocations of 4 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::packuri::PackURI::rels_uri::h12a2aad81da76eac
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgreader::PackageReader::load_rels_lazy::h7c838a4f1c610016
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::h986e4014b673c123
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::h9ad6d55fc2c1c9f9
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::h27322cef717de13d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::package::OpcPackage::from_owned_phys_reader::h9f55a50a10574b10
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_opc::package::OpcPackage::from_vec_with_limits::h742c5df4ddffc027
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::model::Workbook::from_bytes::hf5e871b222954703
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+4 temporary allocations of 4 allocations in total (100.00%) from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    quick_xml::events::BytesStart::push_attribute::h3a980508ff6dca3f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::write_start::h78f0006b360d8ad7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::compact::changed::h7aa06842ec4acc1d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 79B from 125 other places
+
+131077 temporary allocations of 393231 allocations in total (33.33%) from
+litchi_sheet::Cell::a1::h21f5653f9d7429e4
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 temporary allocations of 65536 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_action::h9114253e79d99392
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_row::h137e6bfb83294318
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 temporary allocations of 65536 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_action::h9114253e79d99392
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_row::h137e6bfb83294318
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_sheet::Rect::a1::h4107763f8e1db38c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    _$LT$litchi_sheet..Cell$u20$as$u20$core..fmt..Display$GT$::fmt::hb97a7c5b28ca675d
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_sheet::Rect::a1::h4107763f8e1db38c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 2B from 16 other places
+
+131073 temporary allocations of 262147 allocations in total (50.00%) from
+_RNvXsf_NtCslNYArtu3iFV_5alloc5boxedINtB5_3BoxeENtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 temporary allocations of 65536 allocations in total (100.00%) from:
+    _ZN62_$LT$litchi_xlsx..cell..Cell$u20$as$u20$core..clone..Clone$GT$5clone17h9060003d5179ecfaE.llvm.8079931749014624570
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::model::State::read::h789aa402d59f78e7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 temporary allocations of 65536 allocations in total (100.00%) from:
+    _ZN62_$LT$litchi_xlsx..cell..Cell$u20$as$u20$core..clone..Clone$GT$5clone17h9060003d5179ecfaE.llvm.8079931749014624570
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::model::State::read::h789aa402d59f78e7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    _ZN62_$LT$litchi_xlsx..cell..Cell$u20$as$u20$core..clone..Clone$GT$5clone17h9060003d5179ecfaE.llvm.8079931749014624570
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::model::State::read::h789aa402d59f78e7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 0B from 2 other places
+
+131073 temporary allocations of 262657 allocations in total (49.90%) from
+litchi_xlsx::raw::worksheet::edit::codec::wire::sibling_name::h8f1f0c8fa4f82f57
+  in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 temporary allocations of 65536 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_text_element::h59b30c71e70f05f7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_payload::h0281a80ccf424f8f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_action::h9114253e79d99392
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_row::h137e6bfb83294318
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+65536 temporary allocations of 65536 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_text_element::h59b30c71e70f05f7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_payload::h0281a80ccf424f8f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_action::h9114253e79d99392
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_new_row::h137e6bfb83294318
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::codec::create_sheets::h83d949a2f0dfcb06
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_text_element::h59b30c71e70f05f7
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_payload::h0281a80ccf424f8f
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data::h9b1f8710695f089c
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::raw::worksheet::edit::package::rewrite::hdc366b15d5a8c197
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit::h422002c85d5bbb82
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::run_xlsx_update_commit::h156ddbd629f3ebbf
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+    main
+      in /tmp/litchi-perf-after-xlsx-store-handoff
+  and 0B from 2 other places
+
+
+total runtime: 5.07s.
+calls to allocation functions: 25035251 (4937919/s)
+temporary memory allocations: 4349491 (857887/s)
+peak heap memory consumption: 100.04M
+peak RSS (including heaptrack overhead): 102.13M
+total memory leaked: 1.78K

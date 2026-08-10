@@ -325,6 +325,7 @@ enum Case {
     XlsxNoopCommit,
     XlsxNoopCommitSave,
     XlsxOneCellCommit,
+    XlsxOneCellCommitFirstRead,
     XlsxOneCellCommitSave,
     XlsxOnePercentCommit,
     XlsxOnePercentCommitSave,
@@ -476,6 +477,7 @@ impl Case {
             Self::XlsxNoopCommit => "xlsx_noop_commit",
             Self::XlsxNoopCommitSave => "xlsx_noop_commit_save",
             Self::XlsxOneCellCommit => "xlsx_one_cell_commit",
+            Self::XlsxOneCellCommitFirstRead => "xlsx_one_cell_commit_first_read",
             Self::XlsxOneCellCommitSave => "xlsx_one_cell_commit_save",
             Self::XlsxOnePercentCommit => "xlsx_one_percent_commit",
             Self::XlsxOnePercentCommitSave => "xlsx_one_percent_commit_save",
@@ -629,6 +631,7 @@ impl Case {
                 | Self::XlsxNoopCommit
                 | Self::XlsxNoopCommitSave
                 | Self::XlsxOneCellCommit
+                | Self::XlsxOneCellCommitFirstRead
                 | Self::XlsxOneCellCommitSave
                 | Self::XlsxOnePercentCommit
                 | Self::XlsxOnePercentCommitSave
@@ -2019,6 +2022,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_noop_commit" => Some(Case::XlsxNoopCommit),
         "xlsx_noop_commit_save" => Some(Case::XlsxNoopCommitSave),
         "xlsx_one_cell_commit" => Some(Case::XlsxOneCellCommit),
+        "xlsx_one_cell_commit_first_read" => Some(Case::XlsxOneCellCommitFirstRead),
         "xlsx_one_cell_commit_save" => Some(Case::XlsxOneCellCommitSave),
         "xlsx_one_percent_commit" => Some(Case::XlsxOnePercentCommit),
         "xlsx_one_percent_commit_save" => Some(Case::XlsxOnePercentCommitSave),
@@ -2157,7 +2161,8 @@ fn print_usage() {
                                        xlsx_open_owned,xlsx_list_sheets,xlsx_first_cell,\n\
                                        xlsx_full_cell_scan,xlsx_narrow_column_range_scan,\n\
                                        xlsx_noop_commit,xlsx_noop_commit_save,\n\
-                                       xlsx_one_cell_commit,xlsx_one_cell_commit_save,\n\
+                                       xlsx_one_cell_commit,xlsx_one_cell_commit_first_read,\n\
+                                       xlsx_one_cell_commit_save,\n\
                                        xlsx_one_percent_commit,xlsx_one_percent_commit_save,\n\
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
                                        xlsx_source_first_cell,\n\
@@ -3277,6 +3282,9 @@ fn run_case_with_config(
         Case::XlsxNoopCommit => run_xlsx_noop_commit(corpus, warmup_iterations, samples),
         Case::XlsxNoopCommitSave => run_xlsx_noop_commit_save(corpus, warmup_iterations, samples),
         Case::XlsxOneCellCommit => run_xlsx_update_commit(corpus, warmup_iterations, samples, 1),
+        Case::XlsxOneCellCommitFirstRead => {
+            run_xlsx_one_cell_commit_first_read(corpus, warmup_iterations, samples)
+        },
         Case::XlsxOneCellCommitSave => {
             run_xlsx_update_commit_save(corpus, warmup_iterations, samples, 1)
         },
@@ -5808,6 +5816,7 @@ fn run_xlsx_update_commit(
         Case::XlsxOnePercentCommit
     };
     let mut elapsed = Vec::with_capacity(samples);
+    let mut final_commit = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
@@ -5817,11 +5826,78 @@ fn run_xlsx_update_commit(
         if commit.patch().len() != updates.len() {
             return Err("XLSX update commit has an unexpected semantic change count".into());
         }
-        verify_xlsx_cells(commit.workbook(), spec, updates)?;
         std::hint::black_box(&commit);
+        final_commit = Some(commit);
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
+    verify_xlsx_cells(
+        final_commit
+            .as_ref()
+            .ok_or("XLSX update commit produced no final snapshot")?
+            .workbook(),
+        spec,
+        updates,
+    )?;
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_xlsx_one_cell_commit_first_read(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let coordinate = *spec
+        .one_percent_updates
+        .first()
+        .ok_or("XLSX corpus has no update coordinate")?;
+    let updates = std::slice::from_ref(&coordinate);
+    let sheet_name = xlsx_sheet_name(coordinate.sheet);
+    let address = xlsx_address(coordinate.row, coordinate.column)?;
+    let expected = (xlsx_value(coordinate) + 1).to_string();
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut final_commit = None;
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let edit = prepare_xlsx_updates(&workbook, updates)?;
+        let started = Instant::now();
+        let commit = edit.commit()?;
+        let sheet = commit
+            .workbook()
+            .sheet(sheet_name.as_str())?
+            .ok_or("XLSX updated sheet is missing")?;
+        let cell = sheet
+            .cell(address.as_str())?
+            .stored()
+            .ok_or("XLSX updated cell is missing")?;
+        let XlsxCell::Value(XlsxValue::Number(actual)) = cell else {
+            return Err("XLSX updated cell is not numeric".into());
+        };
+        std::hint::black_box(actual.as_str());
+        let duration = started.elapsed();
+        if actual.as_str() != expected {
+            return Err("XLSX updated cell differs from deterministic expectation".into());
+        }
+        if commit.patch().len() != 1 {
+            return Err("XLSX update commit has an unexpected semantic change count".into());
+        }
+        final_commit = Some(commit);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    verify_xlsx_cells(
+        final_commit
+            .as_ref()
+            .ok_or("XLSX commit/read produced no final snapshot")?
+            .workbook(),
+        spec,
+        updates,
+    )?;
+    Ok(result(
+        Case::XlsxOneCellCommitFirstRead,
+        corpus,
+        elapsed,
+        None,
+    ))
 }
 
 fn run_xlsx_update_commit_save(
@@ -7320,6 +7396,10 @@ mod tests {
                 assert_eq!(xlsx_source.unselected_worksheet_read_calls.len(), 1);
             }
         }
+
+        let measured = run_case(Case::XlsxOneCellCommitFirstRead, &first, 0, 1).unwrap();
+        assert_eq!(measured.case, "xlsx_one_cell_commit_first_read");
+        assert_eq!(measured.elapsed_ns.samples.len(), 1);
     }
 
     #[test]

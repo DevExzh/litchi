@@ -24,6 +24,10 @@ fn cell_crud_is_atomic_reversible_and_source_preserving() {
             .expect("cell changes");
     }
     let committed = edit.commit().expect("commit");
+    assert!(
+        committed.workbook().inner.sheets[0].cells.get().is_some(),
+        "the validated changed worksheet should be ready for its first public read"
+    );
     assert_eq!(
         source.to_bytes().expect("source remains valid"),
         source_bytes
@@ -63,6 +67,49 @@ fn cell_crud_is_atomic_reversible_and_source_preserving() {
         book.apply(committed.patch()),
         Err(Error::PatchConflict { .. })
     ));
+}
+
+#[test]
+fn commit_adopts_only_the_changed_worksheet_store() {
+    let source = two_sheet_workbook(WorksheetKind::Worksheet);
+    assert!(
+        source
+            .inner
+            .sheets
+            .iter()
+            .all(|sheet| sheet.cells.get().is_none())
+    );
+
+    let mut edit = source.edit().expect("edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("sheet")
+        .set("A1", 7_i32)
+        .expect("cell edit");
+    let committed = edit.commit().expect("commit");
+
+    assert!(committed.workbook().inner.sheets[0].cells.get().is_some());
+    assert!(committed.workbook().inner.sheets[1].cells.get().is_none());
+}
+
+#[test]
+fn commit_does_not_retain_an_oversized_validated_store() {
+    let source = Workbook::new().expect("source workbook");
+    let mut edit = source.edit().expect("edit");
+    {
+        let mut sheet = edit.sheet("Sheet1").expect("sheet lookup").expect("sheet");
+        for index in 0..4_097_u32 {
+            sheet
+                .set(
+                    (index / 64, index % 64),
+                    i32::try_from(index).expect("bounded value"),
+                )
+                .expect("cell edit");
+        }
+    }
+
+    let committed = edit.commit().expect("commit");
+    assert!(committed.workbook().inner.sheets[0].cells.get().is_none());
 }
 #[test]
 fn merged_range_crud_is_sparse_safe_reversible_and_composable() {

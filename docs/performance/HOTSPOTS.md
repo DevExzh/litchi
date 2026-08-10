@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0024`](changes/0024-ppt-slide-order-open-reuse.md)
+Evidence through: [`change 0025`](changes/0025-xlsx-validated-store-handoff.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -82,6 +82,8 @@ whole-package OPC materialization
      -> allocate/copy complete replacement worksheet XML
      -> compact and reparse complete replacement for publication proof
      -> clone shared OPC graph and replace changed Part
+     -> hand off the validated Store only below the cell/XML retention bounds
+        and only when final Part and style/shared-string identities still match
   -> save
      -> recompress complete package
 ```
@@ -100,6 +102,10 @@ Confirmed source facts:
 - A targeted cell edit performs a semantic parse, an independent lossless
   layout scan, full replacement-byte construction, and a full changed-sheet
   semantic readback before publication.
+- Eligible changed sheets now adopt that exact commit-validated store into the
+  target snapshot. Medium commit plus first read improves 23.23% p50 and
+  allocation calls fall 21.01%. The handoff is capped at 4,096 cells and 1 MiB
+  XML; the unrestricted dense-wide prototype was rejected at +8.99% peak heap.
 - Bulk cell actions are held in address order, then regrouped into nested
   row/cell `BTreeMap`s during worksheet emission.
 - An empty edit returns the original immutable workbook allocation. When the
@@ -331,7 +337,7 @@ pattern elsewhere.
 | 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their immutable logical payload and validated generated local span without extra copies; borrowed/topology-changing/unsupported sources rewrite fully. | Real media-heavy 1% updates, source-backed editable publication, and attribution of the remaining retained-source/compressor-buffer memory cost. |
 | 7 | Confirmed structurally: duplicate indexes, boxed Parts, source-XML map, and linear fallback exist. | Allocation profiles, type sizes, cache counters and repeated noncanonical lookup. |
 | 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet. | Broader source-backed selectors, edits and real workbook matrices. |
-| 9 | Confirmed structurally: small XLSX edits scan/rebuild/reparse the complete touched sheet and repackage all Parts. | First/middle/last cell, 1% updates, and commit-versus-save separation. |
+| 9 | Refined by measurement: small XLSX edits scan/rebuild/reparse the complete touched sheet; bounded commits can reuse the validation store for first read, while large sheets fall back cold. | Bulk action-plan work, first/middle/last cells, 1% updates, structural edits, large-sheet retention and commit-versus-save separation. |
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
 | 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers; child lookup descends the validated tree; native DOC/XLS/PPT semantic baselines, XLS editor reuse, DOC batched publication and PPT root-open reuse are accepted. | Attribute the remaining final editor render/owner/public-reader work; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
@@ -352,7 +358,7 @@ The order below is provisional until baseline measurements are recorded.
 | 5 | Exact owned-source OPC no-op publication. | Owned DOCX/PPTX/XLSX open/read/no-op save. | Medium | Implemented; same-topology mutations now use targeted preservation. See changes 0004 and 0008. |
 | 6 | Move already-owned XLS/PPT writer buffers into `OleWriter`. | Legacy fresh creation and some rebuilds. | Low | Implemented for XLS/PPT; DOC rejected by measurement. See `changes/0003-legacy-owned-stream-handoff.md`. |
 | 7 | Use validated cached CFB sibling-tree descent and reusable sector buffers. | Legacy stream-heavy open/rebuild workflows. | Medium | Implemented; see `changes/0002-cfb-lookup-and-sector-buffers.md`. |
-| 8 | Extend the accepted XLSX row-start index to broader selector and edit matrices. | Sparse range queries after sheet load. | Low-medium | Narrow ranges are accepted; preservation/readback gates and broad CRUD coverage remain unchanged. |
+| 8 | Extend the accepted XLSX row-start index and bounded validated-store handoff to broader selector and edit matrices. | Sparse range queries and first reads after eligible changed-sheet commits. | Low-medium | Narrow ranges and bounded commit/read reuse are accepted in changes 0006 and 0025; dense-wide handoff is intentionally excluded, and preservation/readback gates and broad CRUD coverage remain unchanged. |
 | 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Implemented for canonical direct-body DOCX batches and PPTX selected-scene reuse; complete source validation and candidate readback remain. See changes 0010 and 0012. |
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
 | 11 | Extend ODF beyond accepted ODS snapshot, row-local reuse and ODT full-text ownership: source-backed selectors, repeated scans, newly attributed package-parse work and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Same-topology ODS row splicing and consuming ODT full-text blocks are accepted; direct package/final-document adoption candidates were reverted for immateriality or a read regression; structural fallback, exact no-op and full readback must remain. See changes 0011, 0014, 0018, 0019, 0020 and 0023. |

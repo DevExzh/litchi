@@ -1,0 +1,891 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cycles:P'
+# Event count (approx.): 4258462423
+#
+# Overhead  Command          Shared Object                                 Symbol
+# ........  ...............  ............................................  ................................................................................................................................................................................
+#
+     9.36%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] _ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17h98329489722ce97dE.llvm.11651465367898063144
+            |
+            ---_ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17h98329489722ce97dE.llvm.11651465367898063144
+               |
+               |--2.68%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+               |          |
+               |          |--1.55%--litchi_xlsx::raw::worksheet::parse
+               |          |          litchi_xlsx::workbook::model::Worksheet::store
+               |          |          |
+               |          |           --1.49%--litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          |                     0xffffffffffffffff
+               |          |
+               |           --1.13%--litchi_xlsx::raw::worksheet::parse
+               |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     |
+               |                      --1.10%--litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                                0xffffffffffffffff
+               |
+               |--1.66%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::model::Worksheet::store
+               |          |
+               |           --1.58%--litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                     0xffffffffffffffff
+               |
+               |--1.61%--litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+               |          litchi_xlsx::raw::worksheet::edit::package::rewrite
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          0xffffffffffffffff
+               |
+               |--1.19%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          0xffffffffffffffff
+               |
+               |--1.13%--litchi_xlsx::raw::web::read
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          0xffffffffffffffff
+               |
+                --1.07%--litchi_xlsx::raw::compact::changed
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          |
+                           --1.04%--litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                                     0xffffffffffffffff
+
+     6.29%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::name::NamespaceResolver::resolve_event
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_event
+               |
+               |--2.71%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+               |          |
+               |          |--1.44%--litchi_xlsx::raw::worksheet::parse
+               |          |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          |          0xffffffffffffffff
+               |          |
+               |           --1.24%--litchi_xlsx::raw::worksheet::parse
+               |                     litchi_xlsx::workbook::model::Worksheet::store
+               |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                     0xffffffffffffffff
+               |
+               |--1.30%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          0xffffffffffffffff
+               |
+               |--1.27%--litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+               |          litchi_xlsx::raw::worksheet::edit::package::rewrite
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          0xffffffffffffffff
+               |
+                --0.96%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+                          litchi_xlsx::raw::worksheet::parse
+                          litchi_xlsx::workbook::model::Worksheet::store
+                          |
+                           --0.85%--litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                                     0xffffffffffffffff
+
+     5.07%  litchi-perf-aft  libc.so.6                                     [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |
+               |--1.95%--litchi_ooxml_common::mce::codec::process_markup_compatibility
+               |          litchi_ooxml_common::mce::codec::process_ooxml
+               |          |
+               |          |--1.02%--litchi_xlsx::raw::worksheet::parse
+               |          |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.90%--litchi_xlsx::raw::worksheet::parse
+               |                     litchi_xlsx::workbook::model::Worksheet::store
+               |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                     0xffffffffffffffff
+               |
+               |--0.96%--litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::model::Worksheet::store
+               |          |
+               |           --0.93%--litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                     0xffffffffffffffff
+               |
+               |--0.65%--litchi_xlsx::raw::namespace::is_spreadsheetml_name
+               |          |
+               |           --0.42%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |                     |
+               |                      --0.25%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |                                litchi_xlsx::raw::worksheet::parse
+               |                                litchi_xlsx::workbook::model::Worksheet::store
+               |
+               |--0.65%--litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          0xffffffffffffffff
+               |
+               |--0.37%--quick_xml::reader::state::ReaderState::emit_end
+               |          quick_xml::reader::Reader<R>::read_event_impl
+               |
+                --0.31%--litchi_xlsx::raw::web::read
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          0xffffffffffffffff
+
+     4.62%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_ooxml_common::xml::unqualified_attribute_value
+            |
+            ---litchi_ooxml_common::xml::unqualified_attribute_value
+               |
+               |--2.57%--litchi_xlsx::raw::worksheet::validation::optional_u32
+               |          |
+               |           --2.51%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               |                     litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |                     |
+               |                     |--1.38%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |                     |          litchi_xlsx::raw::worksheet::parse
+               |                     |          litchi_xlsx::workbook::model::Worksheet::store
+               |                     |          |
+               |                     |           --1.35%--litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     |                     0xffffffffffffffff
+               |                     |
+               |                      --1.13%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |                                litchi_xlsx::raw::worksheet::parse
+               |                                litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                                0xffffffffffffffff
+               |
+               |--1.21%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               |          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |          |
+               |          |--0.87%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          |          litchi_xlsx::raw::worksheet::parse
+               |          |          litchi_xlsx::workbook::model::Worksheet::store
+               |          |          |
+               |          |           --0.82%--litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          |                     0xffffffffffffffff
+               |          |
+               |           --0.34%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |                     litchi_xlsx::raw::worksheet::parse
+               |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     0xffffffffffffffff
+               |
+                --0.51%--litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address
+                          litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell
+                          litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+                          litchi_xlsx::raw::worksheet::edit::package::rewrite
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          0xffffffffffffffff
+
+     4.46%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] _ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+            |
+            ---_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+               |
+               |--2.26%--litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::model::Worksheet::store
+               |          |
+               |           --2.17%--litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                     0xffffffffffffffff
+               |
+                --2.11%--litchi_xlsx::raw::worksheet::parse
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          0xffffffffffffffff
+
+     3.98%  litchi-perf-aft  libc.so.6                                     [.] malloc
+            |
+            |--2.85%--__GI___libc_malloc (inlined)
+            |          |
+            |          |--0.51%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+            |          |          |
+            |          |           --0.34%--litchi_xlsx::raw::worksheet::parse
+            |          |                     litchi_xlsx::workbook::model::Worksheet::store
+            |          |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+            |          |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+            |          |                     0xffffffffffffffff
+            |          |
+            |          |--0.42%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+            |          |          litchi_xlsx::raw::worksheet::parse
+            |          |          litchi_xlsx::workbook::model::Worksheet::store
+            |          |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+            |          |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+            |          |          0xffffffffffffffff
+            |          |
+            |          |--0.39%--quick_xml::events::Event::into_owned
+            |          |
+            |          |--0.37%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+            |          |          alloc::raw_vec::RawVec<T,A>::grow_one
+            |          |          quick_xml::events::attributes::IterState::check_for_duplicates
+            |          |          quick_xml::events::attributes::IterState::next
+            |          |          |
+            |          |           --0.31%--<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+            |          |                     litchi_ooxml_common::xml::unqualified_attribute_value
+            |          |
+            |          |--0.34%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+            |          |          litchi_xlsx::raw::worksheet::parse
+            |          |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+            |          |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+            |          |          0xffffffffffffffff
+            |          |
+            |           --0.28%--litchi_xlsx::raw::web::resolved_name
+            |                     litchi_xlsx::raw::web::read
+            |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+            |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+            |                     0xffffffffffffffff
+            |
+             --1.13%--tcache_get_n (inlined)
+                       tcache_get (inlined)
+                       __GI___libc_malloc (inlined)
+                       |
+                        --0.28%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+
+     3.44%  litchi-perf-aft  libc.so.6                                     [.] _int_free
+            |
+            |--2.99%--_int_free
+            |          |
+            |           --2.85%--__GI___libc_free (inlined)
+            |                     |
+            |                     |--0.62%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+            |                     |          |
+            |                     |          |--0.31%--litchi_xlsx::raw::worksheet::parse
+            |                     |          |          litchi_xlsx::workbook::model::Worksheet::store
+            |                     |          |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+            |                     |          |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+            |                     |          |          0xffffffffffffffff
+            |                     |          |
+            |                     |           --0.31%--litchi_xlsx::raw::worksheet::parse
+            |                     |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+            |                     |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+            |                     |                     0xffffffffffffffff
+            |                     |
+            |                     |--0.45%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+            |                     |          litchi_xlsx::raw::worksheet::parse
+            |                     |          litchi_xlsx::workbook::model::Worksheet::store
+            |                     |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+            |                     |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+            |                     |          0xffffffffffffffff
+            |                     |
+            |                     |--0.31%--litchi_xlsx::raw::web::read
+            |                     |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+            |                     |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+            |                     |          0xffffffffffffffff
+            |                     |
+            |                     |--0.28%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+            |                     |          litchi_xlsx::raw::worksheet::parse
+            |                     |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+            |                     |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+            |                     |          0xffffffffffffffff
+            |                     |
+            |                      --0.25%--litchi_ooxml_common::xml::unqualified_attribute_value
+            |
+             --0.42%--tcache_put (inlined)
+                       _int_free
+                       __GI___libc_free (inlined)
+
+     2.71%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::reader::Reader<R>::read_event_impl
+            |
+            ---quick_xml::reader::Reader<R>::read_event_impl
+               |
+               |--0.84%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+               |          |
+               |          |--0.51%--litchi_xlsx::raw::worksheet::parse
+               |          |          litchi_xlsx::workbook::model::Worksheet::store
+               |          |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.34%--litchi_xlsx::raw::worksheet::parse
+               |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     |
+               |                      --0.31%--litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                                0xffffffffffffffff
+               |
+               |--0.39%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          |
+               |           --0.37%--litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                     0xffffffffffffffff
+               |
+               |--0.39%--litchi_xlsx::raw::compact::changed
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          0xffffffffffffffff
+               |
+               |--0.39%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::model::Worksheet::store
+               |          |
+               |           --0.37%--litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                     0xffffffffffffffff
+               |
+               |--0.34%--litchi_xlsx::raw::web::read
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          0xffffffffffffffff
+               |
+                --0.31%--litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+                          litchi_xlsx::raw::worksheet::edit::package::rewrite
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          0xffffffffffffffff
+
+     2.56%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+            |
+            ---litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+               litchi_xlsx::raw::worksheet::edit::package::rewrite
+               litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               0xffffffffffffffff
+
+     2.54%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+            |
+            ---litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               litchi_xlsx::raw::worksheet::parse
+               litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |
+                --2.51%--litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          0xffffffffffffffff
+
+     2.37%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+            |
+            ---litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               litchi_xlsx::raw::worksheet::parse
+               litchi_xlsx::workbook::model::Worksheet::store
+               |
+                --2.28%--litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          0xffffffffffffffff
+
+     2.09%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::events::attributes::IterState::next
+            |
+            ---quick_xml::events::attributes::IterState::next
+               |
+               |--0.79%--<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+               |          litchi_ooxml_common::xml::unqualified_attribute_value
+               |          |
+               |          |--0.28%--litchi_xlsx::raw::worksheet::validation::optional_u32
+               |          |          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               |          |          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |          |
+               |           --0.28%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               |                     litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |
+               |--0.71%--quick_xml::name::NamespaceResolver::push
+               |          |
+               |           --0.65%--_ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17h98329489722ce97dE.llvm.11651465367898063144
+               |
+                --0.39%--<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+
+     2.08%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::validation::optional_u32
+            |
+            ---litchi_xlsx::raw::worksheet::validation::optional_u32
+               litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |
+               |--1.04%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          |
+               |           --1.01%--0xffffffffffffffff
+               |
+                --1.01%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+                          litchi_xlsx::raw::worksheet::parse
+                          litchi_xlsx::workbook::model::Worksheet::store
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          0xffffffffffffffff
+
+     1.75%  litchi-perf-aft  libc.so.6                                     [.] cfree@GLIBC_2.2.5
+            |
+             --1.72%--__GI___libc_free (inlined)
+                       |
+                       |--0.31%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+                       |
+                        --0.28%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+                                  litchi_xlsx::raw::worksheet::parse
+                                  litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                                  litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                                  0xffffffffffffffff
+
+     1.72%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+               memchr::arch::x86_64::avx2::memchr::Three::find_raw
+               memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+               |
+                --1.69%--quick_xml::reader::Reader<R>::read_event_impl
+                          |
+                          |--0.51%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+                          |          |
+                          |          |--0.25%--litchi_xlsx::raw::worksheet::parse
+                          |          |          litchi_xlsx::workbook::model::Worksheet::store
+                          |          |
+                          |           --0.25%--litchi_xlsx::raw::worksheet::parse
+                          |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          |                     0xffffffffffffffff
+                          |
+                           --0.37%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+                                     litchi_xlsx::raw::worksheet::parse
+                                     litchi_xlsx::workbook::model::Worksheet::store
+                                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                                     0xffffffffffffffff
+
+     1.72%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::events::attributes::IterState::check_for_duplicates
+            |
+            ---quick_xml::events::attributes::IterState::check_for_duplicates
+               quick_xml::events::attributes::IterState::next
+               |
+               |--0.85%--<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+               |          |
+               |           --0.79%--litchi_ooxml_common::xml::unqualified_attribute_value
+               |                     |
+               |                      --0.42%--litchi_xlsx::raw::worksheet::validation::optional_u32
+               |                                litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               |                                litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |
+                --0.53%--<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+                          |
+                           --0.31%--litchi_xlsx::raw::compact::write_start
+                                     litchi_xlsx::raw::compact::changed
+                                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                                     0xffffffffffffffff
+
+     1.61%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+               memchr::arch::x86_64::avx2::memchr::Two::find_raw
+               memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+               quick_xml::reader::Reader<R>::read_event_impl
+               |
+               |--0.40%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::model::Worksheet::store
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          0xffffffffffffffff
+               |
+               |--0.34%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+               |
+               |--0.31%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          0xffffffffffffffff
+               |
+                --0.25%--litchi_xlsx::raw::web::read
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          0xffffffffffffffff
+
+     1.61%  litchi-perf-aft  libc.so.6                                     [.] _int_malloc
+            |
+             --1.58%--_int_malloc
+                       |
+                       |--1.30%--__GI___libc_malloc (inlined)
+                       |          |
+                       |          |--0.42%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h5315466ae9514398E.llvm.8265692055381676896
+                       |          |          |
+                       |          |           --0.39%--alloc::raw_vec::RawVec<T,A>::grow_one
+                       |          |                     litchi_xlsx::raw::worksheet::edit::codec::wire::tag
+                       |          |                     litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell
+                       |          |                     litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+                       |          |                     litchi_xlsx::raw::worksheet::edit::package::rewrite
+                       |          |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                       |          |                     0xffffffffffffffff
+                       |          |
+                       |          |--0.31%--_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+                       |          |          _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+                       |          |          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::push_text
+                       |          |
+                       |           --0.25%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+                       |                     alloc::raw_vec::RawVec<T,A>::grow_one
+                       |                     quick_xml::events::attributes::IterState::check_for_duplicates
+                       |                     quick_xml::events::attributes::IterState::next
+                       |
+                        --0.25%--_int_realloc
+                                  __GI___libc_realloc (inlined)
+
+     1.55%  litchi-perf-aft  libc.so.6                                     [.] unlink_chunk.isra.0
+            |
+            ---unlink_chunk (inlined)
+               |
+               |--1.19%--malloc_consolidate
+               |          |
+               |           --0.96%--_int_malloc
+               |                     |
+               |                      --0.93%--__GI___libc_malloc (inlined)
+               |                                |
+               |                                 --0.90%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h5315466ae9514398E.llvm.8265692055381676896
+               |                                           litchi_xlsx::raw::compact::changed
+               |                                           litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                                           litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                                           0xffffffffffffffff
+               |
+                --0.37%--_int_malloc
+                          |
+                           --0.31%--__GI___libc_malloc (inlined)
+
+     1.50%  litchi-perf-aft  libc.so.6                                     [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memcpy_avx512_unaligned_erms (inlined)
+
+     1.44%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+            |
+            ---litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |
+               |--0.79%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |          0xffffffffffffffff
+               |
+                --0.59%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+                          litchi_xlsx::raw::worksheet::parse
+                          litchi_xlsx::workbook::model::Worksheet::store
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          0xffffffffffffffff
+
+     1.33%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::reader::state::ReaderState::emit_start
+            |
+            ---quick_xml::reader::state::ReaderState::emit_start
+               quick_xml::reader::Reader<R>::read_event_impl
+               |
+                --0.56%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+                          |
+                          |--0.28%--litchi_xlsx::raw::worksheet::parse
+                          |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          |          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          |          0xffffffffffffffff
+                          |
+                           --0.28%--litchi_xlsx::raw::worksheet::parse
+                                     litchi_xlsx::workbook::model::Worksheet::store
+                                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                                     0xffffffffffffffff
+
+     1.27%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+            |
+            ---quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+               quick_xml::events::attributes::Attribute::decoded_and_normalized_value
+               |
+               |--0.85%--litchi_ooxml_common::xml::unqualified_attribute_value
+               |          |
+               |          |--0.34%--litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address
+               |          |          litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell
+               |          |          litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+               |          |          litchi_xlsx::raw::worksheet::edit::package::rewrite
+               |          |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.34%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               |                     litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |
+                --0.42%--litchi_xlsx::raw::worksheet::edit::codec::wire::tag
+                          |
+                           --0.39%--litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell
+                                     litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+                                     litchi_xlsx::raw::worksheet::edit::package::rewrite
+                                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                                     0xffffffffffffffff
+
+     1.21%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::web::read
+            |
+            ---litchi_xlsx::raw::web::read
+               litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |
+                --1.18%--litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          0xffffffffffffffff
+
+     1.21%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+            |
+            ---memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+               quick_xml::reader::Reader<R>::read_event_impl
+               |
+               |--0.34%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+               |          |
+               |           --0.31%--litchi_xlsx::raw::worksheet::parse
+               |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               |                     0xffffffffffffffff
+               |
+                --0.28%--litchi_xlsx::raw::web::read
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          0xffffffffffffffff
+
+     1.10%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::compact::changed
+            |
+            ---litchi_xlsx::raw::compact::changed
+               litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               0xffffffffffffffff
+
+     1.07%  litchi-perf-aft  libc.so.6                                     [.] __memmove_avx512_unaligned
+            |
+            ---__memcpy_avx512_unaligned (inlined)
+
+     1.04%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] memchr::arch::x86_64::avx2::memchr::One::find_raw
+            |
+            ---memchr::arch::x86_64::avx2::memchr::One::find_raw
+               memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+               |
+               |--0.59%--quick_xml::name::QName::local_name
+               |          |
+               |           --0.42%--litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+               |                     litchi_xlsx::raw::worksheet::edit::package::rewrite
+               |                     litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |                     0xffffffffffffffff
+               |
+                --0.31%--quick_xml::name::NamespaceResolver::resolve_event
+
+     0.99%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] zlib_rs::inflate::inflate_fast_help_avx2
+            |
+            ---zlib_rs::inflate::inflate_fast_help_avx2
+               zlib_rs::inflate::inflate
+               zlib_rs::stable::Inflate::decompress
+               <flate2::mem::Decompress as flate2::zio::Ops>::run
+               flate2::zio::read
+               <soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+               std::io::default_read_to_end
+               soapberry_zip::office::ArchiveReader::read
+               soapberry_zip::office::LazyArchiveReader::read_shared
+               soapberry_zip::office::LazyArchiveReader::read
+               |
+                --0.93%--<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+                          litchi_opc::pkgreader::PackageReader::load_parts_lazy
+                          litchi_opc::pkgreader::PackageReader::from_phys_reader
+                          0xffffffffffffffff
+
+     0.93%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::reader::state::ReaderState::emit_end
+            |
+            ---quick_xml::reader::state::ReaderState::emit_end
+               quick_xml::reader::Reader<R>::read_event_impl
+               |
+                --0.28%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+                          litchi_xlsx::raw::worksheet::parse
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          0xffffffffffffffff
+
+     0.85%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::name::NamespaceResolver::resolve_prefix
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_prefix
+               |
+                --0.76%--quick_xml::name::NamespaceResolver::resolve_event
+
+     0.79%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::compact::write_start
+            |
+            ---litchi_xlsx::raw::compact::write_start
+               litchi_xlsx::raw::compact::changed
+               litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               0xffffffffffffffff
+
+     0.76%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+            |
+            ---<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+               litchi_ooxml_common::xml::unqualified_attribute_value
+               |
+               |--0.37%--litchi_xlsx::raw::worksheet::validation::optional_u32
+               |          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               |          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |
+                --0.28%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+                          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+
+     0.76%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::events::Event::into_owned
+            |
+            ---quick_xml::events::Event::into_owned
+               |
+                --0.31%--_ZN11litchi_xlsx3raw9worksheet5x14ac13capture_inner17h49033b1891470531E.llvm.14492694951104976793
+
+     0.65%  litchi-perf-aft  libc.so.6                                     [.] malloc_consolidate
+            |
+            ---malloc_consolidate
+               |
+                --0.48%--_int_malloc
+                          |
+                           --0.34%--__GI___libc_malloc (inlined)
+                                     _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h5315466ae9514398E.llvm.8265692055381676896
+                                     |
+                                      --0.28%--litchi_xlsx::raw::compact::changed
+                                                litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                                                litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                                                0xffffffffffffffff
+
+     0.59%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish
+            |
+            ---litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish
+               |
+               |--0.34%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::model::Worksheet::store
+               |          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               |          0xffffffffffffffff
+               |
+                --0.25%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+                          litchi_xlsx::raw::worksheet::parse
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+                          0xffffffffffffffff
+
+     0.51%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::name::QName::local_name
+            |
+            ---quick_xml::name::QName::local_name
+
+     0.48%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] zlib_rs::inflate::inftrees::inflate_table
+            |
+            ---zlib_rs::inflate::inftrees::inflate_table
+               zlib_rs::inflate::inflate
+               zlib_rs::stable::Inflate::decompress
+               <flate2::mem::Decompress as flate2::zio::Ops>::run
+               flate2::zio::read
+               <soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+               std::io::default_read_to_end
+               soapberry_zip::office::ArchiveReader::read
+               soapberry_zip::office::LazyArchiveReader::read_shared
+               soapberry_zip::office::LazyArchiveReader::read
+               |
+                --0.31%--<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+                          litchi_opc::pkgreader::PackageReader::load_parts_lazy
+                          litchi_opc::pkgreader::PackageReader::from_phys_reader
+                          0xffffffffffffffff
+
+     0.48%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell
+            |
+            ---litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell
+               litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+               litchi_xlsx::raw::worksheet::edit::package::rewrite
+               litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               0xffffffffffffffff
+
+     0.45%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+            |
+            ---memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+
+     0.45%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+            |
+            ---memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+               quick_xml::reader::Reader<R>::read_event_impl
+
+     0.42%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] _RNvCsfLfy6EI15iL_7___rustc35___rust_no_alloc_shim_is_unstable_v2
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc35___rust_no_alloc_shim_is_unstable_v2
+
+     0.42%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+
+     0.39%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] _RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8
+            |
+            ---_RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8
+
+     0.37%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] _RNvCsfLfy6EI15iL_7___rustc12___rust_alloc
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc12___rust_alloc
+
+     0.37%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+            |
+            ---_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+               alloc::raw_vec::RawVec<T,A>::grow_one
+               quick_xml::events::attributes::IterState::check_for_duplicates
+               quick_xml::events::attributes::IterState::next
+               |
+                --0.25%--<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+                          litchi_ooxml_common::xml::unqualified_attribute_value
+
+     0.37%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] _RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc
+
+     0.37%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address
+            |
+            ---litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address
+               litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell
+               litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+               litchi_xlsx::raw::worksheet::edit::package::rewrite
+               litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               0xffffffffffffffff
+
+     0.34%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::name::NamespaceResolver::push
+            |
+            ---quick_xml::name::NamespaceResolver::push
+               _ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17h98329489722ce97dE.llvm.11651465367898063144
+
+     0.34%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] alloc::vec::Vec<T,A>::push_mut
+            |
+            ---alloc::vec::Vec<T,A>::push_mut
+
+     0.31%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::edit::codec::wire::tag
+            |
+            ---litchi_xlsx::raw::worksheet::edit::codec::wire::tag
+               |
+                --0.28%--litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell
+                          litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan
+                          litchi_xlsx::raw::worksheet::edit::package::rewrite
+                          litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+                          0xffffffffffffffff
+
+     0.31%  litchi-perf-aft  libc.so.6                                     [.] realloc
+            |
+             --0.25%--__GI___libc_realloc (inlined)
+
+     0.31%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::semantic::materialize
+            |
+            ---litchi_xlsx::raw::worksheet::semantic::materialize
+
+     0.28%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] _RNvCsfLfy6EI15iL_7___rustc13___rdl_dealloc
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc13___rdl_dealloc
+
+     0.28%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Three::find_raw
+               memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+               quick_xml::reader::Reader<R>::read_event_impl
+
+     0.28%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::web::resolved_name
+            |
+            ---litchi_xlsx::raw::web::resolved_name
+               litchi_xlsx::raw::web::read
+               litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+               litchi_perf_baseline::run_xlsx_one_cell_commit_first_read
+               0xffffffffffffffff
+
+     0.28%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_xlsx::raw::worksheet::validation::parse_a1
+            |
+            ---litchi_xlsx::raw::worksheet::validation::parse_a1
+
+     0.25%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] zlib_rs::inflate::inflate
+            |
+            ---zlib_rs::inflate::inflate
+               zlib_rs::stable::Inflate::decompress
+               <flate2::mem::Decompress as flate2::zio::Ops>::run
+               flate2::zio::read
+               <soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+               std::io::default_read_to_end
+               soapberry_zip::office::ArchiveReader::read
+               soapberry_zip::office::LazyArchiveReader::read_shared
+               soapberry_zip::office::LazyArchiveReader::read
+
+     0.25%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] litchi_ooxml_common::mce::codec::process_markup_compatibility
+            |
+            ---litchi_ooxml_common::mce::codec::process_markup_compatibility
+
+     0.25%  litchi-perf-aft  litchi-perf-after-xlsx-store-handoff-bounded  [.] quick_xml::name::NamespaceResolver::set_level
+            |
+            ---quick_xml::name::NamespaceResolver::set_level
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

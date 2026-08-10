@@ -118,6 +118,13 @@ pub(super) struct SheetData {
     pub(super) relationship_id: String,
 }
 
+/// A commit-validated worksheet store tied to the exact published part bytes.
+pub(super) struct ValidatedWorksheetStore {
+    pub(super) uri: PackURI,
+    pub(super) content: Arc<Vec<u8>>,
+    pub(super) store: Store,
+}
+
 #[derive(Debug)]
 pub(crate) struct Inner {
     pub(super) package: OpcPackage,
@@ -429,6 +436,53 @@ impl Workbook {
             #[cfg(feature = "encryption")]
             encryption: source.map_or_else(PackageEncryption::plain, |source| source.encryption),
         })
+    }
+
+    /// Publish commit-time worksheet validation into an otherwise-cold target
+    /// snapshot only when every identity boundary remains exact.
+    pub(super) fn adopt_validated_worksheet_stores(
+        &self,
+        source: &Self,
+        validated: Vec<ValidatedWorksheetStore>,
+    ) -> Result<()> {
+        if !Arc::ptr_eq(&self.inner.style_lineage, &source.inner.style_lineage)
+            || !Arc::ptr_eq(
+                &self.inner.shared_string_lineage,
+                &source.inner.shared_string_lineage,
+            )
+        {
+            return Ok(());
+        }
+
+        for validated in validated {
+            let source_sheet = source
+                .inner
+                .sheets
+                .iter()
+                .find(|sheet| sheet.part_uri == validated.uri);
+            let target_sheet = self
+                .inner
+                .sheets
+                .iter()
+                .find(|sheet| sheet.part_uri == validated.uri);
+            let (Some(source_sheet), Some(target_sheet)) = (source_sheet, target_sheet) else {
+                continue;
+            };
+            if source_sheet.kind != WorksheetKind::Worksheet
+                || target_sheet.kind != WorksheetKind::Worksheet
+            {
+                continue;
+            }
+            let published = self.inner.package.get_part(&validated.uri)?.blob_arc();
+            if !Arc::ptr_eq(&published, &validated.content) {
+                continue;
+            }
+            target_sheet
+                .cells
+                .set(validated.store)
+                .map_err(|_| invalid("validated worksheet cache was already initialized"))?;
+        }
+        Ok(())
     }
 
     /// Workbook flavor derived from package content, never its filename.
