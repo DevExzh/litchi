@@ -220,11 +220,12 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **88
+The stage-1 records above are retained unchanged. The current harness has **106
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, 16 opt-in
 DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, and 21 opt-in
-ODT/ODS/ODP semantic cases. It remains an incomplete program and CRUD matrix.
+ODT/ODS/ODP semantic cases, and 18 opt-in native DOC/XLS/PPT semantic cases. It
+remains an incomplete program and CRUD matrix.
 
 - The XLSX row-start index is accepted for the narrow-range case: ABBA p50
   geometric mean **-80.499%**, mean geometric mean **-79.962%**; full scan
@@ -296,6 +297,14 @@ ODT/ODS/ODP semantic cases. It remains an incomplete program and CRUD matrix.
   allocations and one package copy disappear per snapshot, while open and
   changed edit-save guardrails remain within 3% and peak heap/RSS stay flat.
   See [`0014`](changes/0014-odt-shared-snapshot-bytes.md).
+- The same deterministic native DOC/XLS/PPT writer artifacts now have public
+  open/list/one/full/no-op/one-edit semantic baselines. On the large shapes,
+  one-edit/save p50 is 1.416 ms for DOC, 1.722 ms for XLS, and 0.357 ms for
+  PPT; XLS open is 1.383 ms. Heaptrack reaches complete workbook reopen and
+  per-cell map construction under XLS commit, making it the next measured
+  native candidate. See
+  [`0015`](changes/0015-native-ole2-semantic-baseline.md) and the
+  [`raw report`](results/ole2-semantic-baseline-a57506d23-2026-08-11.json).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

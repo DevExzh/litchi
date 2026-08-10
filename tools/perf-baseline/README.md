@@ -1,9 +1,9 @@
-# OPC, CFB, legacy-writer, OOXML, RTF, and ODF performance baseline
+# OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
-public-API XLSX snapshot/edit/save flows, and opt-in DOCX/PPTX/RTF/ODT/ODS/ODP
-semantic flows. It creates every corpus in memory; it also exercises
+public-API XLSX snapshot/edit/save flows, and opt-in DOC/XLS/PPT,
+DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog and worksheet reads over positional I/O. It does not
 depend on untracked office files, network state, or randomness. ODP builder
 timestamps are replaced with fixed metadata before measurement. The JSON
@@ -14,17 +14,17 @@ packaged output.
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
 
-The DOCX/PPTX/RTF/ODF semantic matrices are deliberately opt-in. They measure
-only current public APIs and therefore do not change the default 36 cases / 198
-records.
+The native OLE2, DOCX/PPTX, RTF, and ODF semantic matrices are deliberately
+opt-in. They measure only current public APIs and therefore do not change the
+default 36 cases / 198 records.
 
 ## Run
 
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
-range cases, two execution-scaling cases, 16 DOCX/PPTX semantic cases, seven
-RTF semantic cases, and 21 ODF semantic cases are opt-in, for 88 selectable
-cases in total:
+range cases, two execution-scaling cases, 18 native OLE2 semantic cases, 16
+DOCX/PPTX semantic cases, seven RTF semantic cases, and 21 ODF semantic cases
+are opt-in, for 106 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -54,6 +54,16 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 15 \
   --case doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to \
   --writer-shape tiny,large,payload-heavy --json target/perf/legacy-writers.json
+```
+
+Run the complete native DOC/XLS/PPT semantic matrix over the same deterministic
+tiny and large writer artifacts (36 records):
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 --writer-shape tiny,large \
+  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_semantic_full_text,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
+  --json target/perf/ole2-semantic-baseline.json
 ```
 
 For the dense-wide XLSX range traversal that isolates selected-row scanning:
@@ -332,6 +342,39 @@ remain distinguishable.
 - `ppt_fresh_write_to`: construct a new `litchi_ppt::writer::Writer`, add the
   selected slides and text boxes through its public API, and package it with
   public `write_to`.
+- `doc_semantic_open`: open the generated DOC container and its document model
+  through `litchi_doc::Package`.
+- `doc_semantic_list_paragraphs` / `doc_semantic_one_paragraph` /
+  `doc_semantic_full_text`: time ordinary document paragraph enumeration,
+  middle-paragraph selection, or complete text extraction. The public
+  one-paragraph path necessarily materializes the paragraph collection.
+- `doc_semantic_noop_edit_save` / `doc_semantic_one_edit_save`: start from an
+  already-open exact-source `body_text::Snapshot`, publish zero or one middle
+  paragraph replacement, and materialize owned bytes. Exact no-op bytes,
+  deterministic changed bytes, public reopen, forward patch application, and
+  inverse restoration are checked outside timing.
+- `xls_semantic_open`: open the generated native workbook through the ordinary
+  `litchi_xls::Workbook` reader.
+- `xls_semantic_list_worksheets` / `xls_semantic_one_cell` /
+  `xls_semantic_full_cell_scan`: enumerate workbook tabs, resolve one middle
+  numeric cell, or traverse every stored cell through the ordinary public
+  worksheet API.
+- `xls_semantic_noop_edit_save` / `xls_semantic_one_edit_save`: start from an
+  already-open exact-source `cell_values::Snapshot`, publish zero or one
+  middle-cell replacement, and materialize owned bytes with diagnostics,
+  exact patch replay, inverse, and full-grid reopen checks outside timing.
+- `ppt_semantic_open`: open the generated native presentation and its semantic
+  presentation model through `litchi_ppt::Package`.
+- `ppt_semantic_list_slides` / `ppt_semantic_one_shape_text` /
+  `ppt_semantic_full_text`: enumerate slides, resolve one middle textbox, or
+  extract all presentation text. The selected-shape path necessarily builds
+  the public slide collection.
+- `ppt_semantic_noop_edit_save` / `ppt_semantic_one_edit_save`: start from an
+  already-open exact-source `slide_order::Snapshot`, publish zero or one
+  middle-shape text replacement, and materialize owned bytes. The complete
+  patch and exact inverse are verified before reopening all slides and shapes.
+  Native semantic cases use only `tiny` and `large`; `payload-heavy` remains a
+  writer-throughput shape rather than a semantic-edit shape.
 - `xlsx_open_owned`: move a prepared owned XLSX allocation into public
   `Workbook::from_bytes`; the input clone happens before timing.
 - `xlsx_list_sheets`: enumerate sheet names after an already-open workbook,

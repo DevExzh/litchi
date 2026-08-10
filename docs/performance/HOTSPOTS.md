@@ -191,9 +191,36 @@ Confirmed source facts:
 - `HashMap`/`HashSet` iteration in fresh CFB directory construction requires a
   separate determinism audit; it is not treated as a performance result.
 
-The substrate harness still does not measure semantic legacy DOC/XLS/PPT
-open/edit/save. Any additional owned-stream experiment must start with those
-end-to-end baselines; the previous spare-capacity DOC move remains rejected.
+The harness now measures native DOC/XLS/PPT open/list/one/full/no-op/one-edit
+flows over deterministic writer artifacts. Large one-edit/save p50 is 1.722 ms
+for XLS, 1.416 ms for DOC, and 0.357 ms for PPT. Heaptrack reaches complete
+workbook reopen and per-cell `BTreeMap` insertion under XLS commit; that is the
+next native production candidate. The previous spare-capacity DOC move remains
+rejected and must remain an independent writer guardrail.
+
+## Native OLE2 semantic path
+
+The native semantic matrix separates ordinary reader facades from exact-source
+transaction owners. Open is timed explicitly; list/one/full operations start
+from opened ordinary models; no-op and one-edit publication start from opened
+DOC body-text, XLS cell-value, or PPT slide-order snapshots and include owned
+output materialization. Complete semantic verification and patch/inverse
+checks stay outside timing.
+
+Measured large-corpus priorities:
+
+1. XLS one-cell publication (1.722 ms p50) rebuilds the Workbook stream,
+   reconstructs CFB, fully reopens ordinary workbook semantics, then reopens
+   the exact cell-value owner. Profiled allocation sites include the ordinary
+   workbook cell `BTreeMap` and cell-value entry-vector growth.
+2. DOC one-paragraph publication (1.416 ms p50) retains complete revision,
+   style/property and document readback; a reuse proposal needs more precise
+   per-stage attribution before any implementation.
+3. PPT one-shape publication (0.357 ms p50) is materially smaller and is not
+   the first target from this matrix.
+
+See [`change 0015`](changes/0015-native-ole2-semantic-baseline.md) and its
+[`raw JSON`](results/ole2-semantic-baseline-a57506d23-2026-08-11.json).
 
 ## RTF path
 
@@ -244,7 +271,7 @@ pattern elsewhere.
 | 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet. | Broader source-backed selectors, edits and real workbook matrices. |
 | 9 | Confirmed structurally: small XLSX edits scan/rebuild/reparse the complete touched sheet and repackage all Parts. | First/middle/last cell, 1% updates, and commit-versus-save separation. |
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
-| 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers, and child lookup descends the validated tree by cached exact keys. | Add deep-directory, MiniFAT-heavy, concurrent-read, and real DOC/XLS/PPT scenarios beyond the measured synthetic wide-root and writer corpora. |
+| 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers, child lookup descends the validated tree by cached exact keys, and native DOC/XLS/PPT semantic baselines now exist. | Profile and optimize XLS commit/reopen first; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
 | 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable. Measured for ODT existing-document snapshots: one package clone and two allocations per handoff were removable. Both are implemented without changing readback or source lineage. | Broader ODF source-backed read and unchanged-member publication profiles. |
 | 14 | Confirmed for DOCX direct-body batches: repeated full XML rebuild/parse work was removable while retaining ordinary durable operations and complete readback. | Real-producer/extension/security corpora and broader structural/bulk edit semantics. |
@@ -268,7 +295,7 @@ The order below is provisional until baseline measurements are recorded.
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
 | 11 | Extend ODF beyond the accepted ODS snapshot reuse: source-backed selectors and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Public semantic baselines now exist; exact no-op and full readback must remain. |
 | 12 | Add native RTF public semantic cases and remove measured full-text/edit work. | RTF open/list/full-text/stream-save/no-op/one-edit. | Low-medium | Implemented; cached text and native forward-only output contracts remain. See change 0013. |
-| 13 | Add legacy DOC/XLS/PPT semantic open/edit/save baselines before further CFB ownership experiments. | OLE2 document CRUD rather than substrate-only insertion. | Medium | Positional CFB exists; the previous DOC move regression requires end-to-end guardrails. |
+| 13 | Optimize the measured native XLS one-cell commit/reopen path. | OLE2 spreadsheet edit/publication rather than substrate-only insertion. | Medium-high | Baseline implemented in change 0015; preserve exact-source patch/inverse, complete BIFF/CFB validation, semantic readback, and an independent open guard. |
 | 14 | Share existing ODT transaction bytes when a validated document creates a snapshot. | ODT no-op and changed edit/save. | Low-medium | Implemented with private `Arc` identity proof; no-op p50 -18.51% large, guardrails within 3%. See change 0014. |
 | 15 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
 
@@ -288,5 +315,5 @@ changes. Remaining gaps are:
   counters and no claim is generalized from the one measured save workload.
 - Contention evidence beyond the committed explicit-context scaling curves.
 - Format-semantic preservation evidence beyond the generated
-  DOCX/PPTX/RTF/ODT/ODS/ODP slices and native targeted-OPC raw passthrough
-  corpus.
+  DOC/XLS/PPT/DOCX/PPTX/RTF/ODT/ODS/ODP slices and native targeted-OPC raw
+  passthrough corpus.

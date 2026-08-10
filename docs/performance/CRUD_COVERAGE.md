@@ -2,23 +2,23 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 88 selectable
+This is a coverage map, not a completion claim. It compares the 106 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
 | Required scenario | Current status | Measured coverage |
 |---|---|---|
-| Open and identify format | Partial | ZIP/OPC/CFB plus owned RTF/XLSX and source-backed XLSX open; no smart-detection handoff case |
-| List semantic children without payloads | Partial | XLSX/ODS sheets, RTF/DOCX/ODT paragraphs and PPTX/ODP slides; DOCX section listing remains missing |
-| Query one property or named object | Partial | XLSX/ODS cells, one RTF/DOCX/ODT paragraph and one PPTX/ODP slide; broader properties/images remain missing |
-| Read one cell/paragraph/slide/image/Part | Partial | XLSX/ODS cells, RTF/DOCX/ODT paragraphs, PPTX/ODP slides and generic OPC Part; semantic image selection remains missing |
-| Scan all cells/paragraphs/slides | Covered for generated OOXML/RTF/ODF text corpora | XLSX/ODS cell scans, RTF/DOCX/ODT paragraph enumeration and PPTX/ODP slide/text enumeration |
-| Full text extraction | Covered for generated RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; real-producer/media-heavy corpora remain missing |
+| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; no smart-detection handoff case |
+| List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; DOCX section listing remains missing |
+| Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX/ODT paragraph, one PPT shape and one PPTX/ODP slide; broader properties/images remain missing |
+| Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX/ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part; semantic image selection remains missing |
+| Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration |
+| Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; real-producer/media-heavy corpora remain missing |
 | Semantic conversion to sequential sink | Missing | Package serialization exists; semantic export/conversion does not |
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
-| Exact no-op edit and commit | Covered for generated RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen |
+| Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; signed/extension corpora remain missing |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch and reopens the package |
 | Bulk update matching objects | Missing | No semantic end-to-end case |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
@@ -41,8 +41,9 @@ semantic conversion remain.
 
 ## Highest-return next cases
 
-1. Add semantic DOC/XLS/PPT open/edit/save baselines before any further CFB
-   owned-stream experiment; retain the rejected DOC move as a guardrail.
+1. Measure a source-audited XLS commit/reopen optimization against the new
+   native baseline; preserve exact-source patch/inverse and the rejected DOC
+   move as independent guardrails.
 2. Extend native RTF coverage to formatting/media, compressed and legacy-code-
    page input, malformed/security cases, real producers and broad edits.
 3. Separate logical authoring/append time from final serialization and reopen
@@ -67,6 +68,11 @@ snapshots: change 0014 removes one archive copy and two allocations per
 snapshot while retaining the exact no-op, limits, envelope, patch, and readback
 contracts. Direct byte ingress and changed publication remain covered by item
 10 rather than being implied complete.
+
+The former native DOC/XLS/PPT baseline item is complete in change 0015. It
+provides 36 release records and ranks XLS one-cell publication first; it does
+not claim broad native-format CRUD, real-producer, security, or preservation
+coverage.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

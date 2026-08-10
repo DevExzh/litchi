@@ -232,6 +232,30 @@ impl WriterShape {
             Self::PayloadHeavy => "payload-heavy",
         }
     }
+
+    const fn doc_paragraph_count(self) -> usize {
+        match self {
+            Self::Tiny => 3,
+            Self::Large => 512,
+            Self::PayloadHeavy => 128,
+        }
+    }
+
+    const fn xls_dimensions(self) -> Option<(usize, usize, usize)> {
+        match self {
+            Self::Tiny => Some((1, 4, 4)),
+            Self::Large => Some((4, 128, 16)),
+            Self::PayloadHeavy => None,
+        }
+    }
+
+    const fn ppt_dimensions(self) -> (usize, usize) {
+        match self {
+            Self::Tiny => (1, 2),
+            Self::Large => (12, 12),
+            Self::PayloadHeavy => (16, 8),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -274,6 +298,24 @@ enum Case {
     DocFreshWriteTo,
     XlsFreshWriteTo,
     PptFreshWriteTo,
+    DocSemanticOpen,
+    DocSemanticListParagraphs,
+    DocSemanticOneParagraph,
+    DocSemanticFullText,
+    DocSemanticNoopEditSave,
+    DocSemanticOneEditSave,
+    XlsSemanticOpen,
+    XlsSemanticListWorksheets,
+    XlsSemanticOneCell,
+    XlsSemanticFullCellScan,
+    XlsSemanticNoopEditSave,
+    XlsSemanticOneEditSave,
+    PptSemanticOpen,
+    PptSemanticListSlides,
+    PptSemanticOneShapeText,
+    PptSemanticFullText,
+    PptSemanticNoopEditSave,
+    PptSemanticOneEditSave,
     XlsxOpenOwned,
     XlsxListSheets,
     XlsxFirstCell,
@@ -406,6 +448,24 @@ impl Case {
             Self::DocFreshWriteTo => "doc_fresh_write_to",
             Self::XlsFreshWriteTo => "xls_fresh_write_to",
             Self::PptFreshWriteTo => "ppt_fresh_write_to",
+            Self::DocSemanticOpen => "doc_semantic_open",
+            Self::DocSemanticListParagraphs => "doc_semantic_list_paragraphs",
+            Self::DocSemanticOneParagraph => "doc_semantic_one_paragraph",
+            Self::DocSemanticFullText => "doc_semantic_full_text",
+            Self::DocSemanticNoopEditSave => "doc_semantic_noop_edit_save",
+            Self::DocSemanticOneEditSave => "doc_semantic_one_edit_save",
+            Self::XlsSemanticOpen => "xls_semantic_open",
+            Self::XlsSemanticListWorksheets => "xls_semantic_list_worksheets",
+            Self::XlsSemanticOneCell => "xls_semantic_one_cell",
+            Self::XlsSemanticFullCellScan => "xls_semantic_full_cell_scan",
+            Self::XlsSemanticNoopEditSave => "xls_semantic_noop_edit_save",
+            Self::XlsSemanticOneEditSave => "xls_semantic_one_edit_save",
+            Self::PptSemanticOpen => "ppt_semantic_open",
+            Self::PptSemanticListSlides => "ppt_semantic_list_slides",
+            Self::PptSemanticOneShapeText => "ppt_semantic_one_shape_text",
+            Self::PptSemanticFullText => "ppt_semantic_full_text",
+            Self::PptSemanticNoopEditSave => "ppt_semantic_noop_edit_save",
+            Self::PptSemanticOneEditSave => "ppt_semantic_one_edit_save",
             Self::XlsxOpenOwned => "xlsx_open_owned",
             Self::XlsxListSheets => "xlsx_list_sheets",
             Self::XlsxFirstCell => "xlsx_first_cell",
@@ -516,6 +576,42 @@ impl Case {
         matches!(
             self,
             Self::DocFreshWriteTo | Self::XlsFreshWriteTo | Self::PptFreshWriteTo
+        )
+    }
+
+    const fn uses_semantic_doc(self) -> bool {
+        matches!(
+            self,
+            Self::DocSemanticOpen
+                | Self::DocSemanticListParagraphs
+                | Self::DocSemanticOneParagraph
+                | Self::DocSemanticFullText
+                | Self::DocSemanticNoopEditSave
+                | Self::DocSemanticOneEditSave
+        )
+    }
+
+    const fn uses_semantic_xls(self) -> bool {
+        matches!(
+            self,
+            Self::XlsSemanticOpen
+                | Self::XlsSemanticListWorksheets
+                | Self::XlsSemanticOneCell
+                | Self::XlsSemanticFullCellScan
+                | Self::XlsSemanticNoopEditSave
+                | Self::XlsSemanticOneEditSave
+        )
+    }
+
+    const fn uses_semantic_ppt(self) -> bool {
+        matches!(
+            self,
+            Self::PptSemanticOpen
+                | Self::PptSemanticListSlides
+                | Self::PptSemanticOneShapeText
+                | Self::PptSemanticFullText
+                | Self::PptSemanticNoopEditSave
+                | Self::PptSemanticOneEditSave
         )
     }
 
@@ -1446,6 +1542,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .transpose()?;
             for case in options.cases.iter().filter(|case| {
                 !case.is_fresh_writer()
+                    && !case.uses_semantic_doc()
+                    && !case.uses_semantic_xls()
+                    && !case.uses_semantic_ppt()
                     && !case.uses_xlsx()
                     && !case.uses_semantic_rtf()
                     && !case.uses_semantic_docx()
@@ -1496,6 +1595,49 @@ fn main() -> Result<(), Box<dyn Error>> {
                 options.samples,
                 options.range_simulation,
             )?);
+        }
+    }
+
+    for shape in options
+        .writer_shapes
+        .iter()
+        .filter(|shape| **shape != WriterShape::PayloadHeavy)
+    {
+        if options.cases.iter().any(|case| case.uses_semantic_doc()) {
+            let corpus = build_writer_corpus(Case::DocFreshWriteTo, *shape)?;
+            for case in options.cases.iter().filter(|case| case.uses_semantic_doc()) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+        if options.cases.iter().any(|case| case.uses_semantic_xls()) {
+            let corpus = build_writer_corpus(Case::XlsFreshWriteTo, *shape)?;
+            for case in options.cases.iter().filter(|case| case.uses_semantic_xls()) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+        if options.cases.iter().any(|case| case.uses_semantic_ppt()) {
+            let corpus = build_writer_corpus(Case::PptFreshWriteTo, *shape)?;
+            for case in options.cases.iter().filter(|case| case.uses_semantic_ppt()) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
         }
     }
 
@@ -1847,6 +1989,24 @@ fn parse_case(value: &str) -> Option<Case> {
         "doc_fresh_write_to" => Some(Case::DocFreshWriteTo),
         "xls_fresh_write_to" => Some(Case::XlsFreshWriteTo),
         "ppt_fresh_write_to" => Some(Case::PptFreshWriteTo),
+        "doc_semantic_open" => Some(Case::DocSemanticOpen),
+        "doc_semantic_list_paragraphs" => Some(Case::DocSemanticListParagraphs),
+        "doc_semantic_one_paragraph" => Some(Case::DocSemanticOneParagraph),
+        "doc_semantic_full_text" => Some(Case::DocSemanticFullText),
+        "doc_semantic_noop_edit_save" => Some(Case::DocSemanticNoopEditSave),
+        "doc_semantic_one_edit_save" => Some(Case::DocSemanticOneEditSave),
+        "xls_semantic_open" => Some(Case::XlsSemanticOpen),
+        "xls_semantic_list_worksheets" => Some(Case::XlsSemanticListWorksheets),
+        "xls_semantic_one_cell" => Some(Case::XlsSemanticOneCell),
+        "xls_semantic_full_cell_scan" => Some(Case::XlsSemanticFullCellScan),
+        "xls_semantic_noop_edit_save" => Some(Case::XlsSemanticNoopEditSave),
+        "xls_semantic_one_edit_save" => Some(Case::XlsSemanticOneEditSave),
+        "ppt_semantic_open" => Some(Case::PptSemanticOpen),
+        "ppt_semantic_list_slides" => Some(Case::PptSemanticListSlides),
+        "ppt_semantic_one_shape_text" => Some(Case::PptSemanticOneShapeText),
+        "ppt_semantic_full_text" => Some(Case::PptSemanticFullText),
+        "ppt_semantic_noop_edit_save" => Some(Case::PptSemanticNoopEditSave),
+        "ppt_semantic_one_edit_save" => Some(Case::PptSemanticOneEditSave),
         "xlsx_open_owned" => Some(Case::XlsxOpenOwned),
         "xlsx_list_sheets" => Some(Case::XlsxListSheets),
         "xlsx_first_cell" => Some(Case::XlsxFirstCell),
@@ -1980,6 +2140,15 @@ fn print_usage() {
                                        cfb_shared_open,cfb_shared_read_one,\n\
                                        cfb_shared_concurrent_reads,\n\
                                        doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to,\n\
+                                       doc_semantic_open,doc_semantic_list_paragraphs,\n\
+                                       doc_semantic_one_paragraph,doc_semantic_full_text,\n\
+                                       doc_semantic_noop_edit_save,doc_semantic_one_edit_save,\n\
+                                       xls_semantic_open,xls_semantic_list_worksheets,\n\
+                                       xls_semantic_one_cell,xls_semantic_full_cell_scan,\n\
+                                       xls_semantic_noop_edit_save,xls_semantic_one_edit_save,\n\
+                                       ppt_semantic_open,ppt_semantic_list_slides,\n\
+                                       ppt_semantic_one_shape_text,ppt_semantic_full_text,\n\
+                                       ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
                                        xlsx_open_owned,xlsx_list_sheets,xlsx_first_cell,\n\
                                        xlsx_full_cell_scan,xlsx_narrow_column_range_scan,\n\
                                        xlsx_noop_commit,xlsx_noop_commit_save,\n\
@@ -2228,11 +2397,8 @@ fn build_writer_corpus(case: Case, shape: WriterShape) -> Result<Corpus, Box<dyn
 }
 
 fn write_fresh_doc(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dyn Error>> {
-    let (paragraph_count, payload_bytes) = match shape {
-        WriterShape::Tiny => (3, None),
-        WriterShape::Large => (512, None),
-        WriterShape::PayloadHeavy => (128, Some(20_000)),
-    };
+    let paragraph_count = shape.doc_paragraph_count();
+    let payload_bytes = (shape == WriterShape::PayloadHeavy).then_some(20_000);
     let mut writer = litchi_doc::writer::Writer::new();
     let mut content_bytes = 0;
     for paragraph in 0..paragraph_count {
@@ -2255,11 +2421,9 @@ fn write_fresh_xls(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
 
     match shape {
         WriterShape::Tiny | WriterShape::Large => {
-            let (sheet_count, row_count, column_count) = match shape {
-                WriterShape::Tiny => (1, 4, 4),
-                WriterShape::Large => (4, 128, 16),
-                WriterShape::PayloadHeavy => unreachable!("matched above"),
-            };
+            let (sheet_count, row_count, column_count) = shape
+                .xls_dimensions()
+                .ok_or("non-numeric writer shape reached numeric XLS corpus")?;
             for sheet in 0..sheet_count {
                 let worksheet = writer.add_worksheet(&format!("Bench{sheet:02}"))?;
                 for row in 0..row_count {
@@ -2294,11 +2458,8 @@ fn write_fresh_xls(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
 }
 
 fn write_fresh_ppt(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dyn Error>> {
-    let (slide_count, boxes_per_slide, payload_bytes) = match shape {
-        WriterShape::Tiny => (1, 2, None),
-        WriterShape::Large => (12, 12, None),
-        WriterShape::PayloadHeavy => (16, 8, Some(40_000)),
-    };
+    let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
+    let payload_bytes = (shape == WriterShape::PayloadHeavy).then_some(40_000);
     let mut writer = litchi_ppt::writer::Writer::new();
     let mut content_bytes = 0;
     let mut text_box_count = 0;
@@ -2327,6 +2488,15 @@ fn semantic_shape(corpus: &Corpus) -> Result<SemanticShape, Box<dyn Error>> {
         "medium" => Ok(SemanticShape::Medium),
         "large" => Ok(SemanticShape::Large),
         _ => Err("semantic corpus has an unknown shape".into()),
+    }
+}
+
+fn writer_shape(corpus: &Corpus) -> Result<WriterShape, Box<dyn Error>> {
+    match corpus.manifest.shape {
+        "tiny" => Ok(WriterShape::Tiny),
+        "large" => Ok(WriterShape::Large),
+        "payload-heavy" => Ok(WriterShape::PayloadHeavy),
+        _ => Err("legacy writer corpus has an unknown writer shape".into()),
     }
 }
 
@@ -2956,6 +3126,12 @@ fn writer_text(kind: &str, first: usize, second: usize, third: usize) -> String 
     )
 }
 
+fn updated_writer_text(kind: &str, first: usize, second: usize, third: usize) -> String {
+    format!(
+        "litchi-perf-baseline-{kind}-v2-{first:03}-{second:05}-{third:03} deterministic payload"
+    )
+}
+
 fn writer_payload_text(
     kind: &str,
     first: usize,
@@ -3060,6 +3236,30 @@ fn run_case_with_config(
         },
         Case::DocFreshWriteTo | Case::XlsFreshWriteTo | Case::PptFreshWriteTo => {
             run_fresh_writer(case, corpus, warmup_iterations, samples)
+        },
+        Case::DocSemanticOpen
+        | Case::DocSemanticListParagraphs
+        | Case::DocSemanticOneParagraph
+        | Case::DocSemanticFullText
+        | Case::DocSemanticNoopEditSave
+        | Case::DocSemanticOneEditSave => {
+            run_semantic_doc(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsSemanticOpen
+        | Case::XlsSemanticListWorksheets
+        | Case::XlsSemanticOneCell
+        | Case::XlsSemanticFullCellScan
+        | Case::XlsSemanticNoopEditSave
+        | Case::XlsSemanticOneEditSave => {
+            run_semantic_xls(case, corpus, warmup_iterations, samples)
+        },
+        Case::PptSemanticOpen
+        | Case::PptSemanticListSlides
+        | Case::PptSemanticOneShapeText
+        | Case::PptSemanticFullText
+        | Case::PptSemanticNoopEditSave
+        | Case::PptSemanticOneEditSave => {
+            run_semantic_ppt(case, corpus, warmup_iterations, samples)
         },
         Case::XlsxOpenOwned => run_xlsx_open_owned(corpus, warmup_iterations, samples),
         Case::XlsxListSheets => run_xlsx_list_sheets(corpus, warmup_iterations, samples),
@@ -3628,6 +3828,569 @@ fn verify_semantic_odp(
         return Err("semantic ODP full text differs from slide scan".into());
     }
     Ok(())
+}
+
+fn verify_semantic_doc(
+    bytes: &[u8],
+    shape: WriterShape,
+    updated: Option<usize>,
+) -> Result<(), Box<dyn Error>> {
+    use litchi_doc::body_text::{Projection, Snapshot};
+
+    let count = shape.doc_paragraph_count();
+    let snapshot = Snapshot::from_bytes(bytes.to_vec())?;
+    let projected = snapshot.paragraphs(Projection::All)?;
+    if projected.len() != count {
+        return Err("semantic DOC paragraph count differs from writer specification".into());
+    }
+    for (index, paragraph) in projected.iter().enumerate() {
+        let expected = if updated == Some(index) {
+            updated_writer_text("doc", 0, index, 0)
+        } else {
+            writer_text("doc", 0, index, 0)
+        };
+        if paragraph.position() != Position::new(index) || paragraph.text() != expected {
+            return Err(
+                "semantic DOC projected paragraph differs from writer specification".into(),
+            );
+        }
+    }
+
+    let mut package = litchi_doc::Package::from_reader(Cursor::new(bytes))?;
+    let document = package.document()?;
+    let paragraphs = document.paragraphs()?;
+    if paragraphs.len() != count {
+        return Err(
+            "semantic DOC document paragraph count differs from writer specification".into(),
+        );
+    }
+    let mut expected_full = String::new();
+    for (index, paragraph) in paragraphs.iter().enumerate() {
+        let expected = if updated == Some(index) {
+            updated_writer_text("doc", 0, index, 0)
+        } else {
+            writer_text("doc", 0, index, 0)
+        };
+        if paragraph.text()? != expected {
+            return Err("semantic DOC paragraph text differs from writer specification".into());
+        }
+        expected_full.push_str(&expected);
+        expected_full.push('\r');
+    }
+    if document.text()? != expected_full {
+        return Err("semantic DOC full text differs from writer specification".into());
+    }
+    Ok(())
+}
+
+fn run_semantic_doc(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_doc::body_text::Snapshot;
+
+    let shape = writer_shape(corpus)?;
+    if shape == WriterShape::PayloadHeavy {
+        return Err("payload-heavy DOC corpus is excluded from semantic cases".into());
+    }
+    let selected = shape.doc_paragraph_count() / 2;
+    let expected_changed = if case == Case::DocSemanticOneEditSave {
+        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let mut edit = source.edit()?;
+        edit.replace_paragraph(
+            Position::new(selected),
+            &updated_writer_text("doc", 0, selected, 0),
+        )?;
+        edit.commit()?.snapshot().finish()
+    } else {
+        corpus.archive.clone()
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        match case {
+            Case::DocSemanticOpen => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let mut package = litchi_doc::Package::from_reader(Cursor::new(owned))?;
+                let document = package.document()?;
+                let duration = started.elapsed();
+                verify_semantic_doc(&corpus.archive, shape, None)?;
+                std::hint::black_box(document);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocSemanticListParagraphs => {
+                let mut package =
+                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let paragraphs = document.paragraphs()?;
+                let duration = started.elapsed();
+                if paragraphs.len() != shape.doc_paragraph_count() {
+                    return Err(
+                        "semantic DOC paragraph list differs from writer specification".into(),
+                    );
+                }
+                verify_semantic_doc(&corpus.archive, shape, None)?;
+                std::hint::black_box(paragraphs);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocSemanticOneParagraph => {
+                let mut package =
+                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let paragraph = document
+                    .paragraphs()?
+                    .into_iter()
+                    .nth(selected)
+                    .ok_or("semantic DOC selected paragraph is missing")?;
+                let duration = started.elapsed();
+                if paragraph.text()? != writer_text("doc", 0, selected, 0) {
+                    return Err(
+                        "semantic DOC selected paragraph differs from writer specification".into(),
+                    );
+                }
+                verify_semantic_doc(&corpus.archive, shape, None)?;
+                std::hint::black_box(paragraph);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocSemanticFullText => {
+                let mut package =
+                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let text = document.text()?;
+                let duration = started.elapsed();
+                verify_semantic_doc(&corpus.archive, shape, None)?;
+                std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocSemanticNoopEditSave | Case::DocSemanticOneEditSave => {
+                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                let updated = case == Case::DocSemanticOneEditSave;
+                let started = Instant::now();
+                let mut edit = source.edit()?;
+                if updated {
+                    edit.replace_paragraph(
+                        Position::new(selected),
+                        &updated_writer_text("doc", 0, selected, 0),
+                    )?;
+                }
+                let commit = edit.commit()?;
+                let bytes = commit.snapshot().finish();
+                let duration = started.elapsed();
+                if commit.changed() != updated
+                    || commit.patch().is_noop() == updated
+                    || commit.patch().changes().len() != usize::from(updated)
+                    || bytes != expected_changed
+                {
+                    return Err("semantic DOC edit/save has unexpected publication state".into());
+                }
+                let applied = commit.patch().apply(&source)?;
+                if applied.bytes() != commit.snapshot().bytes() {
+                    return Err("semantic DOC exact patch replay differs from commit".into());
+                }
+                let restored = commit.patch().inverse().apply(&applied)?;
+                if restored.bytes() != source.bytes() {
+                    return Err("semantic DOC inverse did not restore exact source bytes".into());
+                }
+                verify_semantic_doc(&bytes, shape, updated.then_some(selected))?;
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            _ => return Err("non-DOC semantic case passed to DOC runner".into()),
+        }
+    }
+    Ok(result(case, corpus, elapsed, None))
+}
+
+fn xls_expected_value(
+    shape: WriterShape,
+    sheet: usize,
+    row: usize,
+    column: usize,
+) -> Result<f64, Box<dyn Error>> {
+    let (_, rows, columns) = shape
+        .xls_dimensions()
+        .ok_or("payload-heavy XLS corpus has no numeric semantic grid")?;
+    Ok((sheet * rows * columns + row * columns + column) as f64)
+}
+
+fn verify_semantic_xls(
+    bytes: &[u8],
+    shape: WriterShape,
+    updated: Option<(usize, usize, usize)>,
+) -> Result<(), Box<dyn Error>> {
+    use litchi_xls::cell_values::{Reference, Snapshot, Value};
+
+    let (sheet_count, rows, columns) = shape
+        .xls_dimensions()
+        .ok_or("payload-heavy XLS corpus is excluded from semantic verification")?;
+    let snapshot = Snapshot::from_bytes(bytes.to_vec())?;
+    if snapshot.worksheet_count() != sheet_count {
+        return Err("semantic XLS worksheet count differs from writer specification".into());
+    }
+    for (sheet, worksheet) in snapshot.worksheets().enumerate() {
+        if worksheet.position() != sheet || worksheet.name() != format!("Bench{sheet:02}") {
+            return Err("semantic XLS worksheet identity differs from writer specification".into());
+        }
+        if worksheet.cells().len() != rows * columns {
+            return Err("semantic XLS cell count differs from writer specification".into());
+        }
+        for cell in worksheet.cells() {
+            let reference = cell.reference();
+            let row = usize::from(reference.row());
+            let column = usize::from(reference.column());
+            let mut expected = xls_expected_value(shape, sheet, row, column)?;
+            if updated == Some((sheet, row, column)) {
+                expected += 0.5;
+            }
+            if !matches!(cell.value(), Value::Number(actual) if actual.to_bits() == expected.to_bits())
+                || worksheet.cell(Reference::new(row as u32, column as u32)?)? != Some(cell)
+            {
+                return Err("semantic XLS cell differs from writer specification".into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn run_semantic_xls(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_core::sheet::{Cell as _, Worksheet as _};
+    use litchi_xls::cell_values::{Reference, Snapshot};
+
+    let shape = writer_shape(corpus)?;
+    let (sheet_count, rows, columns) = shape
+        .xls_dimensions()
+        .ok_or("payload-heavy XLS corpus is excluded from semantic cases")?;
+    let selected = (sheet_count / 2, rows / 2, columns / 2);
+    let reference = Reference::new(selected.1 as u32, selected.2 as u32)?;
+    let replacement = xls_expected_value(shape, selected.0, selected.1, selected.2)? + 0.5;
+    let expected_changed = if case == Case::XlsSemanticOneEditSave {
+        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let mut edit = source.edit();
+        edit.set_number(selected.0.into(), reference, replacement)?;
+        edit.commit()?.snapshot().bytes().to_vec()
+    } else {
+        corpus.archive.clone()
+    };
+    let expected_count = sheet_count * rows * columns;
+    let expected_sum = (expected_count * (expected_count - 1) / 2) as f64;
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        match case {
+            Case::XlsSemanticOpen => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let workbook = litchi_xls::Workbook::new(Cursor::new(owned))?;
+                let duration = started.elapsed();
+                verify_semantic_xls(&corpus.archive, shape, None)?;
+                std::hint::black_box(workbook);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::XlsSemanticListWorksheets => {
+                let workbook = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let started = Instant::now();
+                let names = workbook
+                    .sheets()
+                    .iter()
+                    .map(|sheet| sheet.name().to_owned())
+                    .collect::<Vec<_>>();
+                let duration = started.elapsed();
+                let expected = (0..sheet_count)
+                    .map(|sheet| format!("Bench{sheet:02}"))
+                    .collect::<Vec<_>>();
+                if names != expected {
+                    return Err(
+                        "semantic XLS worksheet list differs from writer specification".into(),
+                    );
+                }
+                verify_semantic_xls(&corpus.archive, shape, None)?;
+                std::hint::black_box(names);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::XlsSemanticOneCell => {
+                let workbook = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let started = Instant::now();
+                let metadata = workbook
+                    .sheet(selected.0)
+                    .ok_or("semantic XLS selected tab is missing")?;
+                let worksheet = workbook.xls_worksheet(
+                    metadata
+                        .parsed_worksheet_index()
+                        .ok_or("semantic XLS selected tab is not a worksheet")?,
+                )?;
+                let cell = worksheet
+                    .get_cell(selected.1 as u32, selected.2 as u32)
+                    .ok_or("semantic XLS selected cell is missing")?;
+                let value = cell
+                    .value()
+                    .as_float()
+                    .ok_or("semantic XLS selected cell is not numeric")?;
+                let duration = started.elapsed();
+                if value.to_bits()
+                    != xls_expected_value(shape, selected.0, selected.1, selected.2)?.to_bits()
+                {
+                    return Err(
+                        "semantic XLS selected cell differs from writer specification".into(),
+                    );
+                }
+                verify_semantic_xls(&corpus.archive, shape, None)?;
+                std::hint::black_box(value);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::XlsSemanticFullCellScan => {
+                let workbook = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let started = Instant::now();
+                let mut count = 0_usize;
+                let mut sum = 0.0_f64;
+                for metadata in workbook.sheets() {
+                    let worksheet = workbook.xls_worksheet(
+                        metadata
+                            .parsed_worksheet_index()
+                            .ok_or("semantic XLS tab is not a worksheet")?,
+                    )?;
+                    let mut cells = worksheet.cells();
+                    while let Some(cell) = cells.next() {
+                        let cell = cell.map_err(|error| io::Error::other(error.to_string()))?;
+                        sum += cell
+                            .value()
+                            .as_float()
+                            .ok_or("semantic XLS scan found a non-numeric cell")?;
+                        count += 1;
+                    }
+                }
+                let duration = started.elapsed();
+                if count != expected_count || sum.to_bits() != expected_sum.to_bits() {
+                    return Err("semantic XLS full scan differs from writer specification".into());
+                }
+                verify_semantic_xls(&corpus.archive, shape, None)?;
+                std::hint::black_box((count, sum));
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::XlsSemanticNoopEditSave | Case::XlsSemanticOneEditSave => {
+                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                let updated = case == Case::XlsSemanticOneEditSave;
+                let started = Instant::now();
+                let mut edit = source.edit();
+                if updated {
+                    edit.set_number(selected.0.into(), reference, replacement)?;
+                }
+                let commit = edit.commit()?;
+                let bytes = commit.snapshot().bytes().to_vec();
+                let duration = started.elapsed();
+                let diagnostics = commit.diagnostics();
+                if commit.patch().is_empty() == updated
+                    || diagnostics.changed_cells() != usize::from(updated)
+                    || diagnostics.changed_number_fields() != usize::from(updated)
+                    || diagnostics.touched_streams() != usize::from(updated)
+                    || bytes != expected_changed
+                {
+                    return Err("semantic XLS edit/save has unexpected publication state".into());
+                }
+                let applied = commit.patch().apply(&source)?;
+                if applied.bytes() != commit.snapshot().bytes() {
+                    return Err("semantic XLS exact patch replay differs from commit".into());
+                }
+                let restored = commit.patch().inverse().apply(&applied)?;
+                if restored.bytes() != source.bytes() {
+                    return Err("semantic XLS inverse did not restore exact source bytes".into());
+                }
+                verify_semantic_xls(&bytes, shape, updated.then_some(selected))?;
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            _ => return Err("non-XLS semantic case passed to XLS runner".into()),
+        }
+    }
+    Ok(result(case, corpus, elapsed, None))
+}
+
+fn verify_semantic_ppt(
+    bytes: &[u8],
+    shape: WriterShape,
+    updated: Option<(usize, usize)>,
+) -> Result<(), Box<dyn Error>> {
+    let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
+    let mut package = litchi_ppt::Package::from_reader(Cursor::new(bytes))?;
+    let presentation = package.presentation()?;
+    let slides = presentation.slides()?;
+    if slides.len() != slide_count {
+        return Err("semantic PPT slide count differs from writer specification".into());
+    }
+    let mut expected_slides = Vec::with_capacity(slide_count);
+    for (slide, item) in slides.iter().enumerate() {
+        let shapes = item.shapes()?;
+        if shapes.len() != boxes_per_slide {
+            return Err("semantic PPT shape count differs from writer specification".into());
+        }
+        let mut expected_shapes = Vec::with_capacity(boxes_per_slide);
+        for (shape_index, object) in shapes.iter().enumerate() {
+            let expected = if updated == Some((slide, shape_index)) {
+                updated_writer_text("ppt", slide, shape_index, 0)
+            } else {
+                writer_text("ppt", slide, shape_index, 0)
+            };
+            if object.text()? != expected {
+                return Err("semantic PPT shape text differs from writer specification".into());
+            }
+            expected_shapes.push(expected);
+        }
+        let expected_slide = expected_shapes.join("\n");
+        if item.text()? != expected_slide {
+            return Err("semantic PPT slide text differs from writer specification".into());
+        }
+        expected_slides.push(expected_slide);
+    }
+    if presentation.text()? != expected_slides.join("\n\n") {
+        return Err("semantic PPT full text differs from writer specification".into());
+    }
+    Ok(())
+}
+
+fn run_semantic_ppt(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_ppt::{slide_order::Snapshot, text_edit::Target};
+
+    let shape = writer_shape(corpus)?;
+    if shape == WriterShape::PayloadHeavy {
+        return Err("payload-heavy PPT corpus is excluded from semantic cases".into());
+    }
+    let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
+    let linear = slide_count * boxes_per_slide / 2;
+    let selected = (linear / boxes_per_slide, linear % boxes_per_slide);
+    let target = Target::new(Position::new(selected.0), Position::new(selected.1));
+    let expected_changed = if case == Case::PptSemanticOneEditSave {
+        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let mut edit = source.edit()?;
+        edit.set_shape_text(
+            target,
+            updated_writer_text("ppt", selected.0, selected.1, 0),
+        )?;
+        edit.commit()?.snapshot().bytes().to_vec()
+    } else {
+        corpus.archive.clone()
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        match case {
+            Case::PptSemanticOpen => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let mut package = litchi_ppt::Package::from_reader(Cursor::new(owned))?;
+                let presentation = package.presentation()?;
+                let duration = started.elapsed();
+                verify_semantic_ppt(&corpus.archive, shape, None)?;
+                std::hint::black_box(presentation);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::PptSemanticListSlides => {
+                let mut package =
+                    litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let presentation = package.presentation()?;
+                let started = Instant::now();
+                let slides = presentation.slides()?;
+                let duration = started.elapsed();
+                if slides.len() != slide_count {
+                    return Err("semantic PPT slide list differs from writer specification".into());
+                }
+                verify_semantic_ppt(&corpus.archive, shape, None)?;
+                std::hint::black_box(slides);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::PptSemanticOneShapeText => {
+                let mut package =
+                    litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let presentation = package.presentation()?;
+                let started = Instant::now();
+                let text = presentation
+                    .slides()?
+                    .into_iter()
+                    .nth(selected.0)
+                    .ok_or("semantic PPT selected slide is missing")?
+                    .shapes()?
+                    .get(selected.1)
+                    .ok_or("semantic PPT selected shape is missing")?
+                    .text()?;
+                let duration = started.elapsed();
+                if text != writer_text("ppt", selected.0, selected.1, 0) {
+                    return Err(
+                        "semantic PPT selected shape differs from writer specification".into(),
+                    );
+                }
+                verify_semantic_ppt(&corpus.archive, shape, None)?;
+                std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::PptSemanticFullText => {
+                let mut package =
+                    litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let presentation = package.presentation()?;
+                let started = Instant::now();
+                let text = presentation.text()?;
+                let duration = started.elapsed();
+                verify_semantic_ppt(&corpus.archive, shape, None)?;
+                std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::PptSemanticNoopEditSave | Case::PptSemanticOneEditSave => {
+                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                let updated = case == Case::PptSemanticOneEditSave;
+                let started = Instant::now();
+                let mut edit = source.edit()?;
+                if updated {
+                    edit.set_shape_text(
+                        target,
+                        updated_writer_text("ppt", selected.0, selected.1, 0),
+                    )?;
+                }
+                let commit = edit.commit()?;
+                let bytes = commit.snapshot().bytes().to_vec();
+                let duration = started.elapsed();
+                if commit.patch().is_empty() == updated
+                    || commit.patch().shape_text_changes().len() != usize::from(updated)
+                    || bytes != expected_changed
+                {
+                    return Err("semantic PPT edit/save has unexpected publication state".into());
+                }
+                if updated {
+                    let [change] = commit.patch().shape_text_changes() else {
+                        return Err("semantic PPT edit patch lacks its one shape change".into());
+                    };
+                    if change.target() != target
+                        || change.before() != writer_text("ppt", selected.0, selected.1, 0)
+                        || change.after() != updated_writer_text("ppt", selected.0, selected.1, 0)
+                    {
+                        return Err("semantic PPT shape change differs from specification".into());
+                    }
+                }
+                let applied = commit.patch().apply(&source)?;
+                if applied.bytes() != commit.snapshot().bytes() {
+                    return Err("semantic PPT exact patch replay differs from commit".into());
+                }
+                let restored = commit.patch().inverse().apply(&applied)?;
+                if restored.bytes() != source.bytes() {
+                    return Err("semantic PPT inverse did not restore exact source bytes".into());
+                }
+                verify_semantic_ppt(&bytes, shape, updated.then_some(selected))?;
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            _ => return Err("non-PPT semantic case passed to PPT runner".into()),
+        }
+    }
+    Ok(result(case, corpus, elapsed, None))
 }
 
 fn run_semantic_rtf(
@@ -6287,6 +7050,57 @@ mod tests {
         assert_eq!(pptx.manifest.entry_count, 12);
         let pptx_result = run_case(Case::PptxSemanticOnePercentEditSave, &pptx, 0, 1).unwrap();
         assert!(pptx_result.sink.is_none());
+    }
+
+    #[test]
+    fn native_ole2_tiny_corpora_exercise_all_semantic_cases() {
+        let families = [
+            (
+                Case::DocFreshWriteTo,
+                [
+                    Case::DocSemanticOpen,
+                    Case::DocSemanticListParagraphs,
+                    Case::DocSemanticOneParagraph,
+                    Case::DocSemanticFullText,
+                    Case::DocSemanticNoopEditSave,
+                    Case::DocSemanticOneEditSave,
+                ],
+            ),
+            (
+                Case::XlsFreshWriteTo,
+                [
+                    Case::XlsSemanticOpen,
+                    Case::XlsSemanticListWorksheets,
+                    Case::XlsSemanticOneCell,
+                    Case::XlsSemanticFullCellScan,
+                    Case::XlsSemanticNoopEditSave,
+                    Case::XlsSemanticOneEditSave,
+                ],
+            ),
+            (
+                Case::PptFreshWriteTo,
+                [
+                    Case::PptSemanticOpen,
+                    Case::PptSemanticListSlides,
+                    Case::PptSemanticOneShapeText,
+                    Case::PptSemanticFullText,
+                    Case::PptSemanticNoopEditSave,
+                    Case::PptSemanticOneEditSave,
+                ],
+            ),
+        ];
+
+        for (writer_case, semantic_cases) in families {
+            let corpus = build_writer_corpus(writer_case, WriterShape::Tiny).unwrap();
+            let again = build_writer_corpus(writer_case, WriterShape::Tiny).unwrap();
+            assert_eq!(corpus.archive, again.archive, "{}", writer_case.name());
+            for case in semantic_cases {
+                let measured = run_case(case, &corpus, 0, 1).unwrap();
+                assert_eq!(measured.case, case.name());
+                assert_eq!(measured.elapsed_ns.samples.len(), 1);
+                assert!(measured.sink.is_none());
+            }
+        }
     }
 
     #[test]
