@@ -9,7 +9,7 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
 
 use crate::column;
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 use crate::formula::{Formula, Kind};
 use crate::layout::Defaults;
 use crate::merge;
@@ -626,11 +626,18 @@ pub(crate) struct Stored {
 #[derive(Debug, Default)]
 pub(crate) struct Store {
     cells: Box<[Stored]>,
+    cell_rows: Box<[CellRowStart]>,
     rows: Box<[row::Stored]>,
     columns: Box<[column::Stored]>,
     defaults: Option<Defaults>,
     merges: merge::Index,
     extents: Extents,
+}
+
+#[derive(Debug)]
+struct CellRowStart {
+    row: RowIndex,
+    start: usize,
 }
 
 /// Distinct worksheet cell-bound summaries.
@@ -704,6 +711,7 @@ impl Store {
                 pair[0].address
             )));
         }
+
         rows.sort_unstable_by_key(|entry| entry.index);
         if let Some(pair) = rows.windows(2).find(|pair| pair[0].index == pair[1].index) {
             return Err(invalid(format!(
@@ -715,7 +723,17 @@ impl Store {
         let mut stored = Bounds::default();
         let mut content = Bounds::default();
         let mut styled = Bounds::default();
-        for entry in &cells {
+        let mut cell_rows = Vec::new();
+        for (index, entry) in cells.iter().enumerate() {
+            if index == 0 || cells[index - 1].address.row() != entry.address.row() {
+                cell_rows
+                    .try_reserve(1)
+                    .map_err(|source| allocation("worksheet cell-row index", source))?;
+                cell_rows.push(CellRowStart {
+                    row: entry.address.row(),
+                    start: index,
+                });
+            }
             stored.push(entry.address);
             if !matches!(entry.cell, Cell::Empty) {
                 content.push(entry.address);
@@ -727,6 +745,7 @@ impl Store {
         let merges = merge::Index::new(merges)?;
         Ok(Self {
             cells: cells.into_boxed_slice(),
+            cell_rows: cell_rows.into_boxed_slice(),
             rows: rows.into_boxed_slice(),
             columns,
             defaults,
@@ -814,10 +833,13 @@ impl Store {
     }
 
     pub(crate) fn cells(&self, range: Rect) -> Cells<'_> {
-        let first = Address::new(range.start().row(), ColumnIndex::FIRST);
-        let start = self.cells.partition_point(|entry| entry.address < first);
+        let start = self
+            .cell_rows
+            .partition_point(|entry| entry.row < range.start().row());
         Cells {
-            remaining: &self.cells[start..],
+            cells: &self.cells,
+            rows: &self.cell_rows[start..],
+            current: &[],
             range,
         }
     }
@@ -863,7 +885,9 @@ impl Bounds {
 /// Borrowed sparse cells inside a half-open range.
 #[derive(Debug)]
 pub struct Cells<'a> {
-    remaining: &'a [Stored],
+    cells: &'a [Stored],
+    rows: &'a [CellRowStart],
+    current: &'a [Stored],
     range: Rect,
 }
 
@@ -871,23 +895,123 @@ impl<'a> Iterator for Cells<'a> {
     type Item = (Address, &'a Cell);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((entry, remaining)) = self.remaining.split_first() {
-            self.remaining = remaining;
-            if entry.address.row().get() >= self.range.end().0 {
-                self.remaining = &[];
-                return None;
-            }
-            if self.range.contains(entry.address) {
+        loop {
+            if let Some((entry, remaining)) = self.current.split_first() {
+                self.current = remaining;
                 return Some((entry.address, &entry.cell));
             }
+
+            let (row, remaining_rows) = self.rows.split_first()?;
+            self.rows = remaining_rows;
+            if row.row.get() >= self.range.end().0 {
+                self.rows = &[];
+                return None;
+            }
+
+            let start_column = self.range.start().column().get();
+            let end = remaining_rows
+                .first()
+                .map_or(self.cells.len(), |next| next.start);
+            let row_cells = &self.cells[row.start..end];
+            let start = if start_column == ColumnIndex::FIRST.get() {
+                0
+            } else {
+                row_cells.partition_point(|entry| entry.address.column().get() < start_column)
+            };
+            let selected = &row_cells[start..];
+            let selected_len = if self.range.end().1 == ColumnIndex::LAST.get() + 1 {
+                selected.len()
+            } else if self.range.end().1 == start_column + 1 {
+                usize::from(
+                    selected
+                        .first()
+                        .is_some_and(|entry| entry.address.column().get() == start_column),
+                )
+            } else {
+                selected.partition_point(|entry| entry.address.column().get() < self.range.end().1)
+            };
+            self.current = &selected[..selected_len];
         }
-        None
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn empty_store(addresses: &[(u32, u32)]) -> Store {
+        let cells = addresses
+            .iter()
+            .map(|&(row, column)| Stored {
+                address: Address::at(row, column).expect("bounded test address"),
+                cell: Cell::Empty,
+                style: None,
+                shared_string: None,
+                cell_metadata: None,
+                value_metadata: None,
+            })
+            .collect();
+        Store::from_unsorted(cells, Vec::new(), Box::new([]), None, Vec::new(), None)
+            .expect("valid cell store")
+    }
+
+    #[test]
+    fn range_cells_skip_columns_outside_each_selected_row() {
+        let store = empty_store(&[
+            (0, 0),
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (1, 0),
+            (1, 2),
+            (1, 3),
+            (2, 0),
+            (2, 1),
+            (2, 2),
+            (2, 3),
+            (3, 1),
+        ]);
+        let range = Rect::at(0, 1, 3, 3).expect("bounded test range");
+
+        let addresses = store
+            .cells(range)
+            .map(|(address, _cell)| address)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            addresses,
+            vec![
+                Address::at(0, 1).unwrap(),
+                Address::at(0, 2).unwrap(),
+                Address::at(1, 2).unwrap(),
+                Address::at(2, 1).unwrap(),
+                Address::at(2, 2).unwrap(),
+            ]
+        );
+    }
+
+    #[test]
+    fn range_cells_handle_sparse_rows_and_grid_edges() {
+        let store = empty_store(&[(0, 0), (2, 0), (2, 16_383), (3, 0), (1_048_575, 16_383)]);
+
+        let middle = Rect::at(1, 0, 4, 1).expect("bounded middle range");
+        assert_eq!(
+            store
+                .cells(middle)
+                .map(|(address, _cell)| address)
+                .collect::<Vec<_>>(),
+            vec![Address::at(2, 0).unwrap(), Address::at(3, 0).unwrap()]
+        );
+
+        let last = Rect::single(Address::at(1_048_575, 16_383).unwrap());
+        assert_eq!(
+            store
+                .cells(last)
+                .map(|(address, _cell)| address)
+                .collect::<Vec<_>>(),
+            vec![Address::at(1_048_575, 16_383).unwrap()]
+        );
+    }
 
     #[test]
     fn numbers_preserve_lexemes_and_convert_explicitly() {

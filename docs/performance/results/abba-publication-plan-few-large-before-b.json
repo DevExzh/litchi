@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": null,
+    "git_worktree_dirty": null,
+    "logical_cpus_available": 12,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "4"
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 3,
+    "cases": [
+      "opc_noop_save"
+    ],
+    "corpus_shapes": [
+      "few-large"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ]
+  },
+  "results": [
+    {
+      "case": "opc_noop_save",
+      "corpus": {
+        "name": "few-large-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 99044,
+        "archive_sha256": "eaa8f44bcb3de09363bfbee755d36fc82d50aa305ef685c5f16004bcca151a0f",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          3099372,
+          3165824,
+          3172103,
+          3177569,
+          3179963,
+          3206560,
+          3211635,
+          3229391,
+          3231754,
+          3232215,
+          3243069,
+          3245073,
+          3251201,
+          3254856,
+          3267053,
+          3281783,
+          3283535,
+          3301660,
+          3327946,
+          3353892,
+          3355164,
+          3403320,
+          3429456,
+          3440401,
+          3464035,
+          3518989,
+          3559165,
+          3570751,
+          3609213,
+          3644521
+        ],
+        "min": 3099372,
+        "p50": 3274418,
+        "p95": 3609213,
+        "p99": 3644521,
+        "max": 3644521,
+        "mean": 3323715.633333334,
+        "standard_deviation": 145483.9863872885,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 3269397.1196834375,
+          "upper": 3378034.14698323
+        }
+      },
+      "sink": {
+        "accepted_bytes": 99044,
+        "write_calls": 49,
+        "largest_write": 24457
+      }
+    },
+    {
+      "case": "opc_noop_save",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783565,
+        "archive_sha256": "f30d92f623e221b16db2697810385d9b1c2c3e6c17c04b0c11945326c57a9612",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          205405823,
+          205427082,
+          205446278,
+          205503899,
+          205895046,
+          206371531,
+          206837731,
+          207150171,
+          207171679,
+          207193171,
+          207607449,
+          207893511,
+          207918077,
+          208136106,
+          208337242,
+          208378520,
+          208488091,
+          208499316,
+          208602789,
+          208789674,
+          208904793,
+          209083008,
+          209100561,
+          209340651,
+          209557880,
+          210211450,
+          210804194,
+          211144052,
+          212555694,
+          218726421
+        ],
+        "min": 205405823,
+        "p50": 208357881,
+        "p95": 212555694,
+        "p99": 218726421,
+        "max": 218726421,
+        "mean": 208482729.66666666,
+        "standard_deviation": 2609020.031434937,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 207508614.9636705,
+          "upper": 209456844.36966282
+        }
+      },
+      "sink": {
+        "accepted_bytes": 16783565,
+        "write_calls": 557,
+        "largest_write": 32768
+      }
+    }
+  ]
+}

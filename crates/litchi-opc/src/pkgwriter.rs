@@ -8,11 +8,14 @@ use crate::error::Result;
 use crate::package::OpcPackage;
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::phys_pkg::PhysPkgWriter;
+use crate::rel::Relationships;
 use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::io::Write;
 use std::path::Path;
+
+const EXACT_SOURCE_CHUNK_BYTES: usize = 64 * 1024;
 
 struct Counted<'a, W> {
     inner: W,
@@ -28,6 +31,105 @@ impl<W: Write> Write for Counted<'_, W> {
 
     fn flush(&mut self) -> std::io::Result<()> {
         self.inner.flush()
+    }
+}
+
+/// Fully validated package metadata and the stable order used for publication.
+///
+/// Building this plan is deliberately separate from emission: every fallible
+/// serialization and XML audit completes before a sequential sink sees bytes.
+struct PublicationPlan<'package> {
+    content_types_uri: PackURI,
+    content_types_xml: String,
+    package_rels_uri: PackURI,
+    package_rels_xml: String,
+    parts: Vec<PlannedPart<'package>>,
+}
+
+struct PlannedPart<'package> {
+    partname: &'package PackURI,
+    content_type: &'package str,
+    blob: &'package [u8],
+    authored_xml: bool,
+    rels: &'package Relationships,
+    relationships: Option<PlannedRelationships>,
+}
+
+struct PlannedRelationships {
+    uri: PackURI,
+    xml: String,
+}
+
+impl<'package> PublicationPlan<'package> {
+    fn from_package(package: &'package OpcPackage) -> Result<Self> {
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(package.part_count())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC XML publication part plan",
+                source,
+            })?;
+        for part in package.iter_parts() {
+            parts.push(PlannedPart {
+                partname: part.partname(),
+                content_type: part.content_type(),
+                blob: part.blob(),
+                authored_xml: xml_minifier::audit::package::is_xml_part(
+                    part.partname().as_str(),
+                    part.content_type(),
+                ) && !package.is_exact_source_xml(part),
+                rels: part.rels(),
+                relationships: None,
+            });
+        }
+        parts.sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
+
+        let content_types_uri =
+            PackURI::new(CONTENT_TYPES_URI).map_err(crate::OpcError::InvalidPackUri)?;
+        let content_types_xml = ContentTypesItem::from_parts(&parts)?.to_xml();
+        PackageWriter::validate_authored_xml("[Content_Types].xml", content_types_xml.as_bytes())?;
+
+        let package_uri = PackURI::new(PACKAGE_URI).map_err(crate::OpcError::InvalidPackUri)?;
+        let package_rels_uri = package_uri
+            .rels_uri()
+            .map_err(crate::OpcError::InvalidPackUri)?;
+        let package_rels_xml = package.rels().to_xml();
+        PackageWriter::validate_authored_xml("_rels/.rels", package_rels_xml.as_bytes())?;
+
+        for part in &mut parts {
+            if part.authored_xml {
+                PackageWriter::validate_authored_xml(part.partname.as_str(), part.blob)?;
+            }
+            if !part.rels.is_empty() {
+                let uri = part
+                    .partname
+                    .rels_uri()
+                    .map_err(crate::OpcError::InvalidPackUri)?;
+                let xml = part.rels.to_xml();
+                PackageWriter::validate_authored_xml(uri.as_str(), xml.as_bytes())?;
+                part.relationships = Some(PlannedRelationships { uri, xml });
+            }
+        }
+
+        Ok(Self {
+            content_types_uri,
+            content_types_xml,
+            package_rels_uri,
+            package_rels_xml,
+            parts,
+        })
+    }
+
+    fn write<W: Write>(&self, physical: &mut PhysPkgWriter<W>) -> Result<()> {
+        physical.write(&self.content_types_uri, self.content_types_xml.as_bytes())?;
+        physical.write(&self.package_rels_uri, self.package_rels_xml.as_bytes())?;
+        for part in &self.parts {
+            physical.write(part.partname, part.blob)?;
+            if let Some(relationships) = &part.relationships {
+                physical.write(&relationships.uri, relationships.xml.as_bytes())?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -100,8 +202,17 @@ impl PackageWriter {
     }
 
     fn write_counted<W: Write>(writer: W, package: &OpcPackage) -> Result<()> {
+        if let Some(source) = package.exact_source() {
+            let mut writer = writer;
+            for chunk in source.chunks(EXACT_SOURCE_CHUNK_BYTES) {
+                writer.write_all(chunk)?;
+            }
+            writer.flush()?;
+            return Ok(());
+        }
+        let plan = PublicationPlan::from_package(package)?;
         let mut physical = PhysPkgWriter::with_writer(writer);
-        Self::write_package(&mut physical, package)?;
+        plan.write(&mut physical)?;
         let mut finished = physical.finish_into_inner()?;
         finished.flush()?;
         Ok(())
@@ -119,57 +230,21 @@ impl PackageWriter {
     /// Returns an error if the package cannot be serialized (for example an
     /// invalid content type or partname) or if the in-memory zip writer fails.
     pub fn to_bytes(package: &OpcPackage) -> Result<Vec<u8>> {
-        let mut physical = PhysPkgWriter::new();
-        Self::write_package(&mut physical, package)?;
-        physical.finish()
-    }
-
-    fn write_package<W: Write>(
-        physical: &mut PhysPkgWriter<W>,
-        package: &OpcPackage,
-    ) -> Result<()> {
-        Self::validate_publication(package)?;
-        Self::write_content_types(physical, package)?;
-        Self::write_pkg_rels(physical, package)?;
-        Self::write_parts(physical, package)
-    }
-
-    fn validate_publication(package: &OpcPackage) -> Result<()> {
-        let content_types = ContentTypesItem::from_package(package)?.to_xml();
-        Self::validate_authored_xml("[Content_Types].xml", content_types.as_bytes())?;
-
-        let package_relationships = package.rels().to_xml();
-        Self::validate_authored_xml("_rels/.rels", package_relationships.as_bytes())?;
-
-        let mut parts = Vec::new();
-        parts
-            .try_reserve_exact(package.part_count())
-            .map_err(|source| crate::OpcError::Allocation {
-                resource: "OPC XML publication part plan",
-                source,
+        if let Some(source) = package.exact_source() {
+            let mut bytes = Vec::new();
+            bytes.try_reserve_exact(source.len()).map_err(|source| {
+                crate::OpcError::Allocation {
+                    resource: "OPC exact source copy",
+                    source,
+                }
             })?;
-        parts.extend(package.iter_parts());
-        parts.sort_unstable_by(|left, right| {
-            left.partname().as_str().cmp(right.partname().as_str())
-        });
-        for part in parts {
-            if xml_minifier::audit::package::is_xml_part(
-                part.partname().as_str(),
-                part.content_type(),
-            ) && !package.is_exact_source_xml(part)
-            {
-                Self::validate_authored_xml(part.partname().as_str(), part.blob())?;
-            }
-            if !part.rels().is_empty() {
-                let relationships = part.rels().to_xml();
-                let name = part
-                    .partname()
-                    .rels_uri()
-                    .map_err(crate::error::OpcError::InvalidPackUri)?;
-                Self::validate_authored_xml(name.as_str(), relationships.as_bytes())?;
-            }
+            bytes.extend_from_slice(source);
+            return Ok(bytes);
         }
-        Ok(())
+        let plan = PublicationPlan::from_package(package)?;
+        let mut physical = PhysPkgWriter::new();
+        plan.write(&mut physical)?;
+        physical.finish()
     }
 
     fn validate_authored_xml(name: &str, bytes: &[u8]) -> Result<()> {
@@ -179,69 +254,6 @@ impl PackageWriter {
                 part: name.to_string(),
                 source,
             })
-    }
-
-    /// Write the `[Content_Types].xml` part.
-    ///
-    /// This file maps file extensions and part names to content types.
-    fn write_content_types<W: Write>(
-        phys_writer: &mut PhysPkgWriter<W>,
-        package: &OpcPackage,
-    ) -> Result<()> {
-        let cti = ContentTypesItem::from_package(package)?;
-        let blob = cti.to_xml();
-
-        let content_types_uri =
-            PackURI::new(CONTENT_TYPES_URI).map_err(crate::error::OpcError::InvalidPackUri)?;
-        phys_writer.write(&content_types_uri, blob.as_bytes())?;
-
-        Ok(())
-    }
-
-    /// Write package-level relationships.
-    fn write_pkg_rels<W: Write>(
-        phys_writer: &mut PhysPkgWriter<W>,
-        package: &OpcPackage,
-    ) -> Result<()> {
-        let package_uri =
-            PackURI::new(PACKAGE_URI).map_err(crate::error::OpcError::InvalidPackUri)?;
-        let rels_uri = package_uri
-            .rels_uri()
-            .map_err(crate::error::OpcError::InvalidPackUri)?;
-        let rels_xml = package.rels().to_xml();
-        phys_writer.write(&rels_uri, rels_xml.as_bytes())?;
-
-        Ok(())
-    }
-
-    /// Write all parts and their relationships.
-    fn write_parts<W: Write>(
-        phys_writer: &mut PhysPkgWriter<W>,
-        package: &OpcPackage,
-    ) -> Result<()> {
-        // `OpcPackage` uses a hash map for O(1) lookup. Never let its randomized
-        // iteration order leak into serialized artifacts.
-        let mut parts = package.iter_parts().collect::<Vec<_>>();
-        parts.sort_unstable_by(|left, right| {
-            left.partname().as_str().cmp(right.partname().as_str())
-        });
-        for part in parts {
-            // Write the part itself
-            let blob = part.blob();
-            phys_writer.write(part.partname(), blob)?;
-
-            // Write the part's relationships if it has any
-            if !part.rels().is_empty() {
-                let rels_uri = part
-                    .partname()
-                    .rels_uri()
-                    .map_err(crate::error::OpcError::InvalidPackUri)?;
-                let rels_xml = part.rels().to_xml();
-                phys_writer.write(&rels_uri, rels_xml.as_bytes())?;
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -271,12 +283,12 @@ impl ContentTypesItem {
         })
     }
 
-    /// Build `ContentTypesItem` from an OPC package.
-    fn from_package(package: &OpcPackage) -> Result<Self> {
+    /// Build `ContentTypesItem` from the sorted publication parts.
+    fn from_parts(parts: &[PlannedPart<'_>]) -> Result<Self> {
         let mut cti = Self::new()?;
 
-        for part in package.iter_parts() {
-            cti.add_content_type(part.partname(), part.content_type())?;
+        for part in parts {
+            cti.add_content_type(part.partname, part.content_type)?;
         }
 
         Ok(cti)
@@ -421,6 +433,22 @@ mod tests {
         }
     }
 
+    fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+        let comment_len = u16::try_from(comment.len()).expect("ZIP comment fits in EOCD");
+        let eocd = archive.len().checked_sub(22).expect("archive has an EOCD");
+        assert_eq!(&archive[eocd..eocd + 4], b"PK\x05\x06");
+        archive[eocd + 20..eocd + 22].copy_from_slice(&comment_len.to_le_bytes());
+        archive.extend_from_slice(comment);
+        archive
+    }
+
+    fn exact_empty_archive(comment: &[u8]) -> Vec<u8> {
+        with_eocd_comment(
+            PackageWriter::to_bytes(&OpcPackage::new()).expect("serialize source package"),
+            comment,
+        )
+    }
+
     #[test]
     fn test_content_types_xml() {
         let mut cti = ContentTypesItem::new().unwrap();
@@ -435,6 +463,121 @@ mod tests {
 
         assert!(xml.contains(r#"<Default Extension="png" ContentType="image/png"/>"#));
         assert!(xml.contains(r#"<Override PartName="/word/document.xml""#));
+    }
+
+    #[test]
+    fn owned_source_round_trips_exactly_to_bytes_and_stream() {
+        let source = exact_empty_archive(b"nonzero EOCD comment");
+        let package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+
+        assert_eq!(
+            PackageWriter::to_bytes(&package).expect("copy exact source"),
+            source
+        );
+
+        let mut streamed = Vec::new();
+        package
+            .to_stream(&mut streamed)
+            .expect("stream exact source");
+        assert_eq!(streamed, source);
+    }
+
+    #[test]
+    fn open_and_reader_retain_owned_source_but_borrowed_bytes_do_not() {
+        let source = exact_empty_archive(b"owned source");
+
+        let from_reader =
+            OpcPackage::from_reader(io::Cursor::new(source.clone())).expect("open reader source");
+        assert_eq!(
+            PackageWriter::to_bytes(&from_reader).expect("copy reader source"),
+            source
+        );
+
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let path = directory.path().join("source.opc");
+        std::fs::write(&path, &source).expect("write source package");
+        let opened = OpcPackage::open(path).expect("open file source");
+        assert_eq!(
+            PackageWriter::to_bytes(&opened).expect("copy file source"),
+            source
+        );
+
+        let borrowed = OpcPackage::from_bytes(&source).expect("open borrowed source");
+        assert!(borrowed.exact_source().is_none());
+        assert_ne!(
+            PackageWriter::to_bytes(&borrowed).expect("republish borrowed source"),
+            source
+        );
+    }
+
+    #[test]
+    fn part_edit_revokes_exact_source_and_republishes_edited_package() {
+        let partname = PackURI::new("/custom/metadata.xml").expect("valid part URI");
+        let mut source_package = OpcPackage::new();
+        source_package.add_part(Box::new(crate::BlobPart::new(
+            partname.clone(),
+            ct::XML.to_owned(),
+            b"<original/>".to_vec(),
+        )));
+        let source = with_eocd_comment(
+            PackageWriter::to_bytes(&source_package).expect("serialize source package"),
+            b"exact source",
+        );
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+
+        package
+            .get_part_mut(&partname)
+            .expect("editable part")
+            .set_blob(b"<edited/>".to_vec());
+        let rewritten = PackageWriter::to_bytes(&package).expect("republish edited package");
+
+        assert_ne!(rewritten, source);
+        let reopened = OpcPackage::from_bytes(&rewritten).expect("reopen edited package");
+        assert_eq!(
+            reopened.get_part(&partname).expect("edited part").blob(),
+            b"<edited/>"
+        );
+    }
+
+    #[test]
+    fn exact_source_streaming_respects_the_64_kib_chunk_bound() {
+        let comment = vec![b'x'; u16::MAX as usize];
+        let source = exact_empty_archive(&comment);
+        assert!(source.len() > EXACT_SOURCE_CHUNK_BYTES);
+        let package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+        let mut sink = ChunkSink {
+            total: 0,
+            writes: 0,
+            largest: 0,
+            limit: EXACT_SOURCE_CHUNK_BYTES,
+        };
+
+        PackageWriter::write_to_stream(&mut sink, &package).expect("stream exact source");
+
+        assert_eq!(sink.total, source.len());
+        assert!(sink.writes > 1);
+        assert!(sink.largest <= EXACT_SOURCE_CHUNK_BYTES);
+    }
+
+    #[test]
+    fn incomplete_exact_source_stream_reports_accepted_bytes() {
+        let source = exact_empty_archive(b"exact source");
+        let package = OpcPackage::from_vec(source).expect("open owned source");
+        let sink = FailAfter {
+            written: 0,
+            limit: 128,
+        };
+
+        let error = PackageWriter::write_to_stream(sink, &package)
+            .expect_err("bounded sink must reject exact source");
+
+        assert!(matches!(
+            error,
+            crate::OpcError::IncompleteOutput {
+                written: 128,
+                source,
+            } if matches!(*source, crate::OpcError::IoError(_))
+        ));
     }
 
     #[test]
@@ -473,6 +616,33 @@ mod tests {
                 Err(crate::OpcError::XmlPublication { part, .. }) if part == part_name
             ));
         }
+    }
+
+    #[test]
+    fn publication_plan_failure_leaves_sequential_sink_untouched() {
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/metadata.xml").expect("valid part URI"),
+            ct::XML.to_owned(),
+            b"<root> <child/></root>".to_vec(),
+        )));
+        let mut sink = ChunkSink {
+            total: 0,
+            writes: 0,
+            largest: 0,
+            limit: usize::MAX,
+        };
+
+        let error = PackageWriter::write_to_stream(&mut sink, &package)
+            .expect_err("authored XML must fail publication planning");
+
+        assert!(matches!(
+            error,
+            crate::OpcError::XmlPublication { part, .. }
+                if part == "/custom/metadata.xml"
+        ));
+        assert_eq!(sink.total, 0);
+        assert_eq!(sink.writes, 0);
     }
 
     #[test]

@@ -41,6 +41,7 @@ pub mod section;
 pub mod settings;
 pub mod smart_tag;
 pub mod smartart;
+pub mod source_backed;
 pub mod statistics;
 pub mod styles;
 pub mod table;

@@ -104,8 +104,34 @@ pub enum OpcError {
     #[error("ZIP error: {0}")]
     ZipError(String),
 
+    /// An explicitly requested OPC open was cooperatively cancelled.
+    #[error("OPC open cancelled")]
+    Cancelled,
+
+    /// An explicit execution context rejected a policy, cancellation check, or
+    /// hierarchical resource charge.
+    #[error("OPC execution failed: {0}")]
+    Execution(#[source] litchi_core::ExecutionError),
+
+    /// The archive-local scheduler used by an explicit open session failed.
+    #[error("OPC local parallel read failed: {0}")]
+    ParallelRead(#[source] soapberry_zip::Error),
+
+    /// The requested neutral affinity policy has no archive-local adapter.
+    #[error("OPC open does not support the requested worker-affinity policy")]
+    UnsupportedExecutionAffinity,
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+
+    /// A positional source changed after this package captured its snapshot.
+    #[error("OPC source changed from {expected:?} to {actual:?}")]
+    SourceChanged {
+        /// Version captured at package open.
+        expected: litchi_core::SourceVersion,
+        /// Version observed during a later operation.
+        actual: litchi_core::SourceVersion,
+    },
 
     /// The destination was atomically replaced, but its parent directory
     /// could not be synchronized. Callers must not blindly retry as if the
@@ -150,7 +176,10 @@ pub enum OpcError {
 
 impl From<soapberry_zip::Error> for OpcError {
     fn from(err: soapberry_zip::Error) -> Self {
-        OpcError::ZipError(err.to_string())
+        match err.kind() {
+            soapberry_zip::ErrorKind::Cancelled => Self::Cancelled,
+            _ => Self::ZipError(err.to_string()),
+        }
     }
 }
 
@@ -177,6 +206,10 @@ impl From<OpcError> for litchi_core::Error {
             },
             OpcError::InvalidReadLimit { .. }
             | OpcError::ReadLimit { .. }
+            | OpcError::Cancelled
+            | OpcError::Execution(_)
+            | OpcError::ParallelRead(_)
+            | OpcError::UnsupportedExecutionAffinity
             | OpcError::PackageNotFound(_)
             | OpcError::InvalidPackUri(_)
             | OpcError::DuplicatePartName(_)
@@ -196,6 +229,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::RelationshipPartCannotBeSource(_)
             | OpcError::MultipleCorePropertiesRelationships
             | OpcError::XmlPublication { .. }
+            | OpcError::SourceChanged { .. }
             | OpcError::Committed { .. }
             | OpcError::IncompleteOutput { .. }
             | OpcError::QuickXmlError(_)

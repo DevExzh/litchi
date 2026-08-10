@@ -7,6 +7,7 @@
 mod codec;
 mod model;
 mod package;
+mod source;
 
 #[cfg(test)]
 mod tests;
@@ -15,3 +16,4 @@ pub mod embedded;
 pub mod media;
 
 pub use model::Presentation;
+pub use source::{SourceBackedPresentation, SourceSlide};

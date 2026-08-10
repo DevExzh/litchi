@@ -646,14 +646,14 @@ impl Writer {
             0x10, 0x8D, 0x81, 0x64, 0x9B, 0x4F, 0xCF, 0x11, 0x86, 0xEA, 0x00, 0xAA, 0x00, 0xB9,
             0x29, 0xE8,
         ]);
-        ole_writer.create_stream(&["PowerPoint Document"], &ppt_stream)?;
-        ole_writer.create_stream(&["Current User"], &current_user)?;
-        ole_writer.create_stream(&["\u{0005}SummaryInformation"], &summary_info)?;
-        ole_writer.create_stream(&["\u{0005}DocumentSummaryInformation"], &doc_summary)?;
+        ole_writer.create_stream_owned(&["PowerPoint Document"], ppt_stream)?;
+        ole_writer.create_stream_owned(&["Current User"], current_user)?;
+        ole_writer.create_stream_owned(&["\u{0005}SummaryInformation"], summary_info)?;
+        ole_writer.create_stream_owned(&["\u{0005}DocumentSummaryInformation"], doc_summary)?;
 
         // Pictures stream (per POI: separate stream for BLIP data)
-        if let Some(pictures) = &pictures_stream {
-            ole_writer.create_stream(&["Pictures"], pictures)?;
+        if let Some(pictures) = pictures_stream {
+            ole_writer.create_stream_owned(&["Pictures"], pictures)?;
         }
 
         ole_writer.save(path)?;
@@ -1007,14 +1007,14 @@ impl Writer {
             0x10, 0x8D, 0x81, 0x64, 0x9B, 0x4F, 0xCF, 0x11, 0x86, 0xEA, 0x00, 0xAA, 0x00, 0xB9,
             0x29, 0xE8,
         ]);
-        ole_writer.create_stream(&["PowerPoint Document"], &ppt_stream)?;
-        ole_writer.create_stream(&["Current User"], &current_user)?;
-        ole_writer.create_stream(&["\u{0005}SummaryInformation"], &summary_info)?;
-        ole_writer.create_stream(&["\u{0005}DocumentSummaryInformation"], &doc_summary)?;
+        ole_writer.create_stream_owned(&["PowerPoint Document"], ppt_stream)?;
+        ole_writer.create_stream_owned(&["Current User"], current_user)?;
+        ole_writer.create_stream_owned(&["\u{0005}SummaryInformation"], summary_info)?;
+        ole_writer.create_stream_owned(&["\u{0005}DocumentSummaryInformation"], doc_summary)?;
 
         // Pictures stream (per POI: separate stream for BLIP data)
-        if let Some(pictures) = &pictures_stream {
-            ole_writer.create_stream(&["Pictures"], pictures)?;
+        if let Some(pictures) = pictures_stream {
+            ole_writer.create_stream_owned(&["Pictures"], pictures)?;
         }
 
         ole_writer.write_to(writer)?;

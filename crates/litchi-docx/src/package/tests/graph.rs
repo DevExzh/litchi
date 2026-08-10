@@ -1,5 +1,32 @@
 use super::*;
 
+fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+    let comment_len = u16::try_from(comment.len()).expect("ZIP comment fits in EOCD");
+    let eocd = archive.len().checked_sub(22).expect("archive has an EOCD");
+    assert_eq!(&archive[eocd..eocd + 4], b"PK\x05\x06");
+    archive[eocd + 20..eocd + 22].copy_from_slice(&comment_len.to_le_bytes());
+    archive.extend_from_slice(comment);
+    archive
+}
+
+#[test]
+fn owned_document_noop_output_preserves_exact_archive() {
+    let mut authored = Package::new().expect("new document");
+    let mut initial = Cursor::new(Vec::new());
+    authored
+        .to_plain_stream(&mut initial)
+        .expect("serialize document");
+    let source = with_eocd_comment(initial.into_inner(), b"docx exact source");
+    let mut package = Package::from_reader(Cursor::new(source.clone())).expect("open document");
+    let mut output = Cursor::new(Vec::new());
+
+    package
+        .to_plain_stream(&mut output)
+        .expect("serialize no-op document");
+
+    assert_eq!(output.into_inner(), source);
+}
+
 #[test]
 fn saves_and_reopens_package() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();

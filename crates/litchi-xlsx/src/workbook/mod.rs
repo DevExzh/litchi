@@ -8,6 +8,7 @@
 pub mod comments;
 pub mod data_model;
 pub mod edit;
+pub mod source;
 pub mod worksheet;
 
 mod codec;
@@ -26,6 +27,7 @@ pub use edit::{
 pub use litchi_core::patch::HistoryLimits;
 pub(crate) use model::Inner;
 pub use model::{DateSystem, Flavor, Selector, Visibility, Workbook, Worksheet, WorksheetKind};
+pub use source::{SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet};
 
 /// Explicit budgeted undo/redo retention for immutable workbook snapshots.
 pub type History = litchi_core::patch::History<Workbook>;

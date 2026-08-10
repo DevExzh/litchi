@@ -7,6 +7,7 @@
 use crate::constants::{content_type as ct, namespace};
 use crate::content_type::ContentTypeMap;
 use crate::error::{OpcError, Result};
+use crate::execution::OpenSession;
 use crate::limits::{ReadLimits, ReadResource};
 use crate::members::{NonPartMember, NonPartReason, PartNameIndex, part_name_for_member};
 use crate::packuri::{PACKAGE_URI, PackURI};
@@ -18,6 +19,71 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::collections::{HashMap, HashSet, TryReserveError};
+
+/// The small ZIP surface needed by the structural OPC reader.
+///
+/// Keeping this behind a private trait lets the eager byte-slice ingress and
+/// the source-backed ingress share exactly the same conformance checks.
+pub(crate) trait ArchiveAccess {
+    fn len(&self) -> usize;
+    fn contains(&self, name: &str) -> bool;
+    fn file_names(&self) -> Box<dyn Iterator<Item = &str> + '_>;
+    fn metadata(
+        &self,
+        name: &str,
+    ) -> std::result::Result<soapberry_zip::office::Metadata, soapberry_zip::Error>;
+    fn read(&self, name: &str) -> std::result::Result<Vec<u8>, soapberry_zip::Error>;
+}
+
+impl ArchiveAccess for soapberry_zip::office::LazyArchiveReader<'_> {
+    fn len(&self) -> usize {
+        Self::len(self)
+    }
+
+    fn contains(&self, name: &str) -> bool {
+        Self::contains(self, name)
+    }
+
+    fn file_names(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(Self::file_names(self))
+    }
+
+    fn metadata(
+        &self,
+        name: &str,
+    ) -> std::result::Result<soapberry_zip::office::Metadata, soapberry_zip::Error> {
+        Self::metadata(self, name)
+    }
+
+    fn read(&self, name: &str) -> std::result::Result<Vec<u8>, soapberry_zip::Error> {
+        Self::read(self, name)
+    }
+}
+
+impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::IndexedArchive<R> {
+    fn len(&self) -> usize {
+        Self::len(self)
+    }
+
+    fn contains(&self, name: &str) -> bool {
+        Self::contains(self, name)
+    }
+
+    fn file_names(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(Self::file_names(self))
+    }
+
+    fn metadata(
+        &self,
+        name: &str,
+    ) -> std::result::Result<soapberry_zip::office::Metadata, soapberry_zip::Error> {
+        Self::metadata(self, name)
+    }
+
+    fn read(&self, name: &str) -> std::result::Result<Vec<u8>, soapberry_zip::Error> {
+        Self::read(self, name)
+    }
+}
 
 /// Reserved ZIP item name of the content types stream (ECMA-376 Part 2 §10.1.2.2).
 const CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
@@ -40,6 +106,22 @@ pub struct SerializedPart {
     /// Serialized relationships from this part
     /// Uses `SmallVec` for efficient storage of typically small relationship collections
     pub srels: SmallVec<[SerializedRelationship; 8]>,
+}
+
+/// Structural information retained by the source-backed reader for one part.
+#[derive(Debug)]
+pub(crate) struct DeferredPart {
+    pub(crate) partname: PackURI,
+    pub(crate) content_type: String,
+    pub(crate) srels: SmallVec<[SerializedRelationship; 8]>,
+}
+
+/// Fully validated package catalog whose ordinary part payloads remain in ZIP.
+#[derive(Debug)]
+pub(crate) struct SourceCatalog {
+    pub(crate) pkg_srels: SmallVec<[SerializedRelationship; 8]>,
+    pub(crate) parts: Vec<DeferredPart>,
+    pub(crate) non_part_members: Vec<NonPartMember>,
 }
 
 #[cfg(test)]
@@ -246,6 +328,74 @@ impl PackageReader {
             &mut non_part_members,
             limits,
             &mut relationship_ledger,
+            |names| {
+                Ok(names
+                    .iter()
+                    .map(|name| (*name, archive.read(name)))
+                    .collect())
+            },
+        )?;
+
+        Ok(Self {
+            pkg_srels,
+            sparts,
+            non_part_members,
+        })
+    }
+
+    /// Open a physical package with an explicitly scheduled eager bulk-read session.
+    ///
+    /// Ordinary constructors call [`Self::from_phys_reader`] and remain serial.
+    pub(crate) fn from_phys_reader_with_session(
+        phys_reader: &PhysPkgReader<'_>,
+        session: &OpenSession,
+    ) -> Result<Self> {
+        let archive = phys_reader.archive();
+        let limits = phys_reader.limits();
+        limits.check(
+            ReadResource::ArchiveMembers,
+            archive.len() as u64,
+            limits.max_archive_members() as u64,
+        )?;
+
+        let relationship_part_count = archive
+            .file_names()
+            .filter(|member_name| Self::is_relationship_member(member_name))
+            .count();
+        limits.check(
+            ReadResource::RelationshipParts,
+            relationship_part_count as u64,
+            limits.max_relationship_parts() as u64,
+        )?;
+        let mut relationship_ledger = RelationshipLedger::default();
+
+        let content_types_member = Self::locate_content_types_member(archive)?;
+        let content_types_metadata = archive.metadata(content_types_member)?;
+        limits.check(
+            ReadResource::ContentTypesBytes,
+            content_types_metadata.uncompressed_size(),
+            limits.max_content_types_bytes() as u64,
+        )?;
+        let content_types_xml = archive.read(content_types_member)?;
+        let content_types = ContentTypeMap::from_xml(&content_types_xml, limits)?;
+
+        let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let pkg_srels =
+            Self::load_rels_lazy(archive, &package_uri, limits, &mut relationship_ledger)?;
+
+        let mut non_part_members = Vec::new();
+        non_part_members
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC non-part members", source))?;
+        let sparts = Self::load_parts_lazy(
+            archive,
+            content_types_member,
+            &pkg_srels,
+            &content_types,
+            &mut non_part_members,
+            limits,
+            &mut relationship_ledger,
+            |names| session.read_many(archive, names),
         )?;
 
         Ok(Self {
@@ -261,9 +411,7 @@ impl PackageReader {
     /// item-name comparison ASCII case-insensitive, so a package that stores the
     /// stream as `[content_types].xml` is still unambiguous; Apache POI resolves
     /// it the same way. The exact spelling wins when both are present.
-    fn locate_content_types_member<'archive>(
-        archive: &'archive soapberry_zip::office::LazyArchiveReader<'_>,
-    ) -> Result<&'archive str> {
+    fn locate_content_types_member<A: ArchiveAccess + ?Sized>(archive: &A) -> Result<&str> {
         if archive.contains(CONTENT_TYPES_MEMBER) {
             return Ok(CONTENT_TYPES_MEMBER);
         }
@@ -387,8 +535,8 @@ impl PackageReader {
     ///
     /// Decompresses and parses the relationships file for a given source URI.
     /// The result is cached by the lazy archive reader for subsequent access.
-    fn load_rels_lazy(
-        archive: &soapberry_zip::office::LazyArchiveReader<'_>,
+    fn load_rels_lazy<A: ArchiveAccess + ?Sized>(
+        archive: &A,
         source_uri: &PackURI,
         limits: ReadLimits,
         ledger: &mut RelationshipLedger,
@@ -424,15 +572,27 @@ impl PackageReader {
     /// 2. Classify every ZIP member into a part or a reported non-part member.
     /// 3. Check the resulting part-name collection for OPC name conflicts.
     /// 4. Decompress all part contents in parallel.
-    fn load_parts_lazy(
-        archive: &soapberry_zip::office::LazyArchiveReader<'_>,
+    fn load_parts_lazy<A, ReadMany>(
+        archive: &A,
         content_types_member: &str,
         pkg_srels: &[SerializedRelationship],
         content_types: &ContentTypeMap,
         non_part_members: &mut Vec<NonPartMember>,
         limits: ReadLimits,
         ledger: &mut RelationshipLedger,
-    ) -> Result<Vec<SerializedPart>> {
+        read_many: ReadMany,
+    ) -> Result<Vec<SerializedPart>>
+    where
+        A: ArchiveAccess + ?Sized,
+        ReadMany: for<'name> FnOnce(
+            &'name [&'name str],
+        ) -> Result<
+            Vec<(
+                &'name str,
+                std::result::Result<Vec<u8>, soapberry_zip::Error>,
+            )>,
+        >,
+    {
         // Phase 1: relationship reachability. Relationship types belong to
         // edges, not parts, so they are intentionally not recorded here.
         let mut relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)?;
@@ -526,7 +686,7 @@ impl PackageReader {
             .try_reserve(typed_parts.len())
             .map_err(|source| allocation("OPC decompressed parts", source))?;
         let mut retained_part_bytes = 0u64;
-        for (member_name, result) in archive.read_many_parallel_results(&member_names) {
+        for (member_name, result) in read_many(&member_names)? {
             let blob = result?;
             limits.check(
                 ReadResource::PartBytes,
@@ -567,6 +727,151 @@ impl PackageReader {
         Ok(sparts)
     }
 
+    /// Perform the same structural admission as [`Self::load_parts_lazy`]
+    /// without reading ordinary part payloads.  This is deliberately kept next
+    /// to the eager path so content-type, relationship, classification, and
+    /// name-conflict semantics cannot drift between the two ingress modes.
+    fn load_part_catalog<A: ArchiveAccess + ?Sized>(
+        archive: &A,
+        content_types_member: &str,
+        pkg_srels: &[SerializedRelationship],
+        content_types: &ContentTypeMap,
+        non_part_members: &mut Vec<NonPartMember>,
+        limits: ReadLimits,
+        ledger: &mut RelationshipLedger,
+    ) -> Result<Vec<DeferredPart>> {
+        let mut relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)?;
+        let mut index = PartNameIndex::try_with_capacity(archive.len())?;
+        let mut typed_parts: Vec<(PackURI, String)> = Vec::new();
+        typed_parts
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC deferred typed parts", source))?;
+
+        let mut declared_part_bytes = 0u64;
+        for member_name in archive.file_names() {
+            if member_name.is_empty()
+                || member_name.ends_with('/')
+                || member_name == content_types_member
+            {
+                continue;
+            }
+            if Self::relationship_part_has_relationships(member_name) {
+                return Err(OpcError::RelationshipPartCannotBeSource(
+                    member_name.to_string(),
+                ));
+            }
+            let max_member_name_bytes =
+                usize::try_from(limits.max_archive_member_name_bytes()).unwrap_or(usize::MAX);
+            let Some(partname) = part_name_for_member(member_name, max_member_name_bytes) else {
+                non_part_members.push(NonPartMember::new(
+                    member_name,
+                    NonPartReason::UnmappablePartName,
+                )?);
+                continue;
+            };
+            let is_relationship_part = Self::is_relationship_member(partname.membername());
+            let content_type = if is_relationship_part {
+                Self::relationship_part_content_type(content_types, &partname)?
+            } else {
+                match content_types.get(&partname) {
+                    Ok(content_type) => content_type,
+                    Err(OpcError::ContentTypeNotFound(_))
+                        if !relationships.contains_key(partname.as_str()) =>
+                    {
+                        non_part_members.push(NonPartMember::new(
+                            member_name,
+                            NonPartReason::UntypedAndUnreferenced,
+                        )?);
+                        continue;
+                    },
+                    Err(error) => return Err(error),
+                }
+            };
+            index.insert(&partname)?;
+            if !is_relationship_part {
+                let part_count =
+                    checked_increment(typed_parts.len(), limits.max_parts(), ReadResource::Parts)?;
+                debug_assert_eq!(part_count, typed_parts.len() + 1);
+                let declared = archive.metadata(partname.membername())?.uncompressed_size();
+                limits.check(ReadResource::PartBytes, declared, limits.max_part_bytes())?;
+                declared_part_bytes = checked_add(
+                    declared_part_bytes,
+                    declared,
+                    ReadResource::TotalPartBytes,
+                    limits.max_total_part_bytes(),
+                )?;
+                typed_parts.push((partname, content_type));
+            }
+        }
+
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC deferred parts", source))?;
+        for (partname, content_type) in typed_parts {
+            let srels = match relationships.remove(partname.as_str()) {
+                Some(srels) => srels,
+                None => Self::load_rels_lazy(archive, &partname, limits, ledger)?,
+            };
+            parts.push(DeferredPart {
+                partname,
+                content_type,
+                srels,
+            });
+        }
+        Ok(parts)
+    }
+
+    pub(crate) fn source_catalog<A: ArchiveAccess + ?Sized>(
+        archive: &A,
+        limits: ReadLimits,
+    ) -> Result<SourceCatalog> {
+        limits.check(
+            ReadResource::ArchiveMembers,
+            archive.len() as u64,
+            limits.max_archive_members() as u64,
+        )?;
+        let relationship_part_count = archive
+            .file_names()
+            .filter(|member_name| Self::is_relationship_member(member_name))
+            .count();
+        limits.check(
+            ReadResource::RelationshipParts,
+            relationship_part_count as u64,
+            limits.max_relationship_parts() as u64,
+        )?;
+        let mut ledger = RelationshipLedger::default();
+        let content_types_member = Self::locate_content_types_member(archive)?;
+        let content_types_metadata = archive.metadata(content_types_member)?;
+        limits.check(
+            ReadResource::ContentTypesBytes,
+            content_types_metadata.uncompressed_size(),
+            limits.max_content_types_bytes() as u64,
+        )?;
+        let content_types_xml = archive.read(content_types_member)?;
+        let content_types = ContentTypeMap::from_xml(&content_types_xml, limits)?;
+        let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let pkg_srels = Self::load_rels_lazy(archive, &package_uri, limits, &mut ledger)?;
+        let mut non_part_members = Vec::new();
+        non_part_members
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC non-part members", source))?;
+        let parts = Self::load_part_catalog(
+            archive,
+            content_types_member,
+            &pkg_srels,
+            &content_types,
+            &mut non_part_members,
+            limits,
+            &mut ledger,
+        )?;
+        Ok(SourceCatalog {
+            pkg_srels,
+            parts,
+            non_part_members,
+        })
+    }
+
     /// Walk the relationship graph, returning each visited part name with its
     /// own relationships.
     ///
@@ -574,8 +879,8 @@ impl PackageReader {
     /// member is still visited: OPC defines no rule requiring a relationship
     /// target to resolve, and the dangling relationship stays visible on its
     /// source part.
-    fn walk_relationship_graph(
-        archive: &soapberry_zip::office::LazyArchiveReader<'_>,
+    fn walk_relationship_graph<A: ArchiveAccess + ?Sized>(
+        archive: &A,
         pkg_srels: &[SerializedRelationship],
         limits: ReadLimits,
         ledger: &mut RelationshipLedger,

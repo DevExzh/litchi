@@ -81,6 +81,12 @@ impl<T: AsRef<[u8]>> ZipSliceArchive<T> {
         self.eocd.entries()
     }
 
+    /// Whether this archive uses ZIP64 end-of-central-directory metadata.
+    #[inline]
+    pub fn is_zip64(&self) -> bool {
+        self.eocd.is_zip64()
+    }
+
     /// Returns the offset of the End of Central Directory (EOCD) signature.
     ///
     /// See [`ZipArchive::eocd_offset()`] for more details.
@@ -480,6 +486,12 @@ impl<R> ZipArchive<R> {
         self.eocd.entries()
     }
 
+    /// Whether this archive uses ZIP64 end-of-central-directory metadata.
+    #[inline]
+    pub fn is_zip64(&self) -> bool {
+        self.eocd.is_zip64()
+    }
+
     /// Returns a Read implementation for the comment of the zip archive.
     ///
     /// Use [`RangeReader::remaining()`] to get the comment length before
@@ -846,24 +858,25 @@ where
         self.size += read as u64;
 
         if read == 0 || self.size >= self.wayfinder.uncompressed_size_hint() {
-            let crc = if self.wayfinder.has_data_descriptor {
+            let expected_crc = if self.wayfinder.has_data_descriptor {
                 DataDescriptor::read_at(&self.archive, self.end_offset).map(|x| x.crc)
             } else {
-                Ok(self.crc)
+                Ok(self.wayfinder.crc)
             };
 
-            crc.and_then(|crc| {
-                let expected = ZipVerification {
-                    crc: self.crc,
-                    uncompressed_size: self.wayfinder.uncompressed_size_hint(),
-                };
+            expected_crc
+                .and_then(|expected_crc| {
+                    let expected = ZipVerification {
+                        crc: expected_crc,
+                        uncompressed_size: self.wayfinder.uncompressed_size_hint(),
+                    };
 
-                expected.valid(ZipVerification {
-                    crc,
-                    uncompressed_size: self.size,
+                    expected.valid(ZipVerification {
+                        crc: self.crc,
+                        uncompressed_size: self.size,
+                    })
                 })
-            })
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         }
 
         Ok(read)
@@ -1625,6 +1638,12 @@ impl<'a> ZipFileHeaderRecord<'a> {
         self.crc32
     }
 
+    /// Whether this central-directory record uses ZIP64 fields.
+    #[inline]
+    pub fn is_zip64(&self) -> bool {
+        self.is_zip64
+    }
+
     /// Returns the offset from the start of reader where this central directory
     /// record was parsed from.
     #[inline]
@@ -1720,7 +1739,7 @@ pub(crate) struct ZipLocalFileHeaderFixed {
 }
 
 impl ZipLocalFileHeaderFixed {
-    const SIZE: usize = 30;
+    pub(crate) const SIZE: usize = 30;
     pub const SIGNATURE: u32 = 0x04034b50;
 
     pub fn parse(data: &[u8]) -> Result<ZipLocalFileHeaderFixed, Error> {

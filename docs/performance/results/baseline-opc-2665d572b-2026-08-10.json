@@ -1,0 +1,1337 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "2665d572b78f0b3efd9ecfc4bd1fda09f8786ae3",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 12,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "4"
+  },
+  "configuration": {
+    "samples_per_case": 15,
+    "warmup_iterations_per_case": 3,
+    "cases": [
+      "zip_index",
+      "zip_read_one",
+      "opc_open",
+      "opc_noop_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ]
+  },
+  "results": [
+    {
+      "case": "zip_index",
+      "corpus": {
+        "name": "tiny-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 1536,
+        "archive_bytes": 1243,
+        "archive_sha256": "034908431a8b0bad34ce94018762a7b9dd00d3c030c94b97b0dcccf5e8958451",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          370,
+          371,
+          381,
+          391,
+          391,
+          391,
+          391,
+          391,
+          400,
+          401,
+          410,
+          441,
+          441,
+          460,
+          490
+        ],
+        "min": 370,
+        "p50": 391,
+        "p95": 490,
+        "p99": 490,
+        "max": 490,
+        "mean": 407.99999999999994,
+        "standard_deviation": 34.54810311104549,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 388.8659953971245,
+          "upper": 427.1340046028754
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "zip_read_one",
+      "corpus": {
+        "name": "tiny-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 1536,
+        "archive_bytes": 1243,
+        "archive_sha256": "034908431a8b0bad34ce94018762a7b9dd00d3c030c94b97b0dcccf5e8958451",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          581,
+          631,
+          681,
+          691,
+          711,
+          721,
+          731,
+          752,
+          771,
+          771,
+          781,
+          781,
+          791,
+          841,
+          14119
+        ],
+        "min": 581,
+        "p50": 752,
+        "p95": 14119,
+        "p99": 14119,
+        "max": 14119,
+        "mean": 1623.6,
+        "standard_deviation": 3457.383027667024,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 0.0,
+          "upper": 3538.425324928882
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_open",
+      "corpus": {
+        "name": "tiny-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 1536,
+        "archive_bytes": 1243,
+        "archive_sha256": "034908431a8b0bad34ce94018762a7b9dd00d3c030c94b97b0dcccf5e8958451",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          30733,
+          31113,
+          31374,
+          32265,
+          32324,
+          32374,
+          32416,
+          32434,
+          33086,
+          33146,
+          34267,
+          35238,
+          43169,
+          47786,
+          85038
+        ],
+        "min": 30733,
+        "p50": 32434,
+        "p95": 85038,
+        "p99": 85038,
+        "max": 85038,
+        "mean": 37784.200000000004,
+        "standard_deviation": 13904.51192033928,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 30083.37213603984,
+          "upper": 45485.02786396017
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_noop_save",
+      "corpus": {
+        "name": "tiny-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 1536,
+        "archive_bytes": 1243,
+        "archive_sha256": "034908431a8b0bad34ce94018762a7b9dd00d3c030c94b97b0dcccf5e8958451",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          33927,
+          34787,
+          34829,
+          34878,
+          34968,
+          34968,
+          35038,
+          35068,
+          35799,
+          36350,
+          36682,
+          36931,
+          39144,
+          44612,
+          51090
+        ],
+        "min": 33927,
+        "p50": 35068,
+        "p95": 51090,
+        "p99": 51090,
+        "max": 51090,
+        "mean": 37271.399999999994,
+        "standard_deviation": 4639.3521376527215,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 34701.95690001612,
+          "upper": 39840.84309998387
+        }
+      },
+      "sink": {
+        "accepted_bytes": 1243,
+        "write_calls": 42,
+        "largest_write": 240
+      }
+    },
+    {
+      "case": "zip_index",
+      "corpus": {
+        "name": "tiny-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 1536,
+        "archive_bytes": 2635,
+        "archive_sha256": "3344134f983df17c88b7d80efb36b75265307b9a0b19dc39d9257cd159f67c16",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          391,
+          400,
+          400,
+          401,
+          401,
+          401,
+          401,
+          401,
+          410,
+          410,
+          411,
+          411,
+          420,
+          421,
+          431
+        ],
+        "min": 391,
+        "p50": 401,
+        "p95": 431,
+        "p99": 431,
+        "max": 431,
+        "mean": 407.3333333333333,
+        "standard_deviation": 10.431180365113232,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 401.55616367287547,
+          "upper": 413.11050299379116
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "zip_read_one",
+      "corpus": {
+        "name": "tiny-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 1536,
+        "archive_bytes": 2635,
+        "archive_sha256": "3344134f983df17c88b7d80efb36b75265307b9a0b19dc39d9257cd159f67c16",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          411,
+          420,
+          421,
+          421,
+          421,
+          421,
+          421,
+          431,
+          431,
+          431,
+          441,
+          441,
+          461,
+          470,
+          470
+        ],
+        "min": 411,
+        "p50": 431,
+        "p95": 470,
+        "p99": 470,
+        "max": 470,
+        "mean": 434.1333333333333,
+        "standard_deviation": 18.927933502278247,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 423.65035064709366,
+          "upper": 444.616316019573
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_open",
+      "corpus": {
+        "name": "tiny-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 1536,
+        "archive_bytes": 2635,
+        "archive_sha256": "3344134f983df17c88b7d80efb36b75265307b9a0b19dc39d9257cd159f67c16",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          30321,
+          30362,
+          30462,
+          30622,
+          30712,
+          30852,
+          31022,
+          31083,
+          31504,
+          32124,
+          32184,
+          48697,
+          53375,
+          58781,
+          94040
+        ],
+        "min": 30321,
+        "p50": 31083,
+        "p95": 94040,
+        "p99": 94040,
+        "max": 94040,
+        "mean": 39742.73333333334,
+        "standard_deviation": 17763.226631228372,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 29904.807962108593,
+          "upper": 49580.65870455808
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_noop_save",
+      "corpus": {
+        "name": "tiny-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 1536,
+        "archive_bytes": 2635,
+        "archive_sha256": "3344134f983df17c88b7d80efb36b75265307b9a0b19dc39d9257cd159f67c16",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "ee8a1c01d233098f05feb2eb7d8b57b29579d6203b780d24a9599d002d92d627"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          61995,
+          62106,
+          62125,
+          63067,
+          68645,
+          74883,
+          79370,
+          85898,
+          86189,
+          86449,
+          86479,
+          86680,
+          86979,
+          87099,
+          94660
+        ],
+        "min": 61995,
+        "p50": 85898,
+        "p95": 94660,
+        "p99": 94660,
+        "max": 94660,
+        "mean": 78174.93333333333,
+        "standard_deviation": 11561.847272489851,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 71771.55893623554,
+          "upper": 84578.30773043113
+        }
+      },
+      "sink": {
+        "accepted_bytes": 2635,
+        "write_calls": 42,
+        "largest_write": 522
+      }
+    },
+    {
+      "case": "zip_index",
+      "corpus": {
+        "name": "many-small-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 54615,
+        "archive_sha256": "1aaa7f360f30239927d9d629b301fbf6e3109bb442c0a0660002f37b68e5a0b1",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          36942,
+          39254,
+          40675,
+          40756,
+          41107,
+          41197,
+          41397,
+          41437,
+          41929,
+          42088,
+          42238,
+          42438,
+          42859,
+          43009,
+          55948
+        ],
+        "min": 36942,
+        "p50": 41437,
+        "p95": 55948,
+        "p99": 55948,
+        "max": 55948,
+        "mean": 42218.26666666667,
+        "standard_deviation": 4091.7967668192377,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 39952.07978171093,
+          "upper": 44484.45355162241
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "zip_read_one",
+      "corpus": {
+        "name": "many-small-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 54615,
+        "archive_sha256": "1aaa7f360f30239927d9d629b301fbf6e3109bb442c0a0660002f37b68e5a0b1",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          961,
+          962,
+          971,
+          971,
+          971,
+          981,
+          991,
+          1001,
+          1012,
+          1012,
+          1012,
+          1021,
+          1022,
+          1061,
+          1062
+        ],
+        "min": 961,
+        "p50": 1001,
+        "p95": 1062,
+        "p99": 1062,
+        "max": 1062,
+        "mean": 1000.7333333333333,
+        "standard_deviation": 32.563052389976924,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 982.6987225093808,
+          "upper": 1018.7679441572859
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_open",
+      "corpus": {
+        "name": "many-small-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 54615,
+        "archive_sha256": "1aaa7f360f30239927d9d629b301fbf6e3109bb442c0a0660002f37b68e5a0b1",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          560773,
+          589342,
+          593137,
+          600167,
+          612874,
+          617670,
+          618312,
+          622097,
+          624149,
+          637647,
+          639331,
+          647583,
+          677625,
+          691954,
+          713222
+        ],
+        "min": 560773,
+        "p50": 622097,
+        "p95": 713222,
+        "p99": 713222,
+        "max": 713222,
+        "mean": 629725.5333333333,
+        "standard_deviation": 40407.64159142366,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 607346.3017524697,
+          "upper": 652104.7649141969
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_noop_save",
+      "corpus": {
+        "name": "many-small-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 54615,
+        "archive_sha256": "1aaa7f360f30239927d9d629b301fbf6e3109bb442c0a0660002f37b68e5a0b1",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          1465738,
+          1469404,
+          1480578,
+          1481461,
+          1481760,
+          1487167,
+          1570243,
+          1574058,
+          1611038,
+          1614304,
+          1621392,
+          1657603,
+          1692962,
+          1766232,
+          1838052
+        ],
+        "min": 1465738,
+        "p50": 1574058,
+        "p95": 1838052,
+        "p99": 1838052,
+        "max": 1838052,
+        "mean": 1587466.1333333335,
+        "standard_deviation": 115373.49976357324,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 1523568.0643588817,
+          "upper": 1651364.2023077854
+        }
+      },
+      "sink": {
+        "accepted_bytes": 54615,
+        "write_calls": 1813,
+        "largest_write": 970
+      }
+    },
+    {
+      "case": "zip_index",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 302935,
+        "archive_sha256": "dbe0ffa1f8452c10bf6678eccd23302440d518b112af63aeb6d86acabe34c1d1",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          27378,
+          27538,
+          27558,
+          27569,
+          27669,
+          27718,
+          27758,
+          27848,
+          27938,
+          28170,
+          28339,
+          28449,
+          28529,
+          34767,
+          35128
+        ],
+        "min": 27378,
+        "p50": 27848,
+        "p95": 35128,
+        "p99": 35128,
+        "max": 35128,
+        "mean": 28823.733333333334,
+        "standard_deviation": 2511.458553643015,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 27432.795620461548,
+          "upper": 30214.67104620512
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "zip_read_one",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 302935,
+        "archive_sha256": "dbe0ffa1f8452c10bf6678eccd23302440d518b112af63aeb6d86acabe34c1d1",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          461,
+          470,
+          470,
+          470,
+          480,
+          481,
+          481,
+          491,
+          491,
+          501,
+          511,
+          520,
+          531,
+          531,
+          561
+        ],
+        "min": 461,
+        "p50": 491,
+        "p95": 561,
+        "p99": 561,
+        "max": 561,
+        "mean": 496.6666666666667,
+        "standard_deviation": 28.664728616658238,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 480.7910902991769,
+          "upper": 512.5422430341564
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_open",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 302935,
+        "archive_sha256": "dbe0ffa1f8452c10bf6678eccd23302440d518b112af63aeb6d86acabe34c1d1",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          561173,
+          640383,
+          664715,
+          690391,
+          701066,
+          702528,
+          730987,
+          736545,
+          814472,
+          852485,
+          939144,
+          954586,
+          975914,
+          979509,
+          1014988
+        ],
+        "min": 561173,
+        "p50": 736545,
+        "p95": 1014988,
+        "p99": 1014988,
+        "max": 1014988,
+        "mean": 797259.0666666667,
+        "standard_deviation": 145506.1385761865,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 716672.4389055244,
+          "upper": 877845.6944278089
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_noop_save",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 302935,
+        "archive_sha256": "dbe0ffa1f8452c10bf6678eccd23302440d518b112af63aeb6d86acabe34c1d1",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          5577671,
+          5585903,
+          5642200,
+          5656139,
+          5673954,
+          5695044,
+          5722923,
+          5727127,
+          5745404,
+          5749858,
+          5789505,
+          5879858,
+          5889081,
+          5979776,
+          6094964
+        ],
+        "min": 5577671,
+        "p50": 5727127,
+        "p95": 6094964,
+        "p99": 6094964,
+        "max": 6094964,
+        "mean": 5760627.133333333,
+        "standard_deviation": 145161.70201333953,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5680231.267153448,
+          "upper": 5841022.999513217
+        }
+      },
+      "sink": {
+        "accepted_bytes": 302935,
+        "write_calls": 1813,
+        "largest_write": 1034
+      }
+    },
+    {
+      "case": "zip_index",
+      "corpus": {
+        "name": "few-large-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 99044,
+        "archive_sha256": "eaa8f44bcb3de09363bfbee755d36fc82d50aa305ef685c5f16004bcca151a0f",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          460,
+          470,
+          471,
+          471,
+          480,
+          480,
+          481,
+          481,
+          490,
+          490,
+          491,
+          511,
+          521,
+          530,
+          531
+        ],
+        "min": 460,
+        "p50": 481,
+        "p95": 531,
+        "p99": 531,
+        "max": 531,
+        "mean": 490.5333333333333,
+        "standard_deviation": 22.46224345323462,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 478.092920375098,
+          "upper": 502.9737462915686
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "zip_read_one",
+      "corpus": {
+        "name": "few-large-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 99044,
+        "archive_sha256": "eaa8f44bcb3de09363bfbee755d36fc82d50aa305ef685c5f16004bcca151a0f",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          395535,
+          395726,
+          396106,
+          401583,
+          401683,
+          402395,
+          407681,
+          408483,
+          411226,
+          414070,
+          416424,
+          420178,
+          424534,
+          427288,
+          431125
+        ],
+        "min": 395535,
+        "p50": 408483,
+        "p95": 431125,
+        "p99": 431125,
+        "max": 431125,
+        "mean": 410269.1333333334,
+        "standard_deviation": 11740.584859285942,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 403766.7675155643,
+          "upper": 416771.49915110256
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_open",
+      "corpus": {
+        "name": "few-large-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 99044,
+        "archive_sha256": "eaa8f44bcb3de09363bfbee755d36fc82d50aa305ef685c5f16004bcca151a0f",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          426629,
+          455036,
+          461055,
+          478890,
+          485768,
+          491828,
+          497806,
+          499368,
+          504745,
+          509262,
+          522711,
+          566029,
+          740950,
+          1346183,
+          1412425
+        ],
+        "min": 426629,
+        "p50": 499368,
+        "p95": 1412425,
+        "p99": 1412425,
+        "max": 1412425,
+        "mean": 626579.0,
+        "standard_deviation": 314062.57071754715,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 452639.64783397067,
+          "upper": 800518.3521660294
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_noop_save",
+      "corpus": {
+        "name": "few-large-compressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 99044,
+        "archive_sha256": "eaa8f44bcb3de09363bfbee755d36fc82d50aa305ef685c5f16004bcca151a0f",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "9ffe215b657a51775a4ebf8995613a031e1752e70beeb1241d2825cc9185ec1e"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          3141757,
+          3172169,
+          3236898,
+          3238780,
+          3260920,
+          3324719,
+          3375248,
+          3382518,
+          3384202,
+          3387826,
+          3431797,
+          3460455,
+          3469889,
+          3535980,
+          3559963
+        ],
+        "min": 3141757,
+        "p50": 3382518,
+        "p95": 3559963,
+        "p99": 3559963,
+        "max": 3559963,
+        "mean": 3357541.4,
+        "standard_deviation": 126520.79509980064,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 3287469.5506710256,
+          "upper": 3427613.249328974
+        }
+      },
+      "sink": {
+        "accepted_bytes": 99044,
+        "write_calls": 49,
+        "largest_write": 24457
+      }
+    },
+    {
+      "case": "zip_index",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783565,
+        "archive_sha256": "f30d92f623e221b16db2697810385d9b1c2c3e6c17c04b0c11945326c57a9612",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          430,
+          440,
+          450,
+          450,
+          451,
+          461,
+          471,
+          471,
+          471,
+          481,
+          481,
+          481,
+          511,
+          531,
+          621
+        ],
+        "min": 430,
+        "p50": 471,
+        "p95": 621,
+        "p99": 621,
+        "max": 621,
+        "mean": 480.06666666666666,
+        "standard_deviation": 46.897253447855356,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 454.09325039980973,
+          "upper": 506.0400829335236
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "zip_read_one",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783565,
+        "archive_sha256": "f30d92f623e221b16db2697810385d9b1c2c3e6c17c04b0c11945326c57a9612",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          438734,
+          448838,
+          460234,
+          466633,
+          467383,
+          468024,
+          474803,
+          479740,
+          483435,
+          484458,
+          484508,
+          484607,
+          487862,
+          491397,
+          525564
+        ],
+        "min": 438734,
+        "p50": 479740,
+        "p95": 525564,
+        "p99": 525564,
+        "max": 525564,
+        "mean": 476414.6666666667,
+        "standard_deviation": 20215.261461390506,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 465218.7146166419,
+          "upper": 487610.61871669145
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_open",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783565,
+        "archive_sha256": "f30d92f623e221b16db2697810385d9b1c2c3e6c17c04b0c11945326c57a9612",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          501240,
+          525254,
+          527595,
+          541816,
+          560671,
+          563967,
+          597763,
+          648294,
+          663494,
+          692425,
+          693444,
+          717328,
+          838704,
+          937392,
+          1080689
+        ],
+        "min": 501240,
+        "p50": 648294,
+        "p95": 1080689,
+        "p99": 1080689,
+        "max": 1080689,
+        "mean": 672671.7333333333,
+        "standard_deviation": 166235.52545558737,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 580604.4120391667,
+          "upper": 764739.0546274999
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "opc_noop_save",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783565,
+        "archive_sha256": "f30d92f623e221b16db2697810385d9b1c2c3e6c17c04b0c11945326c57a9612",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098"
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          207789327,
+          210196373,
+          210468467,
+          211283210,
+          211499508,
+          211601748,
+          212111550,
+          212754375,
+          212872558,
+          212974339,
+          213959506,
+          215488681,
+          225343543,
+          229272253,
+          229522990
+        ],
+        "min": 207789327,
+        "p50": 212754375,
+        "p95": 229522990,
+        "p99": 229522990,
+        "max": 229522990,
+        "mean": 215142561.86666664,
+        "standard_deviation": 6958318.2965147635,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 211288790.3908249,
+          "upper": 218996333.34250838
+        }
+      },
+      "sink": {
+        "accepted_bytes": 16783565,
+        "write_calls": 557,
+        "largest_write": 32768
+      }
+    }
+  ]
+}

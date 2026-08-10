@@ -361,6 +361,9 @@ fn map_writer_error(error: OleError) -> Error {
         OleError::NotOleFile => Error::Container("Not an OLE file".to_string()),
         OleError::CorruptedFile(message) => Error::Container(format!("Corrupted file: {message}")),
         OleError::StreamNotFound => Error::Container("Stream not found".to_string()),
+        OleError::SourceChanged { expected, observed } => Error::Container(format!(
+            "CFB positional source changed (expected {expected:?}, observed {observed:?})"
+        )),
     }
 }
 
@@ -376,6 +379,9 @@ fn map_reader_error(error: OleError) -> Error {
         OleError::NotOleFile => Error::Container("Not an OLE file".to_string()),
         OleError::CorruptedFile(message) => Error::Container(format!("Corrupted file: {message}")),
         OleError::StreamNotFound => Error::Container("Stream not found".to_string()),
+        OleError::SourceChanged { expected, observed } => Error::Container(format!(
+            "CFB positional source changed (expected {expected:?}, observed {observed:?})"
+        )),
     }
 }
 

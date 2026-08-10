@@ -6,6 +6,7 @@
 
 use crate::constants::relationship_type;
 use crate::error::{OpcError, Result};
+use crate::execution::OpenSession;
 use crate::limits::ReadLimits;
 use crate::members::NonPartMember;
 use crate::packuri::{PACKAGE_URI, PackURI, PartNameConflict};
@@ -59,6 +60,9 @@ pub struct OpcPackage {
     /// Exact XML payloads materialized from the opened source package.
     source_xml_parts: HashMap<PackURI, Arc<Vec<u8>>>,
 
+    /// Authorized owned source archive, until any mutable API is entered.
+    exact_source: Option<Arc<Vec<u8>>>,
+
     /// ZIP items the reader found but did not model as parts
     non_part_members: Vec<NonPartMember>,
 
@@ -72,6 +76,7 @@ impl std::fmt::Debug for OpcPackage {
             .field("rels", &self.rels)
             .field("parts_count", &self.parts.len())
             .field("source_xml_parts_count", &self.source_xml_parts.len())
+            .field("has_exact_source", &self.exact_source.is_some())
             .field("non_part_members", &self.non_part_members)
             .field("save_options", &self.save_options)
             .finish()
@@ -86,6 +91,7 @@ impl OpcPackage {
             rels: Relationships::new(PACKAGE_URI.to_string()),
             parts: HashMap::new(),
             source_xml_parts: HashMap::new(),
+            exact_source: None,
             non_part_members: Vec::new(),
             save_options: SaveOptions::default(),
         }
@@ -102,8 +108,17 @@ impl OpcPackage {
         &self.non_part_members
     }
 
+    /// Replace the reader-reported ZIP members that are not OPC parts.
+    ///
+    /// This is crate-private because only package ingress paths can establish
+    /// the classification; mutable package callers cannot manufacture it.
+    pub(crate) fn set_non_part_members(&mut self, members: Vec<NonPartMember>) {
+        self.non_part_members = members;
+    }
+
     /// Set save options for the package.
     pub fn set_save_options(&mut self, options: SaveOptions) {
+        self.revoke_exact_source();
         self.save_options = options;
     }
 
@@ -115,6 +130,7 @@ impl OpcPackage {
 
     /// Configure font embedding with one self-documenting policy.
     pub fn with_fonts(&mut self, policy: FontEmbedding) -> &mut Self {
+        self.revoke_exact_source();
         self.save_options.fonts = policy;
         self
     }
@@ -147,9 +163,7 @@ impl OpcPackage {
     /// a valid OPC package.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: ReadLimits) -> Result<Self> {
         let owned_reader = OwnedPhysPkgReader::open_with_limits(path, limits)?;
-        let phys_reader = owned_reader.reader()?;
-        let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
-        Self::unmarshal(pkg_reader)
+        Self::from_owned_phys_reader(owned_reader)
     }
 
     /// Load an OPC package from a reader.
@@ -170,9 +184,7 @@ impl OpcPackage {
     /// not a valid OPC package.
     pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
         let owned_reader = OwnedPhysPkgReader::from_reader_with_limits(reader, limits)?;
-        let phys_reader = owned_reader.reader()?;
-        let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
-        Self::unmarshal(pkg_reader)
+        Self::from_owned_phys_reader(owned_reader)
     }
 
     /// Move an owned ZIP archive into the package reader.
@@ -191,9 +203,25 @@ impl OpcPackage {
     /// Returns an error if the archive violates `limits` or is not a valid OPC package.
     pub fn from_vec_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
         let owned_reader = OwnedPhysPkgReader::from_bytes_with_limits(data, limits)?;
-        let phys_reader = owned_reader.reader()?;
-        let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
-        Self::unmarshal(pkg_reader)
+        Self::from_owned_phys_reader(owned_reader)
+    }
+
+    /// Moves an owned ZIP archive into an explicitly scheduled eager open.
+    ///
+    /// This additive advanced API retains exact owned-source authorization on
+    /// success. Ordinary constructors remain serial and do not create an
+    /// execution session.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed OPC, execution, or local-session error when opening
+    /// cannot complete. Cancellation discards the incomplete package.
+    pub fn from_vec_with_execution(
+        data: Vec<u8>,
+        limits: ReadLimits,
+        execution: &OpenSession,
+    ) -> Result<Self> {
+        execution.from_vec(data, limits)
     }
 
     /// Load an OPC package from a byte slice.
@@ -217,13 +245,30 @@ impl OpcPackage {
         Self::unmarshal(pkg_reader)
     }
 
+    /// Loads a borrowed ZIP archive through an explicitly scheduled eager open.
+    ///
+    /// Ordinary constructors remain serial and do not create an execution
+    /// session.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed OPC, execution, or local-session error when opening
+    /// cannot complete. Cancellation discards the incomplete package.
+    pub fn from_bytes_with_execution(
+        data: &[u8],
+        limits: ReadLimits,
+        execution: &OpenSession,
+    ) -> Result<Self> {
+        execution.from_bytes(data, limits)
+    }
+
     /// Unmarshal a package from a package reader.
     ///
     /// This is the main deserialization logic that converts serialized parts
     /// and relationships into the in-memory object graph.
     ///
     /// Optimized to minimize clones by consuming the package reader and moving data.
-    fn unmarshal(mut pkg_reader: PackageReader) -> Result<Self> {
+    pub(crate) fn unmarshal(mut pkg_reader: PackageReader) -> Result<Self> {
         let mut package = Self::new();
 
         // Get ownership of package relationships, parts, and non-part members
@@ -367,6 +412,7 @@ impl OpcPackage {
     /// # Errors
     /// Returns `OpcError::PartNotFound` if no part with `partname` exists.
     pub fn get_part_mut(&mut self, partname: &PackURI) -> Result<&mut dyn Part> {
+        self.revoke_exact_source();
         // Resolve the stored key first so the borrow of `self.parts` ends before
         // the mutable lookup; see `find_case_insensitive` for why this matches.
         let key = if self.parts.contains_key(partname) {
@@ -405,6 +451,7 @@ impl OpcPackage {
     /// # Arguments
     /// * `part` - The part to add
     pub fn add_part(&mut self, part: Box<dyn Part + Send + Sync>) {
+        self.revoke_exact_source();
         let partname = part.partname().clone();
         self.source_xml_parts.remove(&partname);
         self.parts.insert(partname, part);
@@ -416,6 +463,7 @@ impl OpcPackage {
     /// Returns an error if the part's partname duplicates or conflicts with an
     /// existing part name; the existing part is left untouched.
     pub fn try_add_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
+        self.revoke_exact_source();
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
         self.parts.insert(partname, part);
@@ -438,6 +486,7 @@ impl OpcPackage {
 
     /// Remove a part by name, returning whether it existed.
     pub fn remove_part(&mut self, partname: &PackURI) -> bool {
+        self.revoke_exact_source();
         self.source_xml_parts.remove(partname);
         self.parts.remove(partname).is_some()
     }
@@ -464,6 +513,7 @@ impl OpcPackage {
 
     /// Get a mutable reference to the package-level relationships.
     pub fn rels_mut(&mut self) -> &mut Relationships {
+        self.revoke_exact_source();
         &mut self.rels
     }
 
@@ -508,6 +558,7 @@ impl OpcPackage {
     /// signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn sign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
+        self.revoke_exact_source();
         crate::sign::sign(self, signer, &litchi_sign::Limits::standard())
     }
 
@@ -522,6 +573,7 @@ impl OpcPackage {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> crate::sign::Result<PackURI> {
+        self.revoke_exact_source();
         crate::sign::sign(self, signer, limits)
     }
 
@@ -532,6 +584,7 @@ impl OpcPackage {
     /// signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn resign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
+        self.revoke_exact_source();
         crate::sign::resign(self, signer, &litchi_sign::Limits::standard())
     }
 
@@ -546,6 +599,7 @@ impl OpcPackage {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> crate::sign::Result<PackURI> {
+        self.revoke_exact_source();
         crate::sign::resign(self, signer, limits)
     }
 
@@ -553,6 +607,7 @@ impl OpcPackage {
     ///
     /// Deletion is infallible and idempotent, including for a malformed graph.
     pub fn unsign(&mut self) {
+        self.revoke_exact_source();
         self.strip_signature_graph();
     }
 
@@ -567,6 +622,7 @@ impl OpcPackage {
     /// # Returns
     /// The relationship ID (rId)
     pub fn relate_to(&mut self, partname: &str, reltype: &str) -> String {
+        self.revoke_exact_source();
         let rel = self.rels.get_or_add(reltype, partname);
         rel.r_id().to_string()
     }
@@ -580,6 +636,7 @@ impl OpcPackage {
     /// # Returns
     /// The relationship ID (e.g., "rId1")
     pub fn relate_to_external(&mut self, target_url: &str, reltype: &str) -> String {
+        self.revoke_exact_source();
         self.rels.get_or_add_ext_rel(reltype, target_url)
     }
 
@@ -587,6 +644,7 @@ impl OpcPackage {
     ///
     /// Useful for advanced relationship management.
     pub fn relationships_mut(&mut self) -> &mut Relationships {
+        self.revoke_exact_source();
         &mut self.rels
     }
 
@@ -706,6 +764,7 @@ impl OpcPackage {
     }
 
     pub(crate) fn strip_signature_graph(&mut self) {
+        self.revoke_exact_source();
         let infrastructure: HashSet<PackURI> = self
             .parts
             .values()
@@ -725,6 +784,54 @@ impl OpcPackage {
         }
         self.parts
             .retain(|_, part| !is_signature_infrastructure(&**part));
+    }
+
+    pub(crate) fn exact_source(&self) -> Option<&[u8]> {
+        self.exact_source.as_deref().map(Vec::as_slice)
+    }
+
+    fn revoke_exact_source(&mut self) {
+        self.exact_source = None;
+    }
+
+    fn from_owned_phys_reader(owned_reader: OwnedPhysPkgReader) -> Result<Self> {
+        let mut package = {
+            let phys_reader = owned_reader.reader()?;
+            let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
+            Self::unmarshal(pkg_reader)?
+        };
+        package.exact_source = Some(Arc::new(owned_reader.into_inner()));
+        Ok(package)
+    }
+
+    pub(crate) fn from_bytes_with_open_session(
+        data: &[u8],
+        limits: ReadLimits,
+        session: &OpenSession,
+    ) -> Result<Self> {
+        session.check()?;
+        let phys_reader = PhysPkgReader::new_with_limits(data, limits)?;
+        session.charge_input(data.len() as u64)?;
+        let pkg_reader = PackageReader::from_phys_reader_with_session(&phys_reader, session)?;
+        Self::unmarshal(pkg_reader)
+    }
+
+    pub(crate) fn from_vec_with_open_session(
+        data: Vec<u8>,
+        limits: ReadLimits,
+        session: &OpenSession,
+    ) -> Result<Self> {
+        session.check()?;
+        let input_bytes = data.len() as u64;
+        let owned_reader = OwnedPhysPkgReader::from_bytes_with_limits(data, limits)?;
+        session.charge_input(input_bytes)?;
+        let mut package = {
+            let phys_reader = owned_reader.reader()?;
+            let pkg_reader = PackageReader::from_phys_reader_with_session(&phys_reader, session)?;
+            Self::unmarshal(pkg_reader)?
+        };
+        package.exact_source = Some(Arc::new(owned_reader.into_inner()));
+        Ok(package)
     }
 }
 
@@ -846,6 +953,15 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+        let comment_len = u16::try_from(comment.len()).expect("ZIP comment fits in EOCD");
+        let eocd = archive.len().checked_sub(22).expect("archive has an EOCD");
+        assert_eq!(&archive[eocd..eocd + 4], b"PK\x05\x06");
+        archive[eocd + 20..eocd + 22].copy_from_slice(&comment_len.to_le_bytes());
+        archive.extend_from_slice(comment);
+        archive
+    }
+
     #[test]
     fn test_open_package() {
         let zip_data = create_minimal_docx();
@@ -869,6 +985,86 @@ mod tests {
     fn moves_owned_archive_into_package_reader() {
         let pkg = OpcPackage::from_vec(create_minimal_docx()).unwrap();
         assert!(pkg.part_count() > 0);
+    }
+
+    #[test]
+    fn clone_shares_owned_source_but_revocation_is_independent() {
+        let bytes = with_eocd_comment(create_minimal_docx(), b"exact source");
+        let package = OpcPackage::from_vec(bytes).expect("open owned package");
+        let mut clone = package.clone();
+
+        assert!(Arc::ptr_eq(
+            package.exact_source.as_ref().expect("source authorized"),
+            clone
+                .exact_source
+                .as_ref()
+                .expect("clone source authorized")
+        ));
+
+        let unchanged_options = clone.save_options().clone();
+        clone.set_save_options(unchanged_options);
+        assert!(clone.exact_source.is_none());
+        assert!(package.exact_source.is_some());
+    }
+
+    #[test]
+    fn mutable_api_entries_revoke_owned_source_even_on_failure_or_noop() {
+        let source = with_eocd_comment(create_minimal_docx(), b"exact source");
+        let base = OpcPackage::from_vec(source).expect("open owned package");
+        let missing = PackURI::new("/missing.xml").expect("valid URI");
+
+        let mut package = base.clone();
+        assert!(package.get_part_mut(&missing).is_err());
+        assert!(package.exact_source.is_none());
+
+        let mut package = base.clone();
+        assert!(!package.remove_part(&missing));
+        assert!(package.exact_source.is_none());
+
+        let mut package = base.clone();
+        let duplicate = package.main_document_part().unwrap().partname().clone();
+        let error = package.try_add_part(Box::new(BlobPart::new(
+            duplicate,
+            "application/xml".to_owned(),
+            Vec::new(),
+        )));
+        assert!(error.is_err());
+        assert!(package.exact_source.is_none());
+
+        let mut package = base.clone();
+        package.unsign();
+        assert!(package.exact_source.is_none());
+    }
+
+    #[test]
+    fn relationship_and_option_mutable_apis_revoke_owned_source() {
+        let source = with_eocd_comment(create_minimal_docx(), b"exact source");
+        let base = OpcPackage::from_vec(source).expect("open owned package");
+
+        let mut package = base.clone();
+        let options = package.save_options().clone();
+        package.set_save_options(options);
+        assert!(package.exact_source.is_none());
+
+        let mut package = base.clone();
+        package.with_fonts(FontEmbedding::None);
+        assert!(package.exact_source.is_none());
+
+        let mut package = base.clone();
+        let _relationships = package.rels_mut();
+        assert!(package.exact_source.is_none());
+
+        let mut package = base.clone();
+        let _relationships = package.relationships_mut();
+        assert!(package.exact_source.is_none());
+
+        let mut package = base.clone();
+        package.relate_to("word/document.xml", relationship_type::OFFICE_DOCUMENT);
+        assert!(package.exact_source.is_none());
+
+        let mut package = base;
+        package.relate_to_external("https://example.com", "urn:example");
+        assert!(package.exact_source.is_none());
     }
 
     #[test]

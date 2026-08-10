@@ -1,0 +1,150 @@
+name: Performance baseline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/litchi-core/**'
+      - 'crates/litchi-cfb/**'
+      - 'crates/litchi-doc/**'
+      - 'crates/litchi-docx/**'
+      - 'crates/litchi-opc/**'
+      - 'crates/litchi-ppt/**'
+      - 'crates/litchi-pptx/**'
+      - 'crates/litchi-xls/**'
+      - 'crates/litchi-xlsx/**'
+      - 'crates/soapberry-zip/**'
+      - 'crates/xml-minifier/**'
+      - 'tools/perf-baseline/**'
+      - '.github/workflows/perf-baseline.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/litchi-core/**'
+      - 'crates/litchi-cfb/**'
+      - 'crates/litchi-doc/**'
+      - 'crates/litchi-docx/**'
+      - 'crates/litchi-opc/**'
+      - 'crates/litchi-ppt/**'
+      - 'crates/litchi-pptx/**'
+      - 'crates/litchi-xls/**'
+      - 'crates/litchi-xlsx/**'
+      - 'crates/soapberry-zip/**'
+      - 'crates/xml-minifier/**'
+      - 'tools/perf-baseline/**'
+      - '.github/workflows/perf-baseline.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 0'
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  PERF_MANIFEST: tools/perf-baseline/Cargo.toml
+
+jobs:
+  smoke:
+    name: deterministic container smoke
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/perf-baseline -> tools/perf-baseline/target
+
+      - name: Check standalone harness
+        run: |
+          cargo fmt --manifest-path "$PERF_MANIFEST" -- --check
+          cargo check --locked --manifest-path "$PERF_MANIFEST"
+          cargo test --locked --manifest-path "$PERF_MANIFEST"
+
+      - name: Run deterministic smoke baseline
+        run: |
+          mkdir -p target/perf
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 2 \
+            --shape tiny \
+            --payload compressible \
+            --writer-shape tiny \
+            --json target/perf/opc-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/opc-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 14
+          assert {item["case"] for item in report["results"]} == {
+              "zip_index", "zip_read_one", "opc_open", "opc_open_owned",
+              "opc_noop_save", "opc_mutated_save",
+              "cfb_open", "cfb_list_streams", "cfb_read_one",
+              "cfb_create_stream_borrowed", "cfb_create_stream_owned",
+              "doc_fresh_write_to", "xls_fresh_write_to", "ppt_fresh_write_to"
+          }
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 2
+              assert item["corpus"]["archive_sha256"]
+          PY
+
+  full:
+    name: release container matrix
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/perf-baseline -> tools/perf-baseline/target
+
+      - name: Build release harness
+        run: cargo build --release --locked --manifest-path "$PERF_MANIFEST"
+
+      - name: Run full release baseline matrix
+        run: |
+          mkdir -p target/perf
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --json target/perf/container-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/container-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 97
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 15
+              assert item["corpus"]["archive_sha256"]
+          PY
+
+      - name: Upload performance baseline JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-performance-baseline-${{ github.run_id }}
+          path: target/perf/container-baseline.json
+          if-no-files-found: error
+          retention-days: 14

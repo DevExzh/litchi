@@ -3,7 +3,7 @@ use super::docx::{ParagraphProjection, RunProjection};
 #[cfg(feature = "yaml")]
 use crate::MetadataYaml;
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
-use crate::document::{Cell, Table};
+use crate::document::Table;
 use crate::document::{Paragraph, Run};
 /// Low-level writer for Markdown generation.
 ///
@@ -17,13 +17,6 @@ use litchi_markdown::TableStyle;
 use litchi_markdown::{MarkdownOptions, escape};
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use memchr::memchr;
-#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-
-/// Minimum number of table rows to justify parallel processing overhead.
-/// Tables are typically smaller than documents, so we use a lower threshold.
-#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
-const TABLE_PARALLEL_THRESHOLD: usize = 20;
 
 /// Information about a detected list item.
 #[derive(Debug, Clone)]
@@ -162,59 +155,30 @@ struct CellData {
 ///
 /// Returns a 2D vector where `result[row][col]` contains the span information for that cell.
 ///
-/// **Performance**: Optimized to extract all cell data in a single pass, avoiding repeated
-/// parsing. For large tables, uses parallel processing to extract cell data concurrently.
+/// **Performance**: Extracts all cell data in a single pass, avoiding repeated parsing.
 #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
-fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<CellSpan>>> {
+fn analyze_table_spans(table: &Table) -> Result<Vec<Vec<CellSpan>>> {
     let rows = table.rows()?;
     if rows.is_empty() {
         return Ok(Vec::new());
     }
 
-    // OPTIMIZATION: Pre-extract all cell data in a single pass to avoid repeated parsing.
-    // This is the key optimization - we parse each cell exactly once.
-    // For large tables, use parallel processing.
-    let cell_data: Result<Vec<Vec<CellData>>> =
-        if use_parallel && rows.len() > TABLE_PARALLEL_THRESHOLD {
-            // PARALLEL PATH: Extract cell data in parallel for large tables
-            // First collect all cells to avoid borrowing issues
-            let all_cells: Result<Vec<Vec<Cell>>> = rows.iter().map(|row| row.cells()).collect();
-            let all_cells = all_cells?;
-
-            all_cells
-                .par_iter()
-                .map(|cells| {
-                    cells
-                        .iter()
-                        .map(|cell| {
-                            Ok(CellData {
-                                grid_span: cell.grid_span().unwrap_or(1),
-                                #[cfg(feature = "docx")]
-                                v_merge: cell.v_merge()?,
-                            })
-                        })
-                        .collect()
+    let cell_data: Vec<Vec<CellData>> = rows
+        .iter()
+        .map(|row| {
+            let cells = row.cells()?;
+            cells
+                .iter()
+                .map(|cell| {
+                    Ok(CellData {
+                        grid_span: cell.grid_span().unwrap_or(1),
+                        #[cfg(feature = "docx")]
+                        v_merge: cell.v_merge()?,
+                    })
                 })
                 .collect()
-        } else {
-            // SEQUENTIAL PATH: Extract cell data sequentially for small tables
-            rows.iter()
-                .map(|row| {
-                    let cells = row.cells()?;
-                    cells
-                        .iter()
-                        .map(|cell| {
-                            Ok(CellData {
-                                grid_span: cell.grid_span().unwrap_or(1),
-                                #[cfg(feature = "docx")]
-                                v_merge: cell.v_merge()?,
-                            })
-                        })
-                        .collect()
-                })
-                .collect()
-        };
-    let cell_data = cell_data?;
+        })
+        .collect::<Result<_>>()?;
 
     // First pass: determine the maximum grid width (considering gridSpan)
     let mut max_grid_cols = 0;
@@ -300,36 +264,20 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
 
 /// Extract all cell data from a table in a single optimized pass.
 ///
-/// **Performance**: For large tables, uses parallel processing to extract cell data concurrently.
-/// This avoids repeated XML parsing during table rendering.
+/// **Performance**: Extracts cell text once before rendering, avoiding repeated XML parsing.
 #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
-fn extract_table_cell_data(table: &Table, use_parallel: bool) -> Result<Vec<Vec<String>>> {
+fn extract_table_cell_data(table: &Table) -> Result<Vec<Vec<String>>> {
     let rows = table.rows()?;
     if rows.is_empty() {
         return Ok(Vec::new());
     }
 
-    // OPTIMIZATION: Extract all cell texts in a single pass
-    // For large tables, use parallel processing
-    if use_parallel && rows.len() > TABLE_PARALLEL_THRESHOLD {
-        // First collect all cells to avoid borrowing issues with enum variants
-        let all_cells: Result<Vec<Vec<Cell>>> = rows.iter().map(|row| row.cells()).collect();
-        let all_cells = all_cells?;
-
-        // Now extract texts in parallel
-        all_cells
-            .par_iter()
-            .map(|cells| cells.iter().map(|cell| cell.text()).collect())
-            .collect()
-    } else {
-        // Sequential extraction for small tables
-        rows.iter()
-            .map(|row| {
-                let cells = row.cells()?;
-                cells.iter().map(|cell| cell.text()).collect()
-            })
-            .collect()
-    }
+    rows.iter()
+        .map(|row| {
+            let cells = row.cells()?;
+            cells.iter().map(|cell| cell.text()).collect()
+        })
+        .collect()
 }
 
 impl MarkdownWriter {
@@ -1463,12 +1411,11 @@ impl MarkdownWriter {
     /// Write a table in Markdown format.
     ///
     /// **Performance**: Uses efficient single-pass escaping and minimizes allocations.
-    /// For large tables (20+ rows), uses parallel processing to render rows concurrently.
     /// Pre-extracts all cell data in a single optimized pass to avoid repeated parsing.
     #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     fn write_markdown_table(&mut self, table: &Table) -> Result<()> {
-        // OPTIMIZATION: Extract all cell data in a single pass (with parallelization for large tables)
-        let cell_data = extract_table_cell_data(table, self.options.use_parallel)?;
+        // Extract all cell data once before rendering.
+        let cell_data = extract_table_cell_data(table)?;
         if cell_data.is_empty() {
             return Ok(());
         }
@@ -1496,42 +1443,14 @@ impl MarkdownWriter {
         }
         self.buffer.push('\n');
 
-        // Write data rows - parallel if large enough
-        if self.options.use_parallel && cell_data.len() > TABLE_PARALLEL_THRESHOLD {
-            // PARALLEL PATH: Process rows in parallel for large tables
-            // Cell data is already extracted, now just format in parallel
-            let row_strings: Vec<String> = cell_data[1..]
-                .par_iter()
-                .map(|cell_texts| {
-                    let mut row_buffer = String::with_capacity(cell_texts.len() * 50);
-                    row_buffer.push('|');
-                    for text in cell_texts {
-                        row_buffer.push(' ');
-                        Self::escape_markdown_to_buffer(&mut row_buffer, text);
-                        row_buffer.push_str(" |");
-                    }
-                    row_buffer.push('\n');
-                    row_buffer
-                })
-                .collect();
-
-            // Concatenate all row strings efficiently
-            let total_len: usize = row_strings.iter().map(|s| s.len()).sum();
-            self.buffer.reserve(total_len);
-            for row_str in &row_strings {
-                self.buffer.push_str(row_str);
+        for row_texts in &cell_data[1..] {
+            self.buffer.push('|');
+            for text in row_texts {
+                self.buffer.push(' ');
+                self.write_markdown_escaped(text);
+                self.buffer.push_str(" |");
             }
-        } else {
-            // SEQUENTIAL PATH: Process rows sequentially for small tables
-            for row_texts in &cell_data[1..] {
-                self.buffer.push('|');
-                for text in row_texts {
-                    self.buffer.push(' ');
-                    self.write_markdown_escaped(text);
-                    self.buffer.push_str(" |");
-                }
-                self.buffer.push('\n');
-            }
+            self.buffer.push('\n');
         }
 
         Ok(())
@@ -1547,8 +1466,6 @@ impl MarkdownWriter {
     }
 
     /// Helper function to escape markdown to a string buffer.
-    ///
-    /// This is extracted as a separate function so it can be used in parallel contexts.
     ///
     /// **Performance**: Single-pass escaping without intermediate allocations.
     /// Uses SIMD-accelerated memchr for fast searching.
@@ -1573,7 +1490,6 @@ impl MarkdownWriter {
     /// Write a table in HTML format with proper colspan and rowspan attributes.
     ///
     /// **Performance**: Uses efficient single-pass HTML escaping and minimizes allocations.
-    /// For large tables, uses parallel processing to render rows concurrently.
     /// Pre-extracts all cell data in a single optimized pass to avoid repeated parsing.
     ///
     /// **Merged Cells**: Properly handles merged cells by:
@@ -1586,8 +1502,8 @@ impl MarkdownWriter {
     /// - Minimal tables (`styled = false`): No indentation, no line feeds for compact output
     #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     fn write_html_table(&mut self, table: &Table, styled: bool) -> Result<()> {
-        // OPTIMIZATION: Extract all cell data in a single pass (with parallelization for large tables)
-        let cell_data = extract_table_cell_data(table, self.options.use_parallel)?;
+        // Extract all cell data once before rendering.
+        let cell_data = extract_table_cell_data(table)?;
         if cell_data.is_empty() {
             return Ok(());
         }
@@ -1597,9 +1513,8 @@ impl MarkdownWriter {
         let total_cells: usize = cell_data.iter().map(|row| row.len()).sum();
         self.buffer.reserve(total_cells * 100);
 
-        // Analyze table to get span information (colspan/rowspan)
-        // Use the same parallel setting as for cell extraction
-        let spans = analyze_table_spans(table, self.options.use_parallel)?;
+        // Analyze table to get span information (colspan/rowspan).
+        let spans = analyze_table_spans(table)?;
 
         // Helper to format a single cell
         let format_cell =
@@ -1694,53 +1609,20 @@ impl MarkdownWriter {
 
             self.buffer.push_str("<table>\n");
 
-            // Use parallel processing for large tables
-            if self.options.use_parallel && cell_data.len() > TABLE_PARALLEL_THRESHOLD {
-                // PARALLEL PATH: Format rows in parallel
-                let row_htmls: Vec<String> = cell_data
-                    .par_iter()
-                    .enumerate()
-                    .map(|(row_idx, row_texts)| {
-                        let tag = if row_idx == 0 { "th" } else { "td" };
-                        let mut row_html = String::with_capacity(row_texts.len() * 100 + 100);
-                        row_html.push_str(&indent);
-                        row_html.push_str("<tr>\n");
-                        row_html.push_str(&format_row(
-                            row_texts,
-                            row_idx,
-                            tag,
-                            &spans,
-                            Some(&double_indent),
-                        ));
-                        row_html.push_str(&indent);
-                        row_html.push_str("</tr>\n");
-                        row_html
-                    })
-                    .collect();
+            for (row_idx, row_texts) in cell_data.iter().enumerate() {
+                let tag = if row_idx == 0 { "th" } else { "td" };
 
-                // Concatenate all row HTMLs efficiently
-                let total_len: usize = row_htmls.iter().map(|s| s.len()).sum();
-                self.buffer.reserve(total_len);
-                for row_html in &row_htmls {
-                    self.buffer.push_str(row_html);
-                }
-            } else {
-                // SEQUENTIAL PATH: Format rows sequentially
-                for (row_idx, row_texts) in cell_data.iter().enumerate() {
-                    let tag = if row_idx == 0 { "th" } else { "td" };
-
-                    self.buffer.push_str(&indent);
-                    self.buffer.push_str("<tr>\n");
-                    self.buffer.push_str(&format_row(
-                        row_texts,
-                        row_idx,
-                        tag,
-                        &spans,
-                        Some(&double_indent),
-                    ));
-                    self.buffer.push_str(&indent);
-                    self.buffer.push_str("</tr>\n");
-                }
+                self.buffer.push_str(&indent);
+                self.buffer.push_str("<tr>\n");
+                self.buffer.push_str(&format_row(
+                    row_texts,
+                    row_idx,
+                    tag,
+                    &spans,
+                    Some(&double_indent),
+                ));
+                self.buffer.push_str(&indent);
+                self.buffer.push_str("</tr>\n");
             }
 
             self.buffer.push_str("</table>");
@@ -1748,38 +1630,13 @@ impl MarkdownWriter {
             // MINIMAL TABLE: No indentation, no line feeds for compact output
             self.buffer.push_str("<table>");
 
-            // Use parallel processing for large tables
-            if self.options.use_parallel && cell_data.len() > TABLE_PARALLEL_THRESHOLD {
-                // PARALLEL PATH: Format rows in parallel
-                let row_htmls: Vec<String> = cell_data
-                    .par_iter()
-                    .enumerate()
-                    .map(|(row_idx, row_texts)| {
-                        let tag = if row_idx == 0 { "th" } else { "td" };
-                        let mut row_html = String::with_capacity(row_texts.len() * 100 + 20);
-                        row_html.push_str("<tr>");
-                        row_html.push_str(&format_row(row_texts, row_idx, tag, &spans, None));
-                        row_html.push_str("</tr>");
-                        row_html
-                    })
-                    .collect();
+            for (row_idx, row_texts) in cell_data.iter().enumerate() {
+                let tag = if row_idx == 0 { "th" } else { "td" };
 
-                // Concatenate all row HTMLs efficiently
-                let total_len: usize = row_htmls.iter().map(|s| s.len()).sum();
-                self.buffer.reserve(total_len);
-                for row_html in &row_htmls {
-                    self.buffer.push_str(row_html);
-                }
-            } else {
-                // SEQUENTIAL PATH: Format rows sequentially
-                for (row_idx, row_texts) in cell_data.iter().enumerate() {
-                    let tag = if row_idx == 0 { "th" } else { "td" };
-
-                    self.buffer.push_str("<tr>");
-                    self.buffer
-                        .push_str(&format_row(row_texts, row_idx, tag, &spans, None));
-                    self.buffer.push_str("</tr>");
-                }
+                self.buffer.push_str("<tr>");
+                self.buffer
+                    .push_str(&format_row(row_texts, row_idx, tag, &spans, None));
+                self.buffer.push_str("</tr>");
             }
 
             self.buffer.push_str("</table>");
@@ -1789,8 +1646,6 @@ impl MarkdownWriter {
     }
 
     /// Helper function to escape HTML to a string buffer.
-    ///
-    /// This is extracted as a separate function so it can be used in parallel contexts.
     ///
     /// **Performance**: Single-pass escaping that writes directly to the buffer,
     /// avoiding the 4 intermediate string allocations from chained `replace()` calls.

@@ -10,10 +10,6 @@ use crate::document::{Document, Paragraph, Run};
 /// **Note**: This module is only available when a document-format feature is enabled.
 use litchi_core::{Error, Result};
 use litchi_markdown::{MarkdownOptions, ToMarkdown};
-use rayon::prelude::*;
-
-/// Minimum number of elements to justify parallel processing overhead.
-const PARALLEL_THRESHOLD: usize = 50;
 
 #[cfg(feature = "docx")]
 pub(crate) fn resolve_docx_lists(
@@ -181,96 +177,40 @@ impl ToMarkdown for Document {
             ));
         }
 
-        // Decide whether to use parallel or sequential processing
-        let content_md = if options.use_parallel && elements.len() >= PARALLEL_THRESHOLD {
-            // PARALLEL PATH: Process elements in parallel for large documents
-            // With Arc-based Send + Sync types, we can now safely parallelize
-            let element_strings: Result<Vec<String>> = elements
-                .par_iter()
-                .enumerate()
-                .zip(resolved_lists.par_iter())
-                .zip(heading_levels.par_iter())
-                .map(
-                    |(((_element_index, element), resolved_list), heading_level)| {
-                        let mut writer = MarkdownWriter::new(*options);
-                        match element {
-                            DocumentElement::Paragraph(para) => {
-                                writer.write_paragraph_with_projection(
-                                    para,
-                                    resolved_list.as_ref(),
-                                    *heading_level,
-                                    #[cfg(feature = "docx")]
-                                    docx_bundle.as_ref().and_then(|bundle| {
-                                        bundle.paragraphs[_element_index].as_ref()
-                                    }),
-                                )?;
-                            },
-                            #[cfg(any(
-                                feature = "doc",
-                                feature = "docx",
-                                feature = "rtf",
-                                feature = "odt"
-                            ))]
-                            DocumentElement::Table(table) => {
-                                writer.write_table(table)?;
-                            },
-                        }
-                        Ok(writer.finish())
-                    },
-                )
-                .collect();
-            let element_strings = element_strings?;
+        // Ordinary conversion is serial. The public options value remains part
+        // of the rendering contract, but it never selects a hidden global
+        // scheduler.
+        let mut writer = MarkdownWriter::new(*options);
+        // Estimate: 100 bytes per paragraph, 500 bytes per table.
+        let estimated_size = elements.len() * 150;
+        writer.reserve(estimated_size);
 
-            // Estimate total size and pre-allocate
-            let total_size: usize = element_strings.iter().map(|s| s.len()).sum();
-            let mut result = String::with_capacity(total_size);
-
-            // Concatenate in document order
-            for s in &element_strings {
-                result.push_str(s);
+        for (_element_index, ((element, resolved_list), heading_level)) in elements
+            .into_iter()
+            .zip(resolved_lists.iter())
+            .zip(heading_levels.iter())
+            .enumerate()
+        {
+            match element {
+                DocumentElement::Paragraph(para) => {
+                    writer.write_paragraph_with_projection(
+                        &para,
+                        resolved_list.as_ref(),
+                        *heading_level,
+                        #[cfg(feature = "docx")]
+                        docx_bundle
+                            .as_ref()
+                            .and_then(|bundle| bundle.paragraphs[_element_index].as_ref()),
+                    )?;
+                },
+                #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
+                DocumentElement::Table(table) => {
+                    writer.write_table(&table)?;
+                },
             }
+        }
 
-            result
-        } else {
-            // SEQUENTIAL PATH: Process elements sequentially for small documents
-            // This avoids the parallelization overhead when it's not beneficial
-            let mut writer = MarkdownWriter::new(*options);
-            // Estimate: 100 bytes per paragraph, 500 bytes per table
-            let estimated_size = elements.len() * 150; // Rough average
-            writer.reserve(estimated_size);
-
-            for (_element_index, ((element, resolved_list), heading_level)) in elements
-                .into_iter()
-                .zip(resolved_lists.iter())
-                .zip(heading_levels.iter())
-                .enumerate()
-            {
-                match element {
-                    DocumentElement::Paragraph(para) => {
-                        writer.write_paragraph_with_projection(
-                            &para,
-                            resolved_list.as_ref(),
-                            *heading_level,
-                            #[cfg(feature = "docx")]
-                            docx_bundle
-                                .as_ref()
-                                .and_then(|bundle| bundle.paragraphs[_element_index].as_ref()),
-                        )?;
-                    },
-                    #[cfg(any(
-                        feature = "doc",
-                        feature = "docx",
-                        feature = "rtf",
-                        feature = "odt"
-                    ))]
-                    DocumentElement::Table(table) => {
-                        writer.write_table(&table)?;
-                    },
-                }
-            }
-
-            writer.finish()
-        };
+        let content_md = writer.finish();
 
         // Combine metadata and content
         let mut markdown =

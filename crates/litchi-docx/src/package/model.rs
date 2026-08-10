@@ -63,7 +63,7 @@ pub(super) use std::path::Path;
 
 pub(super) const MAX_MAIL_MERGE_RELATIONSHIPS: usize = 65_536;
 
-pub(super) fn validate_document_main_content_type(content_type: &str) -> Result<()> {
+pub(crate) fn validate_document_main_content_type(content_type: &str) -> Result<()> {
     if matches!(
         content_type,
         ct::WML_DOCUMENT_MAIN

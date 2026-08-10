@@ -34,15 +34,18 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+use crate::path::{RawPath, ZipFilePath};
 use crate::{
-    CompressionMethod, Error, ErrorKind, ZipArchive, ZipArchiveWriter, ZipSliceArchive,
-    ZipVerification,
+    CompressionMethod, Error, ErrorKind, RECOMMENDED_BUFFER_SIZE, ReaderAt, ZipArchive,
+    ZipArchiveWriter, ZipLocator, ZipSliceArchive, ZipVerification,
 };
 use flate2::Compression;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::num::{NonZeroU64, NonZeroUsize};
 
 pub use crate::LimitResource;
 
@@ -95,6 +98,341 @@ impl Default for ArchiveLimits {
     }
 }
 
+/// CPU-affinity policy for the local workers owned by a [`ParallelReadSession`].
+///
+/// The archive substrate currently supports only inheriting operating-system
+/// placement. A caller must select this policy explicitly when constructing
+/// [`ParallelReadLimits`]; no global scheduler or affinity policy is inferred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ParallelAffinity {
+    /// Do not change operating-system worker affinity.
+    Inherit,
+}
+
+/// Validated finite limits for a local [`ParallelReadSession`].
+///
+/// The task and byte caps bound one submitted batch. A batch below
+/// `min_parallel_bytes` is read serially even when the session owns more than
+/// one worker, avoiding small-task scheduling overhead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ParallelReadLimits {
+    workers: NonZeroUsize,
+    max_in_flight_tasks: NonZeroUsize,
+    max_in_flight_bytes: NonZeroU64,
+    min_parallel_bytes: u64,
+    affinity: ParallelAffinity,
+}
+
+impl ParallelReadLimits {
+    /// Creates limits with [`ParallelAffinity::Inherit`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the worker count exceeds the task cap or when the
+    /// parallel-work threshold exceeds the finite byte cap.
+    pub fn new(
+        workers: NonZeroUsize,
+        max_in_flight_tasks: NonZeroUsize,
+        max_in_flight_bytes: NonZeroU64,
+        min_parallel_bytes: u64,
+    ) -> Result<Self, Error> {
+        Self::with_affinity(
+            workers,
+            max_in_flight_tasks,
+            max_in_flight_bytes,
+            min_parallel_bytes,
+            ParallelAffinity::Inherit,
+        )
+    }
+
+    /// Creates limits with an explicit affinity policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the worker count exceeds the task cap or when the
+    /// parallel-work threshold exceeds the finite byte cap.
+    pub fn with_affinity(
+        workers: NonZeroUsize,
+        max_in_flight_tasks: NonZeroUsize,
+        max_in_flight_bytes: NonZeroU64,
+        min_parallel_bytes: u64,
+        affinity: ParallelAffinity,
+    ) -> Result<Self, Error> {
+        if workers > max_in_flight_tasks {
+            return Err(ErrorKind::InvalidParallelReadLimits {
+                reason: "workers must not exceed max_in_flight_tasks",
+            }
+            .into());
+        }
+        if min_parallel_bytes > max_in_flight_bytes.get() {
+            return Err(ErrorKind::InvalidParallelReadLimits {
+                reason: "min_parallel_bytes must not exceed max_in_flight_bytes",
+            }
+            .into());
+        }
+        Ok(Self {
+            workers,
+            max_in_flight_tasks,
+            max_in_flight_bytes,
+            min_parallel_bytes,
+            affinity,
+        })
+    }
+
+    /// Maximum workers the local session may create.
+    #[must_use]
+    pub const fn workers(self) -> NonZeroUsize {
+        self.workers
+    }
+
+    /// Maximum tasks in one submitted batch.
+    #[must_use]
+    pub const fn max_in_flight_tasks(self) -> NonZeroUsize {
+        self.max_in_flight_tasks
+    }
+
+    /// Maximum declared uncompressed bytes in one submitted batch.
+    #[must_use]
+    pub const fn max_in_flight_bytes(self) -> NonZeroU64 {
+        self.max_in_flight_bytes
+    }
+
+    /// Smallest batch size eligible for parallel execution.
+    #[must_use]
+    pub const fn min_parallel_bytes(self) -> u64 {
+        self.min_parallel_bytes
+    }
+
+    /// Explicit worker-affinity policy.
+    #[must_use]
+    pub const fn affinity(self) -> ParallelAffinity {
+        self.affinity
+    }
+}
+
+/// Cooperative cancellation probe used by an explicit parallel read.
+///
+/// The probe is checked before scheduling, between batches, before each member
+/// read, and after each member read. A currently-running decompressor is not
+/// forcefully interrupted; cancellation is therefore member-granular.
+pub trait CancellationProbe: Send + Sync {
+    /// Returns whether the operation should stop at its next interruption point.
+    fn is_cancelled(&self) -> bool;
+}
+
+impl<F> CancellationProbe for F
+where
+    F: Fn() -> bool + Send + Sync,
+{
+    fn is_cancelled(&self) -> bool {
+        self()
+    }
+}
+
+/// Reusable local scheduler for explicit archive bulk reads.
+///
+/// The session owns a Rayon pool created with the requested worker count. It
+/// never initializes or installs Rayon’s process-global pool. A one-worker
+/// session uses the same bounded batching policy but executes serially.
+pub struct ParallelReadSession {
+    limits: ParallelReadLimits,
+    pool: Option<rayon::ThreadPool>,
+}
+
+impl ParallelReadSession {
+    /// Creates a reusable local scheduler with validated finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the local Rayon worker pool cannot be created.
+    pub fn new(limits: ParallelReadLimits) -> Result<Self, Error> {
+        let workers = limits.workers().get();
+        let pool = if workers == 1 {
+            None
+        } else {
+            Some(
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(workers)
+                    .build()
+                    .map_err(|error| ErrorKind::ParallelReadWorkerPool {
+                        workers,
+                        message: error.to_string(),
+                    })?,
+            )
+        };
+        Ok(Self { limits, pool })
+    }
+
+    /// Validated policy used by this session.
+    #[must_use]
+    pub const fn limits(&self) -> ParallelReadLimits {
+        self.limits
+    }
+
+    /// Explicit worker count requested for this local session.
+    #[must_use]
+    pub const fn worker_count(&self) -> NonZeroUsize {
+        self.limits.workers()
+    }
+
+    fn read_many<'name, MetadataFor, ReadMember>(
+        &self,
+        names: &'name [&'name str],
+        cancellation: &dyn CancellationProbe,
+        metadata_for: MetadataFor,
+        read_member: ReadMember,
+    ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error>
+    where
+        MetadataFor: Fn(&str) -> Result<Metadata, Error> + Sync,
+        ReadMember: Fn(&str) -> Result<Vec<u8>, Error> + Sync,
+    {
+        self.check_cancelled(cancellation)?;
+        let mut results = Vec::new();
+        results.try_reserve(names.len()).map_err(|error| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: format!("could not reserve parallel read results: {error}"),
+            })
+        })?;
+
+        let mut batch = Vec::new();
+        let mut batch_bytes = 0_u64;
+        for name in names {
+            self.check_cancelled(cancellation)?;
+            let metadata = match metadata_for(name) {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    self.flush_batch(
+                        &mut results,
+                        &mut batch,
+                        &mut batch_bytes,
+                        cancellation,
+                        &read_member,
+                    )?;
+                    results.push((*name, Err(error)));
+                    continue;
+                },
+            };
+            let bytes = metadata.uncompressed_size();
+            if bytes > self.limits.max_in_flight_bytes().get() {
+                return Err(ErrorKind::ParallelReadInFlightBytesExceeded {
+                    actual: bytes,
+                    maximum: self.limits.max_in_flight_bytes().get(),
+                }
+                .into());
+            }
+            let exceeds_task_cap = batch.len() == self.limits.max_in_flight_tasks().get();
+            let next_bytes = batch_bytes.checked_add(bytes).ok_or_else(|| {
+                Error::from(ErrorKind::ParallelReadInFlightBytesExceeded {
+                    actual: u64::MAX,
+                    maximum: self.limits.max_in_flight_bytes().get(),
+                })
+            })?;
+            if !batch.is_empty()
+                && (next_bytes > self.limits.max_in_flight_bytes().get() || exceeds_task_cap)
+            {
+                self.flush_batch(
+                    &mut results,
+                    &mut batch,
+                    &mut batch_bytes,
+                    cancellation,
+                    &read_member,
+                )?;
+            }
+            batch_bytes = batch_bytes.checked_add(bytes).ok_or_else(|| {
+                Error::from(ErrorKind::ParallelReadInFlightBytesExceeded {
+                    actual: u64::MAX,
+                    maximum: self.limits.max_in_flight_bytes().get(),
+                })
+            })?;
+            batch.push(*name);
+        }
+        self.flush_batch(
+            &mut results,
+            &mut batch,
+            &mut batch_bytes,
+            cancellation,
+            &read_member,
+        )?;
+        Ok(results)
+    }
+
+    fn flush_batch<'name, ReadMember>(
+        &self,
+        results: &mut Vec<(&'name str, Result<Vec<u8>, Error>)>,
+        batch: &mut Vec<&'name str>,
+        batch_bytes: &mut u64,
+        cancellation: &dyn CancellationProbe,
+        read_member: &ReadMember,
+    ) -> Result<(), Error>
+    where
+        ReadMember: Fn(&str) -> Result<Vec<u8>, Error> + Sync,
+    {
+        if batch.is_empty() {
+            return Ok(());
+        }
+        self.check_cancelled(cancellation)?;
+        let parallel = batch.len() > 1 && *batch_bytes >= self.limits.min_parallel_bytes();
+        let batch = std::mem::take(batch);
+        *batch_bytes = 0;
+        let results_for_batch: Vec<(&'name str, Result<Vec<u8>, Error>)> = match self.pool.as_ref()
+        {
+            Some(pool) if parallel => pool.install(|| {
+                batch
+                    .par_iter()
+                    .map(|name| (*name, self.read_member(name, cancellation, read_member)))
+                    .collect()
+            }),
+            Some(_) | None => batch
+                .into_iter()
+                .map(|name| (name, self.read_member(name, cancellation, read_member)))
+                .collect(),
+        };
+        if cancellation.is_cancelled()
+            || results_for_batch.iter().any(|(_, result)| {
+                matches!(result, Err(error) if matches!(error.kind(), ErrorKind::Cancelled))
+            })
+        {
+            return Err(cancelled_error());
+        }
+        results.extend(results_for_batch);
+        Ok(())
+    }
+
+    fn read_member<ReadMember>(
+        &self,
+        name: &str,
+        cancellation: &dyn CancellationProbe,
+        read_member: &ReadMember,
+    ) -> Result<Vec<u8>, Error>
+    where
+        ReadMember: Fn(&str) -> Result<Vec<u8>, Error> + Sync,
+    {
+        self.check_cancelled(cancellation)?;
+        let result = read_member(name);
+        self.check_cancelled(cancellation)?;
+        result
+    }
+
+    fn check_cancelled(&self, cancellation: &dyn CancellationProbe) -> Result<(), Error> {
+        if cancellation.is_cancelled() {
+            Err(cancelled_error())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl std::fmt::Debug for ParallelReadSession {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ParallelReadSession")
+            .field("limits", &self.limits)
+            .field("uses_local_pool", &self.pool.is_some())
+            .finish()
+    }
+}
+
 /// High-performance ZIP archive reader for Office document formats.
 ///
 /// Provides a simple API for reading ZIP archives with automatic decompression.
@@ -123,6 +461,38 @@ struct EntryInfo {
     wayfinder: crate::ZipArchiveEntryWayfinder,
     compression_method: CompressionMethod,
     uncompressed_size: u64,
+}
+
+/// Opaque identifier for one non-directory member in an [`IndexedArchive`].
+///
+/// An ID is stable for the lifetime of the archive that produced it. Its
+/// representation is intentionally private so callers cannot manufacture an
+/// unchecked physical entry reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct EntryId(usize);
+
+/// One validated, positionally-readable ZIP archive index.
+///
+/// Unlike [`ArchiveReader`], this type is not restricted to a contiguous byte
+/// slice. It owns an already-located [`ZipArchive`] and scans its central
+/// directory exactly once under [`ArchiveLimits`]. Member contents remain
+/// unread until [`Self::read`] or [`Self::read_entry`] is called.
+///
+/// The type deliberately has no payload cache and never uses implicit global
+/// scheduling. Callers that opt into bounded local parallelism use
+/// [`Self::read_many_with_session`] or [`Self::read_all_with_session`].
+pub struct IndexedArchive<R> {
+    archive: ZipArchive<R>,
+    index: HashMap<String, EntryId>,
+    entries: Vec<IndexedEntry>,
+    directories: HashMap<String, Metadata>,
+    order: Vec<EntryId>,
+}
+
+#[derive(Debug, Clone)]
+struct IndexedEntry {
+    name: String,
+    info: EntryInfo,
 }
 
 /// Declared ZIP member metadata available without accessing member payloads.
@@ -442,57 +812,446 @@ impl<'data> ArchiveReader<'data> {
         })
     }
 
-    /// Read and decompress multiple files in parallel.
+    /// Reads multiple members through an explicit local [`ParallelReadSession`].
     ///
-    /// This uses rayon for parallel decompression, providing significant speedup
-    /// when reading many compressed files (typical for OOXML/ODF documents).
+    /// Results retain caller input order. Cancellation returns one outer error
+    /// and discards every successful member result from the interrupted call.
+    pub fn read_many_with_session<'name>(
+        &self,
+        session: &ParallelReadSession,
+        names: &'name [&'name str],
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error> {
+        session.read_many(
+            names,
+            cancellation,
+            |name| self.metadata(name),
+            |name| self.read(name),
+        )
+    }
+
+    /// Reads every member through an explicit local [`ParallelReadSession`].
     ///
-    /// Returns a vector of (name, result) pairs in the same order as input.
-    /// Each result is either the decompressed bytes or an error.
+    /// Results retain physical source order. Cancellation discards all results
+    /// from the interrupted call.
+    pub fn read_all_with_session(
+        &self,
+        session: &ParallelReadSession,
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<Vec<(String, Result<Vec<u8>, Error>)>, Error> {
+        let names = self.file_names().collect::<Vec<_>>();
+        self.read_many_with_session(session, &names, cancellation)
+            .map(|results| {
+                results
+                    .into_iter()
+                    .map(|(name, result)| (name.to_string(), result))
+                    .collect()
+            })
+    }
+
+    /// Reads multiple members serially.
     ///
-    /// # Example
-    /// ```rust,no_run
-    /// use soapberry_zip::office::ArchiveReader;
-    ///
-    /// let data = std::fs::read("document.docx")?;
-    /// let archive = ArchiveReader::new(&data)?;
-    ///
-    /// let files = vec!["word/document.xml", "word/styles.xml"];
-    /// let results = archive.read_many_parallel(&files);
-    ///
-    /// for (name, result) in results {
-    ///     match result {
-    ///         Ok(bytes) => println!("{}: {} bytes", name, bytes.len()),
-    ///         Err(e) => eprintln!("{}: error: {}", name, e),
-    ///     }
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
+    /// This compatibility method no longer uses Rayon’s global pool. Create a
+    /// [`ParallelReadSession`] and call [`Self::read_many_with_session`] to
+    /// request bounded local parallelism.
+    #[deprecated(
+        since = "0.0.1",
+        note = "this compatibility method is serial; use ParallelReadSession with read_many_with_session"
+    )]
     pub fn read_many_parallel<'a, S: AsRef<str> + Sync>(
         &self,
         names: &'a [S],
     ) -> Vec<(&'a S, Result<Vec<u8>, Error>)> {
-        use rayon::prelude::*;
-
         names
-            .par_iter()
+            .iter()
             .map(|name| (name, self.read(name.as_ref())))
             .collect()
     }
 
-    /// Read all files from the archive in parallel.
+    /// Reads all members serially.
     ///
-    /// Results retain physical source order. Every member has an explicit
-    /// result, including corrupt or otherwise unreadable members.
-    ///
-    /// This is optimal when you need to access most/all files in the archive.
+    /// This compatibility method no longer uses Rayon’s global pool. Create a
+    /// [`ParallelReadSession`] and call [`Self::read_all_with_session`] to
+    /// request bounded local parallelism.
+    #[deprecated(
+        since = "0.0.1",
+        note = "this compatibility method is serial; use ParallelReadSession with read_all_with_session"
+    )]
     pub fn read_all_parallel(&self) -> Vec<(String, Result<Vec<u8>, Error>)> {
-        use rayon::prelude::*;
-
         self.order
-            .par_iter()
+            .iter()
             .map(|name| (name.clone(), self.read(name)))
             .collect()
+    }
+}
+
+impl<R> IndexedArchive<R>
+where
+    R: ReaderAt,
+{
+    /// Locate and index a positional ZIP source with default resource limits.
+    ///
+    /// `end_offset` is the exclusive source length used by the ZIP locator.
+    /// Call [`Self::from_zip_archive_with_limits`] when the caller has already
+    /// located the archive and wants to avoid another EOCD search.
+    pub fn from_reader(reader: R, end_offset: u64) -> Result<Self, Error> {
+        Self::from_reader_with_limits(reader, end_offset, ArchiveLimits::default())
+    }
+
+    /// Locate and index a positional ZIP source with explicit resource limits.
+    ///
+    /// The central directory is located and scanned once. Payload bytes are not
+    /// read or decompressed during construction.
+    pub fn from_reader_with_limits(
+        reader: R,
+        end_offset: u64,
+        limits: ArchiveLimits,
+    ) -> Result<Self, Error> {
+        let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
+        let archive = ZipLocator::new()
+            .locate_in_reader(reader, &mut buffer, end_offset)
+            .map_err(|(_reader, error)| error)?;
+        Self::from_zip_archive_with_limits(archive, limits)
+    }
+
+    /// Build an index from an already located ZIP archive using default limits.
+    ///
+    /// This is the preferred constructor for callers that retain one validated
+    /// positional ZIP locator result as their physical-package state.
+    pub fn from_zip_archive(archive: ZipArchive<R>) -> Result<Self, Error> {
+        Self::from_zip_archive_with_limits(archive, ArchiveLimits::default())
+    }
+
+    /// Build an index from an already located ZIP archive with explicit limits.
+    ///
+    /// Every central-directory entry is validated and classified exactly once.
+    /// Directories are retained only for metadata lookup; non-directory entries
+    /// receive stable opaque [`EntryId`] values.
+    pub fn from_zip_archive_with_limits(
+        archive: ZipArchive<R>,
+        limits: ArchiveLimits,
+    ) -> Result<Self, Error> {
+        let mut index = HashMap::new();
+        let mut entries = Vec::new();
+        let mut directories = HashMap::new();
+        let mut ordered_entries = Vec::new();
+        let mut total_metadata_bytes = 0_u64;
+        let mut total_uncompressed_size = 0_u64;
+        let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
+
+        {
+            let mut central_entries = archive.entries(&mut buffer);
+            while let Some(entry) = central_entries.next_entry()? {
+                let path = entry.file_path();
+                let member_name_bytes = path.as_ref().len() as u64;
+                if member_name_bytes > limits.max_member_name_bytes {
+                    return Err(limit_error(
+                        LimitResource::MemberNameBytes,
+                        member_name_bytes,
+                        limits.max_member_name_bytes,
+                    ));
+                }
+
+                let metadata_bytes = entry.metadata_size_hint();
+                total_metadata_bytes = total_metadata_bytes
+                    .checked_add(metadata_bytes)
+                    .ok_or_else(|| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "archive central-directory metadata total overflows u64"
+                                .to_string(),
+                        })
+                    })?;
+                if total_metadata_bytes > limits.max_metadata_bytes {
+                    return Err(limit_error(
+                        LimitResource::MetadataBytes,
+                        total_metadata_bytes,
+                        limits.max_metadata_bytes,
+                    ));
+                }
+
+                let compressed_size = entry.compressed_size_hint();
+                let uncompressed_size = entry.uncompressed_size_hint();
+                let name = normalized_member_name(path);
+
+                if entry.is_dir() {
+                    directories.entry(name).or_insert(Metadata {
+                        compressed_size,
+                        uncompressed_size,
+                        directory: true,
+                    });
+                    continue;
+                }
+
+                if entries.len() >= limits.max_files {
+                    let actual = (entries.len() as u64).checked_add(1).ok_or_else(|| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "archive file count overflows u64".to_string(),
+                        })
+                    })?;
+                    return Err(limit_error(
+                        LimitResource::FileCount,
+                        actual,
+                        limits.max_files as u64,
+                    ));
+                }
+                if compressed_size > limits.max_compressed_size {
+                    return Err(limit_error(
+                        LimitResource::CompressedSize,
+                        compressed_size,
+                        limits.max_compressed_size,
+                    ));
+                }
+                if uncompressed_size > limits.max_entry_size {
+                    return Err(limit_error(
+                        LimitResource::EntrySize,
+                        uncompressed_size,
+                        limits.max_entry_size,
+                    ));
+                }
+                total_uncompressed_size = total_uncompressed_size
+                    .checked_add(uncompressed_size)
+                    .ok_or_else(|| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "archive uncompressed size total overflows u64".to_string(),
+                        })
+                    })?;
+                if total_uncompressed_size > limits.max_total_size {
+                    return Err(limit_error(
+                        LimitResource::TotalSize,
+                        total_uncompressed_size,
+                        limits.max_total_size,
+                    ));
+                }
+
+                let entry_id = EntryId(entries.len());
+                if index.insert(name.clone(), entry_id).is_some() {
+                    return Err(ErrorKind::InvalidInput {
+                        msg: "archive contains duplicate normalized file names".to_string(),
+                    }
+                    .into());
+                }
+                ordered_entries.push((entry.local_header_offset(), entry_id));
+                entries.push(IndexedEntry {
+                    name,
+                    info: EntryInfo {
+                        wayfinder: entry.wayfinder(),
+                        compression_method: entry.compression_method(),
+                        uncompressed_size,
+                    },
+                });
+            }
+        }
+
+        ordered_entries.sort_unstable_by_key(|(offset, _)| *offset);
+        let order = ordered_entries.into_iter().map(|(_, id)| id).collect();
+
+        Ok(Self {
+            archive,
+            index,
+            entries,
+            directories,
+            order,
+        })
+    }
+
+    /// Number of indexed non-directory members.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether this archive has no indexed non-directory members.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return whether a normalized member name exists.
+    #[inline]
+    pub fn contains(&self, name: &str) -> bool {
+        self.entry_id(name).is_some()
+    }
+
+    /// Resolve a member name to its stable opaque entry ID.
+    #[inline]
+    pub fn entry_id(&self, name: &str) -> Option<EntryId> {
+        let normalized = name.strip_prefix('/').unwrap_or(name);
+        self.index.get(normalized).copied()
+    }
+
+    /// Return declared metadata for a member without payload access.
+    pub fn metadata(&self, name: &str) -> Result<Metadata, Error> {
+        match self.entry_id(name) {
+            Some(id) => self.metadata_for(id),
+            None => {
+                let normalized = name.strip_prefix('/').unwrap_or(name);
+                self.directories
+                    .get(normalized)
+                    .copied()
+                    .ok_or_else(|| Error::from(ErrorKind::FileNotFound(normalized.to_string())))
+            },
+        }
+    }
+
+    /// Return declared metadata for one indexed file entry.
+    pub fn metadata_for(&self, entry_id: EntryId) -> Result<Metadata, Error> {
+        let entry = self.indexed_entry(entry_id)?;
+        Ok(Metadata {
+            compressed_size: entry.info.wayfinder.compressed_size_hint(),
+            uncompressed_size: entry.info.uncompressed_size,
+            directory: false,
+        })
+    }
+
+    /// Iterate normalized non-directory names in physical local-header order.
+    pub fn file_names(&self) -> impl Iterator<Item = &str> {
+        self.order.iter().map(|id| self.entries[id.0].name.as_str())
+    }
+
+    /// Whether an indexed file uses ZIP Store compression.
+    pub fn is_stored(&self, name: &str) -> Result<bool, Error> {
+        let entry_id = self.entry_id(name).ok_or_else(|| {
+            let normalized = name.strip_prefix('/').unwrap_or(name);
+            Error::from(ErrorKind::FileNotFound(normalized.to_string()))
+        })?;
+        Ok(self.indexed_entry(entry_id)?.info.compression_method == CompressionMethod::Store)
+    }
+
+    /// Read and verify one member by name.
+    pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
+        let entry_id = self.entry_id(name).ok_or_else(|| {
+            let normalized = name.strip_prefix('/').unwrap_or(name);
+            Error::from(ErrorKind::FileNotFound(normalized.to_string()))
+        })?;
+        self.read_entry(entry_id)
+    }
+
+    /// Read and verify one member by its stable opaque entry ID.
+    ///
+    /// ZIP local-header, data-descriptor, decompressed-size, and CRC checks are
+    /// intentionally deferred until this method is called.
+    pub fn read_entry(&self, entry_id: EntryId) -> Result<Vec<u8>, Error> {
+        let indexed = self.indexed_entry(entry_id)?;
+        let entry = self.archive.get_entry(indexed.info.wayfinder)?;
+        let size = usize::try_from(indexed.info.uncompressed_size).map_err(|_| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: format!(
+                    "archive entry size {} does not fit this platform",
+                    indexed.info.uncompressed_size
+                ),
+            })
+        })?;
+        let mut output = Vec::new();
+        output.try_reserve_exact(size).map_err(|error| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: format!("could not allocate {size} bytes for archive entry: {error}"),
+            })
+        })?;
+
+        match indexed.info.compression_method {
+            CompressionMethod::Store => {
+                let reader = entry.verifying_reader(entry.reader());
+                reader
+                    .take(indexed.info.uncompressed_size.saturating_add(1))
+                    .read_to_end(&mut output)?;
+            },
+            CompressionMethod::Deflate => {
+                let decoder = DeflateDecoder::new(entry.reader());
+                let reader = entry.verifying_reader(decoder);
+                reader
+                    .take(indexed.info.uncompressed_size.saturating_add(1))
+                    .read_to_end(&mut output)?;
+            },
+            other => {
+                return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                    other.as_id().as_u16(),
+                )));
+            },
+        }
+
+        if output.len() != size {
+            return Err(ErrorKind::InvalidSize {
+                expected: indexed.info.uncompressed_size,
+                actual: output.len() as u64,
+            }
+            .into());
+        }
+        Ok(output)
+    }
+
+    /// Reads multiple members through an explicit local [`ParallelReadSession`].
+    ///
+    /// This method is available only for positional sources that are safe to
+    /// access concurrently. Results retain caller input order, and
+    /// cancellation discards every result from the interrupted call.
+    pub fn read_many_with_session<'name>(
+        &self,
+        session: &ParallelReadSession,
+        names: &'name [&'name str],
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error>
+    where
+        R: Send + Sync,
+    {
+        session.read_many(
+            names,
+            cancellation,
+            |name| self.metadata(name),
+            |name| self.read(name),
+        )
+    }
+
+    /// Reads every indexed member through an explicit local [`ParallelReadSession`].
+    ///
+    /// Results retain physical source order, and cancellation discards every
+    /// result from the interrupted call.
+    pub fn read_all_with_session(
+        &self,
+        session: &ParallelReadSession,
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<Vec<(String, Result<Vec<u8>, Error>)>, Error>
+    where
+        R: Send + Sync,
+    {
+        let names = self.file_names().collect::<Vec<_>>();
+        self.read_many_with_session(session, &names, cancellation)
+            .map(|results| {
+                results
+                    .into_iter()
+                    .map(|(name, result)| (name.to_string(), result))
+                    .collect()
+            })
+    }
+
+    /// Consume this index and return the located positional archive.
+    #[must_use]
+    pub fn into_zip_archive(self) -> ZipArchive<R> {
+        self.archive
+    }
+
+    fn indexed_entry(&self, entry_id: EntryId) -> Result<&IndexedEntry, Error> {
+        self.entries.get(entry_id.0).ok_or_else(|| {
+            Error::from(ErrorKind::FileNotFound(format!(
+                "unknown indexed ZIP entry {}",
+                entry_id.0
+            )))
+        })
+    }
+}
+
+impl<R> std::fmt::Debug for IndexedArchive<R> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("IndexedArchive")
+            .field("file_count", &self.entries.len())
+            .finish()
+    }
+}
+
+fn normalized_member_name(path: ZipFilePath<RawPath<'_>>) -> String {
+    match path.try_normalize() {
+        Ok(normalized) => normalized.as_ref().to_string(),
+        Err(_) => String::from_utf8_lossy(path.as_ref()).to_string(),
     }
 }
 
@@ -504,6 +1263,11 @@ fn limit_error(resource: LimitResource, actual: u64, maximum: u64) -> Error {
         maximum,
     }
     .into()
+}
+
+#[inline]
+fn cancelled_error() -> Error {
+    ErrorKind::Cancelled.into()
 }
 
 impl std::fmt::Debug for ArchiveReader<'_> {
@@ -578,7 +1342,7 @@ impl Default for StreamingArchiveWriter<std::io::Cursor<Vec<u8>>> {
     }
 }
 
-// Ensure ArchiveReader is Send + Sync for parallel iteration
+// Ensure ArchiveReader can be borrowed by a local parallel-read session.
 // This is a compile-time assertion
 const _: () = {
     const fn assert_send_sync<T: Send + Sync>() {}
@@ -587,8 +1351,8 @@ const _: () = {
 
 /// Lazy ZIP archive reader with on-demand decompression and caching.
 ///
-/// Unlike `ArchiveReader::read_all_parallel()` which decompresses everything upfront,
-/// this reader decompresses files on-demand as they are accessed. This is optimal for:
+/// Unlike an explicit bulk-read session, this reader decompresses files on demand.
+/// This is optimal for:
 /// - Large archives where only a subset of files are needed
 /// - Pipelining decompression with parsing (process files as they become available)
 /// - Reducing memory pressure by not holding all decompressed data at once
@@ -699,67 +1463,110 @@ impl<'data> LazyArchiveReader<'data> {
         Ok(arc)
     }
 
-    /// Read multiple files in parallel without caching.
+    /// Reads multiple members through an explicit session without populating the cache.
     ///
-    /// This is the fastest method for bulk decompression when you need to read
-    /// many files at once and don't need caching. Avoids all cloning overhead.
+    /// Results retain caller input order. Cancellation returns an outer error
+    /// and does not publish successful values into this reader's cache.
+    pub fn read_many_with_session<'name>(
+        &self,
+        session: &ParallelReadSession,
+        names: &'name [&'name str],
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error> {
+        session.read_many(
+            names,
+            cancellation,
+            |name| self.inner.metadata(name),
+            |name| self.inner.read(name),
+        )
+    }
+
+    /// Reads every member through an explicit session without populating the cache.
     ///
-    /// Results retain the caller-provided order and preserve every member
-    /// error. Successful results are not added to the lazy cache.
-    #[inline]
+    /// Results retain physical source order. Cancellation discards every
+    /// result from the interrupted call.
+    pub fn read_all_with_session(
+        &self,
+        session: &ParallelReadSession,
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<Vec<(String, Result<Vec<u8>, Error>)>, Error> {
+        let names = self.inner.file_names().collect::<Vec<_>>();
+        self.read_many_with_session(session, &names, cancellation)
+            .map(|results| {
+                results
+                    .into_iter()
+                    .map(|(name, result)| (name.to_string(), result))
+                    .collect()
+            })
+    }
+
+    /// Reads multiple files serially without caching.
+    ///
+    /// This compatibility method no longer uses Rayon’s global pool. Create a
+    /// [`ParallelReadSession`] and call [`Self::read_many_with_session`] to
+    /// request bounded local parallelism.
+    #[deprecated(
+        since = "0.0.1",
+        note = "this compatibility method is serial; use ParallelReadSession with read_many_with_session"
+    )]
     pub fn read_many_parallel<'a>(
         &self,
         names: &'a [&'a str],
     ) -> Vec<(&'a str, Result<Vec<u8>, Error>)> {
-        self.read_many_parallel_results(names)
-    }
-
-    /// Read multiple files in parallel while preserving individual errors.
-    ///
-    /// This is intended for parsers that must distinguish a missing or corrupt
-    /// required part from a successfully read package.
-    pub fn read_many_parallel_results<'a>(
-        &self,
-        names: &'a [&'a str],
-    ) -> Vec<(&'a str, Result<Vec<u8>, Error>)> {
-        use rayon::prelude::*;
-
         names
-            .par_iter()
+            .iter()
             .map(|name| (*name, self.inner.read(name)))
             .collect()
     }
 
-    /// Read multiple files in parallel with caching.
+    /// Reads multiple files serially while preserving individual errors.
     ///
-    /// This efficiently decompresses multiple files in parallel while still
-    /// benefiting from caching. Files already in cache are returned immediately.
-    /// Use this when you expect to read the same files multiple times.
+    /// This compatibility method no longer uses Rayon’s global pool. Create a
+    /// [`ParallelReadSession`] and call [`Self::read_many_with_session`] to
+    /// request bounded local parallelism.
+    #[deprecated(
+        since = "0.0.1",
+        note = "this compatibility method is serial; use ParallelReadSession with read_many_with_session"
+    )]
+    pub fn read_many_parallel_results<'a>(
+        &self,
+        names: &'a [&'a str],
+    ) -> Vec<(&'a str, Result<Vec<u8>, Error>)> {
+        names
+            .iter()
+            .map(|name| (*name, self.inner.read(name)))
+            .collect()
+    }
+
+    /// Reads multiple files serially with caching.
     ///
-    /// Results retain the caller-provided order and preserve every member
-    /// error. Only successful decompressions are cached.
+    /// This compatibility method no longer uses Rayon’s global pool. Explicit
+    /// session reads intentionally bypass the cache so cancellation cannot
+    /// publish a partial cache population.
+    #[deprecated(
+        since = "0.0.1",
+        note = "this compatibility method is serial; explicit session reads bypass the cache"
+    )]
     pub fn read_many_parallel_cached<'a>(
         &self,
         names: &'a [&'a str],
     ) -> Vec<(&'a str, Result<Vec<u8>, Error>)> {
-        use rayon::prelude::*;
-
-        names
-            .par_iter()
-            .map(|name| (*name, self.read(name)))
-            .collect()
+        names.iter().map(|name| (*name, self.read(name))).collect()
     }
 
-    /// Read all files in parallel, caching results.
+    /// Reads all files serially, caching results.
     ///
-    /// Results retain physical source order and preserve every member error.
-    /// Successful decompressions are cached; failures are never cached.
+    /// This compatibility method no longer uses Rayon’s global pool. Explicit
+    /// session reads intentionally bypass the cache so cancellation cannot
+    /// publish a partial cache population.
+    #[deprecated(
+        since = "0.0.1",
+        note = "this compatibility method is serial; explicit session reads bypass the cache"
+    )]
     pub fn read_all_parallel(&self) -> Vec<(String, Result<Vec<u8>, Error>)> {
-        use rayon::prelude::*;
-
         let names: Vec<&str> = self.inner.file_names().collect();
         names
-            .into_par_iter()
+            .into_iter()
             .map(|name| (name.to_string(), self.read(name)))
             .collect()
     }
@@ -854,6 +1661,104 @@ mod tests {
         assert_eq!(reader.read("mimetype").unwrap(), b"application/test");
         assert_eq!(reader.read("content.xml").unwrap(), b"<content/>");
         assert_eq!(reader.read("styles.xml").unwrap(), b"<styles/>");
+    }
+
+    #[test]
+    fn indexed_archive_reads_stored_and_deflated_members_by_stable_id() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("mimetype", b"application/test")
+            .unwrap();
+        writer
+            .write_deflated("content.xml", b"<content>Hello</content>")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        assert!(local_member_has_data_descriptor(&bytes, b"content.xml"));
+
+        let archive = indexed_archive(bytes);
+        assert_eq!(archive.len(), 2);
+        assert!(archive.contains("/mimetype"));
+        assert!(archive.is_stored("mimetype").unwrap());
+        assert!(!archive.is_stored("content.xml").unwrap());
+        assert_eq!(
+            archive.file_names().collect::<Vec<_>>(),
+            ["mimetype", "content.xml"]
+        );
+
+        let id = archive
+            .entry_id("content.xml")
+            .expect("indexed content entry");
+        let metadata = archive.metadata_for(id).unwrap();
+        assert_eq!(metadata.uncompressed_size(), 24);
+        assert_eq!(archive.read_entry(id).unwrap(), b"<content>Hello</content>");
+        assert_eq!(archive.read("mimetype").unwrap(), b"application/test");
+    }
+
+    #[test]
+    fn indexed_archive_defers_crc_validation_until_payload_read() {
+        let mut bytes = bulk_fixture();
+        corrupt_payload(&mut bytes, b"bad");
+        let archive = indexed_archive(bytes);
+
+        assert_eq!(archive.read("first").unwrap(), b"first");
+        assert!(archive.read("bad").is_err());
+    }
+
+    #[test]
+    fn indexed_archive_rejects_duplicate_normalized_names_and_limits() {
+        let duplicate = fixture(&[
+            FixtureEntry::stored(b"dir/../same.xml", b"one"),
+            FixtureEntry::stored(b"same.xml", b"two"),
+        ]);
+        assert!(matches!(
+            indexed_archive_result(duplicate, ArchiveLimits::UNBOUNDED),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("duplicate normalized"))
+        ));
+
+        let bytes = fixture(&[
+            FixtureEntry::stored(b"first.xml", b"1234"),
+            FixtureEntry::stored(b"second.xml", b"5678"),
+        ]);
+        let limits = ArchiveLimits {
+            max_files: 1,
+            ..ArchiveLimits::UNBOUNDED
+        };
+        assert_limit(
+            indexed_archive_result(bytes, limits).unwrap_err(),
+            LimitResource::FileCount,
+            2,
+            1,
+        );
+    }
+
+    #[test]
+    fn indexed_archive_applies_zip64_sizes_from_one_located_archive() {
+        let zip64 = zip64_sizes(5, 0);
+        let bytes = fixture(&[FixtureEntry {
+            name: b"zip64.bin",
+            extra: &zip64,
+            comment: b"",
+            compressed_size: u32::MAX,
+            uncompressed_size: u32::MAX,
+            data: b"",
+        }]);
+        let source_length = bytes.len() as u64;
+        let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
+        let located = ZipLocator::new()
+            .locate_in_reader(std::io::Cursor::new(bytes), &mut buffer, source_length)
+            .map_err(|(_reader, error)| error)
+            .unwrap();
+
+        let limits = ArchiveLimits {
+            max_entry_size: 4,
+            ..ArchiveLimits::UNBOUNDED
+        };
+        assert_limit(
+            IndexedArchive::from_zip_archive_with_limits(located, limits).unwrap_err(),
+            LimitResource::EntrySize,
+            5,
+            4,
+        );
     }
 
     #[test]
@@ -1133,24 +2038,30 @@ mod tests {
         let mut bytes = bulk_fixture();
         corrupt_payload(&mut bytes, b"bad");
         let reader = ArchiveReader::new(&bytes).unwrap();
+        let session = test_parallel_session(4);
+        let never_cancel = || false;
 
         let requested = ["last", "bad", "missing", "first"];
-        let results = reader.read_many_parallel(&requested);
+        let results = reader
+            .read_many_with_session(&session, &requested, &never_cancel)
+            .unwrap();
         assert_eq!(results.len(), requested.len());
-        assert_eq!(*results[0].0, "last");
+        assert_eq!(results[0].0, "last");
         assert_eq!(results[0].1.as_ref().unwrap(), b"last");
-        assert_eq!(*results[1].0, "bad");
+        assert_eq!(results[1].0, "bad");
         assert!(
             matches!(results[1].1, Err(ref error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
         );
-        assert_eq!(*results[2].0, "missing");
+        assert_eq!(results[2].0, "missing");
         assert!(
             matches!(results[2].1, Err(ref error) if matches!(error.kind(), ErrorKind::FileNotFound(_)))
         );
-        assert_eq!(*results[3].0, "first");
+        assert_eq!(results[3].0, "first");
         assert_eq!(results[3].1.as_ref().unwrap(), b"first");
 
-        let all = reader.read_all_parallel();
+        let all = reader
+            .read_all_with_session(&session, &never_cancel)
+            .unwrap();
         assert_eq!(
             all.iter()
                 .map(|(name, _)| name.as_str())
@@ -1163,6 +2074,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn lazy_bulk_reads_propagate_errors_and_cache_only_successes() {
         let mut bytes = bulk_fixture();
         corrupt_payload(&mut bytes, b"bad");
@@ -1192,6 +2104,168 @@ mod tests {
             matches!(all[1].1, Err(ref error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
         );
         assert_eq!(reader.cache_size(), 2);
+    }
+
+    #[test]
+    fn local_sessions_with_one_two_and_four_workers_preserve_results_and_order() {
+        let mut bytes = bulk_fixture();
+        corrupt_payload(&mut bytes, b"bad");
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let requested = ["last", "bad", "missing", "first"];
+        let never_cancel = || false;
+
+        for workers in [1, 2, 4] {
+            let session = test_parallel_session(workers);
+            let results = reader
+                .read_many_with_session(&session, &requested, &never_cancel)
+                .unwrap();
+            assert_eq!(
+                results.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+                requested
+            );
+            assert_eq!(results[0].1.as_ref().unwrap(), b"last");
+            assert!(
+                matches!(results[1].1, Err(ref error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
+            );
+            assert!(
+                matches!(results[2].1, Err(ref error) if matches!(error.kind(), ErrorKind::FileNotFound(_)))
+            );
+            assert_eq!(results[3].1.as_ref().unwrap(), b"first");
+        }
+    }
+
+    #[test]
+    fn parallel_session_limits_are_finite_and_validated() {
+        assert!(matches!(
+            ParallelReadLimits::new(
+                std::num::NonZeroUsize::new(2).unwrap(),
+                std::num::NonZeroUsize::new(1).unwrap(),
+                std::num::NonZeroU64::new(1024).unwrap(),
+                0,
+            ),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidParallelReadLimits { .. })
+        ));
+        assert!(matches!(
+            ParallelReadLimits::new(
+                std::num::NonZeroUsize::new(1).unwrap(),
+                std::num::NonZeroUsize::new(1).unwrap(),
+                std::num::NonZeroU64::new(7).unwrap(),
+                8,
+            ),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidParallelReadLimits { .. })
+        ));
+
+        let limits = test_parallel_limits(4);
+        assert_eq!(limits.workers().get(), 4);
+        assert_eq!(limits.max_in_flight_tasks().get(), 8);
+        assert_eq!(limits.max_in_flight_bytes().get(), 4096);
+        assert_eq!(limits.min_parallel_bytes(), 0);
+        assert_eq!(limits.affinity(), ParallelAffinity::Inherit);
+    }
+
+    #[test]
+    fn pre_cancelled_session_reads_no_member_and_does_not_populate_lazy_cache() {
+        let bytes = bulk_fixture();
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let session = test_parallel_session(2);
+        let cancelled = || true;
+
+        let error = reader
+            .read_many_with_session(&session, &["missing"], &cancelled)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::Cancelled));
+        assert_eq!(reader.cache_size(), 0);
+    }
+
+    #[test]
+    fn cancellation_discards_batch_results_and_does_not_publish_lazy_cache_entries() {
+        let bytes = bulk_fixture();
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let session = test_parallel_session(1);
+        let cancellation = CancelAfter::new(4);
+
+        let error = reader
+            .read_many_with_session(&session, &["first"], &cancellation)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::Cancelled));
+        assert_eq!(reader.cache_size(), 0);
+    }
+
+    #[test]
+    fn local_session_uses_its_explicit_worker_count() {
+        let session = test_parallel_session(4);
+        assert_eq!(session.worker_count().get(), 4);
+        assert_eq!(
+            session
+                .pool
+                .as_ref()
+                .map(rayon::ThreadPool::current_num_threads),
+            Some(4)
+        );
+    }
+
+    #[test]
+    fn indexed_archive_can_use_an_explicit_local_session() {
+        let archive = indexed_archive(bulk_fixture());
+        let session = test_parallel_session(2);
+        let never_cancel = || false;
+        let results = archive
+            .read_many_with_session(&session, &["last", "first"], &never_cancel)
+            .unwrap();
+
+        assert_eq!(results[0].0, "last");
+        assert_eq!(results[0].1.as_ref().unwrap(), b"last");
+        assert_eq!(results[1].0, "first");
+        assert_eq!(results[1].1.as_ref().unwrap(), b"first");
+    }
+
+    fn indexed_archive(bytes: Vec<u8>) -> IndexedArchive<std::io::Cursor<Vec<u8>>> {
+        indexed_archive_result(bytes, ArchiveLimits::default()).expect("valid indexed archive")
+    }
+
+    fn test_parallel_limits(workers: usize) -> ParallelReadLimits {
+        ParallelReadLimits::new(
+            std::num::NonZeroUsize::new(workers).expect("test worker count is nonzero"),
+            std::num::NonZeroUsize::new(8).expect("test task count is nonzero"),
+            std::num::NonZeroU64::new(4096).expect("test byte count is nonzero"),
+            0,
+        )
+        .expect("test limits are valid")
+    }
+
+    fn test_parallel_session(workers: usize) -> ParallelReadSession {
+        ParallelReadSession::new(test_parallel_limits(workers))
+            .expect("local test worker pool is available")
+    }
+
+    struct CancelAfter {
+        checks: std::sync::atomic::AtomicUsize,
+        cancel_on_check: usize,
+    }
+
+    impl CancelAfter {
+        fn new(cancel_on_check: usize) -> Self {
+            Self {
+                checks: std::sync::atomic::AtomicUsize::new(0),
+                cancel_on_check,
+            }
+        }
+    }
+
+    impl CancellationProbe for CancelAfter {
+        fn is_cancelled(&self) -> bool {
+            self.checks
+                .fetch_add(1, std::sync::atomic::Ordering::AcqRel)
+                >= self.cancel_on_check
+        }
+    }
+
+    fn indexed_archive_result(
+        bytes: Vec<u8>,
+        limits: ArchiveLimits,
+    ) -> Result<IndexedArchive<std::io::Cursor<Vec<u8>>>, Error> {
+        let length = bytes.len() as u64;
+        IndexedArchive::from_reader_with_limits(std::io::Cursor::new(bytes), length, limits)
     }
 
     fn assert_limit(error: Error, resource: LimitResource, actual: u64, maximum: u64) {
@@ -1332,5 +2406,20 @@ mod tests {
             .filter_map(|(offset, candidate)| (candidate == payload).then_some(offset))
             .collect();
         archive[offsets[1]] ^= 0x80;
+    }
+
+    fn local_member_has_data_descriptor(archive: &[u8], wanted_name: &[u8]) -> bool {
+        const LOCAL_HEADER: [u8; 4] = 0x0403_4b50_u32.to_le_bytes();
+        archive.windows(4).enumerate().any(|(offset, signature)| {
+            if signature != LOCAL_HEADER || offset.saturating_add(30) > archive.len() {
+                return false;
+            }
+            let name_len =
+                u16::from_le_bytes([archive[offset + 26], archive[offset + 27]]) as usize;
+            let name_end = offset.saturating_add(30).saturating_add(name_len);
+            name_end <= archive.len()
+                && &archive[offset + 30..name_end] == wanted_name
+                && u16::from_le_bytes([archive[offset + 6], archive[offset + 7]]) & 0x08 != 0
+        })
     }
 }

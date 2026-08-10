@@ -64,9 +64,8 @@ impl std::fmt::Display for NonPartReason {
 /// A ZIP item that was present in the archive but not exposed as an OPC part.
 ///
 /// The item's bytes are never decompressed by the reader. A caller that needs
-/// them can still reach them through
-/// [`PhysPkgReader::archive`](crate::phys_pkg::PhysPkgReader::archive) using
-/// [`name`](Self::name), which is the raw ZIP item name.
+/// them can use the raw [`name`](Self::name) to locate the corresponding ZIP
+/// member in its source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NonPartMember {
     name: String,

@@ -1,7 +1,7 @@
 use super::consts::{
     DIFSECT, DIRENTRY_SIZE, ENDOFCHAIN, FATSECT, FREESECT, HEADER_DIFAT_ENTRIES,
     HEADER_DIFAT_OFFSET, MAGIC, MAXREGSECT, MINIMAL_OLEFILE_SIZE, NOSTREAM, SECTOR_SIZE_V3,
-    STGTY_EMPTY, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
+    SECTOR_SIZE_V4, STGTY_EMPTY, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
 };
 use crate::directory_name::{DirectoryNameData, directory_name_data};
 use smallvec::SmallVec;
@@ -182,10 +182,28 @@ pub struct OleFile<R: Read + Seek> {
     root: Option<DirectoryEntry>,
     /// All directory entries indexed by SID
     dir_entries: Vec<Option<DirectoryEntry>>,
+    /// Validated MS-CFB directory-name comparison data indexed by SID.
+    dir_name_data: Vec<Option<DirectoryNameData>>,
     /// Mini stream data (loaded on demand)
     ministream: Option<Vec<u8>>,
     /// Exclusive ownership of every physical sector in the file.
     sector_roles: Vec<PhysicalSectorRole>,
+}
+
+/// The validated, cursor-independent portion of an OLE file.
+///
+/// This stays crate-private so the positional reader can retain exactly the
+/// metadata validated by [`OleFile::open`] without exposing CFB physical
+/// sector identifiers as public API.
+pub(crate) struct ParsedOleIndex {
+    pub(crate) file_size: u64,
+    pub(crate) sector_size: usize,
+    pub(crate) mini_sector_size: usize,
+    pub(crate) fat: Vec<u32>,
+    pub(crate) minifat: Vec<u32>,
+    pub(crate) root: Option<DirectoryEntry>,
+    pub(crate) dir_entries: Vec<Option<DirectoryEntry>>,
+    pub(crate) dir_name_data: Vec<Option<DirectoryNameData>>,
 }
 
 /// Represents an OLE directory entry (stream or storage)
@@ -234,6 +252,14 @@ pub enum OleError {
     NotOleFile,
     CorruptedFile(String),
     StreamNotFound,
+    /// The positional source changed while a shared CFB view was opening or
+    /// reading a stream.
+    SourceChanged {
+        /// Version captured before the operation started.
+        expected: litchi_core::SourceVersion,
+        /// Version observed after the operation completed.
+        observed: litchi_core::SourceVersion,
+    },
 }
 
 impl From<io::Error> for OleError {
@@ -273,6 +299,10 @@ impl std::fmt::Display for OleError {
             OleError::NotOleFile => write!(f, "Not an OLE file"),
             OleError::CorruptedFile(s) => write!(f, "Corrupted file: {s}"),
             OleError::StreamNotFound => write!(f, "Stream not found"),
+            OleError::SourceChanged { expected, observed } => write!(
+                f,
+                "CFB positional source changed during read (expected {expected:?}, observed {observed:?})"
+            ),
         }
     }
 }
@@ -286,7 +316,8 @@ impl std::error::Error for OleError {
             | Self::InvalidData(_)
             | Self::NotOleFile
             | Self::CorruptedFile(_)
-            | Self::StreamNotFound => None,
+            | Self::StreamNotFound
+            | Self::SourceChanged { .. } => None,
         }
     }
 }
@@ -313,11 +344,27 @@ impl From<OleError> for litchi_core::Error {
             OleError::StreamNotFound => {
                 litchi_core::Error::ComponentNotFound("Stream not found".to_string())
             },
+            error @ OleError::SourceChanged { .. } => litchi_core::Error::Other(error.to_string()),
         }
     }
 }
 
 impl<R: Read + Seek> OleFile<R> {
+    /// Discard the cursor and validation-only state, retaining the parsed CFB
+    /// index for the crate's immutable positional reader.
+    pub(crate) fn into_parsed_index(self) -> ParsedOleIndex {
+        ParsedOleIndex {
+            file_size: self.file_size,
+            sector_size: self.sector_size,
+            mini_sector_size: self.mini_sector_size,
+            fat: self.fat,
+            minifat: self.minifat,
+            root: self.root,
+            dir_entries: self.dir_entries,
+            dir_name_data: self.dir_name_data,
+        }
+    }
+
     /// Open and parse an OLE file from a reader
     ///
     /// # Arguments
@@ -449,6 +496,7 @@ impl<R: Read + Seek> OleFile<R> {
             first_dir_sector,
             root: None,
             dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
             ministream: None,
             sector_roles,
         };
@@ -536,12 +584,18 @@ impl<R: Read + Seek> OleFile<R> {
         // already says where the list ends, and the FAT chain validation below
         // catches a count that disagrees with the file, so the tail is ignored.
 
+        // CFB sector sizes are fixed to 512 or 4096 bytes. Reuse one bounded
+        // stack buffer while decoding metadata, rather than allocating a new
+        // `Vec` for each DIFAT/FAT sector.
+        let mut sector_data = [0u8; SECTOR_SIZE_V4];
+        let sector_data = &mut sector_data[..self.sector_size];
+
         let mut difat_sector = first_difat_sector;
         let entries_per_sector = (self.sector_size / 4) - 1;
         for difat_index in 0..expected_difat_sectors {
             self.claim_sector(difat_sector, PhysicalSectorRole::Difat)?;
             try_push(&mut difat_sectors, difat_sector, "DIFAT sector locations")?;
-            let sector_data = self.read_sector(difat_sector)?;
+            self.read_sector_into(difat_sector, sector_data)?;
 
             for i in 0..entries_per_sector {
                 let offset = i * 4;
@@ -597,7 +651,7 @@ impl<R: Read + Seek> OleFile<R> {
         let mut fat = try_vec_with_capacity(fat_entry_count, "FAT entries")?;
 
         for &sector_id in &fat_sectors {
-            let sector_data = self.read_sector(sector_id)?;
+            self.read_sector_into(sector_id, sector_data)?;
 
             // Parse sector as array of u32 (little-endian) - use chunks for efficiency
             for chunk in sector_data.chunks_exact(4) {
@@ -651,21 +705,23 @@ impl<R: Read + Seek> OleFile<R> {
             .len()
             .checked_mul(self.sector_size)
             .ok_or_else(|| OleError::CorruptedFile("MiniFAT data size overflow".to_string()))?;
-        let mut minifat_data = try_vec_with_capacity(data_len, "MiniFAT data")?;
+        let entries_count = data_len / 4;
+        // Preserve the historical allocation resource label: this reservation
+        // has the same byte size and occurs at the same point as the removed
+        // aggregate MiniFAT byte-buffer reservation.
+        let mut minifat = try_vec_with_capacity(entries_count, "MiniFAT data")?;
+        let mut sector_data = [0u8; SECTOR_SIZE_V4];
+        let sector_data = &mut sector_data[..self.sector_size];
+
+        // Parse each bounded sector directly into the final table. Keeping only
+        // one reusable bounded buffer avoids allocating and copying an
+        // aggregate byte buffer the same size as the complete MiniFAT.
         for sector in sectors {
-            minifat_data.extend_from_slice(&self.read_sector(sector)?);
-        }
-
-        // Parse as array of u32 (little-endian) - use chunks for efficiency
-        let entries_count = minifat_data.len() / 4;
-        let mut minifat = Vec::new();
-        minifat
-            .try_reserve_exact(entries_count)
-            .map_err(|source| OleError::allocation("MiniFAT entries", source))?;
-
-        for chunk in minifat_data.chunks_exact(4) {
-            let entry = read_u32_le(chunk, "MiniFAT entry")?;
-            try_push(&mut minifat, entry, "MiniFAT entries")?;
+            self.read_sector_into(sector, sector_data)?;
+            for chunk in sector_data.chunks_exact(4) {
+                let entry = read_u32_le(chunk, "MiniFAT entry")?;
+                try_push(&mut minifat, entry, "MiniFAT entries")?;
+            }
         }
         self.minifat = minifat;
 
@@ -690,16 +746,22 @@ impl<R: Read + Seek> OleFile<R> {
             .len()
             .checked_mul(self.sector_size)
             .ok_or_else(|| OleError::CorruptedFile("directory data size overflow".to_string()))?;
-        let mut dir_data = try_vec_with_capacity(data_len, "directory data")?;
-        for sector in sectors {
-            dir_data.extend_from_slice(&self.read_sector(sector)?);
-        }
+        // Initialize the final buffer up front so each sector can be read into
+        // its permanent location. This also leaves the unread tail of a short
+        // final sector zero-filled, matching `read_sector`.
+        let mut dir_data = try_filled_vec(data_len, 0u8, "directory data")?;
+        self.read_sectors_batched(&sectors, &mut dir_data)?;
 
-        Self::validate_directory(&dir_data, self.sector_size)?;
+        let validated_entries = Self::validated_directory_entries(&dir_data, self.sector_size)?;
 
         // Each directory entry is 128 bytes
         let num_entries = dir_data.len() / DIRENTRY_SIZE;
         let mut dir_entries = try_filled_vec(num_entries, None, "directory entries")?;
+        if validated_entries.len() != num_entries {
+            return Err(OleError::CorruptedFile(
+                "validated directory cache has the wrong length".to_string(),
+            ));
+        }
 
         // Parse root entry first (always at index 0)
         let mut root_entry = None;
@@ -713,12 +775,39 @@ impl<R: Read + Seek> OleFile<R> {
             root_entry = Some(root);
         }
 
+        let mut dir_name_data =
+            try_filled_vec(num_entries, None, "directory name comparison data")?;
+        for ((name_data, entry), validated_entry) in dir_name_data
+            .iter_mut()
+            .zip(&dir_entries)
+            .zip(validated_entries)
+        {
+            match (entry, validated_entry) {
+                (None, None) => {},
+                (Some(entry), Some(validated_entry))
+                    if entry.sid == validated_entry.sid
+                        // Validation canonicalizes the explicitly supported
+                        // classic-Mac root encoding to `Root Entry`, while the
+                        // public entry parser retains its historical decoding.
+                        && (entry.sid == 0 || entry.name == validated_entry.name) =>
+                {
+                    *name_data = Some(validated_entry.name_data);
+                },
+                _ => {
+                    return Err(OleError::CorruptedFile(
+                        "directory entries and validated name cache disagree".to_string(),
+                    ));
+                },
+            }
+        }
+
         // Install the validated graph only after every directory entry has
         // been traversed successfully. A malformed tree therefore cannot
         // leave a partially populated object behind for a caller that uses
         // this loader in a staged open path.
         self.root = root_entry;
         self.dir_entries = dir_entries;
+        self.dir_name_data = dir_name_data;
 
         Ok(())
     }
@@ -864,7 +953,15 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(())
     }
 
+    #[cfg(test)]
     pub(crate) fn validate_directory(dir_data: &[u8], sector_size: usize) -> Result<(), OleError> {
+        Self::validated_directory_entries(dir_data, sector_size).map(drop)
+    }
+
+    fn validated_directory_entries(
+        dir_data: &[u8],
+        sector_size: usize,
+    ) -> Result<Vec<Option<ValidatedDirectoryEntry>>, OleError> {
         if dir_data.is_empty() || !dir_data.len().is_multiple_of(DIRENTRY_SIZE) {
             return Err(OleError::CorruptedFile(
                 "CFB directory stream must contain complete 128-byte entries".to_string(),
@@ -988,7 +1085,7 @@ impl<R: Read + Seek> OleFile<R> {
                 )));
             }
         }
-        Ok(())
+        Ok(entries)
     }
 
     fn parse_validated_directory_entry(
@@ -1245,7 +1342,45 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     /// Read a single sector from the file
+    #[allow(
+        dead_code,
+        reason = "kept as the allocating sector-read API and covered by its unit tests"
+    )]
     fn read_sector(&mut self, sector_id: u32) -> Result<Vec<u8>, OleError> {
+        // Preserve the original error ordering for this allocating API: reject
+        // an invalid sector (and perform its seek) before reserving the result.
+        let position = self.sector_position(sector_id)?;
+        self.reader.seek(SeekFrom::Start(position))?;
+        let present = self.present_sector_bytes(position, self.sector_size);
+        let mut buffer = try_filled_vec(self.sector_size, 0u8, "sector buffer")?;
+        self.reader.read_exact(&mut buffer[..present])?;
+        Ok(buffer)
+    }
+
+    /// Read one sector into a caller-provided, sector-sized buffer.
+    ///
+    /// The destination is cleared before the on-disk prefix is read, so short
+    /// final sectors retain the CFB reader's zero-filled tail semantics.
+    fn read_sector_into(&mut self, sector_id: u32, buffer: &mut [u8]) -> Result<(), OleError> {
+        let position = self.sector_position(sector_id)?;
+        if buffer.len() != self.sector_size {
+            return Err(OleError::CorruptedFile(format!(
+                "Sector read destination has length {}, expected {}",
+                buffer.len(),
+                self.sector_size
+            )));
+        }
+        self.reader.seek(SeekFrom::Start(position))?;
+
+        // Keep whatever a truncated final sector actually contains; the tail
+        // stays zero. See the file-length note in the header parser.
+        let present = self.present_sector_bytes(position, self.sector_size);
+        buffer.fill(0);
+        self.reader.read_exact(&mut buffer[..present])?;
+        Ok(())
+    }
+
+    fn sector_position(&self, sector_id: u32) -> Result<u64, OleError> {
         // Sector position in file: (sector_id + 1) * sector_size
         let position = (u64::from(sector_id) + 1)
             .checked_mul(self.sector_size as u64)
@@ -1258,14 +1393,7 @@ impl<R: Read + Seek> OleFile<R> {
                 "Sector {sector_id} is outside the file"
             )));
         }
-        self.reader.seek(SeekFrom::Start(position))?;
-
-        // Keep whatever a truncated final sector actually contains; the tail
-        // stays zero. See the file-length note in the header parser.
-        let present = self.present_sector_bytes(position, self.sector_size);
-        let mut buffer = try_filled_vec(self.sector_size, 0u8, "sector buffer")?;
-        self.reader.read_exact(&mut buffer[..present])?;
-        Ok(buffer)
+        Ok(position)
     }
 
     /// How many of the `wanted` bytes starting at `position` are present in the
@@ -1697,53 +1825,38 @@ impl<R: Read + Seek> OleFile<R> {
         Err(OleError::StreamNotFound)
     }
 
-    /// Find a child entry by name in a red-black tree (iterative, optimized)
+    /// Find a child entry by name in the validated sibling tree.
     ///
-    /// OLE directory entries are organized in a red-black tree, though not all
-    /// implementations guarantee perfect ordering. This uses an iterative traversal
-    /// with zero-allocation string comparison.
-    ///
-    /// Optimizations:
-    /// - Iterative instead of recursive (eliminates function call overhead)
-    /// - Zero-allocation case-insensitive comparison using `eq_ignore_ascii_case`
-    /// - Full tree traversal using work queue (handles all tree structures)
+    /// Directory validation establishes strict MS-CFB name ordering, so lookup
+    /// can descend through one branch at each node. Limit the number of visited
+    /// nodes as a final defense against a malformed in-memory graph.
     fn find_child_by_name(&self, sid: u32, name: &str) -> Result<&DirectoryEntry, OleError> {
-        let Some(sid_index) = usize::try_from(sid).ok() else {
-            return Err(OleError::StreamNotFound);
-        };
-        if sid == NOSTREAM || sid_index >= self.dir_entries.len() {
-            return Err(OleError::StreamNotFound);
-        }
+        let target_name = directory_name_data(name).map_err(|_error| OleError::StreamNotFound)?;
+        let mut current_sid = sid;
 
-        // Use iterative in-order traversal with a work queue (pre-allocated for efficiency)
-        // This handles all tree structures correctly, including improperly ordered trees
-        let mut queue = SmallVec::<[u32; 32]>::new();
-        queue.push(sid);
-
-        while let Some(current_sid) = queue.pop() {
-            let Some(current_index) = usize::try_from(current_sid).ok() else {
-                continue;
-            };
-            if current_sid == NOSTREAM || current_index >= self.dir_entries.len() {
-                continue;
+        for _ in 0..self.dir_entries.len() {
+            if current_sid == NOSTREAM {
+                return Err(OleError::StreamNotFound);
             }
-
-            let entry = self.dir_entries[current_index]
-                .as_ref()
+            let Some(current_index) = usize::try_from(current_sid).ok() else {
+                return Err(OleError::StreamNotFound);
+            };
+            let entry = self
+                .dir_entries
+                .get(current_index)
+                .and_then(Option::as_ref)
+                .ok_or(OleError::StreamNotFound)?;
+            let entry_name = self
+                .dir_name_data
+                .get(current_index)
+                .and_then(Option::as_ref)
                 .ok_or(OleError::StreamNotFound)?;
 
-            // Fast zero-allocation case-insensitive comparison (ASCII-optimized)
-            if entry.name.eq_ignore_ascii_case(name) {
-                return Ok(entry);
-            }
-
-            // Add children to queue (right first for depth-first-like order)
-            if entry.sid_right != NOSTREAM {
-                queue.push(entry.sid_right);
-            }
-            if entry.sid_left != NOSTREAM {
-                queue.push(entry.sid_left);
-            }
+            current_sid = match target_name.compare(entry_name) {
+                Ordering::Less => entry.sid_left,
+                Ordering::Equal => return Ok(entry),
+                Ordering::Greater => entry.sid_right,
+            };
         }
 
         Err(OleError::StreamNotFound)
@@ -2054,6 +2167,91 @@ mod tests {
         output.into_inner()
     }
 
+    fn file_with_streams<I, S>(names: I) -> OleFile<Cursor<Vec<u8>>>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut writer = OleWriter::new();
+        for name in names {
+            writer.create_stream(&[name.as_ref()], b"").unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        OleFile::open(Cursor::new(output.into_inner())).unwrap()
+    }
+
+    #[test]
+    fn finds_exact_names_in_a_wide_sibling_tree() {
+        let names: Vec<_> = (0..257).map(|index| format!("Entry {index:03}")).collect();
+        let file = file_with_streams(&names);
+
+        for name in &names {
+            assert_eq!(file.stream_len(&[name]).unwrap(), 0);
+        }
+    }
+
+    #[test]
+    fn parsed_name_cache_is_sid_aligned_with_directory_entries() {
+        let file = file_with_streams(["Alpha", "Bravo", "Charlie"]);
+
+        assert_eq!(file.dir_name_data.len(), file.dir_entries.len());
+        for (sid, (entry, cached_name)) in
+            file.dir_entries.iter().zip(&file.dir_name_data).enumerate()
+        {
+            assert_eq!(entry.is_some(), cached_name.is_some());
+            if let (Some(entry), Some(cached_name)) = (entry, cached_name) {
+                assert_eq!(entry.sid as usize, sid);
+                assert_eq!(*cached_name, directory_name_data(&entry.name).unwrap());
+            }
+        }
+    }
+
+    #[test]
+    fn lookup_refuses_a_missing_validated_name_cache_entry() {
+        let mut file = file_with_streams(["Alpha"]);
+        let child_sid = file.root.as_ref().unwrap().sid_child as usize;
+        file.dir_name_data[child_sid] = None;
+
+        assert!(matches!(
+            file.stream_len(&["Alpha"]),
+            Err(OleError::StreamNotFound)
+        ));
+    }
+
+    #[test]
+    fn returns_not_found_for_missing_and_invalid_caller_names() {
+        let file = file_with_streams(["Alpha", "Bravo", "Charlie"]);
+        let too_long = "x".repeat(crate::directory_name::MAX_DIRECTORY_NAME_CODE_UNITS + 1);
+
+        for name in ["Delta", "", "bad/name", "nul\0name", &too_long] {
+            assert!(matches!(
+                file.stream_len(&[name]),
+                Err(OleError::StreamNotFound)
+            ));
+        }
+    }
+
+    #[test]
+    fn lookup_uses_ascii_case_equivalence() {
+        let file = file_with_streams(["Quarterly Report"]);
+
+        assert_eq!(file.stream_len(&["qUaRtErLy rEpOrT"]).unwrap(), 0);
+    }
+
+    #[test]
+    fn lookup_uses_cfb_simple_uppercase_comparison() {
+        assert!(!"ſtream".eq_ignore_ascii_case("Stream"));
+        let file = file_with_streams(["ſtream", "élan", "straße"]);
+
+        assert_eq!(file.stream_len(&["Stream"]).unwrap(), 0);
+        assert_eq!(file.stream_len(&["ÉLAN"]).unwrap(), 0);
+        assert!(matches!(
+            file.stream_len(&["STRASSE"]),
+            Err(OleError::StreamNotFound)
+        ));
+    }
+
     #[test]
     fn rejects_invalid_header_shifts_and_versions_without_panicking() {
         for (offset, value) in [(0x1A, 5u16), (0x1E, 63), (0x20, 63)] {
@@ -2120,11 +2318,42 @@ mod tests {
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
         };
 
         assert_eq!(file.read_stream_from_fat(0, 3).unwrap(), b"abc");
+    }
+
+    #[test]
+    fn batched_sector_reads_place_noncontiguous_sectors_in_order() {
+        let mut bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        bytes[SECTOR_SIZE_V3..SECTOR_SIZE_V3 + 3].copy_from_slice(b"one");
+        bytes[3 * SECTOR_SIZE_V3..3 * SECTOR_SIZE_V3 + 3].copy_from_slice(b"two");
+        let mut file = OleFile {
+            reader: Cursor::new(bytes),
+            file_size: (4 * SECTOR_SIZE_V3) as u64,
+            sector_size: SECTOR_SIZE_V3,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; 3],
+        };
+        let mut data = vec![0xFF; 2 * SECTOR_SIZE_V3];
+
+        file.read_sectors_batched(&[0, 2], &mut data).unwrap();
+
+        assert_eq!(&data[..3], b"one");
+        assert_eq!(&data[SECTOR_SIZE_V3..SECTOR_SIZE_V3 + 3], b"two");
+        assert!(data[3..SECTOR_SIZE_V3].iter().all(|&byte| byte == 0));
+        assert!(data[SECTOR_SIZE_V3 + 3..].iter().all(|&byte| byte == 0));
     }
 
     #[test]
@@ -2170,6 +2399,7 @@ mod tests {
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 113],
         };
@@ -2205,6 +2435,7 @@ mod tests {
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
         };
@@ -2229,6 +2460,7 @@ mod tests {
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed],
         };
@@ -2268,6 +2500,7 @@ mod tests {
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: Vec::new(),
         };
@@ -2275,6 +2508,33 @@ mod tests {
             file.read_sector(0),
             Err(OleError::CorruptedFile(message)) if message.contains("outside the file")
         ));
+    }
+
+    #[test]
+    fn read_sector_into_zero_fills_a_truncated_final_sector() {
+        let mut bytes = vec![0u8; SECTOR_SIZE_V3 + 3];
+        bytes[SECTOR_SIZE_V3..].copy_from_slice(b"CFB");
+        let mut file = OleFile {
+            reader: Cursor::new(bytes),
+            file_size: (SECTOR_SIZE_V3 + 3) as u64,
+            sector_size: SECTOR_SIZE_V3,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: Vec::new(),
+        };
+        let mut destination = [0xFF; SECTOR_SIZE_V3];
+
+        file.read_sector_into(0, &mut destination).unwrap();
+
+        assert_eq!(&destination[..3], b"CFB");
+        assert!(destination[3..].iter().all(|&byte| byte == 0));
     }
 
     #[test]
@@ -2301,6 +2561,7 @@ mod tests {
         const DEPTH: usize = 16_384;
 
         let mut dir_entries = vec![None; DEPTH + 1];
+        let mut dir_name_data = vec![None; DEPTH + 1];
         for index in (0..DEPTH).rev() {
             let sid = u32::try_from(index + 1).unwrap();
             let right = if index + 1 < DEPTH {
@@ -2308,9 +2569,11 @@ mod tests {
             } else {
                 NOSTREAM
             };
+            let name = format!("Stream {index:05}");
+            dir_name_data[sid as usize] = Some(directory_name_data(&name).unwrap());
             dir_entries[sid as usize] = Some(DirectoryEntry {
                 sid,
-                name: format!("Stream {index:05}"),
+                name,
                 entry_type: STGTY_STREAM,
                 sid_left: NOSTREAM,
                 sid_right: right,
@@ -2346,6 +2609,7 @@ mod tests {
                 children: Vec::new(),
             }),
             dir_entries,
+            dir_name_data,
             ministream: None,
             sector_roles: Vec::new(),
         };

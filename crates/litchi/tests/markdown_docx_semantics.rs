@@ -2,7 +2,10 @@
 
 use std::io::{Cursor, Write};
 
-use litchi::{Document, markdown::ToMarkdown};
+use litchi::{
+    Document,
+    markdown::{MarkdownOptions, ToMarkdown},
+};
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 const CONTENT_TYPES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/><Override PartName="/word/endnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"/></Types>"#;
@@ -42,6 +45,21 @@ fn package_semantics_have_compact_golden_markdown() {
         document.to_markdown().unwrap(),
         "Before [**site \\[x\\]**](<https://example.test/a%20b> \"tip \\\"q\\\"\") after\n\n![alt \\[image\\]](<data:image/png;base64,iVBORw0KGgo=> \"Picture &quot;one&quot;\")\n\nWith note[^fn-1] and end[^en-2]\n\n[^fn-1]: note \\& \\*body\\*\n[^en-2]: end note\n"
     );
+}
+
+#[test]
+fn parallel_option_preserves_serial_docx_markdown_output() {
+    let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>First</w:t></w:r></w:p><w:p><w:r><w:t>Second</w:t></w:r></w:p></w:body></w:document>"#;
+    let document = Document::from_bytes(docx(document_xml)).unwrap();
+
+    let serial = document
+        .to_markdown_with_options(&MarkdownOptions::new().with_parallel(false))
+        .unwrap();
+    let requested_parallel = document
+        .to_markdown_with_options(&MarkdownOptions::new().with_parallel(true))
+        .unwrap();
+
+    assert_eq!(requested_parallel, serial);
 }
 
 #[test]

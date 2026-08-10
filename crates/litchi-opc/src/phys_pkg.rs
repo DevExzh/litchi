@@ -434,10 +434,11 @@ impl<'data> PhysPkgReader<'data> {
         self.archive.contains(membername)
     }
 
-    /// Read multiple blobs in parallel.
+    /// Read multiple blobs serially.
     ///
-    /// Uses rayon for parallel decompression, providing significant speedup
-    /// when reading many parts at once.
+    /// This compatibility API retains its established name but no longer uses
+    /// an implicit global scheduler. Explicit bounded eager package opens use
+    /// [`crate::OpenSession`] instead.
     ///
     /// # Arguments
     /// * `uris` - Slice of `PackURIs` to read
@@ -478,7 +479,10 @@ impl<'data> PhysPkgReader<'data> {
             names.push(name);
         }
         let reservation = self.reserve_declared_parts(&declared)?;
-        let results = self.archive.read_many_parallel_results(&names);
+        let results = names
+            .iter()
+            .map(|name| (*name, self.archive.read(name)))
+            .collect::<Vec<_>>();
         let mut materialized = Vec::new();
         if let Err(source) = materialized.try_reserve(results.len()) {
             self.release_declared_parts(reservation);

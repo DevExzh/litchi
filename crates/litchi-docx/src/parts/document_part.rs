@@ -35,6 +35,40 @@ pub struct DocumentPart<'a> {
     xml: Arc<Vec<u8>>,
 }
 
+/// Select markup-compatibility branches for a main-document payload.
+///
+/// Both materialized OPC parts and source-backed pinned documents use this
+/// path so their paragraph semantics remain identical.
+pub(crate) fn visible_document_xml(raw: Arc<Vec<u8>>) -> Result<Arc<Vec<u8>>> {
+    // Word 2010 paragraph/drawing extensions are declared ignorable by
+    // producers. Keep that namespace understood at the package boundary so
+    // `w14:paraId`, `w14:textId`, `w14:noSpellErr`, and unrelated w14 markup
+    // survive the MCE visibility pass for typed or opaque source-backed
+    // readers.
+    let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
+    capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
+    match litchi_ooxml_common::mce::process_markup_compatibility(
+        raw.as_slice(),
+        &capabilities,
+        &litchi_ooxml_common::mce::Limits::default(),
+    )?
+    .xml
+    {
+        std::borrow::Cow::Borrowed(_) => Ok(raw),
+        std::borrow::Cow::Owned(value) => Ok(Arc::new(value)),
+    }
+}
+
+/// Extract all visible paragraphs from a normalized main-document payload.
+pub(crate) fn document_paragraphs(xml: Arc<Vec<u8>>) -> Result<SmallVec<[Paragraph; 32]>> {
+    let mut paragraphs = SmallVec::new();
+    scan_word_element_ranges(xml.as_slice(), &[b"p".as_slice()], |_, start, length| {
+        paragraphs.push(Paragraph::from_arc_range(Arc::clone(&xml), start, length));
+        Ok(())
+    })?;
+    Ok(paragraphs)
+}
+
 /// Select the active supported block ranges from original document XML.
 ///
 /// This remains available to the mutable writer, whose source-preserving body
@@ -228,24 +262,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let raw = part.blob_arc();
-        // Word 2010 paragraph/drawing extensions are declared ignorable by
-        // producers. Keep that namespace understood at the package boundary
-        // so `w14:paraId`, `w14:textId`, `w14:noSpellErr`, and unrelated
-        // w14 markup survive the MCE visibility pass for typed or opaque
-        // source-backed readers.
-        let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
-        capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
-        let xml = match litchi_ooxml_common::mce::process_markup_compatibility(
-            raw.as_slice(),
-            &capabilities,
-            &litchi_ooxml_common::mce::Limits::default(),
-        )?
-        .xml
-        {
-            std::borrow::Cow::Borrowed(_) => Arc::clone(&raw),
-            std::borrow::Cow::Owned(v) => Arc::new(v),
-        };
+        let xml = visible_document_xml(part.blob_arc())?;
         Ok(Self { part, xml })
     }
 
@@ -323,17 +340,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
-        let source = self.get_xml_arc();
-        let mut paragraphs = SmallVec::new();
-        scan_word_element_ranges(source.as_slice(), &[b"p".as_slice()], |_, start, length| {
-            paragraphs.push(Paragraph::from_arc_range(
-                Arc::clone(&source),
-                start,
-                length,
-            ));
-            Ok(())
-        })?;
-        Ok(paragraphs)
+        document_paragraphs(self.get_xml_arc())
     }
 
     /// Get all tables in the document.

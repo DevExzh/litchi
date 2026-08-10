@@ -72,6 +72,18 @@ pub enum ErrorKind {
     /// An invalid input error with associated message
     InvalidInput { msg: String },
 
+    /// An explicit parallel-read policy was internally inconsistent.
+    InvalidParallelReadLimits { reason: &'static str },
+
+    /// A member cannot fit within the caller-selected in-flight byte budget.
+    ParallelReadInFlightBytesExceeded { actual: u64, maximum: u64 },
+
+    /// A local parallel-read worker pool could not be created.
+    ParallelReadWorkerPool { workers: usize, message: String },
+
+    /// A parallel-read operation observed cooperative cancellation.
+    Cancelled,
+
     /// A declared archive resource exceeds the caller-selected ceiling.
     LimitExceeded {
         /// The resource whose declared size or count exceeded its ceiling.
@@ -99,6 +111,9 @@ pub enum ErrorKind {
 
     /// Unsupported compression method
     UnsupportedCompressionMethod(u16),
+
+    /// A ZIP layout cannot be safely preserved by the raw-copy writer.
+    UnsupportedPreservation { reason: &'static str },
 }
 
 impl std::error::Error for Error {}
@@ -149,6 +164,25 @@ impl std::fmt::Display for ErrorKind {
             ErrorKind::InvalidInput { ref msg } => {
                 write!(f, "Invalid input: {}", msg)
             },
+            ErrorKind::InvalidParallelReadLimits { reason } => {
+                write!(f, "Invalid parallel read limits: {reason}")
+            },
+            ErrorKind::ParallelReadInFlightBytesExceeded { actual, maximum } => {
+                write!(
+                    f,
+                    "Parallel read in-flight byte limit exceeded: declared {actual}, maximum {maximum}"
+                )
+            },
+            ErrorKind::ParallelReadWorkerPool {
+                workers,
+                ref message,
+            } => {
+                write!(
+                    f,
+                    "Could not create local parallel read pool with {workers} worker(s): {message}"
+                )
+            },
+            ErrorKind::Cancelled => write!(f, "Operation cancelled"),
             ErrorKind::LimitExceeded {
                 resource,
                 actual,
@@ -169,6 +203,9 @@ impl std::fmt::Display for ErrorKind {
             },
             ErrorKind::UnsupportedCompressionMethod(method) => {
                 write!(f, "Unsupported compression method: {}", method)
+            },
+            ErrorKind::UnsupportedPreservation { reason } => {
+                write!(f, "Unsupported ZIP preservation layout: {reason}")
             },
         }
     }

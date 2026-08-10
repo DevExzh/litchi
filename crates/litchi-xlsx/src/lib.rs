@@ -282,7 +282,8 @@ pub use threaded_comments::{
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit,
     DurablePatch, Edit, Flavor, History, HistoryLimits, JoinError, JoinFailure, MergeChoice,
-    MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector, State, TabEdit,
+    MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector,
+    SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet, State, TabEdit,
     ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetEdit, WorksheetKind,
 };
 pub use workbook_metadata::{

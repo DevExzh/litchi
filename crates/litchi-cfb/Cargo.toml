@@ -16,6 +16,7 @@ write = []
 [dependencies]
 fixedbitset     = { workspace = true }
 litchi-core     = { workspace = true }
+rayon           = { workspace = true }
 smallvec        = { workspace = true }
 zerocopy        = { workspace = true }
 zerocopy-derive = { workspace = true }

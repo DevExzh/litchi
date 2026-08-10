@@ -15,6 +15,7 @@ pub mod story;
 mod tests;
 
 pub use model::Package;
+pub(crate) use model::validate_document_main_content_type;
 pub use story::{
     StoryDialect, StoryHyperlinkTextReplacement, StoryInventory, StoryKind, StoryLimits,
     StoryOwner, StoryPart, StoryTopology,

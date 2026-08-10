@@ -37,7 +37,7 @@ impl Writer {
 
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
-        self.populate_compound_document(&mut ole_writer, &streams)?;
+        self.populate_compound_document(&mut ole_writer, streams)?;
 
         // Save to file
         ole_writer.save(path)?;
@@ -66,7 +66,7 @@ impl Writer {
 
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
-        self.populate_compound_document(&mut ole_writer, &streams)?;
+        self.populate_compound_document(&mut ole_writer, streams)?;
 
         // Write to the provided writer
         ole_writer.write_to(writer)?;
@@ -77,9 +77,15 @@ impl Writer {
     fn populate_compound_document(
         &self,
         ole_writer: &mut OleWriter,
-        streams: &stream::WorkbookStreams,
+        streams: stream::WorkbookStreams,
     ) -> Result<()> {
-        ole_writer.create_stream(&["Workbook"], &streams.workbook)?;
+        let stream::WorkbookStreams {
+            workbook,
+            toolbar,
+            pivot_caches,
+        } = streams;
+
+        ole_writer.create_stream_owned(&["Workbook"], workbook)?;
         if let Some(metadata) = &self.vba_metadata {
             ole_writer.create_storage(&["_VBA_PROJECT_CUR"])?;
             metadata
@@ -89,19 +95,19 @@ impl Writer {
 
         // Pivot cache storage: _SX_DB_CUR/XXXX. Stream names use four-digit
         // uppercase hexadecimal identifiers, matching the legacy convention.
-        if !streams.pivot_caches.is_empty() {
+        if !pivot_caches.is_empty() {
             ole_writer.create_storage(&["_SX_DB_CUR"])?;
-            for (id, data) in &streams.pivot_caches {
+            for (id, data) in pivot_caches {
                 let name = format!("{id:04X}");
-                ole_writer.create_stream(&["_SX_DB_CUR", &name], data)?;
+                ole_writer.create_stream_owned(&["_SX_DB_CUR", &name], data)?;
             }
         }
-        if let Some(toolbar) = &streams.toolbar {
-            ole_writer.create_stream(&["XCB"], toolbar)?;
+        if let Some(toolbar) = toolbar {
+            ole_writer.create_stream_owned(&["XCB"], toolbar)?;
         }
         if let Some(map_info) = &self.xml_map {
             let xml = crate::xml_map::write(map_info)?;
-            ole_writer.create_stream(&[crate::xml_map::STREAM_NAME], &xml)?;
+            ole_writer.create_stream_owned(&[crate::xml_map::STREAM_NAME], xml)?;
         }
         Ok(())
     }

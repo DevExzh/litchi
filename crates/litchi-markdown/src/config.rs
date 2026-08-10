@@ -43,11 +43,11 @@ pub struct MarkdownOptions {
     pub script_style: ScriptStyle,
     /// How to render strikethrough text
     pub strikethrough_style: StrikethroughStyle,
-    /// Whether to use parallel processing for large documents (default: true)
+    /// Compatibility hint for parallel Markdown rendering (default: `true`).
     ///
-    /// When enabled, uses rayon to process paragraphs in parallel for documents
-    /// with 50+ paragraphs. Automatically uses sequential processing for smaller
-    /// documents to avoid parallelization overhead.
+    /// The ordinary Litchi renderer executes serially and does not inspect this
+    /// value. It is retained for source compatibility; a future explicit
+    /// caller-owned execution API may consume it.
     pub use_parallel: bool,
 }
 
@@ -62,7 +62,7 @@ impl Default for MarkdownOptions {
             list_indent: 2,
             script_style: ScriptStyle::Html,
             strikethrough_style: StrikethroughStyle::Markdown,
-            use_parallel: true, // Enable parallel processing by default
+            use_parallel: true,
         }
     }
 }
@@ -225,22 +225,23 @@ impl MarkdownOptions {
         self
     }
 
-    /// Set whether to use parallel processing.
+    /// Set the parallel-rendering compatibility hint.
     ///
-    /// When enabled, uses rayon to process paragraphs in parallel for large documents.
-    /// Automatically uses sequential processing for small documents (< 50 paragraphs)
-    /// to avoid parallelization overhead.
+    /// The ordinary Litchi renderer remains serial regardless of this value.
+    /// This builder and the public field remain available for source
+    /// compatibility. A future explicit caller-owned execution API may choose
+    /// to interpret the hint.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use litchi_markdown::MarkdownOptions;
     ///
-    /// // Enable parallel processing (default)
+    /// // Preserve the compatibility hint (the ordinary renderer remains serial).
     /// let options = MarkdownOptions::new()
     ///     .with_parallel(true);
     ///
-    /// // Disable for deterministic single-threaded execution
+    /// // Clear the compatibility hint.
     /// let options = MarkdownOptions::new()
     ///     .with_parallel(false);
     /// ```

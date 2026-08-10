@@ -39,6 +39,7 @@ pub mod atomic;
 pub mod constants;
 pub mod content_type;
 pub mod error;
+pub mod execution;
 pub mod limits;
 pub mod members;
 pub mod package;
@@ -50,10 +51,12 @@ pub mod pkgwriter;
 pub mod rel;
 #[cfg(feature = "sign")]
 pub mod sign;
+pub mod source_backed;
 
 // Re-export commonly used types
 pub use content_type::ContentType;
 pub use error::{OpcError, Result};
+pub use execution::OpenSession;
 pub use limits::{ReadLimits, ReadLimitsBuilder, ReadResource};
 pub use members::{NonPartMember, NonPartReason};
 pub use package::{FontEmbedding, OpcPackage, SaveOptions};
@@ -61,3 +64,7 @@ pub use packuri::PackURI;
 pub use part::{BlobPart, Part, XmlPart};
 pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
+pub use source_backed::{
+    PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimitError,
+    SourceCacheLimits,
+};

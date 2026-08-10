@@ -1,0 +1,265 @@
+# ZIP, OPC, and CFB substrate baseline
+
+Date: 2026-08-10
+Production revision: `2665d572b78f0b3efd9ecfc4bd1fda09f8786ae3`
+Branch: `feat/office-format-completeness`
+
+This is the first measured baseline in the performance program. It covers the
+shared ZIP/OPC substrate and an initial CFB/OLE2 slice. It does not stand in for
+the still-required DOCX, PPTX, XLSX, DOC/XLS/PPT semantic, ODF, iWork,
+encrypted, malformed, cold-file, and edit/patch scenario matrices.
+
+The complete raw samples and corpus manifests are in
+[`results/baseline-opc-2665d572b-2026-08-10.json`](results/baseline-opc-2665d572b-2026-08-10.json).
+The full-process resource result is in
+[`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
+
+## Measurement environment
+
+| Item | Value |
+|---|---|
+| OS | Linux 6.8.0-101-generic, x86_64, KVM |
+| CPU visible to process | 12 logical CPUs, AMD EPYC 9575F |
+| Memory | 31 GiB visible |
+| Rust | `rustc 1.95.0 (59807616e 2026-04-14)` |
+| Build | Cargo `release`, locked dependencies, system allocator |
+| Hardware counters | Unavailable: `/proc/sys/kernel/perf_event_paranoid` is `4` |
+| Samples | 3 untimed warm-ups and 15 measured iterations per matrix cell |
+| Input state | Deterministically generated in memory before timing; warm-memory workload |
+| Output state | Bounded forward-only counting sink; bytes are not retained |
+
+The JSON reports `git_worktree_dirty: true` because the harness and performance
+documents were uncommitted and an unrelated pre-existing documentation edit
+was present. No production source file differed from the named revision when
+this baseline was captured.
+
+Command:
+
+```sh
+cargo build --release --locked --manifest-path tools/perf-baseline/Cargo.toml
+/usr/bin/time -v tools/perf-baseline/target/release/litchi-perf-baseline \
+  --warmup 3 --samples 15 \
+  --json docs/performance/results/baseline-opc-2665d572b-2026-08-10.json
+```
+
+The deterministic corpus has tiny, 256-member many-small, and four-member
+few-large shapes, each with compressible and deterministic incompressible
+payloads. The few-large shape contains 16 MiB of logical Part data. The JSON
+records generator parameters, archive and target SHA-256 hashes, logical and
+physical byte counts, raw sorted samples, p50/p95/p99, sample standard
+deviation, and a two-sided Student's-t 95% interval for the mean.
+
+## Latency and bytes
+
+Times below are p50; p95 is included where it changes the interpretation.
+
+| Case / corpus | Archive bytes | Logical Part bytes | p50 | p95 | Observed output |
+|---|---:|---:|---:|---:|---:|
+| ZIP index, 256 compressible Parts | 54,615 | 262,144 | 41.4 us | 55.9 us | n/a |
+| ZIP index, 256 incompressible Parts | 302,935 | 262,144 | 27.8 us | 35.1 us | n/a |
+| ZIP read one, 4 MiB compressible Part | 99,044 | 4,194,304 | 408 us | 431 us | n/a |
+| ZIP read one, 4 MiB incompressible Part | 16,783,565 | 4,194,304 | 480 us | 526 us | n/a |
+| OPC open, 256 compressible Parts | 54,615 | 262,144 | 622 us | 713 us | n/a |
+| OPC open, 256 incompressible Parts | 302,935 | 262,144 | 737 us | 1.01 ms | n/a |
+| OPC open, 16 MiB compressible Parts | 99,044 | 16,777,216 | 499 us | 1.41 ms | n/a |
+| OPC open, 16 MiB incompressible Parts | 16,783,565 | 16,777,216 | 648 us | 1.08 ms | n/a |
+| OPC no-op save, 256 compressible Parts | 54,615 | 262,144 | 1.57 ms | 1.84 ms | 54,615 B / 1,813 writes |
+| OPC no-op save, 256 incompressible Parts | 302,935 | 262,144 | 5.73 ms | 6.09 ms | 302,935 B / 1,813 writes |
+| OPC no-op save, 16 MiB compressible Parts | 99,044 | 16,777,216 | 3.38 ms | 3.56 ms | 99,044 B / 49 writes |
+| OPC no-op save, 16 MiB incompressible Parts | 16,783,565 | 16,777,216 | 212.8 ms | 229.5 ms | 16,783,565 B / 557 writes |
+
+The 16 MiB incompressible save processes about 78.9 MB/s of logical payload at
+p50 and rewrites the complete 16.8 MB archive. This is the dominant measured
+latency. The 256-member cases expose a different fixed cost: both save variants
+perform 1,813 sink writes and regenerate metadata proportional to Part count.
+
+The complete 24-cell matrix also includes tiny cases; those sub-100 us timings
+show visibly higher relative noise and are retained as smoke/regression inputs,
+not as optimization decision evidence.
+
+## Allocation and peak-memory profile
+
+Heaptrack was run on 100 iterations of the 256-Part incompressible cases. Its
+process totals include one deterministic corpus build, one package open for the
+save case, report construction, and process/runtime startup, so they are useful
+for before/after comparisons with the identical command rather than exact
+per-operation allocation counts.
+
+| Workload, 100 iterations | Allocation calls | Temporary allocations | Peak heap | Peak RSS with Heaptrack |
+|---|---:|---:|---:|---:|
+| `opc_open` | 809,803 | 78,589 | 1.92 MB | 13.56 MB |
+| `opc_noop_save` | 356,632 | 79,136 | 1.73 MB | 12.39 MB |
+
+The save allocation stack directly identified duplicated work in
+`PackageWriter`: 25,600 `ContentTypesItem::to_xml` allocation paths under
+publication validation and another 25,600 under emission across the 100 save
+iterations. `ContentTypesItem::from_package` showed the same two-pass shape.
+This makes a reused, prevalidated publication plan the first low-risk measured
+optimization. It will not remove Deflate work, so Amdahl's law predicts a much
+larger relative effect for many-small packages than for the 16 MiB
+incompressible case.
+
+The uninstrumented complete matrix consumed 4.49 seconds of wall time, 4.52
+seconds of user CPU, 0.08 seconds of system CPU, and 72,516 KiB maximum RSS.
+Those are full-matrix process figures, not per-case peaks.
+
+## CFB baseline
+
+The CFB generator uses the same deterministic payload families and adds a
+2,048-stream wide-root shape. Tiny and 256-stream inputs exercise MiniFAT;
+four 4 MiB streams exercise regular FAT chains; the lexicographically greatest
+wide-root stream makes the existing full-tree name lookup traverse its costly
+successful path. Raw samples and hashes are in
+[`results/baseline-cfb-2665d572b-2026-08-10.json`](results/baseline-cfb-2665d572b-2026-08-10.json).
+
+| CFB case / corpus | p50 | p95 | Interpretation |
+|---|---:|---:|---|
+| open, 256 1 KiB MiniFAT streams | 139 us | 155-161 us | Eager topology/allocation validation, not all payload reads |
+| open, four 4 MiB FAT streams | 139-142 us | 164-173 us | Payload size has little open effect because regular stream bytes remain lazy |
+| open, 2,048 root streams | 948-957 us | 1.05-1.07 ms | Directory and allocation metadata scale with member count |
+| list 2,048 stream paths | 76.9-82.5 us | 91.6-96.1 us | Materializes every path |
+| read last 64 B stream among 2,048 | 7.47-7.52 us | 7.54-7.70 us | Full sibling-tree DFS dominates the tiny payload |
+| read one 4 MiB FAT stream | 104-110 us | 135-149 us | Lookup is trivial; contiguous memory-backed copy dominates |
+| insert borrowed prepared 4 MiB stream | 640-675 us | 717-747 us | `create_stream` allocates and copies the complete payload |
+| insert owned prepared 4 MiB stream | 0.17-0.29 us | 0.31-0.45 us | Ownership transfer only; payload creation and CFB serialization excluded |
+
+The writer comparison deliberately times only insertion of an already-prepared
+payload. It proves the cost of the extra 4 MiB copy and provides a direct gate
+for fresh DOC/XLS/PPT writers that already own their generated buffers; it is
+not an end-to-end CFB-save speedup claim. The two payload families produce
+similar CFB results because CFB does not compress these streams.
+
+The complete CFB matrix took 0.29 seconds wall, 0.19 seconds user CPU, 0.11
+seconds system CPU, and 44,468 KiB maximum RSS. These figures include corpus
+generation and all 40 measurement cells, so they are not per-case peaks.
+
+## Parallel scaling observation
+
+`opc_open` currently uses Rayon through the global pool. Separate processes set
+`RAYON_NUM_THREADS` to 1, 2, 4, 8, and 12; each cell used 10 warm-ups and 50
+samples. Raw reports are the
+[`results/baseline-opc-open-workers-*.json`](results/) files.
+
+| Corpus | 1 worker p50 | 2 workers | 4 workers | 8 workers | 12 workers | Best observed speedup |
+|---|---:|---:|---:|---:|---:|---:|
+| 256 small, compressible | 630 us | 539 us | 497 us | 525 us | 549 us | 1.27x at 4 |
+| 256 small, incompressible | 590 us | 511 us | 485 us | 505 us | 507 us | 1.22x at 4 |
+| four 4 MiB, compressible | 5.42 ms | 2.64 ms | 434 us | 428 us | 697 us | 12.7x at 8 |
+| four 4 MiB, incompressible | 6.28 ms | 3.02 ms | 664 us | 671 us | 662 us | 9.5x at 12, effectively flat from 4 |
+
+Four workers match the four large payload Parts and are the practical knee on
+this host. More workers do not improve the many-small case and increase its
+tail/median latency. This is evidence for a bounded explicit execution context
+with task-size thresholds; it is not evidence for retaining an implicit global
+pool.
+
+## CPU, syscalls, locks, and unavailable counters
+
+Linux `perf stat` and sampled `perf record` are denied by the host policy, so no
+cycles, instructions, cache-miss, or branch-miss claim is made. A Valgrind
+Callgrind fallback on five many-small saves recorded 1.624 billion interpreted
+instructions for the whole process; optimized/inlined Rust symbols made the
+fine-grained CPU attribution insufficient for an optimization claim. The
+allocation profile is the useful attribution for the first change.
+
+The measured input and output are memory-backed. No filesystem I/O occurs in a
+timed operation. A process-level `strace -f -c` is preserved in
+[`results/baseline-opc-many-small.strace.txt`](results/baseline-opc-many-small.strace.txt),
+but it includes Git/Rust environment probes, JSON publication, and global
+Rayon initialization. Its 65 `futex` calls cannot be attributed to the timed
+save loop. The ordinary OPC-open path bypasses the lazy ZIP cache, and the save
+path has no Part cache, so hit/miss, eviction, duplicate-flight, and cache-lock
+metrics are not applicable to these cases. Dedicated lazy-reader concurrency
+and source-backed range-I/O scenarios remain required.
+
+## Ranked result and next gate
+
+1. Implement and measure one pre-output `PublicationPlan`. It removes the
+   duplicated sort/content-type/relationship serialization proven by
+   Heaptrack while preserving all validation and sequential-sink behavior.
+2. Design source-backed lazy OPC and raw-copy unchanged ZIP entries. The full
+   16.8 MB no-op rewrite shows their potential, but both require a larger
+   preservation/security change and must not be folded into the small plan.
+3. Replace hidden global scheduling only with an explicit bounded execution
+   contract. The current scaling knee is four large-entry tasks on this host.
+4. Add format-owner and CFB matrices before choosing XLSX/DOCX/PPTX/legacy
+   semantic optimizations.
+
+An optimization is accepted only after the same hashes, sink byte/write
+summary, correctness suite, and before/after measurement protocol pass. A
+latency-only movement inside overlapping uncertainty is not sufficient.
+
+## Implemented follow-up results
+
+Four measured change records now extend this original baseline:
+
+The aggregate outcome, verification gates, disclosed regressions, and
+remaining program scope are summarized in [`REPORT.md`](REPORT.md).
+
+1. [`changes/0001-opc-publication-plan.md`](changes/0001-opc-publication-plan.md)
+   removes duplicated OPC publication planning: -37.0% allocation calls and
+   -5.49% mean latency on the intended 2,048-Part compressible save.
+2. [`changes/0002-cfb-lookup-and-sector-buffers.md`](changes/0002-cfb-lookup-and-sector-buffers.md)
+   uses cached validated name keys and bounded reusable sector buffers:
+   successful final-stream lookup is 56-66% faster at 256 siblings and about
+   94% faster at 2,048, with 6-9% fewer open-process allocations.
+3. [`changes/0003-legacy-owned-stream-handoff.md`](changes/0003-legacy-owned-stream-handoff.md)
+   retains PPT (-20.2% p50, -12.4% peak heap) and XLS (-9.5% peak heap)
+   ownership transfers. The DOC variant regressed 58.4% and was removed.
+4. [`changes/0004-opc-exact-owned-source.md`](changes/0004-opc-exact-owned-source.md)
+   makes unchanged owned OPC output byte-exact and avoids complete
+   recompression: the 16.78 MB case falls from 211.5 ms to 3.44 ms. Retaining
+   that compressed source increases the large profile's peak heap by 22.6%,
+   so lazy Part materialization remains the next architectural dependency.
+
+The harness now has 14 cases and 97 default result records. In addition to the
+original matrix it measures owned OPC open, one-Part mutated save, and public
+DOC/XLS/PPT writer packaging with tiny, moderate, and 4-5 MiB stream-heavy
+shapes. Scheduled CI records the deterministic full matrix without applying
+machine-noisy latency thresholds.
+
+## Current stable tranche update
+
+The stage-1 records above are retained unchanged. The current harness has **36
+cases and 198 default records**, including positional CFB/OPC coverage and four
+XLSX source-backed cases. It remains a substrate/selective-open harness, not a
+complete program or CRUD matrix.
+
+- The XLSX row-start index is accepted for the narrow-range case: ABBA p50
+  geometric mean **-80.499%**, mean geometric mean **-79.962%**; full scan
+  mean **+0.03%**, first-cell mean **-1.31%**, heap allocations **+17**, and
+  RSS **+0.25%**. Raw samples: [`before A`](results/abba-xlsx-range-before-a.json),
+  [`after A`](results/abba-xlsx-range-after-a.json),
+  [`before B`](results/abba-xlsx-range-before-b.json),
+  [`after B`](results/abba-xlsx-range-after-b.json).
+- Positional `SharedOleFile`, bounded CFB bulk reads, one-index positional ZIP,
+  opaque ZIP `EntryId`, local `ParallelReadSession`, and the runtime-neutral
+  `ExecutionContext`/OPC `OpenSession` are implemented. Default/legacy opens
+  are serial; hidden global Rayon scheduling is removed. Current evidence is
+  correctness and boundedness, not a new aggregate latency claim.
+- Source-backed OPC now has source versions, finite weighted-LRU/single-flight
+  cache diagnostics, and additive DOCX/XLSX/PPTX facades. EOCD terminal-probe
+  samples show structural-open bytes down **73.6% to 98.5%** and payload overlap
+  at zero. Latency is intentionally not compared because later EntryId/cache
+  diagnostics changes confound the ABBA pair and some cells exceed 5% variance.
+  See [`EOCD A`](results/abba-eocd-before-a.json),
+  [`EOCD B`](results/abba-eocd-before-b.json), and
+  [`source versus eager`](results/stage3-source-vs-eager-many-small.json).
+- The positional XLSX source record reports p50 opens of 33.881 us (tiny),
+  56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
+  source reads. First-cell and narrow-range operations physically overlap only
+  the selected worksheet member, with zero unselected worksheet read calls.
+  These are overlap counts, not materialization counts. See
+  [`xlsx-source-positional.json`](results/xlsx-source-positional.json).
+
+See change records [`0005`](changes/0005-xlsx-row-start-index.md),
+[`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
+[`0007`](changes/0007-source-backed-opc-and-facades.md). Raw ZIP preservation
+is implemented/tested in soapberry only; OPC integration and measurement remain
+pending. Source cache bytes are bounded by `SourceCacheLimits`, but are not yet
+charged to the hierarchical `Budget`.
+
+Consolidated changed-crate tests and focused changed-crate formatter and
+warning-denied Clippy gates passed. The attempted umbrella all-feature `litchi`
+run exhausted local disk and is therefore not counted as a passing umbrella
+verification result.

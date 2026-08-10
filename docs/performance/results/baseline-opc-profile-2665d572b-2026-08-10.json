@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "production_revision": "2665d572b78f0b3efd9ecfc4bd1fda09f8786ae3",
+  "tool": {
+    "name": "heaptrack",
+    "version": "1.5.0"
+  },
+  "scope_note": "Process totals include corpus generation, one-time setup, report construction, and runtime startup. Compare only with an identical command.",
+  "profiles": [
+    {
+      "case": "opc_open",
+      "shape": "many-small",
+      "payload_kind": "incompressible",
+      "warmup_iterations": 0,
+      "measured_iterations": 100,
+      "allocation_calls": 809803,
+      "temporary_allocations": 78589,
+      "peak_heap_bytes_reported": 1920000,
+      "peak_rss_bytes_including_profiler_reported": 13560000,
+      "runtime_seconds_reported": 0.41,
+      "top_attribution": "PartNameIndex insertion, member-to-Part-name conversion, archive index string cloning, and content-type parsing under PackageReader::load_parts_lazy"
+    },
+    {
+      "case": "opc_noop_save",
+      "variant": "before_publication_plan",
+      "shape": "many-small",
+      "payload_kind": "incompressible",
+      "warmup_iterations": 0,
+      "measured_iterations": 100,
+      "allocation_calls": 356632,
+      "allocated_bytes_from_histogram": 10825833116,
+      "temporary_allocations": 79136,
+      "peak_heap_bytes_reported": 1730000,
+      "peak_rss_bytes_including_profiler_reported": 12390000,
+      "runtime_seconds_reported": 0.74,
+      "top_attribution": "Duplicate ContentTypesItem construction and XML serialization in PackageWriter validation and emission"
+    },
+    {
+      "case": "opc_noop_save",
+      "variant": "after_publication_plan",
+      "shape": "many-small",
+      "payload_kind": "incompressible",
+      "warmup_iterations": 0,
+      "measured_iterations": 100,
+      "allocation_calls": 224828,
+      "allocated_bytes_from_histogram": 10813414883,
+      "temporary_allocations": 53280,
+      "peak_heap_bytes_reported": 1690000,
+      "peak_rss_bytes_including_profiler_reported": 12530000,
+      "runtime_seconds_reported": 0.72,
+      "top_attribution": "One ContentTypesItem construction and XML serialization under PublicationPlan::from_package; duplicate validation/emission construction is absent"
+    }
+  ]
+}

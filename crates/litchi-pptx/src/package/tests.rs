@@ -13,6 +13,29 @@ use super::Package;
 use crate::custom::Props;
 use crate::web::{AddIn, Conformance, Pane, Panes, Reference, Store};
 
+fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+    let comment_len = u16::try_from(comment.len()).expect("ZIP comment fits in EOCD");
+    let eocd = archive.len().checked_sub(22).expect("archive has an EOCD");
+    assert_eq!(&archive[eocd..eocd + 4], b"PK\x05\x06");
+    archive[eocd + 20..eocd + 22].copy_from_slice(&comment_len.to_le_bytes());
+    archive.extend_from_slice(comment);
+    archive
+}
+
+#[test]
+fn owned_presentation_noop_output_preserves_exact_archive() {
+    let source = with_eocd_comment(
+        Package::new()
+            .expect("new presentation")
+            .to_bytes()
+            .expect("serialize presentation"),
+        b"pptx exact source",
+    );
+    let mut package = Package::from_vec(source.clone()).expect("open owned presentation");
+
+    assert_eq!(package.to_bytes().expect("serialize no-op package"), source);
+}
+
 fn task_panes() -> Panes {
     let reference = Reference::new("litchi-test-add-in", "1.0.0.0", Store::Omex)
         .expect("valid add-in reference");

@@ -14,6 +14,8 @@ pub mod bounded;
 pub mod budget;
 pub mod detection;
 pub mod error;
+/// Runtime-neutral execution policy, cancellation, and resource charging.
+pub mod execution;
 pub mod hex;
 pub mod metadata;
 /// Microsoft Office's shared CRC-32 checksum algorithm.
@@ -43,6 +45,10 @@ pub use bounded::{BoundedU32, BoundsError};
 pub use budget::{Budget, Limits, Profile, Reservation, Resource, ResourceLimit};
 pub use detection::FileFormat;
 pub use error::{Error, Result};
+pub use execution::{
+    AffinityPolicy, CancellationSource, CancellationToken, ExecutionContext, ExecutionError,
+    ExecutionLimits,
+};
 pub use metadata::Metadata;
 pub use patch::{
     BlobBundle, BlobId, BlobLimits, CompositionError, CompositionLimitKind, CompositionLimits,

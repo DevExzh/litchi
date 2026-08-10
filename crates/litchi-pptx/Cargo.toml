@@ -25,8 +25,9 @@ base64 = { workspace = true }
 bitflags = { workspace = true }
 caseless = { workspace = true }
 chrono = { workspace = true }
-litchi-drawingml = { workspace = true }
+litchi-core = { workspace = true }
 litchi-crypto = { workspace = true, optional = true, features = ["ooxml"] }
+litchi-drawingml = { workspace = true }
 litchi-fonts = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
@@ -39,6 +40,7 @@ zeroize = { workspace = true }
 
 [dev-dependencies]
 memchr = { workspace = true }
+soapberry-zip = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

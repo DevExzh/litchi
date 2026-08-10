@@ -127,7 +127,7 @@ automatic-fonts = [
 images = ["dep:litchi-imgconv", "dep:litchi-odraw"]
 eval = ["dep:litchi-eval"]
 web-functions = ["eval", "litchi-eval/web_functions"]
-markdown = ["dep:base64", "dep:litchi-markdown", "dep:memchr", "dep:rayon"]
+markdown = ["dep:base64", "dep:litchi-markdown", "dep:memchr"]
 yaml = ["dep:serde-saphyr"]
 
 # Format and convenience aggregates
@@ -197,7 +197,6 @@ litchi-xls = { workspace = true, optional = true } # Legacy Excel BIFF support
 litchi-xlsb = { workspace = true, optional = true } # BIFF12 support
 litchi-xlsx = { workspace = true, optional = true } # SpreadsheetML support
 memchr = { version = "2.7", optional = true } # Markdown escaping
-rayon = { version = "1.11", optional = true } # Parallel Markdown rendering
 serde-saphyr = { version = "0", optional = true } # YAML metadata serialization
 
 [build-dependencies]

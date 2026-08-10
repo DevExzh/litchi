@@ -35,6 +35,32 @@ impl Write for WriteOnly {
     }
 }
 
+fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+    let comment_len = u16::try_from(comment.len()).expect("ZIP comment fits in EOCD");
+    let eocd = archive.len().checked_sub(22).expect("archive has an EOCD");
+    assert_eq!(&archive[eocd..eocd + 4], b"PK\x05\x06");
+    archive[eocd + 20..eocd + 22].copy_from_slice(&comment_len.to_le_bytes());
+    archive.extend_from_slice(comment);
+    archive
+}
+
+#[test]
+fn owned_workbook_noop_output_preserves_exact_archive() {
+    let source = with_eocd_comment(
+        Workbook::new()
+            .expect("valid workbook")
+            .to_bytes()
+            .expect("serialize workbook"),
+        b"xlsx exact source",
+    );
+    let workbook = Workbook::from_bytes(source.clone()).expect("open owned workbook");
+
+    assert_eq!(
+        workbook.to_bytes().expect("serialize no-op workbook"),
+        source
+    );
+}
+
 #[test]
 fn new_workbook_is_deterministic_and_selector_first() {
     let first = Workbook::new().expect("valid baseline");

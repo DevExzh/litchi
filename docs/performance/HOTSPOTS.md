@@ -1,0 +1,221 @@
+# Performance hotspot inventory
+
+Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
+Branch: `feat/office-format-completeness`
+Source revision: `2665d572b78f0b3efd9ecfc4bd1fda09f8786ae3`
+
+This document records facts established by source inspection. It is not a
+performance-results report. A path is called a bottleneck only after the
+process benchmark and profiler evidence in `BASELINE.md` confirms its effect
+on a named corpus and scenario.
+
+## Shared OOXML data path
+
+```text
+path / Read / Vec / &[u8]
+  -> litchi-opc physical reader
+     -> complete source Vec for path and generic Read ingress
+     -> soapberry-zip central-directory index
+     -> content types and package relationships
+     -> relationship-graph validation
+     -> classify every physical member
+     -> decompress every admitted Part
+  -> OpcPackage
+     -> HashMap<PackURI, Box<dyn Part>>
+     -> second source-XML index
+  -> DOCX / PPTX / XLSX mandatory catalog
+  -> lazy format-owned semantic parse of a selected Part
+  -> Edit plan and dependency validation
+  -> candidate Part reconstruction and readback
+  -> PackageWriter
+     -> exact owned-source copy when no mutable API was entered
+     -> otherwise regenerate manifests and relationship Parts
+     -> build, audit, and retain one deterministic publication plan
+     -> Deflate every Part into a sequential sink
+```
+
+Current work shape:
+
+- Legacy path and generic-reader OPC ingress still has a contiguous-buffer
+  path, while source-backed ingress uses an immutable positional source with
+  source versions and a validated ZIP index.
+- `PackageReader::load_parts_lazy` is not physically lazy: it classifies and
+  decompresses every admitted Part, including unreferenced Parts that must be
+  preserved.
+- Ordinary bulk opens are serial. Explicit eager opens opt into local bounded
+  ZIP sessions through `litchi-core::ExecutionContext` and OPC `OpenSession`;
+  there is no hidden global Rayon pool.
+- `OpcPackage` retains every inflated Part. XML Parts also participate in a
+  second source-XML map. Part lookup has an exact hash-map fast path and a
+  linear ASCII-case-insensitive fallback.
+- Exact unchanged owned OPC output reuses the complete source archive. After
+  any mutable API, output still has no per-entry source descriptor or
+  compressed range and therefore regenerates/recompresses every Part.
+- `PackageWriter` previously reconstructed generated XML and Part order during
+  emission. The measured `PublicationPlan` change now constructs, audits, and
+  reuses that state once. It reduced allocation calls by 37.0% in the profiled
+  256-Part save and mean latency by 5.49% in the 2,048-Part compressible save;
+  full-Part recompression remains unchanged.
+
+## XLSX selective read and edit path
+
+```text
+whole-package OPC materialization
+  -> workbook catalog and relationship parse
+  -> worksheet handles with OnceLock<Store>
+  -> first cell/range query
+     -> parse the complete selected worksheet XML
+     -> materialize and sort the complete sparse Store
+  -> targeted edit commit
+     -> compare against complete Store
+     -> scan complete lossless worksheet layout
+     -> allocate/copy complete replacement worksheet XML
+     -> compact and reparse complete replacement for publication proof
+     -> clone shared OPC graph and replace changed Part
+  -> save
+     -> recompress complete package
+```
+
+Confirmed source facts:
+
+- The legacy eager path still materializes all admitted Parts. The additive
+  source-backed XLSX facade avoids timed source reads while listing after open;
+  cache bytes are finite but not yet charged to a hierarchical `Budget`.
+- One first cell access parses the entire selected worksheet. The non-evicting
+  `OnceLock` retains it for the snapshot lifetime.
+- The sparse cell store is row-major and supports binary-search point lookup.
+  A compact immutable row-start index now skips preceding rows for narrow
+  ranges. The measured range query improves about 80%; full scan and first-cell
+  guardrails remain near neutral.
+- A targeted cell edit performs a semantic parse, an independent lossless
+  layout scan, full replacement-byte construction, and a full changed-sheet
+  semantic readback before publication.
+- Bulk cell actions are held in address order, then regrouped into nested
+  row/cell `BTreeMap`s during worksheet emission.
+- An empty edit returns the original immutable workbook allocation. When the
+  workbook came from owned ingress, saving that no-op snapshot now preserves
+  the exact validated OPC source; borrowed ingress still performs a rewrite.
+
+## DOCX and PPTX paths
+
+DOCX format views are borrowed after eager OPC materialization. Repeated
+`paragraphs`, `tables`, and `blocks` queries rescan and allocate result vectors;
+single-index paragraph/table lookup currently builds the complete collection.
+Changed document transactions reconstruct, compact, and reparse the complete
+main document XML.
+
+PPTX ordinary reads defer slide payload parsing, but repeatedly parse the
+presentation slide-reference list. Exact-name slide lookup resolves and parses
+all candidate slide names. The opened-transaction snapshot is deliberately
+stronger and more expensive: it resolves every slide, notes graph, Part and
+relationship fingerprint, and retains a cloned shared OPC graph. Commit
+recaptures and re-fingerprints the candidate after readback.
+
+These paths have strong preservation and atomicity tests. They do not yet have
+representative timing, allocation, copy, or peak-RSS measurements.
+
+## Legacy CFB data path
+
+```text
+Read + Seek
+  -> header and complete FAT
+  -> complete directory bytes
+     -> structural validation pass
+     -> public entry decoding pass
+  -> complete MiniFAT metadata
+  -> validate every stream allocation chain
+  -> semantic DOC / XLS / PPT owner
+     -> lookup a child by cached validated sibling-tree keys
+     -> materialize selected stream Vecs
+  -> edit/rebuild
+     -> retain all output stream Vecs
+     -> copy borrowed stream slices into OleWriter
+     -> assemble MiniFAT/FAT/directory sector buffers
+     -> Write + Seek output
+```
+
+Confirmed source facts:
+
+- `SharedOleFile` provides positional CFB access and explicit bounded bulk
+  operations. Broader concurrent CFB scaling measurements remain missing.
+- Open eagerly materializes FAT, directory, MiniFAT, and allocation topology,
+  while ordinary large stream payloads remain lazy.
+- MiniFAT now parses directly into its final `Vec<u32>`; FAT/DIFAT/MiniFAT use
+  one bounded sector buffer and directory sectors batch into the final buffer.
+- Child lookup now descends the validated sibling tree with SID-aligned cached
+  comparison keys. The 2,048-root-stream measurement improves about 94%.
+- Fresh XLS and PPT writers move generated stream buffers into `OleWriter`.
+  PPT improves about 20%; XLS peak heap falls about 9.5%. DOC retains the
+  exact-sized copy because moving its spare-capacity buffer regressed 58%.
+- Directory writing allocates scratch structures proportional to every entry
+  for each storage, and duplicate checks scan existing siblings.
+- `HashMap`/`HashSet` iteration in fresh CFB directory construction requires a
+  separate determinism audit; it is not treated as a performance result.
+
+## Source and detector path
+
+`litchi-core::ReadAt` provides immutable positional reads and source versions.
+Source-backed OPC and positional CFB now consume it; IWA also consumes it,
+though current IWA physical ingress snapshots the complete source with one
+full-range request.
+
+Generic smart detection may scan one ZIP package through multiple format
+owners and then discard the prepared parse before the selected owner opens it.
+The focused iWork route has already disproved that this duplication is
+architecturally necessary: `litchi-iwa-detect::PreparedSource` retains an
+opaque classified physical catalog without exposing archive types in the root
+facade. The generic detection path must be measured before adapting that
+pattern elsewhere.
+
+## Initial hypotheses
+
+| # | Source-audit disposition | Measurement needed |
+|---:|---|---|
+| 1 | Refined: legacy OPC path and `Read` ingress slurp the source; source-backed ingress is positional. | Cold/range-source bytes, syscalls, latency and RSS across both modes. |
+| 2 | Confirmed: ordinary OPC open inflates every admitted Part. | Open/list/one-object scaling against total uncompressed bytes and member count. |
+| 3 | Superseded for source-backed OPC: finite weighted LRU, per-entry single-flight and content-free diagnostics exist; legacy eager open does not use that cache. | Cache bytes are not yet charged to the hierarchical Budget; add contention and retention measurements. |
+| 4 | Superseded: ordinary OPC open is serial and explicit eager open has a local bounded session. | Serial fraction and 1/2/4/8/core scaling under the explicit context. |
+| 5 | Confirmed: stored entries are CRC-checked then copied. | Stored-media one-Part read and package-open copied-byte/RSS deltas. |
+| 6 | Refined by measurement: an exact unchanged owned OPC save copies the validated source archive; borrowed-source and mutation-touched saves still regenerate/recompress every Part. | Extend no-op and 1%-update save coverage to real media-heavy documents and per-entry passthrough once source descriptors exist. |
+| 7 | Confirmed structurally: duplicate indexes, boxed Parts, source-XML map, and linear fallback exist. | Allocation profiles, type sizes, cache counters and repeated noncanonical lookup. |
+| 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet. | Broader source-backed selectors, edits and real workbook matrices. |
+| 9 | Confirmed structurally: small XLSX edits scan/rebuild/reparse the complete touched sheet and repackage all Parts. | First/middle/last cell, 1% updates, and commit-versus-save separation. |
+| 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
+| 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers, and child lookup descends the validated tree by cached exact keys. | Add deep-directory, MiniFAT-heavy, concurrent-read, and real DOC/XLS/PPT scenarios beyond the measured synthetic wide-root and writer corpora. |
+| 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
+
+## Ranked work queue
+
+The order below is provisional until baseline measurements are recorded.
+
+| Rank | Candidate | Expected CRUD reach | Risk | ADR fit |
+|---:|---|---|---|---|
+| 1 | Extend source-backed OPC from selective reads to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets the measured exact-source peak-memory cost. | High | Positional source/descriptors are implemented; cache Budget charging and CRUD coverage remain. |
+| 2 | Integrate raw-copy unchanged ZIP entries into OPC publication. | No-op and targeted OOXML save, especially media-heavy packages. | High | Soapberry primitive is tested; OPC must preserve ZIP64/descriptors/metadata and sequential output. |
+| 3 | Measure explicit bounded sessions and complete remaining I/O budget policy. | Large multi-Part open/save/validation. | Medium-high | `ExecutionContext`/local session foundation implemented; no hidden Rayon path remains. |
+| 4 | Build one validated OPC publication plan and reuse its generated XML and Part order during emission. | Every rewritten OPC save. | Low-medium | Implemented; see `changes/0001-opc-publication-plan.md`. |
+| 5 | Exact owned-source OPC no-op publication. | Owned DOCX/PPTX/XLSX open/read/no-op save. | Medium | Implemented; see `changes/0004-opc-exact-owned-source.md`. Mutation still performs a full rewrite. |
+| 6 | Move already-owned XLS/PPT writer buffers into `OleWriter`. | Legacy fresh creation and some rebuilds. | Low | Implemented for XLS/PPT; DOC rejected by measurement. See `changes/0003-legacy-owned-stream-handoff.md`. |
+| 7 | Use validated cached CFB sibling-tree descent and reusable sector buffers. | Legacy stream-heavy open/rebuild workflows. | Medium | Implemented; see `changes/0002-cfb-lookup-and-sector-buffers.md`. |
+| 8 | Extend the accepted XLSX row-start index to broader selector and edit matrices. | Sparse range queries after sheet load. | Low-medium | Narrow ranges are accepted; preservation/readback gates and broad CRUD coverage remain unchanged. |
+| 9 | Cache or directly index DOCX/PPTX collection/slide-reference queries. | Repeated semantic reads and exact-name lookup. | Medium | Must keep immutable bounded snapshot state and deterministic ambiguity. |
+| 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
+| 11 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
+
+## Evidence still missing
+
+The deterministic harness now records warm latency distributions, confidence
+intervals, corpus hashes, complete output validation, and sequential-write
+call/byte counts. Targeted `heaptrack` runs also cover allocation count,
+temporary allocation count, peak heap, and peak RSS for the implemented
+changes. Remaining gaps are:
+
+- Reproducible cold-cache distributions on a controlled host.
+- Decompressed and recompressed byte observers, plus positional range-read
+  distributions once OPC/CFB accept a positional source.
+- Hardware-counter evidence. The stage-1 capture host reported
+  `perf_event_paranoid=4`; the same environment later reported `1`, but no
+  controlled counter rerun is committed yet, so no cycles/IPC/cache claim is
+  made from that external policy change.
+- Contention evidence and explicit-context scaling curves.
+- Native correctness evidence for any future physical package passthrough.

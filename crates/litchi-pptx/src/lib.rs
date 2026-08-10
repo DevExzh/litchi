@@ -152,7 +152,7 @@ pub use media_parts::{
 };
 pub use modern_comments::*;
 pub use package::Package;
-pub use presentation::Presentation;
+pub use presentation::{Presentation, SourceBackedPresentation, SourceSlide};
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
     PrintColorMode, PrintOutput, Properties, Show, ShowExtension, ShowMode, SlideSelection, Web,
