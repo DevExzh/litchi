@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest tranche: `b974fa4e45e66b604a62c0f9aa6dd14b0f2f7f16`
+Production base for the latest tranche: `f12786397d3e677981ed3c441950f94fe6155d48`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -31,6 +31,7 @@ is still not broad program or CRUD coverage.
 | ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP corpora; ODP is coverage-only and ODT has the focused follow-up below; changed ODS publication still rewrites the package |
 | RTF semantic baseline and text paths | Medium/large full-text p50 **-38.39% / -27.08%**; one-edit/save **-33.40% / -25.79%** | Generated native RTF text corpus; open guard +0.96% / +3.41%; formatting/media/security matrices remain missing |
 | ODT shared transaction bytes | Medium/large no-op edit-save p50 **-27.05% / -18.51%**; exactly two allocations and one archive copy removed per snapshot | Existing-document snapshot handoff only; changed edit/save and open guardrails remain within 3%; changed publication still rewrites the package |
+| ODT consuming full-text blocks | Repeated large full-text p50 **-3.25%**, mean **-4.81%**; allocation calls **-15.48%**, temporary allocations **-45.52%** | Private full-text mode only; structured queries remain near neutral; unchanged open +3.94% p50/+4.17% mean and +10.95% p99 disclosed |
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
@@ -158,6 +159,12 @@ edge, tiny and exact-no-op guardrails, allocation attribution, RSS and hardware
 counters are summarized in
 [`change 0022`](changes/0022-zip-generated-local-span-move.md).
 
+The ODT full-text ownership evidence is retained as four short ABBA cycles
+under `results/abba-odt-full-text-single-repeat-*.json`. Structured-query,
+open, size, exact-no-op and edit guardrails, rejected broad-parser evidence,
+allocation attribution, RSS and hardware counters are summarized in
+[`change 0023`](changes/0023-odt-full-text-owned-blocks.md).
+
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
 charged to hierarchical `Budget`. Raw ZIP preservation is now integrated for
 owned same-topology OPC mutations; broader source-backed editing is pending.
@@ -178,13 +185,14 @@ See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0019`](changes/0019-rtf-parser-state-specialization.md), and
 [`0020`](changes/0020-rtf-ascii-transport-batching.md), and
 [`0021`](changes/0021-opc-shared-regenerated-payload.md), and
-[`0022`](changes/0022-zip-generated-local-span-move.md).
+[`0022`](changes/0022-zip-generated-local-span-move.md), and
+[`0023`](changes/0023-odt-full-text-owned-blocks.md).
 
 Consolidated changed-crate tests passed, along with focused changed-crate
-warning-denied Clippy, rustdoc and formatter checks. The workspace all-target,
-all-feature check reached the affected packages, then failed only in
-concurrently changing iWork examples; it is not reported as a passing
-workspace gate.
+warning-denied Clippy, rustdoc and formatter checks. The latest ODT tranche
+also compiled the ODF fuzz target offline. A workspace all-target/all-feature
+gate was not rerun because iWork was explicitly excluded while its crates are
+changing independently.
 
 ## Accepted results
 
@@ -215,6 +223,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | RTF transport batching, open, 10,000 paragraphs | 3.159 ms | 2.316 ms | **-26.67% p50 / -26.56% mean** | Per-byte `SmallVec::extend` frame falls from 15.37% to 2.56%; allocations and peak heap flat |
 | RTF transport batching, one paragraph edit/save, 10,000 paragraphs | 7.795 ms | 7.307 ms | **-6.26% p50 / -5.73% mean** | Instructions -18.40%; allocation count, peak heap and RSS flat |
 | ODT no-op edit/save, 10,000 paragraphs | 3.950 us | 3.219 us | -18.51% p50 / -29.58% mean | Exactly two allocations and one 28.42 KiB archive copy removed per snapshot; peak heap/RSS flat |
+| ODT full text, 10,000 blocks | 4.127 ms | 3.993 ms | **-3.25% p50 / -4.81% mean** | Allocation calls -15.48%, temporary allocations -45.52%; peak heap/RSS flat; open guard disclosed |
 | Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
 
@@ -239,6 +248,7 @@ The underlying records are:
 - [`0020-rtf-ascii-transport-batching.md`](changes/0020-rtf-ascii-transport-batching.md)
 - [`0021-opc-shared-regenerated-payload.md`](changes/0021-opc-shared-regenerated-payload.md)
 - [`0022-zip-generated-local-span-move.md`](changes/0022-zip-generated-local-span-move.md)
+- [`0023-odt-full-text-owned-blocks.md`](changes/0023-odt-full-text-owned-blocks.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -256,6 +266,12 @@ An ODT final-document adoption candidate was also fully reverted. It improved
 large one-edit/save p50 5.70%, but a dedicated medium one-paragraph read guard
 regressed 6.33% mean and 17.64% p95. The accepted snapshot-byte sharing remains;
 the rejected handoff contributes no production or test code.
+
+The first ODT full-text ownership candidate also moved strings for structured
+list and one-paragraph callers. Their large-corpus p50 regressed 5.71% and
+5.30%, respectively, so that broad version was removed. The accepted private
+full-text mode retains the original structured path; the rejected raw reports
+remain linked from change 0023.
 
 ## Work removed
 
@@ -321,6 +337,10 @@ the rejected handoff contributes no production or test code.
 - ODT transaction snapshots created from an already validated `Document` clone
   its private immutable package handle instead of allocating and copying the
   complete archive. Direct snapshot byte ingress keeps independent validation.
+- ODT full-text extraction moves each parser-created validated block string
+  into the element and consumes it into final output instead of cloning the
+  string at both private handoff boundaries. Structured block queries retain
+  their original ownership behavior.
 
 No unsafe code, ambient I/O, dependency edge, public archive type, or global
 synchronization primitive was introduced. Exact-source authorization is
@@ -374,6 +394,9 @@ task clock 21.08%, cycles 19.41% and cache misses 31.12% on its matched
 few-large compressible process. The local-span follow-up removes the next 4.20
 MiB allocation, cuts peak heap another 3.20% and task clock 2.11%; its other
 major hardware counters stay within 5%. Uninstrumented RSS is flat for both.
+The ODT full-text follow-up removes 420,019 allocation calls over ten samples,
+cuts temporary allocations 45.52%, task clock 2.39%, instructions 2.51% and
+cache misses 13.05%; peak heap and uninstrumented RSS remain flat.
 Lock-wait evidence remains missing.
 
 ## Remaining highest-impact work
@@ -396,7 +419,8 @@ security, malformed and real-producer corpora, plus broader ODF and RTF
 coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS
 editor-reuse and DOC batched-publication follow-ups. Remaining native work
 requires new attribution inside the retained final owner/public-reader
-validation layers. Broader ODF source-backed reads, package-parse reuse,
+validation layers. ODT full-text block ownership is accepted, but broader ODF
+source-backed reads, repeated ODT/ODP semantic scans, package-parse reuse,
 unchanged ZIP-member publication and structural-edit profiles remain open.
 The rejected direct ODS target-package and ODT final-document adoptions are not
 evidence that those broader paths are complete or that validation should be

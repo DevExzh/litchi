@@ -13,7 +13,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX/ODT paragraph, one PPT shape and one PPTX/ODP slide; broader properties/images remain missing |
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX/ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part; semantic image selection remains missing |
 | Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration |
-| Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; real-producer/media-heavy corpora remain missing |
+| Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; ODT consuming block ownership is measured in change 0023; real-producer/media-heavy corpora remain missing |
 | Semantic conversion to sequential sink | Missing | Package serialization exists; semantic export/conversion does not |
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
@@ -88,6 +88,11 @@ unknown-extension semantic corpora, or the broader OOXML CRUD rows above.
 Change 0022 removes the separate 4.20 MiB post-validation generated-local-span
 copy. The complete generated archive is still validated before output, and the
 required compression buffer remains; this is not broader OOXML CRUD coverage.
+
+Change 0023 removes two intermediate strings per block only from ODT full-text
+extraction. Structured queries retain their former ownership contract, and
+source-backed ODF reads, repeated ODT/ODP scans, unchanged-member publication,
+structural/bulk edits and broader producer/security coverage remain open.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

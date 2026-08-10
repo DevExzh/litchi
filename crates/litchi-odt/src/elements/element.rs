@@ -131,6 +131,25 @@ impl Element {
         }
         text
     }
+
+    pub(crate) fn set_text_owned(&mut self, text: String) {
+        self.text_content = text;
+    }
+
+    pub(crate) fn into_text_recursive(self) -> String {
+        let mut text = self.text_content;
+        for child in self.children {
+            child.append_text_recursive(&mut text);
+        }
+        text
+    }
+
+    fn append_text_recursive(self, output: &mut String) {
+        output.push_str(&self.text_content);
+        for child in self.children {
+            child.append_text_recursive(output);
+        }
+    }
 }
 
 impl Element {
@@ -545,6 +564,33 @@ mod tests {
         parent.add_child(child);
 
         assert_eq!(parent.get_text_recursive(), "Hello World");
+    }
+
+    #[test]
+    fn owned_text_round_trip_preserves_allocation() {
+        let mut element = Element::new("text:p");
+        let text = String::from("owned paragraph text");
+        let allocation = text.as_ptr();
+
+        element.set_text_owned(text);
+        let text = element.into_text_recursive();
+
+        assert_eq!(text, "owned paragraph text");
+        assert_eq!(text.as_ptr(), allocation);
+    }
+
+    #[test]
+    fn owned_recursive_text_keeps_parent_child_order() {
+        let mut parent = Element::new("text:p");
+        parent.set_text_owned(String::from("parent"));
+        let mut child = Element::new("text:span");
+        child.set_text_owned(String::from(" child"));
+        let mut grandchild = Element::new("text:span");
+        grandchild.set_text_owned(String::from(" grandchild"));
+        child.add_child(grandchild);
+        parent.add_child(child);
+
+        assert_eq!(parent.into_text_recursive(), "parent child grandchild");
     }
 
     #[test]

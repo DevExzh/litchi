@@ -2,10 +2,10 @@
 //!
 //! The owner is deliberately layered:
 //!
-//! - [`model`] stores the in-memory structural projection;
-//! - [`codec`] owns snapshot transitions and XML seams;
+//! - `model` stores the in-memory structural projection;
+//! - `codec` owns snapshot transitions and XML seams;
 //! - [`semantic`] provides contextual content and styles views;
-//! - [`package`] handles package input/output; and
+//! - `package` handles package input/output; and
 //! - the test modules keep the public mutation contracts close to this owner.
 
 mod codec;

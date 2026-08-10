@@ -348,6 +348,13 @@ remains an incomplete program and CRUD matrix.
   exact-no-op guardrails remain within 5% on p50 and mean, and uninstrumented
   RSS is flat (-0.10%). See
   [`0022`](changes/0022-zip-generated-local-span-move.md).
+- ODT full-text extraction now consumes parser-created block strings on its
+  private path instead of cloning each string twice. Repeated large-corpus p50
+  improves 3.25% and mean 4.81%; process allocation calls fall 15.48% and
+  temporary allocations 45.52%, with peak heap and uninstrumented RSS flat.
+  Structured queries remain near neutral. The unchanged open guard moves
+  +3.94% p50/+4.17% mean and its +10.95% p99 trigger is disclosed. See
+  [`0023`](changes/0023-odt-full-text-owned-blocks.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
@@ -356,7 +363,7 @@ bounded by `SourceCacheLimits`, but are not yet charged to the hierarchical
 `Budget`.
 
 Consolidated changed-crate tests and focused changed-crate formatter,
-warning-denied Clippy and rustdoc gates passed. The workspace all-target,
-all-feature check reached the affected packages, then failed only in
-concurrently changing iWork examples; it is not counted as a passing workspace
-verification result.
+warning-denied Clippy and rustdoc gates passed. The latest focused ODT tranche
+also compiled the ODF fuzz target offline. A workspace all-target/all-feature
+gate was not rerun because iWork was explicitly excluded while its crates are
+changing independently.
