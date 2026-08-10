@@ -403,6 +403,49 @@ IWA_KEYNOTE_README_PLACEHOLDER_VISIBILITY_EXAMPLE = re.compile(
     r"(?<![A-Za-z0-9_])(?P<example>set_keynote_placeholder_visibility)"
     r"(?:\.rs)?(?![A-Za-z0-9_])"
 )
+RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_METHODS = (
+    "set_slide_number_visible",
+)
+RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_METHODS
+)
+RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_number.rs"
+)
+RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_MODULES = ("slide_number",)
+RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/set_keynote_slide_number.rs"
+)
+RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_TESTS = (
+    "slide_number_visibility_matches_native_ownership_and_round_trips_exactly",
+    "slide_number_visibility_rejects_inconsistent_native_state_transactionally",
+)
+RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_TEST_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_TESTS
+)
+IWA_KEYNOTE_EDITOR_TEST_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "editor" / "tests.rs"
+IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(slide_number)\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+IWA_KEYNOTE_README_SLIDE_NUMBER_VISIBILITY_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>set_slide_number_visible)\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])"
+        r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?(?P<method>set_slide_number_visible)\b[ \t\r\n]*\("
+    ),
+)
+IWA_KEYNOTE_README_SLIDE_NUMBER_VISIBILITY_EXAMPLE = re.compile(
+    r"(?<![A-Za-z0-9_])(?P<example>set_keynote_slide_number)"
+    r"(?:\.rs)?(?![A-Za-z0-9_])"
+)
 KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "slide" / "placeholder.rs"
 )
@@ -416,12 +459,23 @@ KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_SOURCES = (
     KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT / "errors.rs",
     KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT / "resolve.rs",
     KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT / "rewrite.rs",
+    KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT / "slide_number.rs",
     KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT / "verification.rs",
+)
+KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_PREVIEW_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_preview.rs"
+)
+KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_ROOT = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_preview"
+)
+KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_SOURCES = (
+    KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_ROOT / "slide_number.rs",
 )
 KEYNOTE_PLACEHOLDER_VISIBILITY_IMPLEMENTATION_SOURCES = (
     KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE,
     KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_SOURCE,
     *KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_SOURCES,
+    *KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_SOURCES,
 )
 KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "lib.rs",
@@ -438,6 +492,11 @@ KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES = (
     "Error",
     "LimitKind",
 )
+KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_KINDS = (
+    "Title",
+    "Body",
+    "SlideNumber",
+)
 KEYNOTE_PLACEHOLDER_VISIBILITY_SHORT_NAMES = frozenset(
     KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES
 )
@@ -452,11 +511,29 @@ KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIAS_PREFIXES = (
     "SlidePlaceholder",
     "SlidePlaceholderVisibility",
     "SlideTextPlaceholder",
+    "SlideNumber",
+    "SlideNumberPlaceholder",
+    "SlideNumberVisibility",
+    "SlideNumberPlaceholderVisibility",
 )
 KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES = frozenset(
     prefix + suffix
     for prefix in KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIAS_PREFIXES
     for suffix in KEYNOTE_PLACEHOLDER_VISIBILITY_SHORT_NAMES
+)
+KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_SEMANTIC_ALIASES = frozenset(
+    {"SlideNumberPlaceholder", "SlideNumberVisibility"}
+)
+KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_NUMBER_PUBLIC_MEMBERS = frozenset(
+    {
+        "apply_slide_number_visibility",
+        "edit_slide_number_visibility",
+        "hide_slide_number",
+        "is_slide_number_visible",
+        "set_slide_number_visible",
+        "show_slide_number",
+        "slide_number_visibility",
+    }
 )
 KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:placeholder|slide_placeholder_visibility)"
@@ -483,6 +560,11 @@ PUBLIC_KEYNOTE_PLACEHOLDER_MODULE = re.compile(
     r"[ \t\r\n]*(?:;|\{)",
     re.MULTILINE,
 )
+PUBLIC_KEYNOTE_SLIDE_NUMBER_HELPER_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?slide_number\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
 KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES = frozenset(
     {
         "Archive",
@@ -491,6 +573,7 @@ KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES = frozenset(
         "EntryEdit",
         "ExactArtifacts",
         "IWorkPackage",
+        "NodeVisibilitySnapshot",
         "PhysicalSource",
         "PlaceholderOwnerSnapshot",
         "PlaceholderTextOwnerSnapshot",
@@ -499,10 +582,14 @@ KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES = frozenset(
         "ReferenceSnapshot",
         "Resolved",
         "SlideOwnerSnapshot",
+        "SlideNodeSnapshot",
+        "SlideNumberSnapshot",
+        "SlideNumberVisibilitySnapshot",
         "SnappyStream",
         "SourceCatalog",
     }
 )
+KEYNOTE_PLACEHOLDER_VISIBILITY_PROTO_ORIGINS = frozenset({"kn", "tsp"})
 KEYNOTE_PLACEHOLDER_VISIBILITY_WIRE_TYPES = frozenset(
     {
         "DecodeLimitKind",
@@ -1935,6 +2022,72 @@ def _rust_named_struct_body(source: str, name: str) -> tuple[str, int] | None:
     return code[opening + 1 : cursor - 1], opening + 1
 
 
+def _rust_public_enum_variants(source: str, name: str) -> frozenset[str]:
+    """Return top-level variants of one unrestricted public enum."""
+
+    code = _mask_rust_non_code(source)
+    declaration_pattern = re.compile(
+        rf"(?<![A-Za-z0-9_#])pub[ \t\r\n]+enum[ \t\r\n]+"
+        rf"(?:r#)?{re.escape(name)}\b",
+    )
+    declaration = next(
+        (
+            candidate
+            for candidate in declaration_pattern.finditer(code)
+            if code.count("{", 0, candidate.start())
+            == code.count("}", 0, candidate.start())
+        ),
+        None,
+    )
+    if declaration is None:
+        return frozenset()
+    opening = code.find("{", declaration.end())
+    if opening < 0:
+        return frozenset()
+    depth = 1
+    cursor = opening + 1
+    while cursor < len(code) and depth:
+        if code[cursor] == "{":
+            depth += 1
+        elif code[cursor] == "}":
+            depth -= 1
+        cursor += 1
+    if depth:
+        return frozenset()
+
+    body = code[opening + 1 : cursor - 1]
+    variants: set[str] = set()
+    start = 0
+    parentheses = 0
+    brackets = 0
+    braces = 0
+    for index, character in enumerate(body + ","):
+        if character == "(":
+            parentheses += 1
+        elif character == ")" and parentheses:
+            parentheses -= 1
+        elif character == "[":
+            brackets += 1
+        elif character == "]" and brackets:
+            brackets -= 1
+        elif character == "{":
+            braces += 1
+        elif character == "}" and braces:
+            braces -= 1
+        elif character == "," and not (parentheses or brackets or braces):
+            segment = body[start:index]
+            start = index + 1
+            while True:
+                attribute = re.match(r"^[ \t\r\n]*#\[[^\]]*\]", segment)
+                if attribute is None:
+                    break
+                segment = segment[attribute.end() :]
+            variant = RUST_IDENTIFIER.search(segment)
+            if variant is not None:
+                variants.add(variant.group(1))
+    return frozenset(variants)
+
+
 def _rust_public_module_body(source: str, name: str) -> str | None:
     """Return one unrestricted public inline module body, ignoring trivia."""
 
@@ -2213,6 +2366,8 @@ def _is_keynote_slide_transition_public_declaration(
 def _keynote_placeholder_visibility_public_leak(identifier: str) -> str | None:
     """Classify implementation vocabulary in placeholder visibility APIs."""
 
+    if identifier in KEYNOTE_PLACEHOLDER_VISIBILITY_PROTO_ORIGINS:
+        return "protobuf type"
     if identifier in KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES:
         return "archive/IWA type"
     if (
@@ -2243,9 +2398,15 @@ def _is_keynote_placeholder_visibility_public_declaration(
     identifiers = {
         match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
     }
-    return bool(identifiers & KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES) or (
-        _keynote_placeholder_visibility_owner_declaration(declaration)
-    )
+    return bool(
+        identifiers
+        & (
+            KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES
+            | KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_SEMANTIC_ALIASES
+            | KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_NUMBER_PUBLIC_MEMBERS
+            | {"slide_number"}
+        )
+    ) or _keynote_placeholder_visibility_owner_declaration(declaration)
 
 
 def _rust_canonical_exports(
@@ -2772,6 +2933,78 @@ def audit_iwa_keynote_placeholder_visibility_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_keynote_slide_number_visibility_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep retired per-slide number visibility ownership out of the host."""
+
+    violations: list[str] = []
+    for retired, label in (
+        (RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_SOURCE, "source"),
+        (RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_EXAMPLE, "example"),
+    ):
+        if (root / retired).exists():
+            violations.append(
+                "retired litchi-iwa Keynote slide-number visibility "
+                f"{label} returned: {retired}"
+            )
+
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Keynote slide-number visibility method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    editor_path = root / IWA_KEYNOTE_EDITOR_SOURCE
+    if editor_path.is_file():
+        source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+        for match in IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-number visibility module "
+                f"{match.group(1)}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
+
+    tests_path = root / IWA_KEYNOTE_EDITOR_TEST_SOURCE
+    if tests_path.is_file():
+        source = tests_path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name not in RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_TEST_SET:
+                continue
+            violations.append(
+                "retired litchi-iwa Keynote slide-number visibility test "
+                f"{name}: {IWA_KEYNOTE_EDITOR_TEST_SOURCE}:{line_number}"
+            )
+
+    readme_path = root / IWA_KEYNOTE_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_KEYNOTE_README_SLIDE_NUMBER_VISIBILITY_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-number visibility README call "
+                    f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
+                )
+        for match in IWA_KEYNOTE_README_SLIDE_NUMBER_VISIBILITY_EXAMPLE.finditer(
+            source
+        ):
+            line_number = source.count("\n", 0, match.start("example")) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-number visibility README example "
+                f"reference {match.group('example')}: "
+                f"{IWA_KEYNOTE_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_keynote_placeholder_visibility_facade_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -2788,6 +3021,9 @@ def audit_keynote_placeholder_visibility_facade_source_topology(
     owner_helper_root = root / KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT
     if owner_helper_root.is_dir():
         dedicated_sources.update(owner_helper_root.rglob("*.rs"))
+    preview_helper_root = root / KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_ROOT
+    if preview_helper_root.is_dir():
+        dedicated_sources.update(preview_helper_root.rglob("*.rs"))
     export_sources = {
         root / path
         for path in KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES
@@ -2796,13 +3032,14 @@ def audit_keynote_placeholder_visibility_facade_source_topology(
     violations: list[str] = []
 
     semantic_path = root / KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE
-    canonical_exports = (
-        _rust_canonical_exports(
-            semantic_path.read_text(encoding="utf-8"),
-            KEYNOTE_PLACEHOLDER_VISIBILITY_SHORT_NAMES,
-        )
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
         if semantic_path.is_file()
-        else frozenset()
+        else ""
+    )
+    canonical_exports = _rust_canonical_exports(
+        semantic_source,
+        KEYNOTE_PLACEHOLDER_VISIBILITY_SHORT_NAMES,
     )
     for name in KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES:
         if name in canonical_exports:
@@ -2812,6 +3049,16 @@ def audit_keynote_placeholder_visibility_facade_source_topology(
             f"canonical slide::placeholder type {name}: "
             f"{KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE}"
         )
+    canonical_kinds = _rust_public_enum_variants(semantic_source, "Kind")
+    if "Kind" in canonical_exports:
+        for name in KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_KINDS:
+            if name in canonical_kinds:
+                continue
+            violations.append(
+                "focused litchi-keynote placeholder visibility public API is missing "
+                f"canonical placeholder kind {name}: "
+                f"{KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE}"
+            )
 
     lib_export = root / KEYNOTE_SOURCE_ROOT / "lib.rs"
     lib_source = (
@@ -2877,6 +3124,28 @@ def audit_keynote_placeholder_visibility_facade_source_topology(
             f"{KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_SOURCE}"
         )
 
+    for module_source in (
+        KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE,
+        KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_SOURCE,
+        KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_PREVIEW_SOURCE,
+        *KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES,
+    ):
+        module_path = root / module_source
+        if not module_path.is_file():
+            continue
+        module_text = _mask_rust_non_code(
+            module_path.read_text(encoding="utf-8")
+        )
+        for match in PUBLIC_KEYNOTE_SLIDE_NUMBER_HELPER_MODULE.finditer(
+            module_text
+        ):
+            line_number = module_text.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-keynote placeholder visibility public API exposes "
+                "public slide-number helper module: "
+                f"{module_source}:{line_number}"
+            )
+
     for path in sorted(dedicated_sources | export_sources):
         dedicated_source = path in dedicated_sources
         source = path.read_text(encoding="utf-8")
@@ -2911,6 +3180,17 @@ def audit_keynote_placeholder_visibility_facade_source_topology(
             )
             if (
                 public_declaration
+                and path in export_sources | {semantic_path}
+                and public_use_or_type
+                and "slide_number" in declaration_identifiers
+            ):
+                violations.append(
+                    "focused litchi-keynote placeholder visibility public API exposes "
+                    "public slide-number owner alias: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            if (
+                public_declaration
                 and path in export_sources
                 and owner_declaration
                 and declaration_identifiers[:2] == ["pub", "use"]
@@ -2933,6 +3213,26 @@ def audit_keynote_placeholder_visibility_facade_source_topology(
                     violations.append(
                         "focused litchi-keynote placeholder visibility public API "
                         f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and identifier
+                    in KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_SEMANTIC_ALIASES
+                ):
+                    violations.append(
+                        "focused litchi-keynote placeholder visibility public API "
+                        f"retains flat semantic alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and identifier
+                    in KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_NUMBER_PUBLIC_MEMBERS
+                ):
+                    violations.append(
+                        "focused litchi-keynote placeholder visibility public API "
+                        f"retains slide-number-specific public member {identifier}: "
                         f"{path.relative_to(root)}:{identifier_line}"
                     )
                 if (
@@ -3949,6 +4249,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_slide_transition_source_topology()
         + audit_keynote_slide_transition_facade_source_topology()
         + audit_iwa_keynote_placeholder_visibility_source_topology()
+        + audit_iwa_keynote_slide_number_visibility_source_topology()
         + audit_keynote_placeholder_visibility_facade_source_topology()
         + audit_iwa_numbers_names_source_topology()
         + audit_numbers_names_facade_source_topology()

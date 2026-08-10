@@ -1,5 +1,11 @@
 //! Private invalidation of stale Keynote slide-preview caches.
 
+mod slide_number;
+
+pub(super) use slide_number::{
+    exact_slide_number_delta_with_allowance, set_slide_number_with_report,
+};
+
 use std::collections::{HashMap, HashSet};
 
 use litchi_iwa_common::{
@@ -483,7 +489,7 @@ fn charge_scan_archive_structure(
     })
 }
 
-fn charge_exact_message_selection(
+fn charge_report_message_selection(
     object: &ArchiveObject,
     limits: WireLimits,
     report: &mut InvalidationReport,
@@ -498,15 +504,24 @@ fn charge_exact_message_selection(
     Ok(())
 }
 
+fn charge_report_archive_structure(
+    object: &ArchiveObject,
+    compare_header: bool,
+    limits: WireLimits,
+    report: &mut InvalidationReport,
+) -> Result<(), InvalidationError> {
+    charge_archive_contents(object, compare_header, |work, references| {
+        report.charge_work(work, limits)?;
+        report.charge_references(references)
+    })
+}
+
 fn charge_exact_archive_structure(
     object: &ArchiveObject,
     limits: WireLimits,
     report: &mut InvalidationReport,
 ) -> Result<(), InvalidationError> {
-    charge_archive_contents(object, false, |work, references| {
-        report.charge_work(work, limits)?;
-        report.charge_references(references)
-    })
+    charge_report_archive_structure(object, false, limits, report)
 }
 
 fn charge_exact_message_info_structure(
@@ -894,8 +909,8 @@ fn exact_forward_delta(
     limits: WireLimits,
     report: &mut InvalidationReport,
 ) -> Result<bool, InvalidationError> {
-    charge_exact_message_selection(source, limits, report)?;
-    charge_exact_message_selection(candidate, limits, report)?;
+    charge_report_message_selection(source, limits, report)?;
+    charge_report_message_selection(candidate, limits, report)?;
     let source_index = selected_message_index(source)?;
     let candidate_index = selected_message_index(candidate)?;
     report.charge_work(2, limits)?;
@@ -2627,7 +2642,7 @@ mod tests {
         assert_eq!(object, original);
     }
 
-    fn replace_once(
+    pub(super) fn replace_once(
         data: &mut Vec<u8>,
         source: &[u8],
         replacement: &[u8],
@@ -2640,7 +2655,7 @@ mod tests {
         Ok(())
     }
 
-    fn unbudgeted_test_error(error: BudgetedInvalidationError) -> InvalidationError {
+    pub(super) fn unbudgeted_test_error(error: BudgetedInvalidationError) -> InvalidationError {
         match error {
             BudgetedInvalidationError::Invalidation(inner) => inner,
             BudgetedInvalidationError::BudgetExceeded { .. } => InvalidationError::InvalidSource,
@@ -2754,7 +2769,9 @@ mod tests {
         Ok(report.work())
     }
 
-    fn preview_object(shared_slide_reference: bool) -> Result<ArchiveObject, InvalidationError> {
+    pub(super) fn preview_object(
+        shared_slide_reference: bool,
+    ) -> Result<ArchiveObject, InvalidationError> {
         let mut payload = vec![0x20, 0x00, 0x30, 0x00, 0x38, 0x00];
         if shared_slide_reference {
             payload.extend_from_slice(&[0x12, 0x02, 0x08, 77]);

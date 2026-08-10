@@ -131,9 +131,11 @@ def add_keynote_placeholder_visibility_canonical_scaffold(root: Path) -> None:
     )
     semantic.write_text(
         semantic_source
+        + "pub enum Kind { Title, Body, SlideNumber }\n"
         + "".join(
             f"pub struct {name};\n"
             for name in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES
+            if name != "Kind"
         ),
         encoding="utf-8",
     )
@@ -2306,7 +2308,28 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ),
                 Path(
                     "crates/litchi-keynote/src/package/"
+                    "slide_placeholder_visibility/slide_number.rs"
+                ),
+                Path(
+                    "crates/litchi-keynote/src/package/"
                     "slide_placeholder_visibility/verification.rs"
+                ),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_PREVIEW_SOURCE,
+            Path("crates/litchi-keynote/src/package/slide_preview.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_ROOT,
+            Path("crates/litchi-keynote/src/package/slide_preview"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_SOURCES,
+            (
+                Path(
+                    "crates/litchi-keynote/src/package/slide_preview/"
+                    "slide_number.rs"
                 ),
             ),
         )
@@ -2319,6 +2342,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "slide_placeholder_visibility.rs"
                 ),
                 *boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_SOURCES,
+                *boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_SOURCES,
             ),
         )
         self.assertEqual(
@@ -2332,6 +2356,10 @@ class BoundaryPolicyTests(unittest.TestCase):
         self.assertEqual(
             boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES,
             ("Kind", "State", "Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_KINDS,
+            ("Title", "Body", "SlideNumber"),
         )
         self.assertEqual(
             boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PACKAGE_METHODS,
@@ -2349,6 +2377,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "SlidePlaceholder",
                 "SlidePlaceholderVisibility",
                 "SlideTextPlaceholder",
+                "SlideNumber",
+                "SlideNumberPlaceholder",
+                "SlideNumberVisibility",
+                "SlideNumberPlaceholderVisibility",
             ),
         )
         self.assertEqual(
@@ -2359,7 +2391,25 @@ class BoundaryPolicyTests(unittest.TestCase):
                 for suffix in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES
             ),
         )
-        self.assertEqual(len(boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES), 40)
+        self.assertEqual(len(boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES), 72)
+        self.assertEqual(
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_SEMANTIC_ALIASES,
+            frozenset({"SlideNumberPlaceholder", "SlideNumberVisibility"}),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_NUMBER_PUBLIC_MEMBERS,
+            frozenset(
+                {
+                    "apply_slide_number_visibility",
+                    "edit_slide_number_visibility",
+                    "hide_slide_number",
+                    "is_slide_number_visible",
+                    "set_slide_number_visible",
+                    "show_slide_number",
+                    "slide_number_visibility",
+                }
+            ),
+        )
         self.assertEqual(
             boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES,
             frozenset(
@@ -2370,6 +2420,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "EntryEdit",
                     "ExactArtifacts",
                     "IWorkPackage",
+                    "NodeVisibilitySnapshot",
                     "PhysicalSource",
                     "PlaceholderOwnerSnapshot",
                     "PlaceholderTextOwnerSnapshot",
@@ -2378,6 +2429,9 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "ReferenceSnapshot",
                     "Resolved",
                     "SlideOwnerSnapshot",
+                    "SlideNodeSnapshot",
+                    "SlideNumberSnapshot",
+                    "SlideNumberVisibilitySnapshot",
                     "SnappyStream",
                     "SourceCatalog",
                 }
@@ -2386,6 +2440,10 @@ class BoundaryPolicyTests(unittest.TestCase):
         self.assertNotIn(
             "PlaceholderKind",
             boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES,
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PROTO_ORIGINS,
+            frozenset({"kn", "tsp"}),
         )
         self.assertEqual(
             boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_WIRE_TYPES,
@@ -2609,6 +2667,230 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_iwa_keynote_slide_number_visibility_retirement_inventory_is_exact(
+        self,
+    ) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_METHODS,
+            ("set_slide_number_visible",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/editor/slide_number.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_MODULES,
+            ("slide_number",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_EXAMPLE,
+            Path("crates/litchi-iwa/examples/set_keynote_slide_number.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_TESTS,
+            (
+                "slide_number_visibility_matches_native_ownership_and_round_trips_exactly",
+                "slide_number_visibility_rejects_inconsistent_native_state_transactionally",
+            ),
+        )
+
+    def test_retired_iwa_keynote_slide_number_visibility_surface_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retired = (
+                root
+                / boundaries.RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_SOURCE
+            )
+            retired.parent.mkdir(parents=True)
+            retired.write_text(
+                "pub fn r#set_slide_number_visible() {}\n", encoding="utf-8"
+            )
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.write_text("pub mod r#slide_number;\n", encoding="utf-8")
+            tests = root / boundaries.IWA_KEYNOTE_EDITOR_TEST_SOURCE
+            tests.write_text(
+                "fn slide_number_visibility_matches_native_ownership_and_round_trips_exactly() {}\n"
+                "fn slide_number_visibility_rejects_inconsistent_native_state_transactionally() {}\n",
+                encoding="utf-8",
+            )
+            example = (
+                root / boundaries.RETIRED_IWA_KEYNOTE_SLIDE_NUMBER_VISIBILITY_EXAMPLE
+            )
+            example.parent.mkdir(parents=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_number_visibility_source_topology(
+                    root
+                ),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote slide-number visibility source "
+                        "returned: crates/litchi-iwa/src/keynote/editor/slide_number.rs",
+                        "retired litchi-iwa Keynote slide-number visibility example "
+                        "returned: crates/litchi-iwa/examples/"
+                        "set_keynote_slide_number.rs",
+                        "retired litchi-iwa Keynote slide-number visibility method "
+                        "set_slide_number_visible: crates/litchi-iwa/src/keynote/"
+                        "editor/slide_number.rs:1",
+                        "retired litchi-iwa Keynote slide-number visibility module "
+                        "slide_number: crates/litchi-iwa/src/keynote/editor.rs:1",
+                        "retired litchi-iwa Keynote slide-number visibility test "
+                        "slide_number_visibility_matches_native_ownership_and_round_"
+                        "trips_exactly: crates/litchi-iwa/src/keynote/editor/tests.rs:1",
+                        "retired litchi-iwa Keynote slide-number visibility test "
+                        "slide_number_visibility_rejects_inconsistent_native_state_"
+                        "transactionally: crates/litchi-iwa/src/keynote/editor/tests.rs:2",
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_keynote_slide_number_visibility_module_variants(
+        self,
+    ) -> None:
+        for declaration in (
+            "mod slide_number;",
+            "pub mod r#slide_number;",
+            "pub(crate) mod slide_number {}",
+            "pub(super) mod r#slide_number {}",
+            "pub(in crate) mod slide_number;",
+            "pub\nmod\nr#slide_number\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+                    editor.parent.mkdir(parents=True)
+                    editor.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_iwa_keynote_slide_number_visibility_source_topology(
+                            root
+                        ),
+                        [
+                            "retired litchi-iwa Keynote slide-number visibility "
+                            "module slide_number: crates/litchi-iwa/src/keynote/"
+                            "editor.rs:1"
+                        ],
+                    )
+
+    def test_retired_iwa_keynote_slide_number_visibility_readme_calls_and_example(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "editor.r#set_slide_number_visible(true);\n"
+                "canvas\n    .\n    set_slide_number_visible(false);\n"
+                "crate::nested::KeynoteEditor::\n"
+                "    r#set_slide_number_visible(true);\n"
+                "set_keynote_slide_number\n"
+                "set_keynote_slide_number.rs\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_number_visibility_source_topology(
+                    root
+                ),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote slide-number visibility README "
+                        "call set_slide_number_visible: crates/litchi-iwa/README.md:1",
+                        "retired litchi-iwa Keynote slide-number visibility README "
+                        "call set_slide_number_visible: crates/litchi-iwa/README.md:4",
+                        "retired litchi-iwa Keynote slide-number visibility README "
+                        "call set_slide_number_visible: crates/litchi-iwa/README.md:6",
+                        "retired litchi-iwa Keynote slide-number visibility README "
+                        "example reference set_keynote_slide_number: "
+                        "crates/litchi-iwa/README.md:7",
+                        "retired litchi-iwa Keynote slide-number visibility README "
+                        "example reference set_keynote_slide_number: "
+                        "crates/litchi-iwa/README.md:8",
+                    ]
+                ),
+            )
+
+    def test_iwa_keynote_slide_number_visibility_policy_retains_shared_surfaces(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.parent.mkdir(parents=True)
+            editor.write_text(
+                "// mod slide_number;\n"
+                'const NOTE: &str = "pub mod slide_number;";\n'
+                'const RAW: &str = r#"mod r#slide_number {}"#;\n'
+                "/* outer /* mod slide_number; */ still comment */\n"
+                "mod slide_numbers;\n"
+                "pub struct KeynoteSlideInfo {\n"
+                "    pub is_slide_number_visible: Option<bool>,\n"
+                "}\n"
+                "pub struct KeynoteSlideLayout {\n"
+                "    pub slide_number_placeholder_visibility: Option<bool>,\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            safe = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "creation.rs"
+            safe.write_text(
+                "// fn set_slide_number_visible() {}\n"
+                'const FN_NOTE: &str = "fn set_slide_number_visible() {}";\n'
+                "/* fn r#set_slide_number_visible() {} */\n"
+                "pub const fn slide_number_visible(self, visible: bool) -> Self "
+                "{ self }\n"
+                "pub fn set_slide_numbers_visible() {}\n"
+                "pub fn set_slide_number_visibility() {}\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.IWA_KEYNOTE_EDITOR_TEST_SOURCE
+            tests.parent.mkdir(parents=True, exist_ok=True)
+            tests.write_text(
+                "// fn slide_number_visibility_matches_native_ownership_and_round_trips_exactly() {}\n"
+                'const TEST_NOTE: &str = "fn slide_number_visibility_rejects_inconsistent_native_state_transactionally() {}";\n'
+                "fn slide_number_visibility_matches_native_ownership_and_round_trips_exactly_v2() {}\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/editor.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub fn set_slide_number_visible() {}\n", encoding="utf-8"
+            )
+            retained_example = (
+                root / "crates/litchi-iwa/examples/create_keynote_slide_numbers.rs"
+            )
+            retained_example.parent.mkdir(parents=True)
+            retained_example.write_text("fn main() {}\n", encoding="utf-8")
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "`set_slide_number_visible` is retired prose.\n"
+                "set_slide_number_visible\n"
+                "package.slide_placeholder_visibility(slide, Kind::SlideNumber)\n"
+                "package.edit_slide_placeholder_visibility(slide, Kind::SlideNumber)\n"
+                "settings.set_slide_numbers_visible(true)\n"
+                "create_keynote_slide_numbers.rs\n"
+                "edit_slide_number_visibility.rs\n",
+                encoding="utf-8",
+            )
+            other_readme = root / "README.md"
+            other_readme.write_text(
+                "editor.set_slide_number_visible(true)\n"
+                "set_keynote_slide_number.rs\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_number_visibility_source_topology(
+                    root
+                ),
+                [],
+            )
+
     def test_focused_keynote_placeholder_visibility_requires_each_canonical_type(
         self,
     ) -> None:
@@ -2622,10 +2904,58 @@ class BoundaryPolicyTests(unittest.TestCase):
                         / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE
                     )
                     semantic.write_text(
-                        "".join(
+                        (
+                            "pub enum Kind { Title, Body, SlideNumber }\n"
+                            if missing != "Kind"
+                            else ""
+                        )
+                        + "".join(
                             f"pub struct {name};\n"
                             for name in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES
-                            if name != missing
+                            if name not in {"Kind", missing}
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    expected = [
+                        "focused litchi-keynote placeholder visibility public "
+                        "API is missing canonical slide::placeholder type "
+                        f"{missing}: crates/litchi-keynote/src/slide/placeholder.rs"
+                    ]
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        sorted(expected),
+                    )
+
+    def test_focused_keynote_placeholder_visibility_requires_each_canonical_kind(
+        self,
+    ) -> None:
+        for missing in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_KINDS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    semantic = (
+                        root
+                        / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE
+                    )
+                    retained = [
+                        kind
+                        for kind in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_KINDS
+                        if kind != missing
+                    ]
+                    semantic.write_text(
+                        f"// {missing},\n"
+                        f'const NOTE: &str = "{missing}";\n'
+                        "pub enum Kind { "
+                        + ", ".join(retained)
+                        + " }\n"
+                        + "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES
+                            if name != "Kind"
                         ),
                         encoding="utf-8",
                     )
@@ -2636,7 +2966,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                         ),
                         [
                             "focused litchi-keynote placeholder visibility public "
-                            "API is missing canonical slide::placeholder type "
+                            "API is missing canonical placeholder kind "
                             f"{missing}: crates/litchi-keynote/src/slide/placeholder.rs"
                         ],
                     )
@@ -2792,6 +3122,127 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ],
             )
 
+    def test_focused_keynote_placeholder_visibility_rejects_number_specific_aliases_and_members(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_IMPLEMENTATION_SOURCES
+                + boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            semantic_aliases = sorted(
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_SEMANTIC_ALIASES
+            )
+            members = sorted(
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_NUMBER_PUBLIC_MEMBERS
+            )
+            for index, name in enumerate(semantic_aliases):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                declarations[path].append(f"pub struct {name};")
+                expected.append(
+                    "focused litchi-keynote placeholder visibility public API "
+                    f"retains flat semantic alias {name}: "
+                    f"{relative_sources[source_index]}:{len(declarations[path])}"
+                )
+            for index, name in enumerate(members):
+                source_index = (index + len(semantic_aliases)) % len(sources)
+                path = sources[source_index]
+                declarations[path].append(f"pub fn {name}() {{}}")
+                expected.append(
+                    "focused litchi-keynote placeholder visibility public API "
+                    f"retains slide-number-specific public member {name}: "
+                    f"{relative_sources[source_index]}:{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_keynote_placeholder_visibility_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                    root
+                ),
+                sorted(expected),
+            )
+
+    def test_focused_keynote_placeholder_visibility_rejects_public_number_helper_modules(
+        self,
+    ) -> None:
+        module_sources = (
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE,
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_SOURCE,
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_PREVIEW_SOURCE,
+            *boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES,
+        )
+        declarations = (
+            "pub mod slide_number;",
+            "pub mod r#slide_number;",
+            "pub mod slide_number {}",
+            "pub\nmod\nr#slide_number\n{}",
+        )
+        for relative in module_sources:
+            for declaration in declarations:
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_keynote_placeholder_visibility_canonical_scaffold(root)
+                        path = root / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        source = path.read_text(encoding="utf-8") if path.is_file() else ""
+                        line = source.count("\n") + 1
+                        path.write_text(source + declaration + "\n", encoding="utf-8")
+
+                        self.assertEqual(
+                            boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                                root
+                            ),
+                            [
+                                "focused litchi-keynote placeholder visibility public "
+                                "API exposes public slide-number helper module: "
+                                f"{relative}:{line}"
+                            ],
+                        )
+
+    def test_focused_keynote_placeholder_visibility_rejects_public_number_owner_aliases(
+        self,
+    ) -> None:
+        alias_sources = (
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE,
+            *boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES,
+        )
+        declarations = (
+            "pub use crate::slide_number as legacy;",
+            "pub use crate::r#slide_number as legacy;",
+            "pub\nuse\ncrate::slide_number as legacy;",
+            "pub type slide_number = bool;",
+        )
+        for relative in alias_sources:
+            for declaration in declarations:
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_keynote_placeholder_visibility_canonical_scaffold(root)
+                        path = root / relative
+                        source = path.read_text(encoding="utf-8")
+                        line = source.count("\n") + 1
+                        path.write_text(source + declaration + "\n", encoding="utf-8")
+
+                        self.assertEqual(
+                            boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                                root
+                            ),
+                            [
+                                "focused litchi-keynote placeholder visibility public "
+                                "API exposes public slide-number owner alias: "
+                                f"{relative}:{line}"
+                            ],
+                        )
+
     def test_focused_keynote_placeholder_visibility_rejects_all_flat_aliases(
         self,
     ) -> None:
@@ -2933,6 +3384,9 @@ class BoundaryPolicyTests(unittest.TestCase):
                     sorted(boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_WIRE_TYPES)
                 )
             )
+            owner_lines.append(
+                "pub type Projected = (kn::SlideArchive, tsp::StorageArchive);"
+            )
             owner.write_text("\n".join(owner_lines) + "\n", encoding="utf-8")
             lib_export, package_export, slide_export = (
                 root / path
@@ -2986,6 +3440,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "protobuf type prost_types",
                 "archive/IWA type MessageInfo",
                 "raw source bytes SourceBytes",
+                "protobuf type kn",
+                "archive/IWA type SlideArchive",
+                "protobuf type tsp",
+                "archive/IWA type StorageArchive",
                 *tuple(
                     f"archive/IWA type {name}"
                     for name in sorted(
@@ -2999,7 +3457,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                     )
                 ),
             )
-            self.assertEqual(len(violations), 40)
+            self.assertEqual(len(violations), 48)
             for fragment in expected_fragments:
                 with self.subTest(fragment=fragment):
                     self.assertTrue(
@@ -3007,10 +3465,14 @@ class BoundaryPolicyTests(unittest.TestCase):
                         msg=f"missing focused placeholder-visibility leak: {fragment}",
                     )
 
-    def test_focused_keynote_placeholder_visibility_scans_every_owner_helper(
+    def test_focused_keynote_placeholder_visibility_scans_every_private_helper(
         self,
     ) -> None:
-        for relative in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_SOURCES:
+        helpers = (
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_SOURCES
+            + boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_SOURCES
+        )
+        for relative in helpers:
             with self.subTest(relative=relative):
                 with tempfile.TemporaryDirectory() as directory:
                     root = Path(directory)
@@ -3057,31 +3519,32 @@ class BoundaryPolicyTests(unittest.TestCase):
     def test_focused_keynote_placeholder_visibility_recursively_scans_future_helpers(
         self,
     ) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            add_keynote_placeholder_visibility_canonical_scaffold(root)
-            nested_relative = (
-                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT
-                / "future"
-                / "nested.rs"
-            )
-            nested = root / nested_relative
-            nested.parent.mkdir(parents=True, exist_ok=True)
-            nested.write_text(
-                "pub type FutureVisibilitySnapshot = ArchiveObject;\n",
-                encoding="utf-8",
-            )
+        for helper_root in (
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT,
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_ROOT,
+        ):
+            with self.subTest(helper_root=helper_root):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    nested_relative = helper_root / "future" / "nested.rs"
+                    nested = root / nested_relative
+                    nested.parent.mkdir(parents=True, exist_ok=True)
+                    nested.write_text(
+                        "pub type FutureVisibilitySnapshot = ArchiveObject;\n",
+                        encoding="utf-8",
+                    )
 
-            self.assertEqual(
-                boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
-                    root
-                ),
-                [
-                    "focused litchi-keynote placeholder visibility public API "
-                    "exposes archive/IWA type ArchiveObject: "
-                    f"{nested_relative}:1"
-                ],
-            )
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote placeholder visibility public "
+                            "API exposes archive/IWA type ArchiveObject: "
+                            f"{nested_relative}:1"
+                        ],
+                    )
 
     def test_focused_keynote_placeholder_visibility_allows_private_helper_vocabulary(
         self,
@@ -3089,9 +3552,11 @@ class BoundaryPolicyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             add_keynote_placeholder_visibility_canonical_scaffold(root)
-            for index, relative in enumerate(
+            helpers = (
                 boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_SOURCES
-            ):
+                + boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_SOURCES
+            )
+            for index, relative in enumerate(helpers):
                 helper = root / relative
                 helper.parent.mkdir(parents=True, exist_ok=True)
                 helper.write_text(
@@ -3107,16 +3572,16 @@ class BoundaryPolicyTests(unittest.TestCase):
                     f"struct Helper{index};\n",
                     encoding="utf-8",
                 )
-            non_rust = (
-                root
-                / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT
-                / "future.txt"
-            )
-            non_rust.write_text(
-                "pub type PlaceholderEdit = ArchiveObject;\n"
-                "pub fn source_bytes(value: &[u8]) {}\n",
-                encoding="utf-8",
-            )
+            for helper_root in (
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT,
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_ROOT,
+            ):
+                non_rust = root / helper_root / "future.txt"
+                non_rust.write_text(
+                    "pub type PlaceholderEdit = ArchiveObject;\n"
+                    "pub fn source_bytes(value: &[u8]) {}\n",
+                    encoding="utf-8",
+                )
 
             self.assertEqual(
                 boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
@@ -3140,9 +3605,13 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "/* pub type SlideTextPlaceholderCommit = buffa::ArchiveView; */\n"
                 "pub struct AggregateVisibility;\n"
                 "pub struct LayoutVisibility;\n"
-                "pub struct SlideNumberVisibility;\n"
+                "pub struct SlideNumberVisibilityPolicy;\n"
                 "pub fn title_visible(state: &State) -> bool { todo!() }\n"
                 "pub fn body_visible(state: &State) -> bool { todo!() }\n"
+                "mod slide_number;\n"
+                "pub(crate) mod r#slide_number;\n"
+                "// pub mod slide_number;\n"
+                'const MODULE_NOTE: &str = "pub mod r#slide_number {};";\n'
                 "fn source_bytes(source_bytes: &[u8], object_id: u64) "
                 "-> DocumentArchive { todo!() }\n"
                 "pub(crate) fn restricted(value: ArchiveObject) {}\n"
@@ -3167,6 +3636,26 @@ class BoundaryPolicyTests(unittest.TestCase):
                     )
                 )
             ]
+            private_number_surface = [
+                *[
+                    ("struct" if index % 2 == 0 else "pub(crate) struct")
+                    + f" {name};"
+                    for index, name in enumerate(
+                        sorted(
+                            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_SEMANTIC_ALIASES
+                        )
+                    )
+                ],
+                *[
+                    ("fn" if index % 2 == 0 else "pub(super) fn")
+                    + f" {name}() {{}}"
+                    for index, name in enumerate(
+                        sorted(
+                            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_NUMBER_PUBLIC_MEMBERS
+                        )
+                    )
+                ],
+            ]
             owner.write_text(
                 "\n".join(
                     [
@@ -3181,6 +3670,11 @@ class BoundaryPolicyTests(unittest.TestCase):
                         "slide::placeholder::Error> { todo!() }",
                         *private_aliases,
                         *private_physical,
+                        *private_number_surface,
+                        "mod slide_number;",
+                        "pub(crate) mod r#slide_number;",
+                        "// pub mod slide_number;",
+                        'const MODULE_NOTE: &str = "pub mod slide_number {};";',
                         "impl SlidePlaceholderVisibilityEdit {}",
                     ]
                 )
@@ -3203,25 +3697,42 @@ class BoundaryPolicyTests(unittest.TestCase):
                 'const GLOB_NOTE: &str = "pub use crate::slide::placeholder::*;";\n'
                 + private_roots
                 + "\npub(crate) use crate::slide::placeholder::*;\n"
+                "use crate::slide_number as private_number_owner;\n"
+                "pub(crate) use crate::r#slide_number as restricted_number_owner;\n"
+                "pub(crate) mod slide_number;\n"
                 "pub use crate::layout::{Kind, State, Edit, Patch, Commit, "
                 "Diagnostics, Error, LimitKind};\n"
                 "pub use crate::slide::{SlideInfo, SlideLayout, "
-                "SlideNumberVisibility};\n"
+                "SlideNumberVisibilityPolicy};\n"
                 "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n",
                 encoding="utf-8",
             )
             package_export.write_text(
                 "mod slide_placeholder_visibility;\n"
                 "pub(crate) mod r#slide_placeholder_visibility;\n"
+                "pub(super) mod slide_number;\n"
+                "pub(in crate) use crate::slide_number as private_number_owner;\n"
                 "pub(super) use crate::slide::placeholder::{Kind, State};\n"
                 "pub fn package_layout(object_id: u64) -> DocumentArchive { todo!() }\n",
                 encoding="utf-8",
             )
             slide_export.write_text(
                 "pub mod placeholder;\n"
+                "mod slide_number;\n"
+                "pub(crate) use crate::slide_number as private_number_owner;\n"
                 "pub use crate::layout::{Kind, State};\n"
                 "pub struct SlideAggregate;\n"
                 "pub struct SlideNumberSettings;\n",
+                encoding="utf-8",
+            )
+            preview_parent = (
+                root / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_PREVIEW_SOURCE
+            )
+            preview_parent.write_text(
+                "mod slide_number;\n"
+                "pub(crate) mod r#slide_number;\n"
+                "// pub mod slide_number;\n"
+                'const NOTE: &str = "pub mod slide_number {};";\n',
                 encoding="utf-8",
             )
             nonfocused = root / boundaries.KEYNOTE_SOURCE_ROOT / "render.rs"
@@ -3232,7 +3743,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                         boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES
                     )
                 )
-                + "\npub fn render(object_id: u64) -> DocumentArchive { todo!() }\n",
+                + "\npub struct SlideNumberVisibility;\n"
+                "pub fn show_slide_number() {}\n"
+                "pub mod slide_number;\n"
+                "pub fn render(object_id: u64) -> DocumentArchive { todo!() }\n",
                 encoding="utf-8",
             )
             other_owner = root / "crates/litchi-pages/src/placeholder.rs"
@@ -3245,6 +3759,9 @@ class BoundaryPolicyTests(unittest.TestCase):
                     )
                 )
                 + "\npub use crate::slide::placeholder::*;\n"
+                "pub struct SlideNumberVisibility;\n"
+                "pub fn hide_slide_number() {}\n"
+                "pub mod slide_number;\n"
                 "pub fn placeholder(object_id: u64) -> DocumentArchive { todo!() }\n",
                 encoding="utf-8",
             )

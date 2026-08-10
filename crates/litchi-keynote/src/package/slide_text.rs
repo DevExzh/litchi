@@ -94,9 +94,20 @@ impl fmt::Display for SlideTextLimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum SlideTextError {
-    /// The source was prepared without an exact physical package artifact.
+    /// The source cannot support a changed exact-source slide-text transaction.
     #[error("this Keynote source does not support physical slide-text edits")]
     UnsupportedSource,
+    /// The requested placeholder kind is not supported by the slide-text API.
+    ///
+    /// [`Kind::SlideNumber`] is a per-slide visibility role. Use
+    /// [`Package::slide_placeholder_visibility`][Package::slide_placeholder_visibility]
+    /// and [`Package::edit_slide_placeholder_visibility`][Package::edit_slide_placeholder_visibility]
+    /// for it; those APIs do not change the show-wide slide-number preference.
+    #[error("the {kind} placeholder does not expose slide text")]
+    UnsupportedKind {
+        /// Unsupported semantic placeholder kind.
+        kind: Kind,
+    },
     /// An exact-name selector was ambiguous.
     #[error("the Keynote slide selector is ambiguous")]
     AmbiguousSelector,
@@ -723,10 +734,12 @@ impl SlideTextCommit {
 }
 
 impl Package {
-    /// Read an existing title/body storage without exposing native identity.
+    /// Read existing title or body text without exposing implementation identity.
     ///
-    /// `Ok(None)` means that the slide has no reference for the requested
-    /// role. `Some("")` denotes an existing empty storage.
+    /// `Ok(None)` means that the slide has no title/body role. `Some("")`
+    /// denotes an existing empty storage. [`Kind::SlideNumber`] is not text
+    /// bearing for this API and returns [`SlideTextError::UnsupportedKind`];
+    /// use the per-slide placeholder-visibility transaction instead.
     ///
     /// # Costs
     ///
@@ -734,8 +747,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns a typed selector, source, limit, allocation, or dependency
-    /// error when the requested semantic value cannot be read safely.
+    /// Returns [`SlideTextError::UnsupportedKind`] for
+    /// [`Kind::SlideNumber`], or a typed selector, source, limit, allocation,
+    /// or dependency error when title/body text cannot be read safely.
     pub fn slide_text<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
@@ -779,14 +793,21 @@ impl Package {
 
     /// Start one selector-first title/body text edit.
     ///
+    /// [`Kind::SlideNumber`] is visibility-only and returns
+    /// [`SlideTextError::UnsupportedKind`]. Use
+    /// [`Package::edit_slide_placeholder_visibility`] to show or hide that
+    /// role on one selected slide; it does not modify the show-wide
+    /// slide-number preference.
+    ///
     /// # Costs
     ///
     /// The edit owns one bounded copy of the selected placeholder text.
     ///
     /// # Errors
     ///
-    /// Returns a typed selector, missing-placeholder, source, limit,
-    /// allocation, or dependency error.
+    /// Returns [`SlideTextError::UnsupportedKind`] for
+    /// [`Kind::SlideNumber`], or a typed selector, missing-placeholder, source,
+    /// limit, allocation, or dependency error.
     pub fn edit_slide_text<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
@@ -926,6 +947,9 @@ fn text_snapshot_at(
     position: Position,
     role: Kind,
 ) -> Result<Option<TextSnapshot>, SlideTextError> {
+    if role == Kind::SlideNumber {
+        return Err(SlideTextError::UnsupportedKind { kind: role });
+    }
     let record = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
@@ -943,6 +967,7 @@ fn text_snapshot_at(
     let placeholder = match role {
         Kind::Title => owner.title_placeholder(),
         Kind::Body => owner.body_placeholder(),
+        Kind::SlideNumber => return Err(SlideTextError::UnsupportedKind { kind: role }),
     };
     let Some(placeholder_identifier) = placeholder.map(|reference| reference.identifier().get())
     else {
@@ -1012,13 +1037,14 @@ fn validate_placeholder_kind(role: Kind, kind: Option<i32>) -> Result<(), SlideT
     // through this focused capability.
     match (role, kind) {
         (_, None | Some(0)) | (Kind::Title, Some(2)) | (Kind::Body, Some(3)) => Ok(()),
+        (Kind::SlideNumber, _) => Err(SlideTextError::UnsupportedKind { kind: role }),
         _ => Err(SlideTextError::DependentContent),
     }
 }
 
 const fn semantic_path(position: Position, role: Kind) -> SemanticPath {
     match role {
-        Kind::Title => SemanticPath::SlideTitle {
+        Kind::Title | Kind::SlideNumber => SemanticPath::SlideTitle {
             index: position.get(),
         },
         Kind::Body => SemanticPath::SlideBody {
@@ -1411,6 +1437,7 @@ fn verify_candidate(
                     return Err(SlideTextError::Verification);
                 }
             },
+            Kind::SlideNumber => return Err(SlideTextError::UnsupportedKind { kind: role }),
         }
     }
     Ok(())
@@ -1643,6 +1670,9 @@ fn prove_exclusive_text_ownership(
                                 Kind::Body => {
                                     projected_body == Some(placeholder_identifier)
                                         && projected_title != Some(placeholder_identifier)
+                                },
+                                Kind::SlideNumber => {
+                                    return Err(SlideTextError::UnsupportedKind { kind: role });
                                 },
                             };
                             role_edges = role_edges
@@ -1948,6 +1978,7 @@ fn prove_metadata_ownership(
                             let role_path = match role {
                                 Kind::Title => [5],
                                 Kind::Body => [6],
+                                Kind::SlideNumber => [20],
                             };
                             match field.path.as_slice() {
                                 path if path == role_path => {

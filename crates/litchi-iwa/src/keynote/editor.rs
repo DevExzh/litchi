@@ -5291,7 +5291,6 @@ mod slide_images;
 mod slide_layout_media;
 mod slide_layout_update;
 mod slide_movies;
-mod slide_number;
 mod slide_preview;
 mod slide_shapes;
 mod slide_style_graph;

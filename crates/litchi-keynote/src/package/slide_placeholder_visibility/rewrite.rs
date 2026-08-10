@@ -73,6 +73,7 @@ pub(super) fn rewrite_visibility(
             let changed = rewrite_visibility_payload(
                 payload,
                 selection.placeholder_identifier,
+                selection.kind,
                 selection.state,
                 target,
                 wire_limits,
@@ -102,16 +103,29 @@ pub(super) fn rewrite_visibility(
             if !source_matches {
                 return Err(Error::InvalidSource);
             }
-            let (node_changed, report) =
+            let (node_changed, report) = if selection.kind == super::Kind::SlideNumber {
+                crate::package::slide_preview::set_slide_number_with_report(
+                    node,
+                    target == State::Visible,
+                    archive_limits,
+                    wire_limits,
+                    budget.preview_allowance(),
+                )
+            } else {
                 crate::package::slide_preview::invalidate_if_needed_with_report(
                     node,
                     archive_limits,
                     wire_limits,
                     budget.preview_allowance(),
                 )
-                .map_err(|error| budget.map_preview_budget_error(error))?;
+            }
+            .map_err(|error| budget.map_preview_budget_error(error))?;
             budget.charge_preview_report(report)?;
-            source_node_invalidated = !node_changed;
+            source_node_invalidated = if selection.kind == super::Kind::SlideNumber {
+                selection.state == State::Visible
+            } else {
+                !node_changed
+            };
         }
         let bytes = archive
             .to_bytes_with_limits(archive_limits)
@@ -143,7 +157,11 @@ pub(super) fn rewrite_visibility(
         target,
         0,
         source_node_invalidated,
-        true,
+        if selection.kind == super::Kind::SlideNumber {
+            target == State::Visible
+        } else {
+            true
+        },
         budget,
     )?;
     Ok((candidate, touched, source_node_invalidated))
@@ -152,6 +170,7 @@ pub(super) fn rewrite_visibility(
 pub(super) fn rewrite_visibility_payload(
     source: &[u8],
     identifier: u64,
+    kind: super::Kind,
     before: State,
     after: State,
     limits: WireLimits,
@@ -161,13 +180,10 @@ pub(super) fn rewrite_visibility_payload(
         return Err(Error::Verification);
     }
     let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
-    let role_number = if view.fields().any(|field| {
-        field.number() == TITLE_REFERENCE_FIELD
-            && strict_reference(field, limits).ok() == Some(identifier)
-    }) {
-        TITLE_REFERENCE_FIELD
-    } else {
-        BODY_REFERENCE_FIELD
+    let role_number = match kind {
+        super::Kind::Title => TITLE_REFERENCE_FIELD,
+        super::Kind::Body => BODY_REFERENCE_FIELD,
+        super::Kind::SlideNumber => super::SLIDE_NUMBER_PLACEHOLDER_FIELD,
     };
     let role = view
         .fields()
@@ -220,7 +236,8 @@ pub(super) fn rewrite_visibility_payload(
     }
     let work = source
         .len()
-        .checked_add(output_len)
+        .checked_mul(6)
+        .and_then(|value| value.checked_add(output_len))
         .and_then(|value| value.checked_add(view.len().saturating_mul(2)))
         .ok_or(Error::InvalidSource)?;
     if work > limits.max_rewrite_work() {
@@ -237,14 +254,41 @@ pub(super) fn rewrite_visibility_payload(
     output
         .try_reserve_exact(output_len)
         .map_err(|_allocation| Error::Allocation { amount: output_len })?;
+    let mut remaining_owned_fields = view
+        .fields()
+        .filter(|field| field.number() == OWNED_DRAWABLES_FIELD)
+        .count();
+    let mut remaining_z_order_fields = view
+        .fields()
+        .filter(|field| field.number() == Z_ORDER_FIELD)
+        .count();
+    if kind == super::Kind::SlideNumber
+        && after == State::Visible
+        && (remaining_owned_fields == 0 || remaining_z_order_fields == 0)
+    {
+        return Err(Error::UnsupportedSource);
+    }
     for field in view.fields() {
         let selected_list = matches!(field.number(), OWNED_DRAWABLES_FIELD | Z_ORDER_FIELD)
             && strict_reference(field, limits)? == identifier;
         if after == State::Visible || !selected_list {
             output.extend_from_slice(field.raw());
         }
+        if kind == super::Kind::SlideNumber && after == State::Visible {
+            if field.number() == OWNED_DRAWABLES_FIELD {
+                remaining_owned_fields = remaining_owned_fields.saturating_sub(1);
+                if remaining_owned_fields == 0 {
+                    append_reference_record(&mut output, OWNED_DRAWABLES_FIELD, role.payload());
+                }
+            } else if field.number() == Z_ORDER_FIELD {
+                remaining_z_order_fields = remaining_z_order_fields.saturating_sub(1);
+                if remaining_z_order_fields == 0 {
+                    append_reference_record(&mut output, Z_ORDER_FIELD, role.payload());
+                }
+            }
+        }
     }
-    if after == State::Visible {
+    if after == State::Visible && kind != super::Kind::SlideNumber {
         append_reference_record(&mut output, OWNED_DRAWABLES_FIELD, role.payload());
         append_reference_record(&mut output, Z_ORDER_FIELD, role.payload());
     }
@@ -259,22 +303,32 @@ pub(super) fn visibility_payload_delta_matches(
     source: &[u8],
     target: &[u8],
     identifier: u64,
+    kind: super::Kind,
     before: State,
     after: State,
     limits: WireLimits,
+    budget: &mut TransactionBudget,
 ) -> Result<bool, Error> {
     if before == after {
         return Ok(false);
     }
+    let work = source
+        .len()
+        .checked_mul(5)
+        .and_then(|amount| {
+            target
+                .len()
+                .checked_mul(2)
+                .and_then(|target_work| amount.checked_add(target_work))
+        })
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_work(work)?;
     let source_view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
     let target_view = WireView::parse_with_limits(target, limits).map_err(map_wire_error)?;
-    let role_number = if source_view.fields().any(|field| {
-        field.number() == TITLE_REFERENCE_FIELD
-            && strict_reference(field, limits).ok() == Some(identifier)
-    }) {
-        TITLE_REFERENCE_FIELD
-    } else {
-        BODY_REFERENCE_FIELD
+    let role_number = match kind {
+        super::Kind::Title => TITLE_REFERENCE_FIELD,
+        super::Kind::Body => BODY_REFERENCE_FIELD,
+        super::Kind::SlideNumber => super::SLIDE_NUMBER_PLACEHOLDER_FIELD,
     };
     let role = source_view
         .fields()
@@ -300,6 +354,20 @@ pub(super) fn visibility_payload_delta_matches(
     }
 
     let mut target_fields = target_view.fields();
+    let mut remaining_owned_fields = source_view
+        .fields()
+        .filter(|field| field.number() == OWNED_DRAWABLES_FIELD)
+        .count();
+    let mut remaining_z_order_fields = source_view
+        .fields()
+        .filter(|field| field.number() == Z_ORDER_FIELD)
+        .count();
+    if kind == super::Kind::SlideNumber
+        && after == State::Visible
+        && (remaining_owned_fields == 0 || remaining_z_order_fields == 0)
+    {
+        return Ok(false);
+    }
     for field in source_view.fields() {
         let selected_list = matches!(field.number(), OWNED_DRAWABLES_FIELD | Z_ORDER_FIELD)
             && strict_reference(field, limits)? == identifier;
@@ -314,8 +382,33 @@ pub(super) fn visibility_payload_delta_matches(
                 return Ok(false);
             }
         }
+        if kind == super::Kind::SlideNumber && after == State::Visible {
+            let append_number = if field.number() == OWNED_DRAWABLES_FIELD {
+                remaining_owned_fields = remaining_owned_fields.saturating_sub(1);
+                (remaining_owned_fields == 0).then_some(OWNED_DRAWABLES_FIELD)
+            } else if field.number() == Z_ORDER_FIELD {
+                remaining_z_order_fields = remaining_z_order_fields.saturating_sub(1);
+                (remaining_z_order_fields == 0).then_some(Z_ORDER_FIELD)
+            } else {
+                None
+            };
+            if let Some(number) = append_number {
+                let Some(candidate) = target_fields.next() else {
+                    return Ok(false);
+                };
+                candidate
+                    .validate_canonical_framing()
+                    .map_err(map_wire_error)?;
+                if candidate.number() != number
+                    || candidate.wire_type() != 2
+                    || candidate.payload() != role.payload()
+                {
+                    return Ok(false);
+                }
+            }
+        }
     }
-    if after == State::Visible {
+    if after == State::Visible && kind != super::Kind::SlideNumber {
         for number in [OWNED_DRAWABLES_FIELD, Z_ORDER_FIELD] {
             let Some(candidate) = target_fields.next() else {
                 return Ok(false);
@@ -361,14 +454,17 @@ mod tests {
         append_reference_record(&mut source, Z_ORDER_FIELD, &reference);
         let mut budget = TransactionBudget {
             references: 0,
+            fields: 0,
             work: 0,
             maximum_references: usize::MAX,
+            maximum_fields: usize::MAX,
             maximum_work: source.len(),
         };
         assert!(matches!(
             rewrite_visibility_payload(
                 &source,
                 42,
+                crate::slide::placeholder::Kind::Title,
                 State::Visible,
                 State::Hidden,
                 WireLimits::default(),

@@ -793,7 +793,6 @@ let mut keynote = KeynoteDocumentBuilder::new()
     .build()?;
 let layout = keynote.default_slide_layout()?;
 keynote.add_slide(layout)?;
-keynote.set_slide_number_visible(1, true)?;
 keynote.save("created-with-slide-numbers.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
@@ -1217,7 +1216,6 @@ if let Some(text_box) = keynote
     keynote.remove_slide_text_box(0, copy.drawable_object_id)?;
 }
 keynote.set_slide_name(0, Some("Opening"))?;
-keynote.set_slide_number_visible(0, true)?;
 let layout = keynote.default_slide_layout()?;
 keynote.add_slide(layout)?;
 let mut soundtrack = keynote
@@ -1654,6 +1652,62 @@ unchanged `set` is an exact no-op; a changed exact-source commit removes stale
 root previews and fully reopens the candidate. See
 `litchi-keynote/examples/edit_slide_placeholder_visibility.rs` for distinct
 output, sibling-temporary, no-clobber publication through `Package::write_to`.
+
+### Keynote per-slide slide-number visibility is a focused transaction
+
+For an existing presentation, per-slide slide-number visibility is no longer a
+`KeynoteEditor` mutation. Select the slide semantically and use the same
+immutable placeholder transaction with `Kind::SlideNumber`. A read returns
+`None` when that slide's layout has no slide-number placeholder,
+`Some(State::Visible)` when it draws, and `Some(State::Hidden)` when the
+placeholder, its storage/text graph, and its layout reference remain preserved
+but it is removed from per-slide drawing and z-order ownership.
+
+```rust,no_run
+use litchi_keynote::{
+    Package, SlideSelector,
+    slide::placeholder::{Kind, State},
+};
+
+let package = Package::open("input.key")?;
+let slide = SlideSelector::name("Opening");
+assert_eq!(
+    package.slide_placeholder_visibility(slide, Kind::SlideNumber)?,
+    Some(State::Visible),
+);
+
+let commit = package
+    .edit_slide_placeholder_visibility(slide, Kind::SlideNumber)?
+    .set(State::Hidden)
+    .commit()?;
+assert_eq!(
+    commit
+        .package()
+        .slide_placeholder_visibility(slide, Kind::SlideNumber)?,
+    Some(State::Hidden),
+);
+
+let restored = commit
+    .package()
+    .apply_slide_placeholder_visibility(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+This is not the presentation-wide `show::Settings::slide_numbers_visible`
+flag: edit that global setting through `Package::{show_settings,
+edit_show_settings, apply_show_settings}` when the whole show is in scope. The
+visibility transaction neither creates a slide-number placeholder nor changes
+its storage/text, layout, or slide creation policy. It is an exact no-op when
+the requested state matches; a changed exact-source commit invalidates stale
+rendering state and root previews, and its inverse restores the exact source.
+See `litchi-keynote/examples/edit_slide_number_visibility.rs` for safe,
+distinct-output sibling-temp publication with `Package::write_to` and
+no-clobber publication.
 
 Keynote slide skip/include, ordering, and modern transition transactions have
 focused `litchi-keynote` package-owner paths. Transition transactions use

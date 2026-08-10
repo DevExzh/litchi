@@ -1952,3 +1952,97 @@ Clippy and rustdoc, formatting, and diff checks are green. The expanded
 control-flow smoke; expected missing sanitizer symbols mean this is not
 sanitizer-backed fuzz evidence. Native and exact inverse gates complete the
 compatibility proof. No dependency edge or debt item is removed.
+
+## 2026-08-11 amendment: per-slide Keynote slide-number host exit
+
+The next completed host exit reuses the canonical
+`slide::placeholder::{Kind, State, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` transaction and Package read/edit/apply facade for
+`Kind::SlideNumber`. This supersedes only the title/body amendment's statement
+that slide-number mutation remains in `litchi-iwa`. The global Show field-6
+preference remains with `show::Settings`; slide layout, placeholder creation,
+slide text, and style mutation remain outside this transfer. The slide-text
+owner rejects `SlideNumber`, so the shared `Kind` discriminator does not merge
+the distinct operation and ownership contracts.
+
+The format owner now proves the rooted Document field-2 -> Show/SlideTree
+`[3,2]` -> SlideNode field-2 -> SlideArchive path and the selected
+SlideArchive field-20 native-kind-1 placeholder. Canonical Node field 18 must
+agree with exact selected membership in both Slide fields 7 and 42. A show
+appends one reference after each existing field group; a hide removes only
+those references. Global scanning rejects competing rooted ownership, aliases
+with title/body/object/template/build/style or storage dependencies,
+contradictory membership, missing placeholders, and unsupported style/storage
+closures. Exact hidden no-ops preserve absent/false representation; changed
+hides use canonical false and remain exactly invertible through retained patch
+artifacts.
+
+Storage zero is an allowed native closure and never becomes metadata ref zero.
+A nonzero storage must remain in the selected component and satisfy the strict
+type-2001 storage/type-2043 attachment proof: absent/3 storage kind,
+`in_document=true`, one U+FFFC, one attachment entry at character zero, exact
+aggregate metadata/dependency paths, empty attachment textual super,
+absent/zero attachment kind, and no attachment object refs. Legacy nested
+packages retain read and exact-no-op compatibility, while a changed mutation
+returns `UnsupportedSource` rather than normalizing them.
+
+The Buffa seam adds `KNSlideNumberArchive.proto` for Node field 18, bounded
+storage scalars and borrowed attachment table, and attachment super. Strict raw
+parsing precedes forced/cross-checked lazy views; no repeated generated view or
+encoder owns preservation. Rooted/storage validation and scalar splice/delta
+verification are split into dedicated submodules under the focused visibility
+and preview owners. Generated-build evidence is five files, 112,101 bytes,
+zero repeated views, a 116-KiB cap, and digest
+`eacce4103b5c9f9f32fd98639b81249ae1d15fcd63da6fe636569e0a2a324c30`.
+
+Limits charge codec bytes/fields/work/depth, rooted object/payload/metadata
+scans, aggregate and field references, selected and nonselected payload bytes,
+bounded fallible indexes, output allocation, exact bidirectional delta, and
+archive reassembly. There is no full node/payload clone or second verification
+rewrite. Allocation/limit failures are typed, content-redacted, and atomic.
+
+A changed operation touches the Node and Slide components, deletes all three
+existing root previews, reassembles, and reopens. It deliberately preserves the
+Node thumbnail/cache; only field 18 and selected field-7/field-42 membership
+change. ViewState, storage/attachment closure, other slides/roles, and global
+Show field 6 remain exact. A no-op shares source and skips reassembly/reopen;
+changed apply exact-validates its source and stored target before reopening.
+The focused output is `write_to`; process-local patch serialization,
+allocation/peak-memory, work-bound refinement, and durable save remain shared
+debts.
+
+The exact host deletion is one public
+`KeynoteEditor::set_slide_number_visible` method, its full 172-line
+`slide_number` source/module, the 23-line mutation example, and two direct
+whole tests plus four constants and their fixture helper. The 53-line creation
+example survives and moves only its second-slide edit through the focused
+Package. `KeynoteSlideInfo` read state, creation builder/tests, shared
+ownership, layout, title/body visibility, and global Show settings remain.
+This removes no manifest dependency edge and closes no recorded debt item.
+
+Native compatibility starts at 500,058-byte
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+Rust's 455,859-byte shown candidate is
+`a2dafcd4ffc57bafc3bbf7d7cd4ee8131bab2c06dd52adc292632d4208c126be`,
+with changed=true, two touched components, three deleted previews, and an exact
+inverse to the source. Keynote 14.4 (7043.0.93) opened without warnings,
+displayed attachment `1`, checked Slide Number, and preserved title/body/date.
+Save As, close, and exact-path reopen preserved that state in the 500,192-byte
+resave
+`b1edd073d309157d27508baf4aedbe93d6dee0687f727dd71f1e8232f6171882`.
+Native Save As regenerated root previews; cached Data9074 stayed exact at
+`575645e2455199d7cc0c65fab8002b9e025765ba19b8b03c6e51c000f4915e89`.
+Independent Apple toggles confirmed the native delta is Node field 18 plus one
+field-7 and one field-42 membership entry, while field 20, cache data, and
+global Show field 6 remain exact.
+
+The post-cut gate passes 8/8 focused slide-number codec, 98/98 Keynote library,
+7/7 focused visibility, 22/22 slide-preview, 9/9 `--features keynote` facade,
+and 7/7 doctests. Keynote all-target checking, strict Keynote library
+Clippy/rustdoc, host library check/no-run and examples, formatting, and diff
+checks are green. The fuzz target compiles and completes a bounded 16-run
+stable control-flow smoke; missing sanitizer symbols mean it is not
+sanitizer-backed fuzz evidence. The boundary unit suite passes 138/138; live
+slide-number host, placeholder host, and focused audits are clean. The full
+checker reports only the unchanged 14 dependency-policy baselines. Native and
+exact-artifact compatibility gates are final.

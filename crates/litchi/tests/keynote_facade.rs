@@ -7,7 +7,9 @@ use litchi::keynote::show::{
     Commit, Diagnostics, Edit, Error, LimitKind, Mode, Patch, Settings, Size,
 };
 use litchi::keynote::slide::placeholder::Kind;
-use litchi::keynote::{Package, Position, SlideNotesError, SlideSelector, TextSpan};
+use litchi::keynote::{
+    Package, Position, SlideNotesError, SlideSelector, SlideTextError, TextSpan,
+};
 
 trait ExactPackageBytes {
     fn exact_bytes(&self) -> &'static [u8];
@@ -281,6 +283,96 @@ fn slide_placeholder_visibility_transaction_reaches_the_root_facade()
             .package()
             .slide_placeholder_visibility(selector, kind)?,
         Some(State::Visible)
+    );
+    assert_eq!(restored.package().exact_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn slide_number_visibility_transaction_reaches_the_root_facade()
+-> Result<(), Box<dyn std::error::Error>> {
+    use litchi::keynote::slide::placeholder::{
+        Commit, Diagnostics, Edit, Error, Kind, LimitKind, Patch, State,
+    };
+
+    assert_send_sync::<Kind>();
+    assert_send_sync::<State>();
+    assert_send_sync::<Edit<'static>>();
+    assert_send_sync::<Patch>();
+    assert_send_sync::<Commit>();
+    assert_send_sync::<Diagnostics>();
+    assert_send_sync::<Error>();
+    assert_send_sync::<LimitKind>();
+
+    let package = Package::open(fixture_path())?;
+    let source = package.exact_bytes();
+    let selector = SlideSelector::index(0);
+    let kind = Kind::SlideNumber;
+    assert_eq!(
+        package.slide_placeholder_visibility(selector, kind)?,
+        Some(State::Hidden)
+    );
+    assert!(matches!(
+        package.slide_text(selector, kind),
+        Err(SlideTextError::UnsupportedKind {
+            kind: Kind::SlideNumber
+        })
+    ));
+
+    let edit = package.edit_slide_placeholder_visibility(selector, kind)?;
+    assert_eq!(edit.position(), Position::new(0));
+    assert_eq!(edit.kind(), kind);
+    assert_eq!(edit.state(), State::Hidden);
+    let edit_debug = format!("{edit:?}");
+    assert!(!edit_debug.contains("identifier"));
+    assert!(!edit_debug.contains(".iwa"));
+
+    let shown = edit.show().commit()?;
+    assert_eq!(shown.patch().position(), Position::new(0));
+    assert_eq!(shown.patch().kind(), kind);
+    assert_eq!(shown.patch().before(), State::Hidden);
+    assert_eq!(shown.patch().after(), State::Visible);
+    assert!(!shown.patch().is_noop());
+    assert!(shown.diagnostics().changed());
+    assert_eq!(shown.diagnostics().touched_components(), 2);
+    assert_eq!(shown.diagnostics().deleted_previews(), 3);
+    assert!(shown.diagnostics().full_reparse_performed());
+    assert_eq!(
+        shown
+            .package()
+            .slide_placeholder_visibility(selector, kind)?,
+        Some(State::Visible)
+    );
+    assert_eq!(package.exact_bytes(), source);
+    assert_ne!(shown.package().exact_bytes(), source);
+    let patch_debug = format!("{:?}", shown.patch());
+    assert!(!patch_debug.contains("identifier"));
+    assert!(!patch_debug.contains(".iwa"));
+
+    let applied = package.apply_slide_placeholder_visibility(shown.patch())?;
+    assert!(applied.diagnostics().changed());
+    assert_eq!(applied.diagnostics().touched_components(), 2);
+    assert_eq!(applied.diagnostics().deleted_previews(), 3);
+    assert_eq!(
+        applied
+            .package()
+            .slide_placeholder_visibility(selector, kind)?,
+        Some(State::Visible)
+    );
+    assert_eq!(
+        applied.package().exact_bytes(),
+        shown.package().exact_bytes()
+    );
+
+    let restored = shown
+        .package()
+        .apply_slide_placeholder_visibility(&shown.patch().inverse())?;
+    assert!(restored.diagnostics().changed());
+    assert_eq!(
+        restored
+            .package()
+            .slide_placeholder_visibility(selector, kind)?,
+        Some(State::Hidden)
     );
     assert_eq!(restored.package().exact_bytes(), source);
     Ok(())

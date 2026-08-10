@@ -1189,9 +1189,9 @@ selector-first entry points. Flat `Placeholder*`, `PlaceholderVisibility*`,
 `SlideTextPlaceholder*` transaction aliases, crate-root aliases, package-owner
 exports, and glob re-exports are not part of the surface.
 
-`Kind` contains only `Title` and `Body`; `State` distinguishes `Visible` from
-`Hidden`. Read returns `Result<Option<State>, Error>` so a missing role remains
-distinct from an existing hidden placeholder. Edit returns
+`Kind` contains `Title`, `Body`, and `SlideNumber`; `State` distinguishes
+`Visible` from `Hidden`. Read returns `Result<Option<State>, Error>` so a
+missing role remains distinct from an existing hidden placeholder. Edit returns
 `Error::PlaceholderNotFound { kind }` when the selected role is absent;
 infallible consuming `Edit::{set, show, hide}` can change only an existing role
 and consuming `Edit::commit` returns the immutable verified package, patch,
@@ -1207,13 +1207,15 @@ allocation failure, verification, and exact-source conflict typed without
 leaking document content. `LimitKind` bounds package bytes/entries, slides,
 references, and wire bytes/fields/nesting/work.
 
-Visibility owns only direct per-slide participation of an existing title/body
+Visibility owns only direct per-slide participation of an existing selected
 placeholder. Hidden state preserves its reference, graph, text, and storage;
-visible state requires one occurrence in each selected ownership list. Showing
-appends the exact role-reference bytes at the end of both lists, as independent
-native title and body oracles established. Changed commits also delete existing
-root previews and invalidate the selected SlideNode's rendered thumbnails
-before exact candidate reopen; no-op preserves all caches.
+visible state requires one occurrence in each selected ownership list. For
+title/body, showing appends the exact role-reference bytes at the end of both
+lists, as independent native title and body oracles established. Title/body
+changes also delete existing root previews and invalidate the selected
+SlideNode's rendered thumbnails before exact candidate reopen; no-op preserves
+all caches. The distinct slide-number ordering and cache contract is specified
+below.
 
 The direction-aware node exact-delta verifier uses linear payload
 occurrence/kind and metadata declaration indexes instead of repeated per-ID
@@ -1234,15 +1236,16 @@ Conditional invalidation reuses one payload scan for any rewrite, while exact
 verification neither clones the node nor reruns invalidation. Both consume the
 transaction's remaining work/reference allowance and merge exact reports into
 the same budget. Before allocating its output, the slide router charges exact
-`source.len() + output_len + 2 * parsed_fields` work.
+`6 * source.len() + output_len + 2 * parsed_fields` work.
 
-This API does not add `Kind::SlideNumber`, select a layout placeholder, create
-or delete placeholder graphs, edit slide styles, or absorb layout ownership.
+This API does not select a layout placeholder, create or delete placeholder
+graphs, edit slide styles, or absorb layout ownership.
 Changed admission refuses style-level title/body visibility, a selected build
 dependency, or selected direct-cache state rather than treating any of them as
-authority for a wider mutation. Host slide-number and layout APIs, snapshot
-reads, creation, and the shared private placeholder-ownership machinery remain
-outside this handoff.
+authority for a wider mutation. Layout APIs, snapshot reads, creation, and the
+shared private placeholder-ownership machinery remain outside this handoff;
+the separate amendment below transfers only direct per-slide slide-number
+visibility.
 
 Patches are exact-source, reversible, process-local values that privately hold
 the complete source and target artifacts plus compact semantic/owner/cache
@@ -1256,12 +1259,88 @@ The completed retirement boundary is the three direct public
 `KeynoteEditor` visibility setters, public `KeynoteSlideTextPlaceholder`, the
 direct `placeholder_visibility` module/source and mutation tests, and
 `set_keynote_placeholder_visibility.rs`. `KeynoteSlideInfo` title/body
-visibility snapshot fields, `set_slide_layout`, `set_slide_number_visible`, and
-their retained private helpers are not aliases or shims for this transaction.
+visibility snapshot fields, `set_slide_layout`, and their retained private
+helpers are not aliases or shims for this transaction. The separate amendment
+below records retirement of `set_slide_number_visible` without retiring the
+snapshot, layout, or creation surfaces.
 Mixed layout reads migrated to `slide::placeholder::Kind`, and the focused
 `SlideTextRole` title/body discriminator was removed rather than retained as a
 parallel enum. Host `KeynoteSlideTextRole` remains the aggregate discriminator
 for title, body, text-box, and shape reads; it is not an alias for this
 transaction. The implementation, native, compatibility, and host-removal gates
-enumerated in ADR 0003 passed; the final optimized totals include 94/94 focused
+enumerated in ADR 0003 passed; the title/body totals included 94/94 focused
 library tests, 18/18 preview tests, and the unchanged 5/5 visibility tests.
+
+## 2026-08-11 amendment: focused per-slide slide-number visibility API
+
+`slide::placeholder::Kind::SlideNumber` is the canonical extension of the
+existing visibility transaction. It deliberately reuses
+`slide::placeholder::{State, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` and the existing `Package` read/edit/apply methods; no flat
+`SlideNumber*` transaction family, root alias, raw identifier selector, or
+package-owner export is added. Missing field-20 ownership reads as `None` and
+editing it returns `Error::PlaceholderNotFound`; the API operates only on an
+existing layout-provided role.
+
+The selector remains an exact navigator name or checked slide position. For
+`Kind::SlideNumber`, `State::Hidden` requires absent/false SlideNode field 18
+and no selected membership in SlideArchive fields 7/42; `State::Visible`
+requires true field 18 and one selected membership in each. The stable role
+reference remains SlideArchive field 20. Showing inserts its exact reference
+payload after the last existing member of each native list; hiding removes only
+that payload. The title/body append-at-message-end convention does not apply to
+this role.
+
+Per-slide visibility is not the show-wide preference:
+`show::Settings::slide_numbers_visible` owns KeynoteShow field 6 and remains
+byte-exact across this transaction. Nor does `Kind::SlideNumber` expose text;
+the slide-text API returns
+`SlideTextError::UnsupportedKind { kind: Kind::SlideNumber }`. This explicit
+guard lets one semantic `Kind` select related operations without implying that
+the numeric attachment character is ordinary writable slide text.
+
+The changed-source contract proves the rooted node/slide, unique local type-7
+kind-1 placeholder, parent/lock state, exact reference metadata, optional
+type-2001 storage and type-2043 attachment closure, and all local style,
+attribute-table, presentation, and node-reference dependencies. Strict raw
+decoders and private Buffa views agree on node field 18, storage fields 1/9/10,
+and attachment super fields 1/2; the repeated attachment table stays borrowed
+raw bytes behind a bounded handwritten decoder. The generated five-file
+closure is 112,101 bytes under 116 KiB with SHA-256
+`eacce4103b5c9f9f32fd98639b81249ae1d15fcd63da6fe636569e0a2a324c30`,
+and generated production code exposes neither repeated views nor encoding.
+
+Changed commits rewrite one or two selected components, delete existing root
+previews, and reopen the candidate. The Node verifier permits only canonical
+field-18 insertion/replacement plus message length and preserves every
+thumbnail/cache byte and metadata record; the Slide verifier permits only the
+field-7/42 membership splice plus message length. No-op shares the source;
+exact-source apply reopens only its retained target; `inverse` restores the
+complete source artifact and previews. Resource reports for strict/Buffa
+decoding, scalar editing, exact delta verification, closure scans, and the
+common `6 * source.len() + output_len + 2 * parsed_fields` slide-router plan
+merge into one finite transaction budget before allocation/publication.
+
+Native and Rust gates establish the semantic contract recorded in ADR 0003:
+the Rust candidate opens warning-free with Slide Number checked and canvas
+number 1, preserves title/body/date, survives Save As and reopen, and inverses
+exactly. Apple-only show/hide controls change node field 18 and the placement
+of the exact field-20 payload in fields 7/42 while preserving node caches,
+KeynoteShow field 6, and the complete slide-number closure.
+
+The retired host surface is exactly
+`KeynoteEditor::set_slide_number_visible`, the complete 172-line direct module,
+two whole direct mutation tests plus four exclusive constants, and the 23-line
+`set_keynote_slide_number.rs` example. The cut also removes their
+`test_package_with_slide_number` fixture helper. The source-free creation
+example now uses the focused handoff. Snapshot read
+`KeynoteSlideInfo::is_slide_number_visible`, creation-time
+`KeynoteDocumentBuilder::slide_number_visible`, private creation/materialization,
+layout mutation, and the shared ownership helper remain and are not
+compatibility aliases for the deleted setter. Patches remain process-local and
+non-durable; changed nested legacy sources refuse under Preserve. The frozen
+handoff passed 8/8 codec, 98/98 Keynote library, 7/7 focused visibility, 9/9
+facade, 22/22 preview, and 7/7 doctest cases; ADR 0003 records the nonnumeric
+strict, fuzz, patch, and native gates. The boundary unit suite passed 138/138;
+live slide-number host, placeholder host, and focused audits were empty, and
+the full checker retained only the unchanged 14 dependency-policy baselines.

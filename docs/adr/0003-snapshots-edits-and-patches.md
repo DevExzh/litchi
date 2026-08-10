@@ -557,8 +557,8 @@ any rewrite, and exact verification compares source and candidate without
 cloning a node or rerunning invalidation. Both receive the transaction's
 remaining work/reference allowance and merge their exact reports into the same
 budget. The slide ownership router separately charges exact
-`source.len() + output_len + 2 * parsed_fields` work before allocating output,
-so exhausted transaction work cannot fail only after that allocation.
+`6 * source.len() + output_len + 2 * parsed_fields` work before allocating
+output, so exhausted transaction work cannot fail only after that allocation.
 
 Placeholder text/storage, the other placeholder role, slide-number state,
 layout/style identity, builds, transitions, notes, and unrelated
@@ -592,13 +592,148 @@ discriminator was consolidated into that same type rather than retained as a
 second title/body enum. Host `KeynoteSlideTextRole` remains for aggregate
 title/body/text-box/shape reads and is not a transaction alias. The cut retains
 `KeynoteSlideInfo::{is_title_visible, is_body_visible}` snapshot reads and the
-private ownership substrate still used by aggregate slide decoding, layout
-changes, and slide-number visibility. This handoff does not retire or claim
-semantic ownership of `set_slide_layout`, `set_slide_number_visible`, layout
-placeholder creation/adoption, or slide-number placeholders.
+private ownership substrate still used by aggregate title/body slide decoding
+and layout changes. This title/body slice does not retire or claim semantic
+ownership of `set_slide_layout`, layout placeholder creation/adoption, or
+slide-number placeholders; the separate per-slide slide-number handoff below
+retires only its direct host mutator.
 
-Final gates passed: 94/94 focused library tests, 18/18 preview tests, 5/5
-placeholder-visibility tests, 25/25 slide-text tests, 8/8 facade tests, 7/7
-doctests, and 129/129 boundary-checker tests. The all-target check, strict
+The title/body cut gate passed 94/94 focused library tests, 18/18 preview tests,
+5/5 placeholder-visibility tests, 25/25 slide-text tests, 8/8 facade tests,
+7/7 doctests, and 129/129 boundary-checker tests. The all-target check, strict
 library Clippy, strict rustdoc, bounded fuzz smoke, exact patch/inverse gates,
 and native Keynote interoperability also passed.
+
+## 2026-08-11 amendment: Keynote per-slide slide-number visibility
+
+This amendment extends the existing exact-source placeholder-visibility
+transaction to `slide::placeholder::Kind::SlideNumber`; it supersedes the
+title/body amendment's earlier slide-number exclusion without adding another
+edit, patch, commit, diagnostics, error, or limit family. The same
+`Package::{slide_placeholder_visibility, edit_slide_placeholder_visibility,
+apply_slide_placeholder_visibility}` methods and consuming
+`Edit::{set, show, hide}` operations select one existing role on one rooted
+slide. A missing SlideArchive field 20 reads as `None` when the node is also
+hidden, while edit returns `Error::PlaceholderNotFound { kind }`; this
+transaction never creates a slide-number graph.
+
+Per-slide state is separate from the show-wide setting. The transaction owns
+SlideNode field 18 and the selected field-20 reference's membership in
+SlideArchive owned-drawables field 7 and z-order field 42. It preserves
+KeynoteShow field 6 and therefore does not change
+`show::Settings::slide_numbers_visible`. `Kind::SlideNumber` is also not text:
+the slide-text read/edit boundary returns
+`SlideTextError::UnsupportedKind { kind: Kind::SlideNumber }` rather than
+exposing or rewriting the native attachment character.
+
+The semantic state requires all three facts to agree. Hidden is absent or
+false SlideNode field 18 and zero occurrences of the field-20 reference in
+both lists; visible is true field 18 and exactly one occurrence in each list.
+Duplicate or one-sided list membership, a true node without field 20, or any
+node/list disagreement is `Error::InvalidSource`. Showing copies the exact
+field-20 reference payload after the final existing field-7 member and after
+the final existing field-42 member, matching the native per-list insertion
+rule; a source with no insertion anchor for either list refuses rather than
+inventing an ordering. Hiding removes only the selected membership records.
+Node field 18 is patched in place when present or appended canonically when
+absent. Exact artifacts, not normalization, let inverse restore an absent
+versus explicit-false source representation byte-for-byte.
+
+Changed admission proves the rooted Document-to-Show-to-SlideTree-to-SlideNode-
+to-SlideArchive chain, unique package-wide ownership of the selected field-20
+identifier by that slide, exact aggregate and field-path metadata, canonical
+framing, and slide/placeholder co-location. The selected type-7 placeholder
+must have native kind 1, the selected slide as parent, and unlocked state; its
+modern/deprecated storage references must agree. When nonzero storage exists,
+it is a local type-2001 storage with kind absent or 3, `in_document=true`, one
+object-replacement character, and exactly one character-zero attachment-table
+entry. That entry resolves to a local type-2043 slide-number attachment whose
+kind is absent or zero and whose string equivalent is absent or empty. The
+storage stylesheet/attribute-table dependencies, attachment, placeholder
+presentation dependencies, other slide roles, and relevant node references
+must be unique, non-aliased, and exactly declared in aggregate and field-local
+metadata. Merge/base/diff state, groups, noncanonical framing, layout
+visibility override field 6, layering/cached slide state, selected builds,
+cross-slide aliases, or ambiguous closure fail closed.
+
+A changed commit rewrites the selected SlideArchive and SlideNode in one
+component when co-located or two components when split, then deletes the zero
+to three root previews and reopens the complete candidate. Unlike title/body
+visibility, it does not invalidate SlideNode thumbnail payloads or metadata:
+the exact node delta admits only field 18 and its enclosing message length, so
+all existing node caches remain byte-exact. The exact Slide delta admits only
+the role-membership splice and message length. `Index/ViewState.iwa`,
+KeynoteShow field 6, placeholder/storage/attachment content, other roles, and
+all unrelated members, objects, messages, metadata, and unknown fields remain
+exact. No-op commit/application shares the source and skips changed-only
+guards; changed apply verifies the retained exact source and target deltas;
+inverse swaps the process-local complete artifacts and restores the complete
+source including deleted previews.
+
+The private Buffa closure projects only SlideNode field 18, storage fields
+1/9/10, and the textual attachment super fields 1/2. The repeated attachment
+table remains borrowed opaque bytes and is validated by the bounded strict
+router, so generated production code contains no repeated view or encoder.
+Strict and Buffa snapshots must agree; typed byte/field/work/nesting limits are
+enforced, and successful exact field/work reports consume the transaction's
+remaining aggregate budget. The generated closure is five files and 112,101
+bytes under a 116-KiB cap, with aggregate SHA-256
+`eacce4103b5c9f9f32fd98639b81249ae1d15fcd63da6fe636569e0a2a324c30`.
+The scalar node writer and its direction-aware verifier use the same bounded
+full-structure precharge as the title/body cache verifier; the common slide
+router precharges
+`6 * source.len() + output_len + 2 * parsed_fields` before output allocation.
+
+The exact native gate began from the 500,058-byte source SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+Rust show produced a 455,859-byte artifact with SHA-256
+`a2dafcd4ffc57bafc3bbf7d7cd4ee8131bab2c06dd52adc292632d4208c126be`,
+reported `changed=true`, two touched components, and three deleted previews,
+and its inverse restored the exact source. Keynote 14.4 (7043.0.93) opened the
+candidate without warning, showed Slide Number checked and canvas number 1,
+and retained title, body, and date. Save As, close, and reopen preserved that
+state in a 500,192-byte artifact with SHA-256
+`b1edd073d309157d27508baf4aedbe93d6dee0687f727dd71f1e8232f6171882`;
+Apple regenerated previews, which is semantic compatibility rather than raw
+native-cache equality; cached Data9074 remained byte-exact at SHA-256
+`575645e2455199d7cc0c65fab8002b9e025765ba19b8b03c6e51c000f4915e89`.
+
+Apple-only controls independently changed hidden 500,024-byte SHA-256
+`9a456ccda73da47e81f0781fc831482da30938d043986c54bea43394cd2ad5e9`
+to visible 500,191-byte
+`5f4d4dbe1264446107649342b0b29587e7054282c238b45f42b2ad9b6d65fa5b`,
+then visible resave 500,192-byte
+`01749e2ed0e963e35cb7bc77f8f26cf60df3def59468becfca3169a3f73e2774`
+and rehidden 500,006-byte
+`d70e365a2784fdb927e1772978a9917094973f9963a06cc70aa3b5914b6eb499`.
+The selected native delta changed only field 18 in the SlideNode and inserted
+the exact field-20 reference payload at the end of each field-7/42 list;
+SlideNode caches, KeynoteShow field 6, and the placeholder/storage/attachment
+closure stayed exact.
+
+The completed host cut removes the one public
+`KeynoteEditor::set_slide_number_visible` method with its whole 172-line
+`keynote/editor/slide_number.rs` source and module declaration, two whole
+direct mutation tests, their four exclusive constants, and the
+`test_package_with_slide_number` fixture helper, plus the 23-line
+`set_keynote_slide_number.rs` example. The retained source-free
+`create_keynote_slide_numbers.rs` example now hands off to the focused
+transaction. `KeynoteSlideInfo::is_slide_number_visible` remains a snapshot
+read; `KeynoteDocumentBuilder::slide_number_visible`, the private creation
+module, add-slide materialization, `set_slide_layout`, aggregate title/body
+reads, and the shared host ownership helper remain. This cut transfers only
+direct mutation of an existing per-slide role; it does not retire creation,
+layout, snapshot, show-wide settings, or slide-number graph construction.
+
+The patch remains a process-local two-artifact capability with no stable
+semantic serialization, read/write sets, composition, merge, bounded history,
+or library-owned atomic durable publication. Changed physical nested
+`Index.zip` sources still return `Error::UnsupportedSource`; exact reads and
+no-ops preserve them. The frozen handoff passed 8/8 codec tests, 98/98 Keynote
+library tests, 7/7 focused placeholder-visibility tests, 9/9 facade tests,
+22/22 preview tests, and 7/7 doctests, together with the all-target check,
+strict library Clippy and rustdoc, bounded fuzz smoke, exact patch/inverse
+gates, and native interoperability. The boundary unit suite passed 138/138;
+the live slide-number host, placeholder host, and focused boundary audits were
+empty, while the full checker retained only the unchanged 14 dependency-policy
+baselines.
