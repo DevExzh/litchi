@@ -59,7 +59,7 @@ rand          = "0.10"
 rayon         = "1.11"
 reqwest       = { version = "0.13", features = ["json"] }
 roaring       = "0"
-rowan         = "0.16"
+rowan         = "0.17"
 ryu           = "1.0"
 serde         = { version = "1", features = ["derive"] }
 serde-saphyr  = "0"
