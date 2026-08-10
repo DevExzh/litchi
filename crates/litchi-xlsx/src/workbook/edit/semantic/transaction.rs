@@ -35,8 +35,8 @@ use super::super::model::{
     PartChange, StyleGuard, defaults_after, ensure_merge_area, merge_conflicts, project_merges,
 };
 use super::super::validation::{
-    Added, FinalOrder, MergeIntent, OrderPlan, PanesAction, Placement, SheetActions, TabAction,
-    Target, pending_merge,
+    Added, FinalOrder, MergeIntent, OptionalAction, OrderPlan, PanesAction, Placement,
+    SheetActions, TabAction, Target, pending_merge,
 };
 use super::super::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
@@ -62,6 +62,7 @@ pub struct Edit {
     pub(in crate::workbook::edit) base: Workbook,
     pub(in crate::workbook::edit) panes: Option<PanesAction>,
     pub(in crate::workbook::edit) defined_names: Option<Box<[raw::DefinedName]>>,
+    pub(in crate::workbook::edit) drawings: BTreeMap<usize, super::super::drawing_transfer::Plan>,
     pub(in crate::workbook::edit) active: Option<Target>,
     pub(in crate::workbook::edit) order: Option<OrderPlan>,
     pub(in crate::workbook::edit) sheets: BTreeMap<usize, SheetActions>,
@@ -76,6 +77,7 @@ impl Edit {
             base,
             panes: None,
             defined_names: None,
+            drawings: BTreeMap::new(),
             active: None,
             order: None,
             sheets: BTreeMap::new(),
@@ -340,6 +342,150 @@ impl Edit {
         Ok(Some(self))
     }
 
+    /// Create or replace one worksheet's complete relationship-free page setup.
+    pub fn put_page_setup<'a>(
+        &mut self,
+        sheet: impl Into<Selector<'a>>,
+        value: crate::page_setup::Setup,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page setup")?;
+        let Some(sheet) = Snapshot::new(&self.base).worksheet(sheet)? else {
+            return Ok(None);
+        };
+        self.sheets.entry(sheet.position()).or_default().page_setup =
+            Some(OptionalAction::Put(value));
+        Ok(Some(self))
+    }
+
+    /// Remove one worksheet's direct page setup when no printer settings are attached.
+    pub fn remove_page_setup<'a>(
+        &mut self,
+        sheet: impl Into<Selector<'a>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page setup")?;
+        let Some(sheet) = Snapshot::new(&self.base).worksheet(sheet)? else {
+            return Ok(None);
+        };
+        self.sheets.entry(sheet.position()).or_default().page_setup = Some(OptionalAction::Remove);
+        Ok(Some(self))
+    }
+
+    /// Copy the exact typed page setup between two worksheets.
+    pub fn copy_page_setup<'source, 'target>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        target: impl Into<Selector<'target>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page-setup copy")?;
+        let Some((source, target)) = Snapshot::new(&self.base).worksheet_pair(source, target)?
+        else {
+            return Ok(None);
+        };
+        let value = self.pending_page_setup(&source)?;
+        self.sheets.entry(target.position()).or_default().page_setup =
+            Some(OptionalAction::from_option(value));
+        Ok(Some(self))
+    }
+
+    /// Move the exact typed page setup between two worksheets atomically.
+    pub fn move_page_setup<'source, 'target>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        target: impl Into<Selector<'target>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page-setup move")?;
+        let Some((source, target)) = Snapshot::new(&self.base).worksheet_pair(source, target)?
+        else {
+            return Ok(None);
+        };
+        if source.position() == target.position() {
+            return Ok(Some(self));
+        }
+        let value = self.pending_page_setup(&source)?;
+        self.sheets.entry(target.position()).or_default().page_setup =
+            Some(OptionalAction::from_option(value));
+        self.sheets.entry(source.position()).or_default().page_setup = Some(OptionalAction::Remove);
+        Ok(Some(self))
+    }
+
+    /// Create or replace one worksheet's direct print options.
+    pub fn put_print_options<'a>(
+        &mut self,
+        sheet: impl Into<Selector<'a>>,
+        value: crate::print_options::PrintOptions,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "print options")?;
+        let Some(sheet) = Snapshot::new(&self.base).worksheet(sheet)? else {
+            return Ok(None);
+        };
+        self.sheets
+            .entry(sheet.position())
+            .or_default()
+            .print_options = Some(OptionalAction::Put(value));
+        Ok(Some(self))
+    }
+
+    /// Remove one worksheet's direct print options.
+    pub fn remove_print_options<'a>(
+        &mut self,
+        sheet: impl Into<Selector<'a>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "print options")?;
+        let Some(sheet) = Snapshot::new(&self.base).worksheet(sheet)? else {
+            return Ok(None);
+        };
+        self.sheets
+            .entry(sheet.position())
+            .or_default()
+            .print_options = Some(OptionalAction::Remove);
+        Ok(Some(self))
+    }
+
+    /// Copy exact typed print options between two worksheets.
+    pub fn copy_print_options<'source, 'target>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        target: impl Into<Selector<'target>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "print-options copy")?;
+        let Some((source, target)) = Snapshot::new(&self.base).worksheet_pair(source, target)?
+        else {
+            return Ok(None);
+        };
+        let value = self.pending_print_options(&source)?;
+        self.sheets
+            .entry(target.position())
+            .or_default()
+            .print_options = Some(OptionalAction::from_option(value));
+        Ok(Some(self))
+    }
+
+    /// Move exact typed print options between two worksheets atomically.
+    pub fn move_print_options<'source, 'target>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        target: impl Into<Selector<'target>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "print-options move")?;
+        let Some((source, target)) = Snapshot::new(&self.base).worksheet_pair(source, target)?
+        else {
+            return Ok(None);
+        };
+        if source.position() == target.position() {
+            return Ok(Some(self));
+        }
+        let value = self.pending_print_options(&source)?;
+        self.sheets
+            .entry(target.position())
+            .or_default()
+            .print_options = Some(OptionalAction::from_option(value));
+        self.sheets
+            .entry(source.position())
+            .or_default()
+            .print_options = Some(OptionalAction::Remove);
+        Ok(Some(self))
+    }
+
     /// Copy a bounded rectangular cell region with formula, text, and local
     /// shared-style dependencies closed inside this workbook.
     ///
@@ -349,9 +495,11 @@ impl Edit {
     /// while local style handles retain their validated workbook style-table
     /// lineage. Range-owned formulas, unknown cell encodings, and merged
     /// regions are refused rather than partially copied. An exact same-sheet,
-    /// same-range transfer is a semantic no-op. Worksheets that own DrawingML
-    /// graphs are atomically refused until anchor-aware graph cloning can prove
-    /// complete relationship closure.
+    /// same-range transfer is a semantic no-op. Copying between distinct
+    /// worksheets also clones selected one-/two-cell DrawingML anchors and
+    /// their picture-image leaves into collision-free package parts. Existing
+    /// target drawings, non-picture dependencies, and drawing-bearing moves are
+    /// atomically refused rather than partially transferred.
     ///
     /// # Errors
     ///
@@ -429,8 +577,25 @@ impl Edit {
         }
         self.ensure_unmerged_transfer(&source_sheet, source_range)?;
         self.ensure_unmerged_transfer(&target_sheet, target_range)?;
-        self.ensure_no_drawing_transfer(&source_sheet)?;
-        self.ensure_no_drawing_transfer(&target_sheet)?;
+        if self.drawings.contains_key(&source_sheet.position())
+            || self.drawings.contains_key(&target_sheet.position())
+        {
+            return Err(Error::Unsupported {
+                feature: "composing cell transfers through a staged drawing graph",
+            });
+        }
+        let drawing = super::super::drawing_transfer::plan(
+            &self.base,
+            &source_sheet,
+            &target_sheet,
+            source_range,
+            target_start,
+        )?;
+        if drawing.is_some() && matches!(mode, CellTransfer::Move) {
+            return Err(Error::Unsupported {
+                feature: "moving cell ranges with drawing dependencies",
+            });
+        }
         self.ensure_no_range_formula_transfer(&source_sheet, source_range)?;
         self.ensure_no_range_formula_transfer(&target_sheet, target_range)?;
 
@@ -467,6 +632,9 @@ impl Edit {
             }
         }
 
+        if let Some(drawing) = drawing {
+            self.drawings.insert(target_sheet.position(), drawing);
+        }
         if matches!(mode, CellTransfer::Move) {
             let source_actions = self.actions(source_sheet.position());
             for (source_address, _, _) in &staged {
@@ -512,6 +680,7 @@ impl Edit {
                 .len()
                 .saturating_add(usize::from(self.panes.is_some()))
                 .saturating_add(usize::from(self.defined_names.is_some()))
+                .saturating_add(self.drawings.len())
                 .saturating_add(usize::from(self.active.is_some()))
                 .saturating_add(
                     self.order
@@ -530,6 +699,8 @@ impl Edit {
                 .saturating_add(added.actions.columns.len())
                 .saturating_add(added.actions.merges.len())
                 .saturating_add(usize::from(added.actions.page_breaks.is_some()))
+                .saturating_add(usize::from(added.actions.page_setup.is_some()))
+                .saturating_add(usize::from(added.actions.print_options.is_some()))
         })
     }
 
@@ -537,6 +708,7 @@ impl Edit {
         self.active.is_none()
             && self.panes.is_none()
             && self.defined_names.is_none()
+            && self.drawings.is_empty()
             && self
                 .order
                 .as_ref()
@@ -573,6 +745,22 @@ impl Edit {
                 rejected: Box::new(other),
             });
         }
+        if self.drawings.keys().any(|position| {
+            other.drawings.contains_key(position)
+                || other
+                    .drawings
+                    .values()
+                    .any(|plan| plan.source_position == *position)
+        }) || other.drawings.keys().any(|position| {
+            self.drawings
+                .values()
+                .any(|plan| plan.source_position == *position)
+        }) {
+            return Err(JoinError {
+                failure: JoinFailure::DrawingTransfer,
+                rejected: Box::new(other),
+            });
+        }
         let conflicts = self.conflicts_with(&other);
         if !conflicts.is_empty() {
             return Err(JoinError {
@@ -588,6 +776,7 @@ impl Edit {
         if self.defined_names.is_none() {
             self.defined_names = other.defined_names;
         }
+        self.drawings.extend(other.drawings);
         if self.active.is_none() {
             self.active = other.active.map(|target| match target {
                 Target::Base(position) => Target::Base(position),
@@ -652,6 +841,12 @@ impl Edit {
                     if accepted.page_breaks.is_none() {
                         accepted.page_breaks = actions.page_breaks;
                     }
+                    if accepted.page_setup.is_none() {
+                        accepted.page_setup = actions.page_setup;
+                    }
+                    if accepted.print_options.is_none() {
+                        accepted.print_options = actions.print_options;
+                    }
                 },
             }
         }
@@ -681,6 +876,7 @@ impl Edit {
             base,
             panes: requested_panes,
             defined_names: requested_defined_names,
+            mut drawings,
             active: requested_active,
             order: requested_order,
             mut sheets,
@@ -703,6 +899,7 @@ impl Edit {
         let mut package_changes = Vec::new();
         let mut parts = Vec::new();
         let mut needs_recalculation = false;
+        let mut drawing_graph = Vec::new();
 
         let mut effective_renames = Vec::<(usize, Name)>::new();
         for (position, actions) in &mut sheets {
@@ -1015,6 +1212,7 @@ impl Edit {
         }
 
         for (position, requested) in sheets {
+            let drawing = drawings.remove(&position);
             let data =
                 base.inner.sheets.get(position).cloned().ok_or_else(|| {
                     invalid(format!("edited sheet position {position} disappeared"))
@@ -1029,6 +1227,8 @@ impl Edit {
                 columns,
                 merges,
                 page_breaks,
+                page_setup,
+                print_options,
             } = requested;
             if defaults.is_none()
                 && web.is_none()
@@ -1037,6 +1237,9 @@ impl Edit {
                 && columns.is_empty()
                 && merges.is_empty()
                 && page_breaks.is_none()
+                && page_setup.is_none()
+                && print_options.is_none()
+                && drawing.is_none()
             {
                 continue;
             }
@@ -1063,6 +1266,40 @@ impl Edit {
                             after: after.clone(),
                         });
                         Some(after)
+                    }
+                },
+                None => None,
+            };
+            let effective_page_setup = match page_setup {
+                Some(action) => {
+                    let before = sheet.page_setup()?;
+                    let after = action.as_option().cloned();
+                    if before == after {
+                        None
+                    } else {
+                        changes.push(Change::PageSetup {
+                            sheet: data.name.clone().into_boxed_str(),
+                            before,
+                            after: after.clone(),
+                        });
+                        Some(action)
+                    }
+                },
+                None => None,
+            };
+            let effective_print_options = match print_options {
+                Some(action) => {
+                    let before = sheet.print_options()?;
+                    let after = action.as_option().copied();
+                    if before == after {
+                        None
+                    } else {
+                        changes.push(Change::PrintOptions {
+                            sheet: data.name.clone().into_boxed_str(),
+                            before,
+                            after,
+                        });
+                        Some(action)
                     }
                 },
                 None => None,
@@ -1175,6 +1412,9 @@ impl Edit {
                 && effective_columns.is_empty()
                 && merge_projection.plan.is_empty()
                 && effective_page_breaks.is_none()
+                && effective_page_setup.is_none()
+                && effective_print_options.is_none()
+                && drawing.is_none()
             {
                 continue;
             }
@@ -1222,6 +1462,34 @@ impl Edit {
             if let Some(page_breaks) = &effective_page_breaks {
                 let input = after.as_deref().unwrap_or(&before);
                 after = Some(crate::page_breaks::replace(input, page_breaks)?);
+            }
+            if let Some(page_setup) = &effective_page_setup {
+                let input = after.as_deref().unwrap_or(&before);
+                after = Some(crate::page_setup::replace_worksheet_page_setup(
+                    input,
+                    page_setup.as_option(),
+                )?);
+            }
+            if let Some(print_options) = &effective_print_options {
+                let input = after.as_deref().unwrap_or(&before);
+                after = Some(crate::print_options::replace_print_options(
+                    input,
+                    print_options.as_option(),
+                )?);
+            }
+            if let Some(drawing) = drawing {
+                let input = after.as_deref().unwrap_or(&before);
+                after = Some(super::super::drawing_transfer::attach_worksheet(
+                    input,
+                    &drawing.target_relationship_id,
+                )?);
+                package_changes.push(PackageChange::DrawingTransfer {
+                    source: drawing.source_name,
+                    target: drawing.target_name,
+                    anchors: drawing.anchors,
+                    added: true,
+                });
+                drawing_graph.extend(drawing.graph);
             }
             let after =
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
@@ -1317,6 +1585,30 @@ impl Edit {
                             )));
                         }
                     },
+                    Change::PageSetup {
+                        sheet,
+                        after: expected,
+                        ..
+                    } => {
+                        let actual = crate::page_setup::parse_worksheet_page_setup(&after)?;
+                        if &actual != expected {
+                            return Err(invalid(format!(
+                                "worksheet page-setup verification failed at {sheet}"
+                            )));
+                        }
+                    },
+                    Change::PrintOptions {
+                        sheet,
+                        after: expected,
+                        ..
+                    } => {
+                        let actual = crate::print_options::parse_print_options(&after)?;
+                        if &actual != expected {
+                            return Err(invalid(format!(
+                                "worksheet print-options verification failed at {sheet}"
+                            )));
+                        }
+                    },
                 }
             }
             parts.push(PartChange {
@@ -1324,6 +1616,9 @@ impl Edit {
                 before,
                 after: Arc::new(after),
             });
+        }
+        if !drawings.is_empty() {
+            return Err(invalid("drawing transfer target disappeared during commit"));
         }
 
         let active_added = match final_active {
@@ -1922,10 +2217,16 @@ impl Edit {
 
         let mut graph = Vec::new();
         graph
-            .try_reserve(created.len().saturating_add(calculation_graph.len()))
+            .try_reserve(
+                created
+                    .len()
+                    .saturating_add(calculation_graph.len())
+                    .saturating_add(drawing_graph.len()),
+            )
             .map_err(|source| allocation("package graph changes", source))?;
         graph.extend(created.into_iter().map(|sheet| sheet.graph));
         graph.extend(calculation_graph);
+        graph.extend(drawing_graph);
 
         let web_patch = match requested_panes {
             Some(PanesAction::Put { panes, conformance }) => {
@@ -2132,6 +2433,31 @@ impl Edit {
         sheet.page_breaks()
     }
 
+    fn pending_page_setup(&self, sheet: &Worksheet) -> Result<Option<crate::page_setup::Setup>> {
+        if let Some(value) = self
+            .sheets
+            .get(&sheet.position())
+            .and_then(|actions| actions.page_setup.as_ref())
+        {
+            return Ok(value.as_option().cloned());
+        }
+        sheet.page_setup()
+    }
+
+    fn pending_print_options(
+        &self,
+        sheet: &Worksheet,
+    ) -> Result<Option<crate::print_options::PrintOptions>> {
+        if let Some(value) = self
+            .sheets
+            .get(&sheet.position())
+            .and_then(|actions| actions.print_options.as_ref())
+        {
+            return Ok(value.as_option().copied());
+        }
+        sheet.print_options()
+    }
+
     fn pending_cell_state(&self, sheet: &Worksheet, address: Address) -> Result<State> {
         let stored = sheet.store()?.entry(address);
         Ok(self
@@ -2193,22 +2519,6 @@ impl Edit {
                     feature: "copying or overwriting range-owned formulas",
                 });
             }
-        }
-        Ok(())
-    }
-
-    fn ensure_no_drawing_transfer(&self, sheet: &Worksheet) -> Result<()> {
-        use litchi_opc::constants::relationship_type as rt;
-
-        let part = self.base.inner.package.get_part(&sheet.data.part_uri)?;
-        if part
-            .rels()
-            .iter()
-            .any(|relationship| matches!(relationship.reltype(), rt::DRAWING | rt::STRICT_DRAWING))
-        {
-            return Err(Error::Unsupported {
-                feature: "copying cells on a worksheet with drawing dependencies",
-            });
         }
         Ok(())
     }
@@ -2342,6 +2652,18 @@ impl Edit {
                     position: *position,
                 });
             }
+            if left.page_setup.is_some() && right.page_setup.is_some() {
+                conflicts.push(Conflict::PageSetup {
+                    sheet: sheet.into(),
+                    position: *position,
+                });
+            }
+            if left.print_options.is_some() && right.print_options.is_some() {
+                conflicts.push(Conflict::PrintOptions {
+                    sheet: sheet.into(),
+                    position: *position,
+                });
+            }
             if let (Some(left), Some(right)) = (left.defaults, right.defaults) {
                 let fields = left.fields() & right.fields();
                 if left.overlaps(right) {
@@ -2426,6 +2748,7 @@ impl Edit {
     pub(in crate::workbook::edit) fn has_non_removal(&self) -> bool {
         self.panes.is_some()
             || self.defined_names.is_some()
+            || !self.drawings.is_empty()
             || self.active.is_some()
             || self.order.as_ref().is_some_and(OrderPlan::is_effective)
             || self.sheets.values().any(|actions| !actions.is_empty())

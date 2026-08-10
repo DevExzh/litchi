@@ -8,7 +8,7 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{path::Path, sync::Arc};
+use std::{collections::BTreeSet, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = litchi_odf_common::constants::ODF_DATABASE;
 const BODY_MARKER: &str = "<";
@@ -20,6 +20,13 @@ struct State {
 /// An immutable, validated package snapshot.
 #[derive(Clone)]
 pub(crate) struct Snapshot(Arc<State>);
+
+#[derive(Default)]
+pub(crate) struct PackageDelta {
+    pub(crate) additions: Vec<Addition>,
+    pub(crate) directories: Vec<(String, String)>,
+    pub(crate) excluded_paths: Vec<String>,
+}
 
 impl Snapshot {
     pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -61,10 +68,6 @@ impl Snapshot {
 
     pub(crate) fn files(&self) -> Result<Vec<String>> {
         self.0.package.files()
-    }
-
-    pub(crate) fn file(&self, path: &str) -> Result<Vec<u8>> {
-        self.0.package.package().get_file(path)
     }
 
     pub(crate) fn component_payload(
@@ -175,6 +178,75 @@ impl Snapshot {
         Ok(crate::ActiveContentInventory::new(findings))
     }
 
+    pub(crate) fn delta_to(&self, target: &Self) -> Result<PackageDelta> {
+        let source = self.0.package.package().package()?;
+        let target = target.0.package.package().package()?;
+        let source_files = source.files()?.into_iter().collect::<BTreeSet<_>>();
+        let target_files = target.files()?.into_iter().collect::<BTreeSet<_>>();
+        let mut delta = PackageDelta::default();
+        for path in &target_files {
+            if publication_control_path(path) || path.ends_with('/') {
+                continue;
+            }
+            let bytes = target.get_file(path)?;
+            let media_type = target
+                .manifest()
+                .entries
+                .get(path)
+                .map_or_else(String::new, |entry| entry.media_type.clone());
+            let source_media_type = source
+                .manifest()
+                .entries
+                .get(path)
+                .map_or("", |entry| entry.media_type.as_str());
+            let changed = !source_files.contains(path)
+                || source.get_file(path)? != bytes
+                || source_media_type != media_type.as_str();
+            if changed {
+                delta.additions.push(Addition {
+                    path: path.clone(),
+                    bytes,
+                    media_type,
+                });
+            }
+        }
+        for path in source_files.difference(&target_files) {
+            if !publication_control_path(path) {
+                delta.excluded_paths.push(path.clone());
+            }
+        }
+        let source_manifest = source.manifest();
+        let target_manifest = target.manifest();
+        for (path, entry) in &target_manifest.entries {
+            if path == "/" || !path.ends_with('/') {
+                continue;
+            }
+            let changed = source_manifest
+                .entries
+                .get(path)
+                .is_none_or(|source| source.media_type != entry.media_type);
+            if changed {
+                delta
+                    .directories
+                    .push((path.clone(), entry.media_type.clone()));
+            }
+        }
+        for path in source_manifest.entries.keys() {
+            if path != "/" && path.ends_with('/') && !target_manifest.entries.contains_key(path) {
+                delta.excluded_paths.push(path.clone());
+            }
+        }
+        delta
+            .additions
+            .sort_by(|left, right| left.path.cmp(&right.path));
+        delta
+            .directories
+            .sort_by(|left, right| left.0.cmp(&right.0));
+        delta.excluded_paths.sort();
+        delta.excluded_paths.dedup();
+        Ok(delta)
+    }
+
     pub(crate) fn protection_status(&self) -> Result<crate::ProtectionStatus> {
         let files = self.files()?;
         let signed = files.iter().any(|path| {
@@ -226,7 +298,17 @@ impl Snapshot {
         additions: Vec<Addition>,
         directories: Vec<(String, String)>,
     ) -> Result<Self> {
-        if additions.is_empty() && directories.is_empty() {
+        self.rebuild_with_content_and_mutations(content, additions, directories, Vec::new())
+    }
+
+    pub(crate) fn rebuild_with_content_and_mutations(
+        &self,
+        content: &str,
+        additions: Vec<Addition>,
+        directories: Vec<(String, String)>,
+        excluded_paths: Vec<String>,
+    ) -> Result<Self> {
+        if additions.is_empty() && directories.is_empty() && excluded_paths.is_empty() {
             return self.rebuild_with_content(content);
         }
         crate::codec::validate(content)?;
@@ -237,11 +319,15 @@ impl Snapshot {
             content,
             additions,
             directories,
-            Vec::<String>::new(),
+            excluded_paths,
             Vec::<String>::new(),
         )?;
         Self::from_bytes(bytes)
     }
+}
+
+fn publication_control_path(path: &str) -> bool {
+    matches!(path, "mimetype" | "content.xml" | "META-INF/manifest.xml")
 }
 
 fn push_finding(

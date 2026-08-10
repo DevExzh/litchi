@@ -28,6 +28,7 @@ const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const XLINK: &str = "http://www.w3.org/1999/xlink";
 const FORM: &str = "urn:oasis:names:tc:opendocument:xmlns:form:1.0";
+const SCRIPT: &str = "urn:oasis:names:tc:opendocument:xmlns:script:1.0";
 const FO: &str = "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const CALCEXT: &str = "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0";
 const CONTENT_PATH: &str = "content.xml";
@@ -269,6 +270,51 @@ pub struct StyleGraph {
     pub number_styles: Vec<NumberStyleNode>,
 }
 
+/// Fully inherited table-cell style properties resolved from one closed graph.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct EffectiveCellStyle {
+    pub lineage: Vec<String>,
+    pub data_style: Option<String>,
+    pub cell: CellProperties,
+    pub text: TextProperties,
+}
+
+impl StyleGraph {
+    /// Resolve one cell style from oldest parent to selected child.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid graph or absent/cyclic style dependency.
+    pub fn resolve_cell_style(&self, name: &str) -> Result<EffectiveCellStyle> {
+        let _validated = style_graph_markup(self)?;
+        let styles = self
+            .cell_styles
+            .iter()
+            .map(|style| (style.name.as_str(), style))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        let mut lineage = Vec::new();
+        let mut current = Some(name);
+        while let Some(selected) = current {
+            let style = styles.get(selected).ok_or_else(|| {
+                invalid_error(format!("ODS cell style '{selected}' was not found"))
+            })?;
+            lineage.push(*style);
+            current = style.parent.as_deref();
+        }
+        lineage.reverse();
+        let mut effective = EffectiveCellStyle::default();
+        for style in lineage {
+            effective.lineage.push(style.name.clone());
+            if style.data_style.is_some() {
+                effective.data_style.clone_from(&style.data_style);
+            }
+            merge_cell_properties(&mut effective.cell, &style.cell);
+            merge_text_properties(&mut effective.text, &style.text);
+        }
+        Ok(effective)
+    }
+}
+
 /// One bound inert form control with an optional package image dependency.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BoundFormControl {
@@ -277,6 +323,35 @@ pub struct BoundFormControl {
     pub linked_cell: Option<String>,
     pub source_range: Option<String>,
     pub image_path: Option<String>,
+}
+
+/// Inert ODF form-control vocabulary supported by the unified root.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FormControlKind {
+    Button,
+    CheckBox,
+    ListBox,
+    Text,
+}
+
+/// One inert form event binding. Macro targets are retained but never executed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FormEvent {
+    pub event_name: String,
+    pub macro_name: String,
+}
+
+/// A typed form control with bindings, optional image data, and inert events.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RichFormControl {
+    pub id: String,
+    pub label: String,
+    pub kind: FormControlKind,
+    pub linked_cell: Option<String>,
+    pub source_range: Option<String>,
+    pub image_path: Option<String>,
+    pub events: Vec<FormEvent>,
 }
 
 /// A positioned drawing frame with one package image dependency.
@@ -290,6 +365,25 @@ pub struct DrawingFrame {
     pub width_cm: f64,
     pub height_cm: f64,
     pub z_index: u32,
+}
+
+/// One bounded text frame inside a drawing group.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawingTextBox {
+    pub name: String,
+    pub text: RichText,
+    pub x_cm: f64,
+    pub y_cm: f64,
+    pub width_cm: f64,
+    pub height_cm: f64,
+    pub z_index: u32,
+}
+
+/// One named drawing group containing positioned text frames.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawingGroup {
+    pub name: String,
+    pub children: Vec<DrawingTextBox>,
 }
 
 /// A package-backed chart object and its compact chart `content.xml` dependency.
@@ -719,6 +813,45 @@ fn invalid_style_text(value: &str) -> bool {
     value.len() > 65_536 || value.chars().any(char::is_control)
 }
 
+fn merge_cell_properties(target: &mut CellProperties, source: &CellProperties) {
+    if source.background.is_some() {
+        target.background.clone_from(&source.background);
+    }
+    if source.horizontal_align.is_some() {
+        target.horizontal_align.clone_from(&source.horizontal_align);
+    }
+    if source.vertical_align.is_some() {
+        target.vertical_align.clone_from(&source.vertical_align);
+    }
+    if source.wrap.is_some() {
+        target.wrap = source.wrap;
+    }
+    if source.border.is_some() {
+        target.border.clone_from(&source.border);
+    }
+}
+
+fn merge_text_properties(target: &mut TextProperties, source: &TextProperties) {
+    if source.color.is_some() {
+        target.color.clone_from(&source.color);
+    }
+    if source.font_family.is_some() {
+        target.font_family.clone_from(&source.font_family);
+    }
+    if source.font_size_pt.is_some() {
+        target.font_size_pt = source.font_size_pt;
+    }
+    if source.bold.is_some() {
+        target.bold = source.bold;
+    }
+    if source.italic.is_some() {
+        target.italic = source.italic;
+    }
+    if source.underline.is_some() {
+        target.underline = source.underline;
+    }
+}
+
 fn insert_automatic_styles(source: &[u8], markup: &str, max_output: usize) -> Result<Vec<u8>> {
     let (xml, spans) = content_spans(source)?;
     let automatic = spans
@@ -1004,8 +1137,9 @@ pub(crate) fn put_drawing(
         return invalid("ODS sheet has more than one shapes container");
     }
     if let Some(shapes) = shapes.first().copied()
-        && descendants(&spans, shapes, DRAW, "frame")
+        && ["frame", "g"]
             .into_iter()
+            .flat_map(|local| descendants(&spans, shapes, DRAW, local))
             .any(|index| {
                 attribute(&xml, &spans[index], b"draw:name")
                     .ok()
@@ -1089,6 +1223,49 @@ pub(crate) fn put_chart_object(
     insert_shape_child(source, sheet, &chart.name, child, max_output)
 }
 
+pub(crate) fn put_drawing_group(
+    source: &[u8],
+    sheet: &str,
+    group: &DrawingGroup,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    validate_token(&group.name, "drawing group name")?;
+    if group.children.is_empty() || group.children.len() > 4_096 {
+        return invalid("ODS drawing group requires bounded text children");
+    }
+    let mut names = std::collections::BTreeSet::new();
+    let mut child_markup = String::new();
+    for child in &group.children {
+        validate_token(&child.name, "drawing text-box name")?;
+        if !names.insert(child.name.as_str())
+            || [child.x_cm, child.y_cm, child.width_cm, child.height_cm]
+                .into_iter()
+                .any(|value| !value.is_finite())
+            || child.width_cm <= 0.0
+            || child.height_cm <= 0.0
+        {
+            return invalid("ODS drawing text-box identity or geometry is invalid");
+        }
+        write!(
+            child_markup,
+            "<draw:frame draw:name=\"{}\" draw:z-index=\"{}\" svg:x=\"{}cm\" svg:y=\"{}cm\" svg:width=\"{}cm\" svg:height=\"{}cm\"><draw:text-box>{}</draw:text-box></draw:frame>",
+            escape_xml(&child.name),
+            child.z_index,
+            child.x_cm,
+            child.y_cm,
+            child.width_cm,
+            child.height_cm,
+            child.text.markup()?
+        )
+        .map_err(|_error| invalid_error("ODS drawing text formatting failed"))?;
+    }
+    let markup = format!(
+        "<draw:g xmlns:draw=\"{DRAW}\" xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:xlink=\"{XLINK}\" draw:name=\"{}\">{child_markup}</draw:g>",
+        escape_xml(&group.name)
+    );
+    insert_shape_child(source, sheet, &group.name, markup, max_output)
+}
+
 fn insert_shape_child(
     source: &[u8],
     sheet: &str,
@@ -1103,8 +1280,9 @@ fn insert_shape_child(
         return invalid("ODS sheet has more than one shapes container");
     }
     if let Some(shapes) = shapes.first().copied()
-        && descendants(&spans, shapes, DRAW, "frame")
+        && ["frame", "g"]
             .into_iter()
+            .flat_map(|local| descendants(&spans, shapes, DRAW, local))
             .any(|index| {
                 attribute(&xml, &spans[index], b"draw:name")
                     .ok()
@@ -1268,6 +1446,97 @@ pub(crate) fn set_bound_forms(
                 control.image_path.as_deref(),
             );
             markup.push_str("/>");
+        }
+        markup.push_str("</form:form></office:forms>");
+    }
+    set_forms_markup(source, markup, max_output)
+}
+
+pub(crate) fn set_rich_forms(
+    source: &[u8],
+    controls: &[RichFormControl],
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let spreadsheet = crate::Spreadsheet::from_bytes(source.to_vec())?;
+    if controls.len() > 65_536 {
+        return invalid("ODS rich form control count exceeds the limit");
+    }
+    let mut markup = String::new();
+    if !controls.is_empty() {
+        write!(
+            markup,
+            "<office:forms xmlns:office=\"{OFFICE}\" xmlns:form=\"{FORM}\" xmlns:script=\"{SCRIPT}\" xmlns:xlink=\"{XLINK}\"><form:form form:name=\"LitchiForm\">"
+        )
+        .map_err(|_error| invalid_error("ODS rich form markup formatting failed"))?;
+        let mut ids = std::collections::BTreeSet::new();
+        for control in controls {
+            validate_token(&control.id, "form control id")?;
+            if !ids.insert(control.id.as_str())
+                || control.label.len() > 65_536
+                || control.label.chars().any(char::is_control)
+                || control.events.len() > 1_024
+            {
+                return invalid("ODS rich form control is invalid or duplicated");
+            }
+            if let Some(path) = &control.image_path {
+                super::document::validate_detached_resource_path(path)?;
+            }
+            if let Some(address) = &control.linked_cell {
+                validate_form_address(&spreadsheet, address, true)?;
+            }
+            if let Some(address) = &control.source_range {
+                validate_form_address(&spreadsheet, address, false)?;
+            }
+            let element = match control.kind {
+                FormControlKind::Button => "button",
+                FormControlKind::CheckBox => "checkbox",
+                FormControlKind::ListBox => "listbox",
+                FormControlKind::Text => "text",
+            };
+            write!(
+                markup,
+                "<form:{element} form:id=\"{}\" form:label=\"{}\"",
+                escape_xml(&control.id),
+                escape_xml(&control.label)
+            )
+            .map_err(|_error| invalid_error("ODS rich form formatting failed"))?;
+            push_optional_attribute(
+                &mut markup,
+                "form:linked-cell",
+                control.linked_cell.as_deref(),
+            );
+            push_optional_attribute(
+                &mut markup,
+                "form:source-cell-range",
+                control.source_range.as_deref(),
+            );
+            push_optional_attribute(
+                &mut markup,
+                "form:image-data",
+                control.image_path.as_deref(),
+            );
+            if control.events.is_empty() {
+                markup.push_str("/>");
+                continue;
+            }
+            markup.push_str("><office:event-listeners>");
+            let mut events = std::collections::BTreeSet::new();
+            for event in &control.events {
+                validate_token(&event.event_name, "form event name")?;
+                validate_token(&event.macro_name, "form macro name")?;
+                if !events.insert(event.event_name.as_str()) {
+                    return invalid("ODS form control contains a duplicate event");
+                }
+                write!(
+                    markup,
+                    "<script:event-listener script:event-name=\"{}\" script:macro-name=\"{}\"/>",
+                    escape_xml(&event.event_name),
+                    escape_xml(&event.macro_name)
+                )
+                .map_err(|_error| invalid_error("ODS form event formatting failed"))?;
+            }
+            write!(markup, "</office:event-listeners></form:{element}>")
+                .map_err(|_error| invalid_error("ODS rich form formatting failed"))?;
         }
         markup.push_str("</form:form></office:forms>");
     }

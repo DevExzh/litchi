@@ -12,16 +12,16 @@ mod flat;
 mod model;
 mod package;
 
-pub use facade::{Builder, Drawing};
 pub use facade::{
-    Change as PackageChange, Commit as PackageCommit,
-    ControlReferenceChange as PackageControlReferenceChange, DurablePatch as PackageDurablePatch,
-    GeometryChange as PackageGeometryChange, History as PackageHistory,
-    HistoryLimits as PackageHistoryLimits, JoinedEdits as PackageJoinedEdits,
-    LayerChange as PackageLayerChange, Lineage as PackageLineage, MergePlan as PackageMergePlan,
-    NameChange as PackageNameChange, PageNameChange as PackagePageNameChange,
-    PageStyleChange as PackagePageStyleChange, Patch as PackagePatch,
-    PathChange as PackagePathChange, PreparedEdit as PackagePreparedEdit,
+    ActiveContentStatus as PackageActiveContentStatus,
+    ActiveContentWritePolicy as PackageActiveContentWritePolicy, Change as PackageChange,
+    Commit as PackageCommit, ControlReferenceChange as PackageControlReferenceChange,
+    DurablePatch as PackageDurablePatch, GeometryChange as PackageGeometryChange,
+    History as PackageHistory, HistoryLimits as PackageHistoryLimits,
+    JoinedEdits as PackageJoinedEdits, LayerChange as PackageLayerChange,
+    Lineage as PackageLineage, MergePlan as PackageMergePlan, NameChange as PackageNameChange,
+    PageNameChange as PackagePageNameChange, PageStyleChange as PackagePageStyleChange,
+    Patch as PackagePatch, PathChange as PackagePathChange, PreparedEdit as PackagePreparedEdit,
     ResourceChange as PackageResourceChange, SecurityStatus as PackageSecurityStatus,
     SecurityWritePolicy as PackageSecurityWritePolicy, ShapeTransfer as PackageShapeTransfer,
     Snapshot as PackageSnapshot, StructureChange as PackageStructureChange,
@@ -29,8 +29,9 @@ pub use facade::{
     Transaction as PackageTransaction, TransferControl as PackageTransferControl,
     TransferResource as PackageTransferResource, TransferStyle as PackageTransferStyle,
 };
+pub use facade::{Builder, Drawing};
 pub use flat::{
     FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,
     TextChange,
 };
-pub use model::{FormControl, form, layer, page, resource, shape, style};
+pub use model::{FormControl, form, group, layer, page, resource, shape, style};

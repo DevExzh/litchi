@@ -7,6 +7,7 @@ use litchi_odf_common::core::{
     AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication,
     rebuild_package_with_xml_splices,
 };
+use quick_xml::{Reader, events::Event};
 
 const CONTENT_PATH: &str = "content.xml";
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
@@ -17,13 +18,32 @@ pub(super) fn rebuild_content(source: &OwnedPackage, content: &str) -> Result<Ve
         Error::InvalidFormat(format!("ODB source content.xml is not UTF-8: {error}"))
     })?;
     let edits = differences(exact_source, content)?;
+    let classified = edits
+        .iter()
+        .map(|edit| classify_fragment(edit.replacement.clone()))
+        .collect::<Result<Vec<_>>>();
+    let edits = match classified {
+        Ok(fragments) => edits.into_iter().zip(fragments).collect::<Vec<_>>(),
+        Err(_granular_error) => {
+            let source_range = document_element_range(exact_source)?;
+            let target_range = document_element_range(content)?;
+            let replacement = content.as_bytes()[target_range].to_vec();
+            let fragment = AuthoredXmlFragment::markup(replacement.clone())?;
+            vec![(
+                Edit {
+                    range: source_range,
+                    replacement,
+                },
+                fragment,
+            )]
+        },
+    };
     let mut publication = XmlSplicePublication::new(part.clone());
-    for edit in edits {
+    for (edit, fragment) in edits {
         let expected = part.bytes().get(edit.range.clone()).ok_or_else(|| {
             Error::InvalidFormat("ODB source splice range is invalid".to_string())
         })?;
         let proof = part.checked_range(edit.range, expected)?;
-        let fragment = classify_fragment(edit.replacement)?;
         publication.replace(proof, fragment)?;
     }
     rebuild_package_with_xml_splices(source, vec![publication], MAX_OUTPUT_BYTES)
@@ -176,10 +196,74 @@ fn classify_fragment(bytes: Vec<u8>) -> Result<AuthoredXmlFragment> {
     if is_nonempty_start_tag(&bytes) {
         return AuthoredXmlFragment::start_tag(bytes);
     }
+    if bytes.starts_with(b"</") {
+        return AuthoredXmlFragment::end_tag(bytes);
+    }
     if bytes.first() == Some(&b'<') {
         return AuthoredXmlFragment::markup(bytes);
     }
     AuthoredXmlFragment::text(bytes)
+}
+
+fn document_element_range(xml: &str) -> Result<Range<usize>> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut root_start = None;
+    loop {
+        let start = usize::try_from(reader.buffer_position()).map_err(|error| {
+            Error::InvalidFormat(format!("ODB XML position exceeds usize: {error}"))
+        })?;
+        let event = reader
+            .read_event()
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODB XML publication source: {error}"))
+            })?
+            .into_owned();
+        let end = usize::try_from(reader.buffer_position()).map_err(|error| {
+            Error::InvalidFormat(format!("ODB XML position exceeds usize: {error}"))
+        })?;
+        match event {
+            Event::Start(_) => {
+                if depth == 0 {
+                    root_start = Some(start);
+                }
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODB XML publication depth overflow".to_string())
+                })?;
+            },
+            Event::Empty(_) if depth == 0 => return Ok(start..end),
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODB XML publication depth underflow".to_string())
+                })?;
+                if depth == 0 {
+                    return root_start.map(|root_start| root_start..end).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "ODB XML publication root start is missing".to_string(),
+                        )
+                    });
+                }
+            },
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "DOCTYPE is not allowed in ODB XML publication".to_string(),
+                ));
+            },
+            Event::Eof => {
+                return Err(Error::InvalidFormat(
+                    "ODB XML publication has no complete root".to_string(),
+                ));
+            },
+            Event::Empty(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+        }
+    }
 }
 
 fn is_nonempty_start_tag(bytes: &[u8]) -> bool {
@@ -210,6 +294,7 @@ mod tests {
         assert!(classify_fragment(b"<x>\n <y/>\n</x>".to_vec()).is_err());
         assert!(classify_fragment(b"   ".to_vec()).is_err());
         assert!(classify_fragment(b"<x>".to_vec()).is_ok());
+        assert!(classify_fragment(b"</x>".to_vec()).is_ok());
         assert!(classify_fragment(b"one &amp; two".to_vec()).is_ok());
         assert!(classify_fragment(Vec::new()).is_ok());
     }

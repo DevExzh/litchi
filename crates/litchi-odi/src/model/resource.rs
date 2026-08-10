@@ -1,5 +1,14 @@
 //! Package-local image resource inventory.
 
+/// Explicit lifecycle state of one package resource graph node.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NodeState {
+    ReferencedPresent,
+    ReferencedMissing,
+    UnreferencedPresent,
+    UnreferencedMissing,
+}
+
 /// A package-local image reference discovered in `content.xml`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Resource {
@@ -81,6 +90,17 @@ impl Node {
     #[must_use]
     pub const fn is_referenced(&self) -> bool {
         self.referenced
+    }
+
+    /// Returns the node's explicit reference/presence lifecycle state.
+    #[must_use]
+    pub const fn state(&self) -> NodeState {
+        match (self.referenced, self.present) {
+            (true, true) => NodeState::ReferencedPresent,
+            (true, false) => NodeState::ReferencedMissing,
+            (false, true) => NodeState::UnreferencedPresent,
+            (false, false) => NodeState::UnreferencedMissing,
+        }
     }
 }
 

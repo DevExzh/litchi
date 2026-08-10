@@ -198,6 +198,10 @@ fn merge_reports_divergent_title_conflict() {
 fn changed_signed_and_encrypted_transactions_are_refused_but_noops_are_exact() {
     let signed = Master::from_bytes(package(CONTENT, true)).unwrap();
     assert_eq!(
+        signed.security().changed_write_disposition(),
+        litchi_odm::security::ChangedWriteDisposition::RefusedSigned
+    );
+    assert_eq!(
         signed.edit().commit().unwrap().snapshot().as_bytes(),
         signed.as_bytes()
     );
@@ -215,6 +219,10 @@ fn changed_signed_and_encrypted_transactions_are_refused_but_noops_are_exact() {
     writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
     let encrypted_bytes = writer.finish_to_bytes().unwrap();
     let encrypted = Master::from_bytes_with_password(encrypted_bytes, "secret").unwrap();
+    assert_eq!(
+        encrypted.security().changed_write_disposition(),
+        litchi_odm::security::ChangedWriteDisposition::RefusedEncrypted
+    );
     assert_eq!(
         encrypted.edit().commit().unwrap().snapshot().as_bytes(),
         encrypted.as_bytes()

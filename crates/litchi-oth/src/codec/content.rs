@@ -57,12 +57,16 @@ pub(crate) enum BlockOrder {
 
 pub(crate) struct ParagraphSite {
     pub(crate) content: ReplacementSite,
+    pub(crate) full: ReplacementSite,
+    pub(crate) inline_replaceable: bool,
     pub(crate) replacement: Option<ReplacementSite>,
     pub(crate) value: crate::paragraph::Paragraph,
 }
 
 pub(crate) struct HeadingSite {
     pub(crate) content: ReplacementSite,
+    pub(crate) full: ReplacementSite,
+    pub(crate) inline_replaceable: bool,
     pub(crate) replacement: Option<ReplacementSite>,
     pub(crate) value: crate::heading::Heading,
 }
@@ -90,6 +94,7 @@ pub(crate) struct Projection {
 struct ActiveBlock {
     content_start: usize,
     has_children: bool,
+    has_unknown_children: bool,
     kind: Element,
     level: u8,
     link: Option<ActiveLink>,
@@ -99,6 +104,7 @@ struct ActiveBlock {
     open_spans: Vec<ActiveSpan>,
     runs: Vec<crate::formatting::Run>,
     style_name: Option<String>,
+    source_start: usize,
     text: String,
 }
 
@@ -123,6 +129,7 @@ struct PendingList {
 }
 
 struct PendingListItem {
+    nested_lists: Vec<crate::list::List>,
     paragraph_positions: Vec<usize>,
     start_value: Option<u32>,
 }
@@ -365,7 +372,13 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                         return invalid("OTH text blocks cannot contain text blocks");
                     }
                     let content_start = source_offset(reader.buffer_position())?;
-                    active = Some(ActiveBlock::new(&reader, &start, current, content_start)?);
+                    active = Some(ActiveBlock::new(
+                        &reader,
+                        &start,
+                        current,
+                        content_start,
+                        event_start,
+                    )?);
                 } else if let Some(block) = active.as_mut() {
                     bookmark_event(
                         &reader,
@@ -408,11 +421,12 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                     if active.is_some() {
                         return invalid("OTH text blocks cannot contain text blocks");
                     }
-                    let block = ActiveBlock::new(&reader, &start, current, event_end)?;
+                    let block = ActiveBlock::new(&reader, &start, current, event_end, event_start)?;
                     let replacement = empty_replacement(xml, event_start..event_end, &start)?;
                     publish_block(
                         block,
                         Some(replacement.clone()),
+                        replacement.clone(),
                         replacement,
                         &mut paragraphs,
                         &mut headings,
@@ -470,10 +484,16 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                         range: block.content_start..event_start,
                         suffix: String::new(),
                     };
+                    let full = ReplacementSite {
+                        prefix: String::new(),
+                        range: block.source_start..source_offset(reader.buffer_position())?,
+                        suffix: String::new(),
+                    };
                     publish_block(
                         block,
                         replacement,
                         content,
+                        full,
                         &mut paragraphs,
                         &mut headings,
                         &mut order,
@@ -531,6 +551,75 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
             | Event::Comment(_)
             | Event::Decl(_)
             | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+        }
+    }
+}
+
+/// Finds exact full-element spans for projected resource references.
+pub(crate) fn resource_sites(xml: &str) -> Result<Vec<ReplacementSite>> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0_usize;
+    let mut pending = Vec::<(usize, usize, usize)>::new();
+    let mut sites = Vec::<Option<ReplacementSite>>::new();
+    loop {
+        let event_start = source_offset(reader.buffer_position())?;
+        match reader.read_event().map_err(|error| xml_error(&error))? {
+            Event::Start(start) => {
+                if element(&reader, start.name()) == Element::Resource {
+                    reserve(&mut sites, "OTH resource edit sites")?;
+                    reserve(&mut pending, "OTH resource edit stack")?;
+                    let index = sites.len();
+                    sites.push(None);
+                    pending.push((depth, index, event_start));
+                }
+                depth = depth.saturating_add(1);
+            },
+            Event::Empty(start) if element(&reader, start.name()) == Element::Resource => {
+                reserve(&mut sites, "OTH resource edit sites")?;
+                sites.push(Some(ReplacementSite {
+                    prefix: String::new(),
+                    range: event_start..source_offset(reader.buffer_position())?,
+                    suffix: String::new(),
+                }));
+            },
+            Event::End(end) => {
+                depth = depth.saturating_sub(1);
+                if element(&reader, end.name()) == Element::Resource {
+                    let (resource_depth, index, start) = pending.pop().ok_or_else(|| {
+                        Error::InvalidFormat("OTH resource edit state is missing".to_string())
+                    })?;
+                    if resource_depth != depth {
+                        return invalid("OTH resource edit depth is invalid");
+                    }
+                    sites[index] = Some(ReplacementSite {
+                        prefix: String::new(),
+                        range: start..source_offset(reader.buffer_position())?,
+                        suffix: String::new(),
+                    });
+                }
+            },
+            Event::Eof => {
+                if !pending.is_empty() {
+                    return invalid("OTH resource edit element is not closed");
+                }
+                return sites
+                    .into_iter()
+                    .map(|site| {
+                        site.ok_or_else(|| {
+                            Error::InvalidFormat("OTH resource edit site is missing".to_string())
+                        })
+                    })
+                    .collect();
+            },
+            Event::DocType(_) => return invalid("OTH resource source cannot contain a DTD"),
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::Empty(_)
             | Event::GeneralRef(_)
             | Event::PI(_)
             | Event::Text(_) => {},
@@ -875,6 +964,7 @@ impl ActiveBlock {
         start: &BytesStart<'_>,
         kind: Element,
         content_start: usize,
+        source_start: usize,
     ) -> Result<Self> {
         let style_name = optional_attribute(reader, start, TEXT_NAMESPACE, b"style-name")?;
         let level = if kind == Element::Heading {
@@ -896,6 +986,7 @@ impl ActiveBlock {
             content_start,
             fields: Vec::new(),
             has_children: false,
+            has_unknown_children: false,
             kind,
             level,
             link: None,
@@ -904,6 +995,7 @@ impl ActiveBlock {
             open_spans: Vec::new(),
             runs: Vec::new(),
             style_name,
+            source_start,
             text: String::new(),
         })
     }
@@ -915,6 +1007,17 @@ impl ActiveBlock {
         current: Element,
     ) -> Result<()> {
         self.has_children = true;
+        if matches!(
+            current,
+            Element::Form
+                | Element::FormControl
+                | Element::List
+                | Element::ListItem
+                | Element::Other
+                | Element::Resource
+        ) {
+            self.has_unknown_children = true;
+        }
         match current {
             Element::Link => self.start_link(reader, start),
             Element::Span => self.start_span(reader, start),
@@ -946,6 +1049,17 @@ impl ActiveBlock {
         current: Element,
     ) -> Result<()> {
         self.has_children = true;
+        if matches!(
+            current,
+            Element::Form
+                | Element::FormControl
+                | Element::List
+                | Element::ListItem
+                | Element::Other
+                | Element::Resource
+        ) {
+            self.has_unknown_children = true;
+        }
         match current {
             Element::Link => {
                 self.start_link(reader, start)?;
@@ -1242,6 +1356,7 @@ fn publish_block(
     block: ActiveBlock,
     replacement: Option<ReplacementSite>,
     content: ReplacementSite,
+    full: ReplacementSite,
     paragraphs: &mut Vec<ParagraphSite>,
     headings: &mut Vec<HeadingSite>,
     order: &mut Vec<BlockOrder>,
@@ -1257,6 +1372,8 @@ fn publish_block(
             let index = paragraphs.len();
             paragraphs.push(ParagraphSite {
                 content,
+                full,
+                inline_replaceable: !block.has_unknown_children,
                 replacement,
                 value: crate::paragraph::Paragraph::projected(
                     block.text,
@@ -1281,6 +1398,8 @@ fn publish_block(
             let index = headings.len();
             headings.push(HeadingSite {
                 content,
+                full,
+                inline_replaceable: !block.has_unknown_children,
                 replacement,
                 value: crate::heading::Heading::projected(
                     block.level,
@@ -1428,6 +1547,7 @@ fn start_list(
                 })
                 .transpose()?;
             list.items.push(PendingListItem {
+                nested_lists: Vec::new(),
                 paragraph_positions: Vec::new(),
                 start_value,
             });
@@ -1522,6 +1642,7 @@ fn publish_list(
             );
         }
         items.push(crate::list::Item::projected(
+            item.nested_lists,
             values,
             item.paragraph_positions
                 .into_iter()
@@ -1537,11 +1658,12 @@ fn publish_list(
         range: list.source_start..source_end,
         suffix: String::new(),
     });
-    lists.push(crate::list::List::projected(
-        items,
-        list.level,
-        list.style_name,
-    ));
+    let value = crate::list::List::projected(items, list.level, list.style_name);
+    if let Some(parent_item) = stack.last_mut().and_then(|parent| parent.items.last_mut()) {
+        reserve(&mut parent_item.nested_lists, "OTH nested list tree")?;
+        parent_item.nested_lists.push(value.clone());
+    }
+    lists.push(value);
     Ok(())
 }
 

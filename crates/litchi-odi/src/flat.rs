@@ -160,6 +160,17 @@ impl FlatImage {
         self.0.metadata.as_ref()
     }
 
+    /// Audits whether this exact flat XML can enter changed-byte publication.
+    #[must_use]
+    pub fn rewrite_capability(&self) -> crate::RewriteCapability {
+        let blockers = if compact_xml::validate(self.as_bytes()).is_ok() {
+            Vec::new()
+        } else {
+            vec![crate::RewriteBlocker::NonCompactXml]
+        };
+        crate::RewriteCapability::new(blockers)
+    }
+
     /// Starts a source-bound transaction without changing this snapshot.
     #[must_use]
     pub fn transaction(&self) -> FlatImageTransaction {

@@ -169,6 +169,10 @@ fn effects(edit: &Edit) -> (Vec<String>, Vec<String>) {
         );
         writes.push("workbook/defined-names".to_owned());
     }
+    for (target, drawing) in &edit.drawings {
+        reads.push(format!("sheet/{}/drawing", drawing.source_position));
+        writes.push(format!("sheet/{target}/drawing"));
+    }
     if edit.active.is_some() {
         writes.push("workbook/active-tab".to_owned());
     }
@@ -207,6 +211,12 @@ fn effects(edit: &Edit) -> (Vec<String>, Vec<String>) {
         }
         if actions.page_breaks.is_some() {
             writes.push(format!("sheet/{position}/page-breaks"));
+        }
+        if actions.page_setup.is_some() {
+            writes.push(format!("sheet/{position}/page-setup"));
+        }
+        if actions.print_options.is_some() {
+            writes.push(format!("sheet/{position}/print-options"));
         }
         writes.extend(
             actions

@@ -886,16 +886,40 @@ fn rich_shared_string_transfer_keeps_exact_dependency_through_join_replay_and_in
 }
 
 #[test]
-fn cell_transfer_refuses_drawing_graphs_without_staging_partial_work() {
+fn cell_transfer_clones_selected_picture_graph_and_is_reversible() {
     let baseline = two_sheet_workbook(WorksheetKind::Worksheet);
     let mut package = baseline.inner.package.clone();
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("source worksheet")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1"/><sheetData/><drawing r:id="rIdDrawing"/></worksheet>"#.to_vec(),
+        );
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/drawings/drawing1.xml").expect("drawing URI"),
             litchi_opc::constants::content_type::OFC_DRAWING.to_owned(),
-            br#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"/>"#.to_vec(),
+            br#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><xdr:twoCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="Picture 1"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rIdImage"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr/></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>"#.to_vec(),
         )))
         .expect("drawing part");
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/media/image1.png").expect("image URI"),
+            litchi_opc::constants::content_type::PNG.to_owned(),
+            b"picture-bytes".to_vec(),
+        )))
+        .expect("image part");
+    package
+        .get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").expect("drawing URI"))
+        .expect("drawing part")
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::IMAGE.to_owned(),
+            "../media/image1.png".to_owned(),
+            "rIdImage".to_owned(),
+            TargetMode::Internal,
+        )
+        .expect("image relationship");
     package
         .get_part_mut(&baseline.inner.sheets[0].part_uri)
         .expect("source worksheet")
@@ -908,13 +932,61 @@ fn cell_transfer_refuses_drawing_graphs_without_staging_partial_work() {
         )
         .expect("drawing relationship");
     let source = Workbook::from_package(package).expect("drawing workbook");
+    let source_bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
-    assert!(matches!(
-        edit.copy_cells("Sheet1", "A1", "Sheet2", "A1"),
-        Err(Error::Unsupported { feature })
-            if feature == "copying cells on a worksheet with drawing dependencies"
-    ));
-    assert!(edit.is_empty());
+    edit.copy_cells("Sheet1", "A1:C3", "Sheet2", "E5")
+        .expect("picture transfer")
+        .expect("selectors");
+    let committed = edit.commit().expect("commit picture transfer");
+    assert!(
+        committed
+            .patch()
+            .package_changes()
+            .iter()
+            .any(|change| matches!(
+                change,
+                PackageChange::DrawingTransfer {
+                    source,
+                    target,
+                    anchors: 1,
+                    added: true,
+                } if source.as_ref() == "Sheet1" && target.as_ref() == "Sheet2"
+            ))
+    );
+    let target_sheet = part_text(committed.workbook(), "/xl/worksheets/sheet2.xml");
+    assert!(target_sheet.contains(r#"r:id="rIdDrawingCopy1""#));
+    let target_drawing = part_text(committed.workbook(), "/xl/drawings/drawing1_copy1.xml");
+    assert!(target_drawing.contains("<xdr:col>4</xdr:col>"));
+    assert!(target_drawing.contains("<xdr:row>4</xdr:row>"));
+    assert!(target_drawing.contains("<xdr:col>6</xdr:col>"));
+    assert!(target_drawing.contains("<xdr:row>6</xdr:row>"));
+    assert!(target_drawing.contains(r#"r:embed="rIdImage""#));
+    assert_eq!(
+        committed
+            .workbook()
+            .inner
+            .package
+            .get_part(&PackURI::new("/xl/media/image1_copy1.png").expect("cloned image URI"))
+            .expect("cloned image")
+            .blob(),
+        b"picture-bytes"
+    );
+
+    let replayed = source
+        .apply(committed.patch())
+        .expect("replay picture graph");
+    assert_eq!(
+        replayed.workbook().to_bytes().expect("replayed bytes"),
+        committed.workbook().to_bytes().expect("committed bytes")
+    );
+    let restored = committed
+        .workbook()
+        .apply(&committed.patch().inverse())
+        .expect("inverse picture graph");
+    assert_eq!(
+        restored.workbook().to_bytes().expect("restored"),
+        source_bytes
+    );
 }
 
 #[test]

@@ -296,6 +296,7 @@ struct Frame {
     element: Element,
     in_database: bool,
     table: Option<usize>,
+    query: Option<usize>,
     component_kind: Option<ComponentKind>,
     key: Option<usize>,
     index: Option<usize>,
@@ -484,6 +485,7 @@ fn start(
         return Err(invalid("ODB schema node has an invalid parent"));
     }
     let mut table = parent.and_then(|frame| frame.table);
+    let mut query = parent.and_then(|frame| frame.query);
     let mut key = parent.and_then(|frame| frame.key);
     let mut index = parent.and_then(|frame| frame.index);
     let component_kind = match kind {
@@ -628,12 +630,9 @@ fn start(
             })?;
         catalog.tables.push(Table::parsed(name, table_kind));
         table = Some(catalog.tables.len() - 1);
+        query = None;
         key = None;
         index = None;
-    }
-    if in_database && matches!(kind, Element::Column | Element::ColumnDefinition) && table.is_some()
-    {
-        add_column(reader, element, table, catalog, columns, limits)?;
     }
     if in_database && kind == Element::Query {
         ensure_capacity(
@@ -656,6 +655,14 @@ fn start(
         catalog
             .queries
             .push(Query::parsed(name, command, escape_processing));
+        query = catalog.queries.len().checked_sub(1);
+        table = None;
+    }
+    if in_database
+        && matches!(kind, Element::Column | Element::ColumnDefinition)
+        && (table.is_some() || query.is_some())
+    {
+        add_column(reader, element, table, query, catalog, columns, limits)?;
     }
     if in_database && kind == Element::Component {
         ensure_capacity(*components, limits.max_components, "component declarations")?;
@@ -767,6 +774,7 @@ fn start(
         element: kind,
         in_database,
         table,
+        query,
         component_kind,
         key,
         index,
@@ -777,17 +785,13 @@ fn add_column(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     table: Option<usize>,
+    query: Option<usize>,
     catalog: &mut OwnedCatalog,
     columns: &mut usize,
     limits: Limits,
 ) -> Result<()> {
     ensure_capacity(*columns, limits.max_columns, "column declarations")?;
     let name = required_db_attr(reader, element, b"name", limits)?;
-    let index = table.ok_or_else(|| invalid("ODB column has no table owner"))?;
-    let target = catalog
-        .tables
-        .get_mut(index)
-        .ok_or_else(|| invalid("ODB column table owner is out of bounds"))?;
     let data_type_value = optional_db_attr(reader, element, b"data-type", limits)?;
     let data_type = data_type_value
         .as_deref()
@@ -808,7 +812,7 @@ fn add_column(
     let autoincrement = optional_db_attr(reader, element, b"is-autoincrement", limits)?
         .map(|value| parse_bool(&value))
         .transpose()?;
-    target.try_push_column(Column::parsed(
+    let column = Column::parsed(
         name,
         ColumnSchema {
             data_type,
@@ -819,7 +823,22 @@ fn add_column(
             empty_allowed,
             autoincrement,
         },
-    ))?;
+    );
+    match (table, query) {
+        (Some(index), None) => catalog
+            .tables
+            .get_mut(index)
+            .ok_or_else(|| invalid("ODB column table owner is out of bounds"))?
+            .try_push_column(column)?,
+        (None, Some(index)) => catalog
+            .queries
+            .get_mut(index)
+            .ok_or_else(|| invalid("ODB column query owner is out of bounds"))?
+            .try_push_column(column)?,
+        (None, None) | (Some(_), Some(_)) => {
+            return Err(invalid("ODB column owner is ambiguous"));
+        },
+    }
     *columns = columns
         .checked_add(1)
         .ok_or_else(|| invalid("ODB column count overflow"))?;

@@ -34,6 +34,7 @@ use crate::style::StyleLineage;
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
 mod codec;
+mod drawing_transfer;
 mod model;
 mod package;
 mod planning;
@@ -42,8 +43,8 @@ mod validation;
 mod wire;
 
 use validation::{
-    Added, CreatedSheet, FinalOrder, MergeIntent, MoveIntent, OrderPlan, PanesAction, Placement,
-    SheetActions, TabAction, Target,
+    Added, CreatedSheet, FinalOrder, MergeIntent, MoveIntent, OptionalAction, OrderPlan,
+    PanesAction, Placement, SheetActions, TabAction, Target,
 };
 
 #[cfg(test)]

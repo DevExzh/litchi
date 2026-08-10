@@ -1,8 +1,13 @@
 //! Deterministic ODB sub-edit composition and three-way planning.
 
-use std::{collections::BTreeSet, ops::Range, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Range,
+    sync::Arc,
+};
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::package::edit::Addition;
 
 use super::{Change, ChangeKind, Patch};
 use crate::Database;
@@ -72,17 +77,20 @@ impl Patch {
         let base = source.content_xml();
         let mut hunks = Vec::new();
         let mut changes = Vec::new();
+        let mut additions = BTreeMap::<String, Addition>::new();
+        let mut directories = BTreeMap::<String, String>::new();
+        let mut excluded_paths = BTreeSet::<String>::new();
         for (ordinal, edit) in joined.sub_edits().enumerate() {
             let patch = edit.payload();
             if patch.source.as_bytes() != source.as_bytes() {
                 return invalid("ODB composition patch source is stale");
             }
-            if has_non_content_changes(&patch.source, &patch.target)? {
-                return Err(Error::Unsupported(
-                    "ODB composition refuses patches that change package members outside content.xml"
-                        .to_string(),
-                ));
-            }
+            merge_package_delta(
+                patch.source.package.delta_to(&patch.target.package)?,
+                &mut additions,
+                &mut directories,
+                &mut excluded_paths,
+            )?;
             if let Some(hunk) = difference(base, patch.target.content_xml(), ordinal) {
                 hunks.push(hunk);
             }
@@ -107,7 +115,11 @@ impl Patch {
         for hunk in hunks {
             content.replace_range(hunk.range, &hunk.replacement);
         }
-        if content == base {
+        if content == base
+            && additions.is_empty()
+            && directories.is_empty()
+            && excluded_paths.is_empty()
+        {
             return Ok(Self {
                 source: source.clone(),
                 target: source,
@@ -117,7 +129,12 @@ impl Patch {
         }
         crate::codec::validate(&content)?;
         let target = Database {
-            package: source.package.rebuild_with_content(&content)?,
+            package: source.package.rebuild_with_content_and_mutations(
+                &content,
+                additions.into_values().collect(),
+                directories.into_iter().collect(),
+                excluded_paths.into_iter().collect(),
+            )?,
         };
         target.catalog()?;
         Ok(Self {
@@ -129,22 +146,52 @@ impl Patch {
     }
 }
 
-fn has_non_content_changes(source: &Database, target: &Database) -> Result<bool> {
-    let source_files = source.files()?.into_iter().collect::<BTreeSet<_>>();
-    let target_files = target.files()?.into_iter().collect::<BTreeSet<_>>();
-    let paths = source_files.union(&target_files);
-    for path in paths {
-        if path == "content.xml" {
-            continue;
+fn merge_package_delta(
+    delta: crate::package::PackageDelta,
+    additions: &mut BTreeMap<String, Addition>,
+    directories: &mut BTreeMap<String, String>,
+    excluded_paths: &mut BTreeSet<String>,
+) -> Result<()> {
+    for addition in delta.additions {
+        if excluded_paths.contains(&addition.path) {
+            return invalid("ODB composed package member is both removed and added");
         }
-        if !source_files.contains(path) || !target_files.contains(path) {
-            return Ok(true);
-        }
-        if source.package.file(path)? != target.package.file(path)? {
-            return Ok(true);
+        if let Some(existing) = additions.get(&addition.path) {
+            if existing.bytes != addition.bytes || existing.media_type != addition.media_type {
+                return invalid("ODB composed package additions conflict");
+            }
+        } else {
+            additions.insert(addition.path.clone(), addition);
         }
     }
-    Ok(false)
+    for (path, media_type) in delta.directories {
+        if excluded_paths.contains(&path) {
+            return invalid("ODB composed package directory is both removed and added");
+        }
+        if directories
+            .get(&path)
+            .is_some_and(|existing| existing != &media_type)
+        {
+            return invalid("ODB composed package directory media types conflict");
+        }
+        directories.insert(path, media_type);
+    }
+    for path in delta.excluded_paths {
+        if additions.contains_key(&path) || directories.contains_key(&path) {
+            return invalid("ODB composed package member is both added and removed");
+        }
+        excluded_paths.insert(path);
+    }
+    for directory in excluded_paths.iter().filter(|path| path.ends_with('/')) {
+        if additions.keys().any(|path| path.starts_with(directory))
+            || directories
+                .keys()
+                .any(|path| path != directory && path.starts_with(directory))
+        {
+            return invalid("ODB composed package subtree changes conflict");
+        }
+    }
+    Ok(())
 }
 
 struct Hunk {

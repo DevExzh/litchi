@@ -446,6 +446,13 @@ pub(crate) fn mutate_xml(
     }
     let mut content = apply_edits(source.content_xml(), content_edits)?;
     let mut styles_xml = source.styles_xml().map(str::to_owned);
+    if styles_xml.is_none()
+        && styles.iter().any(
+            |intent| matches!(intent, StyleChange::Add(spec) if spec.origin() == Origin::Styles),
+        )
+    {
+        styles_xml = Some(empty_styles_part().to_owned());
+    }
     if !styles_edits.is_empty() {
         let xml = styles_xml
             .as_deref()
@@ -457,6 +464,22 @@ pub(crate) fn mutate_xml(
             content =
                 insert_before_element_end(&content, OFFICE, b"text", &section_fragment(spec))?;
         }
+    }
+    if styles
+        .iter()
+        .any(|intent| matches!(intent, StyleChange::Add(spec) if spec.origin() == Origin::Content))
+        && !contains_element(&content, OFFICE, b"automatic-styles")?
+    {
+        content = insert_before_element_start(
+            &content,
+            OFFICE,
+            b"body",
+            concat!(
+                r#"<office:automatic-styles "#,
+                r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0">"#,
+                r#"</office:automatic-styles>"#,
+            ),
+        )?;
     }
     for intent in styles {
         if let StyleChange::Add(spec) = intent {
@@ -487,6 +510,15 @@ pub(crate) fn mutate_xml(
         content,
         styles: styles_xml,
     })
+}
+
+const fn empty_styles_part() -> &'static str {
+    concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0">"#,
+        r#"<office:styles></office:styles></office:document-styles>"#,
+    )
 }
 
 pub(crate) fn stage_metadata(source: &Master, metadata: &Metadata) -> Result<String> {
@@ -751,6 +783,77 @@ fn insert_before_element_end(
             },
             Event::Eof => return Err(invalid("ODM XML insertion owner was not found")),
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM XML")),
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn contains_element(xml: &str, namespace: &[u8], local: &[u8]) -> Result<bool> {
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    loop {
+        let (resolved, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid ODM XML owner scan: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if matches!(resolved, ResolveResult::Bound(Namespace(uri)) if uri == namespace)
+                    && element.local_name().as_ref() == local
+                {
+                    return Ok(true);
+                }
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM XML")),
+            Event::Eof => return Ok(false),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn insert_before_element_start(
+    xml: &str,
+    namespace: &[u8],
+    local: &[u8],
+    fragment: &str,
+) -> Result<String> {
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    loop {
+        let start = position(&reader)?;
+        let (resolved, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid ODM XML insertion scan: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if matches!(resolved, ResolveResult::Bound(Namespace(uri)) if uri == namespace)
+                    && element.local_name().as_ref() == local =>
+            {
+                let mut output = String::new();
+                output
+                    .try_reserve_exact(xml.len().saturating_add(fragment.len()))
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODM XML insertion",
+                        source,
+                    })?;
+                output.push_str(&xml[..start]);
+                output.push_str(fragment);
+                output.push_str(&xml[start..]);
+                return Ok(output);
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM XML")),
+            Event::Eof => return Err(invalid("ODM XML insertion anchor was not found")),
             Event::Start(_)
             | Event::Empty(_)
             | Event::End(_)

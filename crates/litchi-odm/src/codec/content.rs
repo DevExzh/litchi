@@ -258,6 +258,29 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
         let is_text = matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == TEXT);
         let is_table = matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == TABLE);
         let event = event.into_owned();
+        let (item_name, item_xml_id) = match &event {
+            Event::Start(element) | Event::Empty(element) => (
+                attribute(&reader, element, TEXT, b"name")?,
+                attribute(&reader, element, XML, b"id")?,
+            ),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::Eof => (None, None),
+        };
+        for (value, scope) in [
+            (item_name.as_deref(), "ODM master-body text:name"),
+            (item_xml_id.as_deref(), "ODM master-body xml:id"),
+        ] {
+            if let Some(value) = value {
+                ensure_short(value, scope)?;
+            }
+        }
         match event {
             Event::Start(element) => {
                 depth = depth.saturating_add(1);
@@ -270,6 +293,8 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
                     &mut text_depth,
                     &mut section_index,
                     &mut structure,
+                    item_name,
+                    item_xml_id,
                 )?;
             },
             Event::Empty(element) => {
@@ -282,6 +307,8 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
                     &mut text_depth,
                     &mut section_index,
                     &mut structure,
+                    item_name,
+                    item_xml_id,
                 )?;
             },
             Event::End(element) => {
@@ -319,6 +346,8 @@ fn observe_master_item(
     text_depth: &mut Option<usize>,
     section_index: &mut usize,
     structure: &mut crate::structure::Structure,
+    item_name: Option<String>,
+    item_xml_id: Option<String>,
 ) -> Result<()> {
     use crate::structure::{IndexKind, Kind};
 
@@ -360,7 +389,25 @@ fn observe_master_item(
                 resource: "ODM master-body structure",
                 source,
             })?;
+        let item = Position::new(structure.items.len());
         structure.items.push(kind);
+        if let Kind::GeneratedIndex(kind) = kind {
+            structure
+                .generated_indexes
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODM generated index inventory",
+                    source,
+                })?;
+            structure
+                .generated_indexes
+                .push(crate::structure::GeneratedIndex {
+                    item,
+                    kind,
+                    name: item_name,
+                    xml_id: item_xml_id,
+                });
+        }
     }
     if is_text && local == b"section" {
         *section_index = (*section_index).saturating_add(1);

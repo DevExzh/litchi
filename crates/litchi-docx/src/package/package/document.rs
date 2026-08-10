@@ -430,8 +430,11 @@ fn transfer_graph_transition(
             | crate::document::Operation::ReplaceComplexFieldText { .. }
             | crate::document::Operation::ReplaceRevisionText { .. }
             | crate::document::Operation::ReplaceContentControlText { .. }
+            | crate::document::Operation::ReplaceNestedContentControlText { .. }
+            | crate::document::Operation::ReplaceBlockContentControlParagraphText { .. }
             | crate::document::Operation::ReplaceCellText { .. }
             | crate::document::Operation::ReplaceCellParagraphText { .. }
+            | crate::document::Operation::ReplaceNestedCellParagraphText { .. }
             | crate::document::Operation::InsertParagraph { .. }
             | crate::document::Operation::RemoveParagraph { .. } => None,
         };

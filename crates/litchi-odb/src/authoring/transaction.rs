@@ -174,8 +174,7 @@ impl<'source> Edit<'source> {
         let query = catalog
             .query(name)?
             .ok_or_else(|| Error::InvalidFormat("ODB transfer query does not exist".to_string()))?;
-        let query = Query::new(query.name(), query.command())
-            .with_escape_processing(query.escape_processing());
+        let query = query.clone();
         self.stage_atomically(|candidate| candidate.add_query(query))
     }
 
@@ -343,6 +342,23 @@ impl<'source> Edit<'source> {
         kind: ComponentKind,
         name: &str,
     ) -> Result<()> {
+        self.transfer_component_from_with(
+            source,
+            kind,
+            name,
+            crate::ActiveContentDisposition::Refuse,
+        )
+    }
+
+    /// Copies one component to the same package path with explicit handling
+    /// for active-content dependencies in its local linked subtree.
+    pub fn transfer_component_from_with(
+        &mut self,
+        source: &Database,
+        kind: ComponentKind,
+        name: &str,
+        active_content: crate::ActiveContentDisposition,
+    ) -> Result<()> {
         let catalog = source.catalog()?;
         let mut matches = catalog
             .components()
@@ -356,7 +372,7 @@ impl<'source> Edit<'source> {
         }
         let component = component.clone();
         self.stage_atomically(|candidate| {
-            candidate.stage_component_payload(source, &component, None)?;
+            candidate.stage_component_payload(source, &component, None, active_content)?;
             candidate.add_component(component)
         })
     }
@@ -379,6 +395,25 @@ impl<'source> Edit<'source> {
         name: &str,
         destination_href: &str,
     ) -> Result<()> {
+        self.transfer_component_from_to_with(
+            source,
+            kind,
+            name,
+            destination_href,
+            crate::ActiveContentDisposition::Refuse,
+        )
+    }
+
+    /// Copies and remaps one component with explicit handling for active
+    /// declarations contained in its local linked package subtree.
+    pub fn transfer_component_from_to_with(
+        &mut self,
+        source: &Database,
+        kind: ComponentKind,
+        name: &str,
+        destination_href: &str,
+        active_content: crate::ActiveContentDisposition,
+    ) -> Result<()> {
         let catalog = source.catalog()?;
         let mut matches = catalog
             .components()
@@ -392,7 +427,12 @@ impl<'source> Edit<'source> {
         }
         let component = component.clone();
         self.stage_atomically(|candidate| {
-            candidate.stage_component_payload(source, &component, Some(destination_href))?;
+            candidate.stage_component_payload(
+                source,
+                &component,
+                Some(destination_href),
+                active_content,
+            )?;
             candidate.add_component(component.with_href(destination_href))
         })
     }
@@ -402,6 +442,7 @@ impl<'source> Edit<'source> {
         source: &Database,
         component: &Component,
         destination_href: Option<&str>,
+        active_content: crate::ActiveContentDisposition,
     ) -> Result<()> {
         if source.protection_status()?.is_encrypted() {
             return Err(Error::Unsupported(
@@ -446,6 +487,17 @@ impl<'source> Edit<'source> {
             .component_payload(&source_prefix, &destination_prefix)?;
         if additions.is_empty() && directories.is_empty() {
             return invalid("ODB linked component package payload does not exist");
+        }
+        let active_dependencies = source
+            .active_content()?
+            .entries()
+            .iter()
+            .filter(|entry| entry.package_path().starts_with(&source_prefix))
+            .count();
+        if active_dependencies > 0 && active_content == crate::ActiveContentDisposition::Refuse {
+            return Err(Error::Unsupported(format!(
+                "ODB component payload has {active_dependencies} active-content dependencies"
+            )));
         }
         self.payload_additions.extend(additions);
         self.payload_directories.extend(directories);
@@ -973,8 +1025,7 @@ impl<'source> Edit<'source> {
 
     /// Adds a stored query without interpreting its command.
     pub fn add_query(&mut self, query: Query) -> Result<()> {
-        validate_name(query.name(), "query")?;
-        validate_value(query.command(), "query command")?;
+        validate_query(&query)?;
         let nodes = scan(&self.content)?;
         if find_named_node(&nodes, "query", query.name())?.is_some() {
             return invalid("ODB query already exists");
@@ -994,8 +1045,7 @@ impl<'source> Edit<'source> {
 
     /// Replaces a stored query without interpreting its command.
     pub fn replace_query(&mut self, name: &str, query: Query) -> Result<()> {
-        validate_name(query.name(), "query")?;
-        validate_value(query.command(), "query command")?;
+        validate_query(&query)?;
         let nodes = scan(&self.content)?;
         let site = find_named_node(&nodes, "query", name)?
             .ok_or_else(|| Error::InvalidFormat("ODB query does not exist".to_string()))?;
@@ -2345,7 +2395,15 @@ fn serialize_query(query: &Query, prefix: &str) -> String {
         ("command", query.command().to_owned()),
     ];
     push_bool(&mut attrs, "escape-processing", query.escape_processing());
-    empty_element(prefix, "query", attrs)
+    let mut children = String::new();
+    if !query.columns().is_empty() {
+        children.push_str(&format!("<{prefix}:columns>"));
+        for column in query.columns() {
+            children.push_str(&serialize_column(column, false, prefix));
+        }
+        children.push_str(&format!("</{prefix}:columns>"));
+    }
+    element_with_children(prefix, "query", attrs, &children)
 }
 
 fn serialize_component(component: &Component, prefixes: &Prefixes) -> String {
@@ -2791,6 +2849,15 @@ fn validate_component(component: &Component) -> Result<()> {
         if let Some(value) = value {
             validate_value(value, kind)?;
         }
+    }
+    Ok(())
+}
+
+fn validate_query(query: &Query) -> Result<()> {
+    validate_name(query.name(), "query")?;
+    validate_value(query.command(), "query command")?;
+    for column in query.columns() {
+        validate_column(column)?;
     }
     Ok(())
 }

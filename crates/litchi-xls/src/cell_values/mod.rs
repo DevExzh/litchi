@@ -1141,6 +1141,27 @@ impl Transaction {
             .effective_xf_payload(source)
             .ok_or_else(|| Error::UnsafeEdit("source XF resource is absent".into()))?
             .to_vec();
+        self.author_style(&payload)
+    }
+
+    /// Authors one validated BIFF8 XF payload as the next workbook resource.
+    ///
+    /// The payload is the exact 20-byte body of an XF record. Its six-byte
+    /// font, number-format, protection, kind, and parent-style dependency prefix
+    /// must match an effective XF; the remaining formatting bytes are retained
+    /// exactly.
+    ///
+    /// # Errors
+    ///
+    /// Returns a payload-length, index-overflow, allocation, or transaction
+    /// bound error without staging a partial resource.
+    pub fn author_style(&mut self, payload: &[u8]) -> Result<StyleIndex> {
+        validate_xf_payload(payload)?;
+        let mut retained = Vec::new();
+        retained
+            .try_reserve_exact(payload.len())
+            .map_err(|_error| Error::Allocation("retaining authored XF payload"))?;
+        retained.extend_from_slice(payload);
         let pending = self
             .resource_changes
             .iter()
@@ -1157,7 +1178,7 @@ impl Transaction {
             .ok_or_else(|| Error::UnsafeEdit("new XF index exceeds u16".into()))?;
         self.stage_resource(ResourceChange::ExtendedFormat {
             index,
-            payload,
+            payload: retained,
             insert: true,
         })?;
         Ok(index)
@@ -1248,6 +1269,27 @@ impl Transaction {
             .saturating_sub(removed)
     }
 
+    fn has_xf_dependency(&self, payload: &[u8]) -> bool {
+        let Some(prefix) = payload.get(..6) else {
+            return false;
+        };
+        self.source
+            .inner
+            .xf_records
+            .iter()
+            .any(|candidate| candidate.get(..6) == Some(prefix))
+            || self.resource_changes.iter().any(|candidate| {
+                matches!(
+                    candidate,
+                    ResourceChange::ExtendedFormat {
+                        payload: existing,
+                        insert: true,
+                        ..
+                    } if existing.get(..6) == Some(prefix)
+                )
+            })
+    }
+
     fn stage_resource(&mut self, change: ResourceChange) -> Result<()> {
         if self
             .resource_changes
@@ -1276,25 +1318,10 @@ impl Transaction {
                             "new XF index is not the next effective resource".into(),
                         ));
                     }
-                    let duplicates_existing = self
-                        .source
-                        .inner
-                        .xf_records
-                        .iter()
-                        .any(|candidate| candidate == payload)
-                        || self.resource_changes.iter().any(|candidate| {
-                            matches!(
-                                candidate,
-                                ResourceChange::ExtendedFormat {
-                                    payload: existing,
-                                    insert: true,
-                                    ..
-                                } if existing == payload
-                            )
-                        });
-                    if !duplicates_existing {
+                    validate_xf_payload(payload)?;
+                    if !self.has_xf_dependency(payload) {
                         return Err(Error::UnsafeEdit(
-                            "new XF payload does not duplicate an effective resource".into(),
+                            "new XF resource dependencies are not effective".into(),
                         ));
                     }
                 } else if usize::from(index.get()).checked_add(1) != Some(count)
@@ -1417,6 +1444,7 @@ impl Transaction {
             ));
         }
         let sheet = self.require_sheet(selector, "row operation")?;
+        structural::certify_shift(&self.source, sheet)?;
         self.stage_structural(StructuralChange::Rows {
             sheet,
             start,
@@ -1443,6 +1471,7 @@ impl Transaction {
             ));
         }
         let sheet = self.require_sheet(selector, "column operation")?;
+        structural::certify_shift(&self.source, sheet)?;
         self.stage_structural(StructuralChange::Columns {
             sheet,
             start,
@@ -1835,6 +1864,11 @@ impl SemanticPatch {
                 "state".to_string(),
                 cell_state(source.storage, &source.value),
             );
+            append_formula_dependency(
+                snapshot,
+                &sheet.entries[change.entry],
+                &mut forward_preconditions,
+            )?;
             let forward = PatchOperation::new(
                 limits,
                 "cell.set",
@@ -1852,6 +1886,11 @@ impl SemanticPatch {
                 "state".to_string(),
                 cell_state(change.storage, &change.value),
             );
+            append_formula_dependency(
+                snapshot,
+                &sheet.entries[change.entry],
+                &mut inverse_preconditions,
+            )?;
             let inverse = PatchOperation::new(
                 limits,
                 "cell.set",
@@ -2135,8 +2174,19 @@ fn append_structural_semantic(
         serde_json::Value::String(sheet_data.name.clone()),
     );
     let (op, value, inverse_op, inverse_value, inverse_name) = match change {
-        StructuralChange::Cell { before, after, .. } => {
+        StructuralChange::Cell {
+            reference,
+            before,
+            after,
+            ..
+        } => {
             preconditions.insert("state".to_string(), optional_cell_state(before.as_ref()));
+            if matches!(before, Some((Storage::Formula, _, _))) {
+                let entry = unique_entry(&sheet_data.entries, *reference)?.ok_or_else(|| {
+                    Error::UnsafeEdit("Formula dependency owner is absent".into())
+                })?;
+                append_formula_dependency(snapshot, entry, &mut preconditions)?;
+            }
             if let Some((_, _, style)) = after {
                 preconditions.insert(
                     "target_xf".to_string(),
@@ -2243,6 +2293,16 @@ fn append_structural_semantic(
     if let StructuralChange::Cell { after, .. } = change {
         inverse_preconditions.insert("state".to_string(), optional_cell_state(after.as_ref()));
         if let StructuralChange::Cell {
+            reference,
+            after: Some((Storage::Formula, _, _)),
+            ..
+        } = change
+        {
+            let entry = unique_entry(&sheet_data.entries, *reference)?
+                .ok_or_else(|| Error::UnsafeEdit("Formula dependency owner is absent".into()))?;
+            append_formula_dependency(snapshot, entry, &mut inverse_preconditions)?;
+        }
+        if let StructuralChange::Cell {
             before: Some((_, _, style)),
             ..
         } = change
@@ -2285,8 +2345,8 @@ fn append_resource_semantic(
             insert,
         } => (
             format!("resource/xf/{:05}", index.get()),
-            if *insert { "xf.duplicate" } else { "xf.remove" },
-            if *insert { "xf.remove" } else { "xf.duplicate" },
+            if *insert { "xf.author" } else { "xf.remove" },
+            if *insert { "xf.remove" } else { "xf.author" },
             serde_json::Value::String(bytes_hex(payload)),
             !*insert,
             *insert,
@@ -2325,6 +2385,76 @@ fn bytes_hex(bytes: &[u8]) -> String {
         encoded.push(char::from(HEX[usize::from(*byte & 0x0f)]));
     }
     encoded
+}
+
+fn append_formula_dependency(
+    snapshot: &Snapshot,
+    entry: &Entry,
+    preconditions: &mut BTreeMap<String, serde_json::Value>,
+) -> Result<()> {
+    if entry.cell.storage != Storage::Formula {
+        return Ok(());
+    }
+    preconditions.insert(
+        "formula_dependency".to_string(),
+        serde_json::Value::String(formula_dependency_fingerprint(snapshot, entry)?),
+    );
+    Ok(())
+}
+
+fn formula_dependency_fingerprint(snapshot: &Snapshot, entry: &Entry) -> Result<String> {
+    let start = entry.kind_offset;
+    if binary::read_u16_le_at(&snapshot.inner.workbook_stream, start)? != FORMULA {
+        return Err(Error::InvalidData(
+            "Formula dependency owner changed record kind".into(),
+        ));
+    }
+    let length_offset = start
+        .checked_add(2)
+        .ok_or_else(|| Error::InvalidData("Formula length offset overflow".into()))?;
+    let payload_len = usize::from(binary::read_u16_le_at(
+        &snapshot.inner.workbook_stream,
+        length_offset,
+    )?);
+    if payload_len < 22 {
+        return Err(Error::InvalidData(
+            "Formula dependency record is truncated".into(),
+        ));
+    }
+    let end = start
+        .checked_add(4)
+        .and_then(|value| value.checked_add(payload_len))
+        .ok_or_else(|| Error::InvalidData("Formula dependency range overflow".into()))?;
+    let dependency_start = start
+        .checked_add(18)
+        .ok_or_else(|| Error::InvalidData("Formula dependency offset overflow".into()))?;
+    let dependency = snapshot
+        .inner
+        .workbook_stream
+        .get(dependency_start..end)
+        .ok_or_else(|| Error::InvalidData("Formula dependency is outside Workbook".into()))?;
+    Ok(DiagnosticFingerprint::of(dependency).as_hex())
+}
+
+fn verify_formula_dependency(
+    snapshot: &Snapshot,
+    entry: &Entry,
+    operation: &PatchOperation,
+) -> Result<()> {
+    if entry.cell.storage != Storage::Formula {
+        return Ok(());
+    }
+    let expected = operation
+        .preconditions
+        .get("formula_dependency")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| Error::InvalidData("Formula patch has no token dependency".into()))?;
+    if formula_dependency_fingerprint(snapshot, entry)? != expected {
+        return Err(Error::UnsafeEdit(
+            "Formula token dependency is stale".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn effective_xf_fingerprint(
@@ -2445,7 +2575,7 @@ fn semantic_operation_order(operation: &PatchOperation) -> u8 {
         3
     } else if matches!(
         operation.op.as_str(),
-        "sst.intern" | "sst.remove" | "xf.duplicate" | "xf.remove"
+        "sst.intern" | "sst.remove" | "xf.author" | "xf.duplicate" | "xf.remove"
     ) {
         0
     } else {
@@ -2471,7 +2601,7 @@ fn apply_semantic_operation(
 ) -> Result<()> {
     match operation.op.as_str() {
         "sst.intern" | "sst.remove" => apply_sst_semantic(transaction, operation),
-        "xf.duplicate" | "xf.remove" => apply_xf_semantic(transaction, operation),
+        "xf.author" | "xf.duplicate" | "xf.remove" => apply_xf_semantic(transaction, operation),
         "cell.set" => apply_fixed_semantic(source, transaction, operation, sheet_names),
         "cell.structural" => {
             apply_structural_cell_semantic(source, transaction, operation, sheet_names)
@@ -2578,7 +2708,7 @@ fn apply_xf_semantic(transaction: &mut Transaction, operation: &PatchOperation) 
     transaction.stage_resource(ResourceChange::ExtendedFormat {
         index,
         payload,
-        insert: operation.op == "xf.duplicate",
+        insert: matches!(operation.op.as_str(), "xf.author" | "xf.duplicate"),
     })
 }
 
@@ -2626,6 +2756,7 @@ fn apply_fixed_semantic(
             "semantic patch cell precondition is stale".into(),
         ));
     }
+    verify_formula_dependency(source, &sheet.entries[entry_index], operation)?;
     let (storage, value) = parse_cell_state(&operation.value)?;
     let shared_strings = transaction.effective_shared_strings();
     let represented = target_storage(cell.storage, &value, &shared_strings)?;
@@ -2667,6 +2798,9 @@ fn apply_structural_cell_semantic(
         return Err(Error::UnsafeEdit(
             "structural cell patch precondition is stale".into(),
         ));
+    }
+    if let Some(entry) = unique_entry(&sheet.entries, reference)? {
+        verify_formula_dependency(source, entry, operation)?;
     }
     let after = parse_optional_cell_state(&operation.value)?;
     if let Some((_, _, style)) = &after {
@@ -3503,6 +3637,16 @@ fn storage_for_new_value(value: &Value, shared_strings: &[String]) -> Result<Sto
             "a cached result cannot create a formula without formula tokens".into(),
         )),
     }
+}
+
+fn validate_xf_payload(payload: &[u8]) -> Result<()> {
+    if payload.len() != 20 {
+        return Err(Error::InvalidData(format!(
+            "BIFF8 XF payload must be exactly 20 bytes, found {}",
+            payload.len()
+        )));
+    }
+    Ok(())
 }
 
 fn valid_formula_cache(cache: &FormulaCache) -> bool {

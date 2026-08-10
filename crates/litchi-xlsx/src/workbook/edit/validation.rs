@@ -27,6 +27,27 @@ pub(super) struct SheetActions {
     pub(super) columns: BTreeMap<ColumnIndex, ColumnAction>,
     pub(super) merges: Vec<MergeIntent>,
     pub(super) page_breaks: Option<crate::page_breaks::PageBreaks>,
+    pub(super) page_setup: Option<OptionalAction<crate::page_setup::Setup>>,
+    pub(super) print_options: Option<OptionalAction<crate::print_options::PrintOptions>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum OptionalAction<T> {
+    Put(T),
+    Remove,
+}
+
+impl<T> OptionalAction<T> {
+    pub(super) fn from_option(value: Option<T>) -> Self {
+        value.map_or(Self::Remove, Self::Put)
+    }
+
+    pub(super) const fn as_option(&self) -> Option<&T> {
+        match self {
+            Self::Put(value) => Some(value),
+            Self::Remove => None,
+        }
+    }
 }
 
 impl SheetActions {
@@ -40,6 +61,8 @@ impl SheetActions {
             .saturating_add(self.columns.len())
             .saturating_add(self.merges.len())
             .saturating_add(usize::from(self.page_breaks.is_some()))
+            .saturating_add(usize::from(self.page_setup.is_some()))
+            .saturating_add(usize::from(self.print_options.is_some()))
     }
 
     pub(super) fn is_empty(&self) -> bool {
@@ -52,6 +75,8 @@ impl SheetActions {
             && self.columns.is_empty()
             && self.merges.is_empty()
             && self.page_breaks.is_none()
+            && self.page_setup.is_none()
+            && self.print_options.is_none()
     }
 }
 

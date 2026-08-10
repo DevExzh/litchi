@@ -263,16 +263,16 @@ pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)
 }
 
 fn declared_bytes(resource: &'static str, actual: u64, maximum: usize) -> Result<()> {
-    let Ok(maximum) = u64::try_from(maximum) else {
+    let Ok(maximum_u64) = u64::try_from(maximum) else {
         // On a target with a wider usize, every possible declared u64 length
         // is necessarily within this limit.
         return Ok(());
     };
-    if actual > maximum {
+    if actual > maximum_u64 {
         return Err(Error::Limit {
             resource,
             actual,
-            maximum,
+            maximum: maximum_u64,
         });
     }
     Ok(())

@@ -24,6 +24,24 @@ pub struct Resource {
 }
 
 impl Resource {
+    /// Creates a detached inert resource reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the unresolved reference is empty.
+    pub fn new(kind: Kind, href: impl Into<String>) -> litchi_core::Result<Self> {
+        let resource_href = href.into();
+        if resource_href.is_empty() {
+            return Err(litchi_core::Error::InvalidFormat(
+                "OTH resource reference cannot be empty".to_string(),
+            ));
+        }
+        Ok(Self {
+            href: resource_href,
+            kind,
+        })
+    }
+
     pub(crate) const fn projected(kind: Kind, href: String) -> Self {
         Self { href, kind }
     }

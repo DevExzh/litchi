@@ -124,6 +124,14 @@ impl Image {
         self.package.resource_file(path)
     }
 
+    /// Audits whether this exact package can enter changed-byte publication.
+    ///
+    /// The audit is inert: it does not verify signatures, decrypt content, or
+    /// mutate bytes. Every independently detected blocker is returned.
+    pub fn rewrite_capability(&self) -> Result<crate::RewriteCapability> {
+        self.package.rewrite_capability()
+    }
+
     /// Starts a source-bound package image transaction.
     ///
     /// This supports the same lossless existing-name and existing-source edits

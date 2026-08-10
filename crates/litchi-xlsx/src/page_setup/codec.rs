@@ -16,6 +16,169 @@ use super::model::{
     Orientation, Paper, RelId, Scale, Setup,
 };
 
+/// Serialize one relationship-free core `pageSetup` element.
+#[must_use]
+pub fn write_page_setup(value: &Setup) -> Vec<u8> {
+    format!("<pageSetup{}/>", setup_attributes(value)).into_bytes()
+}
+
+/// Replace, insert, or remove the direct worksheet `pageSetup` value.
+pub fn replace_worksheet_page_setup(xml: &[u8], value: Option<&Setup>) -> Result<Vec<u8>> {
+    let _ = parse_worksheet_page_setup(xml)?;
+    let printer_settings = parse_worksheet_page_setup_relationship_id(xml)?;
+    if value.is_none() && printer_settings.is_some() {
+        return Err(Error::Unsupported {
+            feature: "removing page setup while printer settings are attached",
+        });
+    }
+    let attributes = value
+        .map(|value| {
+            let mut attributes = setup_attributes(value);
+            if let Some(relationship_id) = &printer_settings {
+                let namespace = relationship_namespace_for_worksheet(xml)?;
+                attributes.push_str(" xmlns:r=\"");
+                attributes.push_str(namespace);
+                attributes.push_str("\" r:id=\"");
+                attributes.push_str(&litchi_core::xml::escape_xml(relationship_id.as_str()));
+                attributes.push('"');
+            }
+            Ok::<_, Error>(attributes)
+        })
+        .transpose()?;
+    let output = crate::raw::worksheet_property::replace_direct_empty(
+        xml,
+        "pageSetup",
+        attributes.as_deref(),
+        &[
+            b"headerFooter",
+            b"rowBreaks",
+            b"colBreaks",
+            b"customProperties",
+            b"cellWatches",
+            b"ignoredErrors",
+            b"smartTags",
+            b"drawing",
+            b"legacyDrawing",
+            b"legacyDrawingHF",
+            b"picture",
+            b"oleObjects",
+            b"controls",
+            b"webPublishItems",
+            b"tableParts",
+            b"extLst",
+        ],
+        "page-setup worksheet output",
+    )?;
+    if parse_worksheet_page_setup(&output)?.as_ref() != value {
+        return Err(invalid("worksheet page-setup write verification failed"));
+    }
+    Ok(output)
+}
+
+fn relationship_namespace_for_worksheet(xml: &[u8]) -> Result<&'static str> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let event = reader.read_event().map_err(xml_error)?.into_owned();
+        let resolver = reader.resolver();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) if element.local_name().as_ref() == b"worksheet" => {
+                return match namespace {
+                    ResolveResult::Bound(Namespace(value)) if value == CORE => {
+                        std::str::from_utf8(REL).map_err(|error| {
+                            invalid(format!("relationship namespace is not UTF-8: {error}"))
+                        })
+                    },
+                    ResolveResult::Bound(Namespace(value)) if value == STRICT => {
+                        std::str::from_utf8(STRICT_REL).map_err(|error| {
+                            invalid(format!("relationship namespace is not UTF-8: {error}"))
+                        })
+                    },
+                    _ => Err(invalid("page-setup writer requires a worksheet root")),
+                };
+            },
+            Event::Decl(_) | Event::Comment(_) | Event::Text(_) => {},
+            _ => return Err(invalid("page-setup writer requires a worksheet root")),
+        }
+    }
+}
+
+fn setup_attributes(value: &Setup) -> String {
+    let mut output = String::new();
+    for (name, value) in [
+        (
+            "paperSize",
+            value.paper.map(|value| value.get().to_string()),
+        ),
+        (
+            "paperWidth",
+            value.paper_width.as_ref().map(ToString::to_string),
+        ),
+        (
+            "paperHeight",
+            value.paper_height.as_ref().map(ToString::to_string),
+        ),
+        ("scale", value.scale.map(|value| value.get().to_string())),
+        (
+            "firstPageNumber",
+            value.first_page.map(|value| value.wire().to_string()),
+        ),
+        (
+            "fitToWidth",
+            value.fit_to_width.map(|value| value.get().to_string()),
+        ),
+        (
+            "fitToHeight",
+            value.fit_to_height.map(|value| value.get().to_string()),
+        ),
+        (
+            "pageOrder",
+            value.order.map(|value| value.as_str().to_owned()),
+        ),
+        (
+            "orientation",
+            value.orientation.map(|value| value.as_str().to_owned()),
+        ),
+        (
+            "usePrinterDefaults",
+            value.use_printer_defaults.map(bool_wire),
+        ),
+        ("blackAndWhite", value.black_and_white.map(bool_wire)),
+        ("draft", value.draft.map(bool_wire)),
+        (
+            "cellComments",
+            value.comments.map(|value| value.as_str().to_owned()),
+        ),
+        ("useFirstPageNumber", value.use_first_page.map(bool_wire)),
+        (
+            "errors",
+            value.errors.map(|value| value.as_str().to_owned()),
+        ),
+        (
+            "horizontalDpi",
+            value.horizontal_dpi.map(|value| value.get().to_string()),
+        ),
+        (
+            "verticalDpi",
+            value.vertical_dpi.map(|value| value.get().to_string()),
+        ),
+        ("copies", value.copies.map(|value| value.get().to_string())),
+    ] {
+        if let Some(value) = value {
+            output.push(' ');
+            output.push_str(name);
+            output.push_str("=\"");
+            output.push_str(&litchi_core::xml::escape_xml(&value));
+            output.push('"');
+        }
+    }
+    output
+}
+
+fn bool_wire(value: bool) -> String {
+    if value { "1" } else { "0" }.to_owned()
+}
+
 pub(super) const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 pub(super) const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 pub(super) const REL: &[u8] =

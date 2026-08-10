@@ -196,6 +196,13 @@ pub enum DrawingDependency {
     InlinePictureOrObjectPreview,
     /// `0x0008`: floating shape/picture with `PlcfSpa` and drawing-group edges.
     FloatingOfficeArt,
+    /// A picture graph uses sharing, grouping, textboxes, producer extensions,
+    /// noncanonical PICF transforms, or an external/delay-loaded BLIP.
+    UnsupportedPictureGraph,
+    /// The receiver already owns picture/shape identifiers or a BLIP store.
+    PictureGraphCollision,
+    /// Picture graph rewriting outside the main story is not modeled.
+    AuxiliaryStoryPicture,
     /// `0xFFFC`: producer-defined object replacement character.
     ObjectReplacement,
     /// Another active control whose coupled binary owner is not modeled here.
@@ -207,6 +214,9 @@ impl DrawingDependency {
         match self {
             Self::InlinePictureOrObjectPreview => "inline-picture/embedded-preview",
             Self::FloatingOfficeArt => "floating-OfficeArt",
+            Self::UnsupportedPictureGraph => "unsupported-picture-graph",
+            Self::PictureGraphCollision => "picture-graph-collision",
+            Self::AuxiliaryStoryPicture => "auxiliary-story-picture",
             Self::ObjectReplacement => "object-replacement",
             Self::UnsupportedControl => "active-control",
         }
@@ -871,6 +881,53 @@ impl Snapshot {
         })
     }
 
+    /// Plans transfer of one canonical singleton inline or floating picture
+    /// graph into a non-empty inert main-story placeholder.
+    ///
+    /// The bounded closure owns the marker CHPX, exact PICF/Data block, and,
+    /// for floating pictures, the singleton `PlcfSpaMom` and `DggInfo` graph.
+    /// Shared BLIP stores, groups, textboxes, producer extensions, delay-loaded
+    /// images, auxiliary stories, and receivers with any existing drawing
+    /// graph are refused explicitly.
+    pub fn plan_picture_transfer_from(
+        &self,
+        donor: &Self,
+        source: TextTarget,
+        destination: TextTarget,
+    ) -> Result<PictureTransferPlan> {
+        if target_story(source) != Story::Main || target_story(destination) != Story::Main {
+            return Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::AuxiliaryStoryPicture,
+            }));
+        }
+        let donor_editor = donor.editor()?;
+        let source_span = resolve_target(&donor_editor, source)?;
+        let floating = match source_span.text.as_str() {
+            "\u{0001}" => false,
+            "\u{0008}" => true,
+            _ => {
+                return Err(Error::Refused(Refusal::DrawingDependency {
+                    dependency: DrawingDependency::UnsupportedPictureGraph,
+                }));
+            },
+        };
+        let graph = donor_editor
+            .picture_graph_at_cp(source_span.start_cp, floating)
+            .map_err(|error| {
+                let _reason = error.to_string();
+                Error::Refused(Refusal::DrawingDependency {
+                    dependency: DrawingDependency::UnsupportedPictureGraph,
+                })
+            })?;
+        let mut validation = self.edit()?;
+        validation.install_picture(destination, graph.clone())?;
+        Ok(PictureTransferPlan {
+            target: self.lineage(),
+            destination,
+            graph,
+        })
+    }
+
     /// Non-mutating three-way plan for two patches based on this exact source.
     pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
         if left.before != *self || right.before != *self {
@@ -1077,6 +1134,74 @@ impl Edit {
             return Err(Error::Conflict);
         }
         self.add_embedded_object(plan.options.clone())
+    }
+
+    /// Applies a canonical picture graph prepared for this exact receiver.
+    pub fn apply_picture_transfer(&mut self, plan: &PictureTransferPlan) -> Result<()> {
+        if plan.target != self.source.lineage() {
+            return Err(Error::Conflict);
+        }
+        self.install_picture(plan.destination, plan.graph.clone())
+    }
+
+    fn install_picture(
+        &mut self,
+        target: TextTarget,
+        graph: crate::tracked_revision::PictureGraph,
+    ) -> Result<()> {
+        if target_story(target) != Story::Main {
+            return Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::AuxiliaryStoryPicture,
+            }));
+        }
+        let span = resolve_target(&self.editor, target)?;
+        if span.start_cp == span.end_cp || has_structural_content(&span.text) {
+            return Err(Error::Refused(Refusal::StructuralContent));
+        }
+        if drawing_dependency(&span.text).is_some() {
+            return Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::PictureGraphCollision,
+            }));
+        }
+        if text_revision_intersects(&self.editor, span.start_cp, span.end_cp)? {
+            return Err(Error::Refused(Refusal::TrackedText));
+        }
+        if !self
+            .editor
+            .has_empty_picture_graph()
+            .map_err(Error::Invalid)?
+        {
+            return Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::PictureGraphCollision,
+            }));
+        }
+        let actual = 1;
+        self.ensure_replacement_capacity(actual)?;
+        self.ensure_operation_capacity()?;
+        if !self
+            .editor
+            .has_uniform_character_format(span.start_cp, span.end_cp)
+            .map_err(Error::Invalid)?
+        {
+            return Err(Error::Refused(Refusal::FormattingDependency));
+        }
+        let expected = span.text.encode_utf16().count();
+        if expected != actual
+            && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
+        {
+            return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
+        }
+        let before = PictureSlot::Text(span.text);
+        self.editor
+            .replace_with_picture_graph(span.start_cp, span.end_cp, &graph)
+            .map_err(Error::Invalid)?;
+        self.replacement_units = self.replacement_units.saturating_add(actual);
+        self.changes.push(Change::Picture {
+            target,
+            before,
+            after: PictureSlot::Graph(graph),
+        });
+        Ok(())
     }
 
     /// Adds one inert embedded object through the dedicated field,
@@ -1517,6 +1642,12 @@ pub enum ChangeRef<'a> {
         before_present: bool,
         after_present: bool,
     },
+    /// One text placeholder/picture-graph presence transition.
+    Picture {
+        target: TextTarget,
+        before_present: bool,
+        after_present: bool,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1525,6 +1656,18 @@ struct RevisionSpec {
     start_cp: u32,
     end_cp: u32,
     metadata: RevisionMetadata,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum PictureSlot {
+    Text(String),
+    Graph(crate::tracked_revision::PictureGraph),
+}
+
+impl PictureSlot {
+    const fn is_graph(&self) -> bool {
+        matches!(self, Self::Graph(_))
+    }
 }
 
 impl RevisionSpec {
@@ -1580,6 +1723,11 @@ enum Change {
         before: Option<crate::embedded_object::WriteOptions>,
         after: Option<crate::embedded_object::WriteOptions>,
     },
+    Picture {
+        target: TextTarget,
+        before: PictureSlot,
+        after: PictureSlot,
+    },
 }
 
 impl Change {
@@ -1596,6 +1744,7 @@ impl Change {
             Self::EmbeddedObject { storage_id, .. } => {
                 format!("resource/embedded:{storage_id}")
             },
+            Self::Picture { target, .. } => format!("{}/text", durable_target(*target)),
         }
     }
 
@@ -1667,6 +1816,18 @@ impl Change {
                     ..
                 },
             ) => left_id == right_id && left_after == right_after,
+            (
+                Self::Picture {
+                    target: left_target,
+                    after: left_after,
+                    ..
+                },
+                Self::Picture {
+                    target: right_target,
+                    after: right_after,
+                    ..
+                },
+            ) => left_target == right_target && left_after == right_after,
             _ => false,
         }
     }
@@ -1727,6 +1888,15 @@ impl Change {
                 before_present: before.is_some(),
                 after_present: after.is_some(),
             },
+            Self::Picture {
+                target,
+                before,
+                after,
+            } => ChangeRef::Picture {
+                target: *target,
+                before_present: before.is_graph(),
+                after_present: after.is_graph(),
+            },
         }
     }
 
@@ -1776,6 +1946,15 @@ impl Change {
                 after,
             } => Self::EmbeddedObject {
                 storage_id: *storage_id,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Picture {
+                target,
+                before,
+                after,
+            } => Self::Picture {
+                target: *target,
                 before: after.clone(),
                 after: before.clone(),
             },
@@ -1996,6 +2175,32 @@ pub struct EmbeddedTransferPlan {
     options: crate::embedded_object::WriteOptions,
 }
 
+/// Canonical singleton inline/floating picture closure prepared for one exact
+/// receiver artifact.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PictureTransferPlan {
+    target: Lineage,
+    destination: TextTarget,
+    graph: crate::tracked_revision::PictureGraph,
+}
+
+impl PictureTransferPlan {
+    #[must_use]
+    pub const fn destination(&self) -> TextTarget {
+        self.destination
+    }
+
+    #[must_use]
+    pub const fn is_floating(&self) -> bool {
+        self.graph.floating
+    }
+
+    #[must_use]
+    pub fn picture_block_size(&self) -> usize {
+        self.graph.picture_block.len()
+    }
+}
+
 impl EmbeddedTransferPlan {
     /// Destination semantic storage identifier.
     #[must_use]
@@ -2160,6 +2365,11 @@ fn durable_operation(
                 format!("resource/embedded:{storage_id}"),
                 embedded_options_value(after.as_ref(), blobs)?,
             )
+        },
+        Change::Picture { .. } => {
+            return Err(PatchError::InvalidText {
+                field: "picture graph durable operation",
+            });
         },
     };
     PatchOperation::new(limits, op, target, preconditions, value)
@@ -2561,6 +2771,22 @@ fn apply_change_after(edit: &mut Edit, change: &Change) -> Result<()> {
             before,
             after,
         } => set_embedded_object(edit, *storage_id, before.clone(), after.clone()),
+        Change::Picture {
+            target,
+            before,
+            after,
+        } => match (before, after) {
+            (PictureSlot::Text(expected), PictureSlot::Graph(graph)) => {
+                let actual = resolve_target(&edit.editor, *target)?;
+                if actual.text != expected.as_str() {
+                    return Err(Error::Conflict);
+                }
+                edit.install_picture(*target, graph.clone())
+            },
+            _ => Err(Error::Refused(Refusal::TransferDependency {
+                dependency: "picture removal/replacement",
+            })),
+        },
     }
 }
 
@@ -3128,7 +3354,9 @@ mod tests {
         Snapshot, Story, TextTarget, TransactionLimits,
     };
     use crate::tracked_revision::Limits;
-    use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
+    use crate::writer::{
+        CharacterFormatting, FloatingPosition, ParagraphFormatting, Picture, TextRevision, Writer,
+    };
     use litchi_cfb::OleWriter;
     use litchi_core::Position;
     use litchi_core::patch::{
@@ -3151,6 +3379,26 @@ mod tests {
         writer
             .write_to(&mut output)
             .expect("fixture DOC must serialize");
+        output.into_inner()
+    }
+
+    fn picture_doc(floating: bool) -> Vec<u8> {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/images/png/lena.png"),
+        )
+        .expect("PNG fixture");
+        let picture = Picture::new(bytes).expect("picture fixture");
+        let mut writer = Writer::new();
+        if floating {
+            writer
+                .insert_floating_picture(picture, FloatingPosition::new(1440, 720))
+                .expect("floating picture");
+        } else {
+            writer.insert_picture(picture).expect("inline picture");
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("picture DOC");
         output.into_inner()
     }
 
@@ -3800,7 +4048,7 @@ mod tests {
         writer
             .insert_floating_shape(
                 crate::writer::Shape::new(crate::writer::Kind::Rectangle, 720, 360).expect("shape"),
-                crate::writer::FloatingPosition::new(120, 240),
+                FloatingPosition::new(120, 240),
             )
             .expect("floating shape");
         let mut output = Cursor::new(Vec::new());
@@ -3883,5 +4131,116 @@ mod tests {
             .apply_durable(&durable.inverse())
             .expect("revision durable inverse");
         assert_eq!(restored.revisions().expect("restored revisions").len(), 1);
+    }
+
+    #[test]
+    fn canonical_inline_and_floating_picture_graphs_transfer_and_reopen() {
+        for floating in [false, true] {
+            let donor = Snapshot::parse(&picture_doc(floating)).expect("picture donor");
+            let receiver = Snapshot::parse(&doc(&["placeholder", "other"])).expect("receiver");
+            let plan = receiver
+                .plan_picture_transfer_from(
+                    &donor,
+                    TextTarget::body_paragraph(Position::new(0)),
+                    TextTarget::body_paragraph(Position::new(0)),
+                )
+                .expect("bounded picture transfer plan");
+            assert_eq!(plan.is_floating(), floating);
+            assert!(plan.picture_block_size() > 68);
+
+            let mut edit = receiver.edit().expect("picture edit");
+            edit.apply_picture_transfer(&plan)
+                .expect("install picture graph");
+            let commit = edit.commit().expect("picture commit and full reopen");
+            let marker = if floating { '\u{0008}' } else { '\u{0001}' };
+            assert_eq!(
+                commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
+                marker.to_string()
+            );
+            assert_eq!(
+                commit
+                    .patch()
+                    .changes()
+                    .filter(|change| matches!(change, super::ChangeRef::Picture { .. }))
+                    .count(),
+                1
+            );
+            assert_eq!(
+                commit
+                    .patch()
+                    .inverse()
+                    .apply(commit.snapshot())
+                    .expect("exact picture inverse"),
+                receiver
+            );
+
+            let mut right = receiver.edit().expect("disjoint text edit");
+            right
+                .replace_paragraph(Position::new(1), "changed")
+                .expect("disjoint replacement");
+            let right = right.commit().expect("disjoint text commit");
+            let merged = receiver
+                .plan_three_way(commit.patch(), right.patch())
+                .expect("picture/text three-way plan");
+            assert!(merged.is_conflict_free());
+            let merged = merged.commit().expect("picture/text merge");
+            assert_eq!(
+                merged.snapshot().paragraphs(Projection::All).unwrap()[1].text(),
+                "changed"
+            );
+
+            let mut history = receiver.history(HistoryLimits::new(1, u64::MAX));
+            history
+                .record(commit.snapshot().clone(), 1)
+                .expect("picture history record");
+            assert!(history.undo());
+            assert_eq!(history.current(), &receiver);
+            assert!(history.redo());
+            assert_eq!(history.current(), commit.snapshot());
+        }
+    }
+
+    #[test]
+    fn picture_transfer_refuses_receiver_graph_collision_and_shared_donor_graph() {
+        let singleton = Snapshot::parse(&picture_doc(false)).expect("singleton donor");
+        let receiver_with_picture =
+            Snapshot::parse(&picture_doc(false)).expect("occupied receiver");
+        assert!(matches!(
+            receiver_with_picture.plan_picture_transfer_from(
+                &singleton,
+                TextTarget::body_paragraph(Position::new(0)),
+                TextTarget::body_paragraph(Position::new(0)),
+            ),
+            Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::PictureGraphCollision
+            }))
+        ));
+
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/images/png/lena.png"),
+        )
+        .expect("PNG fixture");
+        let mut writer = Writer::new();
+        writer
+            .insert_picture(Picture::new(bytes.clone()).expect("first picture"))
+            .expect("first picture run");
+        writer
+            .insert_picture(Picture::new(bytes).expect("second picture"))
+            .expect("second picture run");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("shared donor DOC");
+        let shared = Snapshot::parse(&output.into_inner()).expect("shared donor");
+        let empty = Snapshot::parse(&doc(&["placeholder"])).expect("empty receiver");
+        assert!(matches!(
+            empty.plan_picture_transfer_from(
+                &shared,
+                TextTarget::body_paragraph(Position::new(0)),
+                TextTarget::body_paragraph(Position::new(0)),
+            ),
+            Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::UnsupportedPictureGraph
+            }))
+        ));
     }
 }

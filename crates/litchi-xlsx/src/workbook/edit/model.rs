@@ -682,6 +682,18 @@ pub enum Change {
         before: crate::page_breaks::PageBreaks,
         after: crate::page_breaks::PageBreaks,
     },
+    /// Direct worksheet page-setup state changed.
+    PageSetup {
+        sheet: Box<str>,
+        before: Option<crate::page_setup::Setup>,
+        after: Option<crate::page_setup::Setup>,
+    },
+    /// Direct worksheet print-option state changed.
+    PrintOptions {
+        sheet: Box<str>,
+        before: Option<crate::print_options::PrintOptions>,
+        after: Option<crate::print_options::PrintOptions>,
+    },
 }
 
 impl Change {
@@ -699,7 +711,9 @@ impl Change {
             | Self::Cell { sheet, .. }
             | Self::Row { sheet, .. }
             | Self::Column { sheet, .. }
-            | Self::PageBreaks { sheet, .. } => sheet,
+            | Self::PageBreaks { sheet, .. }
+            | Self::PageSetup { sheet, .. }
+            | Self::PrintOptions { sheet, .. } => sheet,
         }
     }
 
@@ -719,7 +733,9 @@ impl Change {
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -743,7 +759,9 @@ impl Change {
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -763,7 +781,9 @@ impl Change {
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -788,7 +808,9 @@ impl Change {
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -840,7 +862,9 @@ impl Change {
             | Self::Merge { .. }
             | Self::Row { .. }
             | Self::Column { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -862,7 +886,9 @@ impl Change {
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Column { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -887,7 +913,9 @@ impl Change {
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -923,6 +951,34 @@ impl Change {
     )> {
         match self {
             Self::PageBreaks { before, after, .. } => Some((before, after)),
+            _ => None,
+        }
+    }
+
+    /// Direct page-setup transition, when applicable.
+    #[must_use]
+    pub fn page_setup(
+        &self,
+    ) -> Option<(
+        Option<&crate::page_setup::Setup>,
+        Option<&crate::page_setup::Setup>,
+    )> {
+        match self {
+            Self::PageSetup { before, after, .. } => Some((before.as_ref(), after.as_ref())),
+            _ => None,
+        }
+    }
+
+    /// Direct print-option transition, when applicable.
+    #[must_use]
+    pub fn print_options(
+        &self,
+    ) -> Option<(
+        Option<&crate::print_options::PrintOptions>,
+        Option<&crate::print_options::PrintOptions>,
+    )> {
+        match self {
+            Self::PrintOptions { before, after, .. } => Some((before.as_ref(), after.as_ref())),
             _ => None,
         }
     }
@@ -1045,6 +1101,24 @@ impl Change {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::PageSetup {
+                sheet,
+                before,
+                after,
+            } => Self::PageSetup {
+                sheet: sheet.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::PrintOptions {
+                sheet,
+                before,
+                after,
+            } => Self::PrintOptions {
+                sheet: sheet.clone(),
+                before: *after,
+                after: *before,
+            },
         }
     }
 
@@ -1140,6 +1214,16 @@ pub enum Conflict {
         sheet: Box<str>,
         position: usize,
     },
+    /// Both branches replace page setup on the same worksheet.
+    PageSetup {
+        sheet: Box<str>,
+        position: usize,
+    },
+    /// Both branches replace print options on the same worksheet.
+    PrintOptions {
+        sheet: Box<str>,
+        position: usize,
+    },
 }
 
 impl Conflict {
@@ -1158,7 +1242,9 @@ impl Conflict {
             | Self::Cells { sheet, .. }
             | Self::Rows { sheet, .. }
             | Self::Columns { sheet, .. }
-            | Self::PageBreaks { sheet, .. } => sheet,
+            | Self::PageBreaks { sheet, .. }
+            | Self::PageSetup { sheet, .. }
+            | Self::PrintOptions { sheet, .. } => sheet,
         }
     }
 
@@ -1177,7 +1263,9 @@ impl Conflict {
             | Self::Cells { position, .. }
             | Self::Rows { position, .. }
             | Self::Columns { position, .. }
-            | Self::PageBreaks { position, .. } => *position,
+            | Self::PageBreaks { position, .. }
+            | Self::PageSetup { position, .. }
+            | Self::PrintOptions { position, .. } => *position,
         }
     }
 
@@ -1232,6 +1320,18 @@ impl Conflict {
         matches!(self, Self::PageBreaks { .. })
     }
 
+    /// Whether both edits replace page setup on the same worksheet.
+    #[must_use]
+    pub const fn is_page_setup(&self) -> bool {
+        matches!(self, Self::PageSetup { .. })
+    }
+
+    /// Whether both edits replace print options on the same worksheet.
+    #[must_use]
+    pub const fn is_print_options(&self) -> bool {
+        matches!(self, Self::PrintOptions { .. })
+    }
+
     /// Structurally overlapping merged ranges, when applicable.
     #[must_use]
     pub fn merges(&self) -> Option<&[Rect]> {
@@ -1256,7 +1356,9 @@ impl Conflict {
             | Self::Merges { .. }
             | Self::Rows { .. }
             | Self::Columns { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -1275,7 +1377,9 @@ impl Conflict {
             | Self::Merges { .. }
             | Self::Cells { .. }
             | Self::Columns { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -1295,7 +1399,9 @@ impl Conflict {
             | Self::Merges { .. }
             | Self::Cells { .. }
             | Self::Rows { .. }
-            | Self::PageBreaks { .. } => None,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -1307,7 +1413,9 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Web { .. }
-            | Self::PageBreaks { .. } => 1,
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => 1,
             Self::Defaults { fields, .. } => fields.bits().count_ones() as usize,
             Self::Merges { ranges, .. } => ranges.len(),
             Self::Cells { addresses, .. } => addresses.len(),
@@ -1365,6 +1473,8 @@ pub enum JoinFailure {
     TaskPanes,
     /// Both edits replace the complete workbook defined-name catalog.
     DefinedNames,
+    /// Both edits stage worksheet drawing graph transfers that cannot be joined.
+    DrawingTransfer,
 }
 
 /// Recoverable join failure that returns ownership of the rejected edit.
@@ -1395,9 +1505,10 @@ impl JoinError {
     pub fn conflicts(&self) -> Option<&ConflictSet> {
         match &self.failure {
             JoinFailure::Overlap(conflicts) => Some(conflicts),
-            JoinFailure::DifferentSnapshot | JoinFailure::TaskPanes | JoinFailure::DefinedNames => {
-                None
-            },
+            JoinFailure::DifferentSnapshot
+            | JoinFailure::TaskPanes
+            | JoinFailure::DefinedNames
+            | JoinFailure::DrawingTransfer => None,
         }
     }
 
@@ -1435,6 +1546,9 @@ impl fmt::Display for JoinError {
             JoinFailure::DefinedNames => {
                 formatter.write_str("both edits replace the workbook defined-name catalog")
             },
+            JoinFailure::DrawingTransfer => {
+                formatter.write_str("worksheet drawing graph transfers overlap")
+            },
         }
     }
 }
@@ -1455,6 +1569,13 @@ pub enum PackageChange {
         before: Box<[crate::raw::DefinedName]>,
         after: Box<[crate::raw::DefinedName]>,
     },
+    /// Selected worksheet drawing anchors and their image graph were cloned.
+    DrawingTransfer {
+        source: Box<str>,
+        target: Box<str>,
+        anchors: usize,
+        added: bool,
+    },
 }
 
 impl PackageChange {
@@ -1463,7 +1584,7 @@ impl PackageChange {
     pub fn task_panes(&self) -> (Option<&common_web::Panes>, Option<&common_web::Panes>) {
         match self {
             Self::TaskPanes { before, after } => (before.as_ref(), after.as_ref()),
-            Self::DefinedNames { .. } => (None, None),
+            Self::DefinedNames { .. } | Self::DrawingTransfer { .. } => (None, None),
         }
     }
 
@@ -1474,7 +1595,7 @@ impl PackageChange {
     ) -> Option<(&[crate::raw::DefinedName], &[crate::raw::DefinedName])> {
         match self {
             Self::DefinedNames { before, after } => Some((before, after)),
-            Self::TaskPanes { .. } => None,
+            Self::TaskPanes { .. } | Self::DrawingTransfer { .. } => None,
         }
     }
 
@@ -1487,6 +1608,17 @@ impl PackageChange {
             Self::DefinedNames { before, after } => Self::DefinedNames {
                 before: after.clone(),
                 after: before.clone(),
+            },
+            Self::DrawingTransfer {
+                source,
+                target,
+                anchors,
+                added,
+            } => Self::DrawingTransfer {
+                source: source.clone(),
+                target: target.clone(),
+                anchors: *anchors,
+                added: !added,
             },
         }
     }
@@ -1684,15 +1816,13 @@ impl Patch {
                 });
             }
         }
-        for change in &self.graph {
-            change.validate(&package)?;
-        }
         for change in &self.parts {
             package
                 .get_part_mut(&change.uri)?
                 .set_blob_shared(Arc::clone(&change.after));
         }
         for change in &self.graph {
+            change.validate(&package)?;
             change.apply(&mut package)?;
         }
         if let Some(web) = &self.web {

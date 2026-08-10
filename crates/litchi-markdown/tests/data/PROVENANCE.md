@@ -44,15 +44,14 @@ curl -fsSL https://spec.commonmark.org/0.31.2/spec.json \
 - Attribution: GitHub's `cmark-gfm` contributors; the GFM specification is
   based on the CommonMark specification by John MacFarlane.
 
-All 670 examples gate exact-source parsing, range integrity, deterministic
-reparse, and reversible editing. Expected HTML is asserted for the eight table
-and two strikethrough examples supported by the current parser dependency. The
-eleven extended-autolink examples and one tag-filter example remain in the
-parse/edit gate but are not claimed as semantic rendering conformance because
-`pulldown-cmark 0.13.4` does not implement those extensions. The remaining 648
-examples describe the older CommonMark 0.29 baseline, so their rendering is
-superseded by the complete CommonMark 0.31.2 gate rather than used to require
-obsolete parsing behavior.
+All 670 examples gate expected HTML, exact-source parsing, range integrity,
+deterministic reparse, and reversible editing. The reader layers deterministic
+GFM extended-autolink and disallowed-raw-HTML tag-filter behavior around
+`pulldown-cmark 0.13.4`; all 22 explicitly marked extension examples are
+therefore semantic rendering assertions. Compatibility normalization for the
+remaining older CommonMark 0.29 examples is confined to the GFM renderer. The
+independent CommonMark gate continues to require all 652 current CommonMark
+0.31.2 examples without that compatibility layer.
 
 Reproduction commands:
 

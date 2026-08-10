@@ -1,8 +1,8 @@
 use litchi_odb::{
-    ActiveContentKind, Builder, ChangeKind, Column, Component, ComponentKind, CompositionLimits,
-    Connection, Database, DependencyDisposition, EditPolicy, History, HistoryLimits, Index,
-    IndexColumn, JoinedEdits, Key, KeyColumn, KeyKind, MergeChoice, MergePlan, Patch, Query,
-    SealedPatch, SignaturePolicy, Table, TableKind,
+    ActiveContentDisposition, ActiveContentKind, Builder, ChangeKind, Column, Component,
+    ComponentKind, CompositionLimits, Connection, Database, DependencyDisposition, EditPolicy,
+    History, HistoryLimits, Index, IndexColumn, JoinedEdits, Key, KeyColumn, KeyKind, MergeChoice,
+    MergePlan, Patch, Query, SealedPatch, SignaturePolicy, Table, TableKind,
 };
 
 const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:database><d:data-source/><d:queries/></o:database></o:body></o:document-content>"#;
@@ -461,10 +461,10 @@ fn bounded_transfer_copies_only_inert_semantic_declarations() {
         .add_table(Table::new("transferred", TableKind::Definition).with_column(Column::new("id")))
         .unwrap();
     author
-        .add_query(Query::new(
-            "transferred-query",
-            "SELECT id FROM transferred",
-        ))
+        .add_query(
+            Query::new("transferred-query", "SELECT id FROM transferred")
+                .with_column(Column::new("id")),
+        )
         .unwrap();
     author
         .add_component(Component::new(ComponentKind::Report, "transferred-report"))
@@ -484,6 +484,15 @@ fn bounded_transfer_copies_only_inert_semantic_declarations() {
     let catalog = received.catalog().unwrap();
     assert!(catalog.table("transferred").unwrap().is_some());
     assert!(catalog.query("transferred-query").unwrap().is_some());
+    assert_eq!(
+        catalog
+            .query("transferred-query")
+            .unwrap()
+            .unwrap()
+            .columns()
+            .len(),
+        1
+    );
     assert!(catalog.components().iter().any(|component| {
         component.kind() == ComponentKind::Report && component.name() == Some("transferred-report")
     }));
@@ -508,22 +517,41 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
             Component::new(ComponentKind::Report, "payload-report").with_href("reports/source"),
         )
         .unwrap();
+    author
+        .add_component(
+            Component::new(ComponentKind::Report, "payload-report-two")
+                .with_href("reports/source-two"),
+        )
+        .unwrap();
     let donor = author.commit().unwrap().into_database();
     let owned = OwnedPackage::from_bytes(donor.as_bytes().to_vec()).unwrap();
-    let payload = b"<?xml version=\"1.0\"?><report:document xmlns:report=\"urn:example:report\"/>";
+    let payload = b"<?xml version=\"1.0\"?><report:document xmlns:report=\"urn:example:report\" xmlns:form=\"urn:oasis:names:tc:opendocument:xmlns:form:1.0\"><form:button/></report:document>";
     let donor = Database::from_bytes(
         rebuild_package(
             &owned,
             donor.content_xml(),
-            vec![Addition {
-                path: "reports/source/content.xml".to_string(),
-                bytes: payload.to_vec(),
-                media_type: "text/xml".to_string(),
-            }],
-            vec![(
-                "reports/source/".to_string(),
-                "application/vnd.sun.xml.report".to_string(),
-            )],
+            vec![
+                Addition {
+                    path: "reports/source/content.xml".to_string(),
+                    bytes: payload.to_vec(),
+                    media_type: "text/xml".to_string(),
+                },
+                Addition {
+                    path: "reports/source-two/content.xml".to_string(),
+                    bytes: payload.to_vec(),
+                    media_type: "text/xml".to_string(),
+                },
+            ],
+            vec![
+                (
+                    "reports/source/".to_string(),
+                    "application/vnd.sun.xml.report".to_string(),
+                ),
+                (
+                    "reports/source-two/".to_string(),
+                    "application/vnd.sun.xml.report".to_string(),
+                ),
+            ],
             Vec::<String>::new(),
             Vec::<String>::new(),
         )
@@ -532,13 +560,25 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
     .unwrap();
 
     let destination = source();
+    let mut refused = destination.edit();
+    assert!(
+        refused
+            .transfer_component_from_to(
+                &donor,
+                ComponentKind::Report,
+                "payload-report",
+                "reports/refused",
+            )
+            .is_err()
+    );
     let mut transfer = destination.edit();
     transfer
-        .transfer_component_from_to(
+        .transfer_component_from_to_with(
             &donor,
             ComponentKind::Report,
             "payload-report",
             "reports/imported",
+            ActiveContentDisposition::CopyInert,
         )
         .unwrap();
     let commit = transfer.commit().unwrap();
@@ -571,13 +611,34 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
         received.as_bytes()
     );
 
-    let prepared = commit.patch().prepare("payload", limits()).unwrap();
-    let mut joined = JoinedEdits::new(prepared.lineage().clone(), limits());
-    joined.join(prepared).unwrap();
-    assert!(matches!(
-        Patch::compose(joined),
-        Err(litchi_core::Error::Unsupported(_))
-    ));
+    let mut second = destination.edit();
+    second
+        .transfer_component_from_to_with(
+            &donor,
+            ComponentKind::Report,
+            "payload-report-two",
+            "reports/imported-two",
+            ActiveContentDisposition::CopyInert,
+        )
+        .unwrap();
+    let second = second.commit().unwrap();
+    let first = commit.patch().prepare("payload-one", limits()).unwrap();
+    let second = second.patch().prepare("payload-two", limits()).unwrap();
+    let mut joined = JoinedEdits::new(first.lineage().clone(), limits());
+    joined.join(second).unwrap();
+    joined.join(first).unwrap();
+    let composed = Patch::compose(joined).unwrap().apply(&destination).unwrap();
+    let package = OwnedPackage::from_bytes(composed.as_bytes().to_vec()).unwrap();
+    assert_eq!(
+        package.get_file("reports/imported/content.xml").unwrap(),
+        payload
+    );
+    assert_eq!(
+        package
+            .get_file("reports/imported-two/content.xml")
+            .unwrap(),
+        payload
+    );
 }
 
 #[test]
@@ -878,18 +939,16 @@ fn multiple_genuine_libreoffice_base_packages_survive_changed_full_reopen() {
         let database = Database::open(path).unwrap();
         let query_name = format!("__litchi_inert_reopen_{index}");
         let mut edit = database.edit();
-        edit.add_query(Query::new(&query_name, format!("SELECT {}", index + 1)))
-            .unwrap();
+        edit.add_query(
+            Query::new(&query_name, format!("SELECT {}", index + 1))
+                .with_column(Column::new("value")),
+        )
+        .unwrap();
         let committed = edit.commit().unwrap();
         let reopened = Database::from_bytes(committed.database().as_bytes().to_vec()).unwrap();
-        assert!(
-            reopened
-                .catalog()
-                .unwrap()
-                .query(&query_name)
-                .unwrap()
-                .is_some()
-        );
+        let catalog = reopened.catalog().unwrap();
+        let query = catalog.query(&query_name).unwrap().unwrap();
+        assert_eq!(query.columns().len(), 1);
         assert!(reopened.as_bytes().len() <= 256 * 1024 * 1024);
     }
 }

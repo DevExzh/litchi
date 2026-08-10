@@ -310,6 +310,20 @@ pub(crate) fn render_forms(forms: &[crate::form::Form]) -> Result<String> {
     Ok(xml)
 }
 
+pub(crate) fn render_resource(resource: &crate::resource::Resource) -> String {
+    let local = match resource.kind() {
+        crate::resource::Kind::Image => "image",
+        crate::resource::Kind::Object => "object",
+        crate::resource::Kind::OleObject => "object-ole",
+        crate::resource::Kind::Plugin => "plugin",
+        crate::resource::Kind::FloatingFrame => "floating-frame",
+    };
+    format!(
+        "<draw:{local} xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xlink:href=\"{}\"/>",
+        quick_xml::escape::escape(resource.href())
+    )
+}
+
 fn push_bookmark(output: &mut String, local: &str, name: &str) {
     output.push_str("<text:");
     output.push_str(local);
@@ -354,6 +368,9 @@ fn render_list(output: &mut String, list: &crate::list::List) {
             output.push('>');
             output.push_str(&quick_xml::escape::escape(paragraph.text()));
             output.push_str("</text:p>");
+        }
+        for nested in item.nested_lists() {
+            render_list(output, nested);
         }
         output.push_str("</text:list-item>");
     }

@@ -30,6 +30,8 @@ pub use flat::{FlatImage, FlatImageCommit, FlatImagePatch, FlatImageTransaction,
 pub use history::{CommittedTransition, History, HistoryArtifact};
 pub use model::{frame, map, resource, source};
 pub use semantic::{
-    ArtifactKind, Conflict, ConflictKind, FrameProperty, MetadataProperty, OperationKey,
-    ResourceValue, SecurityPolicy, SemanticOperation, SemanticPatch, SemanticPlan, SemanticValue,
+    ArtifactKind, CapabilityState, Conflict, ConflictKind, FrameProperty, MetadataProperty,
+    OperationKey, PublicationState, ResourceValue, RewriteBlocker, RewriteCapability,
+    SecurityCapabilities, SecurityPolicy, SemanticOperation, SemanticPatch, SemanticPlan,
+    SemanticValue,
 };

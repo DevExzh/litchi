@@ -11,7 +11,7 @@ use litchi_xlsb::cell_values::{
 };
 use litchi_xlsb::package::{SharedString, SharedStringRun};
 use litchi_xlsb::styles::{Alignment, Fill, Font, HorizontalAlignment, VerticalAlignment};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{ChartAnchor, Image, ImageFormat, MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -92,6 +92,11 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
 
 #[test]
 fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
+    const GIF_1X1: &[u8] = &[
+        0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00,
+        0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
+    ];
     let mut workbook = producer_workbook("Target", None);
     let style = AuthoredStyle {
         font: Font {
@@ -123,6 +128,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
     let shared_ref = Reference::new(1, 1).expect("shared reference");
     let rich_ref = Reference::new(1, 2).expect("rich reference");
     let formula_ref = Reference::new(1, 3).expect("formula reference");
+    let formula_string_ref = Reference::new(1, 4).expect("string-formula reference");
     let string = SharedString {
         text: "authored rich value".to_string(),
         runs: vec![SharedStringRun {
@@ -144,6 +150,23 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         &style,
     )
     .expect("formula authoring");
+    edit.insert_formula(
+        0,
+        formula_string_ref,
+        Value::FormulaStringCache("two".to_string()),
+        CellFormula::new(0, vec![0x1e, 2, 0], vec![]).expect("constant string-cache formula"),
+        &style,
+    )
+    .expect("string-cache formula authoring");
+    let image = Image::new(
+        GIF_1X1.to_vec(),
+        ImageFormat::Gif,
+        ChartAnchor::new(0, 3, 2, 7),
+    )
+    .expect("valid image")
+    .with_description("authored one-pixel image")
+    .expect("valid image description");
+    edit.insert_image(0, image).expect("image authoring");
     let commit = edit.commit().expect("root commit");
     let bytes = commit
         .patch()
@@ -178,14 +201,53 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
             .value(),
         &Value::FormulaNumberCache(2.0)
     );
+    assert_eq!(
+        snapshot
+            .cell(formula_string_ref)
+            .expect("lookup")
+            .expect("string formula")
+            .value(),
+        &Value::FormulaStringCache("two".to_string())
+    );
     assert!(workbook.styles().get_font(1).is_some());
+    let drawing = workbook.sheet_drawing(0).expect("authored drawing");
+    assert_eq!(drawing.images.len(), 1);
+    assert_eq!(drawing.images[0].data.as_ref(), GIF_1X1);
     let mut reopened_bytes = Cursor::new(Vec::new());
     workbook.save(&mut reopened_bytes).expect("save authored");
     let reopened =
         Workbook::new(Cursor::new(reopened_bytes.into_inner())).expect("reopen authored");
     assert_eq!(
         reopened.cell_values(0).expect("reopen cells").cells().len(),
-        3
+        4
+    );
+    assert_eq!(
+        reopened
+            .sheet_drawing(0)
+            .expect("reopened drawing")
+            .images
+            .len(),
+        1
+    );
+
+    let mut transfer_target = producer_workbook("Image target", None);
+    let mut transfer = transfer_target
+        .edit_workbook_structure()
+        .expect("image transfer edit");
+    transfer
+        .transfer_image(&reopened, 0, 0, 0, ChartAnchor::new(3, 4, 6, 9))
+        .expect("dependency-closed image transfer");
+    let transfer_commit = transfer.commit().expect("image transfer commit");
+    transfer_target
+        .apply_workbook_structure(&transfer_commit)
+        .expect("publish transferred image");
+    let transferred = transfer_target
+        .sheet_drawing(0)
+        .expect("transferred drawing");
+    assert_eq!(transferred.images[0].data.as_ref(), GIF_1X1);
+    assert_eq!(
+        transferred.images[0].description.as_deref(),
+        Some("authored one-pixel image")
     );
 }
 

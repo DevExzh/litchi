@@ -4,7 +4,7 @@
 //! executable form behavior. Package mutation is owned by [`crate::edit`].
 
 use litchi_core::{Error, Result, xml::escape_xml};
-use litchi_odf_common::package::{rebuild_package, splice};
+use litchi_odf_common::package::{is_linked_href, rebuild_package, resolve_package_path, splice};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -18,6 +18,46 @@ const MAX_XML_DEPTH: usize = 512;
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const FORM_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:form:1.0";
+const NUMBER_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0";
+const STYLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const TEXT_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const XLINK_NS: &[u8] = b"http://www.w3.org/1999/xlink";
+
+#[derive(Clone)]
+pub(crate) struct ResourceDependency {
+    pub(crate) href: String,
+    pub(crate) path: String,
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) media_type: String,
+}
+
+#[derive(Clone)]
+pub(crate) struct StyleDependency {
+    name: String,
+    xml: String,
+}
+
+#[derive(Clone)]
+pub(crate) struct TransferObject {
+    page: usize,
+    kind: ObjectKind,
+    source_name: String,
+    destination_name: String,
+    xml: String,
+    styles: Vec<StyleDependency>,
+    resources: Vec<ResourceDependency>,
+}
+
+#[derive(Clone)]
+pub(crate) struct TransferControl {
+    page: usize,
+    source_name: String,
+    destination_name: String,
+    declaration_xml: String,
+    visual_xml: String,
+    styles: Vec<StyleDependency>,
+    resources: Vec<ResourceDependency>,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ObjectKind {
@@ -54,6 +94,11 @@ pub(crate) enum Operation {
     RemoveControl {
         name: String,
     },
+    TransferObject(TransferObject),
+    TransferControl(TransferControl),
+    AddResources {
+        resources: Vec<ResourceDependency>,
+    },
 }
 
 #[derive(Clone, Copy)]
@@ -70,6 +115,12 @@ enum FormsSite {
         name_end: usize,
     },
     Missing(usize),
+}
+
+struct ResourceRemap {
+    xml: String,
+    resources: Vec<ResourceDependency>,
+    values: Vec<(String, String)>,
 }
 
 /// One styled span in a presentation paragraph.
@@ -595,35 +646,519 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
 }
 
+pub(crate) fn prepare_object_transfer(
+    source: &crate::core::OwnedPackage,
+    page: usize,
+    kind: ObjectKind,
+    source_name: &str,
+    destination_name: String,
+) -> Result<Operation> {
+    validate_name(destination_name.clone(), "transferred content object")?;
+    let content = package_xml(source, "content.xml")?;
+    let span = locate_object(&content, kind, source_name)?.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "ODP source content object '{source_name}' was not found"
+        ))
+    })?;
+    let source_xml = content
+        .get(span.start..span.end)
+        .ok_or_else(|| Error::InvalidFormat("invalid ODP source object span".into()))?
+        .to_string();
+    let xml = make_fragment_self_contained(&source_xml, &content)?;
+    let styles = collect_style_dependencies(source, &content, &xml)?;
+    let mut dependency_xml = xml.clone();
+    for style in &styles {
+        dependency_xml.push_str(&style.xml);
+    }
+    let resources = collect_resource_dependencies(source, &dependency_xml, "content.xml")?;
+    Ok(Operation::TransferObject(TransferObject {
+        page,
+        kind,
+        source_name: source_name.to_string(),
+        destination_name,
+        xml,
+        styles,
+        resources,
+    }))
+}
+
+pub(crate) fn prepare_control_transfer(
+    source: &crate::core::OwnedPackage,
+    page: usize,
+    source_name: &str,
+    destination_name: String,
+) -> Result<Operation> {
+    validate_name(destination_name.clone(), "transferred form control")?;
+    let content = package_xml(source, "content.xml")?;
+    let visual = locate_named_drawing(&content, source_name)?.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "ODP source form control '{source_name}' was not found"
+        ))
+    })?;
+    let declaration = locate_form_declaration(&content, source_name)?.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "ODP source form control declaration '{source_name}' was not found"
+        ))
+    })?;
+    let source_visual_xml = content
+        .get(visual.start..visual.end)
+        .ok_or_else(|| Error::InvalidFormat("invalid ODP source form-control span".into()))?
+        .to_string();
+    let source_declaration_xml = content
+        .get(declaration.start..declaration.end)
+        .ok_or_else(|| Error::InvalidFormat("invalid ODP source form declaration span".into()))?
+        .to_string();
+    let visual_xml = make_fragment_self_contained(&source_visual_xml, &content)?;
+    let declaration_xml = make_fragment_self_contained(&source_declaration_xml, &content)?;
+    let combined = format!("{declaration_xml}{visual_xml}");
+    let styles = collect_style_dependencies(source, &content, &combined)?;
+    let mut dependency_xml = combined;
+    for style in &styles {
+        dependency_xml.push_str(&style.xml);
+    }
+    let resources = collect_resource_dependencies(source, &dependency_xml, "content.xml")?;
+    Ok(Operation::TransferControl(TransferControl {
+        page,
+        source_name: source_name.to_string(),
+        destination_name,
+        declaration_xml,
+        visual_xml,
+        styles,
+        resources,
+    }))
+}
+
+pub(crate) fn prepare_resource_transfer(
+    source: &crate::core::OwnedPackage,
+    destination: &crate::core::OwnedPackage,
+    xml: &str,
+    source_base: &str,
+    destination_base: &str,
+) -> Result<(String, Operation)> {
+    let dependencies = collect_resource_dependencies(source, xml, source_base)?;
+    let remap = remap_resources(destination, xml, &dependencies, destination_base)?;
+    Ok((
+        remap.xml,
+        Operation::AddResources {
+            resources: remap.resources,
+        },
+    ))
+}
+
+pub(crate) fn resource_operation_is_empty(operation: &Operation) -> bool {
+    matches!(operation, Operation::AddResources { resources } if resources.is_empty())
+}
+
+fn package_xml(source: &crate::core::OwnedPackage, path: &str) -> Result<String> {
+    String::from_utf8(source.get_file(path)?).map_err(|cause| {
+        Error::InvalidFormat(format!("ODP XML part '{path}' is not UTF-8: {cause}"))
+    })
+}
+
+fn collect_style_dependencies(
+    source: &crate::core::OwnedPackage,
+    content: &str,
+    object_xml: &str,
+) -> Result<Vec<StyleDependency>> {
+    let styles_xml = source
+        .has_file("styles.xml")?
+        .then(|| package_xml(source, "styles.xml"))
+        .transpose()?;
+    let mut pending = collect_style_attribute_values(object_xml)?;
+    let mut visited = std::collections::BTreeSet::new();
+    let mut dependencies = Vec::new();
+    while let Some(name) = pending.pop() {
+        if !visited.insert(name.clone()) {
+            continue;
+        }
+        let mut located_fragment = locate_style_fragment(content, &name)?;
+        let mut namespace_owner = content;
+        if located_fragment.is_none()
+            && let Some(package_styles) = styles_xml.as_deref()
+        {
+            located_fragment = locate_style_fragment(package_styles, &name)?;
+            namespace_owner = package_styles;
+        }
+        let source_fragment = located_fragment.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "ODP transferred object has dangling style dependency '{name}'"
+            ))
+        })?;
+        for referenced in collect_style_attribute_values(&source_fragment)? {
+            if referenced == name {
+                continue;
+            }
+            if !visited.contains(&referenced) {
+                pending.push(referenced);
+            }
+        }
+        dependencies.push(StyleDependency {
+            name,
+            xml: make_fragment_self_contained(&source_fragment, namespace_owner)?,
+        });
+    }
+    Ok(dependencies)
+}
+
+fn locate_style_fragment(xml: &str, name: &str) -> Result<Option<String>> {
+    let mut span = locate_named_element_local(xml, STYLE_NS, b"style", b"name", name)?;
+    if span.is_none() {
+        span = locate_named_element_with_attribute(xml, NUMBER_NS, STYLE_NS, b"name", name)?;
+    }
+    if span.is_none() {
+        span = locate_named_element_local_with_attribute(
+            xml,
+            TEXT_NS,
+            b"list-style",
+            STYLE_NS,
+            b"name",
+            name,
+        )?;
+    }
+    let Some(found_span) = span else {
+        return Ok(None);
+    };
+    xml.get(found_span.start..found_span.end)
+        .map(str::to_string)
+        .ok_or_else(|| Error::InvalidFormat("invalid ODP style dependency span".into()))
+        .map(Some)
+}
+
+fn make_fragment_self_contained(fragment: &str, owner_xml: &str) -> Result<String> {
+    let Some(insertion) = fragment.find(|character: char| {
+        character.is_ascii_whitespace() || character == '>' || character == '/'
+    }) else {
+        return invalid("ODP transferred fragment has no complete root element");
+    };
+    let root_end = fragment.find('>').unwrap_or(fragment.len());
+    let root_start = fragment
+        .get(..root_end)
+        .ok_or_else(|| Error::InvalidFormat("invalid ODP transferred fragment root span".into()))?;
+    let mut declarations = String::new();
+    for (qualified_name, uri) in namespace_declarations(owner_xml)? {
+        if !root_start.contains(&format!("{qualified_name}=")) {
+            declarations.push(' ');
+            declarations.push_str(&qualified_name);
+            declarations.push_str("=\"");
+            declarations.push_str(&escape_xml(&uri));
+            declarations.push('"');
+        }
+    }
+    let mut output = fragment.to_string();
+    output.insert_str(insertion, &declarations);
+    Ok(output)
+}
+
+fn namespace_declarations(xml: &str) -> Result<Vec<(String, String)>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    loop {
+        let event = reader.read_event_into(&mut buffer).map_err(|cause| {
+            Error::InvalidFormat(format!("invalid ODP namespace-owner XML: {cause}"))
+        })?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let mut declarations = Vec::new();
+                for raw_attribute in element.attributes() {
+                    let attribute = raw_attribute.map_err(|cause| {
+                        Error::InvalidFormat(format!("invalid ODP namespace declaration: {cause}"))
+                    })?;
+                    let qualified_name = attribute.key.as_ref();
+                    if qualified_name == b"xmlns" || qualified_name.starts_with(b"xmlns:") {
+                        let uri = attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .map_err(|cause| {
+                                Error::InvalidFormat(format!(
+                                    "invalid ODP namespace declaration value: {cause}"
+                                ))
+                            })?;
+                        declarations.push((
+                            String::from_utf8(qualified_name.to_vec()).map_err(|cause| {
+                                Error::InvalidFormat(format!(
+                                    "ODP namespace name is not UTF-8: {cause}"
+                                ))
+                            })?,
+                            uri.into_owned(),
+                        ));
+                    }
+                }
+                return Ok(declarations);
+            },
+            Event::DocType(_) => return invalid("DTDs are not allowed in ODP namespace-owner XML"),
+            Event::Eof => return invalid("ODP namespace-owner XML has no root element"),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+}
+
+fn collect_resource_dependencies(
+    source: &crate::core::OwnedPackage,
+    xml: &str,
+    base_path: &str,
+) -> Result<Vec<ResourceDependency>> {
+    let hrefs = collect_attribute_values(xml, XLINK_NS, b"href")?;
+    let package = source.package()?;
+    let mut resources = Vec::new();
+    for href in hrefs {
+        if is_external_href(&href) {
+            continue;
+        }
+        let path = resolve_package_href(base_path, &href)?;
+        if !package.has_file(&path) {
+            return invalid(format!(
+                "ODP transferred object has dangling package resource '{href}'"
+            ));
+        }
+        let media_type = package
+            .manifest()
+            .get_entry(&path)
+            .map_or_else(String::new, |entry| entry.media_type.clone());
+        resources.push(ResourceDependency {
+            href,
+            bytes: package.get_file(&path)?,
+            path,
+            media_type,
+        });
+    }
+    Ok(resources)
+}
+
+fn is_external_href(href: &str) -> bool {
+    href.is_empty() || is_linked_href(href)
+}
+
+fn resolve_package_href(base_path: &str, href: &str) -> Result<String> {
+    let combined = base_path.rsplit_once('/').map_or_else(
+        || href.to_string(),
+        |(parent, _)| format!("{parent}/{href}"),
+    );
+    resolve_package_path(&combined)
+}
+
 pub(crate) fn apply(source: &crate::core::OwnedPackage, operation: &Operation) -> Result<Vec<u8>> {
     let content = String::from_utf8(source.get_file("content.xml")?)
         .map_err(|cause| Error::InvalidFormat(format!("ODP content.xml is not UTF-8: {cause}")))?;
-    let updated = match operation {
+    let (updated, resources) = match operation {
         Operation::AddObject {
             page,
             kind,
             name,
             xml,
-        } => add_object(&content, *page, *kind, name, xml)?,
+        } => (add_object(&content, *page, *kind, name, xml)?, Vec::new()),
         Operation::ReplaceObject {
             kind,
             name,
             new_name,
             xml,
-        } => replace_object(&content, *kind, name, new_name, xml)?,
-        Operation::RemoveObject { kind, name } => remove_object(&content, *kind, name)?,
-        Operation::AddControl { page, control } => add_control(&content, *page, control)?,
-        Operation::ReplaceControl { name, control } => replace_control(&content, name, control)?,
-        Operation::RemoveControl { name } => remove_control(&content, name)?,
+        } => (
+            replace_object(&content, *kind, name, new_name, xml)?,
+            Vec::new(),
+        ),
+        Operation::RemoveObject { kind, name } => {
+            (remove_object(&content, *kind, name)?, Vec::new())
+        },
+        Operation::AddControl { page, control } => {
+            (add_control(&content, *page, control)?, Vec::new())
+        },
+        Operation::ReplaceControl { name, control } => {
+            (replace_control(&content, name, control)?, Vec::new())
+        },
+        Operation::RemoveControl { name } => (remove_control(&content, name)?, Vec::new()),
+        Operation::TransferObject(transfer) => apply_object_transfer(source, &content, transfer)?,
+        Operation::TransferControl(transfer) => apply_control_transfer(source, &content, transfer)?,
+        Operation::AddResources { resources } => (
+            content,
+            validate_resource_additions(source, resources.clone())?,
+        ),
     };
+    let additions = resources
+        .into_iter()
+        .map(|resource| litchi_odf_common::package::Addition {
+            path: resource.path,
+            bytes: resource.bytes,
+            media_type: resource.media_type,
+        })
+        .collect();
     rebuild_package(
         source,
         &updated,
-        Vec::new(),
+        additions,
         Vec::new(),
         Vec::new(),
         Vec::new(),
     )
+}
+
+fn apply_object_transfer(
+    destination: &crate::core::OwnedPackage,
+    content: &str,
+    transfer: &TransferObject,
+) -> Result<(String, Vec<ResourceDependency>)> {
+    if locate_named_drawing(content, &transfer.destination_name)?.is_some() {
+        return invalid(format!(
+            "ODP destination content object name '{}' already exists",
+            transfer.destination_name
+        ));
+    }
+    let style_names = plan_style_names(destination, content, &transfer.styles)?;
+    let mut object_xml = rewrite_known_attributes(
+        &transfer.xml,
+        &[(
+            transfer.source_name.clone(),
+            transfer.destination_name.clone(),
+        )],
+        &["draw:name", "table:name"],
+    );
+    object_xml = rewrite_known_attributes(
+        &object_xml,
+        &style_names,
+        &[
+            "draw:style-name",
+            "draw:text-style-name",
+            "text:style-name",
+            "table:style-name",
+            "table:default-cell-style-name",
+            "presentation:style-name",
+        ],
+    );
+    let resource_remap =
+        remap_resources(destination, &object_xml, &transfer.resources, "content.xml")?;
+    object_xml = resource_remap.xml;
+    let style_fragments =
+        rewrite_style_fragments(&transfer.styles, &style_names, &resource_remap.values);
+    let styled_content = inject_automatic_styles(content, &style_fragments)?;
+    let updated = add_object(
+        &styled_content,
+        transfer.page,
+        transfer.kind,
+        &transfer.destination_name,
+        &object_xml,
+    )?;
+    Ok((updated, resource_remap.resources))
+}
+
+fn apply_control_transfer(
+    destination: &crate::core::OwnedPackage,
+    content: &str,
+    transfer: &TransferControl,
+) -> Result<(String, Vec<ResourceDependency>)> {
+    if locate_named_drawing(content, &transfer.destination_name)?.is_some()
+        || locate_form_declaration(content, &transfer.destination_name)?.is_some()
+    {
+        return invalid(format!(
+            "ODP destination form control name '{}' already exists",
+            transfer.destination_name
+        ));
+    }
+    let names = [(
+        transfer.source_name.clone(),
+        transfer.destination_name.clone(),
+    )];
+    let style_names = plan_style_names(destination, content, &transfer.styles)?;
+    let visual_xml = rewrite_known_attributes(
+        &rewrite_known_attributes(&transfer.visual_xml, &names, &["draw:name", "draw:control"]),
+        &style_names,
+        &[
+            "draw:style-name",
+            "draw:text-style-name",
+            "text:style-name",
+            "table:style-name",
+            "table:default-cell-style-name",
+            "presentation:style-name",
+        ],
+    );
+    let declaration_xml =
+        rewrite_known_attributes(&transfer.declaration_xml, &names, &["form:id", "form:name"]);
+    let combined = format!("{declaration_xml}{visual_xml}");
+    let remap = remap_resources(destination, &combined, &transfer.resources, "content.xml")?;
+    let remapped_declaration =
+        rewrite_known_attributes(&declaration_xml, &remap.values, &["xlink:href"]);
+    let remapped_visual = rewrite_known_attributes(&visual_xml, &remap.values, &["xlink:href"]);
+    let style_fragments = rewrite_style_fragments(&transfer.styles, &style_names, &remap.values);
+    let styled_content = inject_automatic_styles(content, &style_fragments)?;
+    let updated = add_control_fragments(
+        &styled_content,
+        transfer.page,
+        &transfer.destination_name,
+        &remapped_declaration,
+        &remapped_visual,
+    )?;
+    Ok((updated, remap.resources))
+}
+
+fn plan_style_names(
+    destination: &crate::core::OwnedPackage,
+    content: &str,
+    dependencies: &[StyleDependency],
+) -> Result<Vec<(String, String)>> {
+    let styles_xml = destination
+        .has_file("styles.xml")?
+        .then(|| package_xml(destination, "styles.xml"))
+        .transpose()?;
+    let mut reserved_names = std::collections::BTreeSet::new();
+    let mut names = Vec::new();
+    for dependency in dependencies {
+        let exists_in_styles = styles_xml
+            .as_deref()
+            .map(|package_styles| locate_style_fragment(package_styles, &dependency.name))
+            .transpose()?
+            .flatten()
+            .is_some();
+        let destination_name = if locate_style_fragment(content, &dependency.name)?.is_some()
+            || exists_in_styles
+            || reserved_names.contains(&dependency.name)
+        {
+            fresh_style_name(
+                content,
+                styles_xml.as_deref(),
+                &dependency.name,
+                &reserved_names,
+            )?
+        } else {
+            dependency.name.clone()
+        };
+        reserved_names.insert(destination_name.clone());
+        names.push((dependency.name.clone(), destination_name));
+    }
+    Ok(names)
+}
+
+fn rewrite_style_fragments(
+    dependencies: &[StyleDependency],
+    style_names: &[(String, String)],
+    resource_names: &[(String, String)],
+) -> String {
+    let mut fragments = String::new();
+    for dependency in dependencies {
+        let mut fragment = rewrite_known_attributes(
+            &dependency.xml,
+            style_names,
+            &[
+                "style:name",
+                "style:parent-style-name",
+                "style:next-style-name",
+                "style:data-style-name",
+                "style:list-style-name",
+                "style:percentage-data-style-name",
+                "draw:style-name",
+                "draw:text-style-name",
+                "text:style-name",
+                "table:style-name",
+                "table:default-cell-style-name",
+                "presentation:style-name",
+            ],
+        );
+        fragment = rewrite_known_attributes(&fragment, resource_names, &["xlink:href"]);
+        fragments.push_str(&fragment);
+    }
+    fragments
 }
 
 fn add_object(
@@ -708,6 +1243,215 @@ fn add_control(content: &str, page: usize, control: &FormControl) -> Result<Stri
         )),
     }
     apply_edits(content, edits)
+}
+
+fn add_control_fragments(
+    content: &str,
+    page: usize,
+    name: &str,
+    declaration_xml: &str,
+    visual_xml: &str,
+) -> Result<String> {
+    let pages = crate::charts::locate_pages(content)?;
+    let page_site = pages
+        .get(page)
+        .ok_or_else(|| Error::InvalidFormat("ODP form page selector is out of bounds".into()))?
+        .end;
+    let form_xml = format!(
+        "<form:form xmlns:form=\"urn:oasis:names:tc:opendocument:xmlns:form:1.0\" form:name=\"{}-form\">{declaration_xml}</form:form>",
+        escape_xml(name)
+    );
+    let mut edits = vec![(page_site, page_site, visual_xml.to_string())];
+    match locate_forms_site(content)? {
+        FormsSite::Content(end) => edits.push((end, end, form_xml)),
+        FormsSite::Empty {
+            start,
+            end,
+            name_end,
+        } => edits.push((
+            start,
+            end,
+            format!("{}>{}</office:forms>", &content[start..name_end], form_xml),
+        )),
+        FormsSite::Missing(position) => edits.push((
+            position,
+            position,
+            format!("<office:forms>{form_xml}</office:forms>"),
+        )),
+    }
+    apply_edits(content, edits)
+}
+
+fn fresh_style_name(
+    content: &str,
+    styles_xml: Option<&str>,
+    requested: &str,
+    reserved: &std::collections::BTreeSet<String>,
+) -> Result<String> {
+    for index in 1..=100_000usize {
+        let candidate = format!("{requested}_litchi_{index}");
+        let exists_in_styles = styles_xml
+            .map(|package_styles| locate_style_fragment(package_styles, &candidate))
+            .transpose()?
+            .flatten()
+            .is_some();
+        if !reserved.contains(&candidate)
+            && locate_style_fragment(content, &candidate)?.is_none()
+            && !exists_in_styles
+        {
+            return Ok(candidate);
+        }
+    }
+    invalid("ODP style collision remapping exhausted its bounded namespace")
+}
+
+fn remap_resources(
+    destination: &crate::core::OwnedPackage,
+    xml: &str,
+    dependencies: &[ResourceDependency],
+    destination_base: &str,
+) -> Result<ResourceRemap> {
+    let package = destination.package()?;
+    let mut reserved = destination
+        .files()?
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut assigned_paths = std::collections::BTreeMap::<String, String>::new();
+    let mut values = Vec::new();
+    let mut resources = Vec::new();
+    for dependency in dependencies {
+        if let Some(destination_path) = assigned_paths.get(&dependency.path) {
+            values.push((
+                dependency.href.clone(),
+                relative_package_href(destination_base, destination_path),
+            ));
+            continue;
+        }
+        let mut destination_path = dependency.path.clone();
+        if package.has_file(&destination_path) {
+            if package.get_file(&destination_path)? == dependency.bytes {
+                values.push((
+                    dependency.href.clone(),
+                    relative_package_href(destination_base, &destination_path),
+                ));
+                assigned_paths.insert(dependency.path.clone(), destination_path);
+                continue;
+            }
+            destination_path = fresh_resource_path(&dependency.path, &reserved)?;
+        }
+        reserved.insert(destination_path.clone());
+        assigned_paths.insert(dependency.path.clone(), destination_path.clone());
+        values.push((
+            dependency.href.clone(),
+            relative_package_href(destination_base, &destination_path),
+        ));
+        resources.push(ResourceDependency {
+            href: dependency.href.clone(),
+            path: destination_path,
+            bytes: dependency.bytes.clone(),
+            media_type: dependency.media_type.clone(),
+        });
+    }
+    Ok(ResourceRemap {
+        xml: rewrite_known_attributes(xml, &values, &["xlink:href"]),
+        resources,
+        values,
+    })
+}
+
+fn validate_resource_additions(
+    destination: &crate::core::OwnedPackage,
+    resources: Vec<ResourceDependency>,
+) -> Result<Vec<ResourceDependency>> {
+    let package = destination.package()?;
+    let mut additions = Vec::new();
+    for resource in resources {
+        if package.has_file(&resource.path) {
+            if package.get_file(&resource.path)? != resource.bytes {
+                return invalid(format!(
+                    "ODP transferred resource path '{}' collided during replay",
+                    resource.path
+                ));
+            }
+            continue;
+        }
+        additions.push(resource);
+    }
+    Ok(additions)
+}
+
+fn fresh_resource_path(
+    requested: &str,
+    reserved: &std::collections::BTreeSet<String>,
+) -> Result<String> {
+    let (parent, file_name) = requested.rsplit_once('/').unwrap_or(("", requested));
+    let (stem, extension) = file_name.rsplit_once('.').unwrap_or((file_name, ""));
+    for index in 1..=100_000usize {
+        let remapped_file = if extension.is_empty() {
+            format!("{stem}_litchi_{index}")
+        } else {
+            format!("{stem}_litchi_{index}.{extension}")
+        };
+        let candidate = if parent.is_empty() {
+            remapped_file
+        } else {
+            format!("{parent}/{remapped_file}")
+        };
+        if !reserved.contains(&candidate) {
+            return Ok(candidate);
+        }
+    }
+    invalid("ODP resource collision remapping exhausted its bounded namespace")
+}
+
+fn relative_package_href(base_path: &str, target_path: &str) -> String {
+    let base_depth = base_path
+        .rsplit_once('/')
+        .map_or(0, |(parent, _)| parent.split('/').count());
+    let mut output = "../".repeat(base_depth);
+    output.push_str(target_path);
+    output
+}
+
+fn inject_automatic_styles(content: &str, fragments: &str) -> Result<String> {
+    if fragments.is_empty() {
+        return Ok(content.to_string());
+    }
+    if let Some(position) = content.rfind("</office:automatic-styles>") {
+        return splice(content, position, position, fragments);
+    }
+    if let Some(position) = content.find("<office:automatic-styles/>") {
+        let end = position + "<office:automatic-styles/>".len();
+        return splice(
+            content,
+            position,
+            end,
+            &format!("<office:automatic-styles>{fragments}</office:automatic-styles>"),
+        );
+    }
+    Err(Error::Unsupported(
+        "ODP content has no transferable automatic-style owner".to_string(),
+    ))
+}
+
+fn rewrite_known_attributes(
+    xml: &str,
+    replacements: &[(String, String)],
+    qualified_names: &[&str],
+) -> String {
+    let mut output = xml.to_string();
+    for (source, destination) in replacements {
+        let escaped_source = escape_xml(source);
+        let escaped_destination = escape_xml(destination);
+        for qualified_name in qualified_names {
+            for quote in ['"', '\''] {
+                let needle = format!("{qualified_name}={quote}{escaped_source}{quote}");
+                let replacement = format!("{qualified_name}={quote}{escaped_destination}{quote}");
+                output = output.replace(&needle, &replacement);
+            }
+        }
+    }
+    output
 }
 
 fn replace_control(content: &str, name: &str, control: &FormControl) -> Result<String> {
@@ -827,6 +1571,69 @@ fn locate_named_element(
     attribute: &[u8],
     expected: &str,
 ) -> Result<Option<Span>> {
+    locate_named_element_impl(content, namespace, None, namespace, attribute, expected)
+}
+
+fn locate_named_element_local(
+    content: &str,
+    namespace: &[u8],
+    element_local: &[u8],
+    attribute: &[u8],
+    expected: &str,
+) -> Result<Option<Span>> {
+    locate_named_element_impl(
+        content,
+        namespace,
+        Some(element_local),
+        namespace,
+        attribute,
+        expected,
+    )
+}
+
+fn locate_named_element_with_attribute(
+    content: &str,
+    element_namespace: &[u8],
+    attribute_namespace: &[u8],
+    attribute: &[u8],
+    expected: &str,
+) -> Result<Option<Span>> {
+    locate_named_element_impl(
+        content,
+        element_namespace,
+        None,
+        attribute_namespace,
+        attribute,
+        expected,
+    )
+}
+
+fn locate_named_element_local_with_attribute(
+    content: &str,
+    element_namespace: &[u8],
+    element_local: &[u8],
+    attribute_namespace: &[u8],
+    attribute: &[u8],
+    expected: &str,
+) -> Result<Option<Span>> {
+    locate_named_element_impl(
+        content,
+        element_namespace,
+        Some(element_local),
+        attribute_namespace,
+        attribute,
+        expected,
+    )
+}
+
+fn locate_named_element_impl(
+    content: &str,
+    element_namespace: &[u8],
+    element_local: Option<&[u8]>,
+    attribute_namespace: &[u8],
+    attribute: &[u8],
+    expected: &str,
+) -> Result<Option<Span>> {
     let mut reader = NsReader::from_str(content);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -839,7 +1646,7 @@ fn locate_named_element(
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid ODP content XML: {error}")))?;
-        let namespace_matches = resolved_namespace(&resolved) == Some(namespace);
+        let namespace_matches = resolved_namespace(&resolved) == Some(element_namespace);
         drop(resolved);
         let end = usize::try_from(reader.buffer_position()).map_err(|error| {
             Error::InvalidFormat(format!("ODP XML position does not fit usize: {error}"))
@@ -847,7 +1654,8 @@ fn locate_named_element(
         match event {
             Event::Start(element) => {
                 if namespace_matches
-                    && read_attribute(&reader, &element, namespace, attribute)?.as_deref()
+                    && element_local.is_none_or(|local| element.local_name().as_ref() == local)
+                    && read_attribute(&reader, &element, attribute_namespace, attribute)?.as_deref()
                         == Some(expected)
                 {
                     if active.is_some() || found.is_some() {
@@ -864,7 +1672,8 @@ fn locate_named_element(
             },
             Event::Empty(element) => {
                 if namespace_matches
-                    && read_attribute(&reader, &element, namespace, attribute)?.as_deref()
+                    && element_local.is_none_or(|local| element.local_name().as_ref() == local)
+                    && read_attribute(&reader, &element, attribute_namespace, attribute)?.as_deref()
                         == Some(expected)
                 {
                     if active.is_some() || found.is_some() {
@@ -985,6 +1794,65 @@ fn locate_forms_site(content: &str) -> Result<FormsSite> {
     presentation_start
         .map(FormsSite::Missing)
         .ok_or_else(|| Error::InvalidFormat("ODP content has no office:presentation".into()))
+}
+
+fn collect_attribute_values(xml: &str, namespace: &[u8], local_name: &[u8]) -> Result<Vec<String>> {
+    collect_attributes(xml, |resolved, local| {
+        resolved_namespace(resolved) == Some(namespace) && local == local_name
+    })
+}
+
+fn collect_style_attribute_values(xml: &str) -> Result<Vec<String>> {
+    collect_attributes(xml, |_resolved, local| local.ends_with(b"style-name"))
+}
+
+fn collect_attributes(
+    xml: &str,
+    mut selected: impl FnMut(&ResolveResult<'_>, &[u8]) -> bool,
+) -> Result<Vec<String>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut values = Vec::new();
+    loop {
+        let (_, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|cause| {
+                Error::InvalidFormat(format!("invalid ODP dependency XML: {cause}"))
+            })?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                for raw_attribute in element.attributes() {
+                    let attribute = raw_attribute.map_err(|cause| {
+                        Error::InvalidFormat(format!("invalid ODP dependency attribute: {cause}"))
+                    })?;
+                    let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+                    if selected(&resolved, local.as_ref()) {
+                        let value = attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .map_err(|cause| {
+                                Error::InvalidFormat(format!(
+                                    "invalid ODP dependency attribute value: {cause}"
+                                ))
+                            })?;
+                        values.push(value.into_owned());
+                    }
+                }
+            },
+            Event::DocType(_) => return invalid("DTDs are not allowed in ODP dependency XML"),
+            Event::Eof => break,
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+    values.sort();
+    values.dedup();
+    Ok(values)
 }
 
 fn read_attribute(

@@ -1106,6 +1106,23 @@ impl Edit {
                 Operation::AddForm { group_index, form } => {
                     OperationResult::Index(document.add_form(*group_index, form)?)
                 },
+                Operation::AddFormFragment {
+                    group_index,
+                    parent_form,
+                    fragment,
+                } => {
+                    let (bytes, index) = crate::package::forms::add_form_fragment(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        crate::package::forms::FormHost::Text,
+                        *group_index,
+                        *parent_form,
+                        fragment,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Index(index)
+                },
                 Operation::AddNestedForm { parent_form, form } => {
                     let (bytes, index) = crate::package::forms::add_form(
                         document.transaction_package(),
@@ -1133,6 +1150,20 @@ impl Edit {
                     document.replace_transaction_bytes(bytes)?;
                     OperationResult::Index(index)
                 },
+                Operation::AddFormControlFragment {
+                    form_index,
+                    fragment,
+                } => {
+                    let (bytes, index) = crate::package::forms::add_control_fragment(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *form_index,
+                        fragment,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Index(index)
+                },
                 Operation::ReplaceFormControl { index, control } => {
                     let bytes = crate::package::forms::replace_control(
                         document.transaction_package(),
@@ -1140,6 +1171,17 @@ impl Edit {
                         document.transaction_styles_xml(),
                         *index,
                         control,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Unit
+                },
+                Operation::ReplaceFormControlFragment { index, fragment } => {
+                    let bytes = crate::package::forms::replace_control_fragment(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                        fragment,
                     )?;
                     document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
@@ -1167,6 +1209,17 @@ impl Edit {
                 },
                 Operation::ReplaceForm { index, form } => {
                     document.replace_form(*index, form)?;
+                    OperationResult::Unit
+                },
+                Operation::ReplaceFormFragment { index, fragment } => {
+                    let bytes = crate::package::forms::replace_form_fragment(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                        fragment,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveForm { index } => {
@@ -1653,6 +1706,11 @@ enum Operation {
         group_index: usize,
         form: crate::package::forms::AuthoredForm,
     },
+    AddFormFragment {
+        group_index: usize,
+        parent_form: Option<usize>,
+        fragment: String,
+    },
     AddNestedForm {
         parent_form: usize,
         form: crate::package::forms::AuthoredForm,
@@ -1661,9 +1719,17 @@ enum Operation {
         form_index: usize,
         control: crate::package::forms::AuthoredFormControl,
     },
+    AddFormControlFragment {
+        form_index: usize,
+        fragment: String,
+    },
     ReplaceFormControl {
         index: usize,
         control: crate::package::forms::AuthoredFormControl,
+    },
+    ReplaceFormControlFragment {
+        index: usize,
+        fragment: String,
     },
     RemoveFormControl {
         index: usize,
@@ -1675,6 +1741,10 @@ enum Operation {
     ReplaceForm {
         index: usize,
         form: crate::package::forms::AuthoredForm,
+    },
+    ReplaceFormFragment {
+        index: usize,
+        fragment: String,
     },
     RemoveForm {
         index: usize,
@@ -1850,8 +1920,9 @@ impl Patch {
     /// Builds a non-mutating, dependency-checked plan for replaying portable
     /// additions and policy updates onto another package snapshot.
     ///
-    /// Source-local replacements, removals, moves, and snapshot restores are
-    /// refused because their semantic positions cannot be transferred safely.
+    /// Form, chart, and embedded-resource positions are checked against the
+    /// destination before their replacements, removals, or moves may commit.
+    /// Other source-local selectors and snapshot restores remain refused.
     pub fn plan_transfer(&self, destination: &Snapshot) -> Result<TransferPlan> {
         TransferPlan::new(destination.clone(), &self.operations)
     }
@@ -1867,10 +1938,22 @@ pub enum TransferDependencyKind {
     RubyStyle,
     /// A named text style referenced by rich inline content.
     TextStyle,
-    /// A chart-local style definition is not present in the authored payload.
+    /// A chart-local style reference retained inside the transferred payload.
     ChartStyle,
     /// A content-addressed embedded payload travels with the operation.
     ResourcePayload,
+    /// A form group must exist, except that group zero may be created on demand.
+    FormGroup,
+    /// A form must exist at the selected semantic position.
+    Form,
+    /// A form control must exist at the selected semantic position.
+    FormControl,
+    /// A validated embedded chart must exist at the selected position.
+    EmbeddedChart,
+    /// An embedded object must exist at the selected position.
+    EmbeddedObject,
+    /// An embedded image must exist at the selected position.
+    EmbeddedImage,
 }
 
 /// One deterministic prerequisite reported by a transfer plan.
@@ -1915,6 +1998,35 @@ impl TransferPlan {
         }
         let document = destination.document()?;
         let mut paragraph_count = document.paragraphs()?.len();
+        let destination_forms = document.forms()?;
+        let form_group_count = destination_forms.groups.len();
+        let (mut form_count, mut form_control_count) = form_counts(&destination_forms);
+        let embedded_objects = document.embedded_objects()?;
+        let mut embedded_chart_positions: BTreeSet<usize> = embedded_objects
+            .iter()
+            .enumerate()
+            .filter_map(|(index, _)| document.embedded_chart(index).is_ok().then_some(index))
+            .collect();
+        let mut next_embedded_object_position = embedded_objects
+            .iter()
+            .filter(|object| object.part == crate::Part::Content)
+            .count();
+        let mut embedded_object_count = embedded_objects
+            .into_iter()
+            .filter(|object| {
+                object.part == crate::Part::Content
+                    && matches!(
+                        object.kind,
+                        litchi_odf_common::embedded::Kind::Object
+                            | litchi_odf_common::embedded::Kind::ObjectOle
+                    )
+            })
+            .count();
+        let mut embedded_image_count = document
+            .images()?
+            .into_iter()
+            .filter(|image| image.part == crate::Part::Content)
+            .count();
         let mut ruby_styles: BTreeSet<String> = document
             .ruby_styles()?
             .styles
@@ -1942,6 +2054,13 @@ impl TransferPlan {
                         embedded_resource_dependency_key(resource),
                         true,
                     );
+                    if resource.kind == crate::package::embedded::EmbeddedResourceKind::Image {
+                        embedded_image_count = embedded_image_count.saturating_add(1);
+                    } else {
+                        embedded_object_count = embedded_object_count.saturating_add(1);
+                        next_embedded_object_position =
+                            next_embedded_object_position.saturating_add(1);
+                    }
                 },
                 Operation::AddEmbeddedChart { definition }
                 | Operation::AddEmbeddedChartWithStorage { definition, .. } => {
@@ -1950,9 +2069,12 @@ impl TransferPlan {
                             &mut dependencies,
                             TransferDependencyKind::ChartStyle,
                             name,
-                            false,
+                            true,
                         );
                     }
+                    embedded_chart_positions.insert(next_embedded_object_position);
+                    next_embedded_object_position = next_embedded_object_position.saturating_add(1);
+                    embedded_object_count = embedded_object_count.saturating_add(1);
                 },
                 Operation::InsertParagraph { index, .. } => {
                     let satisfied = *index <= paragraph_count;
@@ -2019,9 +2141,219 @@ impl TransferPlan {
                         );
                     }
                 },
+                Operation::AddForm { group_index, form } => {
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::FormGroup,
+                        group_index.to_string(),
+                        *group_index < form_group_count
+                            || (*group_index == 0 && form_group_count == 0),
+                    );
+                    let (forms, controls) = authored_form_counts(form);
+                    form_count = form_count.saturating_add(forms);
+                    form_control_count = form_control_count.saturating_add(controls);
+                },
+                Operation::AddNestedForm { parent_form, form } => {
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::Form,
+                        parent_form.to_string(),
+                        *parent_form < form_count,
+                    );
+                    let (forms, controls) = authored_form_counts(form);
+                    form_count = form_count.saturating_add(forms);
+                    form_control_count = form_control_count.saturating_add(controls);
+                },
+                Operation::AddFormControl { form_index, .. } => {
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::Form,
+                        form_index.to_string(),
+                        *form_index < form_count,
+                    );
+                    form_control_count = form_control_count.saturating_add(1);
+                },
+                Operation::ReplaceFormControl { index, .. } => {
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::FormControl,
+                        index.to_string(),
+                        *index < form_control_count,
+                    );
+                },
+                Operation::RemoveFormControl { index } => {
+                    let satisfied = *index < form_control_count;
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::FormControl,
+                        index.to_string(),
+                        satisfied,
+                    );
+                    if satisfied {
+                        form_control_count = form_control_count.saturating_sub(1);
+                    }
+                },
+                Operation::MoveFormControl { from, to } => {
+                    merge_position_dependencies(
+                        &mut dependencies,
+                        TransferDependencyKind::FormControl,
+                        *from,
+                        *to,
+                        form_control_count,
+                    );
+                },
+                Operation::ReplaceForm { index, .. } => {
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::Form,
+                        index.to_string(),
+                        *index < form_count,
+                    );
+                },
+                Operation::RemoveForm { index } => {
+                    let satisfied = *index < form_count;
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::Form,
+                        index.to_string(),
+                        satisfied,
+                    );
+                    if satisfied {
+                        form_count = form_count.saturating_sub(1);
+                    }
+                },
+                Operation::MoveForm { from, to } => {
+                    merge_position_dependencies(
+                        &mut dependencies,
+                        TransferDependencyKind::Form,
+                        *from,
+                        *to,
+                        form_count,
+                    );
+                },
+                Operation::ReplaceEmbeddedChart { index, definition } => {
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::EmbeddedChart,
+                        index.to_string(),
+                        embedded_chart_positions.contains(index),
+                    );
+                    for name in chart_style_names(definition) {
+                        merge_transfer_dependency(
+                            &mut dependencies,
+                            TransferDependencyKind::ChartStyle,
+                            name,
+                            true,
+                        );
+                    }
+                },
+                Operation::RemoveEmbeddedChart { index } => {
+                    let satisfied = embedded_chart_positions.contains(index);
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::EmbeddedChart,
+                        index.to_string(),
+                        satisfied,
+                    );
+                    if satisfied {
+                        embedded_chart_positions.remove(index);
+                        embedded_chart_positions = embedded_chart_positions
+                            .into_iter()
+                            .map(|position| {
+                                if position > *index {
+                                    position - 1
+                                } else {
+                                    position
+                                }
+                            })
+                            .collect();
+                        next_embedded_object_position =
+                            next_embedded_object_position.saturating_sub(1);
+                        embedded_object_count = embedded_object_count.saturating_sub(1);
+                    }
+                },
+                Operation::ReplaceEmbeddedObject { index, resource } => {
+                    embedded_resource_transfer_dependencies(
+                        &mut dependencies,
+                        TransferDependencyKind::EmbeddedObject,
+                        *index,
+                        embedded_object_count,
+                        resource,
+                    );
+                },
+                Operation::ReplaceEmbeddedImage { index, resource } => {
+                    embedded_resource_transfer_dependencies(
+                        &mut dependencies,
+                        TransferDependencyKind::EmbeddedImage,
+                        *index,
+                        embedded_image_count,
+                        resource,
+                    );
+                },
+                Operation::RemoveEmbeddedObject { index } => {
+                    let satisfied = *index < embedded_object_count;
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::EmbeddedObject,
+                        index.to_string(),
+                        satisfied,
+                    );
+                    if satisfied {
+                        embedded_object_count = embedded_object_count.saturating_sub(1);
+                        next_embedded_object_position =
+                            next_embedded_object_position.saturating_sub(1);
+                        embedded_chart_positions.remove(index);
+                        embedded_chart_positions = embedded_chart_positions
+                            .into_iter()
+                            .map(|position| {
+                                if position > *index {
+                                    position - 1
+                                } else {
+                                    position
+                                }
+                            })
+                            .collect();
+                    }
+                },
+                Operation::RemoveEmbeddedImage { index } => {
+                    let satisfied = *index < embedded_image_count;
+                    merge_transfer_dependency(
+                        &mut dependencies,
+                        TransferDependencyKind::EmbeddedImage,
+                        index.to_string(),
+                        satisfied,
+                    );
+                    if satisfied {
+                        embedded_image_count = embedded_image_count.saturating_sub(1);
+                    }
+                },
+                Operation::MoveEmbeddedObject { from, to } => {
+                    merge_position_dependencies(
+                        &mut dependencies,
+                        TransferDependencyKind::EmbeddedObject,
+                        *from,
+                        *to,
+                        embedded_object_count,
+                    );
+                    if *from < embedded_object_count && *to < embedded_object_count {
+                        embedded_chart_positions = embedded_chart_positions
+                            .into_iter()
+                            .map(|position| relocate_position(position, *from, *to))
+                            .collect();
+                    }
+                },
+                Operation::MoveEmbeddedImage { from, to } => {
+                    merge_position_dependencies(
+                        &mut dependencies,
+                        TransferDependencyKind::EmbeddedImage,
+                        *from,
+                        *to,
+                        embedded_image_count,
+                    );
+                },
                 _ => {
                     return Err(Error::Unsupported(
-                        "ODT cross-document transfer refuses source-local replacement, removal, or move operations"
+                        "ODT cross-document transfer refuses this source-local operation"
                             .to_string(),
                     ));
                 },
@@ -2083,6 +2415,91 @@ fn merge_transfer_dependency(
         .entry((kind, key))
         .and_modify(|existing| *existing &= satisfied)
         .or_insert(satisfied);
+}
+
+fn merge_position_dependencies(
+    dependencies: &mut BTreeMap<(TransferDependencyKind, String), bool>,
+    kind: TransferDependencyKind,
+    from: usize,
+    to: usize,
+    count: usize,
+) {
+    for position in [from, to] {
+        merge_transfer_dependency(dependencies, kind, position.to_string(), position < count);
+    }
+}
+
+fn relocate_position(position: usize, from: usize, to: usize) -> usize {
+    if position == from {
+        to
+    } else if from < to && position > from && position <= to {
+        position - 1
+    } else if from > to && position >= to && position < from {
+        position.saturating_add(1)
+    } else {
+        position
+    }
+}
+
+fn form_counts(forms: &crate::form::Forms) -> (usize, usize) {
+    forms.groups.iter().flat_map(|group| &group.forms).fold(
+        (0usize, 0usize),
+        |(forms, controls), form| {
+            let (nested_forms, nested_controls) = parsed_form_counts(form);
+            (
+                forms.saturating_add(nested_forms),
+                controls.saturating_add(nested_controls),
+            )
+        },
+    )
+}
+
+fn parsed_form_counts(form: &crate::form::Form) -> (usize, usize) {
+    form.children
+        .iter()
+        .fold((1usize, 0usize), |(forms, controls), node| match node {
+            crate::form::Node::Form(form) => {
+                let (nested_forms, nested_controls) = parsed_form_counts(form);
+                (
+                    forms.saturating_add(nested_forms),
+                    controls.saturating_add(nested_controls),
+                )
+            },
+            crate::form::Node::Control(_) => (forms, controls.saturating_add(1)),
+        })
+}
+
+fn authored_form_counts(form: &crate::package::forms::AuthoredForm) -> (usize, usize) {
+    form.children
+        .iter()
+        .fold((1usize, 0usize), |(forms, controls), node| match node {
+            crate::package::forms::AuthoredFormNode::Form(form) => {
+                let (nested_forms, nested_controls) = authored_form_counts(form);
+                (
+                    forms.saturating_add(nested_forms),
+                    controls.saturating_add(nested_controls),
+                )
+            },
+            crate::package::forms::AuthoredFormNode::Control(_) => {
+                (forms, controls.saturating_add(1))
+            },
+        })
+}
+
+fn embedded_resource_transfer_dependencies(
+    dependencies: &mut BTreeMap<(TransferDependencyKind, String), bool>,
+    target_kind: TransferDependencyKind,
+    index: usize,
+    count: usize,
+    resource: &crate::package::embedded::EmbeddedResource,
+) {
+    merge_transfer_dependency(dependencies, target_kind, index.to_string(), index < count);
+    merge_transfer_dependency(
+        dependencies,
+        TransferDependencyKind::ResourcePayload,
+        embedded_resource_dependency_key(resource),
+        true,
+    );
 }
 
 fn embedded_resource_dependency_key(
@@ -2583,6 +3000,86 @@ fn semantic_patch_operation(
             format!("/package/rdf/{path}/triples/{from}"),
             serde_json::json!({"to": to}),
         ),
+        Operation::AddForm { group_index, form } => (
+            "form.add",
+            format!("/body/form-groups/{group_index}/forms/-"),
+            form_fragment_value(&form.to_xml_fragment()?)?,
+        ),
+        Operation::AddNestedForm { parent_form, form } => (
+            "form.add_nested",
+            format!("/body/forms/{parent_form}/forms/-"),
+            form_fragment_value(&form.to_xml_fragment()?)?,
+        ),
+        Operation::AddFormFragment {
+            group_index,
+            parent_form,
+            fragment,
+        } => match parent_form {
+            Some(parent_form) => (
+                "form.add_nested",
+                format!("/body/forms/{parent_form}/forms/-"),
+                form_fragment_value(fragment)?,
+            ),
+            None => (
+                "form.add",
+                format!("/body/form-groups/{group_index}/forms/-"),
+                form_fragment_value(fragment)?,
+            ),
+        },
+        Operation::AddFormControl {
+            form_index,
+            control,
+        } => (
+            "form.control.add",
+            format!("/body/forms/{form_index}/controls/-"),
+            form_control_fragment_value(&control.to_xml_fragment()?)?,
+        ),
+        Operation::AddFormControlFragment {
+            form_index,
+            fragment,
+        } => (
+            "form.control.add",
+            format!("/body/forms/{form_index}/controls/-"),
+            form_control_fragment_value(fragment)?,
+        ),
+        Operation::ReplaceFormControl { index, control } => (
+            "form.control.replace",
+            format!("/body/form-controls/{index}"),
+            form_control_fragment_value(&control.to_xml_fragment()?)?,
+        ),
+        Operation::ReplaceFormControlFragment { index, fragment } => (
+            "form.control.replace",
+            format!("/body/form-controls/{index}"),
+            form_control_fragment_value(fragment)?,
+        ),
+        Operation::RemoveFormControl { index } => (
+            "form.control.remove",
+            format!("/body/form-controls/{index}"),
+            Value::Null,
+        ),
+        Operation::MoveFormControl { from, to } => (
+            "form.control.move",
+            format!("/body/form-controls/{from}"),
+            serde_json::json!({"to": to}),
+        ),
+        Operation::ReplaceForm { index, form } => (
+            "form.replace",
+            format!("/body/forms/{index}"),
+            form_fragment_value(&form.to_xml_fragment()?)?,
+        ),
+        Operation::ReplaceFormFragment { index, fragment } => (
+            "form.replace",
+            format!("/body/forms/{index}"),
+            form_fragment_value(fragment)?,
+        ),
+        Operation::RemoveForm { index } => {
+            ("form.remove", format!("/body/forms/{index}"), Value::Null)
+        },
+        Operation::MoveForm { from, to } => (
+            "form.move",
+            format!("/body/forms/{from}"),
+            serde_json::json!({"to": to}),
+        ),
         Operation::AddEmbeddedChart { definition } => (
             "chart.add",
             "/package/charts/-".to_string(),
@@ -2638,6 +3135,31 @@ fn semantic_patch_operation(
             format!("/package/embedded/images/{index}"),
             embedded_resource_value(resource, blobs)?,
         ),
+        Operation::RemoveEmbeddedChart { index } => (
+            "chart.remove",
+            format!("/package/charts/{index}"),
+            Value::Null,
+        ),
+        Operation::RemoveEmbeddedObject { index } => (
+            "resource.embedded.object.remove",
+            format!("/package/embedded/objects/{index}"),
+            Value::Null,
+        ),
+        Operation::RemoveEmbeddedImage { index } => (
+            "resource.embedded.image.remove",
+            format!("/package/embedded/images/{index}"),
+            Value::Null,
+        ),
+        Operation::MoveEmbeddedObject { from, to } => (
+            "resource.embedded.object.move",
+            format!("/package/embedded/objects/{from}"),
+            serde_json::json!({"to": to}),
+        ),
+        Operation::MoveEmbeddedImage { from, to } => (
+            "resource.embedded.image.move",
+            format!("/package/embedded/images/{from}"),
+            serde_json::json!({"to": to}),
+        ),
         Operation::AddScriptResource { resource } => (
             "resource.script.add",
             "/package/scripts/-".to_string(),
@@ -2653,21 +3175,7 @@ fn semantic_patch_operation(
             format!("/package/scripts/{path}"),
             Value::Null,
         ),
-        Operation::RestoreSnapshot
-        | Operation::AddForm { .. }
-        | Operation::AddNestedForm { .. }
-        | Operation::AddFormControl { .. }
-        | Operation::ReplaceFormControl { .. }
-        | Operation::RemoveFormControl { .. }
-        | Operation::MoveFormControl { .. }
-        | Operation::ReplaceForm { .. }
-        | Operation::RemoveForm { .. }
-        | Operation::MoveForm { .. }
-        | Operation::RemoveEmbeddedChart { .. }
-        | Operation::RemoveEmbeddedObject { .. }
-        | Operation::RemoveEmbeddedImage { .. }
-        | Operation::MoveEmbeddedObject { .. }
-        | Operation::MoveEmbeddedImage { .. } => {
+        Operation::RestoreSnapshot => {
             return Err(Error::Unsupported(
                 "this ODT operation has not migrated to the semantic durable vocabulary"
                     .to_string(),
@@ -3058,6 +3566,42 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
                 .ok_or_else(invalid_durable_patch)?;
             Ok(Operation::MoveRdfTriple { path, from, to })
         },
+        "form.add" => Ok(Operation::AddFormFragment {
+            group_index: index("/body/form-groups/", "/forms/-")?,
+            parent_form: None,
+            fragment: form_fragment_from_value(&operation.value)?,
+        }),
+        "form.add_nested" => Ok(Operation::AddFormFragment {
+            group_index: 0,
+            parent_form: Some(index("/body/forms/", "/forms/-")?),
+            fragment: form_fragment_from_value(&operation.value)?,
+        }),
+        "form.control.add" => Ok(Operation::AddFormControlFragment {
+            form_index: index("/body/forms/", "/controls/-")?,
+            fragment: form_control_fragment_from_value(&operation.value)?,
+        }),
+        "form.control.replace" => Ok(Operation::ReplaceFormControlFragment {
+            index: index("/body/form-controls/", "")?,
+            fragment: form_control_fragment_from_value(&operation.value)?,
+        }),
+        "form.control.remove" if operation.value.is_null() => Ok(Operation::RemoveFormControl {
+            index: index("/body/form-controls/", "")?,
+        }),
+        "form.control.move" => Ok(Operation::MoveFormControl {
+            from: index("/body/form-controls/", "")?,
+            to: move_target_from_value(&operation.value)?,
+        }),
+        "form.replace" => Ok(Operation::ReplaceFormFragment {
+            index: index("/body/forms/", "")?,
+            fragment: form_fragment_from_value(&operation.value)?,
+        }),
+        "form.remove" if operation.value.is_null() => Ok(Operation::RemoveForm {
+            index: index("/body/forms/", "")?,
+        }),
+        "form.move" => Ok(Operation::MoveForm {
+            from: index("/body/forms/", "")?,
+            to: move_target_from_value(&operation.value)?,
+        }),
         "chart.add" if operation.target == "/package/charts/-" => {
             let (content, storage) = chart_content_from_value(&operation.value, blobs)?;
             Ok(Operation::AddEmbeddedChartContent { content, storage })
@@ -3069,6 +3613,9 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
                 content,
             })
         },
+        "chart.remove" if operation.value.is_null() => Ok(Operation::RemoveEmbeddedChart {
+            index: index("/package/charts/", "")?,
+        }),
         "resource.embedded.add" if operation.target == "/package/embedded/-" => {
             Ok(Operation::AddEmbeddedResource {
                 resource: embedded_resource_from_value(&operation.value, blobs)?,
@@ -3081,6 +3628,24 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
         "resource.embedded.image.replace" => Ok(Operation::ReplaceEmbeddedImage {
             index: index("/package/embedded/images/", "")?,
             resource: embedded_resource_from_value(&operation.value, blobs)?,
+        }),
+        "resource.embedded.object.remove" if operation.value.is_null() => {
+            Ok(Operation::RemoveEmbeddedObject {
+                index: index("/package/embedded/objects/", "")?,
+            })
+        },
+        "resource.embedded.image.remove" if operation.value.is_null() => {
+            Ok(Operation::RemoveEmbeddedImage {
+                index: index("/package/embedded/images/", "")?,
+            })
+        },
+        "resource.embedded.object.move" => Ok(Operation::MoveEmbeddedObject {
+            from: index("/package/embedded/objects/", "")?,
+            to: move_target_from_value(&operation.value)?,
+        }),
+        "resource.embedded.image.move" => Ok(Operation::MoveEmbeddedImage {
+            from: index("/package/embedded/images/", "")?,
+            to: move_target_from_value(&operation.value)?,
         }),
         "resource.script.add" if operation.target == "/package/scripts/-" => {
             Ok(Operation::AddScriptResource {
@@ -3128,6 +3693,32 @@ fn note_fragment_value(note: &crate::note::Note, fragment: Option<&str>) -> Resu
 fn ruby_annotation_from_value(value: &Value) -> Result<crate::ruby_family::Annotation> {
     crate::ruby_family::Annotation::from_xml_fragment(&object_string(value, "xml", 1)?)
         .map_err(|_| invalid_durable_patch())
+}
+
+fn form_fragment_value(fragment: &str) -> Result<Value> {
+    crate::package::forms::validate_form_fragment(fragment)?;
+    Ok(serde_json::json!({"xml": fragment}))
+}
+
+fn form_fragment_from_value(value: &Value) -> Result<String> {
+    let fragment = object_string(value, "xml", 1)?;
+    crate::package::forms::validate_form_fragment(&fragment)?;
+    Ok(fragment)
+}
+
+fn form_control_fragment_value(fragment: &str) -> Result<Value> {
+    crate::package::forms::validate_control_fragment(fragment)?;
+    Ok(serde_json::json!({"xml": fragment}))
+}
+
+fn form_control_fragment_from_value(value: &Value) -> Result<String> {
+    let fragment = object_string(value, "xml", 1)?;
+    crate::package::forms::validate_control_fragment(&fragment)?;
+    Ok(fragment)
+}
+
+fn move_target_from_value(value: &Value) -> Result<usize> {
+    json_usize(exact_object(value, 1)?.get("to"))
 }
 
 fn dynamic_field_from_value(value: &Value) -> Result<DynamicTextField> {
@@ -3856,6 +4447,43 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             Operation::MoveRdfTriple { path, .. } => {
                 writes.push(format!("/package/rdf/{path}/triples/order"));
             },
+            Operation::AddForm { group_index, .. } => {
+                writes.push(format!("/body/form-groups/{group_index}/forms/order"));
+            },
+            Operation::AddNestedForm { parent_form, .. } => {
+                writes.push(format!("/body/forms/{parent_form}/forms/order"));
+            },
+            Operation::AddFormFragment {
+                group_index,
+                parent_form,
+                ..
+            } => {
+                if let Some(parent_form) = parent_form {
+                    writes.push(format!("/body/forms/{parent_form}/forms/order"));
+                } else {
+                    writes.push(format!("/body/form-groups/{group_index}/forms/order"));
+                }
+            },
+            Operation::AddFormControl { form_index, .. }
+            | Operation::AddFormControlFragment { form_index, .. } => {
+                writes.push(format!("/body/forms/{form_index}/controls/order"));
+            },
+            Operation::ReplaceFormControl { index, .. }
+            | Operation::ReplaceFormControlFragment { index, .. }
+            | Operation::RemoveFormControl { index } => {
+                writes.push(format!("/body/form-controls/{index}"));
+            },
+            Operation::MoveFormControl { .. } => {
+                writes.push("/body/form-controls/order".to_string());
+            },
+            Operation::ReplaceForm { index, .. }
+            | Operation::ReplaceFormFragment { index, .. }
+            | Operation::RemoveForm { index } => {
+                writes.push(format!("/body/forms/{index}"));
+            },
+            Operation::MoveForm { .. } => {
+                writes.push("/body/forms/order".to_string());
+            },
             Operation::AddScriptResource { .. } => {
                 writes.push("/package/scripts/order".to_string());
             },
@@ -3890,16 +4518,7 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             Operation::MoveEmbeddedImage { .. } => {
                 writes.push("/package/embedded/images/order".to_string());
             },
-            Operation::RestoreSnapshot
-            | Operation::AddForm { .. }
-            | Operation::AddNestedForm { .. }
-            | Operation::AddFormControl { .. }
-            | Operation::ReplaceFormControl { .. }
-            | Operation::RemoveFormControl { .. }
-            | Operation::MoveFormControl { .. }
-            | Operation::ReplaceForm { .. }
-            | Operation::RemoveForm { .. }
-            | Operation::MoveForm { .. } => writes.push("/package".to_string()),
+            Operation::RestoreSnapshot => writes.push("/package".to_string()),
         }
     }
     (Vec::new(), writes)

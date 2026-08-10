@@ -1,10 +1,5 @@
 //! ODF spreadsheet content-validation definitions.
 
-#![allow(
-    clippy::expect_used,
-    reason = "streaming parser expectations follow immediately checked validation and message-listener states"
-)]
-
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -588,13 +583,32 @@ fn write_bool_attribute(out: &mut String, name: &str, value: bool) {
     write_optional_attribute(out, name, Some(if value { "true" } else { "false" }));
 }
 
+fn active_validation(current: &mut Option<ContentValidation>) -> Result<&mut ContentValidation> {
+    current.as_mut().ok_or_else(|| {
+        Error::InvalidFormat("validation child has no content-validation owner".to_string())
+    })
+}
+
+fn active_error_macro(current: &mut Option<ContentValidation>) -> Result<&mut ErrorMacro> {
+    active_validation(current)?
+        .error_macro
+        .as_mut()
+        .ok_or_else(|| {
+            Error::InvalidFormat("validation event listener has no error macro".to_string())
+        })
+}
+
+fn active_message(message: &mut Option<(bool, MessageBuilder)>) -> Result<&mut MessageBuilder> {
+    message
+        .as_mut()
+        .map(|(_, builder)| builder)
+        .ok_or_else(|| Error::InvalidFormat("validation message state is missing".to_string()))
+}
+
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
 ///
-/// # Panics
-///
-/// Panics if the parser's internal state becomes inconsistent; every `expect` is guarded by a preceding state check.
 pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
@@ -648,7 +662,7 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                             &element,
                             b"execute",
                         )?;
-                        set_error_macro(current.as_mut().expect("checked validation"), execute)?;
+                        set_error_macro(active_validation(&mut current)?, execute)?;
                     },
                     _ => {},
                 }
@@ -704,10 +718,7 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                     && inside_event_listeners =>
             {
                 let listener = parse_script_event_listener(&reader, &element)?;
-                current
-                    .as_mut()
-                    .and_then(|validation| validation.error_macro.as_mut())
-                    .expect("event-listeners require an error macro")
+                active_error_macro(&mut current)?
                     .event_listeners
                     .push(EventListener::Script(listener));
             },
@@ -729,10 +740,7 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                     && inside_event_listeners =>
             {
                 let listener = parse_presentation_event_listener(&reader, &element)?;
-                current
-                    .as_mut()
-                    .and_then(|validation| validation.error_macro.as_mut())
-                    .expect("event-listeners require an error macro")
+                active_error_macro(&mut current)?
                     .event_listeners
                     .push(EventListener::Presentation(Box::new(listener)));
             },
@@ -741,7 +749,9 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                     && element.local_name().as_ref() == b"sound"
                     && presentation_listener.is_some() =>
             {
-                let listener = presentation_listener.as_mut().expect("checked listener");
+                let listener = presentation_listener.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("presentation sound has no event listener".to_string())
+                })?;
                 if listener.sound.is_some() {
                     return Err(Error::InvalidFormat(
                         "duplicate presentation event sound".to_string(),
@@ -759,11 +769,7 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                     b"help-message" | b"error-message" if current.is_some() => {
                         let is_error = element.local_name().as_ref() == b"error-message";
                         let builder = MessageBuilder::new(&reader, &element)?;
-                        finish_message(
-                            current.as_mut().expect("checked validation"),
-                            is_error,
-                            builder,
-                        )?;
+                        finish_message(active_validation(&mut current)?, is_error, builder)?;
                     },
                     b"error-macro" if current.is_some() => {
                         let execute = optional_bool_attribute(
@@ -772,7 +778,7 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                             &element,
                             b"execute",
                         )?;
-                        set_error_macro(current.as_mut().expect("checked validation"), execute)?;
+                        set_error_macro(active_validation(&mut current)?, execute)?;
                     },
                     _ => {},
                 }
@@ -782,25 +788,21 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                     && element.local_name().as_ref() == b"p"
                     && message.is_some() =>
             {
-                message
-                    .as_mut()
-                    .expect("checked message")
-                    .1
-                    .start_paragraph()?;
+                active_message(&mut message)?.start_paragraph()?;
             },
             Event::Empty(element)
                 if is_namespace(&namespace, TEXT_NAMESPACE)
                     && element.local_name().as_ref() == b"p"
                     && message.is_some() =>
             {
-                let builder = &mut message.as_mut().expect("checked message").1;
+                let builder = active_message(&mut message)?;
                 builder.start_paragraph()?;
                 builder.end_paragraph()?;
             },
             Event::Empty(element)
                 if is_namespace(&namespace, TEXT_NAMESPACE) && message.is_some() =>
             {
-                let builder = &mut message.as_mut().expect("checked message").1;
+                let builder = active_message(&mut message)?;
                 match element.local_name().as_ref() {
                     b"line-break" => builder.push_text("\n"),
                     b"tab" => builder.push_text("\t"),
@@ -827,42 +829,28 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                 let decoded = quick_xml::escape::unescape(&decoded).map_err(|error| {
                     Error::InvalidFormat(format!("invalid validation character reference: {error}"))
                 })?;
-                message
-                    .as_mut()
-                    .expect("checked message")
-                    .1
-                    .push_text(&decoded);
+                active_message(&mut message)?.push_text(&decoded);
             },
             Event::CData(text) if message.is_some() => {
                 let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                     Error::InvalidFormat(format!("invalid validation CDATA: {error}"))
                 })?;
-                message
-                    .as_mut()
-                    .expect("checked message")
-                    .1
-                    .push_text(&decoded);
+                active_message(&mut message)?.push_text(&decoded);
             },
             Event::End(element)
                 if is_namespace(&namespace, TEXT_NAMESPACE)
                     && element.local_name().as_ref() == b"p"
                     && message.is_some() =>
             {
-                message
-                    .as_mut()
-                    .expect("checked message")
-                    .1
-                    .end_paragraph()?;
+                active_message(&mut message)?.end_paragraph()?;
             },
             Event::End(element) if is_namespace(&namespace, TABLE_NAMESPACE) => {
                 match element.local_name().as_ref() {
                     b"help-message" | b"error-message" if message.is_some() => {
-                        let (is_error, builder) = message.take().expect("checked message");
-                        finish_message(
-                            current.as_mut().expect("message requires validation"),
-                            is_error,
-                            builder,
-                        )?;
+                        let (is_error, builder) = message.take().ok_or_else(|| {
+                            Error::InvalidFormat("validation message state is missing".to_string())
+                        })?;
+                        finish_message(active_validation(&mut current)?, is_error, builder)?;
                     },
                     b"content-validation" => {
                         let validation = current.take().ok_or_else(|| {
@@ -883,10 +871,7 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                 let listener = presentation_listener.take().ok_or_else(|| {
                     Error::InvalidFormat("unexpected presentation event-listener end".to_string())
                 })?;
-                current
-                    .as_mut()
-                    .and_then(|validation| validation.error_macro.as_mut())
-                    .expect("event-listeners require an error macro")
+                active_error_macro(&mut current)?
                     .event_listeners
                     .push(EventListener::Presentation(Box::new(listener)));
             },
@@ -1426,6 +1411,11 @@ fn validate_xml_prefix(prefix: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        reason = "unit tests use expectations for concise fixture assertions"
+    )]
+
     use super::*;
 
     #[test]

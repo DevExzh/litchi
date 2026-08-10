@@ -17,6 +17,22 @@ impl ImageMap {
     pub fn areas(&self) -> &[Area] {
         &self.areas
     }
+
+    /// Appends one inert area in document order.
+    pub fn push_area(&mut self, area: Area) {
+        self.areas.push(area);
+    }
+
+    /// Replaces one area and returns the previous value when in bounds.
+    pub fn replace_area(&mut self, index: usize, area: Area) -> Option<Area> {
+        let slot = self.areas.get_mut(index)?;
+        Some(std::mem::replace(slot, area))
+    }
+
+    /// Removes one area while preserving the order of every remaining area.
+    pub fn remove_area(&mut self, index: usize) -> Option<Area> {
+        (index < self.areas.len()).then(|| self.areas.remove(index))
+    }
 }
 
 /// One inert link region. URI values are never resolved or followed.

@@ -1,10 +1,5 @@
 //! Source-bound tracked-change snapshots, inert edits, and reversible patches.
 
-#![allow(
-    clippy::expect_used,
-    reason = "expectations access indexes and owners established by the preceding bounded validation pass"
-)]
-
 use super::model::{RelationKind, Resources};
 use super::{Acceptance, Change, Changes, Limits, codec};
 use litchi_core::{Error, Result};
@@ -99,11 +94,18 @@ impl Snapshot {
         let record = self.map.records.get(index).ok_or_else(|| {
             Error::InvalidFormat("tracked-change source record is missing".to_string())
         })?;
-        Ok(record.acceptance.as_ref().map(|_| {
-            self.changes().expect("checked owner").changes[index]
-                .metadata()
-                .acceptance
-        }))
+        if record.acceptance.is_none() {
+            return Ok(None);
+        }
+        let acceptance = self
+            .changes()
+            .and_then(|changes| changes.changes.get(index))
+            .ok_or_else(|| {
+                Error::InvalidFormat("tracked-change semantic record is missing".to_string())
+            })?
+            .metadata()
+            .acceptance;
+        Ok(Some(acceptance))
     }
 
     /// Resource limits retained for edits and patch application.
@@ -145,7 +147,7 @@ impl RelationKinds {
         self.0 |= other.0;
     }
 
-    fn first(self) -> RelationKind {
+    fn first(self) -> Result<RelationKind> {
         [
             RelationKind::Rejecting,
             RelationKind::Dependency,
@@ -156,7 +158,7 @@ impl RelationKinds {
         ]
         .into_iter()
         .find(|kind| self.0 & (1 << kind.bit()) != 0)
-        .expect("non-empty tracked-change relation mask")
+        .ok_or_else(|| Error::InvalidFormat("tracked-change relation mask is empty".to_string()))
     }
 }
 
@@ -280,6 +282,30 @@ impl Transaction {
         self.changes.as_ref()
     }
 
+    fn owner(&self) -> Result<&Changes> {
+        self.changes
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("tracked-changes owner is absent".to_string()))
+    }
+
+    fn owner_mut(&mut self) -> Result<&mut Changes> {
+        self.changes
+            .as_mut()
+            .ok_or_else(|| Error::InvalidFormat("tracked-changes owner is absent".to_string()))
+    }
+
+    fn id_index(&self) -> Result<&HashMap<String, usize>> {
+        self.ids.as_ref().ok_or_else(|| {
+            Error::InvalidFormat("tracked-change ID index is unavailable".to_string())
+        })
+    }
+
+    fn id_index_mut(&mut self) -> Result<&mut HashMap<String, usize>> {
+        self.ids.as_mut().ok_or_else(|| {
+            Error::InvalidFormat("tracked-change ID index is unavailable".to_string())
+        })
+    }
+
     /// Current presence and value of `table:track-changes`.
     #[must_use]
     pub const fn tracking(&self) -> Option<bool> {
@@ -334,21 +360,14 @@ impl Transaction {
         let candidate_resources =
             add_resources(base_resources, record_resources, &self.before.limits)?;
         self.ensure_ids()?;
-        if self
-            .ids
-            .as_ref()
-            .expect("tracked-change ID index")
-            .contains_key(&change.metadata().id)
-        {
+        if self.id_index()?.contains_key(&change.metadata().id) {
             return invalid(format!(
                 "duplicate spreadsheet tracked-change id '{}'",
                 change.metadata().id
             ));
         }
         let id = try_owned_string(&change.metadata().id, "tracked-change ID index")?;
-        self.ids
-            .as_mut()
-            .expect("tracked-change ID index")
+        self.id_index_mut()?
             .try_reserve(1)
             .map_err(|_error| allocation_error("tracked-change ID index"))?;
         let source_token = self.next_source_token;
@@ -372,10 +391,7 @@ impl Transaction {
             self.changes = Some(changes);
             self.tracking = None;
         } else {
-            reserve_one(
-                &mut self.changes.as_mut().expect("existing owner").changes,
-                "tracked-change records",
-            )?;
+            reserve_one(&mut self.owner_mut()?.changes, "tracked-change records")?;
         }
         if let Err(error) = self.stage_outbound(&change, source_token) {
             if was_absent {
@@ -384,7 +400,7 @@ impl Transaction {
             }
             return Err(error);
         }
-        let changes = self.changes.as_mut().expect("owner initialized");
+        let changes = self.owner_mut()?;
         let acceptance = default_acceptance_presence(&change);
         changes.changes.insert(index, change);
         self.acceptance.insert(index, acceptance);
@@ -398,12 +414,7 @@ impl Transaction {
             },
         );
         if index < record_count {
-            for value in self
-                .ids
-                .as_mut()
-                .expect("tracked-change ID index")
-                .values_mut()
-            {
+            for value in self.id_index_mut()?.values_mut() {
                 if *value >= index {
                     *value += 1;
                 }
@@ -414,44 +425,26 @@ impl Transaction {
                 }
             }
         }
-        self.ids
-            .as_mut()
-            .expect("tracked-change ID index")
-            .insert(id, index);
+        self.id_index_mut()?.insert(id, index);
         self.token_indices.insert(source_token, index);
         if index < record_count {
             self.shift_inbound_for_insert(index);
         }
-        self.publish_staged_outbound(index);
-        let validation = self.validate_indexed_relations(
-            index,
-            &self.changes.as_ref().expect("owner initialized").changes[index]
-                .metadata()
-                .id,
-        );
+        self.publish_staged_outbound(index)?;
+        let validation_id = self.owner()?.changes[index].metadata().id.clone();
+        let validation = self.validate_indexed_relations(index, &validation_id);
         let validation = validation.and_then(|()| self.validate_multi_deletion_edit(index));
         if let Err(error) = validation {
-            let inserted_id = self.changes.as_ref().expect("owner initialized").changes[index]
-                .metadata()
-                .id
-                .as_str();
-            self.ids
-                .as_mut()
-                .expect("tracked-change ID index")
-                .remove(inserted_id);
+            let inserted_id = self.owner()?.changes[index].metadata().id.clone();
+            self.id_index_mut()?.remove(&inserted_id);
             self.token_indices.remove(&source_token);
-            self.remove_outbound(index);
-            self.prune_current_outbound_targets(index);
+            self.remove_outbound(index)?;
+            self.prune_current_outbound_targets(index)?;
             if index < record_count {
                 self.shift_inbound_for_remove(index);
             }
             if index < record_count {
-                for value in self
-                    .ids
-                    .as_mut()
-                    .expect("tracked-change ID index")
-                    .values_mut()
-                {
+                for value in self.id_index_mut()?.values_mut() {
                     if *value > index {
                         *value -= 1;
                     }
@@ -462,11 +455,7 @@ impl Transaction {
                     }
                 }
             }
-            self.changes
-                .as_mut()
-                .expect("owner initialized")
-                .changes
-                .remove(index);
+            self.owner_mut()?.changes.remove(index);
             self.acceptance.remove(index);
             self.records.remove(index);
             if was_absent {
@@ -475,7 +464,7 @@ impl Transaction {
             }
             return Err(error);
         }
-        self.update_multi_deletion_after_insert(index);
+        self.update_multi_deletion_after_insert(index)?;
         self.next_source_token = next_source_token;
         self.resources = candidate_resources;
         Ok(())
@@ -502,26 +491,16 @@ impl Transaction {
             record_resources,
             &self.before.limits,
         )?;
-        let dependencies_changed = self.changes.as_ref().expect("checked owner").changes[index]
-            .metadata()
-            .dependencies
-            != change.metadata().dependencies;
-        if change.metadata().id != id
-            && self
-                .ids
-                .as_ref()
-                .expect("tracked-change ID index")
-                .contains_key(&change.metadata().id)
-        {
+        let dependencies_changed =
+            self.owner()?.changes[index].metadata().dependencies != change.metadata().dependencies;
+        if change.metadata().id != id && self.id_index()?.contains_key(&change.metadata().id) {
             return invalid(format!(
                 "duplicate spreadsheet tracked-change id '{}'",
                 change.metadata().id
             ));
         }
         let replacement_id = try_owned_string(&change.metadata().id, "tracked-change ID index")?;
-        self.ids
-            .as_mut()
-            .expect("tracked-change ID index")
+        self.id_index_mut()?
             .try_reserve(1)
             .map_err(|_error| allocation_error("tracked-change ID index"))?;
         if has_multi_deletion_marker(&change) {
@@ -535,64 +514,49 @@ impl Transaction {
         }
         let source_token = self.records[index].token;
         self.stage_outbound(&change, source_token)?;
-        let before_change = mem::replace(
-            &mut self.changes.as_mut().expect("checked owner").changes[index],
-            change,
-        );
+        let before_change = mem::replace(&mut self.owner_mut()?.changes[index], change);
         remove_outbound_from(&mut self.inbound, source_token, &before_change);
         let before_acceptance = self.acceptance[index];
         let before_record = self.records[index].clone();
-        self.acceptance[index] = default_acceptance_presence(
-            &self.changes.as_ref().expect("checked owner").changes[index],
-        );
+        self.acceptance[index] = default_acceptance_presence(&self.owner()?.changes[index]);
         self.records[index].dirty = true;
         self.records[index].resources = record_resources;
         let old_entry = {
-            let ids = self.ids.as_mut().expect("tracked-change ID index");
-            let old_entry = ids
-                .remove_entry(id)
-                .expect("tracked-change ID index contains selected record");
+            let ids = self.id_index_mut()?;
+            let old_entry = ids.remove_entry(id).ok_or_else(|| {
+                Error::InvalidFormat("tracked-change ID index lost selected record".to_string())
+            })?;
             ids.insert(replacement_id, index);
             old_entry
         };
-        self.publish_staged_outbound(index);
-        let replacement_id = self.changes.as_ref().expect("checked owner").changes[index]
-            .metadata()
-            .id
-            .as_str();
-        let relation = self.validate_indexed_relations(index, replacement_id);
+        self.publish_staged_outbound(index)?;
+        let replacement_id = self.owner()?.changes[index].metadata().id.clone();
+        let relation = self.validate_indexed_relations(index, &replacement_id);
         let relation = relation.and_then(|()| self.validate_multi_deletion_edit(index));
         let validation = relation.and_then(|()| {
             if dependencies_changed {
-                self.changes
-                    .as_ref()
-                    .expect("checked owner")
+                self.owner()?
                     .validate_graph_with_limits(&self.before.limits)
             } else {
                 Ok(())
             }
         });
         if let Err(error) = validation {
-            self.remove_outbound(index);
-            self.stage_outbound(&before_change, source_token)
-                .expect("restoring reserved tracked-change inbound edges");
-            publish_staged_outbound_into(&mut self.inbound, &before_change, index);
-            self.prune_current_outbound_targets(index);
-            let ids = self.ids.as_mut().expect("tracked-change ID index");
-            ids.remove(
-                self.changes.as_ref().expect("checked owner").changes[index]
-                    .metadata()
-                    .id
-                    .as_str(),
-            );
+            self.remove_outbound(index)?;
+            self.stage_outbound(&before_change, source_token)?;
+            publish_staged_outbound_into(&mut self.inbound, &before_change, index)?;
+            self.prune_current_outbound_targets(index)?;
+            let current_id = self.owner()?.changes[index].metadata().id.clone();
+            let ids = self.id_index_mut()?;
+            ids.remove(&current_id);
             ids.insert(old_entry.0, index);
-            self.changes.as_mut().expect("checked owner").changes[index] = before_change;
+            self.owner_mut()?.changes[index] = before_change;
             self.acceptance[index] = before_acceptance;
             self.records[index] = before_record;
             return Err(error);
         }
         self.prune_outbound_targets(&before_change);
-        self.update_multi_deletion_after_replace(index);
+        self.update_multi_deletion_after_replace(index)?;
         self.resources = candidate_resources;
         Ok(())
     }
@@ -603,21 +567,19 @@ impl Transaction {
     /// Returns an error when the operation cannot be completed.
     pub fn remove(&mut self, id: &str) -> Result<Change> {
         let index = self.find_index(id)?;
-        let shifts_following =
-            index + 1 < self.changes.as_ref().expect("checked owner").changes.len();
+        let shifts_following = index + 1 < self.owner()?.changes.len();
         self.ensure_no_indexed_inbound(index, id)?;
         let candidate_resources =
             subtract_resources(self.resources, self.records[index].resources)?;
-        self.remove_outbound(index);
-        let changes = self.changes.as_mut().expect("checked owner");
-        let change = changes.changes.remove(index);
+        self.remove_outbound(index)?;
+        let change = self.owner_mut()?.changes.remove(index);
         let acceptance = self.acceptance.remove(index);
         let record = self.records.remove(index);
         let source_token = record.token;
-        let ids = self.ids.as_mut().expect("tracked-change ID index");
-        let old_entry = ids
-            .remove_entry(id)
-            .expect("tracked-change ID index contains removed record");
+        let ids = self.id_index_mut()?;
+        let old_entry = ids.remove_entry(id).ok_or_else(|| {
+            Error::InvalidFormat("tracked-change ID index lost removed record".to_string())
+        })?;
         if shifts_following {
             for value in ids.values_mut() {
                 if *value > index {
@@ -633,26 +595,20 @@ impl Transaction {
                 }
             }
         }
-        if index < changes.changes.len() {
+        if index < self.owner()?.changes.len() {
             self.shift_inbound_for_remove(index);
         }
         if let Err(error) = self.validate_multi_deletion_edit(index) {
-            if index < self.changes.as_ref().expect("checked owner").changes.len() {
+            if index < self.owner()?.changes.len() {
                 self.shift_inbound_for_insert(index);
             }
-            self.stage_outbound(&change, record.token)
-                .expect("restoring reserved tracked-change inbound edges");
-            publish_staged_outbound_into(&mut self.inbound, &change, index);
-            self.changes
-                .as_mut()
-                .expect("checked owner")
-                .changes
-                .insert(index, change);
+            self.stage_outbound(&change, record.token)?;
+            publish_staged_outbound_into(&mut self.inbound, &change, index)?;
+            self.owner_mut()?.changes.insert(index, change);
             self.acceptance.insert(index, acceptance);
             self.records.insert(index, record);
-            let ids = self.ids.as_mut().expect("tracked-change ID index");
             if shifts_following {
-                for value in ids.values_mut() {
+                for value in self.id_index_mut()?.values_mut() {
                     if *value >= index {
                         *value += 1;
                     }
@@ -663,7 +619,7 @@ impl Transaction {
                     }
                 }
             }
-            ids.insert(old_entry.0, index);
+            self.id_index_mut()?.insert(old_entry.0, index);
             self.token_indices.insert(source_token, index);
             return Err(error);
         }
@@ -679,7 +635,7 @@ impl Transaction {
     /// Returns an error when the operation cannot be completed.
     pub fn move_to(&mut self, id: &str, index: usize) -> Result<()> {
         let from = self.find_index(id)?;
-        let len = self.changes.as_ref().expect("checked owner").changes.len();
+        let len = self.owner()?.changes.len();
         if index > len {
             return invalid(format!(
                 "tracked-change move index {index} exceeds {len} records"
@@ -689,18 +645,17 @@ impl Transaction {
         if from == target {
             return Ok(());
         }
-        let changes = self.changes.as_mut().expect("checked owner");
-        let change = changes.changes.remove(from);
+        let change = self.owner_mut()?.changes.remove(from);
         let acceptance = self.acceptance.remove(from);
         let record = self.records.remove(from);
-        changes.changes.insert(target, change);
+        self.owner_mut()?.changes.insert(target, change);
         self.acceptance.insert(target, acceptance);
         self.records.insert(target, record);
-        if let Err(error) = changes.validate_with_limits(&self.before.limits) {
-            let change = changes.changes.remove(target);
+        if let Err(error) = self.owner()?.validate_with_limits(&self.before.limits) {
+            let change = self.owner_mut()?.changes.remove(target);
             let acceptance = self.acceptance.remove(target);
             let record = self.records.remove(target);
-            changes.changes.insert(from, change);
+            self.owner_mut()?.changes.insert(from, change);
             self.acceptance.insert(from, acceptance);
             self.records.insert(from, record);
             return Err(error);
@@ -708,7 +663,7 @@ impl Transaction {
         self.move_inbound_sources(from, target);
         self.rebuild_multi_deletion_groups();
         self.refresh_id_indices();
-        self.refresh_token_indices();
+        self.refresh_token_indices()?;
         Ok(())
     }
 
@@ -736,14 +691,9 @@ impl Transaction {
             .map_err(|_error| allocation_error("tracked-change reorder seen set"))?;
         seen.resize(ids.len(), false);
         for id in ids {
-            let index = *self
-                .ids
-                .as_ref()
-                .expect("tracked-change ID index")
-                .get(id.as_str())
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!("tracked-change id '{id}' was not found"))
-                })?;
+            let index = *self.id_index()?.get(id.as_str()).ok_or_else(|| {
+                Error::InvalidFormat(format!("tracked-change id '{id}' was not found"))
+            })?;
             if seen[index] {
                 return invalid(format!("tracked-change id '{id}' appears more than once"));
             }
@@ -767,25 +717,20 @@ impl Transaction {
             if target == current {
                 continue;
             }
-            self.swap_records(target, current);
+            self.swap_records(target, current)?;
             let displaced = at_position[target];
             at_position.swap(target, current);
             position_of[desired] = target;
             position_of[displaced] = current;
         }
 
-        if let Err(error) = self
-            .changes
-            .as_ref()
-            .expect("checked owner")
-            .validate_with_limits(&self.before.limits)
-        {
+        if let Err(error) = self.owner()?.validate_with_limits(&self.before.limits) {
             for target in 0..at_position.len() {
                 let current = position_of[target];
                 if target == current {
                     continue;
                 }
-                self.swap_records(target, current);
+                self.swap_records(target, current)?;
                 let displaced = at_position[target];
                 at_position.swap(target, current);
                 position_of[target] = target;
@@ -795,7 +740,7 @@ impl Transaction {
         }
         self.rebuild_multi_deletion_groups();
         self.refresh_id_indices();
-        self.refresh_token_indices();
+        self.refresh_token_indices()?;
         Ok(())
     }
 
@@ -805,14 +750,11 @@ impl Transaction {
     /// Returns an error when the operation cannot be completed.
     pub fn set_acceptance(&mut self, id: &str, acceptance: Option<Acceptance>) -> Result<()> {
         let index = self.find_index(id)?;
-        let before = self.changes.as_ref().expect("checked owner").changes[index]
-            .metadata()
-            .acceptance;
-        metadata_mut(&mut self.changes.as_mut().expect("checked owner").changes[index])
-            .acceptance = acceptance.unwrap_or_default();
+        let before = self.owner()?.changes[index].metadata().acceptance;
+        metadata_mut(&mut self.owner_mut()?.changes[index]).acceptance =
+            acceptance.unwrap_or_default();
         if let Err(error) = self.validate_indexed_relations(index, id) {
-            metadata_mut(&mut self.changes.as_mut().expect("checked owner").changes[index])
-                .acceptance = before;
+            metadata_mut(&mut self.owner_mut()?.changes[index]).acceptance = before;
             return Err(error);
         }
         self.acceptance[index] = acceptance;
@@ -1136,7 +1078,7 @@ impl Transaction {
     }
 
     fn render_record(&self, index: usize) -> Result<String> {
-        let changes = self.changes.as_ref().expect("record owner");
+        let changes = self.owner()?;
         let draft = self.records.get(index).ok_or_else(|| {
             Error::InvalidFormat("tracked-change draft provenance is missing".to_string())
         })?;
@@ -1192,14 +1134,11 @@ impl Transaction {
         )
     }
 
-    fn swap_records(&mut self, left: usize, right: usize) {
-        self.changes
-            .as_mut()
-            .expect("tracked-change reorder owner")
-            .changes
-            .swap(left, right);
+    fn swap_records(&mut self, left: usize, right: usize) -> Result<()> {
+        self.owner_mut()?.changes.swap(left, right);
         self.acceptance.swap(left, right);
         self.records.swap(left, right);
+        Ok(())
     }
 
     fn ensure_ids(&mut self) -> Result<()> {
@@ -1230,9 +1169,7 @@ impl Transaction {
             return invalid("tracked-change id must not be empty");
         }
         self.ensure_ids()?;
-        self.ids
-            .as_ref()
-            .expect("tracked-change ID index")
+        self.id_index()?
             .get(id)
             .copied()
             .ok_or_else(|| Error::InvalidFormat(format!("tracked-change id '{id}' was not found")))
@@ -1260,14 +1197,14 @@ impl Transaction {
         }
     }
 
-    fn refresh_token_indices(&mut self) {
+    fn refresh_token_indices(&mut self) -> Result<()> {
         for (index, record) in self.records.iter().enumerate() {
-            let value = self
-                .token_indices
-                .get_mut(&record.token)
-                .expect("tracked-change source-token index");
+            let value = self.token_indices.get_mut(&record.token).ok_or_else(|| {
+                Error::InvalidFormat("tracked-change source-token index is incomplete".to_string())
+            })?;
             *value = index;
         }
+        Ok(())
     }
 
     fn stage_outbound(&mut self, change: &Change, source_token: usize) -> Result<()> {
@@ -1288,10 +1225,12 @@ impl Transaction {
                 };
                 self.inbound.insert(owned_target, InboundBucket::default());
             }
-            let bucket = self
-                .inbound
-                .get_mut(target)
-                .expect("tracked-change inbound target inserted");
+            let Some(bucket) = self.inbound.get_mut(target) else {
+                failure = Some(Error::InvalidFormat(
+                    "tracked-change inbound target insertion was lost".to_string(),
+                ));
+                return;
+            };
             if bucket.sources.try_reserve(1).is_err() {
                 failure = Some(allocation_error("tracked-change inbound references"));
                 return;
@@ -1326,26 +1265,46 @@ impl Transaction {
         });
     }
 
-    fn publish_staged_outbound(&mut self, source: usize) {
+    fn publish_staged_outbound(&mut self, source: usize) -> Result<()> {
         let (changes, inbound) = (&self.changes, &mut self.inbound);
-        let change = &changes.as_ref().expect("tracked-change owner").changes[source];
-        publish_staged_outbound_into(inbound, change, source);
+        let change = changes
+            .as_ref()
+            .and_then(|changes| changes.changes.get(source))
+            .ok_or_else(|| {
+                Error::InvalidFormat("tracked-change outbound source is missing".to_string())
+            })?;
+        publish_staged_outbound_into(inbound, change, source)
     }
 
-    fn remove_outbound(&mut self, source: usize) {
+    fn remove_outbound(&mut self, source: usize) -> Result<()> {
         let (changes, records, inbound) = (&self.changes, &self.records, &mut self.inbound);
-        let change = &changes.as_ref().expect("tracked-change owner").changes[source];
-        remove_outbound_from(inbound, records[source].token, change);
+        let change = changes
+            .as_ref()
+            .and_then(|changes| changes.changes.get(source))
+            .ok_or_else(|| {
+                Error::InvalidFormat("tracked-change outbound source is missing".to_string())
+            })?;
+        let record = records.get(source).ok_or_else(|| {
+            Error::InvalidFormat("tracked-change outbound provenance is missing".to_string())
+        })?;
+        remove_outbound_from(inbound, record.token, change);
+        Ok(())
     }
 
     fn prune_outbound_targets(&mut self, change: &Change) {
         prune_outbound_targets_from(&mut self.inbound, change);
     }
 
-    fn prune_current_outbound_targets(&mut self, source: usize) {
+    fn prune_current_outbound_targets(&mut self, source: usize) -> Result<()> {
         let (changes, inbound) = (&self.changes, &mut self.inbound);
-        let change = &changes.as_ref().expect("tracked-change owner").changes[source];
+        let change = changes
+            .as_ref()
+            .and_then(|changes| changes.changes.get(source))
+            .ok_or_else(|| {
+                Error::InvalidFormat("tracked-change outbound source is missing".to_string())
+            })?;
         prune_outbound_targets_from(inbound, change);
+        Ok(())
     }
 
     fn shift_inbound_for_insert(&mut self, index: usize) {
@@ -1361,8 +1320,8 @@ impl Transaction {
     }
 
     fn validate_indexed_relations(&self, selected: usize, id: &str) -> Result<()> {
-        let changes = self.changes.as_ref().expect("tracked-change owner");
-        let ids = self.ids.as_ref().expect("tracked-change ID index");
+        let changes = self.owner()?;
+        let ids = self.id_index()?;
         changes.validate_record_relations(selected, ids)?;
         if let Some(bucket) = self.inbound.get(id) {
             for source_token in bucket.sources.keys() {
@@ -1393,9 +1352,7 @@ impl Transaction {
                 .is_none_or(|source| *source != selected)
         }) {
             let source = self
-                .changes
-                .as_ref()
-                .expect("tracked-change owner")
+                .owner()?
                 .changes
                 .get(
                     self.token_indices
@@ -1415,14 +1372,14 @@ impl Transaction {
             return invalid(format!(
                 "tracked-change id '{id}' is still referenced by '{}' ({:?})",
                 source.metadata().id,
-                kinds.first()
+                kinds.first()?
             ));
         }
         Ok(())
     }
 
     fn validate_multi_deletion_edit(&self, index: usize) -> Result<()> {
-        let changes = self.changes.as_ref().expect("tracked-change owner");
+        let changes = self.owner()?;
         if changes
             .changes
             .get(index)
@@ -1443,21 +1400,14 @@ impl Transaction {
         Ok(())
     }
 
-    fn update_multi_deletion_after_insert(&mut self, index: usize) {
-        let span = multi_deletion_span(
-            &self.changes.as_ref().expect("tracked-change owner").changes[index],
-        );
-        if index
-            == self
-                .changes
-                .as_ref()
-                .expect("tracked-change owner")
-                .changes
-                .len()
-                - 1
-            && span.is_none()
-        {
-            return;
+    fn update_multi_deletion_after_insert(&mut self, index: usize) -> Result<()> {
+        let changes = self.owner()?;
+        let change = changes.changes.get(index).ok_or_else(|| {
+            Error::InvalidFormat("tracked-change insertion index is missing".to_string())
+        })?;
+        let span = multi_deletion_span(change);
+        if index == changes.changes.len().saturating_sub(1) && span.is_none() {
+            return Ok(());
         }
         for group in &mut self.multi_deletion_groups {
             if group.start >= index {
@@ -1477,18 +1427,20 @@ impl Transaction {
                 },
             );
         }
+        Ok(())
     }
 
-    fn update_multi_deletion_after_replace(&mut self, index: usize) {
+    fn update_multi_deletion_after_replace(&mut self, index: usize) -> Result<()> {
         if let Ok(position) = self
             .multi_deletion_groups
             .binary_search_by_key(&index, |group| group.start)
         {
             self.multi_deletion_groups.remove(position);
         }
-        if let Some(span) = multi_deletion_span(
-            &self.changes.as_ref().expect("tracked-change owner").changes[index],
-        ) {
+        let change = self.owner()?.changes.get(index).ok_or_else(|| {
+            Error::InvalidFormat("tracked-change replacement index is missing".to_string())
+        })?;
+        if let Some(span) = multi_deletion_span(change) {
             let position = self
                 .multi_deletion_groups
                 .partition_point(|group| group.start < index);
@@ -1500,6 +1452,7 @@ impl Transaction {
                 },
             );
         }
+        Ok(())
     }
 
     fn update_multi_deletion_after_remove(&mut self, index: usize) {
@@ -1811,11 +1764,15 @@ fn publish_staged_outbound_into(
     inbound: &mut HashMap<String, InboundBucket>,
     change: &Change,
     _source: usize,
-) {
+) -> Result<()> {
+    let mut failure = None;
     change.for_each_relation(|target, _| {
-        let bucket = inbound
-            .get_mut(target)
-            .expect("staged tracked-change inbound target");
+        let Some(bucket) = inbound.get_mut(target) else {
+            failure = Some(Error::InvalidFormat(
+                "staged tracked-change inbound target is missing".to_string(),
+            ));
+            return;
+        };
         let Some((source_id, kinds)) = bucket.staged.take() else {
             return;
         };
@@ -1825,6 +1782,7 @@ fn publish_staged_outbound_into(
             .and_modify(|current| current.union(kinds))
             .or_insert(kinds);
     });
+    failure.map_or(Ok(()), Err)
 }
 
 fn remove_outbound_from(
@@ -1876,9 +1834,12 @@ fn build_inbound_index(changes: Option<&Changes>) -> Result<HashMap<String, Inbo
                 };
                 inbound.insert(owned_target, InboundBucket::default());
             }
-            let bucket = inbound
-                .get_mut(target)
-                .expect("tracked-change inbound target inserted");
+            let Some(bucket) = inbound.get_mut(target) else {
+                failure = Some(Error::InvalidFormat(
+                    "tracked-change inbound target insertion was lost".to_string(),
+                ));
+                return;
+            };
             if bucket.sources.try_reserve(1).is_err() {
                 failure = Some(allocation_error("tracked-change inbound references"));
                 return;
@@ -1952,6 +1913,11 @@ fn reserve_one<T>(values: &mut Vec<T>, label: &str) -> Result<()> {
 
 #[cfg(test)]
 mod cache_regressions {
+    #![allow(
+        clippy::expect_used,
+        reason = "unit tests use expectations for concise fixture assertions"
+    )]
+
     use super::super::model::{
         Deletion, Dimension, Info, Insertion, Metadata, NestedDeletion, PositiveInteger,
     };

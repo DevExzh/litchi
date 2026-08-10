@@ -9,6 +9,18 @@ pub enum ComponentKind {
     Report,
 }
 
+/// The inert linkage class of a component declaration.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ComponentLinkKind {
+    /// No `xlink:href` is declared.
+    Absent,
+    /// A safe relative package subtree is declared.
+    LocalPackage,
+    /// An external, fragment, absolute, or otherwise non-package IRI is declared.
+    ExternalIri,
+}
+
 /// A detached form or report component declaration.
 ///
 /// Linked and embedded component payloads remain inert package resources.
@@ -111,6 +123,28 @@ impl Component {
     #[must_use]
     pub fn href(&self) -> Option<&str> {
         self.href.as_deref()
+    }
+
+    /// Classifies the link without following, opening, or decoding it.
+    #[must_use]
+    pub fn link_kind(&self) -> ComponentLinkKind {
+        let Some(href) = self.href() else {
+            return ComponentLinkKind::Absent;
+        };
+        let path = href.trim_end_matches('/');
+        if !path.is_empty()
+            && !href.starts_with('/')
+            && !href
+                .chars()
+                .any(|character| matches!(character, ':' | '\\' | '?' | '#'))
+            && path
+                .split('/')
+                .all(|segment| !segment.is_empty() && !matches!(segment, "." | ".."))
+        {
+            ComponentLinkKind::LocalPackage
+        } else {
+            ComponentLinkKind::ExternalIri
+        }
     }
 
     /// Returns whether the component is marked as a template, if declared.

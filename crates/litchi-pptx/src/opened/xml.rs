@@ -1,5 +1,6 @@
 //! Namespace-aware, range-preserving XML edits for the transaction root.
 
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
 use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
@@ -259,7 +260,7 @@ pub(crate) fn reorder_slides(xml: &[u8], current: &[Slide], ordered: &[u32]) -> 
             resource: "opened-presentation slide permutation",
             source,
         })?;
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     for id in ordered {
         if !seen.insert(*id) {
             return Err(invalid(
@@ -489,9 +490,10 @@ pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
 
 pub(crate) fn remap_shape_fragment(
     source: &[u8],
-    shape_id: u32,
-    shape_name: &str,
-    relationships: &std::collections::HashMap<String, String>,
+    root_source_id: u32,
+    root_name: &str,
+    shape_ids: &HashMap<u32, u32>,
+    relationships: &HashMap<String, String>,
 ) -> Result<Vec<u8>> {
     let mut reader = Reader::from_reader(source);
     reader.config_mut().trim_text(false);
@@ -499,10 +501,11 @@ pub(crate) fn remap_shape_fragment(
     let mut depth = 0usize;
     let mut roots = 0usize;
     let mut remap = ShapeRemap {
-        shape_id,
-        shape_name,
+        root_source_id,
+        root_name,
+        shape_ids,
         relationships,
-        identity_written: false,
+        written_shape_ids: HashSet::new(),
     };
     loop {
         match reader
@@ -574,19 +577,20 @@ pub(crate) fn remap_shape_fragment(
             Event::Eof => break,
         }
     }
-    if depth != 0 || roots != 1 || !remap.identity_written {
+    if depth != 0 || roots != 1 || remap.written_shape_ids.len() != shape_ids.len() {
         return Err(invalid(
-            "opened-presentation transferred shape must have one root and identity",
+            "opened-presentation transferred shape must have one root and a complete identity map",
         ));
     }
     Ok(output)
 }
 
 struct ShapeRemap<'a> {
-    shape_id: u32,
-    shape_name: &'a str,
-    relationships: &'a std::collections::HashMap<String, String>,
-    identity_written: bool,
+    root_source_id: u32,
+    root_name: &'a str,
+    shape_ids: &'a HashMap<u32, u32>,
+    relationships: &'a HashMap<String, String>,
+    written_shape_ids: HashSet<u32>,
 }
 
 fn write_remapped_shape_start(
@@ -596,45 +600,106 @@ fn write_remapped_shape_start(
     empty: bool,
     remap: &mut ShapeRemap<'_>,
 ) -> Result<()> {
-    let is_identity = !remap.identity_written && element.local_name().as_ref() == b"cNvPr";
-    output.push(b'<');
-    output.extend_from_slice(element.name().as_ref());
+    let is_identity = element.local_name().as_ref() == b"cNvPr";
+    let is_connection = matches!(element.local_name().as_ref(), b"stCxn" | b"endCxn");
+    let mut attributes = Vec::new();
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        output.push(b' ');
-        output.extend_from_slice(attribute.key.as_ref());
-        output.extend_from_slice(b"=\"");
         let decoded = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let value = if is_identity && attribute.key.as_ref() == b"id" {
-            remap.shape_id.to_string()
-        } else if is_identity && attribute.key.as_ref() == b"name" {
-            remap.shape_name.to_owned()
-        } else if attribute.key.as_ref().starts_with(b"r:")
-            && matches!(&attribute.key.as_ref()[2..], b"id" | b"embed" | b"link")
+        attributes.push((attribute.key.as_ref().to_vec(), decoded.into_owned()));
+    }
+    let source_identity = if is_identity {
+        shape_identity_from_attributes(&attributes)?
+    } else {
+        None
+    };
+    let mapped_identity = source_identity
+        .and_then(|source_id| {
+            remap
+                .shape_ids
+                .get(&source_id)
+                .copied()
+                .map(|destination_id| (source_id, destination_id))
+        })
+        .map(|(source_id, destination_id)| {
+            if !remap.written_shape_ids.insert(source_id) {
+                return Err(invalid(format!(
+                    "opened-presentation transferred shape repeats identity {source_id}"
+                )));
+            }
+            Ok((source_id, destination_id))
+        })
+        .transpose()?;
+    output.push(b'<');
+    output.extend_from_slice(element.name().as_ref());
+    for (key, decoded) in attributes {
+        output.push(b' ');
+        output.extend_from_slice(&key);
+        output.extend_from_slice(b"=\"");
+        let value = if let Some((_source_id, destination_id)) = mapped_identity
+            && key == b"id"
         {
+            destination_id.to_string()
+        } else if let Some((source_id, destination_id)) = mapped_identity
+            && key == b"name"
+        {
+            if source_id == remap.root_source_id {
+                remap.root_name.to_owned()
+            } else {
+                format!("{decoded} Copy {destination_id}")
+            }
+        } else if is_connection && key == b"id" {
+            let connected_id = decoded.parse::<u32>().map_err(|_err| {
+                invalid("opened-presentation connector endpoint identity is invalid")
+            })?;
+            remap
+                .shape_ids
+                .get(&connected_id)
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "opened-presentation connector endpoint {connected_id} lies outside the transferred shape subtree"
+                    ))
+                })?
+                .to_string()
+        } else if key.starts_with(b"r:") && matches!(&key[2..], b"id" | b"embed" | b"link") {
             remap
                 .relationships
-                .get(decoded.as_ref())
+                .get(decoded.as_str())
                 .cloned()
                 .ok_or_else(|| {
                     invalid(format!(
-                        "opened-presentation transferred relationship {} was not remapped",
-                        decoded.as_ref()
+                        "opened-presentation transferred relationship {decoded} was not remapped"
                     ))
                 })?
         } else {
-            decoded.into_owned()
+            decoded
         };
         output.extend_from_slice(quick_xml::escape::escape(&value).as_bytes());
         output.push(b'"');
     }
-    if is_identity {
-        remap.identity_written = true;
-    }
     output.extend_from_slice(if empty { b"/>" } else { b">" });
     Ok(())
+}
+
+fn shape_identity_from_attributes(attributes: &[(Vec<u8>, String)]) -> Result<Option<u32>> {
+    let mut identities = attributes
+        .iter()
+        .filter(|(key, _)| key.as_slice() == b"id")
+        .map(|(_, value)| value);
+    let Some(value) = identities.next() else {
+        return Ok(None);
+    };
+    if identities.next().is_some() {
+        return Err(invalid(
+            "opened-presentation non-visual identity has duplicate id attributes",
+        ));
+    }
+    value
+        .parse::<u32>()
+        .map(Some)
+        .map_err(|_err| invalid("opened-presentation non-visual shape identity is invalid"))
 }
 
 fn slide_id_elements(xml: &[u8]) -> Result<Vec<SlideIdElement>> {

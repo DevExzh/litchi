@@ -6,6 +6,7 @@ use litchi_core::Position;
 /// One list item.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Item {
+    nested_lists: Vec<List>,
     paragraphs: Vec<Paragraph>,
     positions: Vec<Position>,
     start_value: Option<u32>,
@@ -16,6 +17,7 @@ impl Item {
     #[must_use]
     pub fn new(paragraph: Paragraph) -> Self {
         Self {
+            nested_lists: Vec::new(),
             paragraphs: vec![paragraph],
             positions: Vec::new(),
             start_value: None,
@@ -30,15 +32,30 @@ impl Item {
     }
 
     pub(crate) const fn projected(
+        nested_lists: Vec<List>,
         paragraphs: Vec<Paragraph>,
         positions: Vec<Position>,
         start_value: Option<u32>,
     ) -> Self {
         Self {
+            nested_lists,
             paragraphs,
             positions,
             start_value,
         }
+    }
+
+    /// Adds a detached nested list to this item.
+    #[must_use]
+    pub fn with_nested_list(mut self, list: List) -> Self {
+        self.nested_lists.push(list);
+        self
+    }
+
+    /// Nested lists directly contained by this item.
+    #[must_use]
+    pub fn nested_lists(&self) -> &[List] {
+        &self.nested_lists
     }
 
     /// Paragraphs directly contained by this item.

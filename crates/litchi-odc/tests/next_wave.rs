@@ -242,6 +242,63 @@ fn noncanonical_chart_plot_and_series_attributes_use_checked_exact_spans() -> Te
 }
 
 #[test]
+fn odf_1_4_coordinate_region_exact_edit_transfers_without_normalizing() -> TestResult<()> {
+    // Derived from the OASIS ODF 1.4 OS Relax NG
+    // `chart-coordinate-region` definition. This is standards-derived test
+    // XML, not a producer fixture or repackaged embedded chart.
+    let mut authored = definition();
+    authored.width = Some("10cm".into());
+    let canonical = litchi_odc::serialize_content(&authored)?;
+    let standards_derived = canonical.replacen(
+        "<chart:axis",
+        "<chart:coordinate-region svg:x=\"1cm\" svg:y=\"2cm\" svg:width=\"8cm\" svg:height=\"6cm\"/><chart:axis",
+        1,
+    );
+    let source = Chart::from_bytes(raw_negative_package(&standards_derived)?)?;
+    assert!(source.definition().is_err());
+
+    let mut edit = source.edit();
+    edit.update_exact(
+        ExactTarget::CoordinateRegion,
+        ExactAttribute::X,
+        Some("3cm".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::CoordinateRegion,
+        ExactAttribute::Width,
+        Some("7cm".into()),
+    )?;
+    let changed = edit.commit()?;
+    assert_eq!(changed.patch().exact_changes().len(), 2);
+    assert!(changed
+        .chart()
+        .content_xml()
+        .contains("<chart:coordinate-region svg:x=\"3cm\" svg:y=\"2cm\" svg:width=\"7cm\" svg:height=\"6cm\"/>"));
+
+    let destination_xml = standards_derived.replacen(
+        "<office:body>",
+        "<!-- independently retained -->\n<office:body>",
+        1,
+    );
+    let destination = Chart::from_bytes(raw_negative_package(&destination_xml)?)?;
+    let transfer = changed.patch().transfer_to(&destination)?;
+    assert!(transfer.is_merged());
+    let transferred = transfer
+        .patch()
+        .ok_or("missing coordinate-region transfer patch")?
+        .apply(&destination)?;
+    assert!(
+        transferred
+            .content_xml()
+            .contains("<!-- independently retained -->\n")
+    );
+    assert!(transferred
+        .content_xml()
+        .contains("<chart:coordinate-region svg:x=\"3cm\" svg:y=\"2cm\" svg:width=\"7cm\" svg:height=\"6cm\"/>"));
+    Ok(())
+}
+
+#[test]
 fn definition_join_transfer_and_dependency_conflicts_are_deterministic() -> TestResult<()> {
     let source = DefinitionSnapshot::with_default_limits(definition())?;
 

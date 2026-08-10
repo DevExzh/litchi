@@ -6,7 +6,8 @@ use litchi_odf_common::{
     core::{OwnedPackage, PackageWriter},
 };
 use litchi_odg::{
-    Drawing, FormControl, PackageDurablePatch, PackageMergePlan, PackageSecurityWritePolicy,
+    Drawing, FormControl, PackageActiveContentWritePolicy, PackageDurablePatch, PackageMergePlan,
+    PackageSecurityWritePolicy,
     page::Page,
     shape::{Shape, ShapeKind},
     style::Style,
@@ -375,6 +376,70 @@ fn signed_and_encrypted_security_state_is_inert_and_rewrite_is_refused() {
         encrypted.edit_with_security_policy(PackageSecurityWritePolicy::RemoveSignatures);
     still_refused.set_shape_text(0, 0, "no decryption").unwrap();
     assert!(still_refused.commit().is_err());
+}
+
+#[test]
+fn active_content_is_inventoried_preserved_or_explicitly_refused() {
+    let active = CONTENT
+        .replace(
+            r#"xmlns:xml="http://www.w3.org/XML/1998/namespace""#,
+            r#"xmlns:xml="http://www.w3.org/XML/1998/namespace" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:xlink="http://www.w3.org/1999/xlink""#,
+        )
+        .replace(
+            "</draw:page>",
+            r#"<script:event-listener xlink:href="https://example.invalid/script"/><ev:event-listener/><presentation:show/><office:dde-source/><draw:object xlink:href="https://example.invalid/object"/></draw:page>"#,
+        );
+    let source = Drawing::from_bytes(package(&active)).unwrap();
+    let status = source.active_content();
+    assert!(status.is_present());
+    assert_eq!(status.scripts(), 1);
+    assert_eq!(status.events(), 1);
+    assert_eq!(status.actions(), 1);
+    assert_eq!(status.dde(), 1);
+    assert_eq!(status.external_links(), 2);
+    assert_eq!(status.embedded_objects(), 1);
+
+    let mut preserved = source.edit();
+    preserved.set_shape_text(0, 0, "preserved inertly").unwrap();
+    let commit = preserved.commit().unwrap();
+    assert_eq!(commit.snapshot().active_content(), status);
+    assert!(
+        commit
+            .snapshot()
+            .content_xml()
+            .contains("script:event-listener")
+    );
+
+    let mut refused =
+        source.edit_with_active_content_policy(PackageActiveContentWritePolicy::Refuse);
+    refused.set_shape_text(0, 0, "refused").unwrap();
+    assert!(refused.commit().is_err());
+
+    let durable = commit.patch().durable().unwrap();
+    assert!(
+        durable
+            .apply_with_policies(
+                source.snapshot(),
+                PackageSecurityWritePolicy::Refuse,
+                PackageActiveContentWritePolicy::Refuse,
+            )
+            .is_err()
+    );
+    let limits = CompositionLimits::new(4, 4, 8, 8);
+    let mut joined = source.joined_edits(limits);
+    joined
+        .join(commit.patch().prepare("active", limits).unwrap())
+        .unwrap();
+    assert!(
+        source
+            .snapshot()
+            .apply_joined_with_policies(
+                joined,
+                PackageSecurityWritePolicy::Refuse,
+                PackageActiveContentWritePolicy::Refuse,
+            )
+            .is_err()
+    );
 }
 
 #[test]

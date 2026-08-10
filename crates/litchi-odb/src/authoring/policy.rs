@@ -154,6 +154,17 @@ pub enum DependencyDisposition {
     Cascade,
 }
 
+/// Explicit handling for potentially active content linked by a component.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ActiveContentDisposition {
+    /// Refuse a transfer when the linked subtree contains active declarations.
+    #[default]
+    Refuse,
+    /// Copy the bytes inertly without interpreting or activating them.
+    CopyInert,
+}
+
 impl ProtectionStatus {
     pub(crate) const fn new(signed: bool, encrypted: bool) -> Self {
         Self { signed, encrypted }

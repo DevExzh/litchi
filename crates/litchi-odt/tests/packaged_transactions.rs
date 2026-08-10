@@ -324,6 +324,19 @@ fn residual_semantic_families_share_one_reversible_transaction() {
     assert_eq!(document.protection().unwrap().read_only, Some(true));
     assert_eq!(document.forms().unwrap().groups[0].forms.len(), 1);
     assert_eq!(document.script_resources().unwrap()[0].bytes, script.bytes);
+    let durable = commit.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    for operation in ["form.add", "form.add_nested", "form.control.add"] {
+        assert!(wire_text.contains(operation), "missing {operation}");
+    }
+    assert_eq!(
+        durable
+            .apply(&source.snapshot().unwrap())
+            .unwrap()
+            .as_bytes(),
+        commit.snapshot().as_bytes()
+    );
     assert_all_package_xml_is_compact(commit.snapshot().as_bytes());
     assert_eq!(
         commit
@@ -333,6 +346,72 @@ fn residual_semantic_families_share_one_reversible_transaction() {
             .unwrap()
             .as_bytes(),
         source.original_bytes()
+    );
+}
+
+#[test]
+fn form_replacement_reorder_and_removal_are_durable_and_transferable() {
+    let source = source().snapshot().unwrap();
+    let first = AuthoredForm::new("First");
+    let second = AuthoredForm::new("Second");
+    let first_control = AuthoredFormControl::from(TextControl::text("One", "one"));
+    let second_control = AuthoredFormControl::from(TextControl::text("Two", "two"));
+    let mut setup = source.edit();
+    setup
+        .add_form(0, &first)
+        .unwrap()
+        .add_form(0, &second)
+        .unwrap()
+        .add_form_control(0, &first_control)
+        .unwrap()
+        .add_form_control(0, &second_control)
+        .unwrap();
+    let setup = setup.commit().unwrap().into_snapshot();
+
+    let replacement_form = AuthoredForm::new("Replacement");
+    let replacement_control =
+        AuthoredFormControl::from(TextControl::text("Replacement", "replacement"));
+    let mut edit = setup.edit();
+    edit.replace_form_control(0, &replacement_control)
+        .unwrap()
+        .move_form_control_to(Position::new(0), Position::new(1))
+        .unwrap()
+        .remove_form_control_at(Position::new(1))
+        .unwrap()
+        .replace_form(1, &replacement_form)
+        .unwrap()
+        .move_form_to(Position::new(0), Position::new(1))
+        .unwrap()
+        .remove_form_at(Position::new(1))
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    for operation in [
+        "form.control.replace",
+        "form.control.move",
+        "form.control.remove",
+        "form.replace",
+        "form.move",
+        "form.remove",
+    ] {
+        assert!(wire_text.contains(operation), "missing {operation}");
+    }
+    assert_eq!(
+        durable.apply(&setup).unwrap().as_bytes(),
+        committed.snapshot().as_bytes()
+    );
+    assert_eq!(
+        committed
+            .patch()
+            .plan_transfer(&setup)
+            .unwrap()
+            .commit()
+            .unwrap()
+            .snapshot()
+            .as_bytes(),
+        committed.snapshot().as_bytes()
     );
 }
 
@@ -561,9 +640,97 @@ fn chart_and_resource_payloads_replay_and_transfer_with_explicit_dependencies() 
     assert!(styled_transfer.dependencies().iter().any(|dependency| {
         dependency.kind() == TransferDependencyKind::ChartStyle
             && dependency.key() == "MissingChartStyle"
-            && !dependency.is_satisfied()
+            && dependency.is_satisfied()
     }));
-    assert!(styled_transfer.commit().is_err());
+    styled_transfer.commit().unwrap();
+}
+
+#[test]
+fn chart_and_resource_replacement_removal_and_moves_use_semantic_wire() {
+    let source = source().snapshot().unwrap();
+    let linked = |name: &str| EmbeddedResource {
+        kind: EmbeddedResourceKind::Object,
+        source: EmbeddedResourceSource::Linked {
+            href: format!("https://example.invalid/{name}"),
+        },
+        frame_name: Some(name.to_string()),
+        xml_id: None,
+        class_id: None,
+    };
+    let image = |name: &str, bytes: &[u8]| EmbeddedResource {
+        kind: EmbeddedResourceKind::Image,
+        source: EmbeddedResourceSource::InlineBinary {
+            bytes: bytes.to_vec(),
+            media_type: Some("image/png".to_string()),
+        },
+        frame_name: Some(name.to_string()),
+        xml_id: None,
+        class_id: None,
+    };
+    let mut setup = source.edit();
+    setup
+        .add_embedded_resource(&linked("object-one"))
+        .unwrap()
+        .add_embedded_resource(&linked("object-two"))
+        .unwrap()
+        .add_embedded_chart(&Definition::new(ChartClass::line()))
+        .unwrap()
+        .add_embedded_chart(&Definition::new(ChartClass::bar()))
+        .unwrap()
+        .add_embedded_resource(&image("image-one", b"one"))
+        .unwrap()
+        .add_embedded_resource(&image("image-two", b"two"))
+        .unwrap();
+    let setup = setup.commit().unwrap().into_snapshot();
+
+    let mut edit = setup.edit();
+    edit.replace_embedded_chart(2, &Definition::new(ChartClass::ring()))
+        .unwrap()
+        .remove_embedded_chart_at(Position::new(3))
+        .unwrap()
+        .replace_embedded_object(0, &linked("object-replacement"))
+        .unwrap()
+        .move_embedded_object_to(Position::new(0), Position::new(1))
+        .unwrap()
+        .remove_embedded_object_at(Position::new(1))
+        .unwrap()
+        .replace_embedded_image(0, &image("image-replacement", b"replacement"))
+        .unwrap()
+        .move_embedded_image_to(Position::new(0), Position::new(1))
+        .unwrap()
+        .remove_embedded_image_at(Position::new(1))
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    for operation in [
+        "chart.replace",
+        "chart.remove",
+        "resource.embedded.object.replace",
+        "resource.embedded.object.move",
+        "resource.embedded.object.remove",
+        "resource.embedded.image.replace",
+        "resource.embedded.image.move",
+        "resource.embedded.image.remove",
+    ] {
+        assert!(wire_text.contains(operation), "missing {operation}");
+    }
+    assert_eq!(
+        durable.apply(&setup).unwrap().as_bytes(),
+        committed.snapshot().as_bytes()
+    );
+    assert_eq!(
+        committed
+            .patch()
+            .plan_transfer(&setup)
+            .unwrap()
+            .commit()
+            .unwrap()
+            .snapshot()
+            .as_bytes(),
+        committed.snapshot().as_bytes()
+    );
 }
 
 #[test]

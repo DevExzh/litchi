@@ -131,6 +131,35 @@ fn operation_sheet(change: &StructuralChange) -> usize {
     }
 }
 
+pub(super) fn certify_shift(source: &super::Snapshot, sheet: usize) -> Result<()> {
+    let workbook = &source.inner.workbook_stream;
+    certify_workbook_shift(workbook)?;
+    let workbook_index = source
+        .inner
+        .sheets
+        .get(sheet)
+        .ok_or_else(|| Error::UnsafeEdit("worksheet dependency index is stale".into()))?
+        .workbook_index;
+    let bounds = bound_sheets(workbook)?;
+    let bound = bounds
+        .get(workbook_index)
+        .ok_or_else(|| Error::UnsafeEdit("worksheet dependency owner disappeared".into()))?;
+    let start = usize::try_from(bound.position)
+        .map_err(|_error| Error::InvalidData("worksheet position exceeds usize".into()))?;
+    let end = bounds
+        .iter()
+        .filter_map(|candidate| {
+            let position = usize::try_from(candidate.position).ok()?;
+            (position > start).then_some(position)
+        })
+        .min()
+        .unwrap_or(workbook.len());
+    let worksheet = workbook.get(start..end).ok_or_else(|| {
+        Error::InvalidData("worksheet dependency range is outside Workbook".into())
+    })?;
+    certify_coordinate_shift(&raw_records(worksheet)?)
+}
+
 fn resource_insert(resource: &super::ResourceChange) -> bool {
     match resource {
         super::ResourceChange::SharedString { insert, .. }
@@ -186,32 +215,44 @@ fn apply_shared_string_resource(workbook: &mut Vec<u8>, text: &str, insert: bool
         last = record;
     }
     if insert {
-        let payload = encode_xl_unicode_payload(text)?;
-        let mut record = Vec::with_capacity(4 + payload.len());
-        record.extend_from_slice(&CONTINUE.to_le_bytes());
-        record.extend_from_slice(
-            &u16::try_from(payload.len())
-                .map_err(|_error| Error::InvalidData("SST string payload exceeds u16".into()))?
-                .to_le_bytes(),
-        );
-        record.extend_from_slice(&payload);
-        replace_range_and_adjust_bounds(workbook, family_end, family_end, &record)?;
+        let records = encode_sst_tail_records(text)?;
+        let total = records
+            .iter()
+            .try_fold(0_usize, |total, record| total.checked_add(record.len()));
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(
+                total.ok_or_else(|| Error::InvalidData("SST tail length overflow".into()))?,
+            )
+            .map_err(|_error| Error::Allocation("retaining continued SST tail"))?;
+        for record in records {
+            bytes.extend_from_slice(&record);
+        }
+        replace_range_and_adjust_bounds(workbook, family_end, family_end, &bytes)?;
         let updated = unique
             .checked_add(1)
             .ok_or_else(|| Error::InvalidData("SST unique count overflow".into()))?;
         workbook[sst.start + 8..sst.start + 12].copy_from_slice(&updated.to_le_bytes());
         return Ok(());
     }
-    if last.kind != CONTINUE || last.start == sst.start {
+    let expected = encode_sst_tail_records(text)?;
+    let authored_count = expected.len();
+    let family: Vec<_> = globals[sst_index + 1..]
+        .iter()
+        .take_while(|record| record.kind == CONTINUE)
+        .collect();
+    if authored_count == 0 || family.len() < authored_count {
         return Err(Error::UnsafeEdit(
-            "SST inverse can remove only a tail Continue resource authored by this owner".into(),
+            "SST inverse cannot locate its complete tail resource".into(),
         ));
     }
-    let expected = encode_xl_unicode_payload(text)?;
-    if workbook[last.start + 4..last.end] != expected {
-        return Err(Error::UnsafeEdit(
-            "SST inverse tail resource precondition is stale".into(),
-        ));
+    let tail = &family[family.len() - authored_count..];
+    for (record, expected) in tail.iter().zip(&expected) {
+        if &workbook[record.start..record.end] != expected.as_slice() {
+            return Err(Error::UnsafeEdit(
+                "SST inverse tail resource precondition is stale".into(),
+            ));
+        }
     }
     let removed_index = unique
         .checked_sub(1)
@@ -222,39 +263,74 @@ fn apply_shared_string_resource(workbook: &mut Vec<u8>, text: &str, insert: bool
         ));
     }
     workbook[sst.start + 8..sst.start + 12].copy_from_slice(&removed_index.to_le_bytes());
-    replace_range_and_adjust_bounds(workbook, last.start, last.end, &[])
+    replace_range_and_adjust_bounds(
+        workbook,
+        tail.first()
+            .ok_or_else(|| Error::InvalidData("SST inverse tail is empty".into()))?
+            .start,
+        last.end,
+        &[],
+    )
 }
 
-fn encode_xl_unicode_payload(text: &str) -> Result<Vec<u8>> {
-    let units: Vec<u16> = text.encode_utf16().collect();
-    let count = u16::try_from(units.len())
+fn encode_sst_tail_records(text: &str) -> Result<Vec<Vec<u8>>> {
+    let unit_count = text.encode_utf16().count();
+    let count = u16::try_from(unit_count)
         .map_err(|_error| Error::UnsafeEdit("shared string exceeds u16 characters".into()))?;
+    let mut units = Vec::new();
+    units
+        .try_reserve_exact(unit_count)
+        .map_err(|_error| Error::Allocation("retaining shared-string UTF-16 units"))?;
+    units.extend(text.encode_utf16());
     let compressed = units.iter().all(|unit| *unit <= 0xff);
-    let size = units
-        .len()
-        .checked_mul(if compressed { 1 } else { 2 })
-        .and_then(|length| length.checked_add(3))
-        .ok_or_else(|| Error::InvalidData("shared string payload length overflow".into()))?;
-    if size > 8_224 {
-        return Err(Error::UnsafeEdit(
-            "new SST resource requires unsupported intra-string continuation".into(),
-        ));
-    }
-    let mut payload = Vec::with_capacity(size);
-    payload.extend_from_slice(&count.to_le_bytes());
-    payload.push(u8::from(!compressed));
-    if compressed {
-        for unit in units {
-            payload.push(u8::try_from(unit).map_err(|_error| {
-                Error::InvalidData("compressed shared-string unit exceeds u8".into())
-            })?);
+    let width = if compressed { 1 } else { 2 };
+    let mut offset = 0_usize;
+    let mut first = true;
+    let mut records = Vec::new();
+    records
+        .try_reserve(1 + unit_count / 4_111)
+        .map_err(|_error| Error::Allocation("retaining continued SST records"))?;
+    loop {
+        let prefix = if first { 3 } else { 1 };
+        let capacity = (8_224 - prefix) / width;
+        let mut end = units.len().min(offset.saturating_add(capacity));
+        if end < units.len()
+            && end > offset
+            && (0xd800..=0xdbff).contains(&units[end - 1])
+            && (0xdc00..=0xdfff).contains(&units[end])
+        {
+            end -= 1;
         }
-    } else {
-        for unit in units {
-            payload.extend_from_slice(&unit.to_le_bytes());
+        let mut payload = Vec::with_capacity(prefix + (end - offset) * width);
+        if first {
+            payload.extend_from_slice(&count.to_le_bytes());
         }
+        payload.push(u8::from(!compressed));
+        for unit in &units[offset..end] {
+            if compressed {
+                payload.push(u8::try_from(*unit).map_err(|_error| {
+                    Error::InvalidData("compressed shared-string unit exceeds u8".into())
+                })?);
+            } else {
+                payload.extend_from_slice(&unit.to_le_bytes());
+            }
+        }
+        let mut record = Vec::with_capacity(4 + payload.len());
+        record.extend_from_slice(&CONTINUE.to_le_bytes());
+        record.extend_from_slice(
+            &u16::try_from(payload.len())
+                .map_err(|_error| Error::InvalidData("SST string payload exceeds u16".into()))?
+                .to_le_bytes(),
+        );
+        record.extend_from_slice(&payload);
+        records.push(record);
+        if end == units.len() {
+            break;
+        }
+        offset = end;
+        first = false;
     }
-    Ok(payload)
+    Ok(records)
 }
 
 fn label_sst_reference_exists(workbook: &[u8], index: u32) -> Result<bool> {
@@ -273,6 +349,7 @@ fn apply_xf_resource(
     payload: &[u8],
     insert: bool,
 ) -> Result<()> {
+    super::validate_xf_payload(payload)?;
     let globals = workbook_globals(workbook)?;
     let xfs: Vec<_> = globals.iter().filter(|record| record.kind == XF).collect();
     if insert {

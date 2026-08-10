@@ -19,6 +19,8 @@ struct State {
     forms_site: Option<crate::codec::ReplacementSite>,
     headings: Vec<crate::heading::Heading>,
     heading_content_sites: Vec<crate::codec::ReplacementSite>,
+    heading_full_sites: Vec<crate::codec::ReplacementSite>,
+    heading_inline_replaceable: Vec<bool>,
     heading_replacement_sites: Vec<Option<crate::codec::ReplacementSite>>,
     lists: Vec<crate::list::List>,
     list_sites: Vec<crate::codec::ReplacementSite>,
@@ -27,8 +29,11 @@ struct State {
     package: Package,
     paragraphs: Vec<crate::paragraph::Paragraph>,
     paragraph_content_sites: Vec<crate::codec::ReplacementSite>,
+    paragraph_full_sites: Vec<crate::codec::ReplacementSite>,
+    paragraph_inline_replaceable: Vec<bool>,
     replacement_sites: Vec<Option<crate::codec::ReplacementSite>>,
     resources: Vec<crate::resource::Resource>,
+    resource_sites: Vec<crate::codec::ReplacementSite>,
     styles: Vec<crate::style::Style>,
     text_close: usize,
 }
@@ -79,8 +84,16 @@ impl Snapshot {
             None
         };
         let projection = crate::codec::project(package.content_xml())?;
+        let resource_sites = crate::codec::resource_sites(package.content_xml())?;
+        if resource_sites.len() != projection.resources.len() {
+            return Err(Error::InvalidFormat(
+                "OTH resource projection/site count differs".to_string(),
+            ));
+        }
         let mut headings = Vec::new();
         let mut heading_content_sites = Vec::new();
+        let mut heading_full_sites = Vec::new();
+        let mut heading_inline_replaceable = Vec::new();
         let mut heading_replacement_sites = Vec::new();
         headings
             .try_reserve(projection.headings.len())
@@ -94,6 +107,18 @@ impl Snapshot {
                 resource: "OTH heading content edit sites",
                 source,
             })?;
+        heading_full_sites
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading full source sites",
+                source,
+            })?;
+        heading_inline_replaceable
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading inline edit flags",
+                source,
+            })?;
         heading_replacement_sites
             .try_reserve(projection.headings.len())
             .map_err(|source| Error::Allocation {
@@ -102,11 +127,15 @@ impl Snapshot {
             })?;
         for site in projection.headings {
             heading_content_sites.push(site.content);
+            heading_full_sites.push(site.full);
+            heading_inline_replaceable.push(site.inline_replaceable);
             headings.push(site.value);
             heading_replacement_sites.push(site.replacement);
         }
         let mut paragraphs = Vec::new();
         let mut paragraph_content_sites = Vec::new();
+        let mut paragraph_full_sites = Vec::new();
+        let mut paragraph_inline_replaceable = Vec::new();
         let mut replacement_sites = Vec::new();
         paragraphs
             .try_reserve(projection.paragraphs.len())
@@ -120,6 +149,18 @@ impl Snapshot {
                 resource: "OTH paragraph content edit sites",
                 source,
             })?;
+        paragraph_full_sites
+            .try_reserve(projection.paragraphs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH paragraph full source sites",
+                source,
+            })?;
+        paragraph_inline_replaceable
+            .try_reserve(projection.paragraphs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH paragraph inline edit flags",
+                source,
+            })?;
         replacement_sites
             .try_reserve(projection.paragraphs.len())
             .map_err(|source| Error::Allocation {
@@ -128,6 +169,8 @@ impl Snapshot {
             })?;
         for site in projection.paragraphs {
             paragraph_content_sites.push(site.content);
+            paragraph_full_sites.push(site.full);
+            paragraph_inline_replaceable.push(site.inline_replaceable);
             paragraphs.push(site.value);
             replacement_sites.push(site.replacement);
         }
@@ -145,6 +188,8 @@ impl Snapshot {
             forms_site: projection.forms_site,
             headings,
             heading_content_sites,
+            heading_full_sites,
+            heading_inline_replaceable,
             heading_replacement_sites,
             lists: projection.lists,
             list_sites: projection.list_sites,
@@ -153,8 +198,11 @@ impl Snapshot {
             package,
             paragraphs,
             paragraph_content_sites,
+            paragraph_full_sites,
+            paragraph_inline_replaceable,
             replacement_sites,
             resources: projection.resources,
+            resource_sites,
             styles,
             text_close: projection.text_close,
         })))
@@ -211,12 +259,30 @@ impl Snapshot {
         self.0.list_sites.get(index)
     }
 
-    pub(crate) fn list_sites(&self) -> &[crate::codec::ReplacementSite] {
-        &self.0.list_sites
-    }
-
     pub(crate) fn resources(&self) -> &[crate::resource::Resource] {
         &self.0.resources
+    }
+
+    pub(crate) fn resource_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
+        self.0.resource_sites.get(index)
+    }
+
+    pub(crate) fn resource_sites(&self) -> &[crate::codec::ReplacementSite] {
+        &self.0.resource_sites
+    }
+
+    pub(crate) fn member(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        self.0
+            .package
+            .package()
+            .has_file(path)?
+            .then(|| self.0.package.package().get_file(path))
+            .transpose()
+    }
+
+    pub(crate) fn member_media_type(&self, path: &str) -> Result<Option<String>> {
+        let package = self.0.package.package().package()?;
+        Ok(package.manifest().get_media_type(path).map(str::to_owned))
     }
 
     pub(crate) fn forms(&self) -> &[crate::form::Form] {
@@ -263,6 +329,33 @@ impl Snapshot {
         self.0.heading_content_sites.get(index)
     }
 
+    pub(crate) fn paragraph_full_site(
+        &self,
+        index: usize,
+    ) -> Option<&crate::codec::ReplacementSite> {
+        self.0.paragraph_full_sites.get(index)
+    }
+
+    pub(crate) fn heading_full_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
+        self.0.heading_full_sites.get(index)
+    }
+
+    pub(crate) fn paragraph_inline_replaceable(&self, index: usize) -> bool {
+        self.0
+            .paragraph_inline_replaceable
+            .get(index)
+            .copied()
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn heading_inline_replaceable(&self, index: usize) -> bool {
+        self.0
+            .heading_inline_replaceable
+            .get(index)
+            .copied()
+            .unwrap_or(false)
+    }
+
     pub(crate) fn text_close(&self) -> usize {
         self.0.text_close
     }
@@ -272,6 +365,7 @@ impl Snapshot {
         content: &str,
         metadata: &crate::facade::PartChange,
         styles: &crate::facade::PartChange,
+        members: &[crate::facade::MemberChange],
     ) -> Result<Self> {
         let files = self.files()?;
         if files.iter().any(|path| {
@@ -300,11 +394,17 @@ impl Snapshot {
                 crate::facade::PartChange::Keep | crate::facade::PartChange::Remove => {},
             }
         }
-        let excluded_paths = [
+        for change in members {
+            if let Some(bytes) = &change.after {
+                writer.add_file_with_media_type(&change.path, bytes, &change.media_type)?;
+            }
+        }
+        let mut excluded_paths = vec![
             "content.xml".to_string(),
             "meta.xml".to_string(),
             "styles.xml".to_string(),
         ];
+        excluded_paths.extend(members.iter().map(|change| change.path.clone()));
         writer.copy_auxiliary_files_from_except(self.0.package.package(), &excluded_paths, &[])?;
         Self::from_bytes(writer.finish_to_bounded_bytes()?)
     }

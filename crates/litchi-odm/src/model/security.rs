@@ -12,6 +12,8 @@ pub enum ActiveKind {
     ScriptResource,
     /// Form controls or forms declared in document XML.
     FormControl,
+    /// An inert script or presentation event-listener action.
+    EventListener,
 }
 
 /// One security-relevant inert item.
@@ -19,6 +21,10 @@ pub enum ActiveKind {
 pub struct ActiveContent {
     pub(crate) kind: ActiveKind,
     pub(crate) location: String,
+    pub(crate) trigger: Option<String>,
+    pub(crate) action: Option<String>,
+    pub(crate) target: Option<String>,
+    pub(crate) link: Option<String>,
 }
 
 impl ActiveContent {
@@ -33,6 +39,44 @@ impl ActiveContent {
     pub fn location(&self) -> &str {
         &self.location
     }
+
+    /// Returns the authored event name, when present.
+    #[must_use]
+    pub fn trigger(&self) -> Option<&str> {
+        self.trigger.as_deref()
+    }
+
+    /// Returns the inert presentation action token, when present.
+    #[must_use]
+    pub fn action(&self) -> Option<&str> {
+        self.action.as_deref()
+    }
+
+    /// Returns the inert macro/function target, when present.
+    #[must_use]
+    pub fn target(&self) -> Option<&str> {
+        self.target.as_deref()
+    }
+
+    /// Returns the inert listener link target, when present.
+    #[must_use]
+    pub fn link(&self) -> Option<&str> {
+        self.link.as_deref()
+    }
+}
+
+/// Intrinsic disposition for publishing changed package bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ChangedWriteDisposition {
+    /// A normal changed write is intrinsically supported.
+    Allowed,
+    /// Active content requires explicit inert-preservation opt-in.
+    RequiresInertActiveContentOptIn,
+    /// A recognized signature prevents changed publication.
+    RefusedSigned,
+    /// Manifest encryption prevents changed publication.
+    RefusedEncrypted,
 }
 
 /// Immutable security state projected when the package is opened.
@@ -60,5 +104,19 @@ impl State {
     #[must_use]
     pub fn active_content(&self) -> &[ActiveContent] {
         &self.active_content
+    }
+
+    /// Returns the strongest disposition for a changed write.
+    #[must_use]
+    pub const fn changed_write_disposition(&self) -> ChangedWriteDisposition {
+        if self.encrypted {
+            ChangedWriteDisposition::RefusedEncrypted
+        } else if self.signed {
+            ChangedWriteDisposition::RefusedSigned
+        } else if self.active_content.is_empty() {
+            ChangedWriteDisposition::Allowed
+        } else {
+            ChangedWriteDisposition::RequiresInertActiveContentOptIn
+        }
     }
 }

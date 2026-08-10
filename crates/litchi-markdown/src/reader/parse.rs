@@ -33,7 +33,14 @@ pub(crate) fn read(source: &str, dialect: Dialect, limits: ReadLimits) -> Result
     let options = parser_options(dialect);
     let parser = Parser::new_ext(source, options);
     let (mut blocks, mut references) = collect_reference_definitions(&parser, limits)?;
-    collect_event_blocks(parser, &mut blocks, &mut references, limits)?;
+    collect_event_blocks(
+        parser,
+        source,
+        dialect,
+        &mut blocks,
+        &mut references,
+        limits,
+    )?;
     for block in &mut blocks {
         expand_indented_start(source, block);
     }
@@ -214,6 +221,8 @@ fn block_kind(tag: &Tag<'_>) -> Option<BlockKind> {
 
 fn collect_event_blocks(
     parser: Parser<'_>,
+    source: &str,
+    dialect: Dialect,
     blocks: &mut Vec<BlockRecord>,
     references: &mut Vec<ReferenceRecord>,
     limits: ReadLimits,
@@ -390,8 +399,24 @@ fn collect_event_blocks(
                 },
                 limits,
             )?,
-            Event::Text(_) => {
-                push_leaf(&mut root_block, InlineKind::Text, range, open_inlines.len())?;
+            Event::Text(text) => {
+                let inside_existing_link = open_inlines
+                    .iter()
+                    .any(|inline| matches!(inline.kind, InlineKind::Link | InlineKind::Image));
+                if dialect == Dialect::GitHubFlavored && !inside_existing_link {
+                    push_gfm_text(
+                        &mut root_block,
+                        references,
+                        source,
+                        text.as_ref(),
+                        range,
+                        open_inlines.len(),
+                        &mut event_count,
+                        limits,
+                    )?;
+                } else {
+                    push_leaf(&mut root_block, InlineKind::Text, range, open_inlines.len())?;
+                }
             },
             Event::Code(_) => {
                 push_leaf(&mut root_block, InlineKind::Code, range, open_inlines.len())?;
@@ -437,6 +462,100 @@ fn collect_event_blocks(
             )?,
             Event::InlineMath(_) | Event::DisplayMath(_) | Event::Rule => {},
         }
+    }
+    Ok(())
+}
+
+fn push_gfm_text(
+    root: &mut Option<OpenBlock>,
+    references: &mut Vec<ReferenceRecord>,
+    source: &str,
+    rendered_text: &str,
+    range: std::ops::Range<usize>,
+    depth: usize,
+    event_count: &mut usize,
+    limits: ReadLimits,
+) -> Result<(), Error> {
+    if root
+        .as_ref()
+        .is_none_or(|block| matches!(block.kind, BlockKind::CodeBlock { .. } | BlockKind::Html))
+    {
+        return push_leaf(root, InlineKind::Text, range, depth);
+    }
+    let Some(raw_text) = source.get(range.clone()) else {
+        return push_leaf(root, InlineKind::Text, range, depth);
+    };
+    if raw_text != rendered_text {
+        return push_leaf(root, InlineKind::Text, range, depth);
+    }
+    let links = super::gfm::find_autolinks(raw_text)?;
+    if links.is_empty() {
+        return push_leaf(root, InlineKind::Text, range, depth);
+    }
+
+    let Some(block) = root.as_mut() else {
+        return Ok(());
+    };
+    let mut cursor = 0usize;
+    for link in links {
+        for _ in 0..2 {
+            *event_count = event_count.saturating_add(1);
+            if *event_count > limits.max_events {
+                return Err(Error::EventLimitExceeded {
+                    limit: limits.max_events,
+                });
+            }
+        }
+        if cursor < link.range.start {
+            push_inline(
+                &mut block.inlines,
+                InlineRecord {
+                    kind: InlineKind::Text,
+                    range: range.start.saturating_add(cursor)
+                        ..range.start.saturating_add(link.range.start),
+                    depth,
+                },
+            )?;
+        }
+        let link_range = range.start.saturating_add(link.range.start)
+            ..range.start.saturating_add(link.range.end);
+        push_inline(
+            &mut block.inlines,
+            InlineRecord {
+                kind: InlineKind::Link,
+                range: link_range.clone(),
+                depth,
+            },
+        )?;
+        push_inline(
+            &mut block.inlines,
+            InlineRecord {
+                kind: InlineKind::Text,
+                range: link_range.clone(),
+                depth: depth.saturating_add(1),
+            },
+        )?;
+        push_reference(
+            references,
+            ReferenceRecord {
+                kind: ReferenceKind::Link,
+                range: link_range,
+                label: None,
+                destination: Some(link.destination),
+                title: None,
+            },
+        )?;
+        cursor = link.range.end;
+    }
+    if cursor < raw_text.len() {
+        push_inline(
+            &mut block.inlines,
+            InlineRecord {
+                kind: InlineKind::Text,
+                range: range.start.saturating_add(cursor)..range.end,
+                depth,
+            },
+        )?;
     }
     Ok(())
 }
@@ -673,14 +792,13 @@ const fn is_block_end(end: TagEnd) -> bool {
     )
 }
 
-const fn parser_options(dialect: Dialect) -> Options {
+pub(super) const fn parser_options(dialect: Dialect) -> Options {
     match dialect {
         Dialect::CommonMark => Options::empty(),
         Dialect::GitHubFlavored => Options::ENABLE_TABLES
             .union(Options::ENABLE_FOOTNOTES)
             .union(Options::ENABLE_STRIKETHROUGH)
-            .union(Options::ENABLE_TASKLISTS)
-            .union(Options::ENABLE_GFM),
+            .union(Options::ENABLE_TASKLISTS),
     }
 }
 

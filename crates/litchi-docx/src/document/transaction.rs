@@ -87,6 +87,26 @@ pub enum RevisionKind {
     Deletion,
 }
 
+/// One table/row/cell step in a bounded nested-table selector path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TableCellAddress {
+    /// Direct table position in the body for the first step, or in the
+    /// preceding cell for every nested step.
+    pub table: Position,
+    /// Direct row position in the selected table.
+    pub row: Position,
+    /// Direct cell position in the selected row.
+    pub cell: Position,
+}
+
+impl TableCellAddress {
+    /// Construct one checked-by-use nested table-cell address step.
+    #[must_use]
+    pub const fn new(table: Position, row: Position, cell: Position) -> Self {
+        Self { table, row, cell }
+    }
+}
+
 /// Dependency-checked paragraph payload prepared for one exact receiving
 /// document. Package planning rewrites relationship references to dependencies
 /// already proven present in the receiver before constructing this value.
@@ -284,6 +304,7 @@ pub struct Snapshot {
     xml: Arc<Vec<u8>>,
     paragraphs: Arc<[Range]>,
     tables: Arc<[Range]>,
+    block_controls: Arc<[Range]>,
     content_end: u32,
     conformance: Conformance,
 }
@@ -309,6 +330,7 @@ impl Snapshot {
             xml: Arc::new(xml),
             paragraphs: layout.paragraphs.into(),
             tables: layout.tables.into(),
+            block_controls: layout.block_controls.into(),
             content_end: layout.content_end,
             conformance: layout.conformance,
         })
@@ -349,6 +371,12 @@ impl Snapshot {
     #[must_use]
     pub fn table_count(&self) -> usize {
         self.tables.len()
+    }
+
+    /// Return the number of direct main-body block content controls.
+    #[must_use]
+    pub fn block_content_control_count(&self) -> usize {
+        self.block_controls.len()
     }
 
     /// Start an isolated edit whose selectors resolve against its projected
@@ -449,6 +477,29 @@ pub enum Operation {
         /// Text produced by the operation.
         after: String,
     },
+    /// Replace text in a nested inline content control selected by direct-child path.
+    ReplaceNestedContentControlText {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Non-empty direct `w:sdt` path, first in the paragraph and then in
+        /// each preceding `w:sdtContent`.
+        controls: Arc<[Position]>,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
+    /// Replace one direct paragraph inside a possibly nested block control.
+    ReplaceBlockContentControlParagraphText {
+        /// Non-empty path starting at a direct-body `w:sdt`.
+        controls: Arc<[Position]>,
+        /// Direct paragraph position in the deepest `w:sdtContent`.
+        paragraph: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
     /// Replace text in one basic direct-body table cell.
     ReplaceCellText {
         /// Direct-body table position.
@@ -471,6 +522,17 @@ pub enum Operation {
         /// Direct cell position in the row.
         cell: Position,
         /// Direct paragraph position in the cell.
+        paragraph: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
+    /// Replace a direct paragraph in a cell reached through nested tables.
+    ReplaceNestedCellParagraphText {
+        /// Non-empty body-to-nested-cell path.
+        path: Arc<[TableCellAddress]>,
+        /// Direct paragraph position in the deepest cell.
         paragraph: Position,
         /// Text required before applying the operation.
         before: String,
@@ -599,6 +661,28 @@ impl Operation {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::ReplaceNestedContentControlText {
+                paragraph,
+                controls,
+                before,
+                after,
+            } => Self::ReplaceNestedContentControlText {
+                paragraph: *paragraph,
+                controls: Arc::clone(controls),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ReplaceBlockContentControlParagraphText {
+                controls,
+                paragraph,
+                before,
+                after,
+            } => Self::ReplaceBlockContentControlParagraphText {
+                controls: Arc::clone(controls),
+                paragraph: *paragraph,
+                before: after.clone(),
+                after: before.clone(),
+            },
             Self::ReplaceCellText {
                 table,
                 row,
@@ -623,6 +707,17 @@ impl Operation {
                 table: *table,
                 row: *row,
                 cell: *cell,
+                paragraph: *paragraph,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ReplaceNestedCellParagraphText {
+                path,
+                paragraph,
+                before,
+                after,
+            } => Self::ReplaceNestedCellParagraphText {
+                path: Arc::clone(path),
                 paragraph: *paragraph,
                 before: after.clone(),
                 after: before.clone(),
@@ -1077,6 +1172,75 @@ impl Edit {
         Ok(self)
     }
 
+    /// Replace text in the deepest inline content control reached by a
+    /// non-empty direct-child path. The first position selects a direct
+    /// paragraph `w:sdt`; later positions select a direct `w:sdt` in the
+    /// preceding `w:sdtContent`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked path/refusal, resource-limit, or malformed XML error
+    /// without changing the projected snapshot.
+    pub fn replace_nested_content_control_text(
+        &mut self,
+        paragraph: Position,
+        controls: &[Position],
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        let path: Arc<[Position]> = controls.into();
+        let (start, end) = select_nested_inline_control_content(&self.projected, paragraph, &path)?;
+        let readback_path = Arc::clone(&path);
+        self.replace_selected_owner_text(
+            (start, end),
+            b"sdtContent",
+            paragraph.get(),
+            authored_text.into(),
+            move |before, after| Operation::ReplaceNestedContentControlText {
+                paragraph,
+                controls: path,
+                before,
+                after,
+            },
+            move |candidate| {
+                selected_nested_inline_control_text(candidate, paragraph, &readback_path)
+            },
+        )
+    }
+
+    /// Replace one direct paragraph inside the deepest block content control
+    /// reached by a non-empty path. The first position selects a direct-body
+    /// `w:sdt`; later positions select a direct nested `w:sdt`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked path/refusal, resource-limit, or malformed XML error
+    /// without changing the projected snapshot.
+    pub fn replace_block_content_control_paragraph_text(
+        &mut self,
+        controls: &[Position],
+        paragraph: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        let path: Arc<[Position]> = controls.into();
+        let (start, end) = select_block_control_paragraph(&self.projected, &path, paragraph)?;
+        let readback_path = Arc::clone(&path);
+        self.replace_selected_owner_text(
+            (start, end),
+            b"p",
+            path.first().map_or(0, |position| position.get()),
+            authored_text.into(),
+            move |before, after| Operation::ReplaceBlockContentControlParagraphText {
+                controls: path,
+                paragraph,
+                before,
+                after,
+            },
+            move |candidate| {
+                selected_block_control_paragraph_text(candidate, &readback_path, paragraph)
+            },
+        )
+    }
+
     /// Replace text in a basic direct-body table cell.
     ///
     /// The supported cell contains one direct paragraph. Its existing runs,
@@ -1224,6 +1388,40 @@ impl Edit {
         self.replacement_text_bytes = replacement_text_bytes;
         self.projected = candidate;
         Ok(self)
+    }
+
+    /// Replace one direct paragraph in a cell reached through a non-empty
+    /// body-to-nested-table path. Each later table must be a direct child of
+    /// the preceding selected cell.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked path/refusal, resource-limit, or malformed XML error
+    /// without changing the projected snapshot.
+    pub fn replace_nested_table_cell_paragraph_text(
+        &mut self,
+        path: &[TableCellAddress],
+        paragraph: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        let path_arc: Arc<[TableCellAddress]> = path.into();
+        let (start, end) = select_nested_cell_paragraph(&self.projected, &path_arc, paragraph)?;
+        let readback_path = Arc::clone(&path_arc);
+        self.replace_selected_owner_text(
+            (start, end),
+            b"p",
+            path_arc.first().map_or(0, |address| address.table.get()),
+            authored_text.into(),
+            move |before, after| Operation::ReplaceNestedCellParagraphText {
+                path: path_arc,
+                paragraph,
+                before,
+                after,
+            },
+            move |candidate| {
+                selected_nested_cell_paragraph_text(candidate, &readback_path, paragraph)
+            },
+        )
     }
 
     /// Insert a compact plain-text paragraph at a projected zero-based
@@ -1433,6 +1631,36 @@ impl Edit {
                 }
                 self.replace_content_control_text(*paragraph, *control, after.clone())
             },
+            Operation::ReplaceNestedContentControlText {
+                paragraph,
+                controls,
+                before,
+                after,
+            } => {
+                if selected_nested_inline_control_text(&self.projected, *paragraph, controls)?
+                    != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_nested_content_control_text(*paragraph, controls, after.clone())
+            },
+            Operation::ReplaceBlockContentControlParagraphText {
+                controls,
+                paragraph,
+                before,
+                after,
+            } => {
+                if selected_block_control_paragraph_text(&self.projected, controls, *paragraph)?
+                    != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_block_content_control_paragraph_text(
+                    controls,
+                    *paragraph,
+                    after.clone(),
+                )
+            },
             Operation::ReplaceCellText {
                 table,
                 row,
@@ -1465,6 +1693,19 @@ impl Edit {
                     *paragraph,
                     after.clone(),
                 )
+            },
+            Operation::ReplaceNestedCellParagraphText {
+                path,
+                paragraph,
+                before,
+                after,
+            } => {
+                if selected_nested_cell_paragraph_text(&self.projected, path, *paragraph)?
+                    != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_nested_table_cell_paragraph_text(path, *paragraph, after.clone())
             },
             Operation::InsertParagraph { position, text } => {
                 self.insert_paragraph(*position, text.clone())
@@ -1685,6 +1926,50 @@ impl Edit {
         Ok(self)
     }
 
+    fn replace_selected_owner_text(
+        &mut self,
+        range: (usize, usize),
+        root_name: &[u8],
+        error_position: usize,
+        text: String,
+        operation: impl FnOnce(String, String) -> Operation,
+        readback: impl FnOnce(&Snapshot) -> TransactionResult<String>,
+    ) -> TransactionResult<&mut Self> {
+        self.reserve_operation()?;
+        let (start, end) = range;
+        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+            position: error_position,
+            reason,
+        })?;
+        let replacement_text_bytes = self.checked_text_total(text.len())?;
+        let owner_xml = checked_slice(self.projected.xml_bytes(), start, end, "selected owner")?;
+        let owner =
+            scan_text_owner(owner_xml, root_name).map_err(|reason| TransactionError::Refused {
+                position: error_position,
+                reason,
+            })?;
+        if owner.text == text {
+            return Ok(self);
+        }
+        let replacement = rewrite_text_owner(owner_xml, &owner, &text)?;
+        let candidate = Snapshot::from_xml(replace_range(
+            self.projected.xml_bytes(),
+            start,
+            end,
+            &replacement,
+        )?)?;
+        if readback(&candidate)? != text {
+            return Err(crate::Error::InvalidFormat(
+                "selected owner edit failed semantic readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(operation(owner.text, text));
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
     /// Validate and publish the projected snapshot without changing the
     /// source snapshot.
     ///
@@ -1892,6 +2177,7 @@ struct Range {
 struct Layout {
     paragraphs: Vec<Range>,
     tables: Vec<Range>,
+    block_controls: Vec<Range>,
     content_end: u32,
     conformance: Conformance,
 }
@@ -1954,10 +2240,11 @@ fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
     let mut reader = NsReader::from_reader(xml);
     let mut paragraphs = Vec::new();
     let mut tables = Vec::new();
+    let mut block_controls = Vec::new();
     let mut body_depth = None;
     let mut body_end = None;
     let mut final_section_start = None;
-    let mut pending = None::<(bool, bool, bool, usize)>;
+    let mut pending = None::<(bool, bool, bool, bool, usize)>;
     let mut conformance = None;
     let mut saw_document = false;
     let mut depth = 0usize;
@@ -2027,6 +2314,7 @@ fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
                 } else if body_depth.is_some_and(|body| depth == body + 1) {
                     let is_paragraph = is_word && local.as_ref() == b"p";
                     let is_table = is_word && local.as_ref() == b"tbl";
+                    let is_control = is_word && local.as_ref() == b"sdt";
                     let is_section = is_word && local.as_ref() == b"sectPr";
                     if final_section_start.is_some() {
                         return Err(crate::Error::InvalidFormat(
@@ -2034,7 +2322,7 @@ fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
                         )
                         .into());
                     }
-                    pending = Some((is_paragraph, is_table, is_section, event_start));
+                    pending = Some((is_paragraph, is_table, is_control, is_section, event_start));
                 }
             },
             Event::Empty(element) => {
@@ -2056,13 +2344,16 @@ fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
                     if is_word && local.as_ref() == b"tbl" {
                         tables.push(checked_range(event_start, event_end)?);
                     }
+                    if is_word && local.as_ref() == b"sdt" {
+                        block_controls.push(checked_range(event_start, event_end)?);
+                    }
                     if is_word && local.as_ref() == b"sectPr" {
                         final_section_start = Some(event_start);
                     }
                 }
             },
             Event::End(element) => {
-                if let Some((is_paragraph, is_table, is_section, start)) = pending
+                if let Some((is_paragraph, is_table, is_control, is_section, start)) = pending
                     && body_depth.is_some_and(|body| depth == body + 1)
                 {
                     if is_paragraph {
@@ -2070,6 +2361,9 @@ fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
                     }
                     if is_table {
                         tables.push(checked_range(start, event_end)?);
+                    }
+                    if is_control {
+                        block_controls.push(checked_range(start, event_end)?);
                     }
                     if is_section {
                         final_section_start = Some(start);
@@ -2133,6 +2427,7 @@ fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
     Ok(Layout {
         paragraphs,
         tables,
+        block_controls,
         content_end,
         conformance: document_conformance,
     })
@@ -2910,9 +3205,20 @@ fn select_cell(
     let table_start = checked_start(table_range, "table")?;
     let table_end = checked_end(table_range, "table")?;
     let table_xml = checked_slice(snapshot.xml_bytes(), table_start, table_end, "table")?;
+    select_cell_in_table(snapshot, table_start, table_xml, row, cell, table.get())
+}
+
+fn select_cell_in_table<'a>(
+    snapshot: &'a Snapshot,
+    table_start: usize,
+    table_xml: &[u8],
+    row: Position,
+    cell: Position,
+    error_position: usize,
+) -> TransactionResult<CellSelection<'a>> {
     let row_range = select_direct_child(table_xml, b"tbl", b"tr", row, Refusal::CellNotFound)
         .map_err(|reason| TransactionError::Refused {
-            position: table.get(),
+            position: error_position,
             reason,
         })?;
     let row_start = checked_relative_start(table_start, row_range)?;
@@ -2920,7 +3226,7 @@ fn select_cell(
     let row_xml = checked_slice(snapshot.xml_bytes(), row_start, row_end, "table row")?;
     let cell_range = select_direct_child(row_xml, b"tr", b"tc", cell, Refusal::CellNotFound)
         .map_err(|reason| TransactionError::Refused {
-            position: table.get(),
+            position: error_position,
             reason,
         })?;
     let cell_start = checked_relative_start(row_start, cell_range)?;
@@ -2928,6 +3234,311 @@ fn select_cell(
     Ok(CellSelection {
         xml: checked_slice(snapshot.xml_bytes(), cell_start, cell_end, "table cell")?,
         start: cell_start,
+    })
+}
+
+fn validate_path_length(length: usize, resource: &'static str) -> TransactionResult<()> {
+    if length == 0 {
+        return Err(TransactionError::Refused {
+            position: 0,
+            reason: Refusal::ComplexContent,
+        });
+    }
+    if length > MAX_OPERATIONS {
+        return Err(TransactionError::Limit {
+            resource,
+            max: MAX_OPERATIONS,
+            actual: length,
+        });
+    }
+    Ok(())
+}
+
+fn select_single_control_content(
+    snapshot: &Snapshot,
+    control_start: usize,
+    control_end: usize,
+    error_position: usize,
+) -> TransactionResult<(usize, usize)> {
+    let control_xml = checked_slice(
+        snapshot.xml_bytes(),
+        control_start,
+        control_end,
+        "content control",
+    )?;
+    let content = select_direct_child(
+        control_xml,
+        b"sdt",
+        b"sdtContent",
+        Position::new(0),
+        Refusal::ComplexContent,
+    )
+    .map_err(|reason| TransactionError::Refused {
+        position: error_position,
+        reason,
+    })?;
+    if select_direct_child(
+        control_xml,
+        b"sdt",
+        b"sdtContent",
+        Position::new(1),
+        Refusal::ComplexContent,
+    )
+    .is_ok()
+    {
+        return Err(TransactionError::Refused {
+            position: error_position,
+            reason: Refusal::ComplexContent,
+        });
+    }
+    Ok((
+        checked_relative_start(control_start, content)?,
+        checked_relative_end(control_start, content)?,
+    ))
+}
+
+fn select_direct_control_content(
+    snapshot: &Snapshot,
+    root_start: usize,
+    root_end: usize,
+    root_name: &[u8],
+    control: Position,
+    error_position: usize,
+) -> TransactionResult<(usize, usize)> {
+    let root_xml = checked_slice(snapshot.xml_bytes(), root_start, root_end, "control owner")?;
+    let control_range = select_direct_child(
+        root_xml,
+        root_name,
+        b"sdt",
+        control,
+        Refusal::ContentControlNotFound,
+    )
+    .map_err(|reason| TransactionError::Refused {
+        position: error_position,
+        reason,
+    })?;
+    let control_start = checked_relative_start(root_start, control_range)?;
+    let control_end = checked_relative_end(root_start, control_range)?;
+    select_single_control_content(snapshot, control_start, control_end, error_position)
+}
+
+fn select_nested_inline_control_content(
+    snapshot: &Snapshot,
+    paragraph: Position,
+    controls: &[Position],
+) -> TransactionResult<(usize, usize)> {
+    validate_path_length(controls.len(), "content control path")?;
+    let paragraph_range =
+        snapshot
+            .paragraphs
+            .get(paragraph.get())
+            .copied()
+            .ok_or(TransactionError::OutOfBounds {
+                position: paragraph.get(),
+                len: snapshot.paragraph_count(),
+            })?;
+    let mut start = checked_start(paragraph_range, "paragraph")?;
+    let mut end = checked_end(paragraph_range, "paragraph")?;
+    let mut root_name = b"p".as_slice();
+    for control in controls {
+        (start, end) = select_direct_control_content(
+            snapshot,
+            start,
+            end,
+            root_name,
+            *control,
+            paragraph.get(),
+        )?;
+        root_name = b"sdtContent";
+    }
+    Ok((start, end))
+}
+
+fn selected_nested_inline_control_text(
+    snapshot: &Snapshot,
+    paragraph: Position,
+    controls: &[Position],
+) -> TransactionResult<String> {
+    let (start, end) = select_nested_inline_control_content(snapshot, paragraph, controls)?;
+    scan_text_owner(
+        checked_slice(snapshot.xml_bytes(), start, end, "content control content")?,
+        b"sdtContent",
+    )
+    .map(|owner| owner.text)
+    .map_err(|reason| TransactionError::Refused {
+        position: paragraph.get(),
+        reason,
+    })
+}
+
+fn select_block_control_content(
+    snapshot: &Snapshot,
+    controls: &[Position],
+) -> TransactionResult<(usize, usize)> {
+    validate_path_length(controls.len(), "block content control path")?;
+    let first = controls[0];
+    let range =
+        snapshot
+            .block_controls
+            .get(first.get())
+            .copied()
+            .ok_or(TransactionError::Refused {
+                position: first.get(),
+                reason: Refusal::ContentControlNotFound,
+            })?;
+    let mut start = checked_start(range, "block content control")?;
+    let mut end = checked_end(range, "block content control")?;
+    (start, end) = select_single_control_content(snapshot, start, end, first.get())?;
+    for control in &controls[1..] {
+        (start, end) = select_direct_control_content(
+            snapshot,
+            start,
+            end,
+            b"sdtContent",
+            *control,
+            first.get(),
+        )?;
+    }
+    Ok((start, end))
+}
+
+fn select_block_control_paragraph(
+    snapshot: &Snapshot,
+    controls: &[Position],
+    paragraph: Position,
+) -> TransactionResult<(usize, usize)> {
+    let (content_start, content_end) = select_block_control_content(snapshot, controls)?;
+    let content_xml = checked_slice(
+        snapshot.xml_bytes(),
+        content_start,
+        content_end,
+        "block content control content",
+    )?;
+    let paragraph_range = select_direct_child(
+        content_xml,
+        b"sdtContent",
+        b"p",
+        paragraph,
+        Refusal::ContentControlNotFound,
+    )
+    .map_err(|reason| TransactionError::Refused {
+        position: controls.first().map_or(0, |position| position.get()),
+        reason,
+    })?;
+    Ok((
+        checked_relative_start(content_start, paragraph_range)?,
+        checked_relative_end(content_start, paragraph_range)?,
+    ))
+}
+
+fn selected_block_control_paragraph_text(
+    snapshot: &Snapshot,
+    controls: &[Position],
+    paragraph: Position,
+) -> TransactionResult<String> {
+    let (start, end) = select_block_control_paragraph(snapshot, controls, paragraph)?;
+    scan_text_owner(
+        checked_slice(snapshot.xml_bytes(), start, end, "block control paragraph")?,
+        b"p",
+    )
+    .map(|owner| owner.text)
+    .map_err(|reason| TransactionError::Refused {
+        position: controls.first().map_or(0, |position| position.get()),
+        reason,
+    })
+}
+
+fn select_nested_cell<'a>(
+    snapshot: &'a Snapshot,
+    path: &[TableCellAddress],
+) -> TransactionResult<CellSelection<'a>> {
+    validate_path_length(path.len(), "nested table path")?;
+    let first = path[0];
+    let table_range =
+        snapshot
+            .tables
+            .get(first.table.get())
+            .copied()
+            .ok_or(TransactionError::Refused {
+                position: first.table.get(),
+                reason: Refusal::CellNotFound,
+            })?;
+    let mut table_start = checked_start(table_range, "table")?;
+    let table_end = checked_end(table_range, "table")?;
+    let mut table_xml = checked_slice(snapshot.xml_bytes(), table_start, table_end, "table")?;
+    let mut selection = select_cell_in_table(
+        snapshot,
+        table_start,
+        table_xml,
+        first.row,
+        first.cell,
+        first.table.get(),
+    )?;
+    for address in &path[1..] {
+        let nested_range = select_direct_child(
+            selection.xml,
+            b"tc",
+            b"tbl",
+            address.table,
+            Refusal::CellNotFound,
+        )
+        .map_err(|reason| TransactionError::Refused {
+            position: first.table.get(),
+            reason,
+        })?;
+        table_start = checked_relative_start(selection.start, nested_range)?;
+        let nested_end = checked_relative_end(selection.start, nested_range)?;
+        table_xml = checked_slice(
+            snapshot.xml_bytes(),
+            table_start,
+            nested_end,
+            "nested table",
+        )?;
+        selection = select_cell_in_table(
+            snapshot,
+            table_start,
+            table_xml,
+            address.row,
+            address.cell,
+            first.table.get(),
+        )?;
+    }
+    Ok(selection)
+}
+
+fn select_nested_cell_paragraph(
+    snapshot: &Snapshot,
+    path: &[TableCellAddress],
+    paragraph: Position,
+) -> TransactionResult<(usize, usize)> {
+    let selection = select_nested_cell(snapshot, path)?;
+    let paragraph_range =
+        select_direct_child(selection.xml, b"tc", b"p", paragraph, Refusal::CellNotFound).map_err(
+            |reason| TransactionError::Refused {
+                position: path.first().map_or(0, |address| address.table.get()),
+                reason,
+            },
+        )?;
+    Ok((
+        checked_relative_start(selection.start, paragraph_range)?,
+        checked_relative_end(selection.start, paragraph_range)?,
+    ))
+}
+
+fn selected_nested_cell_paragraph_text(
+    snapshot: &Snapshot,
+    path: &[TableCellAddress],
+    paragraph: Position,
+) -> TransactionResult<String> {
+    let (start, end) = select_nested_cell_paragraph(snapshot, path, paragraph)?;
+    scan_text_owner(
+        checked_slice(snapshot.xml_bytes(), start, end, "nested table paragraph")?,
+        b"p",
+    )
+    .map(|owner| owner.text)
+    .map_err(|reason| TransactionError::Refused {
+        position: path.first().map_or(0, |address| address.table.get()),
+        reason,
     })
 }
 
@@ -3880,5 +4491,108 @@ mod tests {
         }
         assert!(xml.contains("<w:r>"));
         assert_ne!(edit.projected().xml_bytes(), source.xml_bytes());
+    }
+
+    #[test]
+    fn nested_controls_and_tables_are_durable_exact_and_path_checked() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\">\n<w:body><w:p><w:sdt><w:sdtPr><w:tag w:val=\"outer-inline\"/></w:sdtPr><w:sdtContent><w:sdt><w:sdtPr><w:tag w:val=\"inner-inline\"/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:b/></w:rPr><w:t>inline old</w:t></w:r></w:sdtContent></w:sdt></w:sdtContent></w:sdt></w:p><w:sdt><w:sdtPr><w:alias w:val=\"outer-block\"/></w:sdtPr><w:sdtContent><w:sdt><w:sdtPr><w:alias w:val=\"inner-block\"/></w:sdtPr><w:sdtContent><w:p><w:pPr><w:keepNext/></w:pPr><w:r><w:t>block old</w:t></w:r></w:p></w:sdtContent></w:sdt></w:sdtContent></w:sdt><w:tbl><w:tblPr><w:tblStyle w:val=\"Outer\"/></w:tblPr><w:tr><w:tc><w:p><w:r><w:t>outer kept</w:t></w:r></w:p><w:tbl><w:tblPr><w:tblStyle w:val=\"Inner\"/></w:tblPr><w:tr><w:tc><w:tcPr><w:shd w:fill=\"00FF00\"/></w:tcPr><w:p><w:r><w:rPr><w:i/></w:rPr><w:t>nested old</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        assert_eq!(source.block_content_control_count(), 1);
+        let controls = [Position::new(0), Position::new(0)];
+        let table_path = [
+            TableCellAddress::new(Position::new(0), Position::new(0), Position::new(0)),
+            TableCellAddress::new(Position::new(0), Position::new(0), Position::new(0)),
+        ];
+        let mut edit = source.edit();
+        assert!(
+            edit.replace_nested_content_control_text(Position::new(0), &[], "refused")
+                .is_err()
+        );
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        edit.replace_nested_content_control_text(Position::new(0), &controls, "inline new")
+            .unwrap()
+            .replace_block_content_control_paragraph_text(&controls, Position::new(0), "block new")
+            .unwrap()
+            .replace_nested_table_cell_paragraph_text(&table_path, Position::new(0), "nested new")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        for retained in [
+            "w:val=\"outer-inline\"",
+            "w:val=\"inner-inline\"",
+            "<w:rPr><w:b/></w:rPr>",
+            "w:val=\"outer-block\"",
+            "w:val=\"inner-block\"",
+            "<w:pPr><w:keepNext/></w:pPr>",
+            "<w:tblStyle w:val=\"Outer\"/>",
+            "<w:tblStyle w:val=\"Inner\"/>",
+            "<w:shd w:fill=\"00FF00\"/>",
+            "<w:rPr><w:i/></w:rPr>",
+            "<w:t>outer kept</w:t>",
+            "<w:t>inline new</w:t>",
+            "<w:t>block new</w:t>",
+            "<w:t>nested new</w:t>",
+        ] {
+            assert!(xml.contains(retained), "missing retained XML: {retained}");
+        }
+        assert!(!xml.contains("\n"));
+
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let applied = source.apply_durable(&durable).unwrap();
+        assert_eq!(applied.xml_bytes(), commit.snapshot().xml_bytes());
+        assert_eq!(
+            applied
+                .apply_durable(&durable.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let composition_limits = CompositionLimits::new(8, 8, 32, 8);
+        let mut inline = source.edit();
+        inline
+            .replace_nested_content_control_text(Position::new(0), &controls, "inline new")
+            .unwrap();
+        let mut block = source.edit();
+        block
+            .replace_block_content_control_paragraph_text(&controls, Position::new(0), "block new")
+            .unwrap();
+        let mut table = source.edit();
+        table
+            .replace_nested_table_cell_paragraph_text(&table_path, Position::new(0), "nested new")
+            .unwrap();
+        let mut composition = source.compose(composition_limits);
+        composition
+            .join(block.prepare(composition_limits, "block").unwrap())
+            .unwrap()
+            .join(inline.prepare(composition_limits, "inline").unwrap())
+            .unwrap()
+            .join(table.prepare(composition_limits, "table").unwrap())
+            .unwrap();
+        assert_eq!(
+            composition.commit().unwrap().snapshot().xml_bytes(),
+            commit.snapshot().xml_bytes()
+        );
+
+        let history_budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap();
+        let mut history = source.history(HistoryLimits::new(2, history_budget));
+        history.record(commit).unwrap();
+        assert!(history.undo());
+        assert_eq!(history.current().xml_bytes(), source.xml_bytes());
+        assert!(history.redo());
     }
 }

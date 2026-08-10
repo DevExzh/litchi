@@ -10,6 +10,8 @@ pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-maste
 const BODY_MARKER: &str = "";
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 const MAX_ACTIVE_CONTENT: usize = 1_000_000;
+const MAX_ACTIVE_VALUE_BYTES: usize = 16 * 1024;
+const MAX_ACTIVE_XML_BYTES: usize = 256 * 1024 * 1024;
 
 struct State {
     package: Package,
@@ -270,6 +272,12 @@ fn build_security_state(
     if let Some(styles) = package.styles_xml() {
         inspect_active_xml(styles, "styles.xml", &mut active_content)?;
     }
+    if archive.has_file("settings.xml") {
+        let settings = String::from_utf8(archive.get_file("settings.xml")?).map_err(|error| {
+            Error::InvalidFormat(format!("ODM settings.xml is not UTF-8: {error}"))
+        })?;
+        inspect_active_xml(&settings, "settings.xml", &mut active_content)?;
+    }
     Ok(crate::security::State {
         signed,
         encrypted,
@@ -284,32 +292,47 @@ fn inspect_active_xml(
 ) -> Result<()> {
     use quick_xml::{events::Event, name::ResolveResult, reader::NsReader};
 
-    const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const SCRIPT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
     const FORM: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:form:1.0";
+    const PRESENTATION: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    if xml.len() > MAX_ACTIVE_XML_BYTES {
+        return Err(Error::InvalidFormat(
+            "ODM active-content XML exceeds the family limit".to_string(),
+        ));
+    }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     loop {
         let (namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODM active-content XML: {error}"))
         })?;
+        let is_script = matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == SCRIPT);
+        let is_form = matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == FORM);
+        let is_presentation = matches!(
+            &namespace,
+            ResolveResult::Bound(uri) if uri.as_ref() == PRESENTATION
+        );
+        let event = event.into_owned();
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let is_office =
-                    matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == OFFICE);
-                let is_script =
-                    matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == SCRIPT);
-                let is_form =
-                    matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == FORM);
                 let local = element.local_name();
-                let kind = if is_script || (is_office && local.as_ref() == b"scripts") {
+                let event_listener =
+                    (is_script || is_presentation) && local.as_ref() == b"event-listener";
+                let kind = if event_listener {
+                    Some(crate::security::ActiveKind::EventListener)
+                } else if is_script {
                     Some(crate::security::ActiveKind::Script)
-                } else if is_form || (is_office && local.as_ref() == b"forms") {
+                } else if is_form {
                     Some(crate::security::ActiveKind::FormControl)
                 } else {
                     None
                 };
                 if let Some(kind) = kind {
-                    push_active(output, kind, location)?;
+                    if event_listener {
+                        let details = action_details(&reader, &element)?;
+                        push_active_details(output, kind, location, details)?;
+                    } else {
+                        push_active(output, kind, location)?;
+                    }
                 }
             },
             Event::DocType(_) => {
@@ -330,10 +353,73 @@ fn inspect_active_xml(
     Ok(())
 }
 
+fn action_details(
+    reader: &quick_xml::reader::NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> Result<ActionDetails> {
+    use quick_xml::XmlVersion;
+    use std::borrow::Cow;
+
+    let mut trigger = None;
+    let mut action = None;
+    let mut target = None;
+    let mut link = None;
+    for raw in element.attributes() {
+        let attribute = raw.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODM action attribute: {error}"))
+        })?;
+        let local = attribute.key.local_name();
+        let destination = match local.as_ref() {
+            b"event-name" => &mut trigger,
+            b"action" => &mut action,
+            b"macro-name" => &mut target,
+            b"href" => &mut link,
+            _ => continue,
+        };
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map(Cow::into_owned)
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODM action value: {error}")))?;
+        if value.len() > MAX_ACTIVE_VALUE_BYTES {
+            return Err(Error::InvalidFormat(
+                "ODM action value exceeds the 16 KiB limit".to_string(),
+            ));
+        }
+        if destination.replace(value).is_some() {
+            return Err(Error::InvalidFormat(
+                "ODM action has duplicate semantic attributes".to_string(),
+            ));
+        }
+    }
+    Ok(ActionDetails {
+        trigger,
+        action,
+        target,
+        link,
+    })
+}
+
+#[derive(Default)]
+struct ActionDetails {
+    trigger: Option<String>,
+    action: Option<String>,
+    target: Option<String>,
+    link: Option<String>,
+}
+
 fn push_active(
     output: &mut Vec<crate::security::ActiveContent>,
     kind: crate::security::ActiveKind,
     location: &str,
+) -> Result<()> {
+    push_active_details(output, kind, location, ActionDetails::default())
+}
+
+fn push_active_details(
+    output: &mut Vec<crate::security::ActiveContent>,
+    kind: crate::security::ActiveKind,
+    location: &str,
+    details: ActionDetails,
 ) -> Result<()> {
     if output.len() >= MAX_ACTIVE_CONTENT {
         return Err(Error::InvalidFormat(
@@ -347,6 +433,10 @@ fn push_active(
     output.push(crate::security::ActiveContent {
         kind,
         location: location.to_string(),
+        trigger: details.trigger,
+        action: details.action,
+        target: details.target,
+        link: details.link,
     });
     Ok(())
 }

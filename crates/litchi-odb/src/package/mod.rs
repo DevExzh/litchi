@@ -3,4 +3,4 @@
 mod snapshot;
 mod splice;
 
-pub(crate) use snapshot::{MIMETYPE, Snapshot};
+pub(crate) use snapshot::{MIMETYPE, PackageDelta, Snapshot};

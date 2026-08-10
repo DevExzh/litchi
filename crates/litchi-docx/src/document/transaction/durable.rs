@@ -14,8 +14,8 @@ use serde_json::Value;
 
 use super::{
     Commit, CompositionLimits, Edit, HistoryLimits, MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS,
-    Operation, Patch, RevisionKind, Snapshot, TransactionError, TransactionResult, TransferGraph,
-    TransferPart, TransferRelationship,
+    Operation, Patch, RevisionKind, Snapshot, TableCellAddress, TransactionError,
+    TransactionResult, TransferGraph, TransferPart, TransferRelationship,
 };
 
 const FORMAT_NAME: &str = "litchi-docx/document";
@@ -750,8 +750,11 @@ fn history_graph_transition(
             | Operation::ReplaceComplexFieldText { .. }
             | Operation::ReplaceRevisionText { .. }
             | Operation::ReplaceContentControlText { .. }
+            | Operation::ReplaceNestedContentControlText { .. }
+            | Operation::ReplaceBlockContentControlParagraphText { .. }
             | Operation::ReplaceCellText { .. }
             | Operation::ReplaceCellParagraphText { .. }
+            | Operation::ReplaceNestedCellParagraphText { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. } => None,
         };
@@ -765,6 +768,27 @@ fn history_graph_transition(
         }
     }
     Ok(selected)
+}
+
+fn position_path(path: &[Position]) -> String {
+    path.iter()
+        .map(|position| position.get().to_string())
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn table_cell_path(path: &[TableCellAddress]) -> String {
+    path.iter()
+        .map(|address| {
+            format!(
+                "{},{},{}",
+                address.table.get(),
+                address.row.get(),
+                address.cell.get()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(";")
 }
 
 fn operation_effects(
@@ -848,6 +872,28 @@ fn operation_effects(
                     control.get()
                 ));
             },
+            Operation::ReplaceNestedContentControlText {
+                paragraph,
+                controls,
+                ..
+            } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/content-control-path:{}/text",
+                    paragraph.get(),
+                    position_path(controls)
+                ));
+            },
+            Operation::ReplaceBlockContentControlParagraphText {
+                controls,
+                paragraph,
+                ..
+            } => writes.push(format!(
+                "body/block-content-control-path:{}/paragraph:{}/text",
+                position_path(controls),
+                paragraph.get()
+            )),
             Operation::ReplaceCellText {
                 table, row, cell, ..
             } => writes.push(format!(
@@ -877,6 +923,13 @@ fn operation_effects(
                     paragraph.get()
                 ));
             },
+            Operation::ReplaceNestedCellParagraphText {
+                path, paragraph, ..
+            } => writes.push(format!(
+                "body/table-cell-path:{}/paragraph:{}/text",
+                table_cell_path(path),
+                paragraph.get()
+            )),
             Operation::InsertParagraph { position, .. }
             | Operation::InsertTransferredParagraph { position, .. }
                 if position.get() >= source_paragraphs =>
@@ -1017,6 +1070,40 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Operation::ReplaceNestedContentControlText {
+            paragraph,
+            controls,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "content-control.nested-text.replace",
+                format!(
+                    "paragraph:{}/content-control-path:{}",
+                    paragraph.get(),
+                    position_path(controls)
+                ),
+                Value::String(after.clone()),
+            )
+        },
+        Operation::ReplaceBlockContentControlParagraphText {
+            controls,
+            paragraph,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "content-control.block-paragraph-text.replace",
+                format!(
+                    "block-content-control-path:{}/paragraph:{}",
+                    position_path(controls),
+                    paragraph.get()
+                ),
+                Value::String(after.clone()),
+            )
+        },
         Operation::ReplaceCellText {
             table,
             row,
@@ -1052,6 +1139,23 @@ fn durable_operation(
                     table.get(),
                     row.get(),
                     cell.get(),
+                    paragraph.get()
+                ),
+                Value::String(after.clone()),
+            )
+        },
+        Operation::ReplaceNestedCellParagraphText {
+            path,
+            paragraph,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "cell.nested-paragraph-text.replace",
+                format!(
+                    "table-cell-path:{}/paragraph:{}",
+                    table_cell_path(path),
                     paragraph.get()
                 ),
                 Value::String(after.clone()),
@@ -1201,8 +1305,11 @@ fn restore_transfer_operation(
         | Operation::ReplaceComplexFieldText { .. }
         | Operation::ReplaceRevisionText { .. }
         | Operation::ReplaceContentControlText { .. }
+        | Operation::ReplaceNestedContentControlText { .. }
+        | Operation::ReplaceBlockContentControlParagraphText { .. }
         | Operation::ReplaceCellText { .. }
         | Operation::ReplaceCellParagraphText { .. }
+        | Operation::ReplaceNestedCellParagraphText { .. }
         | Operation::InsertParagraph { .. }
         | Operation::RemoveParagraph { .. } => return Ok(None),
     };
@@ -1432,6 +1539,24 @@ fn parse_durable_operation(
                 after: after()?,
             })
         },
+        "content-control.nested-text.replace" if operation.preconditions.len() == 3 => {
+            let (paragraph, controls) = parse_nested_control_target(&operation.target)?;
+            Ok(Operation::ReplaceNestedContentControlText {
+                paragraph,
+                controls,
+                before: before()?,
+                after: after()?,
+            })
+        },
+        "content-control.block-paragraph-text.replace" if operation.preconditions.len() == 3 => {
+            let (controls, paragraph) = parse_block_control_target(&operation.target)?;
+            Ok(Operation::ReplaceBlockContentControlParagraphText {
+                controls,
+                paragraph,
+                before: before()?,
+                after: after()?,
+            })
+        },
         "cell.text.replace" if operation.preconditions.len() == 3 => {
             let (table, row, cell) = parse_cell_target(&operation.target)?;
             Ok(Operation::ReplaceCellText {
@@ -1448,6 +1573,15 @@ fn parse_durable_operation(
                 table,
                 row,
                 cell,
+                paragraph,
+                before: before()?,
+                after: after()?,
+            })
+        },
+        "cell.nested-paragraph-text.replace" if operation.preconditions.len() == 3 => {
+            let (path, paragraph) = parse_nested_cell_target(&operation.target)?;
+            Ok(Operation::ReplaceNestedCellParagraphText {
+                path,
                 paragraph,
                 before: before()?,
                 after: after()?,
@@ -1740,6 +1874,91 @@ fn parse_cell_paragraph_target(
         .ok_or_else(|| invalid_durable("invalid cell paragraph target"))?;
     let (table, row, cell) = parse_cell_target(cell_target)?;
     Ok((table, row, cell, parse_position(paragraph)?))
+}
+
+fn parse_position_path(value: &str) -> TransactionResult<Arc<[Position]>> {
+    if value.is_empty() {
+        return Err(invalid_durable("empty selector path"));
+    }
+    let components = value.split(',').collect::<Vec<_>>();
+    if components.len() > MAX_OPERATIONS {
+        return Err(TransactionError::Limit {
+            resource: "durable selector path",
+            max: MAX_OPERATIONS,
+            actual: components.len(),
+        });
+    }
+    components
+        .into_iter()
+        .map(parse_position)
+        .collect::<TransactionResult<Vec<_>>>()
+        .map(Arc::from)
+}
+
+fn parse_nested_control_target(target: &str) -> TransactionResult<(Position, Arc<[Position]>)> {
+    let rest = target
+        .strip_prefix("paragraph:")
+        .ok_or_else(|| invalid_durable("invalid nested control target"))?;
+    let (paragraph, path) = rest
+        .split_once("/content-control-path:")
+        .ok_or_else(|| invalid_durable("invalid nested control target"))?;
+    Ok((parse_position(paragraph)?, parse_position_path(path)?))
+}
+
+fn parse_block_control_target(target: &str) -> TransactionResult<(Arc<[Position]>, Position)> {
+    let rest = target
+        .strip_prefix("block-content-control-path:")
+        .ok_or_else(|| invalid_durable("invalid block control target"))?;
+    let (path, paragraph) = rest
+        .split_once("/paragraph:")
+        .ok_or_else(|| invalid_durable("invalid block control target"))?;
+    Ok((parse_position_path(path)?, parse_position(paragraph)?))
+}
+
+fn parse_nested_cell_target(
+    target: &str,
+) -> TransactionResult<(Arc<[TableCellAddress]>, Position)> {
+    let rest = target
+        .strip_prefix("table-cell-path:")
+        .ok_or_else(|| invalid_durable("invalid nested cell target"))?;
+    let (path, paragraph) = rest
+        .split_once("/paragraph:")
+        .ok_or_else(|| invalid_durable("invalid nested cell target"))?;
+    if path.is_empty() {
+        return Err(invalid_durable("empty nested table path"));
+    }
+    let steps = path.split(';').collect::<Vec<_>>();
+    if steps.len() > MAX_OPERATIONS {
+        return Err(TransactionError::Limit {
+            resource: "durable nested table path",
+            max: MAX_OPERATIONS,
+            actual: steps.len(),
+        });
+    }
+    let addresses = steps
+        .into_iter()
+        .map(|step| {
+            let mut components = step.split(',');
+            let table = components
+                .next()
+                .ok_or_else(|| invalid_durable("invalid nested table step"))?;
+            let row = components
+                .next()
+                .ok_or_else(|| invalid_durable("invalid nested table step"))?;
+            let cell = components
+                .next()
+                .ok_or_else(|| invalid_durable("invalid nested table step"))?;
+            if components.next().is_some() {
+                return Err(invalid_durable("invalid nested table step"));
+            }
+            Ok(TableCellAddress::new(
+                parse_position(table)?,
+                parse_position(row)?,
+                parse_position(cell)?,
+            ))
+        })
+        .collect::<TransactionResult<Vec<_>>>()?;
+    Ok((addresses.into(), parse_position(paragraph)?))
 }
 
 fn parse_position(value: &str) -> TransactionResult<Position> {

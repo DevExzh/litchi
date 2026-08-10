@@ -166,6 +166,13 @@ impl Chart {
         }
     }
 
+    pub(crate) fn content_path(&self) -> Option<&str> {
+        match &self.location {
+            Location::Existing { content_path, .. } => content_path.as_deref(),
+            Location::Added { .. } => None,
+        }
+    }
+
     pub(crate) fn shares_storage(&self, other: &Self) -> bool {
         match (&self.location, &other.location) {
             (

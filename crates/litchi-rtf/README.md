@@ -50,8 +50,9 @@ assert_eq!(
   paragraph insertion, table-cell text, and header/footer text, with atomic
   commits, reversible durable patches, deterministic sub-edit/three-way
   composition and commit-coupled bounded history
-- Checked ordinary-root transfer plans for passive fields, complete nested
-  table trees, style dependency closures, lists with overrides, and inert
+- Checked ordinary-root transfer plans for passive fields, nested table trees
+  with inert drawings/breaks/cell fields, style dependency closures,
+  picture-bullet lists with remapped shared pictures and overrides, and inert
   embedded objects with remapped result pictures; opaque target destinations,
   active links, and unresolved resource collisions fail closed
 - Lazy borrowed `text::Story`, paragraph, inline, and run traversal

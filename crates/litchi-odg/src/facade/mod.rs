@@ -5,11 +5,11 @@ use std::path::Path;
 
 pub use crate::authoring::Builder;
 pub use crate::package::{
-    Change, Commit, ControlReferenceChange, DurablePatch, GeometryChange, History, HistoryLimits,
-    JoinedEdits, LayerChange, Lineage, MergePlan, NameChange, PageNameChange, PageStyleChange,
-    Patch, PathChange, PreparedEdit, ResourceChange, SecurityStatus, SecurityWritePolicy,
-    ShapeTransfer, Snapshot, StructureChange, StyleChange, TextChange, Transaction,
-    TransferControl, TransferResource, TransferStyle,
+    ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
+    DurablePatch, GeometryChange, History, HistoryLimits, JoinedEdits, LayerChange, Lineage,
+    MergePlan, NameChange, PageNameChange, PageStyleChange, Patch, PathChange, PreparedEdit,
+    ResourceChange, SecurityStatus, SecurityWritePolicy, ShapeTransfer, Snapshot, StructureChange,
+    StyleChange, TextChange, Transaction, TransferControl, TransferResource, TransferStyle,
 };
 
 /// Immutable source-owning drawing facade.
@@ -132,6 +132,12 @@ impl Drawing {
         self.package.security()
     }
 
+    /// Returns inert script, event, action, link, and embedded-object inventory.
+    #[must_use]
+    pub fn active_content(&self) -> ActiveContentStatus {
+        self.package.active_content()
+    }
+
     /// Lists safe package member names.
     ///
     /// # Errors
@@ -159,6 +165,15 @@ impl Drawing {
         self.package.style_definitions()
     }
 
+    /// Resolves a checked group subtree and its nested flattened descendants.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid or non-group selector.
+    pub fn group(&self, page: usize, shape: usize) -> Result<crate::group::Group> {
+        self.package.group(page, shape)
+    }
+
     /// Reads one package-local resource without activating it.
     ///
     /// # Errors
@@ -178,6 +193,23 @@ impl Drawing {
     #[must_use]
     pub fn edit_with_security_policy(&self, policy: SecurityWritePolicy) -> Transaction {
         self.package.edit_with_security_policy(policy)
+    }
+
+    /// Starts a transaction with an explicit inert active-content disposition.
+    #[must_use]
+    pub fn edit_with_active_content_policy(&self, policy: ActiveContentWritePolicy) -> Transaction {
+        self.package.edit_with_active_content_policy(policy)
+    }
+
+    /// Starts a transaction with explicit security and inert active-content dispositions.
+    #[must_use]
+    pub fn edit_with_policies(
+        &self,
+        security_policy: SecurityWritePolicy,
+        active_content_policy: ActiveContentWritePolicy,
+    ) -> Transaction {
+        self.package
+            .edit_with_policies(security_policy, active_content_policy)
     }
 
     /// Prepares a provenance-bound shape or complete group subtree for cross-drawing transfer.
@@ -203,6 +235,22 @@ impl Drawing {
     pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Self> {
         self.package
             .apply_joined(joined)
+            .map(|package| Self { package })
+    }
+
+    /// Applies joined work under explicit security and inert active-content dispositions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale lineage, conflicts, either policy refusal, or failed readback.
+    pub fn apply_joined_with_policies(
+        &self,
+        joined: JoinedEdits,
+        security_policy: SecurityWritePolicy,
+        active_content_policy: ActiveContentWritePolicy,
+    ) -> Result<Self> {
+        self.package
+            .apply_joined_with_policies(joined, security_policy, active_content_policy)
             .map(|package| Self { package })
     }
 

@@ -31,6 +31,18 @@ pub struct Node {
     pub(crate) name_span: Range<usize>,
 }
 
+/// The mutually exclusive source declaration owned by a section.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Source {
+    /// A subdocument entry in [`crate::Master::subdocuments`].
+    Linked(Position),
+    /// A relationship entry in [`Tree::local_references`].
+    Local(Position),
+    /// An inert `office:dde-source` declaration.
+    Dde,
+}
+
 impl Node {
     /// Returns the unique section name.
     #[must_use]
@@ -85,6 +97,20 @@ impl Node {
     #[must_use]
     pub const fn has_dde_source(&self) -> bool {
         self.dde_source
+    }
+
+    /// Returns the section's mutually exclusive source declaration.
+    #[must_use]
+    pub const fn source(&self) -> Option<Source> {
+        if let Some(reference) = self.reference {
+            Some(Source::Linked(reference))
+        } else if let Some(reference) = self.local_reference {
+            Some(Source::Local(reference))
+        } else if self.dde_source {
+            Some(Source::Dde)
+        } else {
+            None
+        }
     }
 }
 
@@ -141,6 +167,13 @@ impl Tree {
     #[must_use]
     pub fn local_references(&self) -> &[LocalReference] {
         &self.local_references
+    }
+
+    /// Iterates local references whose target name is not present.
+    pub fn unresolved_local_references(&self) -> impl Iterator<Item = &LocalReference> {
+        self.local_references
+            .iter()
+            .filter(|reference| reference.target.is_none())
     }
 
     /// Resolves a checked section position.

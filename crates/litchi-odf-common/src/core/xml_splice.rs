@@ -165,6 +165,27 @@ impl AuthoredXmlFragment {
         Ok(Self { bytes: fragment })
     }
 
+    /// Audit one compact XML end tag.
+    ///
+    /// This classification is intended for lexical splices whose token diff
+    /// isolates the closing half of an otherwise balanced authored element.
+    /// The assembled source part is still verified as a complete document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `bytes` are not exactly one compact end tag.
+    pub fn end_tag(bytes: impl Into<Vec<u8>>) -> Result<Self> {
+        let fragment = bytes.into();
+        let name = end_tag_name(&fragment)?;
+        let mut document = Vec::with_capacity(fragment.len() + name.len() + 2);
+        document.push(b'<');
+        document.extend_from_slice(name);
+        document.push(b'>');
+        document.extend_from_slice(&fragment);
+        audit_document(&document)?;
+        Ok(Self { bytes: fragment })
+    }
+
     /// Audit escaped character data as compact authored XML.
     ///
     /// # Errors
@@ -355,6 +376,19 @@ fn start_tag_name(bytes: &[u8]) -> Result<&[u8]> {
         return invalid("authored XML start-tag fragment has no name");
     }
     Ok(&bytes[1..end])
+}
+
+fn end_tag_name(bytes: &[u8]) -> Result<&[u8]> {
+    if bytes.len() < 4
+        || !bytes.starts_with(b"</")
+        || bytes.last() != Some(&b'>')
+        || bytes[2..bytes.len() - 1]
+            .iter()
+            .any(|byte| byte.is_ascii_whitespace() || matches!(byte, b'<' | b'>'))
+    {
+        return invalid("authored XML end-tag fragment is unclassified");
+    }
+    Ok(&bytes[2..bytes.len() - 1])
 }
 
 fn ranges_overlap_or_conflict(left: &Range<usize>, right: &Range<usize>) -> bool {

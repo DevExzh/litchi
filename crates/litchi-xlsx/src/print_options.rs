@@ -26,6 +26,42 @@ pub struct PrintOptions {
 }
 
 impl PrintOptions {
+    /// Create schema-default worksheet print properties.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            horizontal_centered: false,
+            vertical_centered: false,
+            print_headings: false,
+            grid_lines: false,
+            grid_lines_set: false,
+        }
+    }
+
+    /// Set horizontal centering.
+    pub fn set_horizontal_centered(&mut self, value: bool) -> &mut Self {
+        self.horizontal_centered = value;
+        self
+    }
+
+    /// Set vertical centering.
+    pub fn set_vertical_centered(&mut self, value: bool) -> &mut Self {
+        self.vertical_centered = value;
+        self
+    }
+
+    /// Set printed row/column headings.
+    pub fn set_print_headings(&mut self, value: bool) -> &mut Self {
+        self.print_headings = value;
+        self
+    }
+
+    /// Set both wire flags that control printed gridlines.
+    pub fn set_print_grid_lines(&mut self, value: bool) -> &mut Self {
+        self.grid_lines = value;
+        self.grid_lines_set = value;
+        self
+    }
     /// Center the printed content horizontally on the page.
     #[must_use]
     pub fn horizontal_centered(&self) -> bool {
@@ -63,6 +99,64 @@ impl PrintOptions {
     pub fn prints_grid_lines(&self) -> bool {
         self.grid_lines && self.grid_lines_set
     }
+}
+
+/// Serialize one core worksheet `printOptions` element.
+#[must_use]
+pub fn write_print_options(value: &PrintOptions) -> Vec<u8> {
+    format!("<printOptions{}/>", print_option_attributes(value)).into_bytes()
+}
+
+/// Replace, insert, or remove direct worksheet print properties.
+pub fn replace_print_options(xml: &[u8], value: Option<&PrintOptions>) -> Result<Vec<u8>> {
+    let _ = parse_print_options(xml)?;
+    let attributes = value.map(print_option_attributes);
+    let output = crate::raw::worksheet_property::replace_direct_empty(
+        xml,
+        "printOptions",
+        attributes.as_deref(),
+        &[
+            b"pageMargins",
+            b"pageSetup",
+            b"headerFooter",
+            b"rowBreaks",
+            b"colBreaks",
+            b"customProperties",
+            b"cellWatches",
+            b"ignoredErrors",
+            b"smartTags",
+            b"drawing",
+            b"legacyDrawing",
+            b"legacyDrawingHF",
+            b"picture",
+            b"oleObjects",
+            b"controls",
+            b"webPublishItems",
+            b"tableParts",
+            b"extLst",
+        ],
+        "print-options worksheet output",
+    )?;
+    if parse_print_options(&output)?.as_ref() != value {
+        return Err(invalid("worksheet print-options write verification failed"));
+    }
+    Ok(output)
+}
+
+fn print_option_attributes(value: &PrintOptions) -> String {
+    let mut output = String::new();
+    for (name, enabled) in [
+        ("horizontalCentered", value.horizontal_centered),
+        ("verticalCentered", value.vertical_centered),
+        ("headings", value.print_headings),
+        ("gridLines", value.grid_lines),
+        ("gridLinesSet", value.grid_lines_set),
+    ] {
+        output.push(' ');
+        output.push_str(name);
+        output.push_str(if enabled { "=\"1\"" } else { "=\"0\"" });
+    }
+    output
 }
 
 /// Parse a worksheet's optional core `printOptions` element.

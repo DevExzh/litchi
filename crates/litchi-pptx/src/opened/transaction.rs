@@ -401,10 +401,11 @@ impl Transaction {
     /// Copy one common top-level shape and every internal relationship target
     /// reachable from it into a destination slide.
     ///
-    /// Part collisions, relationship IDs, and the destination shape identity
-    /// are remapped deterministically. Groups, connectors, and unknown shapes
-    /// are refused because their internal identity references are not safely
-    /// generalizable.
+    /// Part collisions, relationship IDs, every grouped shape identity, and
+    /// connector endpoint references are remapped deterministically. A
+    /// connector attached to a shape outside the selected transfer subtree is
+    /// refused because publishing a dangling or misdirected endpoint would be
+    /// lossy. Unknown shape kinds remain an explicit refusal boundary.
     ///
     /// # Errors
     ///
@@ -423,18 +424,26 @@ impl Transaction {
         let source_scene = crate::shape::Scene::read(source_owner.blob())?;
         let key = source_shape.into();
         let shape = source_scene.shape(key)?;
-        if matches!(
-            shape,
-            crate::shape::Shape::Group(_)
-                | crate::shape::Shape::Connector(_)
-                | crate::shape::Shape::Unknown(_)
-        ) {
+        if !source_scene
+            .roots()
+            .any(|root| root.common().index() == shape.common().index())
+        {
             return Err(invalid(
-                "opened-presentation cannot safely transfer this shape kind",
+                "opened-presentation transfer requires a top-level shape",
             ));
         }
+        let mut source_shape_ids = BTreeSet::new();
+        collect_transfer_shape_ids(shape, &mut source_shape_ids)?;
         let span = crate::tag::shape::selected_raw_span(source_owner.blob(), key)?;
         let fragment = &source_owner.blob()[span];
+        let source_shape_id = shape.id().ok_or_else(|| {
+            invalid("opened-presentation transferred shape has no non-visual identity")
+        })?;
+        if !source_shape_ids.contains(&source_shape_id) {
+            return Err(invalid(
+                "opened-presentation transferred root identity is absent from its XML",
+            ));
+        }
         let relationship_ids = shape_relationship_ids(fragment)?;
         let mut roots = Vec::new();
         let mut relationships = Vec::new();
@@ -459,7 +468,10 @@ impl Transaction {
         publish_transfer(source.package.as_ref(), &mut candidate, &mapping)?;
         let destination_scene =
             crate::shape::Scene::read(candidate.get_part(&destination.part_name)?.blob())?;
-        let shape_id = next_shape_id(&destination_scene, "transferred shape")?;
+        let shape_id_mapping = plan_shape_identity_transfer(&destination_scene, &source_shape_ids)?;
+        let shape_id = *shape_id_mapping.get(&source_shape_id).ok_or_else(|| {
+            invalid("opened-presentation transferred root identity mapping disappeared")
+        })?;
         let mut relationship_mapping = HashMap::new();
         for relationship in relationships {
             let target = if relationship.is_external() {
@@ -477,8 +489,13 @@ impl Transaction {
             relationship_mapping.insert(relationship.r_id().to_owned(), new_id);
         }
         let name = format!("{} Copy {shape_id}", shape.name().unwrap_or("Shape"));
-        let fragment =
-            super::xml::remap_shape_fragment(fragment, shape_id, &name, &relationship_mapping)?;
+        let fragment = super::xml::remap_shape_fragment(
+            fragment,
+            source_shape_id,
+            &name,
+            &shape_id_mapping,
+            &relationship_mapping,
+        )?;
         let xml = super::xml::append_shape(
             candidate.get_part(&destination.part_name)?.blob(),
             &fragment,
@@ -1268,6 +1285,78 @@ fn next_shape_id(scene: &crate::shape::Scene<'_>, label: &str) -> Result<u32> {
         .unwrap_or(1)
         .checked_add(1)
         .ok_or_else(|| invalid(format!("opened-presentation {label} shape ID overflow")))
+}
+
+fn collect_transfer_shape_ids(
+    shape: crate::shape::Shape<'_>,
+    identities: &mut BTreeSet<u32>,
+) -> Result<()> {
+    match shape {
+        crate::shape::Shape::Unknown(value) => Err(invalid(format!(
+            "opened-presentation cannot transfer unknown shape kind {}",
+            value
+                .common()
+                .source_name()
+                .unwrap_or("without a source name")
+        ))),
+        crate::shape::Shape::Group(group) => {
+            insert_transfer_shape_id(shape, identities)?;
+            for child in group.shapes() {
+                collect_transfer_shape_ids(child, identities)?;
+            }
+            Ok(())
+        },
+        _ => insert_transfer_shape_id(shape, identities),
+    }
+}
+
+fn insert_transfer_shape_id(
+    shape: crate::shape::Shape<'_>,
+    identities: &mut BTreeSet<u32>,
+) -> Result<()> {
+    let identity = shape.id().ok_or_else(|| {
+        invalid(format!(
+            "opened-presentation transferred shape {} has no non-visual identity",
+            shape.name().unwrap_or("without a name")
+        ))
+    })?;
+    if identities.insert(identity) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "opened-presentation transferred shape repeats identity {identity}"
+        )))
+    }
+}
+
+fn plan_shape_identity_transfer(
+    destination: &crate::shape::Scene<'_>,
+    source_ids: &BTreeSet<u32>,
+) -> Result<HashMap<u32, u32>> {
+    if source_ids.is_empty() {
+        return Err(invalid(
+            "opened-presentation transferred shape has no non-visual identities",
+        ));
+    }
+    let mut next = destination
+        .iter()
+        .filter_map(crate::shape::Shape::id)
+        .max()
+        .unwrap_or(1);
+    let mut mapping = HashMap::new();
+    mapping
+        .try_reserve(source_ids.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation transferred shape identities",
+            source,
+        })?;
+    for source_id in source_ids {
+        next = next.checked_add(1).ok_or_else(|| {
+            invalid("opened-presentation transferred shape identity space is exhausted")
+        })?;
+        mapping.insert(*source_id, next);
+    }
+    Ok(mapping)
 }
 
 fn resolve_snapshot_slide(source: &Snapshot, key: crate::slide::Key<'_>) -> Result<Slide> {

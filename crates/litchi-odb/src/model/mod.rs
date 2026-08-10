@@ -10,7 +10,7 @@ mod table;
 
 pub use active::{ActiveContentEntry, ActiveContentInventory, ActiveContentKind};
 pub use catalog::{Catalog, Limits, OwnedCatalog};
-pub use component::{Component, ComponentKind};
+pub use component::{Component, ComponentKind, ComponentLinkKind};
 pub use extension::ProducerExtension;
 pub use table::{
     Column, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind, ReferentialAction, Relation,

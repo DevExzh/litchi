@@ -1,5 +1,13 @@
 //! Package-safe, lossless mutation of form trees and typed controls.
 
+#![deny(
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::unwrap_used
+)]
+
 use crate::core::OwnedPackage;
 use crate::form::{
     Form, Forms, GenericFormControl, GridControl, ImageFrameControl, InteractiveControl, Node,
@@ -179,7 +187,27 @@ pub(crate) fn add_form(
     parent_form: Option<usize>,
     form: &AuthoredForm,
 ) -> Result<(Vec<u8>, usize)> {
-    let fragment = form.to_xml_fragment()?;
+    add_form_fragment(
+        package,
+        content,
+        styles,
+        host,
+        group_index,
+        parent_form,
+        &form.to_xml_fragment()?,
+    )
+}
+
+pub(crate) fn add_form_fragment(
+    package: &OwnedPackage,
+    content: &str,
+    styles: Option<&str>,
+    host: FormHost,
+    group_index: usize,
+    parent_form: Option<usize>,
+    fragment: &str,
+) -> Result<(Vec<u8>, usize)> {
+    validate_form_fragment(fragment)?;
     let scan = scan(content)?;
     let index = scan.forms.len();
     let updated = if let Some(parent) = parent_form {
@@ -208,12 +236,23 @@ pub(crate) fn replace_form(
     index: usize,
     form: &AuthoredForm,
 ) -> Result<Vec<u8>> {
+    replace_form_fragment(package, content, styles, index, &form.to_xml_fragment()?)
+}
+
+pub(crate) fn replace_form_fragment(
+    package: &OwnedPackage,
+    content: &str,
+    styles: Option<&str>,
+    index: usize,
+    fragment: &str,
+) -> Result<Vec<u8>> {
+    validate_form_fragment(fragment)?;
     let scan = scan(content)?;
     let span = scan
         .forms
         .get(index)
         .ok_or_else(|| bounds("form", index, scan.forms.len()))?;
-    let updated = splice(content, span.start, span.end, &form.to_xml_fragment()?)?;
+    let updated = splice(content, span.start, span.end, fragment)?;
     rebuild_validated(package, &updated, styles)
 }
 
@@ -261,13 +300,30 @@ pub(crate) fn add_control(
     form_index: usize,
     control: &AuthoredFormControl,
 ) -> Result<(Vec<u8>, usize)> {
+    add_control_fragment(
+        package,
+        content,
+        styles,
+        form_index,
+        &control.to_xml_fragment()?,
+    )
+}
+
+pub(crate) fn add_control_fragment(
+    package: &OwnedPackage,
+    content: &str,
+    styles: Option<&str>,
+    form_index: usize,
+    fragment: &str,
+) -> Result<(Vec<u8>, usize)> {
+    validate_control_fragment(fragment)?;
     let scan = scan(content)?;
     let form = scan
         .forms
         .get(form_index)
         .ok_or_else(|| bounds("form", form_index, scan.forms.len()))?;
     let index = scan.controls.len();
-    let updated = insert_child(content, form, &control.to_xml_fragment()?)?;
+    let updated = insert_child(content, form, fragment)?;
     rebuild_validated(package, &updated, styles).map(|bytes| (bytes, index))
 }
 
@@ -278,6 +334,17 @@ pub(crate) fn replace_control(
     index: usize,
     control: &AuthoredFormControl,
 ) -> Result<Vec<u8>> {
+    replace_control_fragment(package, content, styles, index, &control.to_xml_fragment()?)
+}
+
+pub(crate) fn replace_control_fragment(
+    package: &OwnedPackage,
+    content: &str,
+    styles: Option<&str>,
+    index: usize,
+    fragment: &str,
+) -> Result<Vec<u8>> {
+    validate_control_fragment(fragment)?;
     let scan = scan(content)?;
     let span = scan
         .controls
@@ -285,9 +352,51 @@ pub(crate) fn replace_control(
         .ok_or_else(|| bounds("form control", index, scan.controls.len()))?;
     rebuild_validated(
         package,
-        &splice(content, span.start, span.end, &control.to_xml_fragment()?)?,
+        &splice(content, span.start, span.end, fragment)?,
         styles,
     )
+}
+
+pub(crate) fn validate_form_fragment(fragment: &str) -> Result<()> {
+    validate_fragment(fragment, true)
+}
+
+pub(crate) fn validate_control_fragment(fragment: &str) -> Result<()> {
+    validate_fragment(fragment, false)
+}
+
+fn validate_fragment(fragment: &str, form: bool) -> Result<()> {
+    let prefix = if form {
+        format!(
+            "<office:document-content xmlns:office=\"{OFFICE}\" xmlns:form=\"{FORM}\"><office:body><office:text><office:forms>"
+        )
+    } else {
+        format!(
+            "<office:document-content xmlns:office=\"{OFFICE}\" xmlns:form=\"{FORM}\"><office:body><office:text><office:forms><form:form form:name=\"FragmentHost\">"
+        )
+    };
+    let suffix = if form {
+        "</office:forms></office:text></office:body></office:document-content>"
+    } else {
+        "</form:form></office:forms></office:text></office:body></office:document-content>"
+    };
+    let wrapped = format!("{prefix}{fragment}{suffix}");
+    let scan = scan(&wrapped)?;
+    let exact_root = if form {
+        scan.forms.first().is_some_and(|span| {
+            span.start == prefix.len() && span.end == prefix.len() + fragment.len()
+        })
+    } else {
+        scan.controls.len() == 1
+            && scan.controls[0].start == prefix.len()
+            && scan.controls[0].end == prefix.len() + fragment.len()
+    };
+    if !exact_root {
+        return invalid("authored form fragment contains unexpected sibling content");
+    }
+    let parts = [(wrapped.as_str(), Part::Content)];
+    let parsed = crate::form::parse_form_parts(&parts)?;
+    validate_unique(&parsed)
 }
 
 pub(crate) fn remove_control(

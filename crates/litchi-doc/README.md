@@ -50,13 +50,19 @@ CHPX FKPs, shifts the modeled CP/PLCF closure, updates FIB story counts, and
 fully reopens the CFB and DOC before publication. Source-checked in-memory and
 blob-backed durable semantic patches, disjoint composition, three-way planning,
 text and embedded-resource transfer, and bounded undo/redo history use the same
-operation model.
+operation model. A second bounded transfer slice accepts a canonical singleton
+native inline or floating picture: the marker CHPX and exact PICF/Data block
+move together, while floating pictures additionally regenerate their exclusive
+`PlcfSpaMom` and `DggInfo` graph. This slice participates in exact in-memory
+inverse/history and three-way planning; its durable wire vocabulary is not yet
+exposed.
 Structural table edits, field delimiters or nesting, destructive revision
 dispositions, auxiliary-story length changes, mixed formatting, and unmodeled
-CP dependencies are typed refusals. Inline pictures, floating OfficeArt shapes,
+CP dependencies are typed refusals. Shared BLIP stores, multiple pictures,
+groups, textboxes, noncanonical scaling/cropping, producer extensions,
+delay-loaded BLIPs, auxiliary-story pictures, receiver shape-ID collisions,
 producer-defined object characters, and other active controls have specific
-dependency refusals when their coupled binary graphs cannot be rewritten; only
-the managed embedded-object closure above is copied. Selection uses the
+dependency refusals. Selection uses the
 format-neutral, zero-based
 `litchi_core::Position`; resolving it against a source collection reports a
 typed not-found refusal.

@@ -23,6 +23,7 @@ struct State {
     axes: Vec<AxisRecord>,
     chart_tag: EditableTag,
     plot_tag: EditableTag,
+    coordinate_region_tag: Option<EditableTag>,
     series_tags: Vec<EditableTag>,
     root_kind: RootKind,
     limits: crate::Limits,
@@ -161,6 +162,11 @@ impl FlatChart {
         match target {
             ExactTarget::Chart => Ok(&self.0.chart_tag),
             ExactTarget::PlotArea => Ok(&self.0.plot_tag),
+            ExactTarget::CoordinateRegion => self
+                .0
+                .coordinate_region_tag
+                .as_ref()
+                .ok_or_else(|| invalid_error("flat ODC coordinate-region selector is missing")),
             ExactTarget::Series(index) => self
                 .0
                 .series_tags
@@ -192,6 +198,8 @@ pub enum ExactTarget {
     Chart,
     /// The chart's single `chart:plot-area` element.
     PlotArea,
+    /// The ODF 1.4 `chart:coordinate-region` inside the plot area.
+    CoordinateRegion,
     /// A direct plot-area series selected by zero-based position.
     Series(usize),
 }
@@ -794,6 +802,7 @@ pub(crate) fn exact_changes_between(source: &FlatChart, target: &FlatChart) -> V
     }
     let targets = std::iter::once(ExactTarget::Chart)
         .chain(std::iter::once(ExactTarget::PlotArea))
+        .chain(std::iter::once(ExactTarget::CoordinateRegion))
         .chain((0..source.0.series_tags.len()).map(ExactTarget::Series));
     let mut changes = Vec::new();
     for exact_target in targets {
@@ -842,6 +851,10 @@ fn validate_exact_pair(target: ExactTarget, attribute: ExactAttribute) -> Result
                 | ExactAttribute::Y
                 | ExactAttribute::Width
                 | ExactAttribute::Height
+        ),
+        ExactTarget::CoordinateRegion => matches!(
+            attribute,
+            ExactAttribute::X | ExactAttribute::Y | ExactAttribute::Width | ExactAttribute::Height
         ),
         ExactTarget::Series(_) => matches!(
             attribute,
@@ -933,6 +946,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
     let mut axes = Vec::new();
     let mut chart_tag = None;
     let mut plot_tag = None;
+    let mut coordinate_region_tag = None;
     let mut series_tags = Vec::new();
 
     loop {
@@ -1018,6 +1032,21 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         limits,
                     )?;
                 } else if namespace == NamespaceKind::Chart
+                    && local.as_ref() == b"coordinate-region"
+                    && plot_depth == Some(event_depth - 1)
+                {
+                    if coordinate_region_tag.is_some() {
+                        return Err(invalid_error("chart:coordinate-region is duplicated"));
+                    }
+                    coordinate_region_tag = Some(record_editable_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        ExactTarget::CoordinateRegion,
+                        limits,
+                    )?);
+                } else if namespace == NamespaceKind::Chart
                     && local.as_ref() == b"series"
                     && plot_depth == Some(event_depth - 1)
                 {
@@ -1081,6 +1110,22 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         event_start..event_end,
                         &bytes,
                         ExactTarget::Series(index),
+                        limits,
+                    )?);
+                }
+                if namespace == NamespaceKind::Chart
+                    && local.as_ref() == b"coordinate-region"
+                    && plot_depth == Some(event_depth - 1)
+                {
+                    if coordinate_region_tag.is_some() {
+                        return Err(invalid_error("chart:coordinate-region is duplicated"));
+                    }
+                    coordinate_region_tag = Some(record_editable_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        ExactTarget::CoordinateRegion,
                         limits,
                     )?);
                 }
@@ -1185,6 +1230,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
         axes,
         chart_tag: chart_tag.ok_or_else(|| invalid_error("flat ODC chart tag is missing"))?,
         plot_tag: plot_tag.ok_or_else(|| invalid_error("flat ODC plot-area tag is missing"))?,
+        coordinate_region_tag,
         series_tags,
         root_kind,
         limits,

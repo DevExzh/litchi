@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use litchi_opc::PackURI;
+use litchi_opc::{BlobPart, PackURI};
 
 use super::{History, Limits, Patch, Resolution};
 use crate::{Error, Package, Result};
@@ -49,6 +49,36 @@ fn part_states(package: &Package) -> BTreeMap<String, (Vec<u8>, Vec<String>)> {
             )
         })
         .collect()
+}
+
+fn add_group_connector_transfer_fixture(package: &mut Package) -> Result<()> {
+    let slide = package.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let image_name = PackURI::new("/ppt/media/group-transfer.png").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        image_name.clone(),
+        "image/png".into(),
+        vec![137, 80, 78, 71, 9, 8, 7, 6],
+    )))?;
+    let target = image_name.relative_ref(slide.base_uri());
+    let relationship_id = package
+        .opc
+        .get_part_mut(&slide)?
+        .relate_to(&target, litchi_opc::constants::relationship_type::IMAGE);
+    let fragment = format!(
+        r#"<p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:nvGrpSpPr><p:cNvPr id="20" name="Transfer group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/><a:chOff x="0" y="0"/><a:chExt cx="2000000" cy="1000000"/></a:xfrm></p:grpSpPr><p:pic><p:nvPicPr><p:cNvPr id="21" name="Group picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{relationship_id}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="900000" cy="900000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic><p:sp><p:nvSpPr><p:cNvPr id="22" name="Group target"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="1100000" y="0"/><a:ext cx="900000" cy="900000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp><p:cxnSp><p:nvCxnSpPr><p:cNvPr id="23" name="Group connector"/><p:cNvCxnSpPr><a:stCxn id="21" idx="0"/><a:endCxn id="22" idx="0"/></p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm><a:off x="900000" y="450000"/><a:ext cx="200000" cy="0"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp></p:grpSp>"#
+    );
+    let free_connector = r#"<p:cxnSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:nvCxnSpPr><p:cNvPr id="24" name="Free connector"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="100000" cy="100000"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp>"#;
+    let external_connector = r#"<p:cxnSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:nvCxnSpPr><p:cNvPr id="25" name="External connector"/><p:cNvCxnSpPr><a:stCxn id="20" idx="0"/><a:endCxn id="22" idx="0"/></p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr><p:spPr><a:prstGeom prst="line"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp>"#;
+    let unknown = r#"<p14:sp xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><p14:nvSpPr><p14:cNvPr id="30" name="Opaque extension shape"/></p14:nvSpPr></p14:sp>"#;
+    let owner = package.opc.get_part(&slide)?;
+    let xml = super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
+    let xml = super::xml::append_shape(&xml, free_connector.as_bytes())?;
+    let xml = super::xml::append_shape(&xml, external_connector.as_bytes())?;
+    let xml = super::xml::append_shape(&xml, unknown.as_bytes())?;
+    package.opc.get_part_mut(&slide)?.set_blob(xml);
+    Ok(())
 }
 
 #[test]
@@ -839,6 +869,177 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
     reopened.apply_opened_presentation_patch(&removal_patch.inverse())?;
     reopened.apply_opened_presentation_patch(&transfer_patch.inverse())?;
     assert_eq!(part_states(&reopened), before);
+    Ok(())
+}
+
+#[test]
+fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result<()> {
+    let mut source_package = opened_two_slide_package()?;
+    add_group_connector_transfer_fixture(&mut source_package)?;
+    let source_package = Package::from_bytes(&source_package.to_bytes()?)?;
+    let source_root = source_package.opened_presentation()?;
+    let source_slide = source_package
+        .opc
+        .get_part(source_root.slides()[0].part_name())?;
+    let source_scene = crate::shape::Scene::read(source_slide.blob())?;
+    let group_position = source_scene
+        .iter()
+        .position(|shape| shape.name() == Some("Transfer group"))
+        .ok_or_else(|| Error::Invalid("source transfer group disappeared".into()))?;
+    let unknown_position = source_scene
+        .iter()
+        .position(|shape| matches!(shape, crate::shape::Shape::Unknown(_)))
+        .ok_or_else(|| Error::Invalid("source unknown shape disappeared".into()))?;
+    let free_connector_position = source_scene
+        .iter()
+        .position(|shape| shape.name() == Some("Free connector"))
+        .ok_or_else(|| Error::Invalid("source free connector disappeared".into()))?;
+    let external_connector_position = source_scene
+        .iter()
+        .position(|shape| shape.name() == Some("External connector"))
+        .ok_or_else(|| Error::Invalid("source external connector disappeared".into()))?;
+
+    let mut destination = opened_two_slide_package()?;
+    let before = part_states(&destination);
+    let destination_root = destination.opened_presentation()?;
+    let mut refusal = destination_root.edit();
+    let refusal_error = refusal
+        .transfer_shape(&source_root, 0_usize, unknown_position, 1_usize)
+        .expect_err("unknown shape transfer must be refused");
+    assert!(
+        matches!(refusal_error, Error::Invalid(message) if message.contains("unknown shape kind"))
+    );
+    assert!(!refusal.is_changed());
+    let mut endpoint_refusal = destination_root.edit();
+    let endpoint_error = endpoint_refusal
+        .transfer_shape(&source_root, 0_usize, external_connector_position, 1_usize)
+        .expect_err("external connector endpoint transfer must be refused");
+    assert!(
+        matches!(endpoint_error, Error::Invalid(message) if message.contains("outside the transferred shape subtree"))
+    );
+    assert!(!endpoint_refusal.is_changed());
+
+    let mut transfer = destination_root.edit();
+    let transferred_group_id =
+        transfer.transfer_shape(&source_root, 0_usize, group_position, 1_usize)?;
+    let transferred_free_connector_id =
+        transfer.transfer_shape(&source_root, 0_usize, free_connector_position, 1_usize)?;
+    let transfer_patch = transfer.commit()?.into_patch();
+    let transfer_patch = Patch::from_bytes(&transfer_patch.to_bytes()?)?;
+    let mut notes = destination_root.edit();
+    notes.set_notes_text(0_usize, "Disjoint grouped-transfer note")?;
+    let notes_patch = notes.commit()?.into_patch();
+    assert!(!transfer_patch.conflicts_with(&notes_patch));
+    let merged = Patch::three_way(&destination_root, &transfer_patch, &notes_patch)?.finish()?;
+    let durable = Patch::from_bytes(&merged.to_bytes()?)?;
+    destination.apply_opened_presentation_patch(&durable)?;
+
+    let mut reopened = Package::from_bytes(&destination.to_bytes()?)?;
+    let opened = reopened.opened_presentation()?;
+    let destination_slide = reopened.opc.get_part(opened.slides()[1].part_name())?;
+    assert!(!destination_slide.blob().contains(&b'\n'));
+    let scene = crate::shape::Scene::read(destination_slide.blob())?;
+    let free_connector = scene
+        .roots()
+        .find(|shape| shape.id() == Some(transferred_free_connector_id))
+        .ok_or_else(|| Error::Invalid("transferred free connector disappeared".into()))?;
+    assert!(matches!(free_connector, crate::shape::Shape::Connector(_)));
+    assert!(
+        free_connector
+            .name()
+            .is_some_and(|name| name.contains("Copy"))
+    );
+    let transferred = scene
+        .iter()
+        .find(|shape| shape.id() == Some(transferred_group_id))
+        .ok_or_else(|| Error::Invalid("transferred group disappeared".into()))?;
+    let crate::shape::Shape::Group(group) = transferred else {
+        return Err(Error::Invalid(
+            "transferred grouped shape changed kind".into(),
+        ));
+    };
+    let children: Vec<_> = group.shapes().collect();
+    assert_eq!(children.len(), 3);
+    let picture = children
+        .iter()
+        .copied()
+        .find(|shape| matches!(shape, crate::shape::Shape::Picture(_)))
+        .ok_or_else(|| Error::Invalid("transferred group picture disappeared".into()))?;
+    let target = children
+        .iter()
+        .copied()
+        .find(|shape| matches!(shape, crate::shape::Shape::Auto(_)))
+        .ok_or_else(|| Error::Invalid("transferred group target disappeared".into()))?;
+    let connector = children
+        .iter()
+        .copied()
+        .find(|shape| matches!(shape, crate::shape::Shape::Connector(_)))
+        .ok_or_else(|| Error::Invalid("transferred group connector disappeared".into()))?;
+    let picture_id = picture
+        .id()
+        .ok_or_else(|| Error::Invalid("transferred group picture has no identity".into()))?;
+    let target_id = target
+        .id()
+        .ok_or_else(|| Error::Invalid("transferred group target has no identity".into()))?;
+    let connector_id = connector
+        .id()
+        .ok_or_else(|| Error::Invalid("transferred group connector has no identity".into()))?;
+    let transferred_ids = [transferred_group_id, picture_id, target_id, connector_id];
+    assert_eq!(
+        transferred_ids
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len(),
+        4
+    );
+    assert!(transferred_ids.iter().all(|id| !(20..=23).contains(id)));
+    let connector_xml =
+        std::str::from_utf8(connector.xml()?).map_err(|error| Error::Xml(error.to_string()))?;
+    assert!(connector_xml.contains(&format!("<a:stCxn id=\"{picture_id}\" idx=\"0\"/>")));
+    assert!(connector_xml.contains(&format!("<a:endCxn id=\"{target_id}\" idx=\"0\"/>")));
+    assert!(picture.name().is_some_and(|name| name.contains("Copy")));
+    assert!(connector.name().is_some_and(|name| name.contains("Copy")));
+
+    let mut copied_image = None;
+    for relationship in destination_slide.rels().iter() {
+        if !crate::parts::is_relationship_type(
+            relationship.reltype(),
+            litchi_opc::constants::relationship_type::IMAGE,
+            "image",
+        ) {
+            continue;
+        }
+        let target_name = relationship.target_partname()?;
+        if reopened.opc.get_part(&target_name)?.blob() == [137, 80, 78, 71, 9, 8, 7, 6] {
+            copied_image = Some(target_name);
+            break;
+        }
+    }
+    assert!(copied_image.is_some());
+    assert_eq!(
+        reopened
+            .notes()?
+            .ok_or_else(|| Error::Invalid("reopened notes disappeared".into()))?
+            .slides()[0]
+            .text()?
+            .as_deref(),
+        Some("Disjoint grouped-transfer note")
+    );
+
+    let after = part_states(&reopened);
+    let mut history = History::new(Limits::default());
+    history.push(durable.clone())?;
+    let undo = history
+        .pop_undo()
+        .ok_or_else(|| Error::Invalid("group transfer undo disappeared".into()))?;
+    assert_eq!(undo, durable.inverse());
+    reopened.apply_opened_presentation_patch(&undo)?;
+    assert_eq!(part_states(&reopened), before);
+    let redo = history
+        .pop_redo()
+        .ok_or_else(|| Error::Invalid("group transfer redo disappeared".into()))?;
+    reopened.apply_opened_presentation_patch(&redo)?;
+    assert_eq!(part_states(&reopened), after);
     Ok(())
 }
 

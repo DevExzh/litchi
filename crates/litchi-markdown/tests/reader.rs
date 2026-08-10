@@ -103,6 +103,69 @@ fn gfm_extensions_are_explicit_and_deterministic() -> Result<(), Error> {
 }
 
 #[test]
+fn gfm_extended_autolinks_preserve_source_ranges_and_transfer() -> Result<(), Error> {
+    let source = "Visit www.commonmark.org/help and foo@bar.baz.";
+    let commonmark = Snapshot::read(source)?;
+    assert!(
+        !commonmark
+            .block(0)
+            .ok_or(Error::BlockNotFound { position: 0 })?
+            .inlines()
+            .any(|inline| inline.kind() == InlineKind::Link)
+    );
+    assert_eq!(
+        commonmark.to_html()?,
+        "<p>Visit www.commonmark.org/help and foo@bar.baz.</p>\n"
+    );
+
+    let gfm = Snapshot::read_with(source, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+    let links: Vec<_> = gfm
+        .block(0)
+        .ok_or(Error::BlockNotFound { position: 0 })?
+        .inlines()
+        .filter(|inline| inline.kind() == InlineKind::Link)
+        .collect();
+    assert_eq!(links.len(), 2);
+    assert_eq!(links[0].source(), "www.commonmark.org/help");
+    assert_eq!(links[1].source(), "foo@bar.baz");
+    assert_eq!(&source[links[0].range()], links[0].source());
+    assert_eq!(&source[links[1].range()], links[1].source());
+    assert!(gfm.references().any(|reference| {
+        reference.kind() == ReferenceKind::Link
+            && reference.destination() == Some("http://www.commonmark.org/help")
+    }));
+    assert!(gfm.references().any(|reference| {
+        reference.kind() == ReferenceKind::Link
+            && reference.destination() == Some("mailto:foo@bar.baz")
+    }));
+    assert_eq!(
+        gfm.to_html()?,
+        "<p>Visit <a href=\"http://www.commonmark.org/help\">www.commonmark.org/help</a> and <a href=\"mailto:foo@bar.baz\">foo@bar.baz</a>.</p>\n"
+    );
+
+    let destination =
+        Snapshot::read_with("Destination", Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+    let transferred = gfm.preflight_transfer_block(0, &destination)?.into_commit();
+    assert!(transferred.snapshot().references().any(|reference| {
+        reference.kind() == ReferenceKind::Link
+            && reference.destination() == Some("http://www.commonmark.org/help")
+    }));
+    Ok(())
+}
+
+#[test]
+fn gfm_tagfilter_changes_html_without_changing_retained_source() -> Result<(), Error> {
+    let source = "<strong> <title> <style> <em>";
+    let snapshot = Snapshot::read_with(source, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+    assert_eq!(snapshot.source(), source);
+    assert_eq!(
+        snapshot.to_html()?,
+        "<p><strong> &lt;title> &lt;style> <em></p>\n"
+    );
+    Ok(())
+}
+
+#[test]
 fn nested_containers_count_as_one_top_level_block() -> Result<(), Error> {
     let source = "1. first\n   - nested\n     > quoted\n     >\n     > ```\n     > code\n     > ```\n2. second";
     let snapshot = Snapshot::read(source)?;

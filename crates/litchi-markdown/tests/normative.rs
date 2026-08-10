@@ -6,7 +6,6 @@
 use std::ops::Range;
 
 use litchi_markdown::reader::{Dialect, Error, ReadLimits, Snapshot};
-use pulldown_cmark::{Options, Parser, html};
 use serde::Deserialize;
 
 const COMMONMARK_JSON: &str = include_str!("corpus/commonmark-0.31.2/spec.json");
@@ -14,7 +13,6 @@ const GFM_JSON: &str = include_str!("corpus/gfm-0.29.0.gfm.13/spec.json");
 const COMMONMARK_EXAMPLE_COUNT: usize = 652;
 const GFM_EXAMPLE_COUNT: usize = 670;
 const GFM_EXTENSION_EXAMPLE_COUNT: usize = 22;
-const GFM_RENDERED_EXTENSION_EXAMPLE_COUNT: usize = 10;
 
 #[derive(Debug, Deserialize)]
 struct Example {
@@ -31,7 +29,7 @@ fn commonmark_0312_complete_normative_release_gate() -> Result<(), Box<dyn std::
     let examples: Vec<Example> = serde_json::from_str(COMMONMARK_JSON)?;
     assert_eq!(examples.len(), COMMONMARK_EXAMPLE_COUNT);
     for example in &examples {
-        assert_rendering(example, Options::empty());
+        assert_rendering(example, Dialect::CommonMark)?;
         assert_exact_model_and_reversible_edit(example, Dialect::CommonMark)?;
     }
     Ok(())
@@ -48,20 +46,10 @@ fn official_gfm_corpus_release_gate() -> Result<(), Box<dyn std::error::Error>> 
             .count(),
         GFM_EXTENSION_EXAMPLE_COUNT
     );
-    let mut rendered_extensions = 0usize;
     for example in &examples {
-        // The pinned GFM specification is based on CommonMark 0.29. Its 648
-        // unmarked examples are retained as an independent parse/edit corpus,
-        // while current CommonMark rendering is governed by the complete
-        // 0.31.2 gate above. Supported GFM-extension examples remain
-        // normative rendering assertions.
-        if let Some(options) = supported_gfm_options(&example.extensions) {
-            assert_rendering(example, options);
-            rendered_extensions = rendered_extensions.saturating_add(1);
-        }
+        assert_rendering(example, Dialect::GitHubFlavored)?;
         assert_exact_model_and_reversible_edit(example, Dialect::GitHubFlavored)?;
     }
-    assert_eq!(rendered_extensions, GFM_RENDERED_EXTENSION_EXAMPLE_COUNT);
     Ok(())
 }
 
@@ -95,9 +83,8 @@ fn real_document_fixtures_roundtrip_through_durable_patches() -> Result<(), Erro
     Ok(())
 }
 
-fn assert_rendering(example: &Example, options: Options) {
-    let mut actual = String::new();
-    html::push_html(&mut actual, Parser::new_ext(&example.markdown, options));
+fn assert_rendering(example: &Example, dialect: Dialect) -> Result<(), Error> {
+    let actual = Snapshot::read_with(&example.markdown, dialect, ReadLimits::DEFAULT)?.to_html()?;
     assert_eq!(
         normalized_html(&actual),
         normalized_html(&example.html),
@@ -105,6 +92,7 @@ fn assert_rendering(example: &Example, options: Options) {
         example.example,
         example.section
     );
+    Ok(())
 }
 
 fn assert_exact_model_and_reversible_edit(
@@ -166,25 +154,6 @@ fn assert_valid_range(source: &str, range: &Range<usize>) {
     assert!(range.start <= range.end && range.end <= source.len());
     assert!(source.is_char_boundary(range.start));
     assert!(source.is_char_boundary(range.end));
-}
-
-fn supported_gfm_options(extensions: &[String]) -> Option<Options> {
-    if extensions.is_empty() {
-        return None;
-    }
-    let mut options = Options::empty();
-    for extension in extensions {
-        match extension.as_str() {
-            "table" => options.insert(Options::ENABLE_TABLES),
-            "strikethrough" => options.insert(Options::ENABLE_STRIKETHROUGH),
-            // pulldown-cmark 0.13.4 does not implement GFM extended
-            // autolinks or the disallowed-raw-HTML tag filter. These cases
-            // still run through the exact-source/range/edit gate above.
-            "autolink" | "tagfilter" => return None,
-            unknown => panic!("unrecognized pinned GFM extension {unknown}"),
-        }
-    }
-    Some(options)
 }
 
 fn normalized_html(source: &str) -> String {

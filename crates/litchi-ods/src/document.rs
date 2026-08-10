@@ -27,7 +27,8 @@ use crate::package::Package;
 
 pub use crate::advanced::{
     BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, Drawing, DrawingFrame,
-    FormControl, NumberStyleNode, RichRun, RichText, StyleGraph, TextProperties, TextStyleNode,
+    DrawingGroup, DrawingTextBox, EffectiveCellStyle, FormControl, FormControlKind, FormEvent,
+    NumberStyleNode, RichFormControl, RichRun, RichText, StyleGraph, TextProperties, TextStyleNode,
 };
 
 const FORMAT: &str = "litchi.ods.document";
@@ -224,6 +225,37 @@ impl Snapshot {
         }))
     }
 
+    /// Report explicit cryptographic write capability/refusal states for this source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when package security metadata is malformed.
+    pub fn security_capabilities(&self) -> Result<SecurityCapabilities> {
+        let package = Package::from_bytes(self.source.as_ref().to_vec())?;
+        let reader = package.package().package()?;
+        let signed =
+            reader.has_file(DOCUMENT_SIGNATURE_PATH) || reader.has_file(MACRO_SIGNATURE_PATH);
+        let encrypted = reader.manifest().has_encrypted_entries();
+        Ok(SecurityCapabilities {
+            sign: SecurityCapability::RefusedUnsupported,
+            resign: if signed {
+                SecurityCapability::RefusedUnsupported
+            } else {
+                SecurityCapability::NotApplicable
+            },
+            decrypt: if encrypted {
+                SecurityCapability::RefusedCredentialsRequired
+            } else {
+                SecurityCapability::NotApplicable
+            },
+            reencrypt: if encrypted {
+                SecurityCapability::RefusedUnsupported
+            } else {
+                SecurityCapability::NotApplicable
+            },
+        })
+    }
+
     /// Begin one clone-staged unified package transaction.
     #[must_use]
     pub fn edit(&self) -> Edit {
@@ -336,6 +368,27 @@ pub enum EncryptionWritePolicy {
 pub struct SecurityWritePolicy {
     pub signatures: SignatureWritePolicy,
     pub encryption: EncryptionWritePolicy,
+}
+
+/// Explicit availability state for a cryptographic package operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SecurityCapability {
+    /// The operation is irrelevant to the current source state.
+    NotApplicable,
+    /// The ODS unified root deliberately does not implement the operation.
+    RefusedUnsupported,
+    /// The operation would require caller credentials that this root never infers.
+    RefusedCredentialsRequired,
+}
+
+/// Sign/resign/decrypt/re-encrypt capability states for one exact snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SecurityCapabilities {
+    pub sign: SecurityCapability,
+    pub resign: SecurityCapability,
+    pub decrypt: SecurityCapability,
+    pub reencrypt: SecurityCapability,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -869,6 +922,47 @@ impl Edit {
         Ok(())
     }
 
+    /// Replace typed inert controls, event bindings, and image dependencies atomically.
+    ///
+    /// Events and macro targets are retained as data and are never executed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid controls/events/bindings, unresolved images, collisions,
+    /// bounds, or splice failure.
+    pub fn set_rich_form_controls_with_resources(
+        &mut self,
+        controls: &[RichFormControl],
+        resources: Vec<Resource>,
+        collision: Collision,
+    ) -> Result<()> {
+        let mut candidate = self.clone();
+        let supplied = resources
+            .iter()
+            .map(Resource::path)
+            .collect::<BTreeSet<_>>();
+        let current = Package::from_bytes(candidate.candidate.clone())?;
+        for control in controls {
+            if let Some(path) = &control.image_path
+                && !supplied.contains(path.as_str())
+                && !current.package().has_file(path)?
+            {
+                return invalid(format!("ODS form image dependency '{path}' is unresolved"));
+            }
+        }
+        for resource in resources {
+            let _disposition = candidate.put_resource(resource, collision)?;
+        }
+        let bytes = crate::advanced::set_rich_forms(
+            &candidate.candidate,
+            controls,
+            candidate.before.limits.package_bytes,
+        )?;
+        candidate.stage_spliced("form.rich", "forms", bytes)?;
+        *self = candidate;
+        Ok(())
+    }
+
     /// Atomically add a drawing frame and its exact package dependency.
     ///
     /// The detached resource path must equal the drawing reference. Both staged changes roll back
@@ -928,6 +1022,22 @@ impl Edit {
         candidate.stage_spliced("drawing-frame.put", &frame.name, bytes)?;
         *self = candidate;
         Ok(disposition)
+    }
+
+    /// Add a bounded drawing group containing rich text frames.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid identity, duplicate names, geometry, rich text, bounds, or
+    /// splice failure.
+    pub fn put_drawing_group(&mut self, sheet: &str, group: &DrawingGroup) -> Result<()> {
+        let bytes = crate::advanced::put_drawing_group(
+            &self.candidate,
+            sheet,
+            group,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("drawing-group.put", &group.name, bytes)
     }
 
     /// Atomically add a package-backed chart drawing and compact chart content dependency.
@@ -1001,6 +1111,74 @@ impl Edit {
             },
             collision,
         )
+    }
+
+    /// Transfer one compact package-backed chart and every member below its object root.
+    ///
+    /// Relative chart data references remain valid because dependency paths below the source root
+    /// are reproduced below the destination root. The transfer is clone-staged and atomic.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an absent content part, unsafe roots, noncompact XML dependencies,
+    /// collision, bounds, drawing publication, or typed chart readback failure.
+    pub fn transfer_chart_dependencies(
+        &mut self,
+        source: &Snapshot,
+        source_object_path: &str,
+        sheet: &str,
+        drawing_name: &str,
+        destination_object_path: &str,
+        collision: Collision,
+    ) -> Result<Vec<TransferDisposition>> {
+        let source_content_path = format!("{source_object_path}/content.xml");
+        let destination_content_path = format!("{destination_object_path}/content.xml");
+        validate_resource_path(&source_content_path)?;
+        validate_resource_path(&destination_content_path)?;
+        let source_package = Package::from_bytes(source.source.as_ref().to_vec())?;
+        let content = source_package
+            .package()
+            .has_file(&source_content_path)?
+            .then(|| source_package.package().get_file(&source_content_path))
+            .transpose()?
+            .ok_or_else(|| invalid_error("ODS chart source content.xml was not found"))?;
+        let content_xml = String::from_utf8(content)
+            .map_err(|_error| invalid_error("ODS chart source content.xml is not UTF-8"))?;
+        let source_prefix = format!("{source_object_path}/");
+        let destination_prefix = format!("{destination_object_path}/");
+        let manifest = source_package.package().package()?;
+        let mut candidate = self.clone();
+        let mut dispositions = Vec::new();
+        for path in source_package.package().files()? {
+            let Some(relative) = path.strip_prefix(&source_prefix) else {
+                continue;
+            };
+            if relative.is_empty() || relative == "content.xml" || path.ends_with('/') {
+                continue;
+            }
+            let destination = format!("{destination_prefix}{relative}");
+            let media_type = manifest
+                .manifest()
+                .get_media_type(&path)
+                .unwrap_or("application/octet-stream");
+            let resource = Resource::new(
+                destination,
+                media_type,
+                source_package.package().get_file(&path)?,
+            )?;
+            dispositions.push(candidate.put_resource(resource, collision)?);
+        }
+        dispositions.push(candidate.put_chart_object(
+            sheet,
+            &ChartObject {
+                name: drawing_name.to_string(),
+                object_path: destination_object_path.to_string(),
+                content_xml,
+            },
+            collision,
+        )?);
+        *self = candidate;
+        Ok(dispositions)
     }
 
     /// Transfer one resource dependency and author a destination drawing reference atomically.
@@ -1969,9 +2147,11 @@ fn known_operation(operation: &str) -> bool {
             | "drawing.put"
             | "drawing.remove"
             | "drawing-frame.put"
+            | "drawing-group.put"
             | "chart-object.put"
             | "form.edit"
             | "form.bindings"
+            | "form.rich"
     )
 }
 

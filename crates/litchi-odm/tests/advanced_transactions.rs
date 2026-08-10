@@ -75,6 +75,21 @@ fn master_from_parts(content: &str, styles: &str, chapter: &[u8]) -> Master {
     Master::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
 }
 
+fn master_without_styles(content: &str, chapter: &[u8]) -> Master {
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(MIME).unwrap();
+    writer.add_file("content.xml", content.as_bytes()).unwrap();
+    writer.add_file("meta.xml", META.as_bytes()).unwrap();
+    writer
+        .add_file_with_media_type(
+            "Chapters/a.odt",
+            chapter,
+            "application/vnd.oasis.opendocument.text",
+        )
+        .unwrap();
+    Master::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+}
+
 #[test]
 fn one_transaction_updates_tree_styles_resources_metadata_and_dependencies() {
     let source = source();
@@ -497,11 +512,17 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     let content = concat!(
         r#"<?xml version="1.0"?><office:document-content "#,
         r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
-        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
-        r#"<office:body><office:text><text:p>front</text:p><text:table-of-content/>"#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:scripts>"#,
+        r#"<script:event-listener script:event-name="on-load" script:macro-name="Main.Run" xlink:href="vnd.sun.star.script:Main.Run"/>"#,
+        r#"</office:scripts><office:body><office:text><text:p>front</text:p>"#,
+        r#"<text:table-of-content text:name="Contents" xml:id="toc1"/>"#,
         r#"<text:section text:name="Target"><text:p>target</text:p></text:section>"#,
         r#"<text:section text:name="LocalSource"><text:section-source text:section-name="Target"/>"#,
         r#"</text:section><text:section text:name="Dde"><office:dde-source/></text:section>"#,
+        r#"<text:section text:name="Unresolved"><text:section-source text:section-name="Missing"/>"#,
+        r#"</text:section>"#,
         r#"</office:text></office:body></office:document-content>"#,
     );
     let master = master_from_parts(content, STYLES, b"chapter");
@@ -513,12 +534,20 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
             Kind::Section(Position::new(0)),
             Kind::Section(Position::new(1)),
             Kind::Section(Position::new(2)),
+            Kind::Section(Position::new(3)),
         ]
     );
     let local = &master.section_tree().local_references()[0];
     assert_eq!(local.owner(), Position::new(1));
     assert_eq!(local.target_name(), "Target");
     assert_eq!(local.target(), Some(Position::new(0)));
+    let unresolved = master
+        .section_tree()
+        .unresolved_local_references()
+        .next()
+        .unwrap();
+    assert_eq!(unresolved.owner(), Position::new(3));
+    assert_eq!(unresolved.target_name(), "Missing");
     assert_eq!(
         master
             .section_tree()
@@ -527,6 +556,14 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
             .local_reference(),
         Some(Position::new(0))
     );
+    assert_eq!(
+        master
+            .section_tree()
+            .get(Position::new(1))
+            .unwrap()
+            .source(),
+        Some(litchi_odm::section::Source::Local(Position::new(0)))
+    );
     assert!(
         master
             .section_tree()
@@ -534,12 +571,37 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
             .unwrap()
             .has_dde_source()
     );
+    assert_eq!(
+        master
+            .section_tree()
+            .get(Position::new(2))
+            .unwrap()
+            .source(),
+        Some(litchi_odm::section::Source::Dde)
+    );
     assert!(
         master
             .security()
             .active_content()
             .iter()
             .any(|item| item.kind() == ActiveKind::Dde)
+    );
+    let generated = &master.structure().generated_indexes()[0];
+    assert_eq!(generated.item(), Position::new(1));
+    assert_eq!(generated.name(), Some("Contents"));
+    assert_eq!(generated.xml_id(), Some("toc1"));
+    let listener = master
+        .security()
+        .active_content()
+        .iter()
+        .find(|item| item.kind() == ActiveKind::EventListener)
+        .unwrap();
+    assert_eq!(listener.trigger(), Some("on-load"));
+    assert_eq!(listener.target(), Some("Main.Run"));
+    assert_eq!(listener.link(), Some("vnd.sun.star.script:Main.Run"));
+    assert_eq!(
+        master.security().changed_write_disposition(),
+        litchi_odm::security::ChangedWriteDisposition::RequiresInertActiveContentOptIn
     );
 
     let no_op = master.edit().commit().unwrap();
@@ -636,4 +698,96 @@ fn collision_safe_transfer_renames_complete_style_and_resource_closures_atomical
             .any(|section| section.name() == "Imported")
     );
     assert!(Master::from_bytes(merged.as_bytes().to_vec()).is_ok());
+    let durable = commit.patch().durable().unwrap();
+    assert_eq!(
+        durable.apply(&destination).unwrap().as_bytes(),
+        changed.as_bytes()
+    );
+    assert_eq!(
+        changed.security().changed_write_disposition(),
+        litchi_odm::security::ChangedWriteDisposition::Allowed
+    );
+}
+
+#[test]
+fn styles_owned_transfer_creates_a_compact_styles_part_when_absent() {
+    let source_content = concat!(
+        r#"<?xml version="1.0"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:text>"#,
+        r#"<text:section text:name="Source" text:style-name="NamedSection">"#,
+        r#"<text:section-source xlink:href="Chapters/a.odt"/></text:section>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let source_styles = concat!(
+        r#"<?xml version="1.0"?><office:document-styles "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+        r#"xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">"#,
+        r#"<office:styles><style:style style:name="NamedBase" style:family="section">"#,
+        r##"<style:section-properties fo:background-color="#eeeeee"/></style:style>"##,
+        r#"<style:style style:name="NamedSection" style:family="section" style:parent-style-name="NamedBase">"#,
+        r#"<style:section-properties fo:margin-right="1cm"/></style:style>"#,
+        r#"</office:styles></office:document-styles>"#,
+    );
+    let destination_content = concat!(
+        r#"<?xml version="1.0"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
+        r#"<office:body><office:text><text:p>destination</text:p></office:text></office:body>"#,
+        r#"</office:document-content>"#,
+    );
+    let source = master_from_parts(source_content, source_styles, b"source chapter");
+    let destination = master_without_styles(destination_content, b"occupied chapter");
+    assert!(destination.styles_xml().is_none());
+
+    let mut edit = destination.edit();
+    edit.transfer_linked_section(
+        &source,
+        Position::new(0),
+        "Imported named style",
+        "Chapters/imported.odt",
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let changed = commit.snapshot();
+    let styles = changed.styles_xml().unwrap();
+    assert!(!styles.contains('\n'));
+    assert!(styles.contains("style:name=\"NamedBase\""));
+    assert!(styles.contains("style:name=\"NamedSection\""));
+    assert!(styles.contains("fo:margin-right=\"1cm\""));
+    assert!(
+        changed
+            .styles()
+            .iter()
+            .any(|style| { style.name() == "NamedSection" && style.parent() == Some("NamedBase") })
+    );
+    assert_eq!(
+        commit.patch().inverse().apply(changed).unwrap().as_bytes(),
+        destination.as_bytes()
+    );
+    let durable = commit.patch().durable().unwrap();
+    assert_eq!(
+        durable.apply(&destination).unwrap().as_bytes(),
+        changed.as_bytes()
+    );
+    let mut history = destination.history(HistoryLimits::new(3, u64::MAX));
+    history.record(&commit).unwrap();
+    assert!(history.undo());
+    assert!(history.current().styles_xml().is_none());
+    assert!(history.redo());
+    assert!(history.current().styles_xml().is_some());
+    let mut title = destination.edit();
+    title.set_title("parallel styles owner").unwrap();
+    let title = title.commit().unwrap();
+    let merged = commit
+        .patch()
+        .merge(title.patch())
+        .unwrap()
+        .apply(&destination)
+        .unwrap();
+    assert_eq!(merged.title(), Some("parallel styles owner"));
+    assert!(merged.styles_xml().is_some());
+    assert!(Master::from_bytes(changed.as_bytes().to_vec()).is_ok());
 }

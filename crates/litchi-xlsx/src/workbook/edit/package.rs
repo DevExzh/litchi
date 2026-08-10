@@ -17,6 +17,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
         base,
         panes: _,
         defined_names: _,
+        drawings: _,
         active: _,
         order: _,
         sheets: _,

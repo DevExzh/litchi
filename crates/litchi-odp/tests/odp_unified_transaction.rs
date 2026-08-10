@@ -315,6 +315,9 @@ fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
     let mut dependent = dependent_base.transaction().unwrap();
     dependent.add("Dependent", "chart").unwrap();
     dependent
+        .embed_media("Pictures/chart.png", b"chart-pixels", "image/png")
+        .unwrap();
+    dependent
         .add_chart(
             0usize,
             "Dependent chart",
@@ -323,17 +326,43 @@ fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
         )
         .unwrap();
     let dependent_source = dependent.commit().unwrap().snapshot().clone();
-    let mut refused = reopened.transaction().unwrap();
-    let error = refused
+    let mut dependent_transfer = reopened.transaction().unwrap();
+    dependent_transfer
+        .embed_media("Pictures/chart.png", b"destination-pixels", "image/png")
+        .unwrap();
+    dependent_transfer
         .transfer_chart_from(
             &dependent_source,
             "Dependent chart",
             0usize,
-            "Must not transfer",
+            "Transferred dependent chart",
             litchi_odp::charts::Storage::InlineXml,
         )
-        .unwrap_err();
-    assert!(error.to_string().contains("xlink:href dependencies"));
+        .unwrap();
+    let dependent_commit = dependent_transfer.commit().unwrap();
+    let dependent_package =
+        OwnedPackage::from_bytes(dependent_commit.snapshot().bytes().to_vec()).unwrap();
+    assert_eq!(
+        dependent_package.get_file("Pictures/chart.png").unwrap(),
+        b"destination-pixels"
+    );
+    assert_eq!(
+        dependent_package
+            .get_file("Pictures/chart_litchi_1.png")
+            .unwrap(),
+        b"chart-pixels"
+    );
+    assert!(
+        dependent_commit
+            .snapshot()
+            .to_presentation()
+            .unwrap()
+            .chart("Transferred dependent chart")
+            .unwrap()
+            .unwrap()
+            .content_xml()
+            .contains("Pictures/chart_litchi_1.png")
+    );
 }
 
 #[test]

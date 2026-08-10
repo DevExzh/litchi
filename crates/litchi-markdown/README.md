@@ -39,10 +39,10 @@ assert_eq!(restored.snapshot().source(), source.source());
 
 The offline release gate vendors all 652 normative CommonMark 0.31.2 examples
 and all 670 examples from a pinned GitHub `cmark-gfm` specification. It checks
-normative CommonMark rendering, supported GFM-extension rendering, exact source
-ranges, deterministic reparsing, reversible edits, and project-authored
-real-document roundtrips. Exact provenance, hashes, attribution, licenses, and
-explicit semantic limits are recorded in `tests/data/PROVENANCE.md`.
+every expected CommonMark and GFM HTML result, exact source ranges,
+deterministic reparsing, reversible edits, and project-authored real-document
+roundtrips. Exact provenance, hashes, attribution, licenses, and explicit
+semantic limits are recorded in `tests/data/PROVENANCE.md`.
 
 ## Reproducible release gate
 

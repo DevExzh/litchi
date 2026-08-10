@@ -139,6 +139,46 @@ impl Snapshot {
         self.0.package.package().get_file(path).map(Some)
     }
 
+    pub(crate) fn rewrite_capability(&self) -> Result<crate::RewriteCapability> {
+        let files = self.files()?;
+        let mut blockers = Vec::new();
+        if files.iter().any(|path| is_signature_path(path)) {
+            blockers.push(crate::RewriteBlocker::Signature);
+        }
+        let archive = self.0.package.package();
+        let inspected = archive.package()?;
+        if inspected.manifest().has_encrypted_entries() {
+            blockers.push(crate::RewriteBlocker::Encryption);
+        }
+        let mut noncompact_xml = false;
+        let mut unreadable_xml = false;
+        for path in files.iter().filter(|path| {
+            Path::new(path)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
+                && path.as_str() != "META-INF/manifest.xml"
+        }) {
+            if inspected
+                .manifest()
+                .get_entry(path)
+                .is_some_and(|entry| entry.encryption.is_some())
+            {
+                continue;
+            }
+            match inspected.get_file(path) {
+                Ok(bytes) => noncompact_xml |= compact_xml::validate(&bytes).is_err(),
+                Err(_) => unreadable_xml = true,
+            }
+        }
+        if noncompact_xml {
+            blockers.push(crate::RewriteBlocker::NonCompactXml);
+        }
+        if unreadable_xml {
+            blockers.push(crate::RewriteBlocker::UnreadableXml);
+        }
+        Ok(crate::RewriteCapability::new(blockers))
+    }
+
     pub(crate) fn rebuild(
         &self,
         content: &str,

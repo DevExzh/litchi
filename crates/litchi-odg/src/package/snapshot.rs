@@ -2,6 +2,7 @@
 
 use crate::model::{
     FormControl,
+    group::Group,
     layer::Layer,
     page::Page,
     resource::Resource,
@@ -41,12 +42,15 @@ const FORM: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:form:1.0";
 const FO: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const SCRIPT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
 const XML_EVENTS: &[u8] = b"http://www.w3.org/2001/xml-events";
+const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
+const PRESENTATION: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MAX_DEPTH: usize = 256;
 const MAX_PAGES: usize = 16_384;
 const MAX_LAYERS: usize = 16_384;
 const MAX_FORM_CONTROLS: usize = 65_536;
 const MAX_TRANSFER_RESOURCES: usize = 4_096;
+const MAX_GROUP_EDITS: usize = 4_096;
 const MAX_SHAPES: usize = 1_000_000;
 const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
@@ -80,6 +84,7 @@ struct State {
     resources: Vec<Resource>,
     form_controls: Vec<FormControl>,
     styles: Vec<Style>,
+    active_content: ActiveContentStatus,
 }
 
 /// Inert package security state and mutation policy.
@@ -98,6 +103,77 @@ pub enum SecurityWritePolicy {
     Refuse,
     /// Deliberately remove stale package signatures while preserving all unsigned payloads.
     RemoveSignatures,
+}
+
+/// Explicit disposition for inert active-content provenance during writes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ActiveContentWritePolicy {
+    /// Preserve unmodified active-content markup inertly without executing it.
+    #[default]
+    PreserveInert,
+    /// Refuse publication when the source inventories any active-content surface.
+    Refuse,
+}
+
+/// Bounded inert inventory of active or externally resolved drawing surfaces.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ActiveContentStatus {
+    scripts: usize,
+    events: usize,
+    actions: usize,
+    dde: usize,
+    external_links: usize,
+    embedded_objects: usize,
+}
+
+impl ActiveContentStatus {
+    /// Whether any active-content surface was inventoried.
+    #[must_use]
+    pub const fn is_present(self) -> bool {
+        self.scripts != 0
+            || self.events != 0
+            || self.actions != 0
+            || self.dde != 0
+            || self.external_links != 0
+            || self.embedded_objects != 0
+    }
+
+    /// Script-bearing element count.
+    #[must_use]
+    pub const fn scripts(self) -> usize {
+        self.scripts
+    }
+
+    /// XML-event listener count.
+    #[must_use]
+    pub const fn events(self) -> usize {
+        self.events
+    }
+
+    /// Presentation action/listener count.
+    #[must_use]
+    pub const fn actions(self) -> usize {
+        self.actions
+    }
+
+    /// DDE source count.
+    #[must_use]
+    pub const fn dde(self) -> usize {
+        self.dde
+    }
+
+    /// External hyperlink count.
+    #[must_use]
+    pub const fn external_links(self) -> usize {
+        self.external_links
+    }
+
+    /// Embedded object/plugin/applet/floating-frame count.
+    #[must_use]
+    pub const fn embedded_objects(self) -> usize {
+        self.embedded_objects
+    }
 }
 
 impl SecurityStatus {
@@ -229,6 +305,7 @@ impl Snapshot {
         styles.sort_unstable_by(|left, right| left.name().cmp(right.name()));
         styles
             .dedup_by(|left, right| left.name() == right.name() && left.family() == right.family());
+        let active_content = scan_active_content(package.content_xml(), package.styles_xml())?;
         Ok(Self(Arc::new(State {
             package,
             mimetype,
@@ -236,6 +313,7 @@ impl Snapshot {
             pages: parsed.pages,
             form_controls: parsed.form_controls,
             styles,
+            active_content,
             layers,
             resources,
         })))
@@ -317,6 +395,12 @@ impl Snapshot {
         self.0.security
     }
 
+    /// Returns an inert, non-executing active-content inventory.
+    #[must_use]
+    pub fn active_content(&self) -> ActiveContentStatus {
+        self.0.active_content
+    }
+
     /// Lists safe package entry names.
     ///
     /// # Errors
@@ -344,6 +428,16 @@ impl Snapshot {
         &self.0.styles
     }
 
+    /// Resolves one group root to its complete flattened nested descendant closure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, non-group shape, or missing source span.
+    pub fn group(&self, page: usize, shape: usize) -> Result<Group> {
+        let parsed = parse_content(self.content_xml())?;
+        group_selection(&parsed, page, shape)
+    }
+
     /// Reads one inventoried package-local resource without activating it.
     ///
     /// # Errors
@@ -362,7 +456,10 @@ impl Snapshot {
     /// Starts a source-bound semantic transaction.
     #[must_use]
     pub fn edit(&self) -> Transaction {
-        self.edit_with_security_policy(SecurityWritePolicy::Refuse)
+        self.edit_with_policies(
+            SecurityWritePolicy::Refuse,
+            ActiveContentWritePolicy::PreserveInert,
+        )
     }
 
     /// Starts a transaction with an explicit protected-package write policy.
@@ -371,6 +468,25 @@ impl Snapshot {
     /// omits the now-stale signature members from the rebuilt package.
     #[must_use]
     pub fn edit_with_security_policy(&self, security_policy: SecurityWritePolicy) -> Transaction {
+        self.edit_with_policies(security_policy, ActiveContentWritePolicy::PreserveInert)
+    }
+
+    /// Starts a transaction with an explicit inert active-content disposition.
+    #[must_use]
+    pub fn edit_with_active_content_policy(
+        &self,
+        active_content_policy: ActiveContentWritePolicy,
+    ) -> Transaction {
+        self.edit_with_policies(SecurityWritePolicy::Refuse, active_content_policy)
+    }
+
+    /// Starts a transaction with explicit security and inert active-content dispositions.
+    #[must_use]
+    pub fn edit_with_policies(
+        &self,
+        security_policy: SecurityWritePolicy,
+        active_content_policy: ActiveContentWritePolicy,
+    ) -> Transaction {
         Transaction {
             source: self.clone(),
             content: self.content_xml().to_string(),
@@ -378,6 +494,7 @@ impl Snapshot {
             changes: Vec::new(),
             resource_edits: Vec::new(),
             security_policy,
+            active_content_policy,
         }
     }
 
@@ -394,7 +511,11 @@ impl Snapshot {
     /// Returns an error for stale lineage, unsupported operations, security refusal, or failed
     /// whole-package readback. No intermediate snapshot is published on failure.
     pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Snapshot> {
-        self.apply_joined_with_security_policy(joined, SecurityWritePolicy::Refuse)
+        self.apply_joined_with_policies(
+            joined,
+            SecurityWritePolicy::Refuse,
+            ActiveContentWritePolicy::PreserveInert,
+        )
     }
 
     /// Applies joined work under an explicit signature-write policy.
@@ -407,12 +528,36 @@ impl Snapshot {
         joined: JoinedEdits,
         security_policy: SecurityWritePolicy,
     ) -> Result<Snapshot> {
+        self.apply_joined_with_policies(
+            joined,
+            security_policy,
+            ActiveContentWritePolicy::PreserveInert,
+        )
+    }
+
+    /// Applies joined work under explicit security and inert active-content dispositions.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::apply_joined`] plus either policy refusal.
+    pub fn apply_joined_with_policies(
+        &self,
+        joined: JoinedEdits,
+        security_policy: SecurityWritePolicy,
+        active_content_policy: ActiveContentWritePolicy,
+    ) -> Result<Snapshot> {
         if !joined.lineage().matches(self) {
             return invalid("joined ODG edits do not match the exact source snapshot");
         }
         let mut current = self.clone();
         for edit in joined.into_sub_edits() {
-            current = apply_durable_patch(&current, edit.payload(), false, security_policy)?;
+            current = apply_durable_patch(
+                &current,
+                edit.payload(),
+                false,
+                security_policy,
+                active_content_policy,
+            )?;
         }
         Ok(current)
     }
@@ -611,6 +756,7 @@ pub struct Transaction {
     changes: Vec<Change>,
     resource_edits: Vec<ResourceEdit>,
     security_policy: SecurityWritePolicy,
+    active_content_policy: ActiveContentWritePolicy,
 }
 
 #[derive(Debug)]
@@ -657,6 +803,138 @@ impl Transaction {
 
     fn invalidate_content_splices(&mut self) {
         self.content_splices = None;
+    }
+
+    fn require_group_descendant(&self, page: usize, group: usize, descendant: usize) -> Result<()> {
+        let parsed = parse_content(&self.content)?;
+        if !group_selection(&parsed, page, group)?.contains(descendant) {
+            return invalid("ODG shape is not owned by the selected group subtree");
+        }
+        Ok(())
+    }
+
+    /// Replaces geometry on one checked descendant owned by a group subtree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid ownership or the same geometry errors as
+    /// [`Self::set_shape_geometry`].
+    pub fn set_group_descendant_geometry(
+        &mut self,
+        page: usize,
+        group: usize,
+        descendant: usize,
+        x: impl Into<String>,
+        y: impl Into<String>,
+        width: impl Into<String>,
+        height: impl Into<String>,
+    ) -> Result<()> {
+        self.require_group_descendant(page, group, descendant)?;
+        self.set_shape_geometry(page, descendant, x, y, width, height)
+    }
+
+    /// Replaces text on one checked descendant owned by a group subtree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid ownership or a non-lossless text owner.
+    pub fn set_group_descendant_text(
+        &mut self,
+        page: usize,
+        group: usize,
+        descendant: usize,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        self.require_group_descendant(page, group, descendant)?;
+        self.set_shape_text(page, descendant, text)
+    }
+
+    /// Assigns one style to every losslessly addressable descendant style owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid group ownership, undeclared style, no style owners, or limits.
+    pub fn set_group_style_name(
+        &mut self,
+        page: usize,
+        group: usize,
+        style_name: impl Into<String>,
+    ) -> Result<()> {
+        let requested_style = style_name.into();
+        validate_bounded_value(&requested_style, "ODG group style name")?;
+        let declared_in_content = declares_style_xml(&self.content, &requested_style)?;
+        let declared_in_styles = self
+            .source
+            .styles_xml()
+            .map(|styles| declares_style_xml(styles, &requested_style))
+            .transpose()?
+            .unwrap_or_default();
+        if !declared_in_content && !declared_in_styles {
+            return invalid("ODG group destination style is not declared");
+        }
+        let parsed = parse_content(&self.content)?;
+        let selection = group_selection(&parsed, page, group)?;
+        let targets = selection
+            .descendants()
+            .iter()
+            .copied()
+            .filter(|position| parsed.style_name_spans[page][*position].is_some())
+            .collect::<Vec<_>>();
+        if targets.is_empty() || targets.len() > MAX_GROUP_EDITS {
+            return invalid("ODG group style owner count is unsupported");
+        }
+        for target in targets {
+            self.set_shape_style_name(page, target, requested_style.clone())?;
+        }
+        Ok(())
+    }
+
+    /// Replaces every single-span descendant text owner atomically after complete preflight.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid group ownership, no lossless text owners, or limits.
+    pub fn set_group_text(
+        &mut self,
+        page: usize,
+        group: usize,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        let replacement_text = text.into();
+        if replacement_text.len() > MAX_TEXT_BYTES {
+            return invalid("ODG replacement group text exceeds the limit");
+        }
+        let parsed = parse_content(&self.content)?;
+        let selection = group_selection(&parsed, page, group)?;
+        let targets = selection
+            .descendants()
+            .iter()
+            .copied()
+            .filter(|position| matches!(parsed.text_spans[page][*position].as_slice(), [Some(_)]))
+            .collect::<Vec<_>>();
+        if targets.is_empty() || targets.len() > MAX_GROUP_EDITS {
+            return invalid("ODG group text owner count is unsupported");
+        }
+        for target in targets {
+            self.set_shape_text(page, target, replacement_text.clone())?;
+        }
+        Ok(())
+    }
+
+    /// Changes an inert form reference on one checked control descendant.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid group ownership or control-reference semantics.
+    pub fn set_group_descendant_control_reference(
+        &mut self,
+        page: usize,
+        group: usize,
+        descendant: usize,
+        reference: impl Into<String>,
+    ) -> Result<()> {
+        self.require_group_descendant(page, group, descendant)?;
+        self.set_shape_control_reference(page, descendant, reference)
     }
 
     /// Renames a page through its existing `draw:name` attribute.
@@ -1658,6 +1936,20 @@ impl Transaction {
             )?;
             self.insert_transferred_form_control(&destination_id, &control_xml)?;
         }
+        transfer_xml = ensure_transfer_namespaces(
+            &transfer_xml,
+            &[
+                ("office", OFFICE),
+                ("draw", DRAW),
+                ("text", TEXT),
+                ("svg", SVG),
+                ("style", STYLE),
+                ("form", FORM),
+                ("fo", FO),
+                ("xlink", XLINK),
+                ("presentation", PRESENTATION),
+            ],
+        )?;
         let initial = parse_content(&self.content)?;
         let initial_page = initial.pages.get(page).ok_or_else(|| {
             Error::InvalidFormat("ODG transfer page selector is out of bounds".into())
@@ -2113,6 +2405,7 @@ impl Transaction {
             return Ok(Commit::unchanged(self.source));
         }
         enforce_security_policy(&self.source, self.security_policy)?;
+        enforce_active_content_policy(&self.source, self.active_content_policy)?;
         let replacements = self
             .resource_edits
             .iter()
@@ -3059,7 +3352,11 @@ impl DurablePatch {
     /// Returns an error for stale source, unsupported operations, security refusal, or failed
     /// whole-package readback.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        self.apply_with_security_policy(source, SecurityWritePolicy::Refuse)
+        self.apply_with_policies(
+            source,
+            SecurityWritePolicy::Refuse,
+            ActiveContentWritePolicy::PreserveInert,
+        )
     }
 
     /// Applies this patch under an explicit signature-write policy.
@@ -3072,7 +3369,25 @@ impl DurablePatch {
         source: &Snapshot,
         security_policy: SecurityWritePolicy,
     ) -> Result<Snapshot> {
-        apply_durable_patch(source, self, true, security_policy)
+        self.apply_with_policies(
+            source,
+            security_policy,
+            ActiveContentWritePolicy::PreserveInert,
+        )
+    }
+
+    /// Applies this patch under explicit security and inert active-content dispositions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale source, policy refusal, unsupported operations, or readback.
+    pub fn apply_with_policies(
+        &self,
+        source: &Snapshot,
+        security_policy: SecurityWritePolicy,
+        active_content_policy: ActiveContentWritePolicy,
+    ) -> Result<Snapshot> {
+        apply_durable_patch(source, self, true, security_policy, active_content_policy)
     }
 
     /// Returns the inverse durable patch.
@@ -3282,6 +3597,7 @@ fn apply_durable_patch(
     patch: &DurablePatch,
     check_source: bool,
     security_policy: SecurityWritePolicy,
+    active_content_policy: ActiveContentWritePolicy,
 ) -> Result<Snapshot> {
     validate_durable_patch(&patch.inner)?;
     let source_fingerprint = fingerprint(source.as_bytes());
@@ -3300,6 +3616,7 @@ fn apply_durable_patch(
     for operation in patch.operations() {
         if operation.op == "package.replace" {
             enforce_security_policy(&current, security_policy)?;
+            enforce_active_content_policy(&current, active_content_policy)?;
             let blob = durable_blob(patch, &operation.value)?;
             current = if current.is_template() {
                 Snapshot::from_template_bytes(blob.to_vec())?
@@ -3308,7 +3625,7 @@ fn apply_durable_patch(
             };
             continue;
         }
-        let mut edit = current.edit_with_security_policy(security_policy);
+        let mut edit = current.edit_with_policies(security_policy, active_content_policy);
         match operation.op.as_str() {
             "page.name.set" => {
                 edit.set_page_name(
@@ -3525,6 +3842,34 @@ struct Parsed {
     drawing_insert_position: usize,
 }
 
+fn group_selection(parsed: &Parsed, page: usize, shape: usize) -> Result<Group> {
+    let selected = parsed
+        .pages
+        .get(page)
+        .and_then(|value| value.shapes().get(shape))
+        .ok_or_else(|| Error::InvalidFormat("ODG group selector is out of bounds".into()))?;
+    if selected.kind() != ShapeKind::Group {
+        return Err(Error::Unsupported(
+            "ODG group operation requires a draw:g root".into(),
+        ));
+    }
+    let root = parsed.shape_spans[page][shape]
+        .as_ref()
+        .ok_or_else(|| Error::InvalidFormat("ODG group source span is missing".into()))?;
+    let descendants = parsed.shape_spans[page]
+        .iter()
+        .enumerate()
+        .filter(|(position, span)| {
+            *position != shape
+                && span.as_ref().is_some_and(|candidate| {
+                    candidate.start >= root.start && candidate.end <= root.end
+                })
+        })
+        .map(|(position, _span)| position)
+        .collect();
+    Ok(Group::parsed(page, shape, descendants))
+}
+
 struct ActiveShape {
     depth: usize,
     page: usize,
@@ -3692,7 +4037,7 @@ impl Scanner {
         if namespace == NamespaceKind::Office && local == b"forms" {
             if self.forms_depth.is_some()
                 || self.forms_insert_position.is_some()
-                || self.body_depth != Some(self.depth - 1)
+                || self.drawing_depth != Some(self.depth - 1)
             {
                 return invalid("ODG office:forms is misplaced or duplicated");
             }
@@ -3708,7 +4053,11 @@ impl Scanner {
                 return invalid("ODG office:drawing is misplaced or duplicated");
             }
             self.drawing_seen = true;
-            self.drawing_start_position = Some(tag_start);
+            self.drawing_start_position = Some(if empty {
+                tag_start + tag.len() - 2
+            } else {
+                tag_start + tag.len()
+            });
             if empty {
                 self.drawing_insert_position = Some(tag_start + tag.len() - 2);
             } else {
@@ -4287,6 +4636,90 @@ fn scan_resources(package: &Package) -> Result<Vec<Resource>> {
     Ok(resources)
 }
 
+fn scan_active_content(content: &str, styles: Option<&str>) -> Result<ActiveContentStatus> {
+    let mut status = ActiveContentStatus::default();
+    scan_active_xml(content, &mut status)?;
+    if let Some(style_xml) = styles {
+        scan_active_xml(style_xml, &mut status)?;
+    }
+    Ok(status)
+}
+
+fn scan_active_xml(xml: &str, status: &mut ActiveContentStatus) -> Result<()> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    loop {
+        let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG active-content inventory XML: {error}"))
+        })?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let local_name = element.local_name();
+                let local = local_name.as_ref();
+                if resolved_bound(&resolved_namespace, SCRIPT)
+                    || resolved_bound(&resolved_namespace, OFFICE) && local == b"scripts"
+                {
+                    status.scripts = checked_active_count(status.scripts)?;
+                }
+                if resolved_bound(&resolved_namespace, XML_EVENTS) {
+                    status.events = checked_active_count(status.events)?;
+                }
+                if resolved_bound(&resolved_namespace, PRESENTATION)
+                    && matches!(local, b"event-listener" | b"show")
+                {
+                    status.actions = checked_active_count(status.actions)?;
+                }
+                if resolved_bound(&resolved_namespace, OFFICE) && local == b"dde-source" {
+                    status.dde = checked_active_count(status.dde)?;
+                }
+                if resolved_bound(&resolved_namespace, DRAW)
+                    && matches!(
+                        local,
+                        b"object" | b"object-ole" | b"plugin" | b"applet" | b"floating-frame"
+                    )
+                {
+                    status.embedded_objects = checked_active_count(status.embedded_objects)?;
+                }
+                if attribute(&reader, &element, XLINK, b"href")?
+                    .as_deref()
+                    .is_some_and(is_external_href)
+                {
+                    status.external_links = checked_active_count(status.external_links)?;
+                }
+            },
+            Event::DocType(_) => return invalid("DTD XML is prohibited in ODG active content"),
+            Event::GeneralRef(reference) => {
+                reference_value(&reference)?;
+            },
+            Event::Eof => break,
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::End(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+        }
+    }
+    Ok(())
+}
+
+fn checked_active_count(count: usize) -> Result<usize> {
+    let next_count = count
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormat("ODG active-content count overflow".into()))?;
+    if next_count > MAX_SHAPES {
+        return invalid("ODG active-content count exceeds the limit");
+    }
+    Ok(next_count)
+}
+
+fn is_external_href(href: &str) -> bool {
+    href.contains("://")
+        || href.starts_with("file:")
+        || href.starts_with("mailto:")
+        || href.starts_with("data:")
+}
+
 #[derive(Clone)]
 struct ParsedStyleDefinition {
     style: Style,
@@ -4343,6 +4776,7 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                 } else if namespace == NamespaceKind::Style
                     && local.as_ref().ends_with(b"-properties")
                     && let Some(value) = &mut active
+                    && value.depth.checked_add(1) == Some(depth)
                 {
                     let owner = String::from_utf8_lossy(local.as_ref());
                     for (name, property) in arbitrary_attributes(&reader, &element, &[])? {
@@ -4376,6 +4810,7 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                 } else if namespace == NamespaceKind::Style
                     && local.as_ref().ends_with(b"-properties")
                     && let Some(value) = &mut active
+                    && value.depth == depth
                 {
                     let owner = String::from_utf8_lossy(local.as_ref());
                     for (name, property) in arbitrary_attributes(&reader, &element, &[])? {
@@ -4575,6 +5010,18 @@ fn enforce_security_policy(source: &Snapshot, policy: SecurityWritePolicy) -> Re
     }
     if source.security().is_encrypted() {
         return invalid("ODG package edits refuse encrypted packages");
+    }
+    Ok(())
+}
+
+fn enforce_active_content_policy(
+    source: &Snapshot,
+    policy: ActiveContentWritePolicy,
+) -> Result<()> {
+    if policy == ActiveContentWritePolicy::Refuse && source.active_content().is_present() {
+        return Err(Error::Unsupported(
+            "ODG active-content write policy refuses the source inventory".into(),
+        ));
     }
     Ok(())
 }

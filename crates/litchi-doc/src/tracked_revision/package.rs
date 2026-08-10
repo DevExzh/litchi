@@ -15,23 +15,37 @@ use super::codec::{
 use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
 use crate::sprm_operations::{
-    SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_RMARK,
-    SPRM_C_F_RMARK_DEL, SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK,
-    SPRM_C_IDSL_RMARK_DEL, SPRM_C_KUL, SPRM_C_PIC_LOCATION, SPRM_C_PROP_RMARK_CURRENT,
-    SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT, SPRM_C_WALL,
-    SPRM_P_F_IN_TABLE, SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT, SPRM_P_PROP_RMARK90,
-    SPRM_P_WALL, SPRM_T_PROP_RMARK, SPRM_T_RSID, SPRM_T_WALL,
+    SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_OBJ,
+    SPRM_C_F_OLE2, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL, SPRM_C_F_SPEC, SPRM_C_IBST_RMARK,
+    SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL, SPRM_C_KUL,
+    SPRM_C_PIC_LOCATION, SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP,
+    SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_F_IN_TABLE, SPRM_P_PROP_RMARK,
+    SPRM_P_PROP_RMARK_CURRENT, SPRM_P_PROP_RMARK90, SPRM_P_WALL, SPRM_T_PROP_RMARK, SPRM_T_RSID,
+    SPRM_T_WALL,
 };
 use crate::writer::ChpxFkpBuilder;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+
+/// Exact, deliberately narrow picture dependency closure shared with the
+/// ordinary body transaction. The wire blocks are accepted only after they
+/// match the crate's canonical singleton writer graph.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PictureGraph {
+    pub(crate) floating: bool,
+    pub(crate) picture_block: Vec<u8>,
+    pub(crate) spa: Option<crate::parts::spa::Spa>,
+    pub(crate) dgg_info: Vec<u8>,
+}
 
 #[derive(Clone)]
 pub struct RevisionEditor {
     package: ObjectEditor,
     word_path: Vec<String>,
     table_path: Vec<String>,
+    data_path: Vec<String>,
     word: Vec<u8>,
     table: Vec<u8>,
+    data: Vec<u8>,
     pieces: Vec<RawPiece>,
     chpx: Vec<FcRun>,
     papx: Vec<PapxRun>,
@@ -39,6 +53,7 @@ pub struct RevisionEditor {
     cp_tables: Vec<CpTable>,
     unmodeled_cp_tables: Vec<usize>,
     main_ccp: u32,
+    data_changed: bool,
     changed: bool,
 }
 
@@ -72,6 +87,10 @@ impl RevisionEditor {
             .stream(&table_path)
             .ok_or_else(|| corrupted("selected Table stream is missing"))?
             .to_vec();
+        let data_path = vec!["Data".to_string()];
+        let data = package
+            .stream(&data_path)
+            .map_or_else(Vec::new, <[u8]>::to_vec);
         reject_protection(&word, &table)?;
         let main_ccp = u32_at(&word, FIB_CCP_TEXT)?;
         let pieces = parse_clx(&word, &table)?;
@@ -136,8 +155,10 @@ impl RevisionEditor {
             package,
             word_path,
             table_path,
+            data_path,
             word,
             table,
+            data,
             pieces,
             chpx,
             papx,
@@ -145,6 +166,7 @@ impl RevisionEditor {
             cp_tables,
             unmodeled_cp_tables,
             main_ccp,
+            data_changed: false,
             changed: false,
         };
         if editor.revisions()?.len() > MAX_REVISIONS {
@@ -581,6 +603,17 @@ impl RevisionEditor {
 
     /// Resolves the exact Data-stream offset carried by
     /// `sprmCPicLocation` on one special picture/object character.
+    #[deny(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::expect_used,
+        clippy::let_underscore_must_use,
+        clippy::map_err_ignore,
+        clippy::unwrap_used,
+        reason = "picture-location resolution is a checked legacy-codec boundary"
+    )]
     pub(crate) fn picture_location_at_cp(&self, cp: u32) -> Result<u32> {
         let end = cp
             .checked_add(1)
@@ -605,8 +638,367 @@ impl RevisionEditor {
         let bytes: [u8; 4] = sprm
             .operand_bytes()
             .try_into()
-            .map_err(|_| corrupted("sprmCPicLocation operand is invalid"))?;
+            .map_err(|error| corrupted(format!("sprmCPicLocation operand is invalid: {error}")))?;
         Ok(u32::from_le_bytes(bytes))
+    }
+
+    /// Extracts the canonical singleton picture graph rooted at one special
+    /// character. This intentionally rejects shared BLIP stores, groups,
+    /// textboxes, producer extensions, external/delay-loaded BLIPs, and
+    /// documents with any second picture owner.
+    #[deny(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::expect_used,
+        clippy::let_underscore_must_use,
+        clippy::map_err_ignore,
+        clippy::unwrap_used,
+        reason = "picture graph transfer is a checked legacy-codec boundary"
+    )]
+    pub(crate) fn picture_graph_at_cp(&self, cp: u32, floating: bool) -> Result<PictureGraph> {
+        let expected_marker = if floating { '\u{0008}' } else { '\u{0001}' };
+        let cp_end = cp
+            .checked_add(1)
+            .ok_or_else(|| corrupted("picture CP overflow"))?;
+        let marker_count = (0..7).try_fold(0usize, |count, story| {
+            let (_origin, text) = self.story_text(story)?;
+            Ok::<_, PackageError>(
+                count
+                    + text
+                        .chars()
+                        .filter(|character| matches!(character, '\u{0001}' | '\u{0008}'))
+                        .count(),
+            )
+        })?;
+        if marker_count != 1 || self.decode_text_range(cp, cp_end)? != expected_marker.to_string() {
+            return Err(corrupted(
+                "picture transfer requires exactly one picture owner in the donor",
+            ));
+        }
+        if self.picture_character_is_object(cp)? {
+            return Err(corrupted(
+                "embedded-object previews must use embedded-object transfer",
+            ));
+        }
+
+        let picture_offset = self.picture_location_at_cp(cp)?;
+        let block_start = usize::try_from(picture_offset)
+            .map_err(|error| corrupted(format!("picture offset exceeds usize: {error}")))?;
+        let fields = crate::image::PictureFields::try_parse(&self.data, block_start)
+            .ok_or_else(|| corrupted("picture PICF is missing or truncated"))?;
+        let picture_lcb = fields.lcb;
+        let goal_width = fields.dxa_goal;
+        let goal_height = fields.dya_goal;
+        if picture_lcb <= 0
+            || fields.cb_header != 0x44
+            || fields.mm != 0x64
+            || goal_width <= 0
+            || goal_height <= 0
+            || fields.mx != 1000
+            || fields.my != 1000
+            || fields.dxa_reserved1 != 0
+            || fields.dya_reserved1 != 0
+            || fields.dxa_reserved2 != 0
+            || fields.dya_reserved2 != 0
+            || fields.dxa_reserved3 != 0
+            || fields.dya_reserved3 != 0
+            || fields.c_props != 0
+        {
+            return Err(corrupted(
+                "picture PICF has scaling, cropping, or producer extensions outside the transfer model",
+            ));
+        }
+        let block_len = usize::try_from(picture_lcb)
+            .map_err(|error| corrupted(format!("picture length exceeds usize: {error}")))?;
+        let block_end = block_start
+            .checked_add(block_len)
+            .ok_or_else(|| corrupted("picture block extent overflow"))?;
+        let picture_block = self
+            .data
+            .get(block_start..block_end)
+            .ok_or_else(|| corrupted("picture block extends past the Data stream"))?
+            .to_vec();
+        let image = crate::image::Image::new(picture_offset)
+            .data(&self.data, &self.word)
+            .map_err(|error| corrupted(format!("picture BLIP is invalid: {error}")))?;
+        if !matches!(
+            image.kind(),
+            litchi_odraw::image::Kind::Jpeg
+                | litchi_odraw::image::Kind::Png
+                | litchi_odraw::image::Kind::Dib
+                | litchi_odraw::image::Kind::Tiff
+        ) {
+            return Err(corrupted(
+                "picture BLIP kind is outside the native bitmap transfer model",
+            ));
+        }
+        let native = image
+            .data()
+            .map_err(|error| corrupted(format!("picture BLIP payload is invalid: {error}")))?;
+        if native.is_empty()
+            || !picture_block
+                .windows(native.len())
+                .any(|candidate| candidate == native)
+        {
+            return Err(corrupted(
+                "delay-loaded or external picture BLIPs cannot be transferred",
+            ));
+        }
+        let width = u32::try_from(goal_width)
+            .map_err(|error| corrupted(format!("picture width is invalid: {error}")))?;
+        let height = u32::try_from(goal_height)
+            .map_err(|error| corrupted(format!("picture height is invalid: {error}")))?;
+        let picture =
+            crate::writer::Picture::from_parts_as(native.to_vec(), image.kind(), width, height)
+                .map_err(|error| {
+                    corrupted(format!(
+                        "picture cannot be represented canonically: {error}"
+                    ))
+                })?;
+        let mut canonical_block = Vec::new();
+        crate::writer::images::write_picture_block(
+            &picture,
+            crate::writer::images::FIRST_PICTURE_SHAPE_ID,
+            &mut canonical_block,
+        )
+        .map_err(|error| corrupted(format!("picture graph cannot be encoded: {error}")))?;
+        if canonical_block != picture_block {
+            return Err(corrupted(
+                "picture block is not the canonical singleton OfficeArt graph",
+            ));
+        }
+
+        let (spa_offset, spa_length) = fib_pair(&self.word, 40)?;
+        let (_header_spa_offset, header_spa_length) = fib_pair(&self.word, 41)?;
+        let (dgg_offset, dgg_length) = fib_pair(&self.word, crate::shape::FIB_INDEX_DGG_INFO)?;
+        if !floating {
+            if spa_length != 0 || header_spa_length != 0 || dgg_length != 0 {
+                return Err(corrupted(
+                    "inline picture shares a drawing-group dependency",
+                ));
+            }
+            return Ok(PictureGraph {
+                floating,
+                picture_block,
+                spa: None,
+                dgg_info: Vec::new(),
+            });
+        }
+        if spa_length == 0 || header_spa_length != 0 || dgg_length == 0 {
+            return Err(corrupted(
+                "floating picture is missing its exclusive main-story drawing graph",
+            ));
+        }
+        let spa_bytes = slice(&self.table, spa_offset, spa_length, "PlcfSpaMom")?;
+        let anchors = crate::parts::spa::parse_plcf_spa(spa_bytes)?;
+        let anchor = anchors
+            .as_slice()
+            .first()
+            .filter(|_| anchors.len() == 1)
+            .ok_or_else(|| corrupted("floating transfer requires one exclusive SPA anchor"))?;
+        if anchor.cp != cp
+            || anchor.spa.shape_id != crate::writer::images::FIRST_PICTURE_SHAPE_ID
+            || anchor.spa.width() != i32::from(goal_width)
+            || anchor.spa.height() != i32::from(goal_height)
+        {
+            return Err(corrupted("floating picture SPA does not match its PICF"));
+        }
+        let position = crate::writer::FloatingPosition::new(anchor.spa.left, anchor.spa.top)
+            .with_origins(anchor.spa.horizontal_origin, anchor.spa.vertical_origin)
+            .with_text_wrap(anchor.spa.wrap)
+            .with_wrap_side(anchor.spa.wrap_side)
+            .behind_text(anchor.spa.below_text)
+            .lock_anchor(anchor.spa.anchor_locked);
+        let shape = crate::writer::images::FloatingShapeInfo {
+            anchor_cp: cp,
+            shape_id: anchor.spa.shape_id,
+            content: crate::writer::images::FloatingShapeContent::Picture(&picture),
+            width_twips: width,
+            height_twips: height,
+            position: &position,
+            text: None,
+        };
+        if crate::writer::images::build_plcf_spa(std::slice::from_ref(&shape), self.main_ccp)
+            != spa_bytes
+        {
+            return Err(corrupted("floating picture PlcfSpa is not canonical"));
+        }
+        let dgg_info = slice(&self.table, dgg_offset, dgg_length, "DggInfo")?.to_vec();
+        let canonical_dgg =
+            crate::writer::images::build_dgg_info(std::slice::from_ref(&shape), &[], 1)
+                .map_err(|error| corrupted(format!("drawing graph cannot be encoded: {error}")))?;
+        if canonical_dgg != dgg_info {
+            return Err(corrupted(
+                "floating picture has a shared, grouped, textbox, or producer-defined drawing graph",
+            ));
+        }
+        Ok(PictureGraph {
+            floating,
+            picture_block,
+            spa: Some(anchor.spa),
+            dgg_info,
+        })
+    }
+
+    #[deny(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::expect_used,
+        clippy::let_underscore_must_use,
+        clippy::map_err_ignore,
+        clippy::unwrap_used,
+        reason = "picture object-flag inspection is a checked legacy-codec boundary"
+    )]
+    fn picture_character_is_object(&self, cp: u32) -> Result<bool> {
+        let end = cp
+            .checked_add(1)
+            .ok_or_else(|| corrupted("picture CP overflow"))?;
+        let intervals = self.fc_intervals(cp, end)?;
+        let Some(&(start, finish)) = intervals.first().filter(|_| intervals.len() == 1) else {
+            return Err(corrupted(
+                "picture character crosses physical text intervals",
+            ));
+        };
+        let run = self
+            .chpx
+            .iter()
+            .find(|run| run.start <= start && finish <= run.end)
+            .ok_or_else(|| corrupted("picture character has no CHPX run"))?;
+        Ok(strict_sprms(&run.grpprl)?.iter().any(|sprm| {
+            matches!(sprm.opcode, SPRM_C_F_OBJ | SPRM_C_F_OLE2) && sprm.operand_byte() == Some(1)
+        }))
+    }
+
+    /// Whether the receiving artifact has no picture marker, SPA owner, or
+    /// drawing group. This is the collision-free precondition for installing
+    /// the singleton graph without rewriting arbitrary shape/BStore ids.
+    #[deny(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::expect_used,
+        clippy::let_underscore_must_use,
+        clippy::map_err_ignore,
+        clippy::unwrap_used,
+        reason = "picture collision checks are a checked legacy-codec boundary"
+    )]
+    pub(crate) fn has_empty_picture_graph(&self) -> Result<bool> {
+        for story in 0..7 {
+            let (_origin, text) = self.story_text(story)?;
+            if text
+                .chars()
+                .any(|character| matches!(character, '\u{0001}' | '\u{0008}'))
+            {
+                return Ok(false);
+            }
+        }
+        Ok([40, 41, crate::shape::FIB_INDEX_DGG_INFO]
+            .into_iter()
+            .all(|index| fib_pair(&self.word, index).is_ok_and(|(_offset, length)| length == 0)))
+    }
+
+    /// Replaces one non-empty main-story placeholder with a canonical
+    /// singleton inline or floating picture graph.
+    #[deny(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::expect_used,
+        clippy::let_underscore_must_use,
+        clippy::map_err_ignore,
+        clippy::unwrap_used,
+        reason = "picture graph publication is a checked legacy-codec boundary"
+    )]
+    pub(crate) fn replace_with_picture_graph(
+        &mut self,
+        start: u32,
+        end: u32,
+        graph: &PictureGraph,
+    ) -> Result<()> {
+        validate_range(start, end, self.main_ccp)?;
+        self.reject_destructive_interactions(start, end)?;
+        if !self.has_empty_picture_graph()? {
+            return Err(corrupted("receiver picture graph is not empty"));
+        }
+        if !self.has_uniform_character_format(start, end)? {
+            return Err(corrupted(
+                "picture placeholder crosses character formatting runs",
+            ));
+        }
+        if !self.unmodeled_cp_tables.is_empty() && end - start != 1 {
+            return Err(corrupted(
+                "picture insertion changes length with unmodeled CP dependencies",
+            ));
+        }
+        if graph.floating != graph.spa.is_some() || graph.floating == graph.dgg_info.is_empty() {
+            return Err(corrupted(
+                "picture graph closure is internally inconsistent",
+            ));
+        }
+
+        let mut candidate = self.clone();
+        let picture_offset = u32::try_from(candidate.data.len())
+            .map_err(|error| corrupted(format!("Data stream exceeds u32: {error}")))?;
+        candidate.data.extend_from_slice(&graph.picture_block);
+        candidate.data_changed = true;
+        let removed = end - start;
+        delete_piece_range(&mut candidate.pieces, start, end)?;
+        let fc = align2(candidate.word.len())?;
+        candidate.word.resize(fc, 0);
+        candidate
+            .word
+            .extend_from_slice(&if graph.floating { 8u16 } else { 1u16 }.to_le_bytes());
+        insert_piece(
+            &mut candidate.pieces,
+            start,
+            1,
+            u32::try_from(fc)
+                .map_err(|error| corrupted(format!("picture marker FC exceeds u32: {error}")))?,
+        )?;
+        let mut grpprl = Vec::with_capacity(10);
+        grpprl.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
+        grpprl.extend_from_slice(&picture_offset.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_C_F_SPEC.to_le_bytes());
+        grpprl.push(1);
+        candidate.chpx.push(FcRun {
+            start: u32::try_from(fc)
+                .map_err(|error| corrupted(format!("picture marker FC exceeds u32: {error}")))?,
+            end: u32::try_from(candidate.word.len()).map_err(|error| {
+                corrupted(format!("picture marker end FC exceeds u32: {error}"))
+            })?,
+            grpprl,
+        });
+        candidate.shift_cp_tables(start, removed, 1)?;
+        candidate.main_ccp = candidate
+            .main_ccp
+            .checked_sub(removed)
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| corrupted("picture replacement CP overflow"))?;
+        candidate.rewrite_chpx()?;
+        candidate.append_clx_and_cp_tables()?;
+        if let Some(spa) = graph.spa {
+            let mut plcf = Vec::with_capacity(34);
+            plcf.extend_from_slice(&start.to_le_bytes());
+            plcf.extend_from_slice(&candidate.main_ccp.to_le_bytes());
+            plcf.extend_from_slice(&spa.to_bytes());
+            append_table_block(&mut candidate.word, &mut candidate.table, 40, &plcf)?;
+            append_table_block(
+                &mut candidate.word,
+                &mut candidate.table,
+                crate::shape::FIB_INDEX_DGG_INFO,
+                &graph.dgg_info,
+            )?;
+        }
+        candidate.patch_sizes()?;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
     }
 
     /// Main-story length in MS-DOC CP (UTF-16 code-unit) coordinates.
@@ -1262,6 +1654,17 @@ impl RevisionEditor {
         self.package
             .put_stream(&self.table_path, self.table.clone())
             .map_err(PackageError::from)?;
+        if self.data_changed {
+            if self.package.stream(&self.data_path).is_some() {
+                self.package
+                    .put_stream(&self.data_path, self.data.clone())
+                    .map_err(PackageError::from)?;
+            } else {
+                self.package
+                    .add_stream(self.data_path.clone(), self.data.clone())
+                    .map_err(PackageError::from)?;
+            }
+        }
         self.changed = true;
         Ok(())
     }

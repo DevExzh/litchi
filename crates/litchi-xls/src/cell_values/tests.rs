@@ -38,6 +38,15 @@ fn formula_free_package() -> Vec<u8> {
     output.into_inner()
 }
 
+fn formula_package(formula: &str) -> Vec<u8> {
+    let mut writer = crate::Writer::new();
+    let sheet = writer.add_worksheet("Formula").unwrap();
+    writer.write_formula(sheet, 0, 0, formula).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
 fn signed_package() -> Vec<u8> {
     let mut ole = OleFile::open(Cursor::new(package())).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
@@ -297,6 +306,24 @@ fn formula_string_cache_resizes_and_semantically_inverts() {
 }
 
 #[test]
+fn formula_cache_transfer_requires_identical_tokens() {
+    let source = Snapshot::from_bytes(formula_package("1+1")).unwrap();
+    let mut transaction = source.transaction();
+    transaction
+        .set_value(
+            "Formula".into(),
+            Reference::new(0, 0).unwrap(),
+            Value::FormulaCache(FormulaCache::Boolean(true)),
+        )
+        .unwrap();
+    let patch = transaction.commit().unwrap().patch().semantic().clone();
+    let divergent = Snapshot::from_bytes(formula_package("2+0")).unwrap();
+    let transfer = patch.plan_transfer(&divergent);
+    assert!(!transfer.is_executable());
+    assert!(patch.apply(&divergent).is_err());
+}
+
+#[test]
 fn new_sst_and_xf_resources_round_trip_with_cells() {
     let source = Snapshot::from_bytes(package()).unwrap();
     let base_style = source
@@ -308,14 +335,17 @@ fn new_sst_and_xf_resources_round_trip_with_cells() {
         .unwrap()
         .style();
     let mut transaction = source.transaction();
-    let authored_style = transaction.duplicate_style(base_style).unwrap();
+    let mut xf_payload = source.inner.xf_records[usize::from(base_style.get())].clone();
+    xf_payload[6] ^= 0x08;
+    let authored_style = transaction.author_style(&xf_payload).unwrap();
     let text_reference = Reference::new(3, 3).unwrap();
     let style_reference = Reference::new(4, 3).unwrap();
+    let continued_text = "λ".repeat(5_000);
     transaction
         .insert_cell(
             "Sheet1".into(),
             text_reference,
-            Value::Text("new shared resource".to_string()),
+            Value::Text(continued_text.clone()),
         )
         .unwrap();
     transaction
@@ -334,7 +364,7 @@ fn new_sst_and_xf_resources_round_trip_with_cells() {
         .unwrap();
     assert_eq!(
         sheet.cell(text_reference).unwrap().unwrap().value(),
-        &Value::Text("new shared resource".to_string())
+        &Value::Text(continued_text)
     );
     assert_eq!(
         sheet.cell(style_reference).unwrap().unwrap().style(),

@@ -19,6 +19,7 @@ use crate::Workbook;
 use crate::package::error::{Error, Result};
 use crate::raw::{Header, Limits as RawLimits, Records, Writer, kind};
 use litchi_core::sheet::traits::WorkbookTrait;
+use litchi_opc::{BlobPart, PackURI, Part};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -65,12 +66,69 @@ enum Operation {
         target_sheet: usize,
         target_reference: Reference,
     },
+    AddImage {
+        sheet: usize,
+        image: ImagePlan,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ImagePlan {
+    data: Arc<[u8]>,
+    format: crate::package::drawing_image::ImageFormat,
+    from_col: u32,
+    from_col_offset: i64,
+    from_row: u32,
+    from_row_offset: i64,
+    to_col: u32,
+    to_col_offset: i64,
+    to_row: u32,
+    to_row_offset: i64,
+    description: Option<String>,
+}
+
+impl ImagePlan {
+    fn from_image(image: &crate::writer::Image) -> Self {
+        let anchor = image.anchor();
+        Self {
+            data: Arc::from(image.data()),
+            format: image.format(),
+            from_col: anchor.from_col,
+            from_col_offset: anchor.from_col_offset,
+            from_row: anchor.from_row,
+            from_row_offset: anchor.from_row_offset,
+            to_col: anchor.to_col,
+            to_col_offset: anchor.to_col_offset,
+            to_row: anchor.to_row,
+            to_row_offset: anchor.to_row_offset,
+            description: image.description().map(str::to_string),
+        }
+    }
+
+    fn image(&self) -> Result<crate::writer::Image> {
+        let anchor = crate::chart::Anchor::with_offsets(
+            self.from_col,
+            self.from_col_offset,
+            self.from_row,
+            self.from_row_offset,
+            self.to_col,
+            self.to_col_offset,
+            self.to_row,
+            self.to_row_offset,
+        );
+        let image = crate::writer::Image::new(Arc::clone(&self.data), self.format, anchor)?;
+        match &self.description {
+            Some(description) => image.with_description(description.clone()),
+            None => Ok(image),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Selection {
     Sheet(usize),
     Cell(usize, Reference),
+    Drawing(usize),
 }
 
 impl Operation {
@@ -82,6 +140,7 @@ impl Operation {
                 target_reference,
                 ..
             } => Selection::Cell(*target_sheet, *target_reference),
+            Self::AddImage { sheet, .. } => Selection::Drawing(*sheet),
         }
     }
 }
@@ -186,9 +245,31 @@ impl WorkbookEdit {
         formula: CellFormula,
         style: &AuthoredStyle,
     ) -> Result<()> {
-        if !cache.is_finite() {
+        self.insert_formula(
+            sheet,
+            reference,
+            Value::FormulaNumberCache(cache),
+            formula,
+            style,
+        )
+    }
+
+    /// Author a formula cell with any supported inert cached-result family.
+    ///
+    /// `cache` must be one of the four `Value::Formula*Cache` variants. The
+    /// detached candidate validates the cache, formula tokens, target context,
+    /// and typed style closure before the operation can be staged.
+    pub fn insert_formula(
+        &mut self,
+        sheet: usize,
+        reference: Reference,
+        cache: Value,
+        formula: CellFormula,
+        style: &AuthoredStyle,
+    ) -> Result<()> {
+        if !cache.is_formula_cache() {
             return Err(Error::InvalidFormat(
-                "formula cached number must be finite".to_string(),
+                "formula authoring requires a Formula*Cache value".to_string(),
             ));
         }
         let mut donor = workbook_from_bytes(&self.before)?;
@@ -198,10 +279,60 @@ impl WorkbookEdit {
             sheet,
             reference,
             style_index,
-            Value::FormulaNumberCache(cache),
+            cache,
             Some(formula),
         )?;
         self.transfer_cell(&donor, sheet, reference, sheet, reference)
+    }
+
+    /// Add one dependency-closed embedded image to a worksheet without an
+    /// existing Drawing part.
+    ///
+    /// The image payload, DrawingML part, relationships, and binary
+    /// `BrtDrawing` link are replayed as one semantic root operation. Existing
+    /// drawings are refused so unknown anchors and relationship IDs are never
+    /// rewritten speculatively.
+    pub fn insert_image(&mut self, sheet: usize, image: crate::writer::Image) -> Result<()> {
+        let operation = Operation::AddImage {
+            sheet,
+            image: ImagePlan::from_image(&image),
+        };
+        let mut candidate = self.operations.clone();
+        candidate.push(operation.clone());
+        let _validated_candidate = replay(&self.before, &candidate)?;
+        self.stage(operation)
+    }
+
+    /// Transfer one decoded embedded-image resource into a new target anchor.
+    ///
+    /// The source image bytes, declared format, and alternative text are
+    /// preserved. The caller supplies the target anchor because worksheet
+    /// dimensions are target-owned semantic context.
+    pub fn transfer_image(
+        &mut self,
+        source: &Workbook,
+        source_sheet: usize,
+        image_index: usize,
+        target_sheet: usize,
+        target_anchor: crate::chart::Anchor,
+    ) -> Result<()> {
+        let drawing = source.sheet_drawing(source_sheet).ok_or_else(|| {
+            Error::UnsupportedFeature(format!(
+                "source sheet {source_sheet} has no decoded drawing"
+            ))
+        })?;
+        let embedded = drawing.images.get(image_index).ok_or_else(|| {
+            Error::UnsupportedFeature(format!(
+                "source sheet {source_sheet} has no embedded image {image_index}"
+            ))
+        })?;
+        let image =
+            crate::writer::Image::new(Arc::clone(&embedded.data), embedded.format, target_anchor)?;
+        let image = match &embedded.description {
+            Some(description) => image.with_description(description.clone())?,
+            None => image,
+        };
+        self.insert_image(target_sheet, image)
     }
 
     fn insert_authored_string(
@@ -541,6 +672,11 @@ impl WorkbookPatch {
             let operation_bytes = match operation {
                 Operation::RenameSheet { name, .. } => 17usize.checked_add(name.len()),
                 Operation::TransferCell { source, .. } => 41usize.checked_add(source.len()),
+                Operation::AddImage { image, .. } => {
+                    74usize.checked_add(image.data.len()).and_then(|size| {
+                        size.checked_add(image.description.as_ref().map_or(0, String::len))
+                    })
+                },
             }
             .ok_or(Error::CapacityOverflow {
                 resource: "workbook history operation bytes",
@@ -566,7 +702,9 @@ impl WorkbookMergeConflict {
     #[must_use]
     pub const fn sheet_index(&self) -> usize {
         match self.selection {
-            Selection::Sheet(sheet) | Selection::Cell(sheet, _) => sheet,
+            Selection::Sheet(sheet) | Selection::Cell(sheet, _) | Selection::Drawing(sheet) => {
+                sheet
+            },
         }
     }
 
@@ -574,7 +712,7 @@ impl WorkbookMergeConflict {
     #[must_use]
     pub const fn cell_reference(&self) -> Option<Reference> {
         match self.selection {
-            Selection::Sheet(_) => None,
+            Selection::Sheet(_) | Selection::Drawing(_) => None,
             Selection::Cell(_, reference) => Some(reference),
         }
     }
@@ -722,6 +860,7 @@ fn replay(before: &[u8], operations: &[Operation]) -> Result<Vec<u8>> {
                 *target_sheet,
                 *target_reference,
             )?,
+            Operation::AddImage { sheet, image } => add_image(&mut workbook, *sheet, image)?,
         }
     }
     validate_all_worksheets(&workbook)?;
@@ -756,6 +895,118 @@ fn insert_candidate_cell(
     let commit = edit.commit()?;
     let _snapshot = super::workbook::apply(&mut package, &uri, &commit)?;
     *workbook = Workbook::from_opc_package(package)?;
+    Ok(())
+}
+
+fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<()> {
+    let worksheet_uri = workbook.worksheet_uri(sheet)?;
+    let worksheet_source = workbook.package.get_part(&worksheet_uri)?.blob().to_vec();
+    if Records::new(&worksheet_source).any(|item| {
+        item.is_ok_and(|record| {
+            matches!(
+                record.kind(),
+                kind::DRAWING | kind::LEGACY_DRAWING | kind::LEGACY_DRAWING_HF
+            )
+        })
+    }) {
+        return Err(Error::UnsupportedFeature(
+            "image authoring into an existing worksheet drawing is refused".to_string(),
+        ));
+    }
+    let image = plan.image()?;
+    let search_end = u32::try_from(workbook.package.iter_parts().count().saturating_add(1))
+        .map_err(|error| {
+            Error::InvalidFormat(format!("drawing part search bound exceeds u32: {error}"))
+        })?;
+    let index = (1_u32..=search_end)
+        .find(|index| {
+            let drawing = PackURI::new(format!("/xl/drawings/drawing{index}.xml"));
+            let media = PackURI::new(format!(
+                "/xl/media/image{index}.{}",
+                plan.format.extension()
+            ));
+            drawing.is_ok_and(|uri| !workbook.package.contains_part(&uri))
+                && media.is_ok_and(|uri| !workbook.package.contains_part(&uri))
+        })
+        .ok_or_else(|| Error::UnsupportedFeature("no drawing part index remains".to_string()))?;
+    let drawing_uri = PackURI::new(format!("/xl/drawings/drawing{index}.xml"))?;
+    let media_uri = PackURI::new(format!(
+        "/xl/media/image{index}.{}",
+        plan.format.extension()
+    ))?;
+    let drawing_xml = crate::package::drawing_write::serialize_drawing(
+        std::slice::from_ref(&image),
+        &[],
+        &[],
+        &[],
+        &[],
+    )?;
+    let mut package = workbook.package.clone();
+    package.try_add_part(Box::new(BlobPart::new(
+        media_uri.clone(),
+        plan.format.content_type().to_string(),
+        plan.data.to_vec(),
+    )))?;
+    let mut drawing_part = BlobPart::new(
+        drawing_uri.clone(),
+        litchi_opc::constants::content_type::OFC_DRAWING.to_string(),
+        drawing_xml,
+    );
+    let strict = package
+        .iter_parts()
+        .flat_map(|part| part.rels().iter())
+        .any(|relationship| {
+            relationship
+                .reltype()
+                .starts_with("http://purl.oclc.org/ooxml/")
+        });
+    drawing_part.rels_mut().add_relationship(
+        if strict {
+            litchi_opc::constants::relationship_type::STRICT_IMAGE
+        } else {
+            litchi_opc::constants::relationship_type::IMAGE
+        }
+        .to_string(),
+        format!("../media/image{index}.{}", plan.format.extension()),
+        "rId1".to_string(),
+        false,
+    );
+    package.try_add_part(Box::new(drawing_part))?;
+    let drawing_rel_id = package.get_part_mut(&worksheet_uri)?.relate_to(
+        &format!("../drawings/drawing{index}.xml"),
+        if strict {
+            litchi_opc::constants::relationship_type::STRICT_DRAWING
+        } else {
+            litchi_opc::constants::relationship_type::DRAWING
+        },
+    );
+    let mut drawing_payload = Vec::new();
+    Writer::new(&mut drawing_payload).write_wide_string(&drawing_rel_id)?;
+    let mut worksheet_output = Vec::new();
+    let mut inserted = false;
+    for item in Records::new(&worksheet_source) {
+        let record = item?;
+        if !inserted && matches!(record.kind(), kind::BEGIN_LIST_PARTS | kind::END_SHEET) {
+            Writer::new(&mut worksheet_output).write_record(kind::DRAWING, &drawing_payload)?;
+            inserted = true;
+        }
+        copy_record(&worksheet_source, &record, &mut worksheet_output)?;
+    }
+    if !inserted {
+        return Err(Error::InvalidFormat(
+            "worksheet has no safe BrtDrawing insertion boundary".to_string(),
+        ));
+    }
+    package
+        .get_part_mut(&worksheet_uri)?
+        .set_blob(worksheet_output);
+    package.unsign();
+    *workbook = Workbook::from_opc_package(package)?;
+    if workbook.sheet_drawing(sheet).is_none() {
+        return Err(Error::InvalidFormat(
+            "authored worksheet drawing failed semantic readback".to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -977,6 +1228,28 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             output.extend_from_slice(&target_reference.column().to_le_bytes());
             output.extend_from_slice(source);
         },
+        Operation::AddImage { sheet, image } => {
+            output.push(3);
+            push_usize(output, *sheet)?;
+            output.push(image_format_bits(image.format));
+            push_usize(output, image.data.len())?;
+            match &image.description {
+                Some(description) => push_usize(output, description.len())?,
+                None => output.extend_from_slice(&u64::MAX.to_le_bytes()),
+            }
+            output.extend_from_slice(&image.from_col.to_le_bytes());
+            output.extend_from_slice(&image.from_col_offset.to_le_bytes());
+            output.extend_from_slice(&image.from_row.to_le_bytes());
+            output.extend_from_slice(&image.from_row_offset.to_le_bytes());
+            output.extend_from_slice(&image.to_col.to_le_bytes());
+            output.extend_from_slice(&image.to_col_offset.to_le_bytes());
+            output.extend_from_slice(&image.to_row.to_le_bytes());
+            output.extend_from_slice(&image.to_row_offset.to_le_bytes());
+            output.extend_from_slice(&image.data);
+            if let Some(description) = &image.description {
+                output.extend_from_slice(description.as_bytes());
+            }
+        },
     }
     Ok(())
 }
@@ -1009,8 +1282,83 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                 target_reference: Reference::new(target_row, target_column)?,
             })
         },
+        3 => {
+            let sheet = read_next_usize(data, offset)?;
+            let format = image_format_from_bits(read_slice(data, offset, 1)?[0])?;
+            let data_len = read_next_usize(data, offset)?;
+            let description_len = read_next_u64(data, offset)?;
+            let from_col = read_next_u32(data, offset)?;
+            let from_col_offset = read_next_i64(data, offset)?;
+            let from_row = read_next_u32(data, offset)?;
+            let from_row_offset = read_next_i64(data, offset)?;
+            let to_col = read_next_u32(data, offset)?;
+            let to_col_offset = read_next_i64(data, offset)?;
+            let to_row = read_next_u32(data, offset)?;
+            let to_row_offset = read_next_i64(data, offset)?;
+            let image_data = Arc::from(read_slice(data, offset, data_len)?.to_vec());
+            let description = if description_len == u64::MAX {
+                None
+            } else {
+                let length = usize::try_from(description_len).map_err(|error| {
+                    Error::InvalidFormat(format!("image description length overflow: {error}"))
+                })?;
+                Some(
+                    std::str::from_utf8(read_slice(data, offset, length)?)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("image description is not UTF-8: {error}"))
+                        })?
+                        .to_string(),
+                )
+            };
+            let image = ImagePlan {
+                data: image_data,
+                format,
+                from_col,
+                from_col_offset,
+                from_row,
+                from_row_offset,
+                to_col,
+                to_col_offset,
+                to_row,
+                to_row_offset,
+                description,
+            };
+            let _validated_image = image.image()?;
+            Ok(Operation::AddImage { sheet, image })
+        },
         _ => Err(Error::InvalidFormat(format!(
             "unknown workbook patch operation {tag}"
+        ))),
+    }
+}
+
+const fn image_format_bits(format: crate::package::drawing_image::ImageFormat) -> u8 {
+    match format {
+        crate::package::drawing_image::ImageFormat::Bmp => 0,
+        crate::package::drawing_image::ImageFormat::Gif => 1,
+        crate::package::drawing_image::ImageFormat::Jpeg => 2,
+        crate::package::drawing_image::ImageFormat::Png => 3,
+        crate::package::drawing_image::ImageFormat::Svg => 4,
+        crate::package::drawing_image::ImageFormat::Tiff => 5,
+        crate::package::drawing_image::ImageFormat::Emf => 6,
+        crate::package::drawing_image::ImageFormat::Wmf => 7,
+        crate::package::drawing_image::ImageFormat::Wdp => 8,
+    }
+}
+
+fn image_format_from_bits(value: u8) -> Result<crate::package::drawing_image::ImageFormat> {
+    match value {
+        0 => Ok(crate::package::drawing_image::ImageFormat::Bmp),
+        1 => Ok(crate::package::drawing_image::ImageFormat::Gif),
+        2 => Ok(crate::package::drawing_image::ImageFormat::Jpeg),
+        3 => Ok(crate::package::drawing_image::ImageFormat::Png),
+        4 => Ok(crate::package::drawing_image::ImageFormat::Svg),
+        5 => Ok(crate::package::drawing_image::ImageFormat::Tiff),
+        6 => Ok(crate::package::drawing_image::ImageFormat::Emf),
+        7 => Ok(crate::package::drawing_image::ImageFormat::Wmf),
+        8 => Ok(crate::package::drawing_image::ImageFormat::Wdp),
+        _ => Err(Error::InvalidFormat(format!(
+            "unknown durable image format {value}"
         ))),
     }
 }
@@ -1081,6 +1429,20 @@ fn read_next_u32(data: &[u8], offset: &mut usize) -> Result<u32> {
     let bytes = read_slice(data, offset, 4)?;
     Ok(u32::from_le_bytes(bytes.try_into().map_err(|_| {
         Error::InvalidFormat("invalid workbook patch coordinate".to_string())
+    })?))
+}
+
+fn read_next_u64(data: &[u8], offset: &mut usize) -> Result<u64> {
+    let bytes = read_slice(data, offset, 8)?;
+    Ok(u64::from_le_bytes(bytes.try_into().map_err(|_| {
+        Error::InvalidFormat("invalid workbook patch u64".to_string())
+    })?))
+}
+
+fn read_next_i64(data: &[u8], offset: &mut usize) -> Result<i64> {
+    let bytes = read_slice(data, offset, 8)?;
+    Ok(i64::from_le_bytes(bytes.try_into().map_err(|_| {
+        Error::InvalidFormat("invalid workbook patch i64".to_string())
     })?))
 }
 

@@ -104,6 +104,32 @@ pub fn bound_variable(identifier: Element, degree: Option<Element>) -> Result<El
     checked("bvar", children)
 }
 
+/// Create a checked Content `MathML` declaration.
+///
+/// The optional definition must be a function or constructor, as required by
+/// the `MathML` 2 declaration content model.
+///
+/// # Errors
+///
+/// Returns an error when `identifier` is not a `ci` token or `definition` is
+/// not an accepted function or constructor.
+pub fn declaration(identifier: Element, definition: Option<Element>) -> Result<Element> {
+    let mut children = vec![identifier];
+    if let Some(value) = definition {
+        children.push(value);
+    }
+    checked("declare", children)
+}
+
+/// Create a checked Content `MathML` function wrapper.
+///
+/// # Errors
+///
+/// Returns an error when `expression` is not a `MathML` expression.
+pub fn function(expression: Element) -> Result<Element> {
+    checked("fn", vec![expression])
+}
+
 /// Create a Content `MathML` identifier token.
 #[must_use]
 pub fn identifier(text: &str) -> Element {

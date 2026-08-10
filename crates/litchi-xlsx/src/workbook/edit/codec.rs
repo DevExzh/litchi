@@ -2,9 +2,10 @@
 
 use super::{
     Added, Arc, BTreeMap, BlobPart, Change, ColumnState, CreatedSheet, Error, GraphAction,
-    GraphChange, HashSet, MergePlan, OpcPackage, PackURI, Part, PartChange, Plan, Relationship,
-    Result, RowState, SheetActions, State, TabAction, TargetMode, WebBindings, Workbook, Worksheet,
-    WorksheetKind, allocation, chain, defaults_after, invalid, project_merges, raw,
+    GraphChange, HashSet, MergePlan, OpcPackage, OptionalAction, PackURI, Part, PartChange, Plan,
+    Relationship, Result, RowState, SheetActions, State, TabAction, TargetMode, WebBindings,
+    Workbook, Worksheet, WorksheetKind, allocation, chain, defaults_after, invalid, project_merges,
+    raw,
 };
 
 pub(super) fn compose_part(
@@ -263,6 +264,8 @@ pub(super) fn create_sheets(
             columns,
             merges,
             page_breaks,
+            page_setup,
+            print_options,
         } = actions;
         let change_start = changes.len();
         if let Some(after) = &web
@@ -393,6 +396,22 @@ pub(super) fn create_sheets(
             });
             content = crate::page_breaks::replace(&content, page_breaks)?;
         }
+        if let Some(OptionalAction::Put(page_setup)) = &page_setup {
+            changes.push(Change::PageSetup {
+                sheet: name.as_str().into(),
+                before: None,
+                after: Some(page_setup.clone()),
+            });
+            content = crate::page_setup::replace_worksheet_page_setup(&content, Some(page_setup))?;
+        }
+        if let Some(OptionalAction::Put(print_options)) = &print_options {
+            changes.push(Change::PrintOptions {
+                sheet: name.as_str().into(),
+                before: None,
+                after: Some(*print_options),
+            });
+            content = crate::print_options::replace_print_options(&content, Some(print_options))?;
+        }
         if active == Some(index) {
             content = raw::sheet_view_edit::rewrite(
                 &content,
@@ -463,6 +482,30 @@ pub(super) fn create_sheets(
                     if &actual != expected {
                         return Err(invalid(format!(
                             "new worksheet page-break verification failed at {sheet}"
+                        )));
+                    }
+                },
+                Change::PageSetup {
+                    sheet,
+                    after: expected,
+                    ..
+                } => {
+                    let actual = crate::page_setup::parse_worksheet_page_setup(&content)?;
+                    if &actual != expected {
+                        return Err(invalid(format!(
+                            "new worksheet page-setup verification failed at {sheet}"
+                        )));
+                    }
+                },
+                Change::PrintOptions {
+                    sheet,
+                    after: expected,
+                    ..
+                } => {
+                    let actual = crate::print_options::parse_print_options(&content)?;
+                    if &actual != expected {
+                        return Err(invalid(format!(
+                            "new worksheet print-options verification failed at {sheet}"
                         )));
                     }
                 },

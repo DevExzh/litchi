@@ -167,3 +167,69 @@ fn rich_content_selectors_and_values_fail_without_partial_publication() {
         1
     );
 }
+
+#[test]
+fn rich_content_objects_transfer_through_durable_history() {
+    let source_base = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let mut source_transaction = source_base.transaction().unwrap();
+    source_transaction.add("Source", "transfer owners").unwrap();
+    source_transaction
+        .add_text_box(
+            0usize,
+            &TextBox::new("Source Box", RichText::plain("copied text").unwrap()).unwrap(),
+        )
+        .unwrap();
+    source_transaction
+        .add_table(
+            0usize,
+            &Table::new(
+                "Source Table",
+                vec![vec![Cell::new(RichText::plain("copied cell").unwrap())]],
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    source_transaction
+        .add_form_control(
+            0usize,
+            &FormControl::new("Source Control", ControlKind::Button)
+                .unwrap()
+                .with_label("copied control")
+                .unwrap(),
+        )
+        .unwrap();
+    let source = source_transaction.commit().unwrap().snapshot().clone();
+
+    let destination_base = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let mut destination_transaction = destination_base.transaction().unwrap();
+    destination_transaction
+        .add("Destination", "transfer target")
+        .unwrap();
+    destination_transaction
+        .transfer_text_box_from(&source, "Source Box", 0usize, "Copied Box")
+        .unwrap();
+    destination_transaction
+        .transfer_table_from(&source, "Source Table", 0usize, "Copied Table")
+        .unwrap();
+    destination_transaction
+        .transfer_form_control_from(&source, "Source Control", 0usize, "Copied Control")
+        .unwrap();
+    let commit = destination_transaction.commit().unwrap();
+    let content = commit.snapshot().to_presentation().unwrap();
+    assert!(content.content_xml().contains("Copied Box"));
+    assert!(content.content_xml().contains("copied text"));
+    assert!(content.content_xml().contains("Copied Table"));
+    assert!(content.content_xml().contains("copied cell"));
+    assert!(content.content_xml().contains("Copied Control"));
+    assert!(content.content_xml().contains("copied control"));
+    assert!(!content.content_xml().contains("> <"));
+
+    let durable =
+        edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
+    let applied = durable.apply(&destination_base).unwrap();
+    assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    assert_eq!(
+        durable.inverse().apply(&applied).unwrap().bytes(),
+        destination_base.bytes()
+    );
+}

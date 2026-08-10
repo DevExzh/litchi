@@ -6,7 +6,8 @@
 use litchi_cfb::OleWriter;
 use litchi_core::Position;
 use litchi_doc::Package;
-use litchi_doc::body_text::{CharacterProperty, Projection, Snapshot, Story};
+use litchi_doc::body_text::{CharacterProperty, Projection, Snapshot, Story, TextTarget};
+use litchi_doc::writer::{FloatingPosition, Picture, Writer};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -261,4 +262,72 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
             .get(9_001)
             .is_some()
     );
+}
+
+#[test]
+fn genuine_receivers_accept_bounded_inline_and_floating_picture_graphs() {
+    let image = std::fs::read(fixture("test-data/images/png/lena.png")).expect("PNG fixture");
+    for floating in [false, true] {
+        let mut writer = Writer::new();
+        let picture = Picture::new(image.clone()).expect("native PNG picture");
+        if floating {
+            writer
+                .insert_floating_picture(picture, FloatingPosition::new(720, 360))
+                .expect("floating donor picture");
+        } else {
+            writer
+                .insert_picture(picture)
+                .expect("inline donor picture");
+        }
+        let mut donor_bytes = Cursor::new(Vec::new());
+        writer
+            .write_to(&mut donor_bytes)
+            .expect("picture donor DOC");
+        let donor = Snapshot::parse(&donor_bytes.into_inner()).expect("picture donor snapshot");
+
+        let receiver = Snapshot::parse(
+            &std::fs::read(fixture("test-data/ole/doc/documentProperties.doc"))
+                .expect("genuine receiver fixture"),
+        )
+        .expect("genuine receiver snapshot");
+        let destination = receiver
+            .paragraphs(Projection::All)
+            .expect("genuine receiver paragraphs")
+            .into_iter()
+            .find(|paragraph| !paragraph.text().is_empty())
+            .expect("genuine receiver placeholder")
+            .position();
+        let plan = receiver
+            .plan_picture_transfer_from(
+                &donor,
+                TextTarget::body_paragraph(Position::new(0)),
+                TextTarget::body_paragraph(destination),
+            )
+            .expect("bounded genuine picture transfer");
+        let mut edit = receiver.edit().expect("genuine picture edit");
+        edit.apply_picture_transfer(&plan)
+            .expect("install genuine picture graph");
+        let commit = edit.commit().expect("genuine picture full reopen");
+
+        let mut package = Package::from_reader(Cursor::new(commit.snapshot().finish()))
+            .expect("picture receiver CFB reopens");
+        let document = package.document().expect("picture receiver DOC reopens");
+        assert_eq!(document.fib().version(), 0x0101);
+        let picture_count = document
+            .paragraphs()
+            .expect("reopened paragraphs")
+            .into_iter()
+            .flat_map(|paragraph| paragraph.runs().expect("reopened runs"))
+            .filter(|run| run.image().is_some())
+            .count();
+        assert_eq!(picture_count, 1);
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .expect("genuine picture exact inverse"),
+            receiver
+        );
+    }
 }

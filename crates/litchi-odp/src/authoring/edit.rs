@@ -4,9 +4,6 @@ use super::mutable::MutablePresentation;
 use crate::core::OwnedPackage;
 use crate::{Presentation, Reference, Shape, Slide};
 use litchi_core::{Error, Result};
-use quick_xml::events::Event;
-use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -23,7 +20,6 @@ const DURABLE_PATCH_VERSION: u16 = 1;
 const DURABLE_HISTORY_MAGIC: &[u8; 16] = b"LITCHI-ODP-HIST\0";
 const DURABLE_HISTORY_VERSION: u16 = 1;
 const MAX_DURABLE_HISTORY_BYTES: usize = 512 * 1024 * 1024;
-const XLINK_NS: &[u8] = b"http://www.w3.org/1999/xlink";
 
 /// Semantic dependency domain touched by a root package patch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -736,6 +732,83 @@ impl Transaction {
         })
     }
 
+    /// Transfer a dependency-closed rich-text box from another immutable deck.
+    ///
+    /// Named styles and package resources are copied, and destination collisions
+    /// are remapped without changing the source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing object/page, dangling dependency, unsafe resource, or limit.
+    pub fn transfer_text_box_from<'a, P>(
+        &mut self,
+        source: &Snapshot,
+        source_name: &str,
+        destination_page: P,
+        destination_name: impl Into<String>,
+    ) -> Result<()>
+    where
+        P: Into<crate::charts::Page<'a>>,
+    {
+        self.transfer_content_object_from(
+            source,
+            source_name,
+            destination_page.into(),
+            destination_name.into(),
+            crate::content::ObjectKind::TextBox,
+        )
+    }
+
+    /// Transfer a dependency-closed rich-cell table from another immutable deck.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing object/page, dangling dependency, unsafe resource, or limit.
+    pub fn transfer_table_from<'a, P>(
+        &mut self,
+        source: &Snapshot,
+        source_name: &str,
+        destination_page: P,
+        destination_name: impl Into<String>,
+    ) -> Result<()>
+    where
+        P: Into<crate::charts::Page<'a>>,
+    {
+        self.transfer_content_object_from(
+            source,
+            source_name,
+            destination_page.into(),
+            destination_name.into(),
+            crate::content::ObjectKind::Table,
+        )
+    }
+
+    /// Transfer an inert form declaration and its visual control from another deck.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing owner/page, dangling dependency, collision, or limit.
+    pub fn transfer_form_control_from<'a, P>(
+        &mut self,
+        source: &Snapshot,
+        source_name: &str,
+        destination_page: P,
+        destination_name: impl Into<String>,
+    ) -> Result<()>
+    where
+        P: Into<crate::charts::Page<'a>>,
+    {
+        let page_index = self.content_page_index(destination_page.into())?;
+        let source_presentation = source.to_presentation()?;
+        let operation = crate::content::prepare_control_transfer(
+            source_presentation.owned_package(),
+            page_index,
+            source_name,
+            destination_name.into(),
+        )?;
+        self.stage_content(operation)
+    }
+
     /// Inspect the RDF metadata graphs in the current transaction draft.
     ///
     /// The inventory is loaded lazily so slide-only transactions do not reject
@@ -1124,16 +1197,15 @@ impl Transaction {
 
     /// Copy one dependency-closed chart from another immutable presentation snapshot.
     ///
-    /// The chart's complete typed part, including chart-local styles and cached data, is
-    /// detached from the source. Parts with `xlink:href` dependencies are refused because
-    /// this bounded operation cannot prove that their referenced package resources are owned
-    /// exclusively by the selected chart. The destination always receives a fresh occurrence
-    /// (and, for subdocument storage, a fresh collision-free package path).
+    /// The chart's complete typed part, including chart-local styles, cached data, and
+    /// package-contained `xlink:href` resources, is detached from the source. Resource-path
+    /// collisions are remapped deterministically; external references remain inert and are
+    /// never fetched. The destination always receives a fresh occurrence and storage root.
     ///
     /// # Errors
     ///
-    /// Returns an error for a missing or ambiguous source chart, a dependent chart part,
-    /// invalid destination selectors, identity collisions, or resource-limit violations.
+    /// Returns an error for a missing or ambiguous source chart, dangling/unsafe package
+    /// dependency, invalid destination selector, identity collision, or resource limit.
     pub fn transfer_chart_from<'a, 'b, S, P>(
         &mut self,
         source: &Snapshot,
@@ -1153,13 +1225,27 @@ impl Transaction {
         let selected = inventory
             .get(source_chart)?
             .ok_or_else(|| invalid_error("ODP source chart selector did not match"))?;
-        ensure_chart_transfer_closed(selected.part().xml())?;
-        self.add_chart(
-            destination_page,
-            destination_name,
-            storage,
-            selected.part().clone(),
-        )
+        let source_package = OwnedPackage::from_shared_bytes(Arc::clone(&source.bytes))?;
+        let destination_bytes = self.content_bytes()?;
+        let destination_package = OwnedPackage::from_shared_bytes(destination_bytes)?;
+        let source_base = selected.content_path().unwrap_or("content.xml");
+        let destination_base = match storage {
+            crate::charts::Storage::InlineXml => "content.xml",
+            crate::charts::Storage::PackageSubdocument => "Object/content.xml",
+        };
+        let (chart_xml, resources) = crate::content::prepare_resource_transfer(
+            &source_package,
+            &destination_package,
+            selected.part().xml(),
+            source_base,
+            destination_base,
+        )?;
+        let part = crate::charts::Part::from_xml(chart_xml)?;
+        let index = self.add_chart(destination_page, destination_name, storage, part)?;
+        if !crate::content::resource_operation_is_empty(&resources) {
+            self.stage_content(resources)?;
+        }
+        Ok(index)
     }
 
     /// Inspect named presentation page layouts in the current package draft.
@@ -1767,6 +1853,26 @@ impl Transaction {
         let content = String::from_utf8(package.get_file("content.xml")?)
             .map_err(|source| invalid_error(format!("ODP content.xml is not UTF-8: {source}")))?;
         crate::charts::page_index(&content, page)
+    }
+
+    fn transfer_content_object_from(
+        &mut self,
+        source: &Snapshot,
+        source_name: &str,
+        destination_page: crate::charts::Page<'_>,
+        destination_name: String,
+        kind: crate::content::ObjectKind,
+    ) -> Result<()> {
+        let page_index = self.content_page_index(destination_page)?;
+        let source_presentation = source.to_presentation()?;
+        let operation = crate::content::prepare_object_transfer(
+            source_presentation.owned_package(),
+            page_index,
+            kind,
+            source_name,
+            destination_name,
+        )?;
+        self.stage_content(operation)
     }
 
     fn content_bytes(&mut self) -> Result<Arc<Vec<u8>>> {
@@ -2587,45 +2693,6 @@ fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snaps
         return invalid("ODP joined package RDF readback differs from the expected graph model");
     }
     Ok(joined)
-}
-
-fn ensure_chart_transfer_closed(xml: &str) -> Result<()> {
-    let mut reader = NsReader::from_str(xml);
-    reader.config_mut().check_end_names = true;
-    let mut buffer = Vec::new();
-    loop {
-        match reader
-            .read_event_into(&mut buffer)
-            .map_err(|source| invalid_error(format!("invalid ODP chart transfer XML: {source}")))?
-        {
-            Event::Start(element) | Event::Empty(element) => {
-                for raw_attribute in element.attributes() {
-                    let attribute = raw_attribute.map_err(|source| {
-                        invalid_error(format!("invalid ODP chart transfer attribute: {source}"))
-                    })?;
-                    let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-                    if matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == *XLINK_NS)
-                        && local.as_ref() == b"href"
-                    {
-                        return unsupported(
-                            "ODP chart transfer refuses unresolved xlink:href dependencies",
-                        );
-                    }
-                }
-            },
-            Event::Eof => break,
-            Event::DocType(_) => return invalid("ODP chart transfer refuses document types"),
-            Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_)
-            | Event::End(_)
-            | Event::GeneralRef(_) => {},
-        }
-        buffer.clear();
-    }
-    Ok(())
 }
 
 fn apply_rdf_operation(package: &OwnedPackage, operation: &RdfOperation) -> Result<Vec<u8>> {

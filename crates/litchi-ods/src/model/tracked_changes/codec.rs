@@ -1,10 +1,5 @@
 //! Namespace-aware XML parsing and serialization for spreadsheet tracked changes.
 
-#![allow(
-    clippy::expect_used,
-    reason = "expectations follow checked fixed-arity records and an active XML owner stack"
-)]
-
 use super::model::{
     Acceptance, Cell, CellAddress, CellValue, Change, Changes, ContentChange, CutOff, Deletion,
     Dimension, Info, Insertion, Integer, Metadata, Movement, NestedDeletion, PositiveInteger,
@@ -1040,6 +1035,12 @@ fn ensure_tracked_location(direct_child: bool, seen: bool) -> Result<()> {
     Ok(())
 }
 
+fn active_node(stack: &mut [Node]) -> Result<&mut Node> {
+    stack.last_mut().ok_or_else(|| {
+        Error::InvalidFormat("tracked-change XML has no active owner node".to_string())
+    })
+}
+
 fn build_subtree(
     reader: &mut NsReader<&[u8]>,
     namespace: Namespace,
@@ -1100,17 +1101,9 @@ fn build_subtree(
                     limits,
                 )?;
                 add_semantic_leaf_text(&mut node, aggregate, limits)?;
-                stack
-                    .last_mut()
-                    .expect("tracked-change root remains active")
-                    .content
-                    .try_reserve(1)
-                    .map_err(allocation_error)?;
-                stack
-                    .last_mut()
-                    .expect("tracked-change root remains active")
-                    .content
-                    .push(Content::Node(node));
+                let parent = active_node(&mut stack)?;
+                parent.content.try_reserve(1).map_err(allocation_error)?;
+                parent.content.push(Content::Node(node));
             },
             Event::Text(text) => {
                 let value = text
@@ -1119,19 +1112,14 @@ fn build_subtree(
                         Error::InvalidFormat(format!("invalid tracked-change text: {error}"))
                     })?
                     .into_owned();
-                append_text(
-                    stack.last_mut().expect("active node"),
-                    value,
-                    aggregate,
-                    limits,
-                )?;
+                append_text(active_node(&mut stack)?, value, aggregate, limits)?;
             },
             Event::CData(text) => {
                 let value = text.decode().map_err(|error| {
                     Error::InvalidFormat(format!("invalid tracked-change CDATA: {error}"))
                 })?;
                 append_text(
-                    stack.last_mut().expect("active node"),
+                    active_node(&mut stack)?,
                     value.into_owned(),
                     aggregate,
                     limits,
@@ -1142,7 +1130,7 @@ fn build_subtree(
                     Error::InvalidFormat("invalid tracked-change entity reference".to_string())
                 })?;
                 append_text(
-                    stack.last_mut().expect("active node"),
+                    active_node(&mut stack)?,
                     resolve_reference(name)?,
                     aggregate,
                     limits,
@@ -1712,30 +1700,40 @@ fn parse_range(node: &Node) -> Result<RangeAddress> {
         "end-row",
     ]
     .map(|name| attribute(node, Namespace::Table, name));
-    if cell.iter().all(Option::is_some) && range.iter().all(Option::is_none) {
-        return Ok(RangeAddress::Cell(CellAddress {
-            table: parse_integer(node, cell[0].expect("present"), "table:table")?,
-            column: parse_integer(node, cell[1].expect("present"), "table:column")?,
-            row: parse_integer(node, cell[2].expect("present"), "table:row")?,
-        }));
-    }
-    if cell.iter().all(Option::is_none) && range.iter().all(Option::is_some) {
-        return Ok(RangeAddress::Range {
+    match (cell, range) {
+        ([Some(table), Some(column), Some(row)], [None, None, None, None, None, None]) => {
+            Ok(RangeAddress::Cell(CellAddress {
+                table: parse_integer(node, table, "table:table")?,
+                column: parse_integer(node, column, "table:column")?,
+                row: parse_integer(node, row, "table:row")?,
+            }))
+        },
+        (
+            [None, None, None],
+            [
+                Some(start_table),
+                Some(start_column),
+                Some(start_row),
+                Some(end_table),
+                Some(end_column),
+                Some(end_row),
+            ],
+        ) => Ok(RangeAddress::Range {
             start: CellAddress {
-                table: parse_integer(node, range[0].expect("present"), "table:start-table")?,
-                column: parse_integer(node, range[1].expect("present"), "table:start-column")?,
-                row: parse_integer(node, range[2].expect("present"), "table:start-row")?,
+                table: parse_integer(node, start_table, "table:start-table")?,
+                column: parse_integer(node, start_column, "table:start-column")?,
+                row: parse_integer(node, start_row, "table:start-row")?,
             },
             end: CellAddress {
-                table: parse_integer(node, range[3].expect("present"), "table:end-table")?,
-                column: parse_integer(node, range[4].expect("present"), "table:end-column")?,
-                row: parse_integer(node, range[5].expect("present"), "table:end-row")?,
+                table: parse_integer(node, end_table, "table:end-table")?,
+                column: parse_integer(node, end_column, "table:end-column")?,
+                row: parse_integer(node, end_row, "table:end-row")?,
             },
-        });
+        }),
+        _ => Err(Error::InvalidFormat(
+            "tracked range requires either cell or complete start/end coordinates".to_string(),
+        )),
     }
-    Err(Error::InvalidFormat(
-        "tracked range requires either cell or complete start/end coordinates".to_string(),
-    ))
 }
 
 fn parse_cell_address(node: &Node) -> Result<CellAddress> {

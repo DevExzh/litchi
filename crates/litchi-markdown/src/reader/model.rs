@@ -522,6 +522,20 @@ impl Snapshot {
         &self.state.source
     }
 
+    /// Render this exact snapshot as HTML using its retained dialect.
+    ///
+    /// The GFM renderer applies extended plain-text autolinks and the
+    /// disallowed-raw-HTML tag filter without changing the retained source or
+    /// any edit range.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed allocation or event-limit error if the bounded event
+    /// adapter cannot be constructed.
+    pub fn to_html(&self) -> Result<String, Error> {
+        super::gfm::render_html(&self.state.source, self.state.dialect, self.state.limits)
+    }
+
     /// Limits retained for future edits and patch application.
     #[must_use]
     pub fn limits(&self) -> ReadLimits {

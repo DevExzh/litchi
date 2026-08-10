@@ -35,6 +35,10 @@ const REAL_DRAW_CORPUS: &[(&str, &[u8])] = &[
         "fontwork",
         include_bytes!("../../../3rdparty/libreoffice-core/svx/qa/unit/data/FontWork.odg"),
     ),
+    (
+        "complex-groups",
+        include_bytes!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/odg/rhbz1870501.odg"),
+    ),
 ];
 
 #[test]
@@ -127,6 +131,56 @@ fn complex_real_fontwork_change_reopens_and_inverts_exactly() {
     );
     let fully_reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
     assert_eq!(fully_reopened.as_bytes(), commit.snapshot().as_bytes());
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        drawing.as_bytes()
+    );
+}
+
+#[test]
+fn complex_real_nested_group_geometry_change_reopens_and_inverts_exactly() {
+    let bytes = REAL_DRAW_CORPUS
+        .iter()
+        .find_map(|(name, bytes)| (*name == "complex-groups").then_some(*bytes))
+        .unwrap();
+    let drawing = Drawing::from_bytes(bytes.to_vec()).unwrap();
+    let (group_shape, descendant, y, width, height) = drawing.pages()[0]
+        .shapes()
+        .iter()
+        .enumerate()
+        .filter(|(_, shape)| shape.kind() == litchi_odg::shape::ShapeKind::Group)
+        .find_map(|(group_shape, _)| {
+            let group = drawing.group(0, group_shape).ok()?;
+            group.descendants().iter().find_map(|descendant| {
+                let shape = &drawing.pages()[0].shapes()[*descendant];
+                shape.x()?;
+                Some((
+                    group_shape,
+                    *descendant,
+                    shape.y()?.to_owned(),
+                    shape.width()?.to_owned(),
+                    shape.height()?.to_owned(),
+                ))
+            })
+        })
+        .unwrap();
+    let mut edit = drawing.edit();
+    edit.set_group_descendant_geometry(0, group_shape, descendant, "9cm", y, width, height)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit.snapshot().pages()[0].shapes()[descendant].x(),
+        Some("9cm")
+    );
+    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    assert_eq!(reopened.as_bytes(), commit.snapshot().as_bytes());
     assert_eq!(
         commit
             .patch()

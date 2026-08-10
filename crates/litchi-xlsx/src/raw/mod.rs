@@ -17,6 +17,7 @@ pub(crate) mod strings;
 pub(crate) mod styles;
 pub mod web;
 pub(crate) mod worksheet;
+pub(crate) mod worksheet_property;
 
 pub use catalog::{parse_catalog, parse_sheet};
 

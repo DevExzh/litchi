@@ -251,7 +251,32 @@ impl Template {
     ) -> Result<TransferPlan> {
         source.check_security(policy.security)?;
         self.check_security(policy.security)?;
-        let block = transfer_block(source, selector)?;
+        if let TransferSelector::Resource(position) = selector {
+            let resource = source
+                .package
+                .resources()
+                .get(position.get())
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH transfer resource is out of bounds".to_string())
+                })?
+                .clone();
+            let payloads = transfer_resource_payloads(source, self, &resource)?;
+            return Ok(TransferPlan {
+                block: None,
+                destination: self.clone(),
+                fragment: None,
+                imported_styles: Vec::new(),
+                payloads,
+                resource: Some(resource),
+            });
+        }
+        let (block, site) = transfer_block(source, selector)?;
+        let fragment = source
+            .content_xml()
+            .get(site.range.clone())
+            .ok_or_else(|| Error::InvalidFormat("OTH transfer source span is invalid".to_string()))?
+            .to_owned();
+        let payloads = transfer_site_payloads(source, self, &site)?;
         let style_names = block_style_names(&block);
         let imported_styles = resolve_transfer_styles(
             source.styles(),
@@ -260,9 +285,12 @@ impl Template {
             policy.include_styles,
         )?;
         Ok(TransferPlan {
-            block,
+            block: Some(block),
             destination: self.clone(),
+            fragment: Some(fragment),
             imported_styles,
+            payloads,
+            resource: None,
         })
     }
 
@@ -272,11 +300,14 @@ impl Template {
         Edit {
             appended: Vec::new(),
             changes: Vec::new(),
+            durable_fragment: None,
             forms_change: None,
             heading_changes: Vec::new(),
             inline_changes: Vec::new(),
             list_changes: Vec::new(),
             metadata: PartChange::Keep,
+            payload_changes: Vec::new(),
+            resource_changes: Vec::new(),
             source: self,
             styles: PartChange::Keep,
         }
@@ -333,6 +364,8 @@ pub enum TransferSelector {
     List(Position),
     /// A paragraph by source-order paragraph position.
     Paragraph(Position),
+    /// An inert resource/object reference by projection position.
+    Resource(Position),
 }
 
 /// Explicit dependency and active-content policy for block transfer.
@@ -355,9 +388,12 @@ impl Default for TransferPolicy {
 
 /// A validated, non-mutating cross-template publication plan.
 pub struct TransferPlan {
-    block: crate::ContentBlock,
+    block: Option<crate::ContentBlock>,
     destination: Template,
+    fragment: Option<String>,
     imported_styles: Vec<crate::style::Style>,
+    payloads: Vec<ResourcePayloadChange>,
+    resource: Option<crate::resource::Resource>,
 }
 
 impl TransferPlan {
@@ -374,7 +410,16 @@ impl TransferPlan {
     /// Returns an error if style or block publication fails semantic readback.
     pub fn publish(self) -> Result<Commit> {
         let mut edit = self.destination.edit();
-        edit.append_block(self.block)?;
+        for payload in self.payloads {
+            edit.stage_payload(payload.path, payload.media_type, payload.after)?;
+        }
+        if let Some(resource) = self.resource {
+            edit.append_resource(resource)?;
+        }
+        if let Some(block) = self.block {
+            edit.append_block(block)?;
+        }
+        edit.durable_fragment = self.fragment;
         if !self.imported_styles.is_empty() {
             let mut styles = self
                 .destination
@@ -425,6 +470,73 @@ pub struct FormsChange {
     before: Vec<crate::form::Form>,
     before_xml: String,
 }
+
+/// One reversible resource/object reference replacement, insertion, or removal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResourceChange {
+    after: Option<crate::resource::Resource>,
+    after_xml: String,
+    before: Option<crate::resource::Resource>,
+    before_xml: String,
+    resource: Position,
+}
+
+impl ResourceChange {
+    /// Projected resource position.
+    #[must_use]
+    pub const fn resource(&self) -> Position {
+        self.resource
+    }
+
+    /// Source reference, absent for insertion.
+    #[must_use]
+    pub const fn before(&self) -> Option<&crate::resource::Resource> {
+        self.before.as_ref()
+    }
+
+    /// Replacement reference, absent for removal.
+    #[must_use]
+    pub const fn after(&self) -> Option<&crate::resource::Resource> {
+        self.after.as_ref()
+    }
+}
+
+/// One reversible embedded package-member payload change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResourcePayloadChange {
+    pub(crate) after: Option<Vec<u8>>,
+    pub(crate) before: Option<Vec<u8>>,
+    pub(crate) media_type: String,
+    pub(crate) path: String,
+}
+
+impl ResourcePayloadChange {
+    /// Package-relative member path.
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// Replacement media type.
+    #[must_use]
+    pub fn media_type(&self) -> &str {
+        &self.media_type
+    }
+
+    /// Exact source bytes, if the member existed.
+    #[must_use]
+    pub fn before(&self) -> Option<&[u8]> {
+        self.before.as_deref()
+    }
+
+    /// Replacement bytes, or `None` for deletion.
+    #[must_use]
+    pub fn after(&self) -> Option<&[u8]> {
+        self.after.as_deref()
+    }
+}
+
+pub(crate) type MemberChange = ResourcePayloadChange;
 
 impl FormsChange {
     /// Source forms.
@@ -493,11 +605,14 @@ impl PartChange {
 pub struct Edit<'a> {
     appended: Vec<crate::ContentBlock>,
     changes: Vec<ParagraphChange>,
+    durable_fragment: Option<String>,
     forms_change: Option<FormsChange>,
     heading_changes: Vec<HeadingChange>,
     inline_changes: Vec<InlineChange>,
     list_changes: Vec<ListChange>,
     metadata: PartChange,
+    payload_changes: Vec<ResourcePayloadChange>,
+    resource_changes: Vec<ResourceChange>,
     source: &'a Template,
     styles: PartChange,
 }
@@ -740,6 +855,15 @@ impl Edit<'_> {
                             "OTH rich paragraph selector is out of bounds".to_string(),
                         )
                     })?;
+                if !self
+                    .source
+                    .package
+                    .paragraph_inline_replaceable(position.get())
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH rich paragraph replacement refuses unknown inline content".to_string(),
+                    ));
+                }
                 (
                     self.source
                         .package
@@ -772,6 +896,15 @@ impl Edit<'_> {
                             "OTH rich heading selector is out of bounds".to_string(),
                         )
                     })?;
+                if !self
+                    .source
+                    .package
+                    .heading_inline_replaceable(position.get())
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH rich heading replacement refuses unknown inline content".to_string(),
+                    ));
+                }
                 (
                     self.source
                         .package
@@ -922,6 +1055,238 @@ impl Edit<'_> {
         Ok(())
     }
 
+    /// Replaces one inert resource or object reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector or source span.
+    pub fn set_resource(
+        &mut self,
+        resource: Position,
+        replacement: crate::resource::Resource,
+    ) -> Result<()> {
+        self.stage_resource(resource, Some(replacement), false)
+    }
+
+    /// Removes one inert resource or object reference while preserving payload bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector or source span.
+    pub fn remove_resource(&mut self, resource: Position) -> Result<()> {
+        self.stage_resource(resource, None, false)
+    }
+
+    /// Appends one inert reference whose embedded payload already exists, or
+    /// whose target is external.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an embedded dependency is absent.
+    pub fn append_resource(&mut self, resource: crate::resource::Resource) -> Result<()> {
+        if resource.is_embedded() {
+            let path = embedded_path(resource.href())?;
+            let prefix = format!("{path}/");
+            let staged = self.payload_changes.iter().any(|change| {
+                (change.path == path || change.path.starts_with(&prefix)) && change.after.is_some()
+            });
+            let packaged = self
+                .source
+                .files()?
+                .iter()
+                .any(|member| member == path || member.starts_with(&prefix));
+            if !staged && !packaged {
+                return Err(Error::InvalidFormat(
+                    "OTH appended embedded resource payload is absent".to_string(),
+                ));
+            }
+        }
+        let position = self.source.package.resources().len().saturating_add(
+            self.resource_changes
+                .iter()
+                .filter(|change| change.before.is_none())
+                .count(),
+        );
+        self.stage_resource(Position::new(position), Some(resource), true)
+    }
+
+    /// Creates an embedded payload and appends its inert reference atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an external reference, unsafe path, or invalid payload.
+    pub fn append_resource_with_payload(
+        &mut self,
+        resource: crate::resource::Resource,
+        media_type: impl Into<String>,
+        bytes: Vec<u8>,
+    ) -> Result<()> {
+        let path = embedded_path(resource.href())?.to_owned();
+        self.stage_payload(path, media_type.into(), Some(bytes))?;
+        self.append_resource(resource)
+    }
+
+    /// Replaces or creates the payload referenced by one embedded resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, external reference, or unsafe path.
+    pub fn set_resource_payload(
+        &mut self,
+        resource: Position,
+        media_type: impl Into<String>,
+        bytes: Vec<u8>,
+    ) -> Result<()> {
+        let reference = self.resource_after(resource)?;
+        let path = embedded_path(reference.href())?.to_owned();
+        self.stage_payload(path, media_type.into(), Some(bytes))
+    }
+
+    /// Removes the payload referenced by one embedded resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, external reference, or unsafe path.
+    pub fn remove_resource_payload(&mut self, resource: Position) -> Result<()> {
+        let reference = self.resource_after(resource)?;
+        let path = embedded_path(reference.href())?.to_owned();
+        let media_type = self
+            .source
+            .package
+            .member_media_type(&path)?
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+        self.stage_payload(path, media_type, None)
+    }
+
+    fn resource_after(&self, resource: Position) -> Result<&crate::resource::Resource> {
+        if let Some(change) = self
+            .resource_changes
+            .iter()
+            .find(|change| change.resource == resource)
+        {
+            return change.after.as_ref().ok_or_else(|| {
+                Error::InvalidFormat("OTH removed resource has no payload target".to_string())
+            });
+        }
+        self.source
+            .package
+            .resources()
+            .get(resource.get())
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH resource selector is out of bounds".to_string())
+            })
+    }
+
+    fn stage_resource(
+        &mut self,
+        resource: Position,
+        after: Option<crate::resource::Resource>,
+        insertion: bool,
+    ) -> Result<()> {
+        let before = (!insertion)
+            .then(|| self.source.package.resources().get(resource.get()).cloned())
+            .flatten();
+        if !insertion && before.is_none() {
+            return Err(Error::InvalidFormat(
+                "OTH resource selector is out of bounds".to_string(),
+            ));
+        }
+        if before == after {
+            self.resource_changes
+                .retain(|change| change.resource != resource);
+            return Ok(());
+        }
+        let before_xml = if insertion {
+            String::new()
+        } else {
+            let site = self
+                .source
+                .package
+                .resource_site(resource.get())
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH resource source site is missing".to_string())
+                })?;
+            self.source
+                .content_xml()
+                .get(site.range.clone())
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH resource source span is invalid".to_string())
+                })?
+                .to_owned()
+        };
+        let after_xml = after.as_ref().map_or_else(String::new, |value| {
+            let element = crate::authoring::render_resource(value);
+            if insertion {
+                format!("<text:p xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\"><draw:frame xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\">{element}</draw:frame></text:p>")
+            } else {
+                element
+            }
+        });
+        let staged = ResourceChange {
+            after,
+            after_xml,
+            before,
+            before_xml,
+            resource,
+        };
+        if let Some(change) = self
+            .resource_changes
+            .iter_mut()
+            .find(|change| change.resource == resource)
+        {
+            *change = staged;
+        } else {
+            self.resource_changes
+                .try_reserve(1)
+                .map_err(|allocation_error| Error::Allocation {
+                    resource: "OTH staged resource changes",
+                    source: allocation_error,
+                })?;
+            self.resource_changes.push(staged);
+        }
+        Ok(())
+    }
+
+    fn stage_payload(
+        &mut self,
+        path: String,
+        media_type: String,
+        after: Option<Vec<u8>>,
+    ) -> Result<()> {
+        if media_type.is_empty() {
+            return Err(Error::InvalidFormat(
+                "OTH resource media type cannot be empty".to_string(),
+            ));
+        }
+        let before = self.source.package.member(&path)?;
+        if before == after {
+            self.payload_changes.retain(|change| change.path != path);
+            return Ok(());
+        }
+        let staged = ResourcePayloadChange {
+            after,
+            before,
+            media_type,
+            path,
+        };
+        if let Some(change) = self
+            .payload_changes
+            .iter_mut()
+            .find(|change| change.path == staged.path)
+        {
+            *change = staged;
+        } else {
+            self.payload_changes
+                .try_reserve(1)
+                .map_err(|allocation_error| Error::Allocation {
+                    resource: "OTH staged resource payload changes",
+                    source: allocation_error,
+                })?;
+            self.payload_changes.push(staged);
+        }
+        Ok(())
+    }
+
     fn stage_list(&mut self, list: Position, after: Option<crate::list::List>) -> Result<()> {
         let before = self
             .source
@@ -930,30 +1295,20 @@ impl Edit<'_> {
             .get(list.get())
             .ok_or_else(|| Error::InvalidFormat("OTH list selector is out of bounds".to_string()))?
             .clone();
-        let normalized_after = after.map(|value| {
-            crate::list::List::projected(
-                value.items().to_vec(),
-                before.level(),
-                value.style_name().map(str::to_owned),
-            )
-        });
+        let normalized_after = after.map(|value| normalize_list_level(&value, before.level()));
         let site = self.source.package.list_site(list.get()).ok_or_else(|| {
             Error::InvalidFormat("OTH list structural site is missing".to_string())
         })?;
-        let overlaps =
-            self.source
-                .package
-                .list_sites()
-                .iter()
-                .enumerate()
-                .any(|(index, candidate)| {
-                    index != list.get()
-                        && candidate.range.start >= site.range.start
-                        && candidate.range.end <= site.range.end
-                });
-        if overlaps {
+        if self.list_changes.iter().any(|change| {
+            change.list != list
+                && self
+                    .source
+                    .package
+                    .list_site(change.list.get())
+                    .is_some_and(|candidate| replacement_sites_overlap(site, candidate))
+        }) {
             return Err(Error::InvalidFormat(
-                "OTH list edit would implicitly discard nested lists".to_string(),
+                "OTH list structural edits overlap".to_string(),
             ));
         }
         if self
@@ -1002,11 +1357,14 @@ impl Edit<'_> {
     /// fully reopened candidate fails semantic readback.
     pub fn commit(self) -> Result<Commit> {
         if self.changes.is_empty()
+            && self.durable_fragment.is_none()
             && self.forms_change.is_none()
             && self.heading_changes.is_empty()
             && self.inline_changes.is_empty()
             && self.list_changes.is_empty()
             && self.metadata.is_keep()
+            && self.payload_changes.is_empty()
+            && self.resource_changes.is_empty()
             && self.styles.is_keep()
             && self.appended.is_empty()
         {
@@ -1018,18 +1376,21 @@ impl Edit<'_> {
             &self.heading_changes,
             &self.inline_changes,
             self.forms_change.as_ref(),
+            &self.resource_changes,
             &self.list_changes,
             &self.appended,
-            None,
+            self.durable_fragment.as_deref(),
         )?)?;
         let snapshot = Template {
             package: self.source.package.rebuild_with_parts(
                 &content,
                 &self.metadata,
                 &self.styles,
+                &self.payload_changes,
             )?,
         };
         validate_edit_readback(&self, &snapshot)?;
+        let durable_fragment = published_durable_fragment(&self, &snapshot)?;
         Ok(Commit {
             snapshot: snapshot.clone(),
             patch: Patch {
@@ -1037,12 +1398,14 @@ impl Edit<'_> {
                 target: snapshot,
                 appended: self.appended,
                 changes: self.changes,
-                durable_fragment: None,
+                durable_fragment,
                 forms_change: self.forms_change,
                 heading_changes: self.heading_changes,
                 inline_changes: self.inline_changes,
                 list_changes: self.list_changes,
                 metadata: self.metadata,
+                payload_changes: self.payload_changes,
+                resource_changes: self.resource_changes,
                 styles: self.styles,
             },
             changed: true,
@@ -1071,6 +1434,13 @@ impl<'a> Edit<'a> {
             Some(JoinFailure::Styles)
         } else if self.forms_change.is_some() && other.forms_change.is_some() {
             Some(JoinFailure::Forms)
+        } else if self.payload_changes.iter().any(|accepted| {
+            other
+                .payload_changes
+                .iter()
+                .any(|incoming| incoming.path == accepted.path)
+        }) {
+            Some(JoinFailure::ResourcePayload)
         } else {
             self.changes
                 .iter()
@@ -1093,11 +1463,20 @@ impl<'a> Edit<'a> {
                 .or_else(|| inline_join_conflict(&self.inline_changes, &other))
                 .or_else(|| inline_join_conflict(&other.inline_changes, self))
                 .or_else(|| {
+                    self.resource_changes.iter().find_map(|accepted| {
+                        other
+                            .resource_changes
+                            .iter()
+                            .any(|incoming| incoming.resource == accepted.resource)
+                            .then_some(JoinFailure::Resource(accepted.resource))
+                    })
+                })
+                .or_else(|| {
                     self.list_changes.iter().find_map(|accepted| {
                         other
                             .list_changes
                             .iter()
-                            .any(|incoming| incoming.list == accepted.list)
+                            .any(|incoming| list_changes_overlap(self.source, accepted, incoming))
                             .then_some(JoinFailure::List(accepted.list))
                     })
                 })
@@ -1141,7 +1520,12 @@ impl<'a> Edit<'a> {
         self.heading_changes.extend(other.heading_changes);
         self.inline_changes.extend(other.inline_changes);
         self.list_changes.extend(other.list_changes);
+        self.payload_changes.extend(other.payload_changes);
+        self.resource_changes.extend(other.resource_changes);
         self.appended.extend(other.appended);
+        if self.durable_fragment.is_none() {
+            self.durable_fragment = other.durable_fragment;
+        }
         if self.metadata.is_keep() {
             self.metadata = other.metadata;
         }
@@ -1177,6 +1561,10 @@ pub enum JoinFailure {
     Metadata,
     /// Both transactions replace the form catalog.
     Forms,
+    /// Both transactions edit one resource reference.
+    Resource(Position),
+    /// Both transactions edit one embedded payload path.
+    ResourcePayload,
     /// Both transactions replace the style catalog.
     Styles,
 }
@@ -1313,6 +1701,8 @@ impl Commit {
                 inline_changes: Vec::new(),
                 list_changes: Vec::new(),
                 metadata: PartChange::Keep,
+                payload_changes: Vec::new(),
+                resource_changes: Vec::new(),
                 source: snapshot.clone(),
                 styles: PartChange::Keep,
                 target: snapshot.clone(),
@@ -1358,6 +1748,8 @@ pub struct Patch {
     inline_changes: Vec<InlineChange>,
     list_changes: Vec<ListChange>,
     metadata: PartChange,
+    payload_changes: Vec<ResourcePayloadChange>,
+    resource_changes: Vec<ResourceChange>,
     source: Template,
     styles: PartChange,
     target: Template,
@@ -1400,7 +1792,7 @@ impl Patch {
             if right
                 .list_changes
                 .iter()
-                .any(|candidate| candidate.list == change.list)
+                .any(|candidate| list_changes_overlap(base, change, candidate))
             {
                 conflicts.push(MergeConflict::List(change.list));
             }
@@ -1438,6 +1830,23 @@ impl Patch {
         }
         if left.forms_change.is_some() && right.forms_change.is_some() {
             conflicts.push(MergeConflict::Forms);
+        }
+        for change in &left.resource_changes {
+            if right
+                .resource_changes
+                .iter()
+                .any(|candidate| candidate.resource == change.resource)
+            {
+                conflicts.push(MergeConflict::Resource(change.resource));
+            }
+        }
+        if left.payload_changes.iter().any(|accepted| {
+            right
+                .payload_changes
+                .iter()
+                .any(|incoming| incoming.path == accepted.path)
+        }) {
+            conflicts.push(MergeConflict::ResourcePayload);
         }
         Ok(MergePlan {
             base: base.clone(),
@@ -1505,6 +1914,18 @@ impl Patch {
     #[must_use]
     pub const fn forms_change(&self) -> Option<&FormsChange> {
         self.forms_change.as_ref()
+    }
+
+    /// Resource reference changes in staging order.
+    #[must_use]
+    pub fn resource_changes(&self) -> &[ResourceChange] {
+        &self.resource_changes
+    }
+
+    /// Embedded payload changes in staging order.
+    #[must_use]
+    pub fn resource_payload_changes(&self) -> &[ResourcePayloadChange] {
+        &self.payload_changes
     }
 
     /// Typed list changes in staging order.
@@ -1621,6 +2042,21 @@ impl Patch {
                 push_wire_bytes(&mut output, change.after_xml.as_bytes())?;
             },
         }
+        push_wire_usize(&mut output, self.resource_changes.len())?;
+        for change in &self.resource_changes {
+            push_wire_usize(&mut output, change.resource.get())?;
+            push_wire_resource(&mut output, change.before.as_ref())?;
+            push_wire_resource(&mut output, change.after.as_ref())?;
+            push_wire_bytes(&mut output, change.before_xml.as_bytes())?;
+            push_wire_bytes(&mut output, change.after_xml.as_bytes())?;
+        }
+        push_wire_usize(&mut output, self.payload_changes.len())?;
+        for change in &self.payload_changes {
+            push_wire_bytes(&mut output, change.path.as_bytes())?;
+            push_wire_bytes(&mut output, change.media_type.as_bytes())?;
+            push_wire_optional_bytes(&mut output, change.before.as_deref())?;
+            push_wire_optional_bytes(&mut output, change.after.as_deref())?;
+        }
         push_wire_usize(&mut output, self.list_changes.len())?;
         for change in &self.list_changes {
             push_wire_usize(&mut output, change.list.get())?;
@@ -1655,7 +2091,7 @@ impl Patch {
         let appended_xml = read_wire_string(bytes, &mut cursor)?;
         if !appended_xml.is_empty() {
             let wrapped = format!(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\"><office:body><office:text>{appended_xml}</office:text></office:body></office:document-content>"
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:form=\"urn:oasis:names:tc:opendocument:xmlns:form:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><office:body><office:text>{appended_xml}</office:text></office:body></office:document-content>"
             );
             crate::codec::validate_authored(&wrapped)?;
         }
@@ -1663,6 +2099,8 @@ impl Patch {
         let heading_changes = read_heading_changes(bytes, &mut cursor, &source, &target)?;
         let inline_changes = read_inline_changes(bytes, &mut cursor, &source, &target)?;
         let forms_change = read_forms_change(bytes, &mut cursor, &source, &target)?;
+        let resource_changes = read_resource_changes(bytes, &mut cursor, &source, &target)?;
+        let payload_changes = read_payload_changes(bytes, &mut cursor, &source, &target)?;
         let list_changes = read_list_changes(bytes, &mut cursor, &source, &target)?;
         let metadata = read_wire_part_change(bytes, &mut cursor)?;
         let styles = read_wire_part_change(bytes, &mut cursor)?;
@@ -1687,6 +2125,8 @@ impl Patch {
             inline_changes,
             list_changes,
             metadata,
+            payload_changes,
+            resource_changes,
             styles,
             source,
             target,
@@ -1744,6 +2184,27 @@ impl Patch {
                 })
                 .collect(),
             metadata: part_change_between(self.target.meta_xml(), self.source.meta_xml()),
+            payload_changes: self
+                .payload_changes
+                .iter()
+                .map(|change| ResourcePayloadChange {
+                    after: change.before.clone(),
+                    before: change.after.clone(),
+                    media_type: change.media_type.clone(),
+                    path: change.path.clone(),
+                })
+                .collect(),
+            resource_changes: self
+                .resource_changes
+                .iter()
+                .map(|change| ResourceChange {
+                    after: change.before.clone(),
+                    after_xml: change.before_xml.clone(),
+                    before: change.after.clone(),
+                    before_xml: change.after_xml.clone(),
+                    resource: change.resource,
+                })
+                .collect(),
             source: self.target.clone(),
             styles: part_change_between(self.target.styles_xml(), self.source.styles_xml()),
             target: self.source.clone(),
@@ -1772,6 +2233,10 @@ pub enum MergeConflict {
     Metadata,
     /// Both patches replace the form catalog.
     Forms,
+    /// Both patches edit one resource reference.
+    Resource(Position),
+    /// Both patches edit one embedded payload path.
+    ResourcePayload,
     /// Both patches replace styles.
     Styles,
     /// Both patches append at the structural tail.
@@ -1815,6 +2280,10 @@ impl MergePlan {
             .forms_change
             .as_ref()
             .or(self.right.forms_change.as_ref());
+        let mut resource_changes = self.left.resource_changes.clone();
+        resource_changes.extend(self.right.resource_changes.clone());
+        let mut payload_changes = self.left.payload_changes.clone();
+        payload_changes.extend(self.right.payload_changes.clone());
         let mut list_changes = self.left.list_changes.clone();
         list_changes.extend(self.right.list_changes.clone());
         let mut appended = self.left.appended.clone();
@@ -1830,6 +2299,7 @@ impl MergePlan {
             &heading_changes,
             &inline_changes,
             forms_change,
+            &resource_changes,
             &list_changes,
             &appended,
             durable_fragment,
@@ -1845,10 +2315,12 @@ impl MergePlan {
             &self.left.styles
         };
         let candidate = Template {
-            package: self
-                .base
-                .package
-                .rebuild_with_parts(&content, metadata, styles)?,
+            package: self.base.package.rebuild_with_parts(
+                &content,
+                metadata,
+                styles,
+                &payload_changes,
+            )?,
         };
         for change in paragraph_changes {
             if candidate
@@ -1878,6 +2350,7 @@ impl MergePlan {
         }
         validate_inline_readback(&inline_changes, &candidate)?;
         validate_forms_readback(forms_change, &candidate)?;
+        validate_resource_readback(&resource_changes, &payload_changes, &candidate)?;
         for change in &list_changes {
             let Some(expected) = change.after.as_ref() else {
                 continue;
@@ -1949,7 +2422,10 @@ impl History {
     }
 }
 
-fn transfer_block(source: &Template, selector: TransferSelector) -> Result<crate::ContentBlock> {
+fn transfer_block(
+    source: &Template,
+    selector: TransferSelector,
+) -> Result<(crate::ContentBlock, crate::codec::ReplacementSite)> {
     match selector {
         TransferSelector::Heading(position) => {
             let heading = source
@@ -1959,15 +2435,19 @@ fn transfer_block(source: &Template, selector: TransferSelector) -> Result<crate
                 .ok_or_else(|| {
                     Error::InvalidFormat("OTH transfer heading is out of bounds".to_string())
                 })?;
-            if !heading.links().is_empty()
-                || !heading.fields().is_empty()
-                || !heading.formatting_runs().is_empty()
-            {
+            if !source.package.heading_inline_replaceable(position.get()) {
                 return Err(Error::InvalidFormat(
-                    "OTH transfer refuses a heading with rich inline markup".to_string(),
+                    "OTH transfer refuses unknown heading inline content".to_string(),
                 ));
             }
-            Ok(crate::ContentBlock::Heading(heading.clone()))
+            let site = source
+                .package
+                .heading_full_site(position.get())
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH transfer heading site is missing".to_string())
+                })?
+                .clone();
+            Ok((crate::ContentBlock::Heading(heading.clone()), site))
         },
         TransferSelector::Paragraph(position) => {
             let paragraph = source
@@ -1977,8 +2457,19 @@ fn transfer_block(source: &Template, selector: TransferSelector) -> Result<crate
                 .ok_or_else(|| {
                     Error::InvalidFormat("OTH transfer paragraph is out of bounds".to_string())
                 })?;
-            validate_transfer_paragraph(paragraph)?;
-            Ok(crate::ContentBlock::Paragraph(paragraph.clone()))
+            if !source.package.paragraph_inline_replaceable(position.get()) {
+                return Err(Error::InvalidFormat(
+                    "OTH transfer refuses unknown paragraph inline content".to_string(),
+                ));
+            }
+            let site = source
+                .package
+                .paragraph_full_site(position.get())
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH transfer paragraph site is missing".to_string())
+                })?
+                .clone();
+            Ok((crate::ContentBlock::Paragraph(paragraph.clone()), site))
         },
         TransferSelector::List(position) => {
             let list = source.package.lists().get(position.get()).ok_or_else(|| {
@@ -1987,63 +2478,157 @@ fn transfer_block(source: &Template, selector: TransferSelector) -> Result<crate
             let site = source.package.list_site(position.get()).ok_or_else(|| {
                 Error::InvalidFormat("OTH transfer list site is missing".to_string())
             })?;
-            let contains_nested =
-                source
-                    .package
-                    .list_sites()
-                    .iter()
-                    .enumerate()
-                    .any(|(index, candidate)| {
-                        index != position.get()
-                            && candidate.range.start >= site.range.start
-                            && candidate.range.end <= site.range.end
-                    });
-            if list.level() != 1 || contains_nested {
+            if list.level() != 1 {
                 return Err(Error::InvalidFormat(
-                    "OTH transfer refuses nested list structure".to_string(),
+                    "OTH transfer requires a top-level list selector".to_string(),
                 ));
             }
-            for paragraph in list.items().iter().flat_map(crate::list::Item::paragraphs) {
-                validate_transfer_paragraph(paragraph)?;
+            for paragraph in list_paragraph_positions(list) {
+                if !source.package.paragraph_inline_replaceable(paragraph.get()) {
+                    return Err(Error::InvalidFormat(
+                        "OTH transfer refuses unknown list inline content".to_string(),
+                    ));
+                }
             }
-            Ok(crate::ContentBlock::List(list.clone()))
+            Ok((crate::ContentBlock::List(list.clone()), site.clone()))
         },
+        TransferSelector::Resource(_) => Err(Error::InvalidFormat(
+            "OTH resource transfer must use dependency planning".to_string(),
+        )),
     }
 }
 
-fn validate_transfer_paragraph(paragraph: &crate::paragraph::Paragraph) -> Result<()> {
-    if paragraph.links().is_empty()
-        && paragraph.fields().is_empty()
-        && paragraph.formatting_runs().is_empty()
-    {
-        Ok(())
-    } else {
-        Err(Error::InvalidFormat(
-            "OTH transfer refuses a paragraph with rich inline markup".to_string(),
-        ))
+fn transfer_resource_payloads(
+    source: &Template,
+    destination: &Template,
+    resource: &crate::resource::Resource,
+) -> Result<Vec<ResourcePayloadChange>> {
+    if !resource.is_embedded() {
+        return Ok(Vec::new());
     }
+    let root = embedded_path(resource.href())?;
+    let prefix = format!("{root}/");
+    let files = source.files()?;
+    let mut paths = files
+        .into_iter()
+        .filter(|path| path == root || path.starts_with(&prefix))
+        .collect::<Vec<_>>();
+    paths.sort();
+    if paths.is_empty() {
+        return Err(Error::InvalidFormat(
+            "OTH transfer embedded resource dependency is absent".to_string(),
+        ));
+    }
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(paths.len())
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "OTH transfer resource dependencies",
+            source: allocation_error,
+        })?;
+    for path in paths {
+        let after = source.package.member(&path)?.ok_or_else(|| {
+            Error::InvalidFormat("OTH transfer resource dependency disappeared".to_string())
+        })?;
+        let before = destination.package.member(&path)?;
+        if before.as_ref().is_some_and(|bytes| bytes != &after) {
+            return Err(Error::InvalidFormat(format!(
+                "OTH transfer resource dependency {path:?} collides"
+            )));
+        }
+        if before.is_none() {
+            changes.push(ResourcePayloadChange {
+                after: Some(after),
+                before,
+                media_type: source
+                    .package
+                    .member_media_type(&path)?
+                    .unwrap_or_else(|| "application/octet-stream".to_string()),
+                path,
+            });
+        }
+    }
+    Ok(changes)
+}
+
+fn transfer_site_payloads(
+    source: &Template,
+    destination: &Template,
+    site: &crate::codec::ReplacementSite,
+) -> Result<Vec<ResourcePayloadChange>> {
+    let mut changes = Vec::new();
+    for (index, candidate) in source.package.resource_sites().iter().enumerate() {
+        if candidate.range.start < site.range.start || candidate.range.end > site.range.end {
+            continue;
+        }
+        let resource = source.package.resources().get(index).ok_or_else(|| {
+            Error::InvalidFormat("OTH transfer resource projection disappeared".to_string())
+        })?;
+        for change in transfer_resource_payloads(source, destination, resource)? {
+            if !changes
+                .iter()
+                .any(|accepted: &ResourcePayloadChange| accepted.path == change.path)
+            {
+                changes.push(change);
+            }
+        }
+    }
+    Ok(changes)
 }
 
 fn block_style_names(block: &crate::ContentBlock) -> Vec<String> {
+    let mut names = Vec::new();
     match block {
-        crate::ContentBlock::Heading(heading) => heading
-            .style_name()
-            .map(str::to_owned)
-            .into_iter()
-            .collect(),
-        crate::ContentBlock::Paragraph(paragraph) => paragraph
-            .style_name()
-            .map(str::to_owned)
-            .into_iter()
-            .collect(),
-        crate::ContentBlock::List(list) => list
-            .items()
-            .iter()
-            .flat_map(crate::list::Item::paragraphs)
-            .filter_map(crate::paragraph::Paragraph::style_name)
-            .map(str::to_owned)
-            .collect(),
+        crate::ContentBlock::Heading(heading) => {
+            names.extend(heading.style_name().map(str::to_owned));
+            names.extend(
+                heading
+                    .formatting_runs()
+                    .iter()
+                    .map(crate::formatting::Run::style_name)
+                    .map(str::to_owned),
+            );
+        },
+        crate::ContentBlock::Paragraph(paragraph) => {
+            extend_paragraph_style_names(&mut names, paragraph);
+        },
+        crate::ContentBlock::List(list) => extend_list_style_names(&mut names, list),
     }
+    names
+}
+
+fn extend_paragraph_style_names(names: &mut Vec<String>, paragraph: &crate::paragraph::Paragraph) {
+    names.extend(paragraph.style_name().map(str::to_owned));
+    names.extend(
+        paragraph
+            .formatting_runs()
+            .iter()
+            .map(crate::formatting::Run::style_name)
+            .map(str::to_owned),
+    );
+}
+
+fn extend_list_style_names(names: &mut Vec<String>, list: &crate::list::List) {
+    names.extend(list.style_name().map(str::to_owned));
+    for item in list.items() {
+        for paragraph in item.paragraphs() {
+            extend_paragraph_style_names(names, paragraph);
+        }
+        for nested in item.nested_lists() {
+            extend_list_style_names(names, nested);
+        }
+    }
+}
+
+fn list_paragraph_positions(list: &crate::list::List) -> Vec<Position> {
+    let mut positions = Vec::new();
+    for item in list.items() {
+        positions.extend_from_slice(item.paragraph_positions());
+        for nested in item.nested_lists() {
+            positions.extend(list_paragraph_positions(nested));
+        }
+    }
+    positions
 }
 
 fn resolve_transfer_styles(
@@ -2204,11 +2789,84 @@ fn validate_forms_readback(
     Ok(())
 }
 
+fn validate_resource_readback(
+    references: &[ResourceChange],
+    payloads: &[ResourcePayloadChange],
+    snapshot: &Template,
+) -> Result<()> {
+    validate_resource_references(references, snapshot, true)?;
+    for change in payloads {
+        if snapshot.package.member(&change.path)? != change.after {
+            return Err(Error::InvalidFormat(
+                "OTH resource payload publication failed readback".to_string(),
+            ));
+        }
+        if change.after.is_some()
+            && snapshot.package.member_media_type(&change.path)?.as_deref()
+                != Some(change.media_type.as_str())
+        {
+            return Err(Error::InvalidFormat(
+                "OTH resource payload media type failed readback".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn embedded_path(href: &str) -> Result<&str> {
+    let path = href.strip_prefix("./").unwrap_or(href);
+    if path.is_empty()
+        || path.starts_with('/')
+        || path.contains("://")
+        || path.starts_with("data:")
+        || path
+            .split('/')
+            .any(|segment| matches!(segment, "" | "." | ".."))
+    {
+        return Err(Error::InvalidFormat(
+            "OTH resource payload path is not a safe package member".to_string(),
+        ));
+    }
+    Ok(path)
+}
+
 fn list_paragraph_count(list: &crate::list::List) -> usize {
     list.items()
         .iter()
-        .map(|item| item.paragraphs().len())
+        .map(|item| {
+            item.nested_lists()
+                .iter()
+                .map(list_paragraph_count)
+                .fold(item.paragraphs().len(), usize::saturating_add)
+        })
         .fold(0_usize, usize::saturating_add)
+}
+
+fn list_tree_count(list: &crate::list::List) -> usize {
+    list.items()
+        .iter()
+        .flat_map(crate::list::Item::nested_lists)
+        .map(list_tree_count)
+        .fold(1_usize, usize::saturating_add)
+}
+
+fn normalize_list_level(list: &crate::list::List, level: usize) -> crate::list::List {
+    let items = list
+        .items()
+        .iter()
+        .map(|item| {
+            crate::list::Item::projected(
+                item.nested_lists()
+                    .iter()
+                    .map(|nested| normalize_list_level(nested, level.saturating_add(1)))
+                    .collect(),
+                item.paragraphs().to_vec(),
+                item.paragraph_positions().to_vec(),
+                item.start_value(),
+            )
+        })
+        .collect();
+    crate::list::List::projected(items, level, list.style_name().map(str::to_owned))
 }
 
 fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
@@ -2238,23 +2896,35 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
     }
     validate_inline_readback(&edit.inline_changes, snapshot)?;
     validate_forms_readback(edit.forms_change.as_ref(), snapshot)?;
-    let removed_lists = edit
+    validate_resource_readback(&edit.resource_changes, &edit.payload_changes, snapshot)?;
+    let replaced_lists = edit
         .list_changes
         .iter()
-        .filter(|change| change.after.is_none())
-        .count();
+        .filter_map(|change| change.before.as_ref())
+        .map(list_tree_count)
+        .fold(0_usize, usize::saturating_add);
+    let replacement_lists = edit
+        .list_changes
+        .iter()
+        .filter_map(|change| change.after.as_ref())
+        .map(list_tree_count)
+        .fold(0_usize, usize::saturating_add);
     let appended_lists = edit
         .appended
         .iter()
-        .filter(|block| matches!(block, crate::ContentBlock::List(_)))
-        .count();
+        .filter_map(|block| match block {
+            crate::ContentBlock::List(list) => Some(list_tree_count(list)),
+            crate::ContentBlock::Heading(_) | crate::ContentBlock::Paragraph(_) => None,
+        })
+        .fold(0_usize, usize::saturating_add);
     if snapshot.package.lists().len()
         != edit
             .source
             .package
             .lists()
             .len()
-            .saturating_sub(removed_lists)
+            .saturating_sub(replaced_lists)
+            .saturating_add(replacement_lists)
             .saturating_add(appended_lists)
     {
         return Err(Error::InvalidFormat(
@@ -2322,18 +2992,61 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
     Ok(())
 }
 
-fn list_target_index(changes: &[ListChange], change: &ListChange) -> Result<usize> {
-    let removed_before = changes
-        .iter()
-        .filter(|candidate| candidate.after.is_none() && candidate.list.get() < change.list.get())
-        .count();
-    change
-        .list
-        .get()
-        .checked_sub(removed_before)
+fn published_durable_fragment(edit: &Edit<'_>, snapshot: &Template) -> Result<Option<String>> {
+    if edit.durable_fragment.is_none() {
+        return Ok(None);
+    }
+    let [block] = edit.appended.as_slice() else {
+        return Err(Error::InvalidFormat(
+            "OTH exact transfer requires one semantic appended block".to_string(),
+        ));
+    };
+    let site = match block {
+        crate::ContentBlock::Heading(_) => snapshot
+            .package
+            .heading_full_site(snapshot.package.headings().len().saturating_sub(1)),
+        crate::ContentBlock::Paragraph(_) => snapshot
+            .package
+            .paragraph_full_site(snapshot.package.paragraphs().len().saturating_sub(1)),
+        crate::ContentBlock::List(_) => snapshot
+            .package
+            .list_site(snapshot.package.lists().len().saturating_sub(1)),
+    }
+    .ok_or_else(|| Error::InvalidFormat("OTH exact transfer target site is missing".to_string()))?;
+    snapshot
+        .content_xml()
+        .get(site.range.clone())
+        .map(str::to_owned)
+        .map(Some)
         .ok_or_else(|| {
+            Error::InvalidFormat("OTH exact transfer target span is invalid".to_string())
+        })
+}
+
+fn list_target_index(changes: &[ListChange], change: &ListChange) -> Result<usize> {
+    let mut target = change.list.get();
+    for candidate in changes
+        .iter()
+        .filter(|candidate| candidate.list.get() < change.list.get())
+    {
+        target = shift_list_index(target, candidate)?;
+    }
+    if change.before.is_some() {
+        target = shift_list_index(target, change)?;
+    }
+    Ok(target)
+}
+
+fn shift_list_index(index: usize, change: &ListChange) -> Result<usize> {
+    let before = change.before.as_ref().map_or(0, list_tree_count);
+    let after = change.after.as_ref().map_or(0, list_tree_count);
+    if after >= before {
+        Ok(index.saturating_add(after - before))
+    } else {
+        index.checked_sub(before - after).ok_or_else(|| {
             Error::InvalidFormat("OTH replacement list target position underflow".to_string())
         })
+    }
 }
 
 fn lists_semantically_equal(actual: &crate::list::List, expected: &crate::list::List) -> bool {
@@ -2347,14 +3060,42 @@ fn lists_semantically_equal(actual: &crate::list::List, expected: &crate::list::
             .all(|(actual_item, expected_item)| {
                 actual_item.start_value() == expected_item.start_value()
                     && actual_item.paragraphs() == expected_item.paragraphs()
+                    && actual_item.nested_lists().len() == expected_item.nested_lists().len()
+                    && actual_item
+                        .nested_lists()
+                        .iter()
+                        .zip(expected_item.nested_lists())
+                        .all(|(actual_nested, expected_nested)| {
+                            lists_semantically_equal(actual_nested, expected_nested)
+                        })
             })
 }
 
 fn list_contains_paragraph(list: &crate::list::List, paragraph: Position) -> bool {
-    list.items()
-        .iter()
-        .flat_map(crate::list::Item::paragraph_positions)
-        .any(|position| *position == paragraph)
+    list.items().iter().any(|item| {
+        item.paragraph_positions().contains(&paragraph)
+            || item
+                .nested_lists()
+                .iter()
+                .any(|nested| list_contains_paragraph(nested, paragraph))
+    })
+}
+
+fn replacement_sites_overlap(
+    left: &crate::codec::ReplacementSite,
+    right: &crate::codec::ReplacementSite,
+) -> bool {
+    left.range.start < right.range.end && right.range.start < left.range.end
+}
+
+fn list_changes_overlap(template: &Template, left: &ListChange, right: &ListChange) -> bool {
+    match (
+        template.package.list_site(left.list.get()),
+        template.package.list_site(right.list.get()),
+    ) {
+        (Some(left_site), Some(right_site)) => replacement_sites_overlap(left_site, right_site),
+        _ => left.list == right.list,
+    }
 }
 
 fn push_wire_usize(output: &mut Vec<u8>, value: usize) -> Result<()> {
@@ -2397,6 +3138,35 @@ fn push_wire_part_change(output: &mut Vec<u8>, change: &PartChange) -> Result<()
             push_wire_bytes(output, xml.as_bytes())
         },
     }
+}
+
+fn push_wire_optional_bytes(output: &mut Vec<u8>, value: Option<&[u8]>) -> Result<()> {
+    match value {
+        None => push_wire_usize(output, 0),
+        Some(bytes) => {
+            push_wire_usize(output, 1)?;
+            push_wire_bytes(output, bytes)
+        },
+    }
+}
+
+fn push_wire_resource(
+    output: &mut Vec<u8>,
+    resource: Option<&crate::resource::Resource>,
+) -> Result<()> {
+    let Some(resource_entry) = resource else {
+        return push_wire_usize(output, 0);
+    };
+    push_wire_usize(output, 1)?;
+    let kind = match resource_entry.kind() {
+        crate::resource::Kind::Image => 0,
+        crate::resource::Kind::Object => 1,
+        crate::resource::Kind::OleObject => 2,
+        crate::resource::Kind::Plugin => 3,
+        crate::resource::Kind::FloatingFrame => 4,
+    };
+    push_wire_usize(output, kind)?;
+    push_wire_bytes(output, resource_entry.href().as_bytes())
 }
 
 fn read_wire_usize(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
@@ -2445,14 +3215,14 @@ fn read_wire_list(bytes: &[u8], cursor: &mut usize) -> Result<Option<crate::list
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\"><office:body><office:text>{fragment}</office:text></office:body></office:document-content>"
             );
             let mut projection = crate::codec::project(&wrapped)?;
-            if projection.lists.len() != 1 || projection.lists[0].level() != 1 {
+            let parsed = projection.lists.pop().ok_or_else(|| {
+                Error::InvalidFormat("OTH durable patch list disappeared".to_string())
+            })?;
+            if parsed.level() != 1 || list_tree_count(&parsed) != projection.lists.len() + 1 {
                 return Err(Error::InvalidFormat(
                     "OTH durable patch list fragment is not one top-level list".to_string(),
                 ));
             }
-            let parsed = projection.lists.pop().ok_or_else(|| {
-                Error::InvalidFormat("OTH durable patch list disappeared".to_string())
-            })?;
             Ok(Some(crate::list::List::projected(
                 parsed.items().to_vec(),
                 level,
@@ -2472,6 +3242,46 @@ fn read_wire_part_change(bytes: &[u8], cursor: &mut usize) -> Result<PartChange>
         2 => Ok(PartChange::Set(read_wire_string(bytes, cursor)?)),
         _ => Err(Error::InvalidFormat(
             "OTH durable patch part-change marker is invalid".to_string(),
+        )),
+    }
+}
+
+fn read_wire_optional_bytes(bytes: &[u8], cursor: &mut usize) -> Result<Option<Vec<u8>>> {
+    match read_wire_usize(bytes, cursor)? {
+        0 => Ok(None),
+        1 => Ok(Some(read_wire_bytes(bytes, cursor)?.to_vec())),
+        _ => Err(Error::InvalidFormat(
+            "OTH durable optional-byte marker is invalid".to_string(),
+        )),
+    }
+}
+
+fn read_wire_resource(
+    bytes: &[u8],
+    cursor: &mut usize,
+) -> Result<Option<crate::resource::Resource>> {
+    match read_wire_usize(bytes, cursor)? {
+        0 => Ok(None),
+        1 => {
+            let kind = match read_wire_usize(bytes, cursor)? {
+                0 => crate::resource::Kind::Image,
+                1 => crate::resource::Kind::Object,
+                2 => crate::resource::Kind::OleObject,
+                3 => crate::resource::Kind::Plugin,
+                4 => crate::resource::Kind::FloatingFrame,
+                _ => {
+                    return Err(Error::InvalidFormat(
+                        "OTH durable resource kind is invalid".to_string(),
+                    ));
+                },
+            };
+            Ok(Some(crate::resource::Resource::new(
+                kind,
+                read_wire_string(bytes, cursor)?,
+            )?))
+        },
+        _ => Err(Error::InvalidFormat(
+            "OTH durable resource marker is invalid".to_string(),
         )),
     }
 }
@@ -2719,6 +3529,204 @@ fn validate_forms_source(change: &FormsChange, template: &Template, after: bool)
     Ok(())
 }
 
+fn read_resource_changes(
+    bytes: &[u8],
+    cursor: &mut usize,
+    source: &Template,
+    target: &Template,
+) -> Result<Vec<ResourceChange>> {
+    let count = read_wire_usize(bytes, cursor)?;
+    if count
+        > source
+            .package
+            .resources()
+            .len()
+            .saturating_add(target.package.resources().len())
+    {
+        return Err(Error::InvalidFormat(
+            "OTH durable resource count is invalid".to_string(),
+        ));
+    }
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(count)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "OTH durable resource changes",
+            source: allocation_error,
+        })?;
+    for _ in 0..count {
+        let change = ResourceChange {
+            resource: Position::new(read_wire_usize(bytes, cursor)?),
+            before: read_wire_resource(bytes, cursor)?,
+            after: read_wire_resource(bytes, cursor)?,
+            before_xml: read_wire_string(bytes, cursor)?,
+            after_xml: read_wire_string(bytes, cursor)?,
+        };
+        if change.before.is_none() && change.after.is_none() {
+            return Err(Error::InvalidFormat(
+                "OTH durable resource change is empty".to_string(),
+            ));
+        }
+        if changes
+            .iter()
+            .any(|candidate: &ResourceChange| candidate.resource == change.resource)
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable resource selector is duplicated".to_string(),
+            ));
+        }
+        changes.push(change);
+    }
+    validate_resource_references(&changes, source, false)?;
+    validate_resource_references(&changes, target, true)?;
+    Ok(changes)
+}
+
+fn read_payload_changes(
+    bytes: &[u8],
+    cursor: &mut usize,
+    source: &Template,
+    target: &Template,
+) -> Result<Vec<ResourcePayloadChange>> {
+    let count = read_wire_usize(bytes, cursor)?;
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(count)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "OTH durable payload changes",
+            source: allocation_error,
+        })?;
+    for _ in 0..count {
+        let change = ResourcePayloadChange {
+            path: read_wire_string(bytes, cursor)?,
+            media_type: read_wire_string(bytes, cursor)?,
+            before: read_wire_optional_bytes(bytes, cursor)?,
+            after: read_wire_optional_bytes(bytes, cursor)?,
+        };
+        embedded_path(&change.path)?;
+        if change.media_type.is_empty() || change.before == change.after {
+            return Err(Error::InvalidFormat(
+                "OTH durable payload change is invalid".to_string(),
+            ));
+        }
+        if changes
+            .iter()
+            .any(|candidate: &ResourcePayloadChange| candidate.path == change.path)
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable payload path is duplicated".to_string(),
+            ));
+        }
+        if source.package.member(&change.path)? != change.before
+            || target.package.member(&change.path)? != change.after
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable payload readback failed".to_string(),
+            ));
+        }
+        if change.after.is_some()
+            && target.package.member_media_type(&change.path)?.as_deref()
+                != Some(change.media_type.as_str())
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable payload media type readback failed".to_string(),
+            ));
+        }
+        changes.push(change);
+    }
+    Ok(changes)
+}
+
+fn validate_resource_references(
+    changes: &[ResourceChange],
+    template: &Template,
+    after: bool,
+) -> Result<()> {
+    let removed = changes
+        .iter()
+        .filter(|change| change.before.is_some() && change.after.is_none())
+        .count();
+    let inserted = changes
+        .iter()
+        .filter(|change| change.before.is_none() && change.after.is_some())
+        .count();
+    let source_count = if after {
+        template
+            .package
+            .resources()
+            .len()
+            .saturating_add(removed)
+            .saturating_sub(inserted)
+    } else {
+        template.package.resources().len()
+    };
+    let expected_count = if after {
+        source_count
+            .saturating_sub(removed)
+            .saturating_add(inserted)
+    } else {
+        source_count
+    };
+    if template.package.resources().len() != expected_count {
+        return Err(Error::InvalidFormat(
+            "OTH durable resource structural readback failed".to_string(),
+        ));
+    }
+    for change in changes {
+        let expected = if after {
+            change.after.as_ref()
+        } else {
+            change.before.as_ref()
+        };
+        let Some(expected_resource) = expected else {
+            continue;
+        };
+        let index = if after {
+            resource_target_index(changes, change)
+        } else {
+            change.resource.get()
+        };
+        if template.package.resources().get(index) != Some(expected_resource) {
+            return Err(Error::InvalidFormat(
+                "OTH durable resource semantic readback failed".to_string(),
+            ));
+        }
+        if after && expected_resource.is_embedded() {
+            let root = embedded_path(expected_resource.href())?;
+            let prefix = format!("{root}/");
+            if !template
+                .files()?
+                .iter()
+                .any(|path| path == root || path.starts_with(&prefix))
+            {
+                return Err(Error::InvalidFormat(
+                    "OTH edited embedded resource dependency is absent".to_string(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn resource_target_index(changes: &[ResourceChange], change: &ResourceChange) -> usize {
+    if change.before.is_none() {
+        let removed = changes
+            .iter()
+            .filter(|candidate| candidate.before.is_some() && candidate.after.is_none())
+            .count();
+        return change.resource.get().saturating_sub(removed);
+    }
+    let removed_before = changes
+        .iter()
+        .filter(|candidate| {
+            candidate.before.is_some()
+                && candidate.after.is_none()
+                && candidate.resource.get() < change.resource.get()
+        })
+        .count();
+    change.resource.get().saturating_sub(removed_before)
+}
+
 fn read_list_changes(
     bytes: &[u8],
     cursor: &mut usize,
@@ -2761,7 +3769,20 @@ fn read_list_changes(
                 "OTH durable patch contains an empty list change".to_string(),
             ));
         }
-        if let Some(expected) = before.as_ref()
+        let pending = ListChange {
+            after,
+            before,
+            list,
+        };
+        if changes
+            .iter()
+            .any(|candidate| list_changes_overlap(source, candidate, &pending))
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable list changes overlap".to_string(),
+            ));
+        }
+        if let Some(expected) = pending.before.as_ref()
             && !source
                 .package
                 .lists()
@@ -2772,20 +3793,18 @@ fn read_list_changes(
                 "OTH durable list change failed source readback".to_string(),
             ));
         }
-        changes.push(ListChange {
-            after,
-            before,
-            list,
-        });
+        changes.push(pending);
     }
     let removed = changes
         .iter()
-        .filter(|change| change.before.is_some() && change.after.is_none())
-        .count();
+        .filter_map(|change| change.before.as_ref())
+        .map(list_tree_count)
+        .fold(0_usize, usize::saturating_add);
     let inserted = changes
         .iter()
-        .filter(|change| change.before.is_none() && change.after.is_some())
-        .count();
+        .filter_map(|change| change.after.as_ref())
+        .map(list_tree_count)
+        .fold(0_usize, usize::saturating_add);
     if target.package.lists().len()
         != source
             .package
@@ -2851,15 +3870,11 @@ fn replace_texts(
     heading_changes: &[HeadingChange],
     inline_changes: &[InlineChange],
     forms_change: Option<&FormsChange>,
+    resource_changes: &[ResourceChange],
     list_changes: &[ListChange],
     appended: &[crate::ContentBlock],
     durable_fragment: Option<&str>,
 ) -> Result<String> {
-    if !appended.is_empty() && durable_fragment.is_some() {
-        return Err(Error::InvalidFormat(
-            "OTH edit cannot combine typed and durable appended fragments".to_string(),
-        ));
-    }
     let has_append =
         !appended.is_empty() || durable_fragment.is_some_and(|value| !value.is_empty());
     let mut replacements = Vec::new();
@@ -2870,6 +3885,7 @@ fn replace_texts(
                 .saturating_add(heading_changes.len())
                 .saturating_add(inline_changes.len())
                 .saturating_add(usize::from(forms_change.is_some()))
+                .saturating_add(resource_changes.len())
                 .saturating_add(list_changes.len())
                 .saturating_add(usize::from(has_append)),
         )
@@ -2964,11 +3980,43 @@ fn replace_texts(
         };
         replacements.push((site.clone(), std::borrow::Cow::Owned(replacement)));
     }
-    if has_append {
-        let fragment = match durable_fragment {
+    let mut resource_tail = String::new();
+    for change in resource_changes {
+        if change.before.is_none() {
+            if !change.before_xml.is_empty() {
+                return Err(Error::InvalidFormat(
+                    "OTH resource insertion precondition is invalid".to_string(),
+                ));
+            }
+            resource_tail.push_str(&change.after_xml);
+            continue;
+        }
+        let site = source
+            .package
+            .resource_site(change.resource.get())
+            .cloned()
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH resource edit site disappeared".to_string())
+            })?;
+        let actual = source
+            .content_xml()
+            .get(site.range.clone())
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH resource edit source span is invalid".to_string())
+            })?;
+        if actual != change.before_xml {
+            return Err(Error::InvalidFormat(
+                "OTH resource edit source precondition failed".to_string(),
+            ));
+        }
+        replacements.push((site, std::borrow::Cow::Borrowed(change.after_xml.as_str())));
+    }
+    if has_append || !resource_tail.is_empty() {
+        let mut fragment = match durable_fragment {
             Some(fragment) => fragment.to_owned(),
             None => crate::authoring::render_fragment(appended)?,
         };
+        fragment.push_str(&resource_tail);
         replacements.push((
             crate::codec::ReplacementSite {
                 prefix: String::new(),

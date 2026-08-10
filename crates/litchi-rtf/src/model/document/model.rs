@@ -2254,6 +2254,29 @@ impl<'a> RtfDocument<'a> {
         Ok(())
     }
 
+    pub(crate) fn push_story_field_metadata(
+        &mut self,
+        field: super::super::field::Field<'a>,
+    ) -> RtfResult<usize> {
+        if matches!(
+            field.owner,
+            crate::FieldOwner::Body | crate::FieldOwner::Detached
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "nested-story field metadata requires a retained story owner".to_string(),
+            ));
+        }
+        if self.fields.len() >= crate::field::MAX_GENERIC_FIELDS {
+            return Err(RtfError::MalformedDocument(
+                "RTF generic field count exceeds the safety limit".to_string(),
+            ));
+        }
+        field.validate()?;
+        let index = self.fields.len();
+        self.fields.push(field);
+        Ok(index)
+    }
+
     pub fn clear_fields(&mut self) {
         self.fields.clear();
         self.body_story_events

@@ -20,11 +20,11 @@ mod model;
 mod package;
 
 pub use authoring::{
-    Change, ChangeAction, ChangeKind, Commit, CompositionLimits, DependencyDisposition,
-    DurablePatch, Edit, EditPolicy, EncryptionCapability, EncryptionPolicy, History, HistoryLimits,
-    JoinError, JoinedEdits, Lineage, MergeChoice, MergePlan, MergePlanError, Patch, PreparedEdit,
-    ProtectionCapabilities, ProtectionStatus, ProtectionTransition, QueryChange, SealedPatch,
-    SignatureCapability, SignaturePolicy,
+    ActiveContentDisposition, Change, ChangeAction, ChangeKind, Commit, CompositionLimits,
+    DependencyDisposition, DurablePatch, Edit, EditPolicy, EncryptionCapability, EncryptionPolicy,
+    History, HistoryLimits, JoinError, JoinedEdits, Lineage, MergeChoice, MergePlan,
+    MergePlanError, Patch, PreparedEdit, ProtectionCapabilities, ProtectionStatus,
+    ProtectionTransition, QueryChange, SealedPatch, SignatureCapability, SignaturePolicy,
 };
 pub use facade::{Builder, Database};
 pub use litchi_odf_common::signature::{
@@ -34,6 +34,7 @@ pub use model::connection::Connection;
 pub use model::query::Query;
 pub use model::{
     ActiveContentEntry, ActiveContentInventory, ActiveContentKind, Catalog, Column, Component,
-    ComponentKind, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind, Limits, OwnedCatalog,
-    ProducerExtension, ReferentialAction, Relation, Table, TableKind, connection, query,
+    ComponentKind, ComponentLinkKind, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind,
+    Limits, OwnedCatalog, ProducerExtension, ReferentialAction, Relation, Table, TableKind,
+    connection, query,
 };

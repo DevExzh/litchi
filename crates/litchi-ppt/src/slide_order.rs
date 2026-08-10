@@ -37,6 +37,9 @@ pub enum TransferDependency {
     /// An `ExObjRefAtom` can address media, a chart, or another OLE object in
     /// the document external-object relationship table.
     ExternalObjectRelationship,
+    /// An interaction or external-object owner contains executable, active
+    /// OLE, or unknown relationship semantics that are never transferred.
+    ActiveOrUnknownExternalObject,
 }
 
 impl fmt::Display for TransferDependency {
@@ -47,25 +50,7 @@ impl fmt::Display for TransferDependency {
             Self::HyperlinkAction => "hyperlink-action",
             Self::DrawingGroup => "drawing-group/picture-store",
             Self::ExternalObjectRelationship => "external media/chart/OLE relationship",
-        })
-    }
-}
-
-/// Root owners whose byte publications cannot be safely interleaved in one
-/// transaction without rebasing the staged document structure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OwnerBoundary {
-    /// Slide-list and master-list structure in the live document record.
-    DocumentStructure,
-    /// External media and its document relationship list.
-    ExternalMedia,
-}
-
-impl fmt::Display for OwnerBoundary {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::DocumentStructure => "document structure",
-            Self::ExternalMedia => "external media",
+            Self::ActiveOrUnknownExternalObject => "active or unknown external object",
         })
     }
 }
@@ -86,16 +71,12 @@ pub enum Refusal {
     UnsupportedSlideDependency { dependency: TransferDependency },
     /// The receiving presentation does not contain the referenced master.
     MissingMasterDependency { master_id: u32 },
+    /// The receiver reuses the master ID for different persisted content.
+    MismatchedMasterDependency { master_id: u32 },
     /// A transfer plan was prepared for a different exact receiving artifact.
     TransferTargetMismatch,
     /// A shape edit selected a slide inserted but not yet published.
     UncommittedSlideDependency,
-    /// Two live-document owners were requested in an order that cannot be
-    /// rebased without risking a lost update.
-    OwnerOrderConflict {
-        staged: OwnerBoundary,
-        requested: OwnerBoundary,
-    },
 }
 
 impl fmt::Display for Refusal {
@@ -121,15 +102,15 @@ impl fmt::Display for Refusal {
                 formatter,
                 "PPT transfer target has no matching master {master_id:#010x}"
             ),
+            Self::MismatchedMasterDependency { master_id } => write!(
+                formatter,
+                "PPT transfer target master {master_id:#010x} has different persisted content"
+            ),
             Self::TransferTargetMismatch => {
                 formatter.write_str("PPT slide transfer plan belongs to a different target")
             },
             Self::UncommittedSlideDependency => formatter
                 .write_str("PPT shape text cannot target an inserted slide before publication"),
-            Self::OwnerOrderConflict { staged, requested } => write!(
-                formatter,
-                "PPT root cannot stage {requested} after {staged} without rebasing the live document"
-            ),
         }
     }
 }
@@ -430,10 +411,11 @@ impl Snapshot {
     /// Plans a dependency-checked transfer from `donor` without mutating
     /// either presentation.
     ///
-    /// The current conservative closure supports slides whose master identity
-    /// already exists in the receiver and which have no notes, drawing-group,
-    /// or external-media ownership. Unsupported dependency edges are refused
-    /// explicitly instead of copying dangling native identifiers.
+    /// The bounded closure reuses a byte-identical master plus matching
+    /// comment-author, hyperlink, drawing-group/picture-store, sound, and
+    /// external-media owners already present in the receiver. Native IDs are
+    /// never guessed or renumbered. Notes, active OLE/macro/program actions,
+    /// and missing or mismatched owners are refused explicitly.
     ///
     /// # Errors
     ///
@@ -445,12 +427,13 @@ impl Snapshot {
         let donor_slide = donor.document.slides()[slide.get()];
         let group = donor.document.edit().slide_group(slide.get())?;
         let record = persisted_record(donor, donor_slide.persist_id())?;
-        require_portable_slide(self, &record)?;
+        let reused_dependencies = require_portable_slide(self, donor, &record)?;
         let payload = slide_payload(group, record)?;
-        require_master(&self.document.edit(), payload.master_id)?;
+        require_master_closure(self, donor, payload.master_id)?;
         Ok(TransferPlan {
             target_artifact: artifact_hash(self.bytes()),
             payload: normalized_payload(&payload),
+            reused_dependencies,
         })
     }
 
@@ -716,6 +699,7 @@ struct SlidePayload {
 pub struct TransferPlan {
     target_artifact: String,
     payload: SlidePayload,
+    reused_dependencies: Vec<TransferDependency>,
 }
 
 impl TransferPlan {
@@ -723,6 +707,13 @@ impl TransferPlan {
     #[must_use]
     pub const fn required_master_id(&self) -> u32 {
         self.payload.master_id
+    }
+
+    /// Presentation-global owners proven identical and therefore reused by
+    /// this bounded transfer without rewriting their native identifiers.
+    #[must_use]
+    pub fn reused_dependencies(&self) -> &[TransferDependency] {
+        &self.reused_dependencies
     }
 }
 
@@ -863,7 +854,6 @@ impl Transaction {
         if from == destination {
             return Ok(());
         }
-        self.require_no_media_for_structure()?;
         let before_order = order_digest(&self.document)?;
         self.document
             .move_slide(from.get(), destination.get())
@@ -974,15 +964,14 @@ impl Transaction {
     /// document's external-media owner.
     ///
     /// The path is serialized only; it is never opened or resolved. A
-    /// transaction that already staged slide-list structure is refused
-    /// atomically because both owners replace the same live document record.
+    /// transaction that also stages slide-list structure is rebased over the
+    /// changed live document before its single append-only publication.
     ///
     /// # Errors
     ///
     /// Returns a typed owner-order refusal or an external-media validation or
     /// package publication error.
     pub fn set_external_media_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
-        self.require_no_structure_for_media()?;
         let media = external_media_snapshot(&self.working)?;
         let object = media
             .collection()
@@ -1026,7 +1015,6 @@ impl Transaction {
         id: u32,
         playback: crate::external_media::Playback,
     ) -> Result<()> {
-        self.require_no_structure_for_media()?;
         let media = external_media_snapshot(&self.working)?;
         let before = media
             .collection()
@@ -1066,7 +1054,6 @@ impl Transaction {
     /// Returns a typed position refusal or a structural validation error.
     pub fn remove_slide(&mut self, position: Position) -> Result<()> {
         self.require_position(position)?;
-        self.require_no_media_for_structure()?;
         let before_order = order_digest(&self.document)?;
         let slides = self.document.slides()?;
         let selected = slides[position.get()];
@@ -1100,7 +1087,6 @@ impl Transaction {
         if position.get() > self.slide_count() {
             return Err(Error::Refused(Refusal::SlideNotFound { position }));
         }
-        self.require_no_media_for_structure()?;
         require_master(&self.document, plan.payload.master_id)?;
         let persist_id = next_persist_id(&self.source, &self.inserted_records)?;
         let slide_id = next_slide_id(&self.document)?;
@@ -1133,7 +1119,15 @@ impl Transaction {
     /// Returns an error if publication, preservation checks, full reopen, or
     /// semantic readback fails.
     pub fn commit(self) -> Result<Commit> {
-        let document_commit = self.document.commit()?;
+        let document_commit = if self.structural.is_empty()
+            || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
+        {
+            self.document.commit()?
+        } else {
+            let mut rebased = self.working.document.edit();
+            replay_structural_changes(&mut rebased, &self.structural)?;
+            rebased.commit()?
+        };
         let source = self.source;
         let working = self.working;
         if document_commit.patch().is_empty() {
@@ -1163,7 +1157,7 @@ impl Transaction {
             source.limits.max_package_bytes,
         )?;
         let live = editor.persisted_record(source.document_persist_id)?;
-        if live.as_slice() != source.document.bytes() {
+        if live.as_slice() != working.document.bytes() {
             return Err(PackageError::Corrupted(
                 "PPT slide-order transaction source changed before publication".into(),
             )
@@ -1229,28 +1223,6 @@ impl Transaction {
 
     fn order_fingerprint(&self) -> Result<String> {
         order_digest(&self.document).map(hex_digest)
-    }
-
-    fn require_no_media_for_structure(&self) -> Result<()> {
-        if self.media_path_changes.is_empty() && self.media_playback_changes.is_empty() {
-            Ok(())
-        } else {
-            Err(Error::Refused(Refusal::OwnerOrderConflict {
-                staged: OwnerBoundary::ExternalMedia,
-                requested: OwnerBoundary::DocumentStructure,
-            }))
-        }
-    }
-
-    fn require_no_structure_for_media(&self) -> Result<()> {
-        if self.structural.is_empty() {
-            Ok(())
-        } else {
-            Err(Error::Refused(Refusal::OwnerOrderConflict {
-                staged: OwnerBoundary::DocumentStructure,
-                requested: OwnerBoundary::ExternalMedia,
-            }))
-        }
     }
 }
 
@@ -2307,6 +2279,7 @@ fn apply_durable_structural(
             let plan = TransferPlan {
                 target_artifact: artifact.to_string(),
                 payload,
+                reused_dependencies: Vec::new(),
             };
             transaction.insert_transfer(position, &plan)
         },
@@ -2497,6 +2470,38 @@ fn require_master(document: &document_structure::Transaction, master_id: u32) ->
     }
 }
 
+fn require_master_closure(target: &Snapshot, donor: &Snapshot, master_id: u32) -> Result<()> {
+    let target_master = target
+        .document
+        .masters()
+        .iter()
+        .find(|master| master.master_id() == master_id)
+        .copied()
+        .ok_or(Error::Refused(Refusal::MissingMasterDependency {
+            master_id,
+        }))?;
+    let donor_master = donor
+        .document
+        .masters()
+        .iter()
+        .find(|master| master.master_id() == master_id)
+        .copied()
+        .ok_or_else(|| {
+            PackageError::Corrupted(
+                "PPT transferred slide references a donor master that is absent".into(),
+            )
+        })?;
+    if persisted_record(target, target_master.persist_id())?
+        == persisted_record(donor, donor_master.persist_id())?
+    {
+        Ok(())
+    } else {
+        Err(Error::Refused(Refusal::MismatchedMasterDependency {
+            master_id,
+        }))
+    }
+}
+
 fn next_persist_id(source: &Snapshot, inserted: &BTreeMap<u32, Vec<u8>>) -> Result<u32> {
     let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         source.bytes.clone(),
@@ -2586,7 +2591,11 @@ fn slide_payload(group: Vec<crate::records::Record>, record: Vec<u8>) -> Result<
     })
 }
 
-fn require_portable_slide(target: &Snapshot, record: &[u8]) -> Result<()> {
+fn require_portable_slide(
+    target: &Snapshot,
+    donor: &Snapshot,
+    record: &[u8],
+) -> Result<Vec<TransferDependency>> {
     let (root, consumed) = crate::Record::parse_with_limits(record, 0, RecordLimits::default())?;
     if consumed != record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
@@ -2604,52 +2613,124 @@ fn require_portable_slide(target: &Snapshot, record: &[u8]) -> Result<()> {
             dependency: TransferDependency::SpeakerNotes,
         }));
     }
+    let mut reused = Vec::new();
     if !crate::comments::parse_slide_comments(&root)?.is_empty() {
-        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: TransferDependency::CommentAuthorCatalog,
-        }));
-    }
-    if contains_record_type(&root, crate::RecordType::InteractiveInfo)
-        || contains_record_type(&root, crate::RecordType::TextInteractiveInfoAtom)
-    {
-        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: TransferDependency::HyperlinkAction,
-        }));
-    }
-    let has_drawing = contains_record_type(&root, crate::RecordType::PPDrawing);
-    let has_external = contains_record_type(&root, crate::RecordType::ExternalObjectRefAtom);
-    if has_drawing || has_external {
-        let live_ids = target
-            .document
-            .slides()
-            .iter()
-            .map(|slide| slide.persist_id())
-            .collect::<BTreeSet<_>>();
-        let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-            target.bytes.clone(),
-            target.limits.max_package_bytes,
-        )?;
-        let has_orphaned_closure = editor.persist_ids().into_iter().any(|persist_id| {
-            !live_ids.contains(&persist_id)
-                && editor
-                    .persisted_record(persist_id)
-                    .is_ok_and(|candidate| candidate == record)
-        });
-        if has_orphaned_closure {
-            return Ok(());
+        let donor_authors = crate::comments::Authors::parse(donor.document.record())?;
+        let target_authors = crate::comments::Authors::parse(target.document.record())?;
+        if donor_authors != target_authors {
+            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::CommentAuthorCatalog,
+            }));
         }
+        reused.push(TransferDependency::CommentAuthorCatalog);
     }
-    if has_external {
+
+    let mut interactions = Vec::new();
+    collect_interactions(&root, &mut interactions)?;
+    if interactions.iter().any(|interaction| {
+        matches!(
+            interaction.action,
+            crate::InteractionAction::Macro
+                | crate::InteractionAction::RunProgram
+                | crate::InteractionAction::Ole
+        )
+    }) {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::ActiveOrUnknownExternalObject,
+        }));
+    }
+    let has_hyperlink_action =
+        interactions.iter().any(|interaction| {
+            interaction.hyperlink_id != 0
+                || matches!(
+                    interaction.action,
+                    crate::InteractionAction::Hyperlink | crate::InteractionAction::CustomShow
+                )
+        }) || contains_record_type(&root, crate::RecordType::TextInteractiveInfoAtom);
+    if has_hyperlink_action {
+        if crate::Hyperlinks::parse(donor.document.record())?
+            != crate::Hyperlinks::parse(target.document.record())?
+        {
+            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::HyperlinkAction,
+            }));
+        }
+        reused.push(TransferDependency::HyperlinkAction);
+    }
+    if interactions
+        .iter()
+        .any(|interaction| interaction.sound_id != 0)
+        && !record_owners_equal(
+            donor.document.record(),
+            target.document.record(),
+            crate::RecordType::SoundCollection,
+        )
+    {
         return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
             dependency: TransferDependency::ExternalObjectRelationship,
         }));
     }
-    if has_drawing {
-        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: TransferDependency::DrawingGroup,
-        }));
+    let has_drawing = contains_record_type(&root, crate::RecordType::PPDrawing);
+    let has_external = contains_record_type(&root, crate::RecordType::ExternalObjectRefAtom)
+        || interactions
+            .iter()
+            .any(|interaction| interaction.action == crate::InteractionAction::Media);
+    if has_external {
+        if external_owner_contains_active_or_unknown(donor.document.record()) {
+            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::ActiveOrUnknownExternalObject,
+            }));
+        }
+        if !record_owners_equal(
+            donor.document.record(),
+            target.document.record(),
+            crate::RecordType::ExObjList,
+        ) {
+            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::ExternalObjectRelationship,
+            }));
+        }
+        reused.push(TransferDependency::ExternalObjectRelationship);
     }
-    Ok(())
+    if has_drawing {
+        if !has_orphaned_persisted_record(target, record)? {
+            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::DrawingGroup,
+            }));
+        }
+        if !record_owners_equal(
+            donor.document.record(),
+            target.document.record(),
+            crate::RecordType::PPDrawingGroup,
+        ) {
+            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::DrawingGroup,
+            }));
+        }
+        reused.push(TransferDependency::DrawingGroup);
+    }
+    reused.sort_by_key(|dependency| transfer_dependency_order(*dependency));
+    reused.dedup();
+    Ok(reused)
+}
+
+fn has_orphaned_persisted_record(target: &Snapshot, record: &[u8]) -> Result<bool> {
+    let live_ids = target
+        .document
+        .slides()
+        .iter()
+        .map(|slide| slide.persist_id())
+        .collect::<BTreeSet<_>>();
+    let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        target.bytes.clone(),
+        target.limits.max_package_bytes,
+    )?;
+    Ok(editor.persist_ids().into_iter().any(|persist_id| {
+        !live_ids.contains(&persist_id)
+            && editor
+                .persisted_record(persist_id)
+                .is_ok_and(|candidate| candidate == record)
+    }))
 }
 
 fn read_payload_u32(bytes: &[u8], offset: usize) -> Result<u32> {
@@ -2666,6 +2747,78 @@ fn contains_record_type(record: &crate::Record, target: crate::RecordType) -> bo
             .children
             .iter()
             .any(|child| contains_record_type(child, target))
+}
+
+fn collect_interactions(
+    record: &crate::Record,
+    output: &mut Vec<crate::Interaction>,
+) -> Result<()> {
+    if record.record_type == crate::RecordType::InteractiveInfo {
+        output.push(crate::Interaction::parse(record)?);
+        return Ok(());
+    }
+    for child in &record.children {
+        collect_interactions(child, output)?;
+    }
+    Ok(())
+}
+
+fn record_owners_equal(
+    donor: &crate::Record,
+    target: &crate::Record,
+    owner: crate::RecordType,
+) -> bool {
+    let mut donor_records = Vec::new();
+    let mut target_records = Vec::new();
+    collect_record_owners(donor, owner, &mut donor_records);
+    collect_record_owners(target, owner, &mut target_records);
+    !donor_records.is_empty() && donor_records == target_records
+}
+
+fn collect_record_owners<'a>(
+    record: &'a crate::Record,
+    owner: crate::RecordType,
+    output: &mut Vec<&'a crate::Record>,
+) {
+    if record.record_type == owner {
+        output.push(record);
+    }
+    for child in &record.children {
+        collect_record_owners(child, owner, output);
+    }
+}
+
+fn external_owner_contains_active_or_unknown(root: &crate::Record) -> bool {
+    let mut owners = Vec::new();
+    collect_record_owners(root, crate::RecordType::ExObjList, &mut owners);
+    owners.into_iter().any(contains_active_or_unknown_external)
+}
+
+fn contains_active_or_unknown_external(record: &crate::Record) -> bool {
+    matches!(
+        record.record_type,
+        crate::RecordType::Unknown
+            | crate::RecordType::ExternalOleEmbed
+            | crate::RecordType::ExternalOleEmbedAtom
+            | crate::RecordType::ExternalOleLink
+            | crate::RecordType::ExternalOleLinkAtom
+            | crate::RecordType::ExternalOleControl
+            | crate::RecordType::ExternalOleControlAtom
+    ) || record
+        .children
+        .iter()
+        .any(contains_active_or_unknown_external)
+}
+
+const fn transfer_dependency_order(dependency: TransferDependency) -> u8 {
+    match dependency {
+        TransferDependency::SpeakerNotes => 0,
+        TransferDependency::CommentAuthorCatalog => 1,
+        TransferDependency::HyperlinkAction => 2,
+        TransferDependency::DrawingGroup => 3,
+        TransferDependency::ExternalObjectRelationship => 4,
+        TransferDependency::ActiveOrUnknownExternalObject => 5,
+    }
 }
 
 fn normalized_payload(payload: &SlidePayload) -> SlidePayload {
@@ -2695,6 +2848,35 @@ fn inverse_structural(structural_change: &StructuralChange) -> StructuralChange 
             payload: normalized_payload(&list_change.payload),
         }),
     }
+}
+
+fn replay_structural_changes(
+    document: &mut document_structure::Transaction,
+    changes: &[StructuralChange],
+) -> Result<()> {
+    for structural_change in changes {
+        match structural_change {
+            StructuralChange::Move(move_change) => {
+                document.move_slide(move_change.from.get(), move_change.destination.get())?;
+            },
+            StructuralChange::Remove(remove_change) => {
+                let removed = document.remove_slide(remove_change.position.get())?;
+                if removed != remove_change.payload.group {
+                    return Err(PackageError::Corrupted(
+                        "PPT structural rebase selected a different slide-list group".into(),
+                    )
+                    .into());
+                }
+            },
+            StructuralChange::Insert(insert_change) => {
+                document.insert_slide_group(
+                    insert_change.position.get(),
+                    insert_change.payload.group.clone(),
+                )?;
+            },
+        }
+    }
+    Ok(())
 }
 
 fn patch_effects(patch: &Patch) -> BTreeSet<String> {
@@ -3283,7 +3465,7 @@ mod tests {
     }
 
     #[test]
-    fn live_document_owner_overlap_is_a_typed_atomic_refusal() {
+    fn live_document_owners_can_be_staged_in_either_order() {
         let (source, id) = real_media_fixture();
         let before = source.external_media_playback(id).unwrap();
         let replacement = crate::external_media::Playback::new(
@@ -3294,32 +3476,62 @@ mod tests {
 
         let mut structural_first = source.edit().unwrap();
         structural_first.remove_slide(Position::new(0)).unwrap();
-        assert!(matches!(
-            structural_first.set_external_media_playback(id, replacement),
-            Err(Error::Refused(Refusal::OwnerOrderConflict {
-                staged: OwnerBoundary::DocumentStructure,
-                requested: OwnerBoundary::ExternalMedia,
-            }))
-        ));
+        structural_first
+            .set_external_media_playback(id, replacement)
+            .unwrap();
         assert_eq!(structural_first.slide_count(), source.slide_count() - 1);
+        assert_eq!(structural_first.external_media_playback_changes().len(), 1);
+        let structural_first_commit = structural_first.commit().unwrap();
+        assert_eq!(
+            structural_first_commit
+                .snapshot()
+                .external_media_playback(id)
+                .unwrap(),
+            replacement
+        );
+        assert_eq!(
+            structural_first_commit.snapshot().slide_count(),
+            source.slide_count() - 1
+        );
+        assert_eq!(
+            structural_first_commit
+                .patch()
+                .inverse()
+                .apply(structural_first_commit.snapshot())
+                .unwrap(),
+            source
+        );
 
         let mut media_first = source.edit().unwrap();
         media_first
             .set_external_media_playback(id, replacement)
             .unwrap();
-        assert!(matches!(
-            media_first.remove_slide(Position::new(0)),
-            Err(Error::Refused(Refusal::OwnerOrderConflict {
-                staged: OwnerBoundary::ExternalMedia,
-                requested: OwnerBoundary::DocumentStructure,
-            }))
-        ));
+        media_first.remove_slide(Position::new(0)).unwrap();
         assert!(media_first.changes().is_empty());
+        assert_eq!(media_first.slide_count(), source.slide_count() - 1);
         assert_eq!(media_first.external_media_playback_changes().len(), 1);
+        let media_first_commit = media_first.commit().unwrap();
+        assert_eq!(
+            media_first_commit.snapshot().slide_count(),
+            source.slide_count() - 1
+        );
+        let mut reopened =
+            Package::from_reader(Cursor::new(media_first_commit.snapshot().bytes())).unwrap();
+        assert_eq!(
+            reopened.presentation().unwrap().slide_count(),
+            source.slide_count() - 1
+        );
+        let durable = media_first_commit
+            .patch()
+            .to_durable(transfer_patch_limits())
+            .unwrap();
+        let replayed = source.apply_durable(&durable).unwrap();
+        assert_eq!(replayed.slide_count(), source.slide_count() - 1);
+        assert_eq!(replayed.external_media_playback(id).unwrap(), replacement);
     }
 
     #[test]
-    fn transfer_planning_closes_simple_dependencies_and_refuses_drawings() {
+    fn transfer_planning_reuses_bounded_common_dependencies() {
         let base = Snapshot::from_bytes(authored_fixture()).unwrap();
         let transferred_anchor = crate::Anchor::small(25, 35, 325, 235).unwrap();
         let mut format = base.edit().unwrap();
@@ -3336,6 +3548,10 @@ mod tests {
         let plan = receiver
             .plan_transfer_from(&donor, Position::new(0))
             .unwrap();
+        assert!(
+            plan.reused_dependencies()
+                .contains(&TransferDependency::DrawingGroup)
+        );
         let mut edit = receiver.edit().unwrap();
         edit.insert_transfer(Position::new(0), &plan).unwrap();
         let commit = edit.commit().unwrap();
@@ -3370,11 +3586,16 @@ mod tests {
         ));
 
         let comments = Snapshot::from_bytes(fixture("WithComments.ppt")).unwrap();
-        assert!(matches!(
-            comments.plan_transfer_from(&comments, Position::new(0)),
-            Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-                dependency: TransferDependency::CommentAuthorCatalog
-            }))
-        ));
+        let mut remove_comment_slide = comments.edit().unwrap();
+        remove_comment_slide.remove_slide(Position::new(0)).unwrap();
+        let comments_receiver = remove_comment_slide.commit().unwrap().snapshot().clone();
+        let comments_plan = comments_receiver
+            .plan_transfer_from(&comments, Position::new(0))
+            .unwrap();
+        assert!(
+            comments_plan
+                .reused_dependencies()
+                .contains(&TransferDependency::CommentAuthorCatalog)
+        );
     }
 }
