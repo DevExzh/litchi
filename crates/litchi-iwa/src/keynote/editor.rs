@@ -122,13 +122,6 @@ pub struct KeynoteSlideInfo {
     pub notes: Option<String>,
 }
 
-/// Layout-provided text placeholder whose per-slide visibility can be changed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteSlideTextPlaceholder {
-    Title,
-    Body,
-}
-
 /// Stable identity of a slide layout in the presentation theme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KeynoteSlideLayoutId(ObjectId);
@@ -1601,24 +1594,14 @@ impl KeynoteEditor {
                 .title_placeholder
                 .as_ref()
                 .map(|reference| {
-                    placeholder_visibility::validate_placeholder_ownership(
-                        index,
-                        &slide,
-                        reference.identifier,
-                        KeynoteSlideTextPlaceholder::Title,
-                    )
+                    placeholder_ownership::validate(index, &slide, reference.identifier, "title")
                 })
                 .transpose()?;
             let is_body_visible = slide
                 .body_placeholder
                 .as_ref()
                 .map(|reference| {
-                    placeholder_visibility::validate_placeholder_ownership(
-                        index,
-                        &slide,
-                        reference.identifier,
-                        KeynoteSlideTextPlaceholder::Body,
-                    )
+                    placeholder_ownership::validate(index, &slide, reference.identifier, "body")
                 })
                 .transpose()?;
             let title_storage_id = slide
@@ -5294,7 +5277,6 @@ mod date_time_fields;
 mod drawable_order;
 mod named_paragraph_styles;
 mod placeholder_ownership;
-mod placeholder_visibility;
 mod slide_audio;
 mod slide_background;
 mod slide_background_color;

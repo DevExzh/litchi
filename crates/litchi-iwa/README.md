@@ -1598,6 +1598,63 @@ new-output, sibling-temp, no-clobber operation. The example does not implement
 the library's durable atomic-save contract. Never use a truncating
 write to replace an existing Keynote package.
 
+### Keynote title and body placeholder visibility is a focused transaction
+
+Per-slide title/body visibility is no longer a `KeynoteEditor` mutation. Use
+`litchi_keynote::slide::placeholder::{Kind, State, Edit, Patch, Commit,
+Diagnostics, Error, LimitKind}` with a semantic `SlideSelector`; native object
+IDs are never exposed. `slide_placeholder_visibility` returns `None` when the
+selected title or body placeholder is missing, `Some(State::Visible)` when it
+participates in drawing, and `Some(State::Hidden)` when its text and references
+remain intact but it is removed from the native drawing and z-order lists.
+
+```rust,no_run
+use litchi_keynote::{
+    Package, SlideSelector,
+    slide::placeholder::{Kind, State},
+};
+
+let package = Package::open("input.key")?;
+let slide = SlideSelector::name("Opening");
+let title_before = package.slide_title(slide)?;
+assert_eq!(
+    package.slide_placeholder_visibility(slide, Kind::Title)?,
+    Some(State::Visible),
+);
+
+let commit = package
+    .edit_slide_placeholder_visibility(slide, Kind::Title)?
+    .set(State::Hidden)
+    .commit()?;
+assert_eq!(
+    commit
+        .package()
+        .slide_placeholder_visibility(slide, Kind::Title)?,
+    Some(State::Hidden),
+);
+// Hiding changes visibility only; it does not erase the title storage.
+assert_eq!(commit.package().slide_title(slide)?, title_before);
+
+let restored = commit
+    .package()
+    .apply_slide_placeholder_visibility(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+An absent role cannot be edited and returns `Error::PlaceholderNotFound`; this
+transaction does not create a placeholder. Its scope is only visibility for
+existing title/body layout placeholders: slide-number visibility, layout
+editing, and slide or placeholder creation remain separate operations. An
+unchanged `set` is an exact no-op; a changed exact-source commit removes stale
+root previews and fully reopens the candidate. See
+`litchi-keynote/examples/edit_slide_placeholder_visibility.rs` for distinct
+output, sibling-temporary, no-clobber publication through `Package::write_to`.
+
 Keynote slide skip/include, ordering, and modern transition transactions have
 focused `litchi-keynote` package-owner paths. Transition transactions use
 `litchi_keynote::transition::{Edit, Patch, Commit, Diagnostics, Error,

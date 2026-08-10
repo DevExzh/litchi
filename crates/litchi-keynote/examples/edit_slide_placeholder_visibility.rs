@@ -1,4 +1,4 @@
-//! Edit an existing slide title or body without exposing Keynote internals.
+//! Show or hide one layout-provided Keynote title or body placeholder.
 
 #![allow(
     clippy::print_stdout,
@@ -10,13 +10,14 @@ use std::ffi::{OsStr, OsString};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use litchi_keynote::{Package, SlideSelector, TextSpan, slide::placeholder::Kind};
+use litchi_keynote::{
+    Package, SlideSelector,
+    slide::placeholder::{Kind, State},
+};
 use tempfile::NamedTempFile;
 
-const USAGE: &str = "usage: edit_slide_text <input.key> <output.key> \\
-                     <index:N|name:NAME> <title|body> \\
-                     <set TEXT|clear|replace UTF16_START UTF16_END TEXT> \\
-                     [--inverse PATH]";
+const USAGE: &str = "usage: edit_slide_placeholder_visibility <input.key> <output.key> \\
+                     <index:N|name:NAME> <title|body> <show|hide> [--inverse PATH]";
 
 enum SelectedSlide {
     Index(usize),
@@ -32,21 +33,13 @@ impl SelectedSlide {
     }
 }
 
-enum Operation {
-    Set(String),
-    Clear,
-    Replace { span: TextSpan, replacement: String },
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     let mut arguments = std::env::args_os().skip(1);
     let input = PathBuf::from(required_argument(&mut arguments, "missing input path")?);
     let output = PathBuf::from(required_argument(&mut arguments, "missing output path")?);
-    let slide_argument = required_text(&mut arguments, "missing slide selector")?;
-    let slide = parse_selector(&slide_argument)?;
-    let role_argument = required_text(&mut arguments, "missing text role")?;
-    let role = parse_role(&role_argument)?;
-    let operation = parse_operation(&mut arguments)?;
+    let slide = parse_selector(&required_text(&mut arguments, "missing slide selector")?)?;
+    let kind = parse_kind(&required_text(&mut arguments, "missing placeholder kind")?)?;
+    let state = parse_state(&required_text(&mut arguments, "missing placeholder state")?)?;
     let inverse_output = parse_inverse_output(&mut arguments)?;
 
     if input == output {
@@ -62,22 +55,44 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let package = Package::open(&input)?;
-    let mut edit = package.edit_slide_text(slide.selector(), role)?;
-    match operation {
-        Operation::Set(text) => edit.set(&text)?,
-        Operation::Clear => edit.clear()?,
-        Operation::Replace { span, replacement } => edit.replace(span, &replacement)?,
-    };
-    let commit = edit.commit()?;
+    let before = package
+        .slide_placeholder_visibility(slide.selector(), kind)?
+        .ok_or_else(|| invalid_input("selected slide has no placeholder for the requested kind"))?;
+    let commit = package
+        .edit_slide_placeholder_visibility(slide.selector(), kind)?
+        .set(state)
+        .commit()?;
+    if commit
+        .package()
+        .slide_placeholder_visibility(slide.selector(), kind)?
+        != Some(state)
+    {
+        return Err(invalid_input(
+            "committed placeholder visibility did not match the requested state",
+        ));
+    }
 
     let inverse = inverse_output
         .as_ref()
-        .map(|_| commit.package().apply_slide_text(&commit.patch().inverse()))
+        .map(|_| {
+            commit
+                .package()
+                .apply_slide_placeholder_visibility(&commit.patch().inverse())
+        })
         .transpose()?;
     if let Some(restored) = inverse.as_ref() {
         if exact_bytes(restored.package())? != exact_bytes(&package)? {
             return Err(invalid_input(
                 "inverse patch did not restore the exact input package",
+            ));
+        }
+        if restored
+            .package()
+            .slide_placeholder_visibility(slide.selector(), kind)?
+            != Some(before)
+        {
+            return Err(invalid_input(
+                "inverse patch did not restore the original placeholder state",
             ));
         }
     }
@@ -88,9 +103,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "slide {role}: changed={}, touched_components={}",
+        "slide {kind} placeholder: changed={}, touched_components={}, deleted_previews={}",
         commit.diagnostics().changed(),
         commit.diagnostics().touched_components(),
+        commit.diagnostics().deleted_previews(),
     );
     Ok(())
 }
@@ -108,7 +124,7 @@ fn required_text(
 ) -> Result<String, Box<dyn Error>> {
     required_argument(arguments, message)?
         .into_string()
-        .map_err(|_non_utf8| invalid_input("text arguments must be valid UTF-8"))
+        .map_err(|_error| invalid_input("slide selector, kind, and state must be valid UTF-8"))
 }
 
 fn parse_selector(value: &str) -> Result<SelectedSlide, Box<dyn Error>> {
@@ -116,7 +132,7 @@ fn parse_selector(value: &str) -> Result<SelectedSlide, Box<dyn Error>> {
         return index
             .parse()
             .map(SelectedSlide::Index)
-            .map_err(|_parse| invalid_input("slide index must be a non-negative integer"));
+            .map_err(|_error| invalid_input("slide index must be a non-negative integer"));
     }
     if let Some(name) = value.strip_prefix("name:") {
         return Ok(SelectedSlide::Name(name.to_owned()));
@@ -126,44 +142,20 @@ fn parse_selector(value: &str) -> Result<SelectedSlide, Box<dyn Error>> {
     ))
 }
 
-fn parse_role(value: &str) -> Result<Kind, Box<dyn Error>> {
+fn parse_kind(value: &str) -> Result<Kind, Box<dyn Error>> {
     match value {
         "title" => Ok(Kind::Title),
         "body" => Ok(Kind::Body),
-        _ => Err(invalid_input("text role must be title or body")),
+        _ => Err(invalid_input("placeholder kind must be title or body")),
     }
 }
 
-fn parse_operation(
-    arguments: &mut impl Iterator<Item = OsString>,
-) -> Result<Operation, Box<dyn Error>> {
-    match required_text(arguments, "missing text operation")?.as_str() {
-        "set" => Ok(Operation::Set(required_text(
-            arguments,
-            "missing replacement text",
-        )?)),
-        "clear" => Ok(Operation::Clear),
-        "replace" => {
-            let start_argument = required_text(arguments, "missing UTF-16 start")?;
-            let start = parse_index(&start_argument, "start")?;
-            let end_argument = required_text(arguments, "missing UTF-16 end")?;
-            let end = parse_index(&end_argument, "end")?;
-            let replacement = required_text(arguments, "missing replacement text")?;
-            Ok(Operation::Replace {
-                span: TextSpan::from_utf16_indexes(start, end)?,
-                replacement,
-            })
-        },
-        _ => Err(invalid_input(
-            "text operation must be set, clear, or replace",
-        )),
+fn parse_state(value: &str) -> Result<State, Box<dyn Error>> {
+    match value {
+        "show" => Ok(State::Visible),
+        "hide" => Ok(State::Hidden),
+        _ => Err(invalid_input("placeholder state must be show or hide")),
     }
-}
-
-fn parse_index(value: &str, label: &str) -> Result<usize, Box<dyn Error>> {
-    value
-        .parse()
-        .map_err(|_parse| invalid_input(format!("UTF-16 {label} must be a non-negative integer")))
 }
 
 fn parse_inverse_output(
@@ -184,20 +176,18 @@ fn parse_inverse_output(
     Ok(Some(path))
 }
 
-/// Publishes through a sibling temporary file without replacing an existing target.
-///
-/// This example does not provide the library's durable atomic-save contract.
+/// Publishes through a sibling temporary file without overwriting an existing target.
 fn save_new(path: &Path, package: &Package) -> Result<(), Box<dyn Error>> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let mut temporary = NamedTempFile::new_in(parent)?;
-    package.write_to(&mut temporary)?;
+    package.write_to(temporary.as_file_mut())?;
     temporary.as_file().sync_all()?;
     temporary
         .persist_noclobber(path)
-        .map_err(|error| -> Box<dyn Error> { Box::new(error.error) })?;
+        .map_err(|error| Box::new(error.error))?;
     Ok(())
 }
 

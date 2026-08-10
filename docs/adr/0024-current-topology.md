@@ -1378,3 +1378,97 @@ Remaining debt is aggregate memory/work and fallible-allocation accounting,
 process-local complete-artifact patches without stable semantic operations,
 composition/merge/history, durable atomic library save, baseline Clippy
 cleanup, and sanitizer-backed fuzzing.
+
+## 2026-08-10 current-status amendment: Keynote placeholder visibility
+
+Title/body placeholder visibility is owned behind
+`slide::placeholder::{Kind, State, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` and `Package::{slide_placeholder_visibility,
+edit_slide_placeholder_visibility, apply_slide_placeholder_visibility}`. These
+focused signatures expose no generated or raw-source types. Missing roles read
+as `None` and cannot be synthesized by the consuming `set`/`show`/`hide` edit.
+The public selector is canonically the shared `slide::placeholder::Kind` for
+both slide-text and visibility operations. Replacing `SlideTextRole` is an
+intentional source break; the common discriminator does not merge the
+operations' distinct ownership and mutation contracts.
+
+The format contract retains title/body stable references in SlideArchive fields
+5/6 and represents visibility as exact membership in both owned-drawables field
+7 and z-order field 42. The rooted Document `[2]` -> Show/SlideTree `[3,2]` ->
+SlideNode field 2 chain, exact aggregate reference metadata, slide/placeholder
+co-location, and the strict placeholder Buffa view jointly prove ownership.
+Changed admission also refuses aliases, conflicting list metadata, merge state,
+noncanonical framing, selected cache/layering state, layout overrides, and
+builds targeting the selected placeholder.
+
+Changed edits touch the slide component and, when separate, the SlideNode
+component; they invalidate only that node's rendering cache and remove the
+three root previews. `Index/ViewState.iwa`, other roles, date objects, content,
+unknown fields, and unrelated components remain preserved. No-op and inverse
+artifacts are exact, and changed patch application validates its retained
+source before reopening the target. This does not move slide-number, layout,
+placeholder creation, text-box, or style mutation.
+Ownership uses linear payload occurrence/kind and metadata declaration indexes.
+The bounded 4,096-to-8,192-object step remains within 2.3x recorded work. A
+budget-aware single SlideNode pass conditionally invalidates and exact-verifies
+the direction-aware delta. Verification uses only bounded, fallibly allocated
+occurrence/declaration indexes, with no full node/payload clone or verification
+rewrite; zero allowance fails atomically before publication. Structural work
+includes every `MessageInfo`/`FieldInfo`, even empty records. A fixture with
+4,096 empty `FieldInfo` records is atomically rejected by zero and payload-only
+allowances, and the slide router precharges exact
+`source + output + 2 * fields` work before allocation.
+Full precharge includes selected/nonselected payload bytes, metadata vectors,
+paths, features, and bases, every aggregate/`FieldInfo` reference in both
+`Work` and `References`, and `header_length`. Low allowances atomically reject
+the 256-KiB sibling plus 2,048 references/vectors.
+
+Native Keynote 14.4 confirmed the list convention and UI behavior. The pristine
+500,058-byte fixture is
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+Title hidden
+`d61a92b212d8a0f001bdfc24490d846e065b96885f0d0d0b86ef0be9f10e7580`
+to reshown
+`9d914ea25a42aaced4459a429e776b09b2024e2858133369f159dad7bce67325`
+appended title after body; body hidden
+`05ca9617ea5a23c57252c28c3029af96d4ec54345de331571d89b612566b8416`
+to reshown
+`8ee6ac8230273def64450b4cee86c9678849d77b5a7fbd11eb88e0c786279eee`
+appended body. Checkboxes, canvas, date/other role, and reopen were confirmed.
+Apple regenerated caches, so this is semantic rather than raw-cache evidence.
+
+The Rust title-hidden candidate
+`df119410433b97b9993d46619764a8ffb75f257b16c0680cd54faabd9a453cdd`
+reported changed=true, two touched components, and three deleted previews; its
+inverse exactly restored the pristine hash. Keynote 14.4 opened it warning-free
+with Title off, Body on, and body/date retained. Save As, close, and reopen
+preserved that state in the 475,102-byte native resave
+`c5c996415191758b9fc638a8fdf024a912a6fe2ac4c3989970f0cb611e0670e3`.
+
+Two-way Rust gates also pass exactly: Apple-hidden title
+`d61a92b212d8a0f001bdfc24490d846e065b96885f0d0d0b86ef0be9f10e7580`
+became shown
+`3d36d31c6222b7622cab180f6dd9559ccf43f4b481e6b245c9d2c56fe8852b2c`,
+and Apple-hidden body
+`05ca9617ea5a23c57252c28c3029af96d4ec54345de331571d89b612566b8416`
+became shown
+`3e8855e954c16bd32350e057665b5ee4758a02e85ad23c3c6543f1caef177b13`;
+each inverse restored its exact hidden source. Both shows reported
+changed=true, two touched components, and three deleted previews.
+
+The host cut is exact: the three
+`KeynoteEditor::{set_slide_text_placeholder_visible, set_slide_title_visible,
+set_slide_body_visible}` mutators, public `KeynoteSlideTextPlaceholder`, the
+complete 150-line `keynote/editor/placeholder_visibility.rs` source/module, two
+whole direct tests plus one exclusive constant, and the 30-line
+`set_keynote_placeholder_visibility` example are gone. Five mixed layout
+assertions use focused reads. Shared ownership and the layout and slide-number
+paths remain.
+
+Verification is 94/94 Keynote library, 18/18 slide-preview, 5/5 focused
+visibility, 25/25 slide-text, 8/8 `--features keynote` facade, 7/7 doctest, and
+129/129 boundary tests. Keynote all-target and host-lib checks plus strict
+library Clippy/rustdoc, formatting, and diff checks pass. The expanded
+`keynote_slide_text` fuzz target compiles and completes a bounded stable smoke;
+missing sanitizer symbols make that control-flow evidence, not sanitizer-backed
+fuzzing. Native and exact inverse gates pass. No edge or debt item closes.

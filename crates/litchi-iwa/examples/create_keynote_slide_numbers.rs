@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_keynote::{Package, SlideSelector, SlideTextRole};
+use litchi_keynote::{Package, SlideSelector, slide::placeholder::Kind};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&keynote.to_bytes()?)
         .map_err(|error| std::io::Error::other(format!("focused reopen failed: {error:?}")))?;
     let mut title = package
-        .edit_slide_text(SlideSelector::index(1), SlideTextRole::Title)
+        .edit_slide_text(SlideSelector::index(1), Kind::Title)
         .map_err(|error| std::io::Error::other(format!("title preflight failed: {error:?}")))?;
     title.set("Second slide")?;
     let title = title

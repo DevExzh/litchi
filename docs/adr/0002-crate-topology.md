@@ -1292,7 +1292,8 @@ transactions for an existing slide's existing semantic title and body
 placeholders. The role-aware surface consists of `slide_text`,
 `edit_slide_text`, and `apply_slide_text`, with `slide_title`, `slide_body`,
 `edit_slide_title`, and `edit_slide_body` conveniences. Its format-owned
-`SlideTextRole`, edit, commit, patch, diagnostics, error, and limit types use
+`slide::placeholder::Kind`, edit, commit, patch, diagnostics, error, and limit
+types use
 the shared archive-free `TextPosition` and `TextSpan`. Callers select a slide
 by exact navigator name or checked semantic position; placeholder, storage,
 component, and protobuf identities remain private.
@@ -2205,3 +2206,125 @@ patches without stable semantic serialization/read-write sets/composition/
 merge/history, library-owned durable atomic publication, baseline Clippy
 cleanup, and a sanitizer-backed fuzz campaign. `write_to` does not itself
 flush, sync, rename, or make output durable.
+
+## 2026-08-10 amendment: Keynote title/body placeholder visibility
+
+The focused Keynote cut assigns title/body placeholder visibility to the
+format package. Its semantic surface is
+`slide::placeholder::{Kind, State, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` plus `Package::{slide_placeholder_visibility,
+edit_slide_placeholder_visibility, apply_slide_placeholder_visibility}`.
+The focused method/type signatures expose neither generated messages nor raw
+source artifacts. `Edit::set`, `show`, and `hide` consume the edit; reading a
+missing role returns `None`, while editing one fails rather than synthesizing a
+placeholder.
+
+This is a deliberate source-level canonicalization: callers that previously
+used `SlideTextRole` must use the shared
+`slide::placeholder::Kind::{Title, Body}` discriminator for both slide-text and
+visibility operations. The discriminator is common; each operation retains its
+own ownership and mutation contract.
+
+The wire seam is deliberately narrower than slide text, layout, or
+slide-number mutation. A title reference remains SlideArchive field 5 and a
+body reference field 6. Visibility is the selected reference's membership in
+both owned-drawables field 7 and z-order field 42: hidden means zero
+occurrences in each, visible exactly one in each. Showing appends the selected
+reference and hiding removes only it. Other placeholder roles, date objects,
+content, and unknown fields remain untouched.
+
+Ownership follows the unique rooted Document field 2 -> Show/SlideTree path
+`[3,2]` -> SlideNode field 2 -> SlideArchive chain, with exact aggregate
+reference metadata and co-location of the selected placeholder and slide. The
+strict raw preflight is cross-checked through the placeholder Buffa projection:
+native role 2/3, parent-slide path `[1,1,1,2]`, unlocked path
+`[1,1,1,5]`, and agreeing modern/deprecated storage references. Changed edits
+fail closed for aliased title/body or object/slide-number references,
+conflicting list-local evidence, merge/base/diff state, noncanonical framing,
+nonzero slide layering field 41, selected slide cache fields 37/38, layout-level
+visibility overrides, and builds targeting the selected placeholder.
+
+A changed commit rewrites only the slide membership component, or that
+component plus a separate SlideNode component, invalidates the selected node's
+rendering cache, and deletes `preview.jpg`, `preview-micro.jpg`, and
+`preview-web.jpg`. `Index/ViewState.iwa` and unrelated components are
+preserved. No-ops share the exact source; changed patch application validates
+the retained source and reopens the target; the inverse restores the exact
+source artifact. Legacy changed nested archives remain a fail-closed
+compatibility case. This amendment does not move slide-number, layout,
+placeholder creation, text-box, or style mutation.
+
+Ownership preflight builds linear indexes for payload occurrence/kind and
+metadata declarations. Increasing the bounded indexed fixture from 4,096 to
+8,192 objects consumed no more than 2.3x recorded work. The budget-aware
+SlideNode path conditionally invalidates and direction-aware exact-verifies in
+one pass, merging exact reference/wire-work charges. Verification uses only the
+bounded, fallibly allocated occurrence/declaration indexes: it makes no full
+node/payload clone or verification rewrite. Zero remaining allowance fails
+atomically before publication. Structural work is charged per `MessageInfo`
+and `FieldInfo`, including empty records; 4,096 empty `FieldInfo` records are
+atomically rejected by both zero and payload-only allowances. Before
+allocation, the slide router charges the exact
+`source + output + 2 * fields` work budget.
+The full precharge also covers selected and nonselected payload bytes, metadata
+vectors, paths, features, and bases, every aggregate/`FieldInfo` reference in
+both `Work` and `References`, and `header_length`. A 256-KiB sibling plus 2,048
+references/vectors is atomically rejected under low allowances.
+
+Keynote 14.4 provides native membership oracles. The pristine 500,058-byte
+`basic.key` has SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+A native title-hidden artifact
+`d61a92b212d8a0f001bdfc24490d846e065b96885f0d0d0b86ef0be9f10e7580`
+became
+`9d914ea25a42aaced4459a429e776b09b2024e2858133369f159dad7bce67325`
+when reshown, appending title after body. A native body-hidden artifact
+`05ca9617ea5a23c57252c28c3029af96d4ec54345de331571d89b612566b8416`
+became
+`8ee6ac8230273def64450b4cee86c9678849d77b5a7fbd11eb88e0c786279eee`
+when reshown, appending body. The UI confirmed the title/body checkboxes,
+canvas result, preserved date/other role, and close/reopen behavior. Apple
+regenerated caches; that is compatible with the focused writer's conservative
+cache invalidation, not evidence of byte-identical cache preservation.
+
+The Rust-authored compatibility gate starts from, and its inverse restores,
+the exact pristine hash above. Hiding title produced
+`df119410433b97b9993d46619764a8ffb75f257b16c0680cd54faabd9a453cdd`
+with `changed=true`, two touched components, and three deleted root previews.
+Keynote 14.4 opened it without warning with Title off and Body on while
+retaining the body and date. Save As, close, and reopen preserved that UI state;
+the 475,102-byte native resave is
+`c5c996415191758b9fc638a8fdf024a912a6fe2ac4c3989970f0cb611e0670e3`.
+
+The reverse-direction Rust gates are exact as well. Showing the Apple-hidden
+title source
+`d61a92b212d8a0f001bdfc24490d846e065b96885f0d0d0b86ef0be9f10e7580`
+produced
+`3d36d31c6222b7622cab180f6dd9559ccf43f4b481e6b245c9d2c56fe8852b2c`,
+and its inverse restored the hidden source. Showing the Apple-hidden body
+source
+`05ca9617ea5a23c57252c28c3029af96d4ec54345de331571d89b612566b8416`
+produced
+`3e8855e954c16bd32350e057665b5ee4758a02e85ad23c3c6543f1caef177b13`,
+and its inverse likewise restored the hidden source. Both reported
+`changed=true`, two touched components, and three deleted previews.
+
+The host cut removes exactly the three
+`KeynoteEditor::{set_slide_text_placeholder_visible, set_slide_title_visible,
+set_slide_body_visible}` mutators, public `KeynoteSlideTextPlaceholder`, the
+whole 150-line `keynote/editor/placeholder_visibility.rs` source and module,
+two whole direct mutation tests plus their exclusive constant, and the 30-line
+`set_keynote_placeholder_visibility` example. Five mixed layout assertions now
+use focused package reads. Shared placeholder ownership, layout, and
+slide-number readers/mutators remain; this is not their retirement. No manifest
+edge or architecture debt item closes.
+
+Final verification passes 94/94 Keynote library tests, 18/18 filtered
+slide-preview tests, 5/5 focused visibility integration tests, 25/25 slide-text
+integration tests, 8/8 root facade tests with `--features keynote`, 7/7
+doctests, and 129/129 boundary regressions. Keynote all-target and host-library
+checks, warning-denied library Clippy and rustdoc, formatting, and diff checks
+are green. The expanded `keynote_slide_text` fuzz target checks and completes a
+bounded stable-toolchain control-flow smoke; the expected missing sanitizer
+symbols mean that run is not sanitizer-backed fuzzing evidence. The native and
+exact-artifact gates above complete the compatibility proof.

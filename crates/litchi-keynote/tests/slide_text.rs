@@ -8,7 +8,7 @@ use litchi_iwa_protos::{kn, tsa, tsk, tsp, tswp};
 use litchi_keynote::{
     Package, Position, ReadOptions, SemanticLimits, SlideSelector, SlideTextCommit,
     SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch,
-    SlideTextRole, TextPosition, TextSpan,
+    TextPosition, TextSpan, slide::placeholder::Kind,
 };
 use prost::Message as _;
 
@@ -802,7 +802,7 @@ fn title_body_reads_are_role_distinct_and_preserve_absent_vs_empty() -> TestResu
     let bytes = synthetic_package(false)?;
     let package = Package::from_bytes(&bytes)?;
     assert_eq!(
-        package.slide_text("Agenda", SlideTextRole::Title)?,
+        package.slide_text("Agenda", Kind::Title)?,
         Some(TITLE.to_owned())
     );
     assert_eq!(
@@ -810,7 +810,7 @@ fn title_body_reads_are_role_distinct_and_preserve_absent_vs_empty() -> TestResu
         Some(TITLE.to_owned())
     );
     assert_eq!(
-        package.slide_text("Agenda", SlideTextRole::Body)?,
+        package.slide_text("Agenda", Kind::Body)?,
         Some(BODY.to_owned())
     );
     assert_eq!(
@@ -823,9 +823,7 @@ fn title_body_reads_are_role_distinct_and_preserve_absent_vs_empty() -> TestResu
 
     assert!(matches!(
         package.edit_slide_body("Existing Empty"),
-        Err(SlideTextError::TextStorageNotFound {
-            role: SlideTextRole::Body
-        })
+        Err(SlideTextError::TextStorageNotFound { role: Kind::Body })
     ));
     Ok(())
 }
@@ -939,13 +937,13 @@ fn unrelated_zero_placeholder_is_invisible_and_preserved_by_title_and_body_commi
 
     for (role, other_role, replacement) in [
         (
-            SlideTextRole::Title,
-            SlideTextRole::Body,
+            Kind::Title,
+            Kind::Body,
             "Selected title changed beside zero sentinel",
         ),
         (
-            SlideTextRole::Body,
-            SlideTextRole::Title,
+            Kind::Body,
+            Kind::Title,
             "Selected body changed beside zero sentinel",
         ),
     ] {
@@ -1019,13 +1017,13 @@ fn selector_first_utf16_operations_cover_both_roles() -> TestResult<()> {
     let span = TextSpan::from_utf16_indexes(7, 9)?;
     let mut edit = package.edit_slide_title("Agenda")?;
     assert_eq!(edit.position(), Position::new(0));
-    assert_eq!(edit.role(), SlideTextRole::Title);
+    assert_eq!(edit.role(), Kind::Title);
     assert_eq!(edit.text(), TITLE);
     edit.replace(span, "東京😀")?;
     assert_eq!(edit.span(), Some(span));
     let commit = edit.commit()?;
     assert_eq!(commit.patch().position(), Position::new(0));
-    assert_eq!(commit.patch().role(), SlideTextRole::Title);
+    assert_eq!(commit.patch().role(), Kind::Title);
     assert_eq!(commit.patch().span(), span);
     assert_eq!(commit.patch().before(), TITLE);
     assert_eq!(commit.patch().after(), "Launch 東京😀 title");
@@ -1094,7 +1092,7 @@ fn utf16_boundaries_selector_and_staging_errors_leave_source_unchanged() -> Test
         Err(SlideTextError::SlideNameNotFound)
     ));
     assert!(matches!(
-        package.edit_slide_text(SlideSelector::index(2), SlideTextRole::Title),
+        package.edit_slide_text(SlideSelector::index(2), Kind::Title),
         Err(SlideTextError::SlidePositionNotFound { position }) if position == Position::new(2)
     ));
 
@@ -1138,7 +1136,7 @@ fn semantic_noops_share_the_exact_source_allocation_for_each_role() -> TestResul
     let package = Package::from_bytes(&bytes)?;
     let source_snapshot = package.exact_bytes();
 
-    for (role, text) in [(SlideTextRole::Title, TITLE), (SlideTextRole::Body, BODY)] {
+    for (role, text) in [(Kind::Title, TITLE), (Kind::Body, BODY)] {
         let mut edit = package.edit_slide_text("Agenda", role)?;
         edit.set(text)?;
         let commit = edit.commit()?;
@@ -1292,7 +1290,7 @@ fn changed_text_preserves_unknowns_scope_siblings_and_exact_inverse() -> TestRes
     let applied = package.apply_slide_text(commit.patch())?;
     assert_eq!(applied.package().exact_bytes(), target);
     let inverse = commit.patch().inverse();
-    assert_eq!(inverse.role(), SlideTextRole::Title);
+    assert_eq!(inverse.role(), Kind::Title);
     assert_eq!(inverse.before(), commit.patch().after());
     assert_eq!(inverse.after(), commit.patch().before());
     assert_eq!(
@@ -1427,13 +1425,13 @@ fn explicit_placeholder_kinds_are_role_checked_for_both_roles() -> TestResult<()
     for (owner, role, allowed, rejected) in [
         (
             TITLE_OWNER,
-            SlideTextRole::Title,
+            Kind::Title,
             [None, Some(0), Some(2)],
             [1, 3, 4, 99],
         ),
         (
             BODY_OWNER,
-            SlideTextRole::Body,
+            Kind::Body,
             [None, Some(0), Some(3)],
             [1, 2, 4, 99],
         ),
@@ -1443,8 +1441,8 @@ fn explicit_placeholder_kinds_are_role_checked_for_both_roles() -> TestResult<()
             let package = Package::from_bytes(&compatible)?;
             let mut edit = package.edit_slide_text("Agenda", role)?;
             edit.set(match role {
-                SlideTextRole::Title => "compatible title kind",
-                SlideTextRole::Body => "compatible body kind",
+                Kind::Title => "compatible title kind",
+                Kind::Body => "compatible body kind",
                 _ => "compatible placeholder kind",
             })?;
             let commit = edit.commit()?;
@@ -1840,9 +1838,7 @@ fn errors_and_transaction_debug_are_content_free() -> TestResult<()> {
 
     let errors = [
         SlideTextError::SlideNameNotFound,
-        SlideTextError::TextStorageNotFound {
-            role: SlideTextRole::Title,
-        },
+        SlideTextError::TextStorageNotFound { role: Kind::Title },
         SlideTextError::PatchConflict,
         SlideTextError::LimitExceeded {
             kind: SlideTextLimitKind::OutputBytes,

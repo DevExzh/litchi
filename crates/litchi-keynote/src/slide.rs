@@ -4,6 +4,7 @@ pub mod audio;
 pub mod image;
 pub mod media;
 pub mod movie;
+pub mod placeholder;
 pub mod table;
 
 use std::collections::TryReserveError;

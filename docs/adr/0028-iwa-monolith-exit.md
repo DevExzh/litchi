@@ -1097,7 +1097,8 @@ this amendment explicitly makes no aggregate peak-memory completion claim.
 
 Deletion gate 3 advances for one more Keynote mutation family. The concrete
 format owner now reads and edits text in an existing slide's existing semantic
-title or body placeholder through `SlideSelector`, `SlideTextRole`, checked
+title or body placeholder through `SlideSelector`,
+`slide::placeholder::Kind`, checked
 UTF-16 spans, and an exact-source reversible patch. Native slide, placeholder,
 and storage identifiers, component names, protobuf messages, and authorization
 records remain private.
@@ -1858,3 +1859,96 @@ process-local full-artifact patches without stable semantic serialization/
 composition/merge/history, library-owned durable atomic publication, baseline
 Clippy cleanup, and sanitizer-backed fuzzing. No dependency edge or debt item
 is removed by this vertical.
+
+## 2026-08-10 amendment: Keynote placeholder-visibility host exit
+
+This Keynote host exit moves title/body visibility ownership to
+`slide::placeholder::{Kind, State, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` and semantic `Package` read/edit/apply methods. The focused API
+signatures do not expose generated messages or raw source artifacts. A missing
+role is readable as `None` but cannot be manufactured by this transaction.
+The canonical selector is now the shared
+`slide::placeholder::Kind::{Title, Body}` for both visibility and slide-text
+operations. Replacing `SlideTextRole` is an intentional source break; the
+common discriminator still fronts distinct ownership and mutation contracts.
+
+The vertical owns only the selected title/body reference's membership in
+SlideArchive owned-drawables field 7 and z-order field 42; stable role
+references remain fields 5/6. Rooted Document/Show/SlideNode ownership, exact
+reference metadata, co-location, and strict raw plus Buffa placeholder
+projection are required. Changed edits fail closed on aliases, conflicting
+list evidence, merge/framing state, cache/layering state, layout overrides, and
+selected-placeholder builds.
+
+A change rewrites one or two components depending on SlideNode co-location,
+invalidates the selected node cache, and deletes all three root previews while
+preserving `Index/ViewState.iwa` and unrelated data. No-ops and inverses are
+byte-exact; changed patch application validates the retained source payload.
+This is not a transfer of slide-number, layout, placeholder creation, text-box,
+or style mutation.
+Ownership uses linear payload occurrence/kind and metadata declaration indexes;
+the bounded 4,096-to-8,192-object step stays within 2.3x recorded work. A
+budget-aware single SlideNode pass conditionally invalidates and exact-verifies
+the direction-aware delta. Verification uses only bounded, fallibly allocated
+occurrence/declaration indexes, with no full node/payload clone or verification
+rewrite. Zero allowance fails atomically before publication. Structural work
+charges every `MessageInfo` and `FieldInfo`, including empty records; 4,096
+empty `FieldInfo` records are rejected atomically under zero and payload-only
+allowances. The slide router precharges exact
+`source + output + 2 * fields` work before allocation.
+Full precharge covers selected/nonselected payload bytes, metadata vectors,
+paths, features, and bases, every aggregate/`FieldInfo` reference in both
+`Work` and `References`, and `header_length`. Low allowances atomically reject
+a 256-KiB sibling plus 2,048 references/vectors.
+
+Keynote 14.4 native oracles use pristine 500,058-byte SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+Reshowing title changed
+`d61a92b212d8a0f001bdfc24490d846e065b96885f0d0d0b86ef0be9f10e7580`
+to
+`9d914ea25a42aaced4459a429e776b09b2024e2858133369f159dad7bce67325`
+and appended title after body; reshowing body changed
+`05ca9617ea5a23c57252c28c3029af96d4ec54345de331571d89b612566b8416`
+to
+`8ee6ac8230273def64450b4cee86c9678849d77b5a7fbd11eb88e0c786279eee`
+and appended body. UI checkboxes, canvas, date/other role, and close/reopen were
+confirmed. Native cache regeneration is compatible with the focused writer's
+conservative preview/cache invalidation.
+
+The Rust-authored title-hidden candidate
+`df119410433b97b9993d46619764a8ffb75f257b16c0680cd54faabd9a453cdd`
+reported changed=true, two touched components, and three deleted previews, and
+its inverse restored the exact pristine hash. Keynote 14.4 opened the candidate
+without warning with Title off, Body on, and body/date retained. Save As, close,
+and reopen preserved that state in the 475,102-byte native resave
+`c5c996415191758b9fc638a8fdf024a912a6fe2ac4c3989970f0cb611e0670e3`.
+
+The reverse-direction Rust gates are also exact. Apple-hidden title
+`d61a92b212d8a0f001bdfc24490d846e065b96885f0d0d0b86ef0be9f10e7580`
+became shown
+`3d36d31c6222b7622cab180f6dd9559ccf43f4b481e6b245c9d2c56fe8852b2c`,
+and Apple-hidden body
+`05ca9617ea5a23c57252c28c3029af96d4ec54345de331571d89b612566b8416`
+became shown
+`3e8855e954c16bd32350e057665b5ee4758a02e85ad23c3c6543f1caef177b13`;
+each inverse restored its exact hidden source. Both shows diagnosed
+changed=true, two touched components, and three deleted previews.
+
+The completed host exit removes
+`KeynoteEditor::{set_slide_text_placeholder_visible, set_slide_title_visible,
+set_slide_body_visible}`, public `KeynoteSlideTextPlaceholder`, the full 150-line
+`keynote/editor/placeholder_visibility.rs` module/source, two whole direct
+tests and their exclusive constant, and the 30-line
+`set_keynote_placeholder_visibility` example. Five mixed layout assertions now
+use focused reads. Shared placeholder ownership, layout, and slide-number code
+remain, so this vertical does not overstate their retirement.
+
+The final gate passes 94/94 Keynote library tests, 18/18 filtered slide-preview
+tests, 5/5 focused visibility tests, 25/25 slide-text integration tests, 8/8
+root facade tests with `--features keynote`, 7/7 doctests, and 129/129 boundary
+regressions. Keynote all-target and host-library checks, warning-denied library
+Clippy and rustdoc, formatting, and diff checks are green. The expanded
+`keynote_slide_text` fuzz target compiles and completes a bounded stable
+control-flow smoke; expected missing sanitizer symbols mean this is not
+sanitizer-backed fuzz evidence. Native and exact inverse gates complete the
+compatibility proof. No dependency edge or debt item is removed.

@@ -115,6 +115,54 @@ For safe filesystem publication, use
 output through `Package::write_to` into a synchronized sibling temporary file
 and publishes it without clobbering an existing target.
 
+## Focused Keynote title/body placeholder visibility
+
+With the `keynote` feature enabled, `litchi::keynote` exposes the frozen
+selector-first visibility transaction. `Kind::Title` and `Kind::Body` select
+only existing layout-provided placeholders: a read returns `None` if the role
+is missing, `Some(State::Visible)` if it draws, or `Some(State::Hidden)` if it
+is retained without drawing. Hidden placeholders keep their text.
+
+```rust,no_run
+use litchi::keynote::{
+    Package, SlideSelector,
+    slide::placeholder::{Kind, State},
+};
+
+let package = Package::open("input.key")?;
+let slide = SlideSelector::index(0);
+let body_before = package.slide_body(slide)?;
+
+let commit = package
+    .edit_slide_placeholder_visibility(slide, Kind::Body)?
+    .set(State::Hidden)
+    .commit()?;
+assert_eq!(
+    commit
+        .package()
+        .slide_placeholder_visibility(slide, Kind::Body)?,
+    Some(State::Hidden),
+);
+assert_eq!(commit.package().slide_body(slide)?, body_before);
+
+let restored = commit
+    .package()
+    .apply_slide_placeholder_visibility(&commit.patch().inverse())?;
+let mut output = Vec::new();
+restored.package().write_to(&mut output)?;
+assert!(!output.is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The transaction types are in `litchi::keynote::slide::placeholder`. Missing
+roles return `Error::PlaceholderNotFound` from the edit entry point; visibility
+does not create a placeholder. Slide-number visibility, layout edits, and
+slide/placeholder creation are out of scope. An unchanged `set` is exact
+no-op, and an inverse is exact-source checked. For safe publication, use
+`litchi-keynote/examples/edit_slide_placeholder_visibility.rs`, which streams
+through `Package::write_to` into a synchronized sibling temporary file and
+publishes without clobbering an existing target.
+
 ## Focused Numbers table-header edits
 
 Enable the `numbers` feature to use the focused immutable Numbers package API

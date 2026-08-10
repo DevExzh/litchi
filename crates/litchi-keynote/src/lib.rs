@@ -169,6 +169,46 @@
 //! assert_eq!(restored.package().slide_body("Appendix")?, Some(body_before));
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! # Show or hide a slide placeholder
+//!
+//! Missing and hidden placeholders remain distinct: a read returns `None` for
+//! a missing role and `Some(State::Hidden)` for an existing placeholder whose
+//! content is retained outside both drawing ownership lists.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{
+//!     Package,
+//!     slide::placeholder::{Kind, State},
+//! };
+//!
+//! let package = Package::open("input.key")?;
+//! let before = package
+//!     .slide_placeholder_visibility("Appendix", Kind::Title)?
+//!     .ok_or_else(|| io::Error::other("slide has no title placeholder"))?;
+//! let commit = package
+//!     .edit_slide_placeholder_visibility("Appendix", Kind::Title)?
+//!     .hide()
+//!     .commit()?;
+//! assert_eq!(
+//!     commit
+//!         .package()
+//!         .slide_placeholder_visibility("Appendix", Kind::Title)?,
+//!     Some(State::Hidden),
+//! );
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_placeholder_visibility(&commit.patch().inverse())?;
+//! assert_eq!(
+//!     restored
+//!         .package()
+//!         .slide_placeholder_visibility("Appendix", Kind::Title)?,
+//!     Some(before),
+//! );
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 #![forbid(unsafe_code)]
 
@@ -203,8 +243,7 @@ pub use package::{
     SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
     SlideNotesPatch, SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError,
     SlideOrderLimitKind, SlideOrderPatch, SlideTextCommit, SlideTextDiagnostics, SlideTextEdit,
-    SlideTextError, SlideTextLimitKind, SlideTextPatch, SlideTextRole, Stats, TextStorageFailure,
-    WriteError,
+    SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats, TextStorageFailure, WriteError,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::MovieKind;
