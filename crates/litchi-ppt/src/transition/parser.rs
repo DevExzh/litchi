@@ -48,8 +48,8 @@ pub fn parse_transition(record: &Record) -> Result<TransitionInfo> {
 
     let effect_speed = record.data.get(12).copied().unwrap_or(0);
 
-    transition.transition_type = parse_transition_type(effect_type);
-    transition.direction = parse_transition_direction(effect_direction, effect_type);
+    (transition.transition_type, transition.direction) =
+        parse_transition_visual(effect_type, effect_direction);
     transition.speed = parse_transition_speed(effect_speed);
     transition.advance_mode = parse_advance_mode(flags, slide_time > 0);
     transition.loop_sound = (flags & 0x40) != 0;
@@ -61,108 +61,120 @@ pub fn parse_transition(record: &Record) -> Result<TransitionInfo> {
     Ok(transition)
 }
 
-/// Parse transition type from effect type value.
-pub(super) fn parse_transition_type(effect_type: u16) -> TransitionType {
+/// Parse one transition kind/direction pair using the exact effect table in
+/// `[MS-PPT]` 2.6.6. Invalid or undefined producer values remain explicitly
+/// undefined instead of being mislabeled as another effect.
+pub(super) fn parse_transition_visual(
+    effect_type: u16,
+    direction: u8,
+) -> (TransitionType, TransitionDirection) {
+    let undefined = (TransitionType::Undefined, TransitionDirection::None);
     match effect_type {
-        1 => TransitionType::Blinds,
-        2 => TransitionType::Checkerboard,
-        3 => TransitionType::Cover,
-        4 => TransitionType::Dissolve,
-        5 => TransitionType::Fade,
-        6 => TransitionType::Uncover,
-        7 => TransitionType::RandomBars,
-        8 => TransitionType::Strips,
-        9 => TransitionType::Wipe,
-        10 => TransitionType::Box,
-        11 => TransitionType::Random,
-        13 => TransitionType::Split,
-        17 => TransitionType::Cut,
-        18 => TransitionType::Push,
-        19 => TransitionType::Comb,
-        20 => TransitionType::Zoom,
-        21 => TransitionType::Wedge,
-        22 => TransitionType::Wheel,
-        23 => TransitionType::Newsflash,
-        24 => TransitionType::Vortex,
-        25 => TransitionType::Shred,
-        26 => TransitionType::Switch,
-        27 => TransitionType::Flip,
-        28 => TransitionType::Gallery,
-        29 => TransitionType::Cube,
-        30 => TransitionType::Doors,
-        31 => TransitionType::Window,
-        32 => TransitionType::Ferris,
-        33 => TransitionType::Conveyor,
-        34 => TransitionType::Rotate,
-        35 => TransitionType::Pan,
-        36 => TransitionType::Glitter,
-        37 => TransitionType::Honeycomb,
-        38 => TransitionType::Flash,
-        39 => TransitionType::Ripple,
-        40 => TransitionType::Fracture,
-        41 => TransitionType::Crush,
-        42 => TransitionType::Peel,
-        43 => TransitionType::PageCurl,
-        44 => TransitionType::Airplane,
-        45 => TransitionType::Origami,
-        46 => TransitionType::Morph,
-        _ => TransitionType::None,
-    }
-}
-
-/// Parse transition direction from effect direction value.
-///
-/// Direction values follow MS-PPT 2.6.6 (`SlideShowSlideInfoAtom`) and are the
-/// exact inverse of `encode_transition_direction` in the writer.
-pub(super) fn parse_transition_direction(direction: u8, effect_type: u16) -> TransitionDirection {
-    match effect_type {
-        // Blinds: 0=Vertical, 1=Horizontal
-        1 => {
-            if direction == 0 {
-                TransitionDirection::Vertical
+        0 => match direction {
+            0 => (TransitionType::None, TransitionDirection::None),
+            1 => (TransitionType::Cut, TransitionDirection::ThroughBlack),
+            _ => undefined,
+        },
+        1 => (TransitionType::Random, TransitionDirection::None),
+        2 => match direction {
+            0 => (TransitionType::Blinds, TransitionDirection::Vertical),
+            1 => (TransitionType::Blinds, TransitionDirection::Horizontal),
+            _ => undefined,
+        },
+        3 | 8 | 21 => match direction {
+            0 => (
+                match effect_type {
+                    3 => TransitionType::Checkerboard,
+                    8 => TransitionType::RandomBars,
+                    _ => TransitionType::Comb,
+                },
+                TransitionDirection::Horizontal,
+            ),
+            1 => (
+                match effect_type {
+                    3 => TransitionType::Checkerboard,
+                    8 => TransitionType::RandomBars,
+                    _ => TransitionType::Comb,
+                },
+                TransitionDirection::Vertical,
+            ),
+            _ => undefined,
+        },
+        4 | 7 => {
+            let transition_type = if effect_type == 4 {
+                TransitionType::Cover
             } else {
-                TransitionDirection::Horizontal
-            }
+                TransitionType::Uncover
+            };
+            let transition_direction = match direction {
+                0 => TransitionDirection::FromLeft,
+                1 => TransitionDirection::FromTop,
+                2 => TransitionDirection::FromRight,
+                3 => TransitionDirection::FromBottom,
+                4 => TransitionDirection::LeftUp,
+                5 => TransitionDirection::RightUp,
+                6 => TransitionDirection::LeftDown,
+                7 => TransitionDirection::RightDown,
+                _ => return undefined,
+            };
+            (transition_type, transition_direction)
         },
-        // Checkerboard / Random Bars: 0=Horizontal, 1=Vertical
-        2 | 7 => {
-            if direction == 0 {
-                TransitionDirection::Horizontal
-            } else {
-                TransitionDirection::Vertical
-            }
+        5 | 6 | 17 | 18 | 19 | 22 | 23 | 27 if direction == 0 => (
+            match effect_type {
+                5 => TransitionType::Dissolve,
+                6 => TransitionType::Fade,
+                17 => TransitionType::Diamond,
+                18 => TransitionType::Plus,
+                19 => TransitionType::Wedge,
+                22 => TransitionType::Newsflash,
+                23 => TransitionType::AlphaFade,
+                _ => TransitionType::Circle,
+            },
+            TransitionDirection::None,
+        ),
+        9 => match direction {
+            4 => (TransitionType::Strips, TransitionDirection::LeftUp),
+            5 => (TransitionType::Strips, TransitionDirection::RightUp),
+            6 => (TransitionType::Strips, TransitionDirection::LeftDown),
+            7 => (TransitionType::Strips, TransitionDirection::RightDown),
+            _ => undefined,
         },
-        // Cover / Uncover / Wipe / Push: 0=Left, 1=Up, 2=Right, 3=Down
-        3 | 6 | 9 | 18 => match direction {
-            0 => TransitionDirection::FromLeft,
-            1 => TransitionDirection::FromTop,
-            2 => TransitionDirection::FromRight,
-            3 => TransitionDirection::FromBottom,
-            _ => TransitionDirection::None,
-        },
-        // Strips: 4=Left Up, 5=Right Up, 6=Left Down, 7=Right Down
-        8 => match direction {
-            4 => TransitionDirection::LeftUp,
-            5 => TransitionDirection::RightUp,
-            6 => TransitionDirection::LeftDown,
-            7 => TransitionDirection::RightDown,
-            _ => TransitionDirection::None,
-        },
-        // Box / Zoom: 0=Out, 1=In
         10 | 20 => {
-            if direction == 0 {
-                TransitionDirection::Out
+            let transition_type = if effect_type == 10 {
+                TransitionType::Wipe
             } else {
-                TransitionDirection::In
-            }
+                TransitionType::Push
+            };
+            let transition_direction = match direction {
+                0 => TransitionDirection::FromLeft,
+                1 => TransitionDirection::FromTop,
+                2 => TransitionDirection::FromRight,
+                3 => TransitionDirection::FromBottom,
+                _ => return undefined,
+            };
+            (transition_type, transition_direction)
         },
-        // Split: 0|1=Horizontal variants, 2|3=Vertical variants
+        11 => match direction {
+            0 => (TransitionType::Box, TransitionDirection::Out),
+            1 => (TransitionType::Box, TransitionDirection::In),
+            _ => undefined,
+        },
         13 => match direction {
-            0 | 1 => TransitionDirection::Horizontal,
-            2 | 3 => TransitionDirection::Vertical,
-            _ => TransitionDirection::None,
+            0 => (TransitionType::Split, TransitionDirection::HorizontalOut),
+            1 => (TransitionType::Split, TransitionDirection::HorizontalIn),
+            2 => (TransitionType::Split, TransitionDirection::VerticalOut),
+            3 => (TransitionType::Split, TransitionDirection::VerticalIn),
+            _ => undefined,
         },
-        _ => TransitionDirection::None,
+        26 => match direction {
+            1 => (TransitionType::Wheel, TransitionDirection::Spokes1),
+            2 => (TransitionType::Wheel, TransitionDirection::Spokes2),
+            3 => (TransitionType::Wheel, TransitionDirection::Spokes3),
+            4 => (TransitionType::Wheel, TransitionDirection::Spokes4),
+            8 => (TransitionType::Wheel, TransitionDirection::Spokes8),
+            _ => undefined,
+        },
+        _ => undefined,
     }
 }
 
@@ -232,11 +244,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_transition_type() {
-        assert_eq!(parse_transition_type(0), TransitionType::None);
-        assert_eq!(parse_transition_type(1), TransitionType::Blinds);
-        assert_eq!(parse_transition_type(4), TransitionType::Dissolve);
-        assert_eq!(parse_transition_type(11), TransitionType::Random);
+    fn parses_spec_transition_visuals_without_shifted_names() {
+        assert_eq!(
+            parse_transition_visual(0, 0),
+            (TransitionType::None, TransitionDirection::None)
+        );
+        assert_eq!(
+            parse_transition_visual(1, 99),
+            (TransitionType::Random, TransitionDirection::None)
+        );
+        assert_eq!(
+            parse_transition_visual(4, 3),
+            (TransitionType::Cover, TransitionDirection::FromBottom)
+        );
+        assert_eq!(
+            parse_transition_visual(11, 1),
+            (TransitionType::Box, TransitionDirection::In)
+        );
+        assert_eq!(
+            parse_transition_visual(17, 0),
+            (TransitionType::Diamond, TransitionDirection::None)
+        );
     }
 
     #[test]
@@ -288,11 +316,11 @@ mod tests {
 
     #[test]
     fn parses_minimal_slide_show_slide_info_atom() {
-        // slideTime=2000ms, soundIdRef=0, direction=0, effect=9 (Wipe),
+        // slideTime=2000ms, soundIdRef=0, direction=0, effect=10 (Wipe),
         // flags=auto-advance bit only, speed=2 (Fast)
         let mut data = vec![0u8; 16];
         data[0..4].copy_from_slice(&2000u32.to_le_bytes());
-        data[9] = 9;
+        data[9] = 10;
         data[10..12].copy_from_slice(&0x0400u16.to_le_bytes());
         data[12] = 2;
 

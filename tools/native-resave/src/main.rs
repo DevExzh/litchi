@@ -310,8 +310,8 @@ fn readback_ppt(input: &Path) -> Result<()> {
 #[cfg(feature = "ppt")]
 fn ppt_source_transition() -> Result<litchi_ppt::slide_order::SlideTransitionVisual> {
     Ok(litchi_ppt::slide_order::SlideTransitionVisual::new(
-        litchi_ppt::TransitionType::Random,
-        litchi_ppt::TransitionDirection::None,
+        litchi_ppt::TransitionType::Box,
+        litchi_ppt::TransitionDirection::Out,
         litchi_ppt::TransitionSpeed::Slow,
     )?)
 }
@@ -319,8 +319,8 @@ fn ppt_source_transition() -> Result<litchi_ppt::slide_order::SlideTransitionVis
 #[cfg(feature = "ppt")]
 fn ppt_changed_transition() -> Result<litchi_ppt::slide_order::SlideTransitionVisual> {
     Ok(litchi_ppt::slide_order::SlideTransitionVisual::new(
-        litchi_ppt::TransitionType::Dissolve,
-        litchi_ppt::TransitionDirection::None,
+        litchi_ppt::TransitionType::Cover,
+        litchi_ppt::TransitionDirection::FromLeft,
         litchi_ppt::TransitionSpeed::Medium,
     )?)
 }

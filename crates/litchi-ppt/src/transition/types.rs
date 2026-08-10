@@ -89,7 +89,7 @@ impl TransitionInfo {
 /// Slide transition type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum TransitionType {
-    /// No transition
+    /// No visible transition (`Cut` without the through-black variant).
     #[default]
     None,
     /// Blinds (horizontal or vertical)
@@ -124,69 +124,79 @@ pub enum TransitionType {
     Wheel,
     /// Wedge
     Wedge,
-    /// Zoom (in or out)
+    /// Zoom (not representable in `[MS-PPT]` 2.6.6).
     Zoom,
     /// Random
     Random,
     /// Newsflash
     Newsflash,
-    /// Vortex
+    /// Diamond.
+    Diamond,
+    /// Plus.
+    Plus,
+    /// Alpha fade.
+    AlphaFade,
+    /// Circle.
+    Circle,
+    /// Undefined effect (`effectType = 255`), which consumers must ignore.
+    Undefined,
+    /// Vortex (not representable in `[MS-PPT]` 2.6.6).
     Vortex,
-    /// Shred
+    /// Shred (not representable in `[MS-PPT]` 2.6.6).
     Shred,
-    /// Switch
+    /// Switch (not representable in `[MS-PPT]` 2.6.6).
     Switch,
-    /// Flip
+    /// Flip (not representable in `[MS-PPT]` 2.6.6).
     Flip,
-    /// Gallery
+    /// Gallery (not representable in `[MS-PPT]` 2.6.6).
     Gallery,
-    /// Cube
+    /// Cube (not representable in `[MS-PPT]` 2.6.6).
     Cube,
-    /// Doors
+    /// Doors (not representable in `[MS-PPT]` 2.6.6).
     Doors,
-    /// Window
+    /// Window (not representable in `[MS-PPT]` 2.6.6).
     Window,
-    /// Ferris
+    /// Ferris (not representable in `[MS-PPT]` 2.6.6).
     Ferris,
-    /// Conveyor
+    /// Conveyor (not representable in `[MS-PPT]` 2.6.6).
     Conveyor,
-    /// Rotate
+    /// Rotate (not representable in `[MS-PPT]` 2.6.6).
     Rotate,
-    /// Pan
+    /// Pan (not representable in `[MS-PPT]` 2.6.6).
     Pan,
-    /// Glitter
+    /// Glitter (not representable in `[MS-PPT]` 2.6.6).
     Glitter,
-    /// Honeycomb
+    /// Honeycomb (not representable in `[MS-PPT]` 2.6.6).
     Honeycomb,
-    /// Flash
+    /// Flash (not representable in `[MS-PPT]` 2.6.6).
     Flash,
-    /// Ripple
+    /// Ripple (not representable in `[MS-PPT]` 2.6.6).
     Ripple,
-    /// Fracture
+    /// Fracture (not representable in `[MS-PPT]` 2.6.6).
     Fracture,
-    /// Crush
+    /// Crush (not representable in `[MS-PPT]` 2.6.6).
     Crush,
-    /// Peel
+    /// Peel (not representable in `[MS-PPT]` 2.6.6).
     Peel,
-    /// `PageCurl`
+    /// `PageCurl` (not representable in `[MS-PPT]` 2.6.6).
     PageCurl,
-    /// Airplane
+    /// Airplane (not representable in `[MS-PPT]` 2.6.6).
     Airplane,
-    /// Origami
+    /// Origami (not representable in `[MS-PPT]` 2.6.6).
     Origami,
-    /// Morph
+    /// Morph (not representable in `[MS-PPT]` 2.6.6).
     Morph,
 }
 
 /// Transition speed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum TransitionSpeed {
-    /// Slow (2 seconds)
+    /// Slow (0.75 seconds).
     Slow,
-    /// Medium (1 second)
+    /// Medium (0.5 seconds).
     #[default]
     Medium,
-    /// Fast (0.5 seconds)
+    /// Fast (0.25 seconds).
     Fast,
 }
 
@@ -195,9 +205,9 @@ impl TransitionSpeed {
     #[must_use]
     pub fn duration_ms(&self) -> u32 {
         match self {
-            TransitionSpeed::Slow => 2000,
-            TransitionSpeed::Medium => 1000,
-            TransitionSpeed::Fast => 500,
+            TransitionSpeed::Slow => 750,
+            TransitionSpeed::Medium => 500,
+            TransitionSpeed::Fast => 250,
         }
     }
 }
@@ -244,6 +254,26 @@ pub enum TransitionDirection {
     RightDown,
     /// Right-up
     RightUp,
+    /// Cut through black.
+    ThroughBlack,
+    /// Split horizontally out.
+    HorizontalOut,
+    /// Split horizontally in.
+    HorizontalIn,
+    /// Split vertically out.
+    VerticalOut,
+    /// Split vertically in.
+    VerticalIn,
+    /// Wheel with one radial division.
+    Spokes1,
+    /// Wheel with two radial divisions.
+    Spokes2,
+    /// Wheel with three radial divisions.
+    Spokes3,
+    /// Wheel with four radial divisions.
+    Spokes4,
+    /// Wheel with eight radial divisions.
+    Spokes8,
 }
 
 /// Sound action for transition.

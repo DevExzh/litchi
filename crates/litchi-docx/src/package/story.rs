@@ -30,6 +30,8 @@ use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use crate::document::ParagraphHyperlinkAddress;
+
 const TRANSITIONAL_RELATIONSHIPS: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
 const STRICT_RELATIONSHIPS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/";
@@ -83,6 +85,52 @@ pub enum StoryKind {
     Endnotes,
     Comments,
     Glossary,
+}
+
+/// One direct hyperlink-text replacement scoped to an exact Word story part.
+///
+/// The address is relative to the direct paragraphs and hyperlinks of the
+/// selected main, header, or footer story. Package publication validates all
+/// replacements before changing any story.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StoryHyperlinkTextReplacement {
+    part_name: String,
+    address: ParagraphHyperlinkAddress,
+    text: String,
+}
+
+impl StoryHyperlinkTextReplacement {
+    /// Construct one package-scoped story hyperlink replacement.
+    #[must_use]
+    pub fn new(
+        part_name: impl Into<String>,
+        address: ParagraphHyperlinkAddress,
+        text: impl Into<String>,
+    ) -> Self {
+        Self {
+            part_name: part_name.into(),
+            address,
+            text: text.into(),
+        }
+    }
+
+    /// Borrow the exact OPC part name selected by this replacement.
+    #[must_use]
+    pub fn part_name(&self) -> &str {
+        &self.part_name
+    }
+
+    /// Return the direct paragraph/hyperlink address within the story.
+    #[must_use]
+    pub const fn address(&self) -> ParagraphHyperlinkAddress {
+        self.address
+    }
+
+    /// Borrow the authored replacement text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
 }
 
 impl StoryKind {

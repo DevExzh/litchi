@@ -13,10 +13,11 @@ use super::codec::{
 };
 use super::model::{
     BackgroundImageContentType, BackgroundPicture, ChartCompanionResource,
-    ChartEmbeddedPackageContentType, ChartEmbeddedPackageResource, ChartOutboundResource,
-    ChartResource, ChartResourceKind, ChartThemeOverrideResource, ChartUserShapesResource,
-    DrawingResource, Entry, ExtensionRelationship, ExtensionRelationshipTarget, ImageContentType,
-    ImageResource, Package, PrinterSettings, VmlDrawingResource,
+    ChartEmbeddedPackageContentType, ChartEmbeddedPackageResource, ChartExternalResource,
+    ChartOpaqueResource, ChartOutboundResource, ChartResource, ChartResourceKind,
+    ChartThemeOverrideResource, ChartUserShapesResource, DrawingResource, Entry,
+    ExtensionRelationship, ExtensionRelationshipTarget, ImageContentType, ImageResource, Package,
+    PrinterSettings, VmlDrawingResource,
 };
 use super::{
     CHART_COLOR_STYLE_CT, CHART_COLOR_STYLE_REL, CHART_CT, CHART_EX_CT, CHART_EX_REL,
@@ -306,13 +307,55 @@ pub(super) fn load_chart_resource(
         DrawingChartKind::Classic => {
             require_content_type(part, CHART_CT, "chart")?;
             validate_chart_xml(part.blob(), conformance)?;
-            if !part.rels().is_empty() {
-                return Err(invalid(
-                    "bounded classic chart must be a relationship-free leaf",
-                ));
+            if part.rels().len() > MAX_CHART_RELATIONSHIPS {
+                return Err(limit("classic chart relationship count"));
             }
             add_resource(total, part.blob().len(), MAX_CHART_BYTES, "chart bytes")?;
-            ChartResourceKind::Classic
+            let referenced = classic_chart_relationship_ids(part.blob(), conformance)?;
+            let actual = part
+                .rels()
+                .iter()
+                .map(|relationship| relationship.r_id().to_owned())
+                .collect::<BTreeSet<_>>();
+            if referenced != actual {
+                return Err(invalid(
+                    "classic chart XML references do not close over package relationships",
+                ));
+            }
+            if actual.is_empty() {
+                ChartResourceKind::Classic
+            } else {
+                let mut user_shapes = None;
+                let mut outbound_resources = Vec::with_capacity(actual.len());
+                for relationship in part.rels().iter() {
+                    if relationship.reltype() == conformance.chart_user_shapes_rel() {
+                        if user_shapes.is_some() || relationship.is_external() {
+                            return Err(invalid(
+                                "classic chart has ambiguous chartUserShapes ownership",
+                            ));
+                        }
+                        user_shapes = Some(load_chart_user_shapes_resource(
+                            package,
+                            relationship,
+                            conformance,
+                            total,
+                        )?);
+                    } else {
+                        outbound_resources.push(load_classic_chart_resource(
+                            package,
+                            relationship,
+                            conformance,
+                            total,
+                        )?);
+                    }
+                }
+                outbound_resources
+                    .sort_by(|left, right| left.relationship_id().cmp(right.relationship_id()));
+                ChartResourceKind::ClassicWithRelationships {
+                    user_shapes,
+                    outbound_resources,
+                }
+            }
         },
         DrawingChartKind::Extended => {
             require_content_type(part, CHART_EX_CT, "chartEx")?;
@@ -456,14 +499,19 @@ pub(super) fn load_chart_resource(
                 .filter_map(|value| match value {
                     ChartOutboundResource::Image(image) => Some(image.relationship_id.clone()),
                     ChartOutboundResource::ThemeOverride(_)
-                    | ChartOutboundResource::EmbeddedPackage(_) => None,
+                    | ChartOutboundResource::EmbeddedPackage(_)
+                    | ChartOutboundResource::External(_)
+                    | ChartOutboundResource::Opaque(_) => None,
                 })
                 .collect::<BTreeSet<_>>();
             let package_id = outbound_resources.iter().find_map(|value| match value {
                 ChartOutboundResource::EmbeddedPackage(package) => {
                     Some(package.relationship_id.clone())
                 },
-                ChartOutboundResource::Image(_) | ChartOutboundResource::ThemeOverride(_) => None,
+                ChartOutboundResource::Image(_)
+                | ChartOutboundResource::ThemeOverride(_)
+                | ChartOutboundResource::External(_)
+                | ChartOutboundResource::Opaque(_) => None,
             });
             if image_ids != references.images || package_id != references.package {
                 return Err(invalid(
@@ -489,6 +537,79 @@ pub(super) fn load_chart_resource(
         data: part.blob().to_vec(),
         kind,
     })
+}
+
+fn classic_chart_relationship_ids(
+    xml: &[u8],
+    conformance: Conformance,
+) -> Result<BTreeSet<String>> {
+    let root = parse_document(xml, MAX_CHART_BYTES)?;
+    if root.namespace != conformance.chart() || root.name != "chartSpace" {
+        return Err(invalid("chart root does not match chartsheet conformance"));
+    }
+    let mut ids = BTreeSet::new();
+    collect_extension_relationship_ids(
+        &root,
+        conformance.rel(),
+        &mut ids,
+        MAX_CHART_RELATIONSHIPS,
+    )?;
+    Ok(ids)
+}
+
+fn load_classic_chart_resource(
+    package: &OpcPackage,
+    relationship: &litchi_opc::Relationship,
+    conformance: Conformance,
+    total: &mut usize,
+) -> Result<ChartOutboundResource> {
+    if relationship.is_external() {
+        if relationship.target_ref().is_empty()
+            || relationship.target_ref().len() > MAX_EXTENSION_RELATIONSHIP_STRING_BYTES
+        {
+            return Err(limit("classic chart external target bytes"));
+        }
+        return Ok(ChartOutboundResource::External(ChartExternalResource {
+            relationship_id: relationship.r_id().to_owned(),
+            relationship_type: relationship.reltype().to_owned(),
+            target: relationship.target_ref().to_owned(),
+        }));
+    }
+    if relationship.reltype() == conformance.image_rel() {
+        return load_chart_image_resource(package, relationship, total, "classic chart image")
+            .map(ChartOutboundResource::Image);
+    }
+    if relationship.reltype() == conformance.theme_override_rel() {
+        return load_chart_theme_override_resource(package, relationship, conformance, total)
+            .map(ChartOutboundResource::ThemeOverride);
+    }
+    if relationship.reltype() == conformance.package_rel() {
+        return load_chart_embedded_package_resource(package, relationship, total)
+            .map(ChartOutboundResource::EmbeddedPackage);
+    }
+    let name = relationship.target_partname()?;
+    if !name.as_str().starts_with("/xl/") {
+        return Err(invalid("classic chart dependency is outside /xl"));
+    }
+    let part = package.get_part(&name)?;
+    if !part.rels().is_empty() {
+        return Err(invalid(
+            "classic chart opaque dependency must be a relationship-free leaf",
+        ));
+    }
+    add_resource(
+        total,
+        part.blob().len(),
+        MAX_CHART_EMBEDDED_PACKAGE_BYTES,
+        "classic chart opaque dependency bytes",
+    )?;
+    Ok(ChartOutboundResource::Opaque(ChartOpaqueResource {
+        relationship_id: relationship.r_id().to_owned(),
+        relationship_type: relationship.reltype().to_owned(),
+        part_name: name.to_string(),
+        content_type: part.content_type().to_owned(),
+        data: part.blob().to_vec(),
+    }))
 }
 
 pub(super) fn load_chart_user_shapes_resource(
@@ -732,6 +853,23 @@ pub fn validate_package(value: &Package, conformance: Conformance) -> Result<()>
     validate_package_value(value, conformance)
 }
 
+fn chart_relationship_resources(
+    kind: &ChartResourceKind,
+) -> Option<(&Option<ChartUserShapesResource>, &[ChartOutboundResource])> {
+    match kind {
+        ChartResourceKind::Classic => None,
+        ChartResourceKind::ClassicWithRelationships {
+            user_shapes,
+            outbound_resources,
+        }
+        | ChartResourceKind::Extended {
+            user_shapes,
+            outbound_resources,
+            ..
+        } => Some((user_shapes, outbound_resources)),
+    }
+}
+
 pub(super) fn store_chartsheet_inner(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
@@ -793,8 +931,7 @@ pub(super) fn store_chartsheet_inner(
         if let ChartResourceKind::Extended {
             styles,
             color_styles,
-            user_shapes,
-            outbound_resources,
+            ..
         } = &chart.kind
         {
             for companion in styles.iter().chain(color_styles) {
@@ -806,6 +943,8 @@ pub(super) fn store_chartsheet_inner(
                     new_uri(package, &companion.part_name, "/xl/charts/")?,
                 );
             }
+        }
+        if let Some((user_shapes, outbound_resources)) = chart_relationship_resources(&chart.kind) {
             if let Some(user_shapes) = user_shapes {
                 user_shape_uris.insert(
                     chart.relationship_id.clone(),
@@ -820,19 +959,27 @@ pub(super) fn store_chartsheet_inner(
             }
             for resource in outbound_resources {
                 let relationship_id = resource.relationship_id().to_owned();
-                let (prefix, part_name) = match resource {
-                    ChartOutboundResource::Image(image) => ("/xl/media/", image.part_name.as_str()),
+                let location = match resource {
+                    ChartOutboundResource::Image(image) => {
+                        Some(("/xl/media/", image.part_name.as_str()))
+                    },
                     ChartOutboundResource::ThemeOverride(theme) => {
-                        ("/xl/theme/", theme.part_name.as_str())
+                        Some(("/xl/theme/", theme.part_name.as_str()))
                     },
                     ChartOutboundResource::EmbeddedPackage(embedded) => {
-                        ("/xl/embeddings/", embedded.part_name.as_str())
+                        Some(("/xl/embeddings/", embedded.part_name.as_str()))
                     },
+                    ChartOutboundResource::Opaque(opaque) => {
+                        Some(("/xl/", opaque.part_name.as_str()))
+                    },
+                    ChartOutboundResource::External(_) => None,
                 };
-                outbound_uris.insert(
-                    (chart.relationship_id.clone(), relationship_id.clone()),
-                    new_uri(package, part_name, prefix)?,
-                );
+                if let Some((prefix, part_name)) = location {
+                    outbound_uris.insert(
+                        (chart.relationship_id.clone(), relationship_id.clone()),
+                        new_uri(package, part_name, prefix)?,
+                    );
+                }
                 if let ChartOutboundResource::ThemeOverride(theme) = resource {
                     for image in &theme.images {
                         theme_image_uris.insert(
@@ -901,8 +1048,7 @@ pub(super) fn store_chartsheet_inner(
         if let ChartResourceKind::Extended {
             styles,
             color_styles,
-            user_shapes,
-            outbound_resources,
+            ..
         } = &chart.kind
         {
             for companion in styles.iter().chain(color_styles) {
@@ -920,6 +1066,8 @@ pub(super) fn store_chartsheet_inner(
                     companion.data.clone(),
                 )))?;
             }
+        }
+        if let Some((user_shapes, outbound_resources)) = chart_relationship_resources(&chart.kind) {
             if let Some(user_shapes) = user_shapes {
                 let user_shape_uri =
                     staged_uri(&user_shape_uris, &chart.relationship_id, "chart user-shape")?;
@@ -946,12 +1094,17 @@ pub(super) fn store_chartsheet_inner(
                     chart.relationship_id.clone(),
                     resource.relationship_id().to_owned(),
                 );
-                let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
                 match resource {
-                    ChartOutboundResource::Image(image) => package.try_add_part(Box::new(
-                        BlobPart::new(uri, image.content_type.as_str().into(), image.data.clone()),
-                    ))?,
+                    ChartOutboundResource::Image(image) => {
+                        let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
+                        package.try_add_part(Box::new(BlobPart::new(
+                            uri,
+                            image.content_type.as_str().into(),
+                            image.data.clone(),
+                        )))?;
+                    },
                     ChartOutboundResource::ThemeOverride(theme) => {
+                        let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
                         package.try_add_part(Box::new(BlobPart::new(
                             uri.clone(),
                             theme.content_type.clone(),
@@ -975,12 +1128,22 @@ pub(super) fn store_chartsheet_inner(
                         }
                     },
                     ChartOutboundResource::EmbeddedPackage(embedded) => {
+                        let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
                         package.try_add_part(Box::new(BlobPart::new(
                             uri,
                             embedded.content_type.as_str().into(),
                             embedded.data.clone(),
                         )))?;
                     },
+                    ChartOutboundResource::Opaque(opaque) => {
+                        let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
+                        package.try_add_part(Box::new(BlobPart::new(
+                            uri,
+                            opaque.content_type.clone(),
+                            opaque.data.clone(),
+                        )))?;
+                    },
+                    ChartOutboundResource::External(_) => {},
                 }
             }
         }
@@ -1066,7 +1229,9 @@ pub(super) fn store_chartsheet_inner(
     }
     for chart in &value.drawing.charts {
         let relationship_type = match &chart.kind {
-            ChartResourceKind::Classic => conformance.chart_rel(),
+            ChartResourceKind::Classic | ChartResourceKind::ClassicWithRelationships { .. } => {
+                conformance.chart_rel()
+            },
             ChartResourceKind::Extended { .. } => CHART_EX_REL,
         };
         let chart_uri = staged_uri(&chart_uris, &chart.relationship_id, "chart")?;
@@ -1081,8 +1246,7 @@ pub(super) fn store_chartsheet_inner(
         if let ChartResourceKind::Extended {
             styles,
             color_styles,
-            user_shapes,
-            outbound_resources,
+            ..
         } = &chart.kind
         {
             for (companions, relationship_type) in [
@@ -1108,6 +1272,8 @@ pub(super) fn store_chartsheet_inner(
                     )?;
                 }
             }
+        }
+        if let Some((user_shapes, outbound_resources)) = chart_relationship_resources(&chart.kind) {
             if let Some(user_shapes) = user_shapes {
                 let uri = staged_uri(&user_shape_uris, &chart.relationship_id, "chart user-shape")?;
                 add_relationship_checked(
@@ -1135,25 +1301,57 @@ pub(super) fn store_chartsheet_inner(
                 }
             }
             for resource in outbound_resources {
-                let key = (
-                    chart.relationship_id.clone(),
-                    resource.relationship_id().to_owned(),
-                );
-                let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
-                let relationship_type = match resource {
-                    ChartOutboundResource::Image(_) => conformance.image_rel(),
-                    ChartOutboundResource::ThemeOverride(_) => conformance.theme_override_rel(),
-                    ChartOutboundResource::EmbeddedPackage(_) => conformance.package_rel(),
+                let (relationship_type, target, mode) = match resource {
+                    ChartOutboundResource::External(external) => (
+                        external.relationship_type.as_str(),
+                        external.target.clone(),
+                        TargetMode::External,
+                    ),
+                    internal @ (ChartOutboundResource::Image(_)
+                    | ChartOutboundResource::ThemeOverride(_)
+                    | ChartOutboundResource::EmbeddedPackage(_)
+                    | ChartOutboundResource::Opaque(_)) => {
+                        let key = (
+                            chart.relationship_id.clone(),
+                            internal.relationship_id().to_owned(),
+                        );
+                        let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
+                        let relationship_type = match internal {
+                            ChartOutboundResource::Image(_) => conformance.image_rel(),
+                            ChartOutboundResource::ThemeOverride(_) => {
+                                conformance.theme_override_rel()
+                            },
+                            ChartOutboundResource::EmbeddedPackage(_) => conformance.package_rel(),
+                            ChartOutboundResource::Opaque(opaque) => {
+                                opaque.relationship_type.as_str()
+                            },
+                            ChartOutboundResource::External(_) => {
+                                return Err(invalid(
+                                    "external chart resource reached the internal relationship path",
+                                ));
+                            },
+                        };
+                        (
+                            relationship_type,
+                            uri.relative_ref(chart_uri.base_uri()),
+                            TargetMode::Internal,
+                        )
+                    },
                 };
                 add_relationship_checked(
                     package,
                     &chart_uri,
                     relationship_type,
-                    uri.relative_ref(chart_uri.base_uri()),
+                    target,
                     resource.relationship_id().to_owned(),
-                    TargetMode::Internal,
+                    mode,
                 )?;
                 if let ChartOutboundResource::ThemeOverride(theme) = resource {
+                    let key = (
+                        chart.relationship_id.clone(),
+                        resource.relationship_id().to_owned(),
+                    );
+                    let uri = staged_uri(&outbound_uris, &key, "chart outbound")?;
                     for image in &theme.images {
                         let image_uri = staged_uri(
                             &theme_image_uris,
@@ -1342,7 +1540,33 @@ pub(super) fn validate_chart_resource_value<'a>(
                 return Err(invalid("classic chart has invalid content type"));
             }
             validate_chart_xml(&chart.data, conformance)?;
+            if !classic_chart_relationship_ids(&chart.data, conformance)?.is_empty() {
+                return Err(invalid(
+                    "classic chart relationship metadata is missing from its typed graph",
+                ));
+            }
             add_resource(total, chart.data.len(), MAX_CHART_BYTES, "chart bytes")?;
+        },
+        (
+            ChartResourceKind::ClassicWithRelationships {
+                user_shapes,
+                outbound_resources,
+            },
+            DrawingChartKind::Classic,
+        ) => {
+            if chart.content_type != CHART_CT {
+                return Err(invalid("classic chart has invalid content type"));
+            }
+            validate_chart_xml(&chart.data, conformance)?;
+            add_resource(total, chart.data.len(), MAX_CHART_BYTES, "chart bytes")?;
+            validate_classic_chart_relationship_values(
+                chart,
+                user_shapes,
+                outbound_resources,
+                conformance,
+                total,
+                resources,
+            )?;
         },
         (
             ChartResourceKind::Extended {
@@ -1483,6 +1707,213 @@ pub(super) fn validate_chart_resource_value<'a>(
     Ok(())
 }
 
+fn validate_classic_chart_relationship_values<'a>(
+    chart: &'a ChartResource,
+    user_shapes: &'a Option<ChartUserShapesResource>,
+    outbound_resources: &'a [ChartOutboundResource],
+    conformance: Conformance,
+    total: &mut usize,
+    resources: &mut BTreeMap<String, &'a Vec<u8>>,
+) -> Result<()> {
+    let referenced = classic_chart_relationship_ids(&chart.data, conformance)?;
+    let mut declared = BTreeSet::new();
+    if let Some(user_shapes) = user_shapes {
+        if !declared.insert(user_shapes.relationship_id.clone()) {
+            return Err(invalid("classic chart relationship IDs collide"));
+        }
+        validate_chart_user_shapes_value(user_shapes, conformance, total, resources)?;
+    }
+    for resource in outbound_resources {
+        validate_id(resource.relationship_id())?;
+        if !declared.insert(resource.relationship_id().to_owned()) {
+            return Err(invalid("classic chart relationship IDs collide"));
+        }
+        match resource {
+            ChartOutboundResource::Image(image) => validate_chart_image_value(
+                image,
+                total,
+                resources,
+                MAX_CHART_USER_SHAPE_IMAGE_BYTES,
+                "classic chart image bytes",
+            )?,
+            ChartOutboundResource::ThemeOverride(theme) => {
+                validate_chart_theme_override_value(theme, conformance, total, resources)?;
+            },
+            ChartOutboundResource::EmbeddedPackage(embedded) => {
+                let uri = PackURI::new(&embedded.part_name).map_err(invalid)?;
+                if !uri.as_str().starts_with("/xl/embeddings/")
+                    || !embedded.content_type.validates_part_name(uri.as_str())
+                {
+                    return Err(invalid(
+                        "invalid classic chart embedded package path or content type",
+                    ));
+                }
+                add_resource(
+                    total,
+                    embedded.data.len(),
+                    MAX_CHART_EMBEDDED_PACKAGE_BYTES,
+                    "classic chart embedded package bytes",
+                )?;
+                if resources
+                    .insert(embedded.part_name.clone(), &embedded.data)
+                    .is_some()
+                {
+                    return Err(invalid("duplicate chartsheet resource part name"));
+                }
+            },
+            ChartOutboundResource::External(external) => {
+                if external.relationship_type.is_empty()
+                    || !external.relationship_type.contains(':')
+                    || external.target.is_empty()
+                    || external.target.len() > MAX_EXTENSION_RELATIONSHIP_STRING_BYTES
+                    || external.target.chars().any(char::is_control)
+                {
+                    return Err(invalid("invalid classic chart external relationship"));
+                }
+            },
+            ChartOutboundResource::Opaque(opaque) => {
+                if opaque.relationship_type.is_empty() || !opaque.relationship_type.contains(':') {
+                    return Err(invalid("invalid classic chart relationship type"));
+                }
+                let uri = PackURI::new(&opaque.part_name).map_err(invalid)?;
+                if !uri.as_str().starts_with("/xl/") {
+                    return Err(invalid("classic chart dependency is outside /xl"));
+                }
+                litchi_opc::ContentType::new(opaque.content_type.clone())
+                    .map_err(|error| invalid(error.to_string()))?;
+                add_resource(
+                    total,
+                    opaque.data.len(),
+                    MAX_CHART_EMBEDDED_PACKAGE_BYTES,
+                    "classic chart opaque dependency bytes",
+                )?;
+                if resources
+                    .insert(opaque.part_name.clone(), &opaque.data)
+                    .is_some()
+                {
+                    return Err(invalid("duplicate chartsheet resource part name"));
+                }
+            },
+        }
+    }
+    if declared != referenced {
+        return Err(invalid(
+            "classic chart XML relationship references do not match typed resources",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_chart_user_shapes_value<'a>(
+    user_shapes: &'a ChartUserShapesResource,
+    conformance: Conformance,
+    total: &mut usize,
+    resources: &mut BTreeMap<String, &'a Vec<u8>>,
+) -> Result<()> {
+    validate_id(&user_shapes.relationship_id)?;
+    if user_shapes.content_type != CHART_USER_SHAPES_CT {
+        return Err(invalid("chartUserShapes has invalid content type"));
+    }
+    let uri = PackURI::new(&user_shapes.part_name).map_err(invalid)?;
+    if !uri.as_str().starts_with("/xl/drawings/") || !uri.as_str().ends_with(".xml") {
+        return Err(invalid(
+            "chartUserShapes is outside /xl/drawings or lacks .xml suffix",
+        ));
+    }
+    let referenced = validate_chart_user_shapes_xml(&user_shapes.data, conformance)?;
+    if referenced.len() != user_shapes.images.len()
+        || user_shapes.images.len() > MAX_CHART_USER_SHAPE_IMAGES
+    {
+        return Err(invalid(
+            "chartUserShapes image relationship metadata does not match XML references",
+        ));
+    }
+    add_resource(
+        total,
+        user_shapes.data.len(),
+        MAX_CHART_USER_SHAPES_BYTES,
+        "chartUserShapes bytes",
+    )?;
+    if resources
+        .insert(user_shapes.part_name.clone(), &user_shapes.data)
+        .is_some()
+    {
+        return Err(invalid("duplicate chartsheet resource part name"));
+    }
+    let mut image_ids = BTreeSet::new();
+    for image in &user_shapes.images {
+        validate_id(&image.relationship_id)?;
+        if !referenced.contains(&image.relationship_id)
+            || !image_ids.insert(image.relationship_id.as_str())
+        {
+            return Err(invalid(
+                "chartUserShapes image metadata is duplicate or unreferenced",
+            ));
+        }
+        validate_chart_image_value(
+            image,
+            total,
+            resources,
+            MAX_CHART_USER_SHAPE_IMAGE_BYTES,
+            "chart user-shape image bytes",
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_chart_theme_override_value<'a>(
+    theme: &'a ChartThemeOverrideResource,
+    conformance: Conformance,
+    total: &mut usize,
+    resources: &mut BTreeMap<String, &'a Vec<u8>>,
+) -> Result<()> {
+    if theme.content_type != THEME_OVERRIDE_CT {
+        return Err(invalid("themeOverride has invalid content type"));
+    }
+    let uri = PackURI::new(&theme.part_name).map_err(invalid)?;
+    if !uri.as_str().starts_with("/xl/theme/") || !uri.as_str().ends_with(".xml") {
+        return Err(invalid(
+            "themeOverride is outside /xl/theme or lacks .xml suffix",
+        ));
+    }
+    let referenced = validate_theme_override_xml(&theme.data, conformance)?;
+    if theme.images.len() > MAX_CHART_THEME_IMAGES || theme.images.len() != referenced.len() {
+        return Err(invalid(
+            "themeOverride image relationship metadata does not match XML references",
+        ));
+    }
+    add_resource(
+        total,
+        theme.data.len(),
+        MAX_CHART_THEME_OVERRIDE_BYTES,
+        "themeOverride bytes",
+    )?;
+    if resources
+        .insert(theme.part_name.clone(), &theme.data)
+        .is_some()
+    {
+        return Err(invalid("duplicate chartsheet resource part name"));
+    }
+    let mut image_ids = BTreeSet::new();
+    for image in &theme.images {
+        if !image_ids.insert(image.relationship_id.clone())
+            || !referenced.contains(&image.relationship_id)
+        {
+            return Err(invalid(
+                "themeOverride image metadata is duplicate or unreferenced",
+            ));
+        }
+        validate_chart_image_value(
+            image,
+            total,
+            resources,
+            MAX_CHART_USER_SHAPE_IMAGE_BYTES,
+            "themeOverride image bytes",
+        )?;
+    }
+    Ok(())
+}
+
 pub(super) fn validate_chart_outbound_resources<'a>(
     chart: &'a ChartResource,
     conformance: Conformance,
@@ -1617,6 +2048,11 @@ pub(super) fn validate_chart_outbound_resources<'a>(
                     return Err(invalid("duplicate chartsheet resource part name"));
                 }
                 package_id = Some(embedded.relationship_id.clone());
+            },
+            ChartOutboundResource::External(_) | ChartOutboundResource::Opaque(_) => {
+                return Err(invalid(
+                    "chartEx generic relationship resources are not part of its bounded vocabulary",
+                ));
             },
         }
     }

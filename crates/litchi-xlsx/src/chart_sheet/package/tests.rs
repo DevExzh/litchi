@@ -905,6 +905,72 @@ fn strict_package_writer_round_trips_complete_leaf_graph() {
         expected
     );
 }
+
+#[test]
+fn classic_chart_embedded_workbook_relationship_round_trips() {
+    for conformance in [Conformance::Transitional, Conformance::Strict] {
+        let mut expected = value(conformance);
+        let chart = &mut expected.drawing.charts[0];
+        chart.data = format!(
+            "<c:chartSpace xmlns:c=\"{}\" xmlns:r=\"{}\"><c:chart><c:plotArea/></c:chart><c:externalData r:id=\"rIdWorkbook\"><c:autoUpdate val=\"0\"/></c:externalData></c:chartSpace>",
+            conformance.chart(),
+            conformance.rel(),
+        )
+        .into_bytes();
+        chart.kind = ChartResourceKind::ClassicWithRelationships {
+            user_shapes: None,
+            outbound_resources: vec![ChartOutboundResource::EmbeddedPackage(
+                ChartEmbeddedPackageResource {
+                    relationship_id: "rIdWorkbook".into(),
+                    part_name: "/xl/embeddings/embeddedWorkbook1.xlsx".into(),
+                    content_type: ChartEmbeddedPackageContentType::Xlsx,
+                    data: vec![0x50, 0x4b, 0x03, 0x04, 0, 255],
+                },
+            )],
+        };
+
+        let (mut package, workbook) = base_package(conformance);
+        store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
+        let loaded = load_chartsheet(&package, &workbook, "rIdChartSheet").unwrap();
+        assert_eq!(loaded, expected);
+
+        let (mut second, second_workbook) = base_package(conformance);
+        store_chartsheet(&mut second, &second_workbook, &loaded, conformance).unwrap();
+        assert_eq!(
+            load_chartsheet(&second, &second_workbook, "rIdChartSheet").unwrap(),
+            expected
+        );
+    }
+}
+
+#[test]
+fn classic_chart_relationship_metadata_must_match_xml() {
+    let conformance = Conformance::Transitional;
+    let mut missing = value(conformance);
+    missing.drawing.charts[0].data = format!(
+        "<c:chartSpace xmlns:c=\"{}\" xmlns:r=\"{}\"><c:chart><c:plotArea/></c:chart><c:externalData r:id=\"rIdWorkbook\"/></c:chartSpace>",
+        conformance.chart(),
+        conformance.rel(),
+    )
+    .into_bytes();
+    let (mut package, workbook) = base_package(conformance);
+    assert!(store_chartsheet(&mut package, &workbook, &missing, conformance).is_err());
+
+    let mut stale = value(conformance);
+    stale.drawing.charts[0].kind = ChartResourceKind::ClassicWithRelationships {
+        user_shapes: None,
+        outbound_resources: vec![ChartOutboundResource::EmbeddedPackage(
+            ChartEmbeddedPackageResource {
+                relationship_id: "rIdWorkbook".into(),
+                part_name: "/xl/embeddings/embeddedWorkbook1.xlsx".into(),
+                content_type: ChartEmbeddedPackageContentType::Xlsx,
+                data: vec![0x50, 0x4b, 0x03, 0x04],
+            },
+        )],
+    };
+    let (mut package, workbook) = base_package(conformance);
+    assert!(store_chartsheet(&mut package, &workbook, &stale, conformance).is_err());
+}
 #[test]
 fn printer_settings_page_setup_strict_mce_and_schema_order() {
     let xml = format!(

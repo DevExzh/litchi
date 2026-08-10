@@ -214,10 +214,11 @@ struct TargetChart {
 }
 
 #[derive(Debug)]
-struct TargetExternalRelationship {
+struct TargetRelationship {
     relationship_id: String,
     relationship_type: String,
     target: String,
+    external: bool,
 }
 
 pub(super) fn transfer(
@@ -245,7 +246,7 @@ pub(super) fn transfer(
     {
         relationship_mapping.insert(source_id.clone(), chart.relationship_id.clone());
     }
-    let target_external_relationships = copy_shape_relationships(
+    let target_relationships = copy_shape_relationships(
         &source,
         &mut package,
         &source_plan,
@@ -268,7 +269,7 @@ pub(super) fn transfer(
         &target_plan,
         drawing_xml,
         target_chart,
-        target_external_relationships,
+        target_relationships,
     )?;
     package.unsign();
     *target = Workbook::from_opc_package(package)?;
@@ -287,7 +288,8 @@ fn plan_source(source: &Workbook, source_sheet: usize, source_anchor: usize) -> 
     let source_inventory = source.sheet_drawing(source_sheet).ok_or_else(|| {
         Error::InvalidFormat("source BrtDrawing has no decoded drawing inventory".to_string())
     })?;
-    let layout = drawing_layout(source_part.blob())?;
+    let source_xml = effective_drawing_xml(source_part.blob())?;
+    let layout = drawing_layout(&source_xml)?;
     if layout.anchors.len() != source_inventory.drawing.anchors.len() {
         return Err(refused(DrawingTransferRefusal::MarkupCompatibility));
     }
@@ -305,7 +307,30 @@ fn plan_source(source: &Workbook, source_sheet: usize, source_anchor: usize) -> 
         },
         crate::package::drawing::Object::GraphicFrame(frame) => {
             if !frame.is_chart() {
-                return Err(refused(DrawingTransferRefusal::NonChartGraphicFrame));
+                let selected_id = frame.non_visual.id;
+                let mut matches = source_inventory
+                    .shapes
+                    .iter()
+                    .filter(|object| object_id(&object.object) == Some(selected_id));
+                let object = matches
+                    .next()
+                    .ok_or_else(|| refused(DrawingTransferRefusal::NonChartGraphicFrame))?;
+                if matches.next().is_some() {
+                    return Err(refused(DrawingTransferRefusal::AmbiguousObjectId(
+                        selected_id,
+                    )));
+                }
+                if !matches!(object.object, crate::shapes::Object::OleObject(_)) {
+                    return Err(refused(DrawingTransferRefusal::NonChartGraphicFrame));
+                }
+                selected.insert(source_anchor);
+                return Ok(SourcePlan {
+                    drawing_uri: source_location.uri.clone(),
+                    xml: source_xml,
+                    layout,
+                    selected,
+                    chart_relationship,
+                });
             }
             let relationship_id = frame
                 .rel_id
@@ -329,7 +354,7 @@ fn plan_source(source: &Workbook, source_sheet: usize, source_anchor: usize) -> 
     }
     Ok(SourcePlan {
         drawing_uri: source_location.uri.clone(),
-        xml: source_part.blob().to_vec(),
+        xml: source_xml,
         layout,
         selected,
         chart_relationship,
@@ -348,7 +373,7 @@ fn plan_target(target: &Workbook, target_sheet: usize) -> Result<TargetPlan> {
         let uri = allocate_new_drawing_uri(&target.package)?;
         (empty_drawing_xml(is_strict(&target.package)), uri)
     };
-    let target_layout = drawing_layout(&target_xml)?;
+    let target_layout = drawing_layout(&effective_drawing_xml(&target_xml)?)?;
     Ok(TargetPlan {
         location: target_location,
         uri: target_uri,
@@ -403,7 +428,7 @@ fn copy_shape_relationships(
     target_plan: &TargetPlan,
     mapping: &mut BTreeMap<String, String>,
     target_chart: Option<&TargetChart>,
-) -> Result<Vec<TargetExternalRelationship>> {
+) -> Result<Vec<TargetRelationship>> {
     let source_part = source.package.get_part(&source_plan.drawing_uri)?;
     let mut references = BTreeSet::new();
     for index in &source_plan.selected {
@@ -419,15 +444,37 @@ fn copy_shape_relationships(
     let mut planned = Vec::new();
     let mut used = target_relationship_ids(package, target_plan, target_chart)?;
     let mut equivalent = BTreeMap::<(String, String), String>::new();
+    let mut reserved = package
+        .iter_parts()
+        .map(|part| part.partname().as_str().to_string())
+        .collect::<BTreeSet<_>>();
     for source_id in references {
         let relationship = source_part.rels().get(&source_id).ok_or_else(|| {
             refused(DrawingTransferRefusal::MissingShapeRelationship(
                 source_id.clone(),
             ))
         })?;
-        if !relationship.is_external()
-            || !matches!(relationship.reltype(), rt::HYPERLINK | rt::STRICT_HYPERLINK)
-        {
+        let supported_external = relationship.is_external()
+            && matches!(
+                relationship.reltype(),
+                rt::HYPERLINK
+                    | rt::STRICT_HYPERLINK
+                    | rt::IMAGE
+                    | rt::STRICT_IMAGE
+                    | rt::OLE_OBJECT
+                    | rt::STRICT_OLE_OBJECT
+            );
+        let supported_internal = !relationship.is_external()
+            && matches!(
+                relationship.reltype(),
+                rt::IMAGE
+                    | rt::STRICT_IMAGE
+                    | rt::OLE_OBJECT
+                    | rt::STRICT_OLE_OBJECT
+                    | rt::PACKAGE
+                    | rt::STRICT_PACKAGE
+            );
+        if !supported_external && !supported_internal {
             return Err(refused(
                 DrawingTransferRefusal::UnsupportedShapeRelationship {
                     relationship_id: source_id,
@@ -436,16 +483,131 @@ fn copy_shape_relationships(
                 },
             ));
         }
-        let target_id = if target_plan.location.is_some() {
-            package
-                .get_part_mut(&target_plan.uri)?
-                .relate_to_ext(relationship.target_ref(), relationship.reltype())
+        let target_id = if relationship.is_external() {
+            if target_plan.location.is_some() {
+                package
+                    .get_part_mut(&target_plan.uri)?
+                    .relate_to_ext(relationship.target_ref(), relationship.reltype())
+            } else {
+                plan_external_relationship(relationship, &mut equivalent, &mut used, &mut planned)?
+            }
         } else {
-            plan_external_relationship(relationship, &mut equivalent, &mut used, &mut planned)?
+            clone_shape_dependency(
+                source,
+                package,
+                relationship,
+                target_plan,
+                &mut reserved,
+                &mut used,
+                &mut planned,
+            )?
         };
         mapping.insert(source_id, target_id);
     }
     Ok(planned)
+}
+
+fn clone_shape_dependency(
+    source: &Workbook,
+    package: &mut litchi_opc::OpcPackage,
+    relationship: &litchi_opc::Relationship,
+    target_plan: &TargetPlan,
+    reserved: &mut BTreeSet<String>,
+    used: &mut BTreeSet<String>,
+    planned: &mut Vec<TargetRelationship>,
+) -> Result<String> {
+    if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
+        return Err(refused(
+            DrawingTransferRefusal::UnsupportedShapeRelationship {
+                relationship_id: relationship.r_id().to_string(),
+                relationship_type: relationship.reltype().to_string(),
+                external: false,
+            },
+        ));
+    }
+    let source_uri = relationship.target_partname()?;
+    let source_part = source.package.get_part(&source_uri)?;
+    validate_shape_dependency(relationship, source_part)?;
+    let target_uri = allocate_graph_uri(&source_uri, reserved, package)?;
+    package.try_add_part(Box::new(BlobPart::new_shared(
+        target_uri.clone(),
+        source_part.content_type().to_string(),
+        source_part.blob_arc(),
+    )))?;
+    if target_plan.location.is_some() {
+        return Ok(package.get_part_mut(&target_plan.uri)?.relate_to(
+            &target_uri.relative_ref(target_plan.uri.base_uri()),
+            relationship.reltype(),
+        ));
+    }
+    let relationship_id = free_relationship_id(used)?;
+    used.insert(relationship_id.clone());
+    planned.push(TargetRelationship {
+        relationship_id: relationship_id.clone(),
+        relationship_type: relationship.reltype().to_string(),
+        target: target_uri.relative_ref(target_plan.uri.base_uri()),
+        external: false,
+    });
+    Ok(relationship_id)
+}
+
+fn validate_shape_dependency(
+    relationship: &litchi_opc::Relationship,
+    part: &dyn Part,
+) -> Result<()> {
+    if !part.rels().is_empty() || part.blob().len() > MAX_GRAPH_BYTES {
+        return Err(refused(
+            DrawingTransferRefusal::UnsupportedShapeRelationship {
+                relationship_id: relationship.r_id().to_string(),
+                relationship_type: relationship.reltype().to_string(),
+                external: false,
+            },
+        ));
+    }
+    match relationship.reltype() {
+        rt::IMAGE | rt::STRICT_IMAGE => {
+            if !part.partname().as_str().starts_with("/xl/media/") {
+                return Err(Error::InvalidFormat(
+                    "drawing image dependency is outside /xl/media".to_string(),
+                ));
+            }
+            let format =
+                crate::package::drawing_image::ImageFormat::from_content_type(part.content_type())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "drawing image dependency has unsupported content type {:?}",
+                            part.content_type()
+                        ))
+                    })?;
+            format.validate_payload(part.blob())
+        },
+        rt::OLE_OBJECT | rt::STRICT_OLE_OBJECT => {
+            validate_embedded_shape_dependency(part, ct::OFC_OLE_OBJECT)
+        },
+        rt::PACKAGE | rt::STRICT_PACKAGE => {
+            validate_embedded_shape_dependency(part, ct::OFC_PACKAGE)
+        },
+        _ => Err(refused(
+            DrawingTransferRefusal::UnsupportedShapeRelationship {
+                relationship_id: relationship.r_id().to_string(),
+                relationship_type: relationship.reltype().to_string(),
+                external: false,
+            },
+        )),
+    }
+}
+
+fn validate_embedded_shape_dependency(part: &dyn Part, expected_content_type: &str) -> Result<()> {
+    if !part.partname().as_str().starts_with("/xl/embeddings/")
+        || part.content_type() != expected_content_type
+        || part.blob().is_empty()
+    {
+        return Err(Error::InvalidFormat(format!(
+            "drawing embedded dependency '{}' has invalid path, content type, or payload",
+            part.partname()
+        )));
+    }
+    Ok(())
 }
 
 fn target_relationship_ids(
@@ -473,7 +635,7 @@ fn plan_external_relationship(
     relationship: &litchi_opc::Relationship,
     equivalent: &mut BTreeMap<(String, String), String>,
     used: &mut BTreeSet<String>,
-    planned: &mut Vec<TargetExternalRelationship>,
+    planned: &mut Vec<TargetRelationship>,
 ) -> Result<String> {
     let key = (
         relationship.reltype().to_string(),
@@ -485,10 +647,11 @@ fn plan_external_relationship(
     let relationship_id = free_relationship_id(used)?;
     used.insert(relationship_id.clone());
     equivalent.insert(key.clone(), relationship_id.clone());
-    planned.push(TargetExternalRelationship {
+    planned.push(TargetRelationship {
         relationship_id: relationship_id.clone(),
         relationship_type: key.0,
         target: key.1,
+        external: true,
     });
     Ok(relationship_id)
 }
@@ -537,7 +700,7 @@ fn install_transfer(
     plan: &TargetPlan,
     drawing_xml: Vec<u8>,
     chart: Option<TargetChart>,
-    external_relationships: Vec<TargetExternalRelationship>,
+    relationships: Vec<TargetRelationship>,
 ) -> Result<()> {
     if let Some(location) = &plan.location {
         package.get_part_mut(&location.uri)?.set_blob(drawing_xml);
@@ -552,12 +715,16 @@ fn install_transfer(
                 TargetMode::Internal,
             )?;
         }
-        for relationship in external_relationships {
+        for relationship in relationships {
             drawing_part.rels_mut().try_add_relationship(
                 relationship.relationship_type,
                 relationship.target,
                 relationship.relationship_id,
-                TargetMode::External,
+                if relationship.external {
+                    TargetMode::External
+                } else {
+                    TargetMode::Internal
+                },
             )?;
         }
         package.try_add_part(Box::new(drawing_part))?;
@@ -652,6 +819,14 @@ fn ensure_drawing_ownership(
         ));
     }
     Ok(())
+}
+
+fn effective_drawing_xml(source: &[u8]) -> Result<Vec<u8>> {
+    let source = std::str::from_utf8(source)
+        .map_err(|error| Error::Encoding(format!("drawing XML is not UTF-8: {error}")))?;
+    Ok(litchi_ooxml_common::mce::process_str(source)?
+        .into_owned()
+        .into_bytes())
 }
 
 fn drawing_layout(xml: &[u8]) -> Result<DrawingLayout> {
@@ -1266,14 +1441,6 @@ fn collect_chart_graph(source: &Workbook, root: PackURI) -> Result<ChartGraph> {
         let mut relationships = part.rels().iter().collect::<Vec<_>>();
         relationships.sort_unstable_by_key(|relationship| relationship.r_id());
         for relationship in relationships {
-            if matches!(
-                relationship.reltype(),
-                rt::OLE_OBJECT | rt::STRICT_OLE_OBJECT
-            ) {
-                return Err(refused(DrawingTransferRefusal::ActiveChartDependency(
-                    relationship.reltype().to_string(),
-                )));
-            }
             if relationship.is_external() {
                 continue;
             }
@@ -1300,16 +1467,20 @@ fn collect_chart_graph(source: &Workbook, root: PackURI) -> Result<ChartGraph> {
 }
 
 fn chart_owned_uri(uri: &PackURI) -> bool {
-    [
-        "/xl/charts/",
-        "/xl/drawings/",
-        "/xl/media/",
-        "/xl/embeddings/",
-        "/xl/chartResources/",
-        "/xl/theme/",
-    ]
-    .iter()
-    .any(|prefix| uri.as_str().starts_with(prefix))
+    let value = uri.as_str();
+    value.starts_with("/xl/")
+        && value != "/xl/workbook.bin"
+        && value != "/xl/styles.bin"
+        && value != "/xl/sharedStrings.bin"
+        && value != "/xl/calcChain.bin"
+        && ![
+            "/xl/worksheets/",
+            "/xl/chartsheets/",
+            "/xl/dialogsheets/",
+            "/xl/macrosheets/",
+        ]
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
 }
 
 fn copy_chart_graph(
@@ -1697,6 +1868,68 @@ mod tests {
                 DrawingTransferRefusal::AmbiguousObjectId(7)
             ))
         ));
+    }
+
+    #[test]
+    fn drawing_level_alternate_content_projects_one_active_anchor() {
+        let xml = format!(
+            "<xdr:wsDr xmlns:xdr=\"{}\" xmlns:mc=\"{}\" xmlns:u=\"urn:unsupported\"><mc:AlternateContent><mc:Choice Requires=\"u\"><u:futureAnchor/></mc:Choice><mc:Fallback><xdr:absoluteAnchor><xdr:pos x=\"0\" y=\"0\"/><xdr:ext cx=\"1\" cy=\"1\"/><xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"7\" name=\"Fallback\"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr/></xdr:sp><xdr:clientData/></xdr:absoluteAnchor></mc:Fallback></mc:AlternateContent></xdr:wsDr>",
+            String::from_utf8_lossy(XDR),
+            String::from_utf8_lossy(MCE),
+        );
+        let effective = effective_drawing_xml(xml.as_bytes()).unwrap();
+        let layout = drawing_layout(&effective).unwrap();
+        assert_eq!(layout.anchors.len(), 1);
+        assert_eq!(layout.anchors[0].ids, vec![(7, Some("Fallback".into()))]);
+        assert!(
+            !effective
+                .windows(16)
+                .any(|window| window == b"AlternateContent")
+        );
+    }
+
+    #[test]
+    fn inert_ole_and_package_shape_leaves_are_valid_dependencies() {
+        let drawing_uri = PackURI::new("/xl/drawings/drawing1.xml").unwrap();
+        for (relationship_type, content_type, name) in [
+            (rt::OLE_OBJECT, ct::OFC_OLE_OBJECT, "oleObject1.bin"),
+            (rt::PACKAGE, ct::OFC_PACKAGE, "embeddedPackage1.bin"),
+        ] {
+            let target = format!("../embeddings/{name}");
+            let relationship = litchi_opc::Relationship::new_with_mode(
+                "rId1".into(),
+                relationship_type.into(),
+                target,
+                drawing_uri.base_uri().to_owned(),
+                TargetMode::Internal,
+            );
+            let part = BlobPart::new(
+                PackURI::new(format!("/xl/embeddings/{name}")).unwrap(),
+                content_type.into(),
+                b"inert-payload".to_vec(),
+            );
+            validate_shape_dependency(&relationship, &part).unwrap();
+        }
+    }
+
+    #[test]
+    fn chart_graph_accepts_package_resources_but_not_workbook_or_sheet_parts() {
+        for value in [
+            "/xl/embeddings/oleObject1.bin",
+            "/xl/customChartData/resource1.bin",
+            "/xl/pivotCache/pivotCacheDefinition1.bin",
+        ] {
+            assert!(chart_owned_uri(&PackURI::new(value).unwrap()), "{value}");
+        }
+        for value in [
+            "/xl/workbook.bin",
+            "/xl/styles.bin",
+            "/xl/sharedStrings.bin",
+            "/xl/worksheets/sheet1.bin",
+            "/xl/chartsheets/sheet1.bin",
+        ] {
+            assert!(!chart_owned_uri(&PackURI::new(value).unwrap()), "{value}");
+        }
     }
 
     #[test]

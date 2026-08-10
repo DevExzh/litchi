@@ -38,12 +38,12 @@ pub use writer::write_transition;
 pub(crate) fn decode_visual(
     bytes: [u8; 3],
 ) -> Option<(TransitionType, TransitionDirection, TransitionSpeed)> {
-    let transition_type = parser::parse_transition_type(u16::from(bytes[1]));
-    let direction = parser::parse_transition_direction(bytes[0], u16::from(bytes[1]));
+    let (transition_type, direction) =
+        parser::parse_transition_visual(u16::from(bytes[1]), bytes[0]);
     let speed = parser::parse_transition_speed(bytes[2]);
     let canonical = [
-        writer::encode_transition_direction(direction, transition_type),
-        writer::encode_transition_type(transition_type),
+        writer::encode_transition_direction(direction, transition_type)?,
+        writer::encode_transition_type(transition_type)?,
         writer::encode_transition_speed(speed),
     ];
     (canonical == bytes).then_some((transition_type, direction, speed))
@@ -55,8 +55,8 @@ pub(crate) fn encode_visual(
     speed: TransitionSpeed,
 ) -> Option<[u8; 3]> {
     let bytes = [
-        writer::encode_transition_direction(direction, transition_type),
-        writer::encode_transition_type(transition_type),
+        writer::encode_transition_direction(direction, transition_type)?,
+        writer::encode_transition_type(transition_type)?,
         writer::encode_transition_speed(speed),
     ];
     (decode_visual(bytes) == Some((transition_type, direction, speed))).then_some(bytes)

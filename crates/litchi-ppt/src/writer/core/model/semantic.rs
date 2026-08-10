@@ -1713,6 +1713,17 @@ impl Writer {
                 "transition sounds are not supported by the create-side writer".to_string(),
             ));
         }
+        if crate::transition::encode_visual(
+            transition.transition_type,
+            transition.direction,
+            transition.speed,
+        )
+        .is_none()
+        {
+            return Err(WriteError::InvalidData(
+                "transition type/direction is not representable by [MS-PPT] 2.6.6".to_string(),
+            ));
+        }
         let slide_data = self
             .slides
             .get_mut(slide)

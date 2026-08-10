@@ -124,6 +124,27 @@ impl Editor {
         mutation::insert_persisted_record(self, persist_id, record)
     }
 
+    /// Replaces the unique stream with `name`, or creates it at the package
+    /// root when it is absent.
+    pub(crate) fn replace_stream_by_name(&mut self, name: &str, data: Vec<u8>) -> Result<()> {
+        let mut matches = self
+            .streams
+            .iter_mut()
+            .filter(|(path, _data)| path.last().is_some_and(|component| component == name));
+        if let Some((_path, stream)) = matches.next() {
+            if matches.next().is_some() {
+                return Err(Error::Corrupted(format!(
+                    "PPT package contains multiple {name} streams"
+                )));
+            }
+            *stream = data;
+        } else {
+            self.streams.push((vec![name.to_string()], data));
+        }
+        self.changed = true;
+        Ok(())
+    }
+
     /// Returns the typed embedded-object collection represented by this edit.
     #[must_use]
     pub fn objects(&self) -> &Collection {

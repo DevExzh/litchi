@@ -16,5 +16,6 @@ mod tests;
 
 pub use model::Package;
 pub use story::{
-    StoryDialect, StoryInventory, StoryKind, StoryLimits, StoryOwner, StoryPart, StoryTopology,
+    StoryDialect, StoryHyperlinkTextReplacement, StoryInventory, StoryKind, StoryLimits,
+    StoryOwner, StoryPart, StoryTopology,
 };

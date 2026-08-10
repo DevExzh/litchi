@@ -61,7 +61,7 @@ fn presentation_comments_aggregates_commented_slides_only() {
 }
 
 #[test]
-fn bug45543_ppt_exposes_random_transition() {
+fn bug45543_ppt_exposes_box_transition() {
     with_presentation("45543.ppt", |presentation| {
         let slides = presentation.slides().expect("slides");
         let transition = slides[0]
@@ -69,7 +69,7 @@ fn bug45543_ppt_exposes_random_transition() {
             .expect("parse transition")
             .expect("slide 1 has a transition");
 
-        assert_eq!(transition.transition_type, TransitionType::Random);
+        assert_eq!(transition.transition_type, TransitionType::Box);
         assert_eq!(transition.speed, TransitionSpeed::Slow);
         assert_eq!(transition.advance_mode, AdvanceMode::OnClick);
         assert_eq!(transition.advance_time_ms, None);
@@ -88,8 +88,10 @@ fn with_links_ppt_exposes_slide_timing_and_advance_mode() {
             .transition()
             .expect("parse transition")
             .expect("slide 1 has an SSSlideInfoAtom");
-        // Raw atom: slideTime=1024ms, effect=0, flags=0x11 (manual advance + sound).
-        assert_eq!(transition.transition_type, TransitionType::None);
+        // Raw atom: slideTime=1024ms, effect=0, nonstandard direction=2,
+        // flags=0x11 (manual advance + sound). MS-PPT permits only direction
+        // 0 or 1 for effect 0, so the visual is explicitly undefined.
+        assert_eq!(transition.transition_type, TransitionType::Undefined);
         assert_eq!(transition.speed, TransitionSpeed::Medium);
         assert_eq!(transition.advance_mode, AdvanceMode::Both);
         assert_eq!(transition.advance_time_ms, Some(1024));

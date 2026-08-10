@@ -36,7 +36,7 @@ impl Revision {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChangeKind {
     SlidesReordered,
-    SlideVisibilityChanged,
+    SlideNonOutlineDataChanged,
     SlideInserted,
     SlideRemoved,
     MastersReordered,
@@ -51,8 +51,8 @@ pub enum ChangeKind {
 pub enum Change {
     /// Reorder slide groups while retaining each group's text and opaque atoms.
     SlidesReordered { before: Vec<u32>, after: Vec<u32> },
-    /// Change the hidden flag of one slide while retaining every other flag.
-    SlideVisibilityChanged {
+    /// Change whether one slide contains non-outline data while retaining every other flag.
+    SlideNonOutlineDataChanged {
         position: usize,
         before: bool,
         after: bool,
@@ -92,7 +92,7 @@ impl Change {
     pub const fn kind(&self) -> ChangeKind {
         match self {
             Self::SlidesReordered { .. } => ChangeKind::SlidesReordered,
-            Self::SlideVisibilityChanged { .. } => ChangeKind::SlideVisibilityChanged,
+            Self::SlideNonOutlineDataChanged { .. } => ChangeKind::SlideNonOutlineDataChanged,
             Self::SlideInserted { .. } => ChangeKind::SlideInserted,
             Self::SlideRemoved { .. } => ChangeKind::SlideRemoved,
             Self::MastersReordered { .. } => ChangeKind::MastersReordered,
@@ -109,11 +109,11 @@ impl Change {
                 before: after.clone(),
                 after: before.clone(),
             },
-            Self::SlideVisibilityChanged {
+            Self::SlideNonOutlineDataChanged {
                 position,
                 before,
                 after,
-            } => Self::SlideVisibilityChanged {
+            } => Self::SlideNonOutlineDataChanged {
                 position: *position,
                 before: *after,
                 after: *before,
@@ -406,26 +406,27 @@ impl Transaction {
         self.move_slide(index, destination)
     }
 
-    /// Changes whether one slide is omitted from the presentation sequence.
+    /// Changes whether one slide contains data other than placeholder text.
     ///
-    /// This edits only bit 2 of the fixed-width `SlidePersistAtom.flags`
-    /// field. Every other flag and every following slide-list record remains
-    /// exact.
+    /// This edits only `fNonOutlineData` (bit 2) of the fixed-width
+    /// `SlidePersistAtom.flags` field, as defined by `[MS-PPT]` 2.4.14.5.
+    /// It does not control whether the slide is hidden during a slide show;
+    /// that state belongs to `SlideShowSlideInfoAtom.fHidden`.
     ///
     /// # Errors
     ///
     /// Returns an error when the position is absent or the resulting document
     /// violates the structural invariants.
-    pub fn set_slide_hidden(&mut self, position: usize, hidden: bool) -> Result<()> {
-        const HIDDEN_FLAG: u32 = 1 << 2;
+    pub fn set_slide_non_outline_data(&mut self, position: usize, present: bool) -> Result<()> {
+        const NON_OUTLINE_DATA_FLAG: u32 = 1 << 2;
 
         let slide = self
             .slides()?
             .get(position)
             .copied()
             .ok_or_else(|| Error::InvalidFormat("slide position is out of range".into()))?;
-        let before = slide.flags() & HIDDEN_FLAG != 0;
-        if before == hidden {
+        let before = slide.flags() & NON_OUTLINE_DATA_FLAG != 0;
+        if before == present {
             return Ok(());
         }
         let list_index = validation::list_index(&self.candidate, 0)?
@@ -445,17 +446,17 @@ impl Transaction {
                 .try_into()
                 .map_err(|_error| Error::Corrupted("slide flags are truncated".into()))?,
         );
-        if hidden {
-            flags |= HIDDEN_FLAG;
+        if present {
+            flags |= NON_OUTLINE_DATA_FLAG;
         } else {
-            flags &= !HIDDEN_FLAG;
+            flags &= !NON_OUTLINE_DATA_FLAG;
         }
         atom.data[4..8].copy_from_slice(&flags.to_le_bytes());
         self.publish_candidate(candidate)?;
-        self.changes.push(Change::SlideVisibilityChanged {
+        self.changes.push(Change::SlideNonOutlineDataChanged {
             position,
             before,
-            after: hidden,
+            after: present,
         });
         Ok(())
     }

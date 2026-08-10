@@ -6,11 +6,26 @@ use super::types::{
     AdvanceMode, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };
 use crate::consts::RecordType;
+use crate::package::{Error, Result};
 
 /// Write `SSSlideInfoAtom` record with transition information.
-#[must_use]
-pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
+///
+/// # Errors
+///
+/// Returns an invalid-format error when the requested type/direction pair has
+/// no representation in the `[MS-PPT]` 2.6.6 transition table.
+pub fn write_transition(transition: &TransitionInfo) -> Result<Vec<u8>> {
     let mut data = Vec::new();
+
+    let Some([effect_direction, effect_type, effect_speed]) = super::encode_visual(
+        transition.transition_type,
+        transition.direction,
+        transition.speed,
+    ) else {
+        return Err(Error::InvalidFormat(
+            "transition type/direction is not representable by [MS-PPT] 2.6.6".into(),
+        ));
+    };
 
     // SSSlideInfoAtom structure (16 bytes total):
     // slideTime (4 bytes), soundIdRef (4 bytes), effectDirection (1 byte),
@@ -26,12 +41,9 @@ pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
     data.extend(&sound_id_ref.to_le_bytes());
 
     // effectDirection comes BEFORE effectType (1 byte)
-    let effect_direction =
-        encode_transition_direction(transition.direction, transition.transition_type);
     data.push(effect_direction);
 
     // effectType is 1 byte, not 2!
-    let effect_type = encode_transition_type(transition.transition_type);
     data.push(effect_type);
 
     // effectTransitionFlags (2 bytes)
@@ -39,7 +51,6 @@ pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
     data.extend(&flags.to_le_bytes());
 
     // speed (1 byte)
-    let effect_speed = encode_transition_speed(transition.speed);
     data.push(effect_speed);
 
     // unused (3 bytes)
@@ -55,181 +66,40 @@ pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
     result.extend(header);
     result.extend(data);
 
-    result
+    Ok(result)
 }
 
 /// Encode transition type to effect type value (1 byte).
 ///
-/// These are the crate's established `SlideShowSlideInfoAtom` effect values,
-/// shared with `parse_transition_type` in the reader so authored files
-/// round-trip through this crate unchanged.
-pub(super) fn encode_transition_type(transition_type: TransitionType) -> u8 {
+/// Values follow the exact effect table in `[MS-PPT]` 2.6.6. Effects which
+/// exist in newer presentation formats but have no binary-PPT representation
+/// return `None` and are rejected by the writer.
+pub(super) const fn encode_transition_type(transition_type: TransitionType) -> Option<u8> {
     match transition_type {
-        TransitionType::None => 0,
-        TransitionType::Blinds => 1,
-        TransitionType::Checkerboard => 2,
-        TransitionType::Cover => 3,
-        TransitionType::Dissolve => 4,
-        TransitionType::Fade => 5,
-        TransitionType::Uncover => 6,
-        TransitionType::RandomBars => 7,
-        TransitionType::Strips => 8,
-        TransitionType::Wipe => 9,
-        TransitionType::Box => 10,
-        TransitionType::Random => 11,
-        TransitionType::Zoom => 20,
-        TransitionType::Split => 13,
-        TransitionType::Cut => 17, // DIAMOND
-        TransitionType::Push => 18,
-        TransitionType::Comb => 19,
-        TransitionType::Wedge => 21,
-        TransitionType::Wheel => 22,
-        TransitionType::Newsflash => 23,
-        TransitionType::Vortex => 24,
-        TransitionType::Shred => 25,
-        TransitionType::Switch => 26,
-        TransitionType::Flip => 27,
-        TransitionType::Gallery => 28,
-        TransitionType::Cube => 29,
-        TransitionType::Doors => 30,
-        TransitionType::Window => 31,
-        TransitionType::Ferris => 32,
-        TransitionType::Conveyor => 33,
-        TransitionType::Rotate => 34,
-        TransitionType::Pan => 35,
-        TransitionType::Glitter => 36,
-        TransitionType::Honeycomb => 37,
-        TransitionType::Flash => 38,
-        TransitionType::Ripple => 39,
-        TransitionType::Fracture => 40,
-        TransitionType::Crush => 41,
-        TransitionType::Peel => 42,
-        TransitionType::PageCurl => 43,
-        TransitionType::Airplane => 44,
-        TransitionType::Origami => 45,
-        TransitionType::Morph => 46,
-    }
-}
-
-/// Encode transition direction based on type.
-///
-/// Direction values follow MS-PPT 2.6.6 (`SlideShowSlideInfoAtom`) and are the
-/// exact inverse of `parse_transition_direction` in the reader.
-pub(super) fn encode_transition_direction(
-    direction: TransitionDirection,
-    transition_type: TransitionType,
-) -> u8 {
-    match transition_type {
-        TransitionType::Blinds => match direction {
-            // MS-PPT 2.6.6 Blinds: 0=Vertical, 1=Horizontal
-            TransitionDirection::Horizontal => 1,
-            TransitionDirection::None
-            | TransitionDirection::Vertical
-            | TransitionDirection::FromLeft
-            | TransitionDirection::FromRight
-            | TransitionDirection::FromTop
-            | TransitionDirection::FromBottom
-            | TransitionDirection::In
-            | TransitionDirection::Out
-            | TransitionDirection::LeftDown
-            | TransitionDirection::LeftUp
-            | TransitionDirection::RightDown
-            | TransitionDirection::RightUp => 0,
-        },
-        TransitionType::Checkerboard | TransitionType::RandomBars => match direction {
-            // Checkerboard: 0=horizontal, 1=vertical
-            TransitionDirection::Vertical => 1,
-            TransitionDirection::None
-            | TransitionDirection::Horizontal
-            | TransitionDirection::FromLeft
-            | TransitionDirection::FromRight
-            | TransitionDirection::FromTop
-            | TransitionDirection::FromBottom
-            | TransitionDirection::In
-            | TransitionDirection::Out
-            | TransitionDirection::LeftDown
-            | TransitionDirection::LeftUp
-            | TransitionDirection::RightDown
-            | TransitionDirection::RightUp => 0,
-        },
-        TransitionType::Split => match direction {
-            // MS-PPT 2.6.6 Split: 0=Horizontally out, 2=Vertically out
-            // (the in/out axis is not representable in `TransitionDirection`)
-            TransitionDirection::Vertical => 2,
-            // Horizontal split (opens vertically)
-            TransitionDirection::None
-            | TransitionDirection::Horizontal
-            | TransitionDirection::FromLeft
-            | TransitionDirection::FromRight
-            | TransitionDirection::FromTop
-            | TransitionDirection::FromBottom
-            | TransitionDirection::In
-            | TransitionDirection::Out
-            | TransitionDirection::LeftDown
-            | TransitionDirection::LeftUp
-            | TransitionDirection::RightDown
-            | TransitionDirection::RightUp => 0,
-        },
-        TransitionType::Cover
-        | TransitionType::Uncover
-        | TransitionType::Wipe
-        | TransitionType::Push => match direction {
-            // MS-PPT 2.6.6 Cover/Uncover/Wipe/Push: 0=Left, 1=Up, 2=Right, 3=Down
-            TransitionDirection::FromTop => 1,
-            TransitionDirection::FromRight => 2,
-            TransitionDirection::FromBottom => 3,
-            TransitionDirection::None
-            | TransitionDirection::Horizontal
-            | TransitionDirection::Vertical
-            | TransitionDirection::FromLeft
-            | TransitionDirection::In
-            | TransitionDirection::Out
-            | TransitionDirection::LeftDown
-            | TransitionDirection::LeftUp
-            | TransitionDirection::RightDown
-            | TransitionDirection::RightUp => 0,
-        },
-        TransitionType::Strips => match direction {
-            // MS-PPT 2.6.6 Strips: 4=Left Up, 5=Right Up, 6=Left Down, 7=Right Down
-            TransitionDirection::LeftUp => 4,
-            TransitionDirection::RightUp => 5,
-            TransitionDirection::LeftDown => 6,
-            TransitionDirection::None
-            | TransitionDirection::Horizontal
-            | TransitionDirection::Vertical
-            | TransitionDirection::FromLeft
-            | TransitionDirection::FromRight
-            | TransitionDirection::FromTop
-            | TransitionDirection::FromBottom
-            | TransitionDirection::In
-            | TransitionDirection::Out
-            | TransitionDirection::RightDown => 7,
-        },
-        TransitionType::Box | TransitionType::Zoom => match direction {
-            // MS-PPT 2.6.6 Box In/Out: 0=Out, 1=In
-            TransitionDirection::Out => 0,
-            TransitionDirection::None
-            | TransitionDirection::Horizontal
-            | TransitionDirection::Vertical
-            | TransitionDirection::FromLeft
-            | TransitionDirection::FromRight
-            | TransitionDirection::FromTop
-            | TransitionDirection::FromBottom
-            | TransitionDirection::In
-            | TransitionDirection::LeftDown
-            | TransitionDirection::LeftUp
-            | TransitionDirection::RightDown
-            | TransitionDirection::RightUp => 1,
-        },
-        TransitionType::None
-        | TransitionType::Cut
-        | TransitionType::Dissolve
-        | TransitionType::Fade
-        | TransitionType::Comb
-        | TransitionType::Wheel
-        | TransitionType::Wedge
-        | TransitionType::Random
-        | TransitionType::Newsflash
+        TransitionType::None | TransitionType::Cut => Some(0),
+        TransitionType::Random => Some(1),
+        TransitionType::Blinds => Some(2),
+        TransitionType::Checkerboard => Some(3),
+        TransitionType::Cover => Some(4),
+        TransitionType::Dissolve => Some(5),
+        TransitionType::Fade => Some(6),
+        TransitionType::Uncover => Some(7),
+        TransitionType::RandomBars => Some(8),
+        TransitionType::Strips => Some(9),
+        TransitionType::Wipe => Some(10),
+        TransitionType::Box => Some(11),
+        TransitionType::Split => Some(13),
+        TransitionType::Diamond => Some(17),
+        TransitionType::Plus => Some(18),
+        TransitionType::Wedge => Some(19),
+        TransitionType::Push => Some(20),
+        TransitionType::Comb => Some(21),
+        TransitionType::Newsflash => Some(22),
+        TransitionType::AlphaFade => Some(23),
+        TransitionType::Wheel => Some(26),
+        TransitionType::Circle => Some(27),
+        TransitionType::Undefined => Some(255),
+        TransitionType::Zoom
         | TransitionType::Vortex
         | TransitionType::Shred
         | TransitionType::Switch
@@ -252,7 +122,124 @@ pub(super) fn encode_transition_direction(
         | TransitionType::PageCurl
         | TransitionType::Airplane
         | TransitionType::Origami
-        | TransitionType::Morph => 0,
+        | TransitionType::Morph => None,
+    }
+}
+
+/// Encode transition direction based on type.
+///
+/// Direction values follow MS-PPT 2.6.6 (`SlideShowSlideInfoAtom`) and are the
+/// exact inverse of `parse_transition_direction` in the reader.
+pub(super) const fn encode_transition_direction(
+    direction: TransitionDirection,
+    transition_type: TransitionType,
+) -> Option<u8> {
+    // Each nested match is intentionally a compact whitelist for one wire
+    // effect; all remaining enum directions are unrepresentable for it.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "nested matches whitelist the exact directions permitted by each MS-PPT effect"
+    )]
+    match transition_type {
+        TransitionType::Cut => match direction {
+            TransitionDirection::ThroughBlack => Some(1),
+            _ => None,
+        },
+        TransitionType::Blinds => match direction {
+            TransitionDirection::Vertical => Some(0),
+            TransitionDirection::Horizontal => Some(1),
+            _ => None,
+        },
+        TransitionType::Checkerboard | TransitionType::RandomBars | TransitionType::Comb => {
+            match direction {
+                TransitionDirection::Horizontal => Some(0),
+                TransitionDirection::Vertical => Some(1),
+                _ => None,
+            }
+        },
+        TransitionType::Cover | TransitionType::Uncover => match direction {
+            TransitionDirection::FromLeft => Some(0),
+            TransitionDirection::FromTop => Some(1),
+            TransitionDirection::FromRight => Some(2),
+            TransitionDirection::FromBottom => Some(3),
+            TransitionDirection::LeftUp => Some(4),
+            TransitionDirection::RightUp => Some(5),
+            TransitionDirection::LeftDown => Some(6),
+            TransitionDirection::RightDown => Some(7),
+            _ => None,
+        },
+        TransitionType::Strips => match direction {
+            TransitionDirection::LeftUp => Some(4),
+            TransitionDirection::RightUp => Some(5),
+            TransitionDirection::LeftDown => Some(6),
+            TransitionDirection::RightDown => Some(7),
+            _ => None,
+        },
+        TransitionType::Wipe | TransitionType::Push => match direction {
+            TransitionDirection::FromLeft => Some(0),
+            TransitionDirection::FromTop => Some(1),
+            TransitionDirection::FromRight => Some(2),
+            TransitionDirection::FromBottom => Some(3),
+            _ => None,
+        },
+        TransitionType::Box => match direction {
+            TransitionDirection::Out => Some(0),
+            TransitionDirection::In => Some(1),
+            _ => None,
+        },
+        TransitionType::Split => match direction {
+            TransitionDirection::HorizontalOut => Some(0),
+            TransitionDirection::HorizontalIn => Some(1),
+            TransitionDirection::VerticalOut => Some(2),
+            TransitionDirection::VerticalIn => Some(3),
+            _ => None,
+        },
+        TransitionType::Wheel => match direction {
+            TransitionDirection::Spokes1 => Some(1),
+            TransitionDirection::Spokes2 => Some(2),
+            TransitionDirection::Spokes3 => Some(3),
+            TransitionDirection::Spokes4 => Some(4),
+            TransitionDirection::Spokes8 => Some(8),
+            _ => None,
+        },
+        TransitionType::None
+        | TransitionType::Random
+        | TransitionType::Dissolve
+        | TransitionType::Fade
+        | TransitionType::Wedge
+        | TransitionType::Diamond
+        | TransitionType::Plus
+        | TransitionType::Newsflash
+        | TransitionType::AlphaFade
+        | TransitionType::Circle
+        | TransitionType::Undefined => match direction {
+            TransitionDirection::None => Some(0),
+            _ => None,
+        },
+        TransitionType::Zoom
+        | TransitionType::Vortex
+        | TransitionType::Shred
+        | TransitionType::Switch
+        | TransitionType::Flip
+        | TransitionType::Gallery
+        | TransitionType::Cube
+        | TransitionType::Doors
+        | TransitionType::Window
+        | TransitionType::Ferris
+        | TransitionType::Conveyor
+        | TransitionType::Rotate
+        | TransitionType::Pan
+        | TransitionType::Glitter
+        | TransitionType::Honeycomb
+        | TransitionType::Flash
+        | TransitionType::Ripple
+        | TransitionType::Fracture
+        | TransitionType::Crush
+        | TransitionType::Peel
+        | TransitionType::PageCurl
+        | TransitionType::Airplane
+        | TransitionType::Origami
+        | TransitionType::Morph => None,
     }
 }
 
@@ -335,10 +322,12 @@ mod tests {
 
     #[test]
     fn test_encode_transition_type() {
-        assert_eq!(encode_transition_type(TransitionType::None), 0);
-        assert_eq!(encode_transition_type(TransitionType::Blinds), 1);
-        assert_eq!(encode_transition_type(TransitionType::Dissolve), 4);
-        assert_eq!(encode_transition_type(TransitionType::Random), 11);
+        assert_eq!(encode_transition_type(TransitionType::None), Some(0));
+        assert_eq!(encode_transition_type(TransitionType::Random), Some(1));
+        assert_eq!(encode_transition_type(TransitionType::Cover), Some(4));
+        assert_eq!(encode_transition_type(TransitionType::Box), Some(11));
+        assert_eq!(encode_transition_type(TransitionType::Diamond), Some(17));
+        assert_eq!(encode_transition_type(TransitionType::Morph), None);
     }
 
     #[test]
@@ -373,7 +362,7 @@ mod tests {
     #[test]
     fn test_write_transition_minimal() {
         let transition = TransitionInfo::default();
-        let data = write_transition(&transition);
+        let data = write_transition(&transition).unwrap();
 
         assert!(data.len() >= 8);
     }

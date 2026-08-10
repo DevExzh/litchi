@@ -206,8 +206,9 @@ fn stream_offset(ppt_stream: &[u8]) -> Result<u32, WriteError> {
 /// preserved in either case.
 fn build_slide_info_atom(slide: &WritableSlide) -> Result<Option<Vec<u8>>, WriteError> {
     if let Some(ref transition) = slide.transition {
-        // write_transition always returns an 8-byte header plus a 16-byte payload
-        let mut record = crate::transition::writer::write_transition(transition);
+        // A valid transition is an 8-byte header plus a 16-byte payload.
+        let mut record = crate::transition::writer::write_transition(transition)
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         if slide.timing.as_ref().is_some_and(|timing| timing.hidden) {
             // fHidden is bit 2 of effectTransitionFlags (payload offset 10)
             let flags = u16::from_le_bytes([record[18], record[19]]) | (1 << 2);

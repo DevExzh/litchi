@@ -369,7 +369,7 @@ fn save_transition_sample(
     filename: &str,
     transition: &TransitionInfo,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let data = write_transition(transition);
+    let data = write_transition(transition)?;
     let mut file = File::create(filename)?;
     file.write_all(&data)?;
     Ok(())

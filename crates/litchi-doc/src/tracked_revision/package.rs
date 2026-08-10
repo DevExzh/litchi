@@ -62,11 +62,11 @@ impl PictureGraph {
         reason = "durable picture graph validation is a checked legacy-codec boundary"
     )]
     pub(crate) fn validate_rehomed(&self) -> Result<()> {
-        let (picture, width, height) = canonical_picture_from_block(&self.picture_block)?;
+        let (picture, width, height, shape_id) = canonical_picture_from_block(&self.picture_block)?;
         match self.spa {
             None if !self.floating && self.dgg_info.is_empty() => Ok(()),
             Some(spa) if self.floating && !self.dgg_info.is_empty() => {
-                if spa.shape_id != crate::writer::images::FIRST_PICTURE_SHAPE_ID
+                if spa.shape_id != shape_id
                     || spa.width()
                         != i32::try_from(width).map_err(|error| {
                             corrupted(format!("picture width exceeds i32: {error}"))
@@ -93,8 +93,17 @@ impl PictureGraph {
                         .map_err(|error| {
                             corrupted(format!("re-homed Dgg cannot be encoded: {error}"))
                         })?;
+                if expected == self.dgg_info {
+                    return Ok(());
+                }
+                let nested =
+                    validate_floating_picture_identity(&self.dgg_info, shape_id, 0, &picture)?
+                        .ok_or_else(|| corrupted("re-homed Dgg does not match its picture/SPA"))?;
+                let expected = build_nested_picture_dgg_info(&picture, spa, &nested)?;
                 if expected != self.dgg_info {
-                    return Err(corrupted("re-homed Dgg does not match its picture/SPA"));
+                    return Err(corrupted(
+                        "re-homed nested image group is not a closed canonical dependency graph",
+                    ));
                 }
                 Ok(())
             },
@@ -123,7 +132,7 @@ fn floating_position_from_spa(spa: crate::parts::spa::Spa) -> crate::writer::Flo
     clippy::unwrap_used,
     reason = "durable picture blocks are a checked legacy-codec boundary"
 )]
-fn canonical_picture_from_block(block: &[u8]) -> Result<(crate::writer::Picture, u32, u32)> {
+fn canonical_picture_from_block(block: &[u8]) -> Result<(crate::writer::Picture, u32, u32, u32)> {
     let fields = crate::image::PictureFields::try_parse(block, 0)
         .ok_or_else(|| corrupted("re-homed picture PICF is missing"))?;
     let lcb = fields.lcb;
@@ -169,17 +178,14 @@ fn canonical_picture_from_block(block: &[u8]) -> Result<(crate::writer::Picture,
     let picture =
         crate::writer::Picture::from_parts_as(native.to_vec(), image.kind(), width, height)
             .map_err(|error| corrupted(format!("re-homed picture is invalid: {error}")))?;
+    let shape_id = picture_shape_id(block)?;
     let mut expected = Vec::new();
-    crate::writer::images::write_picture_block(
-        &picture,
-        crate::writer::images::FIRST_PICTURE_SHAPE_ID,
-        &mut expected,
-    )
-    .map_err(|error| corrupted(format!("re-homed picture cannot be encoded: {error}")))?;
+    crate::writer::images::write_picture_block(&picture, shape_id, &mut expected)
+        .map_err(|error| corrupted(format!("re-homed picture cannot be encoded: {error}")))?;
     if expected != block {
         return Err(corrupted("re-homed picture block is not canonical"));
     }
-    Ok((picture, width, height))
+    Ok((picture, width, height, shape_id))
 }
 
 #[deny(
@@ -248,7 +254,12 @@ fn picture_shape_id(block: &[u8]) -> Result<u32> {
     clippy::unwrap_used,
     reason = "main/header OfficeArt traversal is bounded and checked"
 )]
-fn main_drawing_shapes(dgg_info: &[u8]) -> Result<Vec<litchi_odraw::shape::Shape<'_>>> {
+struct MainDrawing<'data> {
+    bytes: &'data [u8],
+    shapes: Vec<litchi_odraw::shape::Shape<'data>>,
+}
+
+fn main_drawing(dgg_info: &[u8]) -> Result<MainDrawing<'_>> {
     let (first, first_size) = litchi_odraw::Record::parse(dgg_info, 0)
         .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
     if first.kind() != litchi_odraw::RecordKind::DggContainer {
@@ -287,7 +298,13 @@ fn main_drawing_shapes(dgg_info: &[u8]) -> Result<Vec<litchi_odraw::shape::Shape
         let shapes = litchi_odraw::shape::parse(drawing_bytes)
             .map_err(|error| corrupted(format!("OfficeArt shapes are invalid: {error}")))?;
         if label == 0 {
-            if main.replace(shapes).is_some() {
+            if main
+                .replace(MainDrawing {
+                    bytes: drawing_bytes,
+                    shapes,
+                })
+                .is_some()
+            {
                 return Err(corrupted(
                     "OfficeArtContent contains more than one main-story drawing",
                 ));
@@ -313,20 +330,31 @@ fn main_drawing_shapes(dgg_info: &[u8]) -> Result<Vec<litchi_odraw::shape::Shape
     clippy::unwrap_used,
     reason = "selected picture identity is a checked OfficeArt/BStore boundary"
 )]
+#[derive(Debug)]
+struct NestedPictureGroup {
+    bytes: Vec<u8>,
+    shape_ids: Vec<u32>,
+}
+
 fn validate_floating_picture_identity(
     dgg_info: &[u8],
     shape_id: u32,
     anchor_index: usize,
     picture: &crate::writer::Picture,
-) -> Result<()> {
-    let shapes = main_drawing_shapes(dgg_info)?;
-    let selected = shapes
+) -> Result<Option<NestedPictureGroup>> {
+    let drawing = main_drawing(dgg_info)?;
+    let selected = drawing
+        .shapes
         .iter()
         .find(|shape| shape.id() == shape_id)
         .ok_or_else(|| corrupted("floating picture shape is absent from the main drawing"))?;
     let mut matching_ids = 0usize;
-    let mut pending = shapes.iter().collect::<Vec<_>>();
+    let mut all_ids = std::collections::BTreeSet::new();
+    let mut pending = drawing.shapes.iter().collect::<Vec<_>>();
     while let Some(shape) = pending.pop() {
+        if !all_ids.insert(shape.id()) {
+            return Err(corrupted("OfficeArt drawing contains duplicate shape IDs"));
+        }
         if shape.id() == shape_id {
             matching_ids = matching_ids
                 .checked_add(1)
@@ -339,6 +367,96 @@ fn validate_floating_picture_identity(
             "floating picture shape ID is duplicated or ambiguously nested",
         ));
     }
+    if selected.kind() == litchi_odraw::shape::Kind::Picture {
+        validate_canonical_picture_shape(selected, anchor_index)?;
+        validate_picture_store(dgg_info, selected, picture)?;
+        return Ok(None);
+    }
+    if selected.kind() != litchi_odraw::shape::Kind::Group
+        || !selected
+            .flags()
+            .contains(litchi_odraw::shape::Flags::GROUP | litchi_odraw::shape::Flags::HAVE_ANCHOR)
+        || selected
+            .flags()
+            .intersects(litchi_odraw::shape::Flags::CHILD | litchi_odraw::shape::Flags::PATRIARCH)
+        || selected.textbox().is_some()
+    {
+        return Err(corrupted(
+            "selected floating shape is neither a picture nor a closed image group",
+        ));
+    }
+    let client_anchor = selected
+        .client_anchor()
+        .ok_or_else(|| corrupted("selected image group has no Word client anchor"))?;
+    let anchor_ordinal = u32::try_from(anchor_index)
+        .map_err(|error| corrupted(format!("SPA anchor index exceeds u32: {error}")))?;
+    if client_anchor.version() != 0
+        || client_anchor.instance() != 0
+        || client_anchor.data() != anchor_ordinal.to_le_bytes()
+    {
+        return Err(corrupted(
+            "selected image group does not own the expected SPA client anchor",
+        ));
+    }
+
+    let mut shape_ids = vec![selected.id()];
+    let mut member = selected;
+    loop {
+        let [child] = member.children() else {
+            return Err(corrupted(
+                "selected image group is not a closed single-child chain",
+            ));
+        };
+        shape_ids.push(child.id());
+        if child.kind() == litchi_odraw::shape::Kind::Group {
+            if child.textbox().is_some() {
+                return Err(corrupted("nested image group owns a textbox"));
+            }
+            member = child;
+            continue;
+        }
+        if child.kind() != litchi_odraw::shape::Kind::Picture
+            || child.native_kind() != litchi_odraw::shape::Native::PICTURE
+            || !child
+                .flags()
+                .contains(litchi_odraw::shape::Flags::CHILD | litchi_odraw::shape::Flags::HAVE_SPT)
+            || child.textbox().is_some()
+            || !child.children().is_empty()
+        {
+            return Err(corrupted(
+                "selected image group has a non-picture or active terminal child",
+            ));
+        }
+        validate_picture_store(dgg_info, child, picture)?;
+        let pib = picture_pib(child)?;
+        let record = selected.container().record();
+        let payload_offset = record
+            .data_offset(drawing.bytes)
+            .ok_or_else(|| corrupted("selected image-group record is outside the main drawing"))?;
+        let record_start = payload_offset
+            .checked_sub(8)
+            .ok_or_else(|| corrupted("selected image-group header offset underflows"))?;
+        let record_len = usize::try_from(record.len())
+            .map_err(|error| corrupted(format!("image-group length exceeds usize: {error}")))?
+            .checked_add(8)
+            .ok_or_else(|| corrupted("image-group record extent overflows"))?;
+        let record_end = record_start
+            .checked_add(record_len)
+            .ok_or_else(|| corrupted("image-group record extent overflows"))?;
+        let mut bytes = drawing
+            .bytes
+            .get(record_start..record_end)
+            .ok_or_else(|| corrupted("selected image-group record is truncated"))?
+            .to_vec();
+        rewrite_nested_picture_group(&mut bytes, pib)?;
+        return Ok(Some(NestedPictureGroup { bytes, shape_ids }));
+    }
+}
+
+fn validate_canonical_picture_shape(
+    selected: &litchi_odraw::shape::Shape<'_>,
+    anchor_index: usize,
+) -> Result<()> {
     if selected.kind() != litchi_odraw::shape::Kind::Picture
         || selected.native_kind() != litchi_odraw::shape::Native::PICTURE
         || selected.flags()
@@ -351,20 +469,17 @@ fn validate_floating_picture_identity(
             "selected floating shape is not a canonical top-level picture frame",
         ));
     }
-    let props = selected.props();
-    let pib = props
+    let _pib = selected
+        .props()
         .prop(litchi_odraw::prop::Id::BlipToDisplay)
         .filter(|prop| {
-            props.len() == 1
+            selected.props().len() == 1
                 && prop.raw_opid() == 0x4104
                 && prop.is_blip()
                 && !prop.is_complex()
                 && prop.raw_value() > 0
         })
         .ok_or_else(|| corrupted("selected picture frame has no canonical pib property"))?;
-    let pib = u32::try_from(pib.raw_value())
-        .map_err(|error| corrupted(format!("picture pib is invalid: {error}")))?;
-
     let records = selected
         .meta()
         .children()
@@ -410,6 +525,30 @@ fn validate_floating_picture_identity(
         ));
     }
 
+    Ok(())
+}
+
+fn picture_pib(selected: &litchi_odraw::shape::Shape<'_>) -> Result<u32> {
+    let props = selected.props();
+    let pib = props
+        .prop(litchi_odraw::prop::Id::BlipToDisplay)
+        .filter(|prop| {
+            prop.raw_opid() == 0x4104
+                && prop.is_blip()
+                && !prop.is_complex()
+                && prop.raw_value() > 0
+        })
+        .ok_or_else(|| corrupted("picture frame has no usable pib property"))?;
+    u32::try_from(pib.raw_value())
+        .map_err(|error| corrupted(format!("picture pib is invalid: {error}")))
+}
+
+fn validate_picture_store(
+    dgg_info: &[u8],
+    selected: &litchi_odraw::shape::Shape<'_>,
+    picture: &crate::writer::Picture,
+) -> Result<()> {
+    let pib = picture_pib(selected)?;
     let (_drawing_group, drawing_group_size) = litchi_odraw::Record::parse(dgg_info, 0)
         .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
     let drawing_group = dgg_info
@@ -431,6 +570,296 @@ fn validate_floating_picture_identity(
             "picture PICF and floating BStore entry have different binary identities",
         ));
     }
+    Ok(())
+}
+
+#[derive(Default)]
+struct NestedRewriteState {
+    blip_references: usize,
+    client_anchors: usize,
+}
+
+fn rewrite_nested_picture_group(bytes: &mut [u8], source_pib: u32) -> Result<()> {
+    let (record, consumed) = litchi_odraw::Record::parse(bytes, 0)
+        .map_err(|error| corrupted(format!("nested image-group record is invalid: {error}")))?;
+    if consumed != bytes.len() || record.kind() != litchi_odraw::RecordKind::SpgrContainer {
+        return Err(corrupted(
+            "nested image-group closure is not one complete SpgrContainer",
+        ));
+    }
+    let mut state = NestedRewriteState::default();
+    rewrite_nested_records(bytes, 0, bytes.len(), source_pib, &mut state, 0)?;
+    if state.blip_references == 0 || state.client_anchors != 1 {
+        return Err(corrupted(
+            "nested image-group closure lacks one BLIP reference or Word client anchor",
+        ));
+    }
+    Ok(())
+}
+
+fn rewrite_nested_records(
+    bytes: &mut [u8],
+    start: usize,
+    end: usize,
+    source_pib: u32,
+    state: &mut NestedRewriteState,
+    depth: u16,
+) -> Result<()> {
+    if depth > 64 {
+        return Err(corrupted("nested image-group depth exceeds 64"));
+    }
+    let mut offset = start;
+    while offset < end {
+        let header_end = offset
+            .checked_add(8)
+            .ok_or_else(|| corrupted("nested image-group record header overflows"))?;
+        let header = bytes
+            .get(offset..header_end)
+            .ok_or_else(|| corrupted("nested image-group record header is truncated"))?;
+        let ver_inst = u16::from_le_bytes([header[0], header[1]]);
+        let version = ver_inst & 0x000f;
+        let instance = usize::from(ver_inst >> 4);
+        let kind = u16::from_le_bytes([header[2], header[3]]);
+        let body_len = usize::try_from(u32::from_le_bytes([
+            header[4], header[5], header[6], header[7],
+        ]))
+        .map_err(|error| corrupted(format!("nested image-group length exceeds usize: {error}")))?;
+        let body_end = header_end
+            .checked_add(body_len)
+            .ok_or_else(|| corrupted("nested image-group record extent overflows"))?;
+        if body_end > end {
+            return Err(corrupted(
+                "nested image-group child extends past its container",
+            ));
+        }
+        if version == 0x000f {
+            rewrite_nested_records(bytes, header_end, body_end, source_pib, state, depth + 1)?;
+        } else if matches!(kind, 0xF00B | 0xF121 | 0xF122) {
+            let descriptor_bytes = instance
+                .checked_mul(6)
+                .ok_or_else(|| corrupted("nested image-group property table overflows"))?;
+            if descriptor_bytes > body_len {
+                return Err(corrupted(
+                    "nested image-group property descriptors are truncated",
+                ));
+            }
+            for property in 0..instance {
+                let property_offset = header_end
+                    .checked_add(property * 6)
+                    .ok_or_else(|| corrupted("nested image-group property offset overflows"))?;
+                let opid = u16::from_le_bytes(
+                    bytes[property_offset..property_offset + 2]
+                        .try_into()
+                        .map_err(|error| {
+                            corrupted(format!("nested image-group opid is truncated: {error}"))
+                        })?,
+                );
+                if opid & 0x4000 == 0 {
+                    continue;
+                }
+                if opid & 0x8000 != 0 {
+                    return Err(corrupted("nested image-group has a complex BLIP property"));
+                }
+                let value_offset = property_offset + 2;
+                let value =
+                    u32::from_le_bytes(bytes[value_offset..value_offset + 4].try_into().map_err(
+                        |error| corrupted(format!("nested image-group pib is truncated: {error}")),
+                    )?);
+                if value != source_pib {
+                    return Err(corrupted(
+                        "nested image-group references more than one BLIP-store entry",
+                    ));
+                }
+                bytes[value_offset..value_offset + 4].copy_from_slice(&1u32.to_le_bytes());
+                state.blip_references = state
+                    .blip_references
+                    .checked_add(1)
+                    .ok_or_else(|| corrupted("nested image-group BLIP count overflows"))?;
+            }
+        } else if kind == 0xF010 {
+            if body_len != 4 {
+                return Err(corrupted(
+                    "nested image-group Word client anchor is not four bytes",
+                ));
+            }
+            bytes[header_end..body_end].copy_from_slice(&0u32.to_le_bytes());
+            state.client_anchors = state
+                .client_anchors
+                .checked_add(1)
+                .ok_or_else(|| corrupted("nested image-group anchor count overflows"))?;
+        }
+        offset = body_end;
+    }
+    if offset != end {
+        return Err(corrupted(
+            "nested image-group record sequence has trailing bytes",
+        ));
+    }
+    Ok(())
+}
+
+#[allow(
+    clippy::drop_non_drop,
+    reason = "explicit drops end zero-copy OfficeArt borrows before the backing buffer is spliced"
+)]
+fn build_nested_picture_dgg_info(
+    picture: &crate::writer::Picture,
+    spa: crate::parts::spa::Spa,
+    group: &NestedPictureGroup,
+) -> Result<Vec<u8>> {
+    let first_shape_id = crate::writer::images::FIRST_PICTURE_SHAPE_ID;
+    if group.shape_ids.is_empty()
+        || group.shape_ids[0] != spa.shape_id
+        || group
+            .shape_ids
+            .iter()
+            .any(|id| *id < first_shape_id || *id >= 2_048)
+    {
+        return Err(corrupted(
+            "nested image-group shape IDs are outside the main drawing cluster",
+        ));
+    }
+    let max_shape_id = group
+        .shape_ids
+        .iter()
+        .copied()
+        .max()
+        .ok_or_else(|| corrupted("nested image-group has no shape IDs"))?;
+    let allocated = max_shape_id
+        .checked_sub(first_shape_id)
+        .and_then(|value| value.checked_add(1))
+        .ok_or_else(|| corrupted("nested image-group allocation count overflows"))?;
+    let position = floating_position_from_spa(spa);
+    let placeholder = crate::writer::images::FloatingShapeInfo {
+        anchor_cp: 0,
+        shape_id: spa.shape_id,
+        content: crate::writer::images::FloatingShapeContent::Picture(picture),
+        width_twips: u32::try_from(spa.width())
+            .map_err(|error| corrupted(format!("nested image-group width is invalid: {error}")))?,
+        height_twips: u32::try_from(spa.height())
+            .map_err(|error| corrupted(format!("nested image-group height is invalid: {error}")))?,
+        position: &position,
+        text: None,
+    };
+    let mut output = crate::writer::images::build_dgg_info(
+        std::slice::from_ref(&placeholder),
+        &[],
+        allocated,
+    )
+    .map_err(|error| corrupted(format!("nested image-group Dgg cannot be encoded: {error}")))?;
+
+    let (drawing_group_record, drawing_group_size) = litchi_odraw::Record::parse(&output, 0)
+        .map_err(|error| corrupted(format!("generated Dgg root is invalid: {error}")))?;
+    let dgg_meta = litchi_odraw::Container::try_new(drawing_group_record)
+        .map_err(|error| corrupted(format!("generated Dgg root is invalid: {error}")))?
+        .find(litchi_odraw::RecordKind::Dgg)
+        .map_err(|error| corrupted(format!("generated Dgg atom is invalid: {error}")))?
+        .ok_or_else(|| corrupted("generated Dgg root has no Dgg atom"))?;
+    let dgg_meta_payload = dgg_meta
+        .data_offset(&output)
+        .ok_or_else(|| corrupted("generated Dgg atom is outside its root"))?;
+
+    let dg_start = drawing_group_size
+        .checked_add(1)
+        .ok_or_else(|| corrupted("generated drawing offset overflows"))?;
+    let (drawing_record, drawing_size) = litchi_odraw::Record::parse(&output, dg_start)
+        .map_err(|error| corrupted(format!("generated drawing is invalid: {error}")))?;
+    if drawing_record.kind() != litchi_odraw::RecordKind::DgContainer {
+        return Err(corrupted("generated drawing has no DgContainer"));
+    }
+    let drawing_container = litchi_odraw::Container::try_new(drawing_record)
+        .map_err(|error| corrupted(format!("generated drawing is invalid: {error}")))?;
+    let dg_atom = drawing_container
+        .find(litchi_odraw::RecordKind::Dg)
+        .map_err(|error| corrupted(format!("generated Dg atom is invalid: {error}")))?
+        .ok_or_else(|| corrupted("generated drawing has no Dg atom"))?;
+    let dg_payload = dg_atom
+        .data_offset(&output)
+        .ok_or_else(|| corrupted("generated Dg atom is outside its drawing"))?;
+    let root_group = drawing_container
+        .find(litchi_odraw::RecordKind::SpgrContainer)
+        .map_err(|error| corrupted(format!("generated root shape group is invalid: {error}")))?
+        .ok_or_else(|| corrupted("generated drawing has no root shape group"))?;
+    let root_group_len = usize::try_from(root_group.len())
+        .map_err(|error| corrupted(format!("root shape-group length exceeds usize: {error}")))?;
+    let root_group_payload = root_group
+        .data_offset(&output)
+        .ok_or_else(|| corrupted("generated root shape group is outside its drawing"))?;
+    let root_group_start = root_group_payload
+        .checked_sub(8)
+        .ok_or_else(|| corrupted("generated root shape-group offset underflows"))?;
+    let root_group_container = litchi_odraw::Container::try_new(root_group)
+        .map_err(|error| corrupted(format!("generated root shape group is invalid: {error}")))?;
+    let shape_records = root_group_container
+        .children()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|error| corrupted(format!("generated shape records are invalid: {error}")))?;
+    let [_patriarch, selected] = shape_records.as_slice() else {
+        return Err(corrupted(
+            "generated root shape group is not a singleton drawing",
+        ));
+    };
+    let selected_payload = selected
+        .data_offset(&output)
+        .ok_or_else(|| corrupted("generated selected shape is outside its drawing"))?;
+    let selected_start = selected_payload
+        .checked_sub(8)
+        .ok_or_else(|| corrupted("generated selected-shape offset underflows"))?;
+    let selected_end = selected_payload
+        .checked_add(usize::try_from(selected.len()).map_err(|error| {
+            corrupted(format!(
+                "generated selected-shape length exceeds usize: {error}"
+            ))
+        })?)
+        .ok_or_else(|| corrupted("generated selected-shape extent overflows"))?;
+    let selected_len = selected_end - selected_start;
+    let replacement_len = group.bytes.len();
+    drop(shape_records);
+    drop(root_group_container);
+    drop(drawing_container);
+    drop(dgg_meta);
+    output.splice(selected_start..selected_end, group.bytes.iter().copied());
+    let new_root_len = root_group_len
+        .checked_sub(selected_len)
+        .and_then(|value| value.checked_add(replacement_len))
+        .ok_or_else(|| corrupted("root shape-group replacement length overflows"))?;
+    let new_dg_len = drawing_size
+        .checked_sub(8)
+        .and_then(|value| value.checked_sub(selected_len))
+        .and_then(|value| value.checked_add(replacement_len))
+        .ok_or_else(|| corrupted("drawing replacement length overflows"))?;
+    write_record_length(&mut output, root_group_start, new_root_len)?;
+    write_record_length(&mut output, dg_start, new_dg_len)?;
+
+    let shape_count = u32::try_from(group.shape_ids.len())
+        .map_err(|error| corrupted(format!("nested shape count exceeds u32: {error}")))?
+        .checked_add(1)
+        .ok_or_else(|| corrupted("nested shape count overflows"))?;
+    write_u32_at(&mut output, dg_payload, shape_count)?;
+    write_u32_at(&mut output, dg_payload + 4, max_shape_id + 1)?;
+    let spid_max = max_shape_id
+        .checked_add(1_024 - max_shape_id % 1_024)
+        .ok_or_else(|| corrupted("nested image-group spidMax overflows"))?;
+    write_u32_at(&mut output, dgg_meta_payload, spid_max)?;
+    write_u32_at(&mut output, dgg_meta_payload + 8, shape_count)?;
+    write_u32_at(&mut output, dgg_meta_payload + 20, max_shape_id % 1_024 + 1)?;
+    Ok(output)
+}
+
+fn write_record_length(bytes: &mut [u8], record_start: usize, length: usize) -> Result<()> {
+    let length = u32::try_from(length)
+        .map_err(|error| corrupted(format!("OfficeArt record length exceeds u32: {error}")))?;
+    write_u32_at(bytes, record_start + 4, length)
+}
+
+fn write_u32_at(bytes: &mut [u8], offset: usize, value: u32) -> Result<()> {
+    let end = offset
+        .checked_add(4)
+        .ok_or_else(|| corrupted("OfficeArt patch offset overflows"))?;
+    bytes
+        .get_mut(offset..end)
+        .ok_or_else(|| corrupted("OfficeArt patch is outside generated bytes"))?
+        .copy_from_slice(&value.to_le_bytes());
     Ok(())
 }
 
@@ -1069,7 +1498,7 @@ impl RevisionEditor {
             ));
         }
         let (picture, width, height, shape_id) = self.canonical_picture_at_cp(cp)?;
-        let selected_spa = if floating {
+        let (selected_spa, nested_group) = if floating {
             let (spa_offset, spa_length) = fib_pair(&self.word, 40)?;
             let (header_spa_offset, header_spa_length) = fib_pair(&self.word, 41)?;
             if header_spa_length != 0 {
@@ -1112,20 +1541,22 @@ impl RevisionEditor {
                 return Err(corrupted("floating picture has no DggInfo"));
             }
             let dgg_info = slice(&self.table, dgg_offset, dgg_length, "DggInfo")?;
-            validate_floating_picture_identity(dgg_info, shape_id, anchor_index, &picture)?;
-            Some(anchor.spa)
+            let nested =
+                validate_floating_picture_identity(dgg_info, shape_id, anchor_index, &picture)?;
+            (Some(anchor.spa), nested)
         } else {
-            None
+            (None, None)
+        };
+        let rehomed_shape_id = if nested_group.is_some() {
+            shape_id
+        } else {
+            crate::writer::images::FIRST_PICTURE_SHAPE_ID
         };
         let mut picture_block = Vec::new();
-        crate::writer::images::write_picture_block(
-            &picture,
-            crate::writer::images::FIRST_PICTURE_SHAPE_ID,
-            &mut picture_block,
-        )
-        .map_err(|error| corrupted(format!("selected picture cannot be re-homed: {error}")))?;
+        crate::writer::images::write_picture_block(&picture, rehomed_shape_id, &mut picture_block)
+            .map_err(|error| corrupted(format!("selected picture cannot be re-homed: {error}")))?;
         let (spa, dgg_info) = if let Some(mut spa) = selected_spa {
-            spa.shape_id = crate::writer::images::FIRST_PICTURE_SHAPE_ID;
+            spa.shape_id = rehomed_shape_id;
             let position = floating_position_from_spa(spa);
             let shape = crate::writer::images::FloatingShapeInfo {
                 anchor_cp: cp,
@@ -1136,12 +1567,16 @@ impl RevisionEditor {
                 position: &position,
                 text: None,
             };
-            let dgg = crate::writer::images::build_dgg_info(std::slice::from_ref(&shape), &[], 1)
-                .map_err(|error| {
-                corrupted(format!(
-                    "selected drawing graph cannot be re-homed: {error}"
-                ))
-            })?;
+            let dgg = if let Some(group) = nested_group.as_ref() {
+                build_nested_picture_dgg_info(&picture, spa, group)?
+            } else {
+                crate::writer::images::build_dgg_info(std::slice::from_ref(&shape), &[], 1)
+                    .map_err(|error| {
+                        corrupted(format!(
+                            "selected drawing graph cannot be re-homed: {error}"
+                        ))
+                    })?
+            };
             (Some(spa), dgg)
         } else {
             (None, Vec::new())
@@ -2191,5 +2626,185 @@ impl RevisionEditor {
         }
         self.changed = true;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod picture_group_tests {
+    use super::*;
+    use crate::parts::spa::{
+        ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide,
+    };
+
+    fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
+        let mut output = Vec::new();
+        crate::writer::images::write_record_header(
+            &mut output,
+            version,
+            instance,
+            kind,
+            u32::try_from(payload.len()).unwrap(),
+        );
+        output.extend_from_slice(payload);
+        output
+    }
+
+    fn shape_container(children: &[Vec<u8>]) -> Vec<u8> {
+        let payload = children.concat();
+        record(0x0f, 0, 0xF004, &payload)
+    }
+
+    fn nested_group(shape_id: u32, picture_id: u32, width: i32, height: i32) -> Vec<u8> {
+        let mut bounds = Vec::new();
+        for value in [0, 0, width, height] {
+            bounds.extend_from_slice(&value.to_le_bytes());
+        }
+        let mut group_shape = Vec::new();
+        group_shape.extend_from_slice(&shape_id.to_le_bytes());
+        group_shape.extend_from_slice(&0x0201u32.to_le_bytes());
+        let group_meta = shape_container(&[
+            record(1, 0, 0xF009, &bounds),
+            record(2, 0, 0xF00A, &group_shape),
+            record(0, 0, 0xF010, &0u32.to_le_bytes()),
+            record(0, 0, 0xF011, &0u32.to_le_bytes()),
+        ]);
+
+        let mut picture_shape = Vec::new();
+        picture_shape.extend_from_slice(&picture_id.to_le_bytes());
+        picture_shape.extend_from_slice(&0x0A02u32.to_le_bytes());
+        let mut opt = Vec::new();
+        crate::writer::images::write_opt_record(&mut opt, &[(0x4104, 1)]);
+        let picture = shape_container(&[
+            record(2, 75, 0xF00A, &picture_shape),
+            opt,
+            record(0, 0, 0xF00F, &bounds),
+            record(0, 0, 0xF011, &0u32.to_le_bytes()),
+        ]);
+        let payload = [group_meta, picture].concat();
+        record(0x0f, 0, 0xF003, &payload)
+    }
+
+    #[test]
+    fn nested_single_image_group_is_a_closed_rehomed_graph() {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/images/png/lena.png"),
+        )
+        .unwrap();
+        let picture = crate::writer::Picture::new(bytes).unwrap();
+        let shape_id = crate::writer::images::FIRST_PICTURE_SHAPE_ID;
+        let spa = crate::parts::spa::Spa {
+            shape_id,
+            left: 120,
+            top: 240,
+            right: 120 + i32::try_from(picture.width_twips()).unwrap(),
+            bottom: 240 + i32::try_from(picture.height_twips()).unwrap(),
+            horizontal_origin: ShapeHorizontalOrigin::Page,
+            vertical_origin: ShapeVerticalOrigin::Page,
+            wrap: ShapeTextWrap::Square,
+            wrap_side: ShapeWrapSide::Both,
+            below_text: false,
+            anchor_locked: true,
+        };
+        let group = NestedPictureGroup {
+            bytes: nested_group(shape_id, shape_id + 1, spa.width(), spa.height()),
+            shape_ids: vec![shape_id, shape_id + 1],
+        };
+        let dgg_info = build_nested_picture_dgg_info(&picture, spa, &group).unwrap();
+        let normalized =
+            validate_floating_picture_identity(&dgg_info, shape_id, 0, &picture).unwrap();
+        assert!(normalized.is_some());
+
+        let mut picture_block = Vec::new();
+        crate::writer::images::write_picture_block(&picture, shape_id, &mut picture_block).unwrap();
+        PictureGraph {
+            floating: true,
+            picture_block,
+            spa: Some(spa),
+            dgg_info,
+            replaced_grpprl: None,
+            data_offset: None,
+        }
+        .validate_rehomed()
+        .unwrap();
+    }
+
+    #[test]
+    fn nested_image_group_transfers_through_the_body_transaction() {
+        use crate::body_text::{Projection, Snapshot as BodySnapshot, TextTarget};
+        use crate::writer::{CharacterFormatting, FloatingPosition, ParagraphFormatting, Writer};
+        use litchi_core::Position;
+        use std::io::Cursor;
+
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/images/png/lena.png"),
+        )
+        .unwrap();
+        let picture = crate::writer::Picture::new(bytes).unwrap();
+        let mut writer = Writer::new();
+        writer
+            .insert_floating_picture(picture, FloatingPosition::new(1440, 720))
+            .unwrap();
+        let mut donor_bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut donor_bytes).unwrap();
+
+        let mut editor = RevisionEditor::open(donor_bytes.into_inner(), Limits::default()).unwrap();
+        let (picture, width, height, shape_id) = editor.canonical_picture_at_cp(0).unwrap();
+        let (spa_offset, spa_length) = fib_pair(&editor.word, 40).unwrap();
+        let anchors = crate::parts::spa::parse_plcf_spa(
+            slice(&editor.table, spa_offset, spa_length, "PlcfSpaMom").unwrap(),
+        )
+        .unwrap();
+        let spa = anchors[0].spa;
+        let group = NestedPictureGroup {
+            bytes: nested_group(
+                shape_id,
+                shape_id + 1,
+                i32::try_from(width).unwrap(),
+                i32::try_from(height).unwrap(),
+            ),
+            shape_ids: vec![shape_id, shape_id + 1],
+        };
+        let dgg_info = build_nested_picture_dgg_info(&picture, spa, &group).unwrap();
+        append_table_block(
+            &mut editor.word,
+            &mut editor.table,
+            crate::shape::FIB_INDEX_DGG_INFO,
+            &dgg_info,
+        )
+        .unwrap();
+        editor.commit().unwrap();
+        let donor = BodySnapshot::parse(&editor.finish().unwrap()).unwrap();
+
+        let mut receiver_writer = Writer::new();
+        receiver_writer
+            .add_paragraph_runs(
+                vec![("placeholder".to_owned(), CharacterFormatting::default())],
+                ParagraphFormatting::default(),
+            )
+            .unwrap();
+        let mut receiver_bytes = Cursor::new(Vec::new());
+        receiver_writer.write_to(&mut receiver_bytes).unwrap();
+        let receiver = BodySnapshot::parse(&receiver_bytes.into_inner()).unwrap();
+        let plan = receiver
+            .plan_picture_transfer_from(
+                &donor,
+                TextTarget::body_paragraph(Position::new(0)),
+                TextTarget::body_paragraph(Position::new(0)),
+            )
+            .unwrap();
+        assert!(plan.is_floating());
+        let mut edit = receiver.edit().unwrap();
+        edit.apply_picture_transfer(&plan).unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(
+            commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
+            "\u{0008}"
+        );
+        assert_eq!(
+            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            receiver
+        );
     }
 }

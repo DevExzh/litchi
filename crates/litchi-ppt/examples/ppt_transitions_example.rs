@@ -107,15 +107,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_direction(TransitionDirection::Horizontal)
         .with_advance_mode(AdvanceMode::OnClick);
 
-    // Slide 8: Zoom Transition
-    println!("Creating slide 8: Zoom Transition");
+    // Slide 8: Circle Transition
+    println!("Creating slide 8: Circle Transition");
     let slide8 = writer.add_slide()?;
-    writer.add_textbox(slide8, 100, 150, 600, 100, "Zoom Transition")?;
-    writer.add_textbox(slide8, 100, 280, 600, 100, "Zoom In Effect")?;
+    writer.add_textbox(slide8, 100, 150, 600, 100, "Circle Transition")?;
+    writer.add_textbox(slide8, 100, 280, 600, 100, "MS-PPT Circle Effect")?;
 
-    let transition8 = TransitionInfo::with_type(TransitionType::Zoom)
+    let transition8 = TransitionInfo::with_type(TransitionType::Circle)
         .with_speed(TransitionSpeed::Fast)
-        .with_direction(TransitionDirection::In)
         .with_advance_mode(AdvanceMode::OnClick);
 
     // Slide 9: Automatic Advance
@@ -140,20 +139,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_advance_mode(AdvanceMode::Both)
         .with_advance_time(5000); // 5 seconds
 
-    // Slide 11: Modern Transitions - Morph
-    println!("Creating slide 11: Modern Transitions");
+    // Slide 11: Diamond Transition
+    println!("Creating slide 11: Diamond Transition");
     let slide11 = writer.add_slide()?;
-    writer.add_textbox(slide11, 100, 150, 600, 100, "Modern Transitions")?;
-    writer.add_textbox(
-        slide11,
-        100,
-        280,
-        600,
-        100,
-        "Morph Effect (PowerPoint 2016+)",
-    )?;
+    writer.add_textbox(slide11, 100, 150, 600, 100, "Diamond Transition")?;
+    writer.add_textbox(slide11, 100, 280, 600, 100, "MS-PPT Diamond Effect")?;
 
-    let transition11 = TransitionInfo::with_type(TransitionType::Morph)
+    let transition11 = TransitionInfo::with_type(TransitionType::Diamond)
         .with_speed(TransitionSpeed::Medium)
         .with_advance_mode(AdvanceMode::OnClick);
 
@@ -167,7 +159,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         200,
         600,
         200,
-        "Transition Speeds:\n\n• Slow (2 seconds)\n• Medium (1 second)\n• Fast (0.5 seconds)",
+        "Transition Speeds:\n\n• Slow (0.75 seconds)\n• Medium (0.5 seconds)\n• Fast (0.25 seconds)",
     )?;
 
     let speed_transition = TransitionInfo::with_type(TransitionType::Fade)

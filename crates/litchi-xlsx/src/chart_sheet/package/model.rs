@@ -290,10 +290,30 @@ pub struct ChartEmbeddedPackageResource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChartExternalResource {
+    pub relationship_id: String,
+    pub relationship_type: String,
+    /// Inert external target retained verbatim and never fetched.
+    pub target: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChartOpaqueResource {
+    pub relationship_id: String,
+    pub relationship_type: String,
+    pub part_name: String,
+    pub content_type: String,
+    /// Relationship-free inert payload retained without interpretation.
+    pub data: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChartOutboundResource {
     Image(ImageResource),
     ThemeOverride(ChartThemeOverrideResource),
     EmbeddedPackage(ChartEmbeddedPackageResource),
+    External(ChartExternalResource),
+    Opaque(ChartOpaqueResource),
 }
 impl ChartOutboundResource {
     pub(super) fn relationship_id(&self) -> &str {
@@ -301,6 +321,8 @@ impl ChartOutboundResource {
             Self::Image(value) => &value.relationship_id,
             Self::ThemeOverride(value) => &value.relationship_id,
             Self::EmbeddedPackage(value) => &value.relationship_id,
+            Self::External(value) => &value.relationship_id,
+            Self::Opaque(value) => &value.relationship_id,
         }
     }
 }
@@ -308,6 +330,10 @@ impl ChartOutboundResource {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChartResourceKind {
     Classic,
+    ClassicWithRelationships {
+        user_shapes: Option<ChartUserShapesResource>,
+        outbound_resources: Vec<ChartOutboundResource>,
+    },
     Extended {
         styles: Vec<ChartCompanionResource>,
         color_styles: Vec<ChartCompanionResource>,

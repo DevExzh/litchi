@@ -30,8 +30,8 @@ fn source_position() -> Position {
 
 fn before_visual() -> SlideTransitionVisual {
     SlideTransitionVisual::new(
-        TransitionType::Random,
-        TransitionDirection::None,
+        TransitionType::Box,
+        TransitionDirection::Out,
         TransitionSpeed::Slow,
     )
     .expect("fixture visual transition is exact")
@@ -39,8 +39,8 @@ fn before_visual() -> SlideTransitionVisual {
 
 fn after_visual() -> SlideTransitionVisual {
     SlideTransitionVisual::new(
-        TransitionType::Dissolve,
-        TransitionDirection::None,
+        TransitionType::Cover,
+        TransitionDirection::FromLeft,
         TransitionSpeed::Medium,
     )
     .expect("handoff visual transition is exact")
@@ -175,8 +175,8 @@ fn genuine_visual_transition_reopens_reverses_merges_and_uses_history() {
 fn visual_transition_refusals_are_typed_and_failure_atomic() {
     assert!(
         SlideTransitionVisual::new(
-            TransitionType::Dissolve,
-            TransitionDirection::FromLeft,
+            TransitionType::Cover,
+            TransitionDirection::None,
             TransitionSpeed::Medium,
         )
         .is_err()

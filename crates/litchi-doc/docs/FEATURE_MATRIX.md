@@ -72,12 +72,13 @@ unmodeled CP-indexed structures are typed refusals. The same semantic changes
 drive source-checked reversible patches, deterministic durable patches,
 disjoint composition, three-way planning, inert text and managed-resource
 transfer, and bounded undo/redo history. Canonical native inline/floating
-pictures can be re-homed after proving the selected PICF/Data and, when
-floating, its SPA/top-level-shape/`pib`/BStore binary identity; unrelated
-bounded main/header-story shapes, groups, textboxes, and shared BStore resources remain
-outside the copied closure. Selected nested/group-owned or extended drawing
-graphs and producer-defined object controls receive specific typed refusals
-rather than partial copying. Selection uses the
+pictures and floating pictures inside a closed single-child nested group chain
+can be re-homed after proving the selected PICF/Data and, when floating, its
+complete SPA/shape/group/`pib`/BStore binary identity; unrelated bounded
+main/header-story shapes, groups, textboxes, and shared BStore resources remain
+outside the copied closure. Multi-child, multi-image, active, or complex-BLIP
+drawing graphs and producer-defined object controls receive specific typed
+refusals rather than partial copying. Selection uses the
 format-neutral `litchi_core::Position`, with collection resolution returning a
 typed not-found refusal. Closure evidence includes full reopen plus durable
 replay/inversion into a checked-in genuine DOC receiver and typed fail-closed

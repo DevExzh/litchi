@@ -129,7 +129,7 @@ fn authored_transition_record_layout_matches_spec() {
     assert_eq!(u32::from_le_bytes(wipe[0..4].try_into().unwrap()), 0);
     assert_eq!(u32::from_le_bytes(wipe[4..8].try_into().unwrap()), 0);
     assert_eq!(wipe[8], 0, "Wipe FromLeft direction (MS-PPT 2.6.6: 0=Left)");
-    assert_eq!(wipe[9], 9, "crate effect value for Wipe");
+    assert_eq!(wipe[9], 10, "MS-PPT 2.6.6 effect value for Wipe");
     assert_eq!(
         u16::from_le_bytes(wipe[10..12].try_into().unwrap()),
         0x0001,
@@ -141,7 +141,7 @@ fn authored_transition_record_layout_matches_spec() {
     let dissolve = &payloads[1];
     assert_eq!(dissolve.len(), 16);
     assert_eq!(u32::from_le_bytes(dissolve[0..4].try_into().unwrap()), 3000);
-    assert_eq!(dissolve[9], 4, "crate effect value for Dissolve");
+    assert_eq!(dissolve[9], 5, "MS-PPT 2.6.6 effect value for Dissolve");
     assert_eq!(
         u16::from_le_bytes(dissolve[10..12].try_into().unwrap()),
         0x0400,
@@ -163,9 +163,11 @@ fn directional_transitions_round_trip() {
         (TransitionType::Strips, TransitionDirection::RightUp),
         (TransitionType::Box, TransitionDirection::Out),
         (TransitionType::Box, TransitionDirection::In),
-        (TransitionType::Zoom, TransitionDirection::In),
-        (TransitionType::Split, TransitionDirection::Horizontal),
-        (TransitionType::Split, TransitionDirection::Vertical),
+        (TransitionType::Split, TransitionDirection::HorizontalOut),
+        (TransitionType::Split, TransitionDirection::HorizontalIn),
+        (TransitionType::Split, TransitionDirection::VerticalOut),
+        (TransitionType::Split, TransitionDirection::VerticalIn),
+        (TransitionType::Wheel, TransitionDirection::Spokes3),
     ];
 
     let mut writer = Writer::new();
@@ -262,6 +264,15 @@ fn transition_with_sound_is_refused() {
         ..TransitionInfo::default()
     };
     let result = writer.set_slide_transition(slide, transition);
+    assert!(matches!(result, Err(WriteError::InvalidData(_))));
+}
+
+#[test]
+fn transition_without_binary_ppt_representation_is_refused() {
+    let mut writer = Writer::new();
+    let slide = writer.add_slide().unwrap();
+    let result =
+        writer.set_slide_transition(slide, TransitionInfo::with_type(TransitionType::Morph));
     assert!(matches!(result, Err(WriteError::InvalidData(_))));
 }
 

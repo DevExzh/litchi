@@ -230,6 +230,9 @@ pub enum Refusal {
     /// The selected slide does not contain exactly one valid fixed-width
     /// `SlideShowSlideInfoAtom` to mutate without record insertion/removal.
     UnsupportedSlideAdvance { position: Position },
+    /// The selected slide does not contain exactly one valid fixed-width
+    /// `SlideShowSlideInfoAtom` whose `fHidden` flag can be changed in place.
+    UnsupportedSlideVisibility { position: Position },
     /// The selected slide does not contain exactly one canonical fixed-width
     /// visual transition owner.
     UnsupportedSlideTransitionVisual { position: Position },
@@ -270,6 +273,11 @@ impl fmt::Display for Refusal {
             Self::UnsupportedSlideAdvance { position } => write!(
                 formatter,
                 "PPT slide position {} has no unique fixed-width slide-show information atom",
+                position.get()
+            ),
+            Self::UnsupportedSlideVisibility { position } => write!(
+                formatter,
+                "PPT slide position {} has no unique fixed-width slide-show visibility owner",
                 position.get()
             ),
             Self::UnsupportedSlideTransitionVisual { position } => write!(
@@ -450,14 +458,14 @@ impl Snapshot {
         self.document.slides().len()
     }
 
-    /// Whether one slide is omitted from the presentation sequence.
+    /// Whether one slide is hidden during the slide show.
     ///
     /// # Errors
     ///
     /// Returns a typed refusal when the position is absent.
     pub fn slide_hidden(&self, position: Position) -> Result<bool> {
         self.require_position(position)?;
-        Ok(self.document.slides()[position.get()].flags() & (1 << 2) != 0)
+        inspect_slide_hidden(self, position)
     }
 
     /// Returns one slide's fixed-width manual/automatic advance state.
@@ -554,6 +562,7 @@ impl Snapshot {
             media_playback_changes: Vec::new(),
             formatting: Vec::new(),
             inserted_records: BTreeMap::new(),
+            inserted_pictures: BTreeMap::new(),
         })
     }
 
@@ -616,10 +625,12 @@ impl Snapshot {
     ///
     /// The bounded closure reuses a byte-identical master plus matching
     /// comment-author, hyperlink, sound, and external-media owners already
-    /// present in the receiver. Ordinary shapes and connector rules are
-    /// deterministically rewritten to target-owned unused drawing IDs. Notes,
-    /// BLIPs, animation/build graphs, active OLE/macro/program actions, and
-    /// missing or mismatched owners are refused explicitly.
+    /// present in the receiver. Ordinary shapes and their passive reference
+    /// rules are deterministically rewritten to target-owned unused drawing
+    /// IDs. Referenced BLIPs are reused by semantic identity or appended with
+    /// exact native image framing to the target `BStore` and `Pictures` stream.
+    /// Notes, animation/build graphs, active OLE/macro/program actions, and
+    /// missing or mismatched remaining owners are refused explicitly.
     ///
     /// # Errors
     ///
@@ -636,7 +647,10 @@ impl Snapshot {
         require_master_closure(self, donor, payload.master_id)?;
         Ok(TransferPlan {
             target_artifact: artifact_hash(self.bytes()),
-            payload: normalized_payload(&payload),
+            payload: normalized_payload(&SlidePayload {
+                pictures: closure.pictures,
+                ..payload
+            }),
             reused_dependencies: closure.dependencies,
             relationship_remaps: closure.remaps,
         })
@@ -682,6 +696,9 @@ impl Snapshot {
                     },
                     "presentation.shape-anchor.set" => {
                         apply_durable_anchor(&current, &operations[index])?
+                    },
+                    "presentation.slide-hidden.set" => {
+                        apply_durable_slide_visibility(&current, &operations[index])?
                     },
                     "presentation.slide-advance.set" => {
                         apply_durable_slide_advance(&current, &operations[index])?
@@ -853,11 +870,10 @@ pub struct ExternalMediaPlaybackChange {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SlideVisibilityChange {
     position: Position,
+    target: Position,
     slide_id: u32,
     before: bool,
     after: bool,
-    before_order: [u8; 32],
-    after_order: [u8; 32],
 }
 
 impl SlideVisibilityChange {
@@ -982,6 +998,7 @@ impl ShapeAnchorChange {
 enum FormattingChange {
     Text(ShapeTextChange),
     Anchor(ShapeAnchorChange),
+    SlideVisibility(SlideVisibilityChange),
     SlideAdvance(SlideAdvanceChange),
     SlideTransitionVisual(SlideTransitionVisualChange),
     MediaPath(ExternalMediaPathChange),
@@ -993,6 +1010,13 @@ struct SlidePayload {
     group: Vec<crate::records::Record>,
     record: Vec<u8>,
     master_id: u32,
+    pictures: Vec<TransferredPicture>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TransferredPicture {
+    target_id: u32,
+    blip: Vec<u8>,
 }
 
 /// Non-mutating dependency-checked plan for transferring one slide from a
@@ -1122,7 +1146,6 @@ struct ListChange {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum StructuralChange {
     Move(Change),
-    Visibility(SlideVisibilityChange),
     Remove(ListChange),
     Insert(ListChange),
 }
@@ -1144,6 +1167,7 @@ pub struct Transaction {
     media_playback_changes: Vec<ExternalMediaPlaybackChange>,
     formatting: Vec<FormattingChange>,
     inserted_records: BTreeMap<u32, Vec<u8>>,
+    inserted_pictures: BTreeMap<u32, Vec<u8>>,
 }
 
 impl Transaction {
@@ -1240,34 +1264,43 @@ impl Transaction {
 
     /// Changes whether one slide is hidden during presentation.
     ///
-    /// Only bit 2 of the live `SlidePersistAtom.flags` field is changed. The
-    /// operation composes with order, shape, and inert media changes and is
-    /// carried by exact, inverse, durable, history, and merge surfaces.
+    /// Only `SlideShowSlideInfoAtom.fHidden` (flags bit 2), defined by
+    /// `[MS-PPT]` 2.6.6, is changed. The similarly positioned
+    /// `SlidePersistAtom.fNonOutlineData` bit is not a visibility flag and is
+    /// preserved exactly. The operation composes with order, shape, and inert
+    /// media changes and is carried by exact, inverse, durable, history, and
+    /// merge surfaces.
     ///
     /// # Errors
     ///
-    /// Returns a typed refusal when the position is absent or a package error
-    /// when the fixed-width document mutation fails validation.
+    /// Returns a typed refusal when the position is absent or the slide has no
+    /// unique fixed-width slide-show information atom.
     pub fn set_slide_hidden(&mut self, position: Position, hidden: bool) -> Result<()> {
         self.require_position(position)?;
         let selected = self.document.slides()?[position.get()];
-        let before = selected.flags() & (1 << 2) != 0;
+        let source_position = self
+            .source
+            .document
+            .slides()
+            .iter()
+            .position(|slide| slide.persist_id() == selected.persist_id())
+            .map(Position::new)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let before = self.working.slide_hidden(source_position)?;
         if before == hidden {
             return Ok(());
         }
-        let before_order = order_digest(&self.document)?;
-        self.document.set_slide_hidden(position.get(), hidden)?;
-        let after_order = order_digest(&self.document)?;
+        self.working = replace_slide_hidden(&self.working, source_position, hidden)?;
         let change = SlideVisibilityChange {
             position,
+            target: source_position,
             slide_id: selected.slide_id(),
             before,
             after: hidden,
-            before_order,
-            after_order,
         };
         self.visibility_changes.push(change);
-        self.structural.push(StructuralChange::Visibility(change));
+        self.formatting
+            .push(FormattingChange::SlideVisibility(change));
         Ok(())
     }
 
@@ -1568,6 +1601,32 @@ impl Transaction {
             return Err(Error::Refused(Refusal::SlideNotFound { position }));
         }
         require_master(&self.document, plan.payload.master_id)?;
+        let picture_slots = picture_inventory(&self.source)?.slots;
+        for (index, picture) in plan.payload.pictures.iter().enumerate() {
+            let expected_id = picture_slots
+                .checked_add(u32::try_from(index).map_err(|_error| {
+                    PackageError::ResourceLimit("too many transferred PPT pictures".into())
+                })?)
+                .and_then(|value| value.checked_add(1))
+                .ok_or_else(|| PackageError::ResourceLimit("PPT BLIP ID overflow".into()))?;
+            if picture.target_id != expected_id {
+                return Err(PackageError::InvalidFormat(
+                    "PPT transfer picture IDs are not contiguous after the target BStore".into(),
+                )
+                .into());
+            }
+            build_picture_fbse(&picture.blip, 0)?;
+            match self.inserted_pictures.get(&picture.target_id) {
+                Some(existing) if existing == &picture.blip => {},
+                Some(_) => {
+                    return Err(Error::Refused(Refusal::UncommittedSlideDependency));
+                },
+                None => {
+                    self.inserted_pictures
+                        .insert(picture.target_id, picture.blip.clone());
+                },
+            }
+        }
         let persist_id = next_persist_id(&self.source, &self.inserted_records)?;
         let slide_id = next_slide_id(&self.document)?;
         let mut group = plan.payload.group.clone();
@@ -1586,6 +1645,7 @@ impl Transaction {
                 group,
                 record: plan.payload.record.clone(),
                 master_id: plan.payload.master_id,
+                pictures: plan.payload.pictures.clone(),
             },
         }));
         Ok(())
@@ -1649,12 +1709,25 @@ impl Transaction {
         for (persist_id, record) in &self.inserted_records {
             editor.insert_persisted_record(*persist_id, record.clone())?;
         }
-        editor.replace_persisted_record(
-            source.document_persist_id,
-            document_commit.snapshot().bytes().to_vec(),
-        )?;
+        let mut document_bytes = document_commit.snapshot().bytes().to_vec();
+        let picture_stream = if self.inserted_pictures.is_empty() {
+            None
+        } else {
+            let (rewritten, pictures) =
+                append_transferred_pictures(&working, &document_bytes, &self.inserted_pictures)?;
+            document_bytes = rewritten;
+            Some(pictures)
+        };
+        editor.replace_persisted_record(source.document_persist_id, document_bytes)?;
+        if let Some(pictures) = picture_stream {
+            editor.replace_stream_by_name("Pictures", pictures)?;
+        }
         let bytes = editor.finish()?;
-        crate::font::validate_unrelated_streams(working.bytes(), &bytes)?;
+        if self.inserted_pictures.is_empty() {
+            crate::font::validate_unrelated_streams(working.bytes(), &bytes)?;
+        } else {
+            validate_unrelated_picture_publication(working.bytes(), &bytes)?;
+        }
         let snapshot = Snapshot::from_bytes_with_limits(bytes, source.limits)?;
         if snapshot.document.slides() != document_commit.snapshot().slides() {
             return Err(PackageError::Corrupted(
@@ -1674,6 +1747,7 @@ impl Transaction {
             )
             .into());
         }
+        validate_transferred_pictures(&snapshot, &self.inserted_pictures)?;
         let patch = Patch {
             before: source,
             after: snapshot.clone(),
@@ -1866,11 +1940,10 @@ impl Patch {
                 .rev()
                 .map(|change| SlideVisibilityChange {
                     position: change.position,
+                    target: change.target,
                     slide_id: change.slide_id,
                     before: change.after,
                     after: change.before,
-                    before_order: change.after_order,
-                    after_order: change.before_order,
                 })
                 .collect(),
             advance_changes: self
@@ -1952,6 +2025,15 @@ impl Patch {
                             target: anchor_change.target,
                             before: anchor_change.after,
                             after: anchor_change.before,
+                        })
+                    },
+                    FormattingChange::SlideVisibility(visibility_change) => {
+                        FormattingChange::SlideVisibility(SlideVisibilityChange {
+                            position: visibility_change.position,
+                            target: visibility_change.target,
+                            slide_id: visibility_change.slide_id,
+                            before: visibility_change.after,
+                            after: visibility_change.before,
                         })
                     },
                     FormattingChange::SlideAdvance(advance_change) => {
@@ -2044,6 +2126,20 @@ impl Patch {
                         anchor_change.before,
                     )?,
                 ),
+                FormattingChange::SlideVisibility(visibility_change) => ReversibleOperation::new(
+                    durable_visibility_operation(
+                        limits,
+                        visibility_change.target,
+                        visibility_change.before,
+                        visibility_change.after,
+                    )?,
+                    durable_visibility_operation(
+                        limits,
+                        visibility_change.target,
+                        visibility_change.after,
+                        visibility_change.before,
+                    )?,
+                ),
                 FormattingChange::SlideAdvance(advance_change) => ReversibleOperation::new(
                     durable_slide_advance_operation(
                         limits,
@@ -2120,27 +2216,6 @@ impl Patch {
                         move_change.from,
                         &self.structural_after_artifact,
                         move_change.after_order,
-                    )?,
-                ),
-                StructuralChange::Visibility(visibility_change) => (
-                    durable_visibility_operation(
-                        limits,
-                        visibility_change,
-                        &self.structural_before_artifact,
-                        visibility_change.before_order,
-                    )?,
-                    durable_visibility_operation(
-                        limits,
-                        &SlideVisibilityChange {
-                            position: visibility_change.position,
-                            slide_id: visibility_change.slide_id,
-                            before: visibility_change.after,
-                            after: visibility_change.before,
-                            before_order: visibility_change.after_order,
-                            after_order: visibility_change.before_order,
-                        },
-                        &self.structural_after_artifact,
-                        visibility_change.after_order,
                     )?,
                 ),
                 StructuralChange::Remove(list_change) => {
@@ -2377,18 +2452,17 @@ fn durable_operation(
 
 fn durable_visibility_operation(
     limits: litchi_core::patch::PatchLimits,
-    change: &SlideVisibilityChange,
-    artifact: &str,
-    order: [u8; 32],
+    target: Position,
+    before: bool,
+    after: bool,
 ) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
-    let mut preconditions = structural_preconditions(artifact, order);
-    preconditions.insert("hidden".to_string(), serde_json::Value::Bool(change.before));
+    let preconditions = BTreeMap::from([("hidden".to_string(), serde_json::Value::Bool(before))]);
     litchi_core::patch::PatchOperation::new(
         limits,
         "presentation.slide-hidden.set",
-        format!("slide:{}", change.position.get()),
+        format!("slide:{}", target.get()),
         preconditions,
-        serde_json::Value::Bool(change.after),
+        serde_json::Value::Bool(after),
     )
 }
 
@@ -2717,6 +2791,7 @@ fn is_formatting_operation(operation: &str) -> bool {
         operation,
         "presentation.shape-text.set"
             | "presentation.shape-anchor.set"
+            | "presentation.slide-hidden.set"
             | "presentation.slide-advance.set"
             | "presentation.slide-transition-visual.set"
             | "presentation.external-media-path.set"
@@ -2878,6 +2953,34 @@ fn apply_durable_anchor(
     Snapshot::from_bytes_with_limits(rewritten.bytes, snapshot.limits)
 }
 
+fn apply_durable_slide_visibility(
+    snapshot: &Snapshot,
+    operation: &litchi_core::patch::PatchOperation,
+) -> Result<Snapshot> {
+    if operation.preconditions.len() != 1 {
+        return Err(invalid_durable_patch(
+            "slide-hidden operation has unexpected preconditions",
+        ));
+    }
+    let target = parse_target(&operation.target)?;
+    let expected = operation
+        .preconditions
+        .get("hidden")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| invalid_durable_patch("missing slide-hidden precondition"))?;
+    if snapshot.slide_hidden(target)? != expected {
+        return Err(PackageError::InvalidFormat(
+            "PPT durable slide-hidden semantic precondition does not match".into(),
+        )
+        .into());
+    }
+    let replacement = operation
+        .value
+        .as_bool()
+        .ok_or_else(|| invalid_durable_patch("slide-hidden value must be boolean"))?;
+    replace_slide_hidden(snapshot, target, replacement)
+}
+
 fn apply_durable_slide_advance(
     snapshot: &Snapshot,
     operation: &litchi_core::patch::PatchOperation,
@@ -3009,27 +3112,6 @@ fn apply_durable_structural(
                 .map(Position::new)
                 .ok_or_else(|| invalid_durable_patch("slide destination must fit usize"))?;
             transaction.move_slide(position, destination)
-        },
-        "presentation.slide-hidden.set" if operation.preconditions.len() == 3 => {
-            let expected_hidden = operation
-                .preconditions
-                .get("hidden")
-                .and_then(serde_json::Value::as_bool)
-                .ok_or_else(|| invalid_durable_patch("missing slide-hidden precondition"))?;
-            transaction.require_position(position)?;
-            let current_hidden =
-                transaction.document.slides()?[position.get()].flags() & (1 << 2) != 0;
-            if current_hidden != expected_hidden {
-                return Err(PackageError::InvalidFormat(
-                    "PPT durable slide-hidden semantic precondition does not match".into(),
-                )
-                .into());
-            }
-            let replacement = operation
-                .value
-                .as_bool()
-                .ok_or_else(|| invalid_durable_patch("slide-hidden value must be boolean"))?;
-            transaction.set_slide_hidden(position, replacement)
         },
         "slide-order.remove" if operation.preconditions.len() == 3 && operation.value.is_null() => {
             transaction.require_position(position)?;
@@ -3223,6 +3305,136 @@ fn persisted_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
     )?
     .persisted_record(persist_id)
     .map_err(Error::from)
+}
+
+fn inspect_slide_hidden(snapshot: &Snapshot, position: Position) -> Result<bool> {
+    let slide = snapshot
+        .document
+        .slides()
+        .get(position.get())
+        .copied()
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
+    let bytes = persisted_record(snapshot, slide.persist_id())?;
+    let (root, consumed) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits)?;
+    if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
+        return Err(PackageError::Corrupted(
+            "PPT slide visibility owner is not one complete SlideContainer".into(),
+        )
+        .into());
+    }
+    parse_slide_hidden_atom(unique_slide_hidden_atom(&root, position)?, position)
+}
+
+fn unique_slide_hidden_atom(root: &crate::Record, position: Position) -> Result<&crate::Record> {
+    let mut atoms = root
+        .children
+        .iter()
+        .filter(|child| child.record_type == crate::RecordType::SSSlideInfoAtom);
+    let atom = atoms
+        .next()
+        .ok_or(Error::Refused(Refusal::UnsupportedSlideVisibility {
+            position,
+        }))?;
+    if atoms.next().is_some() {
+        return Err(Error::Refused(Refusal::UnsupportedSlideVisibility {
+            position,
+        }));
+    }
+    Ok(atom)
+}
+
+fn parse_slide_hidden_atom(atom: &crate::Record, position: Position) -> Result<bool> {
+    const RESERVED_FLAGS: u16 =
+        (1 << 1) | (1 << 3) | (1 << 5) | (1 << 7) | (1 << 9) | (1 << 11) | (0b111 << 13);
+
+    if atom.version != 0 || atom.instance != 0 || !atom.children.is_empty() || atom.data.len() != 16
+    {
+        return Err(Error::Refused(Refusal::UnsupportedSlideVisibility {
+            position,
+        }));
+    }
+    let flags = u16::from_le_bytes([atom.data[10], atom.data[11]]);
+    if flags & RESERVED_FLAGS != 0 {
+        return Err(Error::Refused(Refusal::UnsupportedSlideVisibility {
+            position,
+        }));
+    }
+    Ok(flags & (1 << 2) != 0)
+}
+
+fn replace_slide_hidden(
+    snapshot: &Snapshot,
+    position: Position,
+    replacement: bool,
+) -> Result<Snapshot> {
+    let slide = snapshot
+        .document
+        .slides()
+        .get(position.get())
+        .copied()
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
+    let source_record = persisted_record(snapshot, slide.persist_id())?;
+    let (mut root, consumed) =
+        crate::Record::parse_with_limits(&source_record, 0, snapshot.limits)?;
+    if consumed != source_record.len() || root.record_type != crate::RecordType::Slide {
+        return Err(PackageError::Corrupted(
+            "PPT slide visibility owner is not one complete SlideContainer".into(),
+        )
+        .into());
+    }
+    if encode_record(&root)? != source_record {
+        return Err(PackageError::Corrupted(
+            "PPT slide visibility source record is not byte-exactly re-encodable".into(),
+        )
+        .into());
+    }
+    let atom_index = {
+        let _current =
+            parse_slide_hidden_atom(unique_slide_hidden_atom(&root, position)?, position)?;
+        root.children
+            .iter()
+            .position(|child| child.record_type == crate::RecordType::SSSlideInfoAtom)
+            .ok_or(Error::Refused(Refusal::UnsupportedSlideVisibility {
+                position,
+            }))?
+    };
+    let atom = &mut root.children[atom_index];
+    let before = atom.data.clone();
+    let mut flags = u16::from_le_bytes([atom.data[10], atom.data[11]]);
+    if replacement {
+        flags |= 1 << 2;
+    } else {
+        flags &= !(1 << 2);
+    }
+    atom.data[10..12].copy_from_slice(&flags.to_le_bytes());
+    if atom.data[..10] != before[..10] || atom.data[12..] != before[12..] {
+        return Err(PackageError::Corrupted(
+            "PPT slide visibility rewrite changed non-visibility transition fields".into(),
+        )
+        .into());
+    }
+    let rewritten_record = encode_record(&root)?;
+    if rewritten_record.len() != source_record.len() {
+        return Err(PackageError::Corrupted(
+            "PPT fixed-width slide visibility rewrite changed record length".into(),
+        )
+        .into());
+    }
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        snapshot.bytes.clone(),
+        snapshot.limits.max_package_bytes,
+    )?;
+    editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
+    let bytes = editor.finish()?;
+    crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
+    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    if published.document != snapshot.document || published.slide_hidden(position)? != replacement {
+        return Err(PackageError::Corrupted(
+            "PPT slide visibility replacement did not round-trip exactly".into(),
+        )
+        .into());
+    }
+    Ok(published)
 }
 
 fn inspect_slide_advance(snapshot: &Snapshot, position: Position) -> Result<SlideAdvance> {
@@ -3661,12 +3873,14 @@ fn slide_payload(group: Vec<crate::records::Record>, record: Vec<u8>) -> Result<
         group,
         record,
         master_id,
+        pictures: Vec::new(),
     })
 }
 
 struct TransferClosure {
     dependencies: Vec<TransferDependency>,
     remaps: Vec<RelationshipRemap>,
+    pictures: Vec<TransferredPicture>,
 }
 
 fn require_portable_slide(
@@ -3724,6 +3938,10 @@ fn require_portable_slide(
         reused.push(TransferDependency::ExternalObjectRelationship);
     }
     let has_drawing = contains_record_type(&root, crate::RecordType::PPDrawing);
+    let (picture_remaps, pictures) = picture_remaps(target, donor, &relationships.blip_ids)?;
+    if !relationships.blip_ids.is_empty() {
+        reused.push(TransferDependency::PictureStore);
+    }
     let drawing_remaps = drawing_remaps(target, &relationships)?;
     let has_external = !relationships.external_object_ids.is_empty();
     let external_remaps =
@@ -3741,6 +3959,7 @@ fn require_portable_slide(
         &hyperlink_remaps,
         &sound_remaps,
         &external_remaps,
+        &picture_remaps,
         &drawing_remaps,
     )?;
     *record = encode_record(&root)?;
@@ -3753,6 +3972,7 @@ fn require_portable_slide(
         &hyperlink_remaps,
         &sound_remaps,
         &external_remaps,
+        &picture_remaps,
         &drawing_remaps,
     );
     remaps.sort_by_key(|remap| {
@@ -3765,6 +3985,7 @@ fn require_portable_slide(
     Ok(TransferClosure {
         dependencies: reused,
         remaps,
+        pictures,
     })
 }
 
@@ -3772,6 +3993,7 @@ fn relationship_remaps(
     hyperlinks: &BTreeMap<u32, u32>,
     sounds: &BTreeMap<u32, u32>,
     external_objects: &BTreeMap<u32, u32>,
+    pictures: &BTreeMap<u32, u32>,
     drawings: &BTreeMap<u32, u32>,
 ) -> Vec<RelationshipRemap> {
     let mut output = Vec::new();
@@ -3800,6 +4022,13 @@ fn relationship_remaps(
                 })
             }),
     );
+    output.extend(pictures.iter().filter_map(|(source_id, target_id)| {
+        (source_id != target_id).then_some(RelationshipRemap {
+            dependency: TransferDependency::PictureStore,
+            source_id: *source_id,
+            target_id: *target_id,
+        })
+    }));
     output.extend(drawings.iter().filter_map(|(source_id, target_id)| {
         (source_id != target_id).then_some(RelationshipRemap {
             dependency: TransferDependency::DrawingGroup,
@@ -3831,8 +4060,10 @@ struct SlideRelationships {
     hyperlink_ids: BTreeSet<u32>,
     sound_ids: BTreeSet<u32>,
     external_object_ids: BTreeSet<u32>,
+    blip_ids: BTreeSet<u32>,
     shape_ids: BTreeSet<u32>,
     connector_shape_ids: BTreeSet<u32>,
+    other_shape_reference_ids: BTreeSet<u32>,
     active_action: bool,
     unsupported_dependencies: BTreeSet<TransferDependency>,
 }
@@ -3870,29 +4101,47 @@ fn scan_ppt_record(record: &crate::Record, output: &mut SlideRelationships) -> R
     Ok(())
 }
 
-fn option_has_blip_reference(instance: u16, payload: &[u8]) -> Result<bool> {
+fn option_blip_references(instance: u16, payload: &[u8]) -> Result<BTreeSet<u32>> {
     let property_bytes = usize::from(instance)
         .checked_mul(6)
         .ok_or_else(|| PackageError::Corrupted("OfficeArt property count overflow".into()))?;
     let properties = payload
         .get(..property_bytes)
         .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
-    Ok(properties
-        .chunks_exact(6)
-        .any(|property| u16::from_le_bytes([property[0], property[1]]) & 0x4000 != 0))
+    let mut references = BTreeSet::new();
+    for property in properties.chunks_exact(6) {
+        if u16::from_le_bytes([property[0], property[1]]) & 0x4000 == 0 {
+            continue;
+        }
+        let blip_id = u32::from_le_bytes([property[2], property[3], property[4], property[5]]);
+        if blip_id != 0 {
+            references.insert(blip_id);
+        }
+    }
+    Ok(references)
 }
 
-fn option_has_linked_shape_reference(instance: u16, payload: &[u8]) -> Result<bool> {
+fn scan_linked_shape_references(
+    instance: u16,
+    payload: &[u8],
+    output: &mut SlideRelationships,
+) -> Result<()> {
     let property_bytes = usize::from(instance)
         .checked_mul(6)
         .ok_or_else(|| PackageError::Corrupted("OfficeArt property count overflow".into()))?;
     let properties = payload
         .get(..property_bytes)
         .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
-    Ok(properties.chunks_exact(6).any(|property| {
+    for property in properties.chunks_exact(6) {
         let opid = u16::from_le_bytes([property[0], property[1]]) & 0x3fff;
-        opid == 0x008a && property[2..6].iter().any(|byte| *byte != 0)
-    }))
+        if opid == 0x008a {
+            let shape_id = u32::from_le_bytes([property[2], property[3], property[4], property[5]]);
+            if shape_id != 0 {
+                output.other_shape_reference_ids.insert(shape_id);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn scan_connector_rule(payload: &[u8], output: &mut SlideRelationships) -> Result<()> {
@@ -3910,15 +4159,468 @@ fn scan_connector_rule(payload: &[u8], output: &mut SlideRelationships) -> Resul
     Ok(())
 }
 
-fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTreeMap<u32, u32>> {
-    if donor
-        .unsupported_dependencies
-        .contains(&TransferDependency::PictureStore)
-    {
-        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: TransferDependency::PictureStore,
-        }));
+fn scan_single_shape_rule(
+    payload: &[u8],
+    context: &str,
+    output: &mut SlideRelationships,
+) -> Result<()> {
+    if payload.len() != 8 {
+        return Err(
+            PackageError::Corrupted(format!("{context} payload must contain eight bytes")).into(),
+        );
     }
+    let shape_id = read_payload_u32(payload, 4)?;
+    if shape_id != 0 {
+        output.other_shape_reference_ids.insert(shape_id);
+    }
+    Ok(())
+}
+
+fn scan_deleted_shape_rule(payload: &[u8], output: &mut SlideRelationships) -> Result<()> {
+    if payload.len() != 4 {
+        return Err(PackageError::Corrupted(
+            "OfficeArtFPSPL payload must contain four bytes".into(),
+        )
+        .into());
+    }
+    let shape_id = read_payload_u32(payload, 0)? & 0x3fff_ffff;
+    if shape_id != 0 {
+        output.other_shape_reference_ids.insert(shape_id);
+    }
+    Ok(())
+}
+
+fn scan_drawing_selection(payload: &[u8], output: &mut SlideRelationships) -> Result<()> {
+    if payload.len() < 12 || !(payload.len() - 12).is_multiple_of(4) {
+        return Err(PackageError::Corrupted(
+            "OfficeArtFDGSL payload has an invalid shape-list width".into(),
+        )
+        .into());
+    }
+    for offset in (8..payload.len()).step_by(4) {
+        let shape_id = read_payload_u32(payload, offset)?;
+        if shape_id != 0 {
+            output.other_shape_reference_ids.insert(shape_id);
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PictureResource {
+    kind: litchi_odraw::image::Kind,
+    data: Vec<u8>,
+    blip: Vec<u8>,
+}
+
+struct PictureInventory {
+    slots: u32,
+    resources: BTreeMap<u32, PictureResource>,
+}
+
+fn picture_inventory(snapshot: &Snapshot) -> Result<PictureInventory> {
+    let mut package = Package::from_reader(Cursor::new(snapshot.bytes()))?;
+    let presentation = package.presentation()?;
+    let slots = presentation
+        .image_store()?
+        .map_or(0, |store| u32::from(store.len()));
+    let mut resources = BTreeMap::new();
+    for image in presentation.images()? {
+        let id = image
+            .index()
+            .checked_add(1)
+            .and_then(|index| u32::try_from(index).ok())
+            .ok_or_else(|| PackageError::Corrupted("PPT BLIP index exceeds u32".into()))?;
+        let data = image.data().map_err(PackageError::from)?.to_vec();
+        let mut blip = Vec::new();
+        litchi_odraw::image::write::copy(&mut blip, &image.blip().map_err(PackageError::from)?)
+            .map_err(PackageError::from)?;
+        if resources
+            .insert(
+                id,
+                PictureResource {
+                    kind: image.kind(),
+                    data,
+                    blip,
+                },
+            )
+            .is_some()
+        {
+            return Err(PackageError::Corrupted(
+                "PPT image inventory contains duplicate BLIP IDs".into(),
+            )
+            .into());
+        }
+    }
+    Ok(PictureInventory { slots, resources })
+}
+
+fn picture_remaps(
+    target: &Snapshot,
+    donor: &Snapshot,
+    references: &BTreeSet<u32>,
+) -> Result<(BTreeMap<u32, u32>, Vec<TransferredPicture>)> {
+    if references.is_empty() {
+        return Ok((BTreeMap::new(), Vec::new()));
+    }
+    let donor_pictures = picture_inventory(donor)?;
+    let target_pictures = picture_inventory(target)?;
+    let mut remaps = BTreeMap::new();
+    let mut pictures = Vec::<TransferredPicture>::new();
+    for source_id in references {
+        let source = donor_pictures.resources.get(source_id).ok_or_else(|| {
+            PackageError::Corrupted(format!(
+                "PPT slide references missing donor BLIP {source_id}"
+            ))
+        })?;
+        let existing = target_pictures
+            .resources
+            .iter()
+            .find(|(_candidate_id, candidate)| {
+                candidate.kind == source.kind && candidate.data == source.data
+            })
+            .map(|(candidate_id, _candidate)| *candidate_id);
+        let staged = pictures.iter().find_map(|picture| {
+            let blip = litchi_odraw::image::Blip::parse(&picture.blip).ok()?;
+            (blip.kind() == source.kind && blip.data() == source.data).then_some(picture.target_id)
+        });
+        let target_id = if let Some(target_id) = existing.or(staged) {
+            target_id
+        } else {
+            let target_id = target_pictures
+                .slots
+                .checked_add(u32::try_from(pictures.len()).map_err(|_error| {
+                    PackageError::ResourceLimit("too many transferred PPT pictures".into())
+                })?)
+                .and_then(|value| value.checked_add(1))
+                .ok_or_else(|| PackageError::ResourceLimit("PPT BLIP ID overflow".into()))?;
+            litchi_odraw::image::Id::new(target_id).map_err(PackageError::from)?;
+            build_picture_fbse(&source.blip, 0)?;
+            pictures.push(TransferredPicture {
+                target_id,
+                blip: source.blip.clone(),
+            });
+            target_id
+        };
+        remaps.insert(*source_id, target_id);
+    }
+    Ok((remaps, pictures))
+}
+
+fn build_picture_fbse(blip_bytes: &[u8], delay_offset: u32) -> Result<Vec<u8>> {
+    let blip = litchi_odraw::image::Blip::parse(blip_bytes).map_err(PackageError::from)?;
+    let kind = blip.kind();
+    let uid = blip
+        .uids()
+        .ok_or_else(|| {
+            PackageError::InvalidFormat(
+                "opaque OfficeArt BLIPs cannot be added to a PPT BStore".into(),
+            )
+        })?
+        .effective();
+    let size = u32::try_from(blip_bytes.len())
+        .map_err(|_error| PackageError::ResourceLimit("PPT BLIP exceeds u32".into()))?;
+    let mut fbse = Vec::with_capacity(44);
+    fbse.extend_from_slice(&((u16::from(kind.raw()) << 4) | 2).to_le_bytes());
+    fbse.extend_from_slice(&0xF007u16.to_le_bytes());
+    fbse.extend_from_slice(&36u32.to_le_bytes());
+    fbse.extend_from_slice(&[kind.raw(), kind.raw()]);
+    fbse.extend_from_slice(uid.as_bytes());
+    fbse.extend_from_slice(&0x00FFu16.to_le_bytes());
+    fbse.extend_from_slice(&size.to_le_bytes());
+    fbse.extend_from_slice(&1u32.to_le_bytes());
+    fbse.extend_from_slice(&delay_offset.to_le_bytes());
+    fbse.extend_from_slice(&[0, 0, 0, 0]);
+    Ok(fbse)
+}
+
+fn append_transferred_pictures(
+    snapshot: &Snapshot,
+    document: &[u8],
+    pictures: &BTreeMap<u32, Vec<u8>>,
+) -> Result<(Vec<u8>, Vec<u8>)> {
+    let inventory = picture_inventory(snapshot)?;
+    let mut delay = picture_stream(snapshot)?;
+    let mut entries = Vec::with_capacity(pictures.len());
+    for (index, (target_id, blip)) in pictures.iter().enumerate() {
+        let expected = inventory
+            .slots
+            .checked_add(u32::try_from(index).map_err(|_error| {
+                PackageError::ResourceLimit("too many transferred PPT pictures".into())
+            })?)
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| PackageError::ResourceLimit("PPT BLIP ID overflow".into()))?;
+        if *target_id != expected {
+            return Err(PackageError::Corrupted(
+                "transferred PPT picture IDs are not contiguous after the target BStore".into(),
+            )
+            .into());
+        }
+        let offset = u32::try_from(delay.len()).map_err(|_error| {
+            PackageError::ResourceLimit("PPT Pictures stream exceeds u32".into())
+        })?;
+        entries.push(build_picture_fbse(blip, offset)?);
+        delay.extend_from_slice(blip);
+    }
+
+    let (mut root, consumed) = crate::Record::parse_with_limits(document, 0, snapshot.limits)?;
+    if consumed != document.len() || root.record_type != crate::RecordType::Document {
+        return Err(PackageError::Corrupted(
+            "PPT picture-store owner is not one DocumentContainer".into(),
+        )
+        .into());
+    }
+    let mut owners = 0usize;
+    append_picture_store_owner(&mut root, &entries, &mut owners)?;
+    if owners != 1 {
+        return Err(PackageError::Corrupted(
+            "PPT document must contain exactly one PPDrawingGroup picture-store owner".into(),
+        )
+        .into());
+    }
+    Ok((encode_record(&root)?, delay))
+}
+
+fn append_picture_store_owner(
+    record: &mut crate::Record,
+    entries: &[Vec<u8>],
+    owners: &mut usize,
+) -> Result<()> {
+    if record.record_type == crate::RecordType::PPDrawingGroup {
+        record.data = append_officeart_bstore(&record.data, entries)?;
+        *owners = owners.saturating_add(1);
+    }
+    for child in &mut record.children {
+        append_picture_store_owner(child, entries, owners)?;
+    }
+    Ok(())
+}
+
+fn append_officeart_bstore(bytes: &[u8], entries: &[Vec<u8>]) -> Result<Vec<u8>> {
+    let mut stores = 0usize;
+    let rewritten = rewrite_officeart_bstore(bytes, entries, &mut stores)?;
+    match stores {
+        0 => {
+            let mut containers = 0usize;
+            let inserted = insert_officeart_bstore(&rewritten, entries, &mut containers)?;
+            if containers != 1 {
+                return Err(PackageError::Corrupted(
+                    "PPDrawingGroup must contain exactly one OfficeArtDggContainer".into(),
+                )
+                .into());
+            }
+            Ok(inserted)
+        },
+        1 => Ok(rewritten),
+        _ => Err(PackageError::Corrupted(
+            "PPDrawingGroup contains multiple OfficeArt BStore containers".into(),
+        )
+        .into()),
+    }
+}
+
+fn rewrite_officeart_bstore(
+    bytes: &[u8],
+    entries: &[Vec<u8>],
+    stores: &mut usize,
+) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    let mut offset = 0usize;
+    while offset < bytes.len() {
+        let (version, instance, kind, payload_start, end) =
+            raw_record_bounds(bytes, offset, "OfficeArt drawing group")?;
+        let mut payload = bytes[payload_start..end].to_vec();
+        let mut rewritten_instance = instance;
+        if kind == 0xF001 {
+            if version != 0x0F {
+                return Err(PackageError::Corrupted(
+                    "OfficeArt BStore has an invalid record version".into(),
+                )
+                .into());
+            }
+            rewritten_instance = instance
+                .checked_add(u16::try_from(entries.len()).map_err(|_error| {
+                    PackageError::ResourceLimit("too many transferred PPT pictures".into())
+                })?)
+                .filter(|count| *count <= 0x0FFF)
+                .ok_or_else(|| {
+                    PackageError::ResourceLimit("PPT BStore exceeds 4095 entries".into())
+                })?;
+            for entry in entries {
+                payload.extend_from_slice(entry);
+            }
+            *stores = stores.saturating_add(1);
+        } else if version == 0x0F {
+            payload = rewrite_officeart_bstore(&payload, entries, stores)?;
+        }
+        append_raw_record(&mut output, version, rewritten_instance, kind, &payload)?;
+        offset = end;
+    }
+    Ok(output)
+}
+
+fn insert_officeart_bstore(
+    bytes: &[u8],
+    entries: &[Vec<u8>],
+    containers: &mut usize,
+) -> Result<Vec<u8>> {
+    let bstore = encode_new_bstore(entries)?;
+    let mut output = Vec::new();
+    let mut offset = 0usize;
+    while offset < bytes.len() {
+        let (version, instance, kind, payload_start, end) =
+            raw_record_bounds(bytes, offset, "OfficeArt drawing group")?;
+        let source_payload = &bytes[payload_start..end];
+        let payload = if kind == 0xF000 {
+            *containers = containers.saturating_add(1);
+            insert_bstore_after_dgg(source_payload, &bstore)?
+        } else if version == 0x0F {
+            insert_officeart_bstore(source_payload, entries, containers)?
+        } else {
+            source_payload.to_vec()
+        };
+        append_raw_record(&mut output, version, instance, kind, &payload)?;
+        offset = end;
+    }
+    Ok(output)
+}
+
+fn insert_bstore_after_dgg(bytes: &[u8], bstore: &[u8]) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    let mut offset = 0usize;
+    let mut inserted = false;
+    while offset < bytes.len() {
+        let (_version, _instance, kind, _payload_start, end) =
+            raw_record_bounds(bytes, offset, "OfficeArtDggContainer")?;
+        output.extend_from_slice(&bytes[offset..end]);
+        if kind == 0xF006 && !inserted {
+            output.extend_from_slice(bstore);
+            inserted = true;
+        }
+        offset = end;
+    }
+    if !inserted {
+        return Err(PackageError::Corrupted(
+            "OfficeArtDggContainer has no OfficeArtDgg atom".into(),
+        )
+        .into());
+    }
+    Ok(output)
+}
+
+fn encode_new_bstore(entries: &[Vec<u8>]) -> Result<Vec<u8>> {
+    let count = u16::try_from(entries.len())
+        .ok()
+        .filter(|count| *count <= 0x0FFF)
+        .ok_or_else(|| PackageError::ResourceLimit("PPT BStore exceeds 4095 entries".into()))?;
+    let mut payload = Vec::new();
+    for entry in entries {
+        payload.extend_from_slice(entry);
+    }
+    let mut output = Vec::new();
+    append_raw_record(&mut output, 0x0F, count, 0xF001, &payload)?;
+    Ok(output)
+}
+
+fn append_raw_record(
+    output: &mut Vec<u8>,
+    version: u16,
+    instance: u16,
+    kind: u16,
+    payload: &[u8],
+) -> Result<()> {
+    let length = u32::try_from(payload.len())
+        .map_err(|_error| PackageError::ResourceLimit("OfficeArt record exceeds u32".into()))?;
+    output.extend_from_slice(&((instance << 4) | version).to_le_bytes());
+    output.extend_from_slice(&kind.to_le_bytes());
+    output.extend_from_slice(&length.to_le_bytes());
+    output.extend_from_slice(payload);
+    Ok(())
+}
+
+fn picture_stream(snapshot: &Snapshot) -> Result<Vec<u8>> {
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(snapshot.bytes())).map_err(PackageError::from)?;
+    let paths = ole
+        .list_streams()
+        .into_iter()
+        .filter(|path| path.last().is_some_and(|name| name == "Pictures"))
+        .collect::<Vec<_>>();
+    match paths.as_slice() {
+        [] => Ok(Vec::new()),
+        [path] => {
+            let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+            Ok(ole.open_stream(&refs).map_err(PackageError::from)?)
+        },
+        _ => Err(
+            PackageError::Corrupted("PPT package contains multiple Pictures streams".into()).into(),
+        ),
+    }
+}
+
+fn validate_transferred_pictures(
+    snapshot: &Snapshot,
+    pictures: &BTreeMap<u32, Vec<u8>>,
+) -> Result<()> {
+    if pictures.is_empty() {
+        return Ok(());
+    }
+    let inventory = picture_inventory(snapshot)?;
+    for (target_id, expected_blip) in pictures {
+        let expected =
+            litchi_odraw::image::Blip::parse(expected_blip).map_err(PackageError::from)?;
+        let actual = inventory.resources.get(target_id).ok_or_else(|| {
+            PackageError::Corrupted(format!(
+                "published PPT is missing transferred BLIP {target_id}"
+            ))
+        })?;
+        if actual.kind != expected.kind() || actual.data != expected.data() {
+            return Err(PackageError::Corrupted(format!(
+                "published PPT transferred BLIP {target_id} changed semantic image bytes"
+            ))
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn validate_unrelated_picture_publication(before: &[u8], after: &[u8]) -> Result<()> {
+    let mut old = litchi_cfb::OleFile::open(Cursor::new(before)).map_err(PackageError::from)?;
+    let mut new = litchi_cfb::OleFile::open(Cursor::new(after)).map_err(PackageError::from)?;
+    let mut old_paths = old.list_streams();
+    let mut new_paths = new.list_streams();
+    old_paths.retain(|path| path.last().is_none_or(|name| name != "Pictures"));
+    new_paths.retain(|path| path.last().is_none_or(|name| name != "Pictures"));
+    old_paths.sort();
+    new_paths.sort();
+    if old_paths != new_paths {
+        return Err(PackageError::Corrupted(
+            "PPT picture publication changed unrelated CFB stream topology".into(),
+        )
+        .into());
+    }
+    for path in old_paths {
+        if path.last().is_some_and(|name| {
+            name.eq_ignore_ascii_case("PowerPoint Document")
+                || name.eq_ignore_ascii_case("Current User")
+        }) {
+            continue;
+        }
+        let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+        if old.open_stream(&refs).map_err(PackageError::from)?
+            != new.open_stream(&refs).map_err(PackageError::from)?
+        {
+            return Err(PackageError::Corrupted(format!(
+                "PPT picture publication changed unrelated stream {}",
+                path.join("/")
+            ))
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTreeMap<u32, u32>> {
     if donor
         .unsupported_dependencies
         .contains(&TransferDependency::AnimationBuildGraph)
@@ -3938,6 +4640,11 @@ fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTree
     if !donor.connector_shape_ids.is_subset(&donor.shape_ids) {
         return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
             dependency: TransferDependency::ConnectorRule,
+        }));
+    }
+    if !donor.other_shape_reference_ids.is_subset(&donor.shape_ids) {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::OtherOfficeArtShapeReference,
         }));
     }
     if donor.shape_ids.is_empty() {
@@ -4012,16 +4719,10 @@ fn scan_officeart_records(bytes: &[u8], output: &mut SlideRelationships) -> Resu
                     output.shape_ids.insert(read_payload_u32(payload, 0)?);
                 },
                 0xF00B | 0xF121 | 0xF122 => {
-                    if option_has_blip_reference(instance, payload)? {
-                        output
-                            .unsupported_dependencies
-                            .insert(TransferDependency::PictureStore);
-                    }
-                    if option_has_linked_shape_reference(instance, payload)? {
-                        output
-                            .unsupported_dependencies
-                            .insert(TransferDependency::OtherOfficeArtShapeReference);
-                    }
+                    output
+                        .blip_ids
+                        .extend(option_blip_references(instance, payload)?);
+                    scan_linked_shape_references(instance, payload, output)?;
                 },
                 0xF012 if version == 1 && instance == 0 => {
                     scan_connector_rule(payload, output)?;
@@ -4032,10 +4733,23 @@ fn scan_officeart_records(bytes: &[u8], output: &mut SlideRelationships) -> Resu
                     )
                     .into());
                 },
+                0xF014 if version == 0 && instance == 0 => {
+                    scan_single_shape_rule(payload, "OfficeArtFArcRule", output)?;
+                },
+                0xF017 if version == 0 && instance == 0 => {
+                    scan_single_shape_rule(payload, "OfficeArtFCalloutRule", output)?;
+                },
+                0xF11D if version == 0 && instance == 0 => {
+                    scan_deleted_shape_rule(payload, output)?;
+                },
+                0xF119 if version == 0 && instance == 0 => {
+                    scan_drawing_selection(payload, output)?;
+                },
                 0xF014 | 0xF017 | 0xF11D | 0xF119 => {
-                    output
-                        .unsupported_dependencies
-                        .insert(TransferDependency::OtherOfficeArtShapeReference);
+                    return Err(PackageError::Corrupted(
+                        "OfficeArt shape-reference rule has an invalid record header".into(),
+                    )
+                    .into());
                 },
                 0xF00D | 0xF011 => scan_host_records(payload, output)?,
                 _ if version == 0x0f => scan_officeart_records(payload, output)?,
@@ -4289,6 +5003,7 @@ fn rewrite_slide_relationships(
     hyperlinks: &BTreeMap<u32, u32>,
     sounds: &BTreeMap<u32, u32>,
     external_objects: &BTreeMap<u32, u32>,
+    pictures: &BTreeMap<u32, u32>,
     drawings: &BTreeMap<u32, u32>,
 ) -> Result<()> {
     if root.record_type == crate::RecordType::InteractiveInfoAtom {
@@ -4314,11 +5029,19 @@ fn rewrite_slide_relationships(
             hyperlinks,
             sounds,
             external_objects,
+            pictures,
             drawings,
         )?;
     }
     for child in &mut root.children {
-        rewrite_slide_relationships(child, hyperlinks, sounds, external_objects, drawings)?;
+        rewrite_slide_relationships(
+            child,
+            hyperlinks,
+            sounds,
+            external_objects,
+            pictures,
+            drawings,
+        )?;
     }
     Ok(())
 }
@@ -4406,6 +5129,7 @@ fn rewrite_officeart_records(
     hyperlinks: &BTreeMap<u32, u32>,
     sounds: &BTreeMap<u32, u32>,
     external_objects: &BTreeMap<u32, u32>,
+    pictures: &BTreeMap<u32, u32>,
     drawings: &BTreeMap<u32, u32>,
 ) -> Result<()> {
     visit_raw_records_mut(
@@ -4414,12 +5138,34 @@ fn rewrite_officeart_records(
         |version, instance, kind, payload| {
             match kind {
                 0xF00A => rewrite_u32_reference(payload, drawings, "OfficeArtSp.spid")?,
+                0xF00B | 0xF121 | 0xF122 => {
+                    rewrite_blip_references(instance, payload, pictures)?;
+                    rewrite_linked_shape_references(instance, payload, drawings)?;
+                },
                 0xF012 if version == 1 && instance == 0 => {
                     rewrite_connector_rule(payload, drawings)?;
                 },
                 0xF012 => {
                     return Err(PackageError::Corrupted(
                         "OfficeArtFConnectorRule has an invalid record header".into(),
+                    )
+                    .into());
+                },
+                0xF014 if version == 0 && instance == 0 => {
+                    rewrite_single_shape_rule(payload, drawings, "OfficeArtFArcRule")?;
+                },
+                0xF017 if version == 0 && instance == 0 => {
+                    rewrite_single_shape_rule(payload, drawings, "OfficeArtFCalloutRule")?;
+                },
+                0xF11D if version == 0 && instance == 0 => {
+                    rewrite_deleted_shape_rule(payload, drawings)?;
+                },
+                0xF119 if version == 0 && instance == 0 => {
+                    rewrite_drawing_selection(payload, drawings)?;
+                },
+                0xF014 | 0xF017 | 0xF11D | 0xF119 => {
+                    return Err(PackageError::Corrupted(
+                        "OfficeArt shape-reference rule has an invalid record header".into(),
                     )
                     .into());
                 },
@@ -4432,6 +5178,7 @@ fn rewrite_officeart_records(
                         hyperlinks,
                         sounds,
                         external_objects,
+                        pictures,
                         drawings,
                     )?;
                 },
@@ -4440,6 +5187,121 @@ fn rewrite_officeart_records(
             Ok(())
         },
     )
+}
+
+fn rewrite_linked_shape_references(
+    instance: u16,
+    payload: &mut [u8],
+    drawings: &BTreeMap<u32, u32>,
+) -> Result<()> {
+    let property_bytes = usize::from(instance)
+        .checked_mul(6)
+        .ok_or_else(|| PackageError::Corrupted("OfficeArt property count overflow".into()))?;
+    let properties = payload
+        .get_mut(..property_bytes)
+        .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
+    for property in properties.chunks_exact_mut(6) {
+        let opid = u16::from_le_bytes([property[0], property[1]]) & 0x3fff;
+        if opid != 0x008a {
+            continue;
+        }
+        let source_id = u32::from_le_bytes([property[2], property[3], property[4], property[5]]);
+        if source_id == 0 {
+            continue;
+        }
+        let target_id = drawings.get(&source_id).ok_or_else(|| {
+            PackageError::Corrupted(format!(
+                "OfficeArt hspNext references unmapped shape {source_id}"
+            ))
+        })?;
+        property[2..6].copy_from_slice(&target_id.to_le_bytes());
+    }
+    Ok(())
+}
+
+fn rewrite_blip_references(
+    instance: u16,
+    payload: &mut [u8],
+    pictures: &BTreeMap<u32, u32>,
+) -> Result<()> {
+    let property_bytes = usize::from(instance)
+        .checked_mul(6)
+        .ok_or_else(|| PackageError::Corrupted("OfficeArt property count overflow".into()))?;
+    let properties = payload
+        .get_mut(..property_bytes)
+        .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
+    for property in properties.chunks_exact_mut(6) {
+        if u16::from_le_bytes([property[0], property[1]]) & 0x4000 == 0 {
+            continue;
+        }
+        let source_id = u32::from_le_bytes([property[2], property[3], property[4], property[5]]);
+        if source_id == 0 {
+            continue;
+        }
+        let target_id = pictures.get(&source_id).ok_or_else(|| {
+            PackageError::Corrupted(format!(
+                "OfficeArt property references unmapped BLIP {source_id}"
+            ))
+        })?;
+        property[2..6].copy_from_slice(&target_id.to_le_bytes());
+    }
+    Ok(())
+}
+
+fn rewrite_single_shape_rule(
+    payload: &mut [u8],
+    drawings: &BTreeMap<u32, u32>,
+    context: &str,
+) -> Result<()> {
+    if payload.len() != 8 {
+        return Err(
+            PackageError::Corrupted(format!("{context} payload must contain eight bytes")).into(),
+        );
+    }
+    rewrite_u32_reference(&mut payload[4..8], drawings, context)
+}
+
+fn rewrite_deleted_shape_rule(payload: &mut [u8], drawings: &BTreeMap<u32, u32>) -> Result<()> {
+    if payload.len() != 4 {
+        return Err(PackageError::Corrupted(
+            "OfficeArtFPSPL payload must contain four bytes".into(),
+        )
+        .into());
+    }
+    let raw = read_payload_u32(payload, 0)?;
+    let source_id = raw & 0x3fff_ffff;
+    if source_id == 0 {
+        return Ok(());
+    }
+    let target_id = drawings.get(&source_id).ok_or_else(|| {
+        PackageError::Corrupted(format!(
+            "OfficeArtFPSPL references unmapped shape {source_id}"
+        ))
+    })?;
+    payload.copy_from_slice(&((raw & 0xc000_0000) | target_id).to_le_bytes());
+    Ok(())
+}
+
+fn rewrite_drawing_selection(payload: &mut [u8], drawings: &BTreeMap<u32, u32>) -> Result<()> {
+    if payload.len() < 12 || !(payload.len() - 12).is_multiple_of(4) {
+        return Err(PackageError::Corrupted(
+            "OfficeArtFDGSL payload has an invalid shape-list width".into(),
+        )
+        .into());
+    }
+    for offset in (8..payload.len()).step_by(4) {
+        let source_id = read_payload_u32(payload, offset)?;
+        if source_id == 0 {
+            continue;
+        }
+        let target_id = drawings.get(&source_id).ok_or_else(|| {
+            PackageError::Corrupted(format!(
+                "OfficeArtFDGSL references unmapped shape {source_id}"
+            ))
+        })?;
+        payload[offset..offset + 4].copy_from_slice(&target_id.to_le_bytes());
+    }
+    Ok(())
 }
 
 fn rewrite_connector_rule(payload: &mut [u8], drawings: &BTreeMap<u32, u32>) -> Result<()> {
@@ -4658,16 +5520,6 @@ fn normalized_payload(payload: &SlidePayload) -> SlidePayload {
 fn inverse_structural(structural_change: &StructuralChange) -> StructuralChange {
     match structural_change {
         StructuralChange::Move(move_change) => StructuralChange::Move(move_change.inverse()),
-        StructuralChange::Visibility(change) => {
-            StructuralChange::Visibility(SlideVisibilityChange {
-                position: change.position,
-                slide_id: change.slide_id,
-                before: change.after,
-                after: change.before,
-                before_order: change.after_order,
-                after_order: change.before_order,
-            })
-        },
         StructuralChange::Remove(list_change) => StructuralChange::Insert(ListChange {
             position: list_change.position,
             before_order: list_change.after_order,
@@ -4692,16 +5544,6 @@ fn replay_structural_changes(
             StructuralChange::Move(move_change) => {
                 document.move_slide(move_change.from.get(), move_change.destination.get())?;
             },
-            StructuralChange::Visibility(change) => {
-                let current = document.slides()?[change.position.get()].flags() & (1 << 2) != 0;
-                if current != change.before {
-                    return Err(PackageError::Corrupted(
-                        "PPT structural rebase selected a different slide visibility state".into(),
-                    )
-                    .into());
-                }
-                document.set_slide_hidden(change.position.get(), change.after)?;
-            },
             StructuralChange::Remove(remove_change) => {
                 let removed = document.remove_slide(remove_change.position.get())?;
                 if removed != remove_change.payload.group {
@@ -4724,6 +5566,9 @@ fn replay_structural_changes(
 
 fn patch_effects(patch: &Patch) -> BTreeSet<String> {
     let mut effects = BTreeSet::new();
+    for change in &patch.visibility_changes {
+        effects.insert(format!("slide-id:{}/hidden", change.slide_id));
+    }
     for change in &patch.advance_changes {
         effects.insert(format!("slide-id:{}/advance", change.slide_id));
     }
@@ -4759,9 +5604,6 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
                     effects.insert(format!("slide-list/position:{position}"));
                 }
             },
-            StructuralChange::Visibility(change) => {
-                effects.insert(format!("slide-id:{}/hidden", change.slide_id));
-            },
             StructuralChange::Remove(list_change) | StructuralChange::Insert(list_change) => {
                 effects.insert(format!(
                     "slide-list/position:{}",
@@ -4789,7 +5631,11 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
 
 fn encode_payload(payload: &SlidePayload) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"LSP1");
+    bytes.extend_from_slice(if payload.pictures.is_empty() {
+        b"LSP1"
+    } else {
+        b"LSP2"
+    });
     bytes.extend_from_slice(&payload.master_id.to_le_bytes());
     bytes.extend_from_slice(
         &u32::try_from(payload.group.len())
@@ -4801,11 +5647,25 @@ fn encode_payload(payload: &SlidePayload) -> Result<Vec<u8>> {
         append_length_prefixed(&mut bytes, &encoded)?;
     }
     append_length_prefixed(&mut bytes, &payload.record)?;
+    if !payload.pictures.is_empty() {
+        bytes.extend_from_slice(
+            &u32::try_from(payload.pictures.len())
+                .map_err(|_error| {
+                    PackageError::ResourceLimit("too many transferred PPT pictures".into())
+                })?
+                .to_le_bytes(),
+        );
+        for picture in &payload.pictures {
+            bytes.extend_from_slice(&picture.target_id.to_le_bytes());
+            append_length_prefixed(&mut bytes, &picture.blip)?;
+        }
+    }
     Ok(bytes)
 }
 
 fn decode_payload(bytes: &[u8], limits: RecordLimits) -> Result<SlidePayload> {
-    if bytes.len() > limits.max_input_bytes || bytes.get(0..4) != Some(b"LSP1") {
+    let version = bytes.get(0..4);
+    if bytes.len() > limits.max_input_bytes || !matches!(version, Some(b"LSP1" | b"LSP2")) {
         return Err(invalid_durable_patch(
             "invalid or oversized slide insertion blob",
         ));
@@ -4829,12 +5689,39 @@ fn decode_payload(bytes: &[u8], limits: RecordLimits) -> Result<SlidePayload> {
         group.push(record);
     }
     let record = take_length_prefixed(bytes, &mut offset, limits.max_record_bytes)?.to_vec();
+    let mut pictures = Vec::new();
+    if version == Some(b"LSP2") {
+        let picture_count = usize::try_from(read_payload_u32(bytes, offset)?)
+            .map_err(|_error| invalid_durable_patch("picture count exceeds this platform"))?;
+        offset = offset
+            .checked_add(4)
+            .ok_or_else(|| invalid_durable_patch("picture count offset overflows"))?;
+        if picture_count == 0 || picture_count > 0x0FFF {
+            return Err(invalid_durable_patch(
+                "transferred picture count exceeds its bound",
+            ));
+        }
+        pictures.reserve(picture_count);
+        for _ in 0..picture_count {
+            let target_id = read_payload_u32(bytes, offset)?;
+            offset = offset
+                .checked_add(4)
+                .ok_or_else(|| invalid_durable_patch("picture ID offset overflows"))?;
+            litchi_odraw::image::Id::new(target_id)
+                .map_err(|_error| invalid_durable_patch("transferred picture ID is invalid"))?;
+            let blip = take_length_prefixed(bytes, &mut offset, limits.max_record_bytes)?.to_vec();
+            build_picture_fbse(&blip, 0)
+                .map_err(|_error| invalid_durable_patch("transferred picture BLIP is invalid"))?;
+            pictures.push(TransferredPicture { target_id, blip });
+        }
+    }
     if offset != bytes.len() {
         return Err(invalid_durable_patch(
             "slide insertion blob has trailing bytes",
         ));
     }
-    let payload = slide_payload(group, record)?;
+    let mut payload = slide_payload(group, record)?;
+    payload.pictures = pictures;
     if payload.master_id != master_id {
         return Err(invalid_durable_patch(
             "slide insertion blob master is inconsistent",
@@ -5580,6 +6467,69 @@ mod tests {
     }
 
     #[test]
+    fn novel_picture_transfer_appends_bstore_and_pictures_stream_atomically() {
+        let png = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4];
+        let mut donor_writer = crate::writer::Writer::new();
+        let donor_slide = donor_writer.add_slide().unwrap();
+        donor_writer
+            .add_picture_as(
+                donor_slide,
+                20,
+                30,
+                200,
+                120,
+                png.clone(),
+                crate::writer::PictureKind::Png,
+            )
+            .unwrap();
+        let mut donor_bytes = Cursor::new(Vec::new());
+        donor_writer.write_to(&mut donor_bytes).unwrap();
+        let donor = Snapshot::from_bytes(donor_bytes.into_inner()).unwrap();
+
+        let mut target_writer = crate::writer::Writer::new();
+        let live = target_writer.add_slide().unwrap();
+        target_writer
+            .add_textbox(live, 10, 10, 100, 30, "receiver")
+            .unwrap();
+        let orphan = target_writer.add_slide().unwrap();
+        for offset in [0, 30, 60, 90] {
+            target_writer
+                .add_rectangle(orphan, 10 + offset, 20, 20, 20)
+                .unwrap();
+        }
+        let mut target_bytes = Cursor::new(Vec::new());
+        target_writer.write_to(&mut target_bytes).unwrap();
+        let target = Snapshot::from_bytes(target_bytes.into_inner()).unwrap();
+        let mut remove = target.edit().unwrap();
+        remove.remove_slide(Position::new(1)).unwrap();
+        let receiver = remove.commit().unwrap().snapshot().clone();
+        assert!(picture_inventory(&receiver).unwrap().resources.is_empty());
+        assert!(picture_stream(&receiver).unwrap().is_empty());
+
+        let plan = receiver
+            .plan_transfer_from(&donor, Position::new(0))
+            .unwrap();
+        assert_eq!(plan.payload.pictures.len(), 1);
+        assert_eq!(plan.payload.pictures[0].target_id, 1);
+        let mut edit = receiver.edit().unwrap();
+        edit.insert_transfer(Position::new(1), &plan).unwrap();
+        let commit = edit.commit().unwrap();
+        let inventory = picture_inventory(commit.snapshot()).unwrap();
+        assert_eq!(inventory.slots, 1);
+        assert_eq!(inventory.resources[&1].data, png);
+        assert!(!picture_stream(commit.snapshot()).unwrap().is_empty());
+
+        let durable = commit.patch().to_durable(transfer_patch_limits()).unwrap();
+        let applied = receiver.apply_durable(&durable).unwrap();
+        assert_eq!(picture_inventory(&applied).unwrap().resources[&1].data, png);
+        assert_eq!(applied.slide_count(), 2);
+        assert_eq!(
+            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            receiver
+        );
+    }
+
+    #[test]
     fn relationship_atom_remapping_is_fixed_width_and_fail_closed() {
         let mut atom = crate::InteractiveInfoAtom {
             sound_id: 7,
@@ -5638,6 +6588,7 @@ mod tests {
             &BTreeMap::new(),
             &BTreeMap::new(),
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &BTreeMap::from([(0x0401, 0x0801), (0x0402, 0x0802), (0x0403, 0x0803)]),
         )
         .unwrap();
@@ -5653,14 +6604,93 @@ mod tests {
     }
 
     #[test]
-    fn connector_picture_store_and_animation_build_refusals_are_distinct() {
+    fn officeart_shape_and_blip_reference_families_close_under_remapping() {
+        fn push_record(output: &mut Vec<u8>, header: u16, kind: u16, payload: &[u8]) {
+            output.extend_from_slice(&header.to_le_bytes());
+            output.extend_from_slice(&kind.to_le_bytes());
+            output.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
+            output.extend_from_slice(payload);
+        }
+
+        let mut drawing = Vec::new();
+        let mut options = Vec::new();
+        options.extend_from_slice(&0x008a_u16.to_le_bytes());
+        options.extend_from_slice(&0x0401_u32.to_le_bytes());
+        options.extend_from_slice(&0x4104_u16.to_le_bytes());
+        options.extend_from_slice(&5_u32.to_le_bytes());
+        push_record(&mut drawing, 0x0023, 0xF00B, &options);
+
+        for (kind, shape_id) in [(0xF014_u16, 0x0402_u32), (0xF017, 0x0403)] {
+            let mut payload = 7_u32.to_le_bytes().to_vec();
+            payload.extend_from_slice(&shape_id.to_le_bytes());
+            push_record(&mut drawing, 0, kind, &payload);
+        }
+        push_record(
+            &mut drawing,
+            0,
+            0xF11D,
+            &(0xc000_0000_u32 | 0x0404).to_le_bytes(),
+        );
+        let mut selection = vec![0; 8];
+        selection.extend_from_slice(&0x0405_u32.to_le_bytes());
+        selection.extend_from_slice(&0x0406_u32.to_le_bytes());
+        push_record(&mut drawing, 0, 0xF119, &selection);
+
+        let mut relationships = SlideRelationships::default();
+        scan_officeart_records(&drawing, &mut relationships).unwrap();
+        assert_eq!(relationships.blip_ids, BTreeSet::from([5]));
+        assert_eq!(
+            relationships.other_shape_reference_ids,
+            BTreeSet::from([0x0401, 0x0402, 0x0403, 0x0404, 0x0405, 0x0406])
+        );
+
+        let drawings = BTreeMap::from([
+            (0x0401, 0x0801),
+            (0x0402, 0x0802),
+            (0x0403, 0x0803),
+            (0x0404, 0x0804),
+            (0x0405, 0x0805),
+            (0x0406, 0x0806),
+        ]);
+        rewrite_officeart_records(
+            &mut drawing,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            &BTreeMap::from([(5, 9)]),
+            &drawings,
+        )
+        .unwrap();
+
+        let mut rewritten = SlideRelationships::default();
+        scan_officeart_records(&drawing, &mut rewritten).unwrap();
+        assert_eq!(rewritten.blip_ids, BTreeSet::from([9]));
+        assert_eq!(
+            rewritten.other_shape_reference_ids,
+            BTreeSet::from([0x0801, 0x0802, 0x0803, 0x0804, 0x0805, 0x0806])
+        );
+        let mut deleted = (0xc000_0000_u32 | 0x0404).to_le_bytes();
+        rewrite_deleted_shape_rule(&mut deleted, &drawings).unwrap();
+        assert_eq!(u32::from_le_bytes(deleted), 0xc000_0000_u32 | 0x0804);
+    }
+
+    #[test]
+    fn external_shape_and_animation_refusals_are_distinct() {
         let source = Snapshot::from_bytes(fixture("basic_test_ppt_file.ppt")).unwrap();
         let mut linked_shape_property = Vec::new();
         linked_shape_property.extend_from_slice(&0x008a_u16.to_le_bytes());
         linked_shape_property.extend_from_slice(&0x0401_u32.to_le_bytes());
-        assert!(option_has_linked_shape_reference(1, &linked_shape_property).unwrap());
+        let mut relationships = SlideRelationships::default();
+        scan_linked_shape_references(1, &linked_shape_property, &mut relationships).unwrap();
+        assert_eq!(
+            relationships.other_shape_reference_ids,
+            BTreeSet::from([0x0401])
+        );
         linked_shape_property[0..2].copy_from_slice(&0x4001_u16.to_le_bytes());
-        assert!(option_has_blip_reference(1, &linked_shape_property).unwrap());
+        assert_eq!(
+            option_blip_references(1, &linked_shape_property).unwrap(),
+            BTreeSet::from([0x0401])
+        );
 
         let connector = SlideRelationships {
             connector_shape_ids: BTreeSet::from([0x0401]),
@@ -5686,17 +6716,6 @@ mod tests {
             }))
         ));
 
-        let picture = SlideRelationships {
-            unsupported_dependencies: BTreeSet::from([TransferDependency::PictureStore]),
-            ..SlideRelationships::default()
-        };
-        assert!(matches!(
-            drawing_remaps(&source, &picture),
-            Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-                dependency: TransferDependency::PictureStore
-            }))
-        ));
-
         let animation = SlideRelationships {
             unsupported_dependencies: BTreeSet::from([TransferDependency::AnimationBuildGraph]),
             ..SlideRelationships::default()
@@ -5711,8 +6730,10 @@ mod tests {
 
     #[test]
     fn slide_visibility_composes_with_order_and_round_trips_durably() {
-        let source = Snapshot::from_bytes(fixture("basic_test_ppt_file.ppt")).unwrap();
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
         let original = source.slide_hidden(Position::new(0)).unwrap();
+        let slide_id = source.document.slides()[0].slide_id();
+        let non_outline_flags = source.document.slides()[0].flags();
         let mut edit = source.edit().unwrap();
         edit.set_slide_hidden(Position::new(0), !original).unwrap();
         edit.move_slide(Position::new(0), Position::new(1)).unwrap();
@@ -5721,6 +6742,18 @@ mod tests {
         assert_eq!(
             commit.snapshot().slide_hidden(Position::new(1)).unwrap(),
             !original
+        );
+        let moved = commit
+            .snapshot()
+            .document
+            .slides()
+            .iter()
+            .find(|slide| slide.slide_id() == slide_id)
+            .unwrap();
+        assert_eq!(
+            moved.flags(),
+            non_outline_flags,
+            "set_slide_hidden must preserve SlidePersistAtom.fNonOutlineData"
         );
         assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
         assert_eq!(

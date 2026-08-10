@@ -16,10 +16,11 @@ mod tests;
 
 pub use model::{
     BackgroundImageContentType, BackgroundPicture, ChartCompanionResource,
-    ChartEmbeddedPackageContentType, ChartEmbeddedPackageResource, ChartOutboundResource,
-    ChartResource, ChartResourceKind, ChartThemeOverrideResource, ChartUserShapesResource,
-    DrawingResource, Entry, ExtensionRelationship, ExtensionRelationshipTarget, ImageContentType,
-    ImageResource, Package, PrinterSettings, VmlDrawingResource,
+    ChartEmbeddedPackageContentType, ChartEmbeddedPackageResource, ChartExternalResource,
+    ChartOpaqueResource, ChartOutboundResource, ChartResource, ChartResourceKind,
+    ChartThemeOverrideResource, ChartUserShapesResource, DrawingResource, Entry,
+    ExtensionRelationship, ExtensionRelationshipTarget, ImageContentType, ImageResource, Package,
+    PrinterSettings, VmlDrawingResource,
 };
 pub use operations::{load_chartsheet, store_chartsheet, validate_package};
 
