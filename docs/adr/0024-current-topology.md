@@ -1001,3 +1001,97 @@ library-owned atomic durable filesystem replacement, and versioned deterministic
 patch serialization with semantic operations, read/write sets, composition,
 merge, and history. Exact source bytes remain ordinary `Package` surface;
 opaque cache objects and other Pages settings/render state remain unowned.
+
+## 2026-08-10 current-status amendment: hardened Keynote show settings
+
+The earlier Keynote show-settings section is superseded. The archive-free
+semantic and transaction family is now canonically grouped as
+`show::{Settings, Edit, Patch, Commit, Diagnostics, Error, LimitKind}`.
+`Package::{show_settings, edit_show_settings, apply_show_settings}` exposes no
+native or raw-source values in its focused signatures; consuming `Edit::set`
+makes immutable chaining explicit. Exact output is streamed through
+`Package::write_to`, which keeps the retained source private and reports a
+precise sink offset on failure without allocating another package-sized
+buffer.
+
+The private locator selects the unique root `Document.iwa`, object 1, and
+`KN.DocumentArchive`, then follows required local show reference field 2. A
+nonzero selected identifier must occur exactly once in aggregate metadata;
+optional field metadata must match unique path `[2]` and cannot assign the
+selected identifier elsewhere. It resolves to one object in one component
+with one `KN.ShowArchive` message. A null show remains readable as default
+settings and supports only an exact no-op.
+
+Strict raw and forced Buffa lazy passes cross-check both hops. The root's five
+generated files measure 58,630 bytes under 60 KiB with aggregate SHA-256
+`7918aad2578cf3bd07eb0be36f2e31d11f93391584308c1e4adc1fd86ed065fd`.
+The Show/SlideTree projection validates all known reference/size/settings
+fields and the slide ceiling without retaining the hand-routed repeated slide
+list; its five files measure 138,661 bytes under 140 KiB with aggregate
+SHA-256
+`747fe9f99dc5bb1855aae1bfcb16065a5fe6305bdbf8730a21ef24bb75e915ee`.
+Both generated surfaces are repeated-view-free and encoder-free. Raw records,
+not Buffa, own preservation and rewriting.
+
+Mutation adds canonical selected-component framing and rejects selected
+`should_merge`, base-message, and all diff/merge metadata. A changed edit
+raw-splices only size and eight optional settings fields in the selected Show,
+rewrites one component, then fully reopens and verifies the candidate. Size or
+slide-number-visibility changes delete the existing zero-to-three root
+previews; playback-only changes preserve them exactly. Every slide component
+and slide-node thumbnail/playback cache remains exact in both cases.
+Diagnostics separate the one component from preview deletions.
+
+No-ops share the exact source and skip cache inspection, reassembly, and
+reopen. Changed patch application authorizes exact bytes and reopens its stored
+target; the inverse restores the entire source artifact. Legacy nested
+`Index.zip` reads and exact no-ops remain supported, while changed edits now
+return `show::Error::UnsupportedSource` rather than invoking the retired
+normalizing host behavior.
+
+`KeynoteEditor::{show_settings, set_show_settings}`, its module/source,
+`examples/edit_keynote_show.rs`, and direct editor mutation tests are deleted.
+The focused example owns consuming semantic staging, inverse verification,
+no-clobber temporary publication, and `write_to`. The host read-only
+`KeynoteDocument::show` still Prost-decodes `KN.ShowArchive`; this is direct
+editor-mutation retirement, not complete host/native Show retirement. No
+manifest edge or ordered debt changes.
+
+Current evidence passes 19/19 focused transactions, 106/106 complete codec
+tests, 49/49 focused Keynote codec tests, Keynote all-target checking,
+`litchi-iwa` library checking, umbrella facade compilation, strict rustdoc,
+and 80/80 boundary tests. Focused live retirement/leak audits are empty; the
+general boundary command retains 14 unrelated pre-existing diagnostics.
+The fuzz target passes `cargo check`, and its stable-built executable completed
+32 bounded cases with expected missing-sanitizer-symbol warnings; cargo-fuzz
+sanitizer execution still requires unavailable nightly.
+
+Apple Keynote 14.4 (7043.0.93) opened and auto-played both final Rust candidates
+without repair/recovery/conversion. From source
+`f3adcde9315b6df580805bcb63c995cc1e1ef569a4befa06a102485e13c883b2`,
+the slide-number candidate/resave hashes were
+`6d28d461c1203f00384fe6a758df1f903c7555b90ff02d2dc32d856aa9056c13`
+and `031a701040ed1ea9a5111fe3e298bcddcf33d498891f827b703d01328ba17224`;
+the 1280-by-720 candidate/resave hashes were
+`67e9ff0557683af105dfe57f999acabcde23f121f7aebb06102c93e03121c027`
+and `a3a2f6e072db4bd952f2c02e528f25c3656dba5810fbff75e93b5a699aac0eda`.
+Both inverses restored the source exactly. Inspector, Save As, close, and
+exact-path reopen retained Self-Playing, Loop, Play on Open, five-/two-second
+delays, and the respective 1920-by-1080 Widescreen/1280-by-720 Custom sizes.
+Rust deleted three root previews and Keynote regenerated them. All four
+`Index/Slide*.iwa` hashes stayed exact from each Rust candidate through native
+resave.
+
+Keynote normalized explicit slide-number true to absence. Restaging absence is
+an exact `031a7010...` no-op; restaging true changes it. The native size
+artifact's same-settings no-op and inverse remain exact at `a3a2f6e0...`.
+Thus the native evidence supports conservative preview invalidation and exact
+slide-cache preservation, not persistence of the slide-number scalar.
+
+Open debt includes the host Prost Show reader and other generated graph
+consumers, aggregate peak-memory/total-work accounting, a complete fallible-
+allocation proof, group-aware changed splicing, durable/versioned semantic
+patches with read/write sets and composition/merge/history, and a
+library-owned atomic durable filesystem save. `write_to` neither flushes nor
+syncs or renames a destination. A full sanitizer-backed fuzz campaign remains
+a verification gate.

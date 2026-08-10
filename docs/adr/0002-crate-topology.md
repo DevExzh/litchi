@@ -1701,3 +1701,125 @@ atomic durable filesystem replacement, and a versioned deterministic patch
 envelope with read/write sets, composition, merge, and bounded history. Exact
 source bytes also remain on the ordinary `Package` surface. The opaque cache
 object and other Pages settings/render state remain outside this vertical.
+
+## 2026-08-10 amendment: hardened Keynote show-settings ownership
+
+This amendment supersedes the 2026-08-08 show-settings topology and its
+temporary flattened transaction names. `litchi-keynote::show` now owns the
+archive-free `Settings` plus canonical short `Edit`, `Patch`, `Commit`,
+`Diagnostics`, `Error`, and `LimitKind` types. `Package::{show_settings,
+edit_show_settings, apply_show_settings}` is the focused read/edit/apply
+surface. `Edit::set` consumes and returns the edit, so immutable chaining is
+explicit. Those method and type signatures expose no native identifier,
+component/member name, generated message, raw field, or source byte slice.
+Callers publish the returned immutable `Package` through bounded
+`Package::write_to`; exact transaction artifacts remain private.
+
+The physical owner is resolved from the unique root `Document.iwa`, object 1,
+and its selected `KN.DocumentArchive` message. Required show reference field 2
+must be local, occur exactly once in the selected message's aggregate
+references when nonzero, and, when field metadata exists, have one matching
+path `[2]` entry and no competing path. A nonzero reference must resolve in
+exactly one component to one object containing exactly one selected
+`KN.ShowArchive` message. A zero reference reads as `Settings::default()` and
+admits only an exact no-op because the transaction does not create/register a
+new native owner.
+
+Both ownership hops use strict raw preflight followed by forced private Buffa
+lazy views and a complete equality cross-check. The root projection forces the
+full three-field show reference after validating the required opaque document
+base. Its five generated files total 58,630 bytes under 60 KiB with aggregate
+SHA-256
+`7918aad2578cf3bd07eb0be36f2e31d11f93391584308c1e4adc1fd86ed065fd`.
+The show projection validates the complete known Show/SlideTree envelope and
+slide-reference ceiling, routes the repeated slide tree by hand, and forces
+theme, size, stylesheet, optional references, and all eight optional scalar
+settings without retaining slide identifiers. Its five generated files total
+138,661 bytes under 140 KiB with aggregate SHA-256
+`747fe9f99dc5bb1855aae1bfcb16065a5fe6305bdbf8730a21ef24bb75e915ee`.
+Both build ratchets forbid generated repeated views and production encoding;
+raw source records retain rewrite and unknown-field authority.
+
+Reads accept the bounded canonical ownership projection without imposing
+mutation-only publication rules. A changed edit additionally requires
+canonical object-length framing for every selected component and rejects
+`should_merge`, base-message, diff/merge-version, diff-field-path,
+fields-to-remove, and diff-read-version state on the selected root and show
+messages. It raw-splices only size field 4 and scalar fields 6, 8-11, 15-16,
+and 18 in the unique Show message, rewrites exactly one IWA component, fully
+reopens under retained limits, and verifies settings, ownership, framing,
+package structure, and unchanged content.
+
+Cache invalidation follows semantics rather than treating every settings edit
+as rendering. A size or slide-number-visibility change deletes the existing
+root `preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg` entries (zero to
+three), while leaving all slide components and slide-node thumbnail/playback
+caches exact. Playback-only settings changes preserve those root previews and
+all slide caches byte-for-byte. Diagnostics report one touched component and
+the actual root-preview deletion count separately. An exact semantic no-op
+shares the source allocation and skips cache inspection, reassembly, and
+reopen. Changed patch application authorizes exact source bytes and reopens its
+retained target; inverse application restores the entire exact source artifact.
+
+Legacy nested `Index.zip` remains readable and supports an exact no-op, but a
+changed edit now returns `show::Error::UnsupportedSource`. This intentional
+Preserve-policy break deletes the old normalizing compatibility writer rather
+than silently changing physical provenance. The host
+`KeynoteEditor::{show_settings, set_show_settings}`, its `mod show_settings`,
+`keynote/editor/show_settings.rs`, `examples/edit_keynote_show.rs`, and direct
+editor mutation tests are removed. The focused `edit_show_settings` example
+uses the consuming semantic edit, optional exact inverse, and `write_to` with
+no-clobber temporary publication.
+
+This is direct editor-mutation retirement, not all Show ownership. The host's
+read-only `KeynoteDocument::show` still decodes a Prost `KN.ShowArchive`, and
+other Keynote creation, slide, transition, media, soundtrack, and graph paths
+still use host/generated representations. No manifest edge or ordered debt is
+retired by this amendment.
+
+The current deterministic evidence includes 19/19 focused show-settings
+transactions, 106/106 full codec tests, 49/49 focused Keynote codec tests,
+Keynote all-target checking, `litchi-iwa` library checking, umbrella Keynote
+facade compilation, strict rustdoc, and 80/80 boundary regressions. The focused
+retirement and public-leak live audits are empty; the general repository
+boundary run still has the 14 unrelated pre-existing `soapberry-zip` and
+`xml-minifier` diagnostics. The show-settings fuzz target passes `cargo check`;
+its stable-built executable completed 32 bounded cases with the expected
+missing-sanitizer-symbol warnings. A cargo-fuzz sanitizer run still requires
+nightly, which was unavailable.
+
+Apple Keynote 14.4 (7043.0.93) completed two native gates from source SHA-256
+`f3adcde9315b6df580805bcb63c995cc1e1ef569a4befa06a102485e13c883b2`.
+The pristine Rust slide-number candidate was
+`6d28d461c1203f00384fe6a758df1f903c7555b90ff02d2dc32d856aa9056c13`;
+native Save As, close, and exact-path reopen produced
+`031a701040ed1ea9a5111fe3e298bcddcf33d498891f827b703d01328ba17224`.
+The pristine Rust 1280-by-720 candidate was
+`67e9ff0557683af105dfe57f999acabcde23f121f7aebb06102c93e03121c027`;
+its native resave was
+`a3a2f6e072db4bd952f2c02e528f25c3656dba5810fbff75e93b5a699aac0eda`.
+Each Rust inverse restored the exact source. Both candidates opened without
+repair, recovery, or conversion, auto-played, and retained Self-Playing, Loop,
+Play on Open, five-second transitions, and two-second builds; the inspectors
+showed Widescreen 1920-by-1080 and Custom 1280-by-720 respectively. Exact-path
+reopen preserved those values and auto-played again. All four
+`Index/Slide*.iwa` hashes remained exact from each pristine Rust candidate
+through native resave. Rust deleted all three root previews and Keynote
+regenerated them on resave.
+
+Keynote normalized `slide_numbers_visible = Some(true)` to absence during the
+first native resave. Restaging absent is an exact no-op at the `031a7010...`
+hash, while restaging true is a change. The 1280-by-720 native artifact's
+same-settings no-op and inverse were both exact at `a3a2f6e0...`. This is
+native evidence for slide-cache preservation and conservative root-preview
+invalidation, not evidence that Keynote persists the slide-number scalar.
+
+Remaining debt includes the host Prost `KeynoteDocument::show` reader and
+other Show/graph consumers, aggregate transaction peak-memory and total-work
+accounting, a complete transitive fallible-allocation proof, canonical
+group-aware changed splicing, stable versioned patch serialization with
+semantic operations/read-write sets/composition/merge/history, and
+library-owned atomic durable filesystem replacement. `write_to` provides
+bounded exact output and sink-offset errors but does not flush, sync, rename,
+or make publication durable. A full sanitizer-backed fuzz campaign remains a
+verification gate rather than an architectural claim.

@@ -18,6 +18,19 @@ const NAMES: [&str; 4] = ["Intro", "Plan", "Evidence", "Appendix"];
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+trait ExactPackageBytes {
+    fn exact_bytes(&self) -> &'static [u8];
+}
+
+impl ExactPackageBytes for Package {
+    fn exact_bytes(&self) -> &'static [u8] {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts every package byte");
+        Box::leak(bytes.into_boxed_slice())
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Topology {
     Flat,
@@ -506,15 +519,12 @@ fn selectors_validate_source_before_final_destination_and_bound_one_operation() 
 fn noop_reuses_source_and_changed_patch_is_exact_and_reversible() -> TestResult<()> {
     let bytes = package_bytes(Topology::Flat, NAMES, false)?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let mut noop_edit = package.edit_slide_order();
     noop_edit.move_slide(2usize, Position::new(2))?;
     let noop_commit = noop_edit.commit()?;
-    assert_eq!(
-        noop_commit.package().source_bytes().as_ptr(),
-        source_pointer
-    );
-    assert_eq!(noop_commit.package().source_bytes(), bytes);
+    assert_eq!(noop_commit.package().exact_bytes(), source_snapshot);
+    assert_eq!(noop_commit.package().exact_bytes(), bytes);
     assert!(noop_commit.patch().is_noop());
 
     let mut changed_edit = package.edit_slide_order();
@@ -522,13 +532,13 @@ fn noop_reuses_source_and_changed_patch_is_exact_and_reversible() -> TestResult<
     let changed_commit = changed_edit.commit()?;
     let applied = package.apply_slide_order(changed_commit.patch())?;
     assert_eq!(
-        applied.package().source_bytes(),
-        changed_commit.package().source_bytes()
+        applied.package().exact_bytes(),
+        changed_commit.package().exact_bytes()
     );
     let inverse = changed_commit.patch().inverse();
     assert_eq!(inverse.inverse(), changed_commit.patch().clone());
     let restored = changed_commit.package().apply_slide_order(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(restored.package().exact_bytes(), bytes);
 
     let unrelated_bytes = package_bytes(
         Topology::Flat,
@@ -552,7 +562,7 @@ fn noop_reuses_source_and_changed_patch_is_exact_and_reversible() -> TestResult<
 fn every_commit_validates_downstream_semantics_before_publication() -> TestResult<()> {
     let bytes = package_bytes(Topology::MissingSlide, NAMES, false)?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let mut edit = package.edit_slide_order();
     edit.move_slide(0usize, Position::new(0))?;
     assert!(matches!(edit.commit(), Err(SlideOrderError::InvalidSource)));
@@ -563,8 +573,8 @@ fn every_commit_validates_downstream_semantics_before_publication() -> TestResul
         changed.commit(),
         Err(SlideOrderError::InvalidSource)
     ));
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
+    assert_eq!(package.exact_bytes(), bytes);
     Ok(())
 }
 
@@ -579,7 +589,7 @@ fn rewrite_permutates_complete_reference_records_and_only_one_component() -> Tes
     let mut edit = package.edit_slide_order();
     edit.move_slide(3usize, Position::new(1))?;
     let commit = edit.commit()?;
-    let after_bytes = commit.package().source_bytes();
+    let after_bytes = commit.package().exact_bytes();
     let after_records = slide_reference_records(after_bytes)?;
     let after_tree = slide_tree_records(after_bytes)?;
     let after_show = show_records(after_bytes)?;
@@ -644,7 +654,7 @@ fn rewrite_permutates_complete_reference_records_and_only_one_component() -> Tes
     reverse.move_slide(1usize, Position::new(3))?;
     let reversed = reverse.commit()?;
     assert_eq!(
-        document_stream(reversed.package().source_bytes())?,
+        document_stream(reversed.package().exact_bytes())?,
         before_stream
     );
     Ok(())
@@ -692,7 +702,7 @@ fn changed_rewrite_preserves_noncanonical_iwa_prefix_and_all_bytes_outside_show(
     let mut edit = package.edit_slide_order();
     edit.move_slide(0usize, Position::new(3))?;
     let commit = edit.commit()?;
-    let after = document_stream(commit.package().source_bytes())?;
+    let after = document_stream(commit.package().exact_bytes())?;
     assert_eq!(&after[..range.start], &before[..range.start]);
     assert_eq!(&after[range.end..], &before[range.end..]);
     assert_ne!(&after[range.clone()], &before[range]);
@@ -709,10 +719,10 @@ fn legacy_physical_source_allows_exact_noop_but_refuses_changed_reassembly() -> 
     let mut noop_edit = package.edit_slide_order();
     noop_edit.move_slide(1usize, Position::new(1))?;
     let noop_commit = noop_edit.commit()?;
-    assert_eq!(noop_commit.package().source_bytes(), legacy);
+    assert_eq!(noop_commit.package().exact_bytes(), legacy);
     assert!(noop_commit.patch().is_noop());
     let applied = package.apply_slide_order(noop_commit.patch())?;
-    assert_eq!(applied.package().source_bytes(), legacy);
+    assert_eq!(applied.package().exact_bytes(), legacy);
 
     let mut changed = package.edit_slide_order();
     changed.move_slide(0usize, Position::new(1))?;
@@ -817,10 +827,10 @@ fn concurrent_edits_publish_independent_immutable_snapshots() -> TestResult<()> 
         names(backward.package())?,
         ["Appendix", "Intro", "Plan", "Evidence"]
     );
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     assert_ne!(
-        forward.package().source_bytes(),
-        backward.package().source_bytes()
+        forward.package().exact_bytes(),
+        backward.package().exact_bytes()
     );
     Ok(())
 }

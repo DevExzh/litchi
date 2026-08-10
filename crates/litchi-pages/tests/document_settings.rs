@@ -1506,7 +1506,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
         .field_infos
         .iter()
         .find(|field| field.path.as_slice() == [34])
-        .ok_or_else(|| io::Error::other("native footnote-gap metadata is missing"))?;
+        .ok_or_else(|| io::Error::other("native facing-pages metadata is missing"))?;
     assert_eq!(
         gap_info.effective_unknown_field_rule(),
         UnknownFieldRule::IgnoreAndPreserve

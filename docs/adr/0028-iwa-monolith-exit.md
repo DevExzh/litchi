@@ -1462,3 +1462,103 @@ deterministic serialization, semantic operations and read/write sets,
 composition, merge, and history. Exact source bytes remain ordinary `Package`
 surface, and opaque cache objects plus remaining Pages settings/render state
 remain exit work.
+
+## 2026-08-10 amendment: hardened Keynote show-settings deletion gate
+
+The earlier partial Show gate is superseded. `litchi-keynote::show` now owns
+the complete archive-free focused family `Settings`, `Edit`, `Patch`, `Commit`,
+`Diagnostics`, `Error`, and `LimitKind`. The package's `show_settings`,
+`edit_show_settings`, and `apply_show_settings` signatures expose no raw
+source, native identity, IWA member, or generated type. `Edit::set` consumes
+the edit for immutable chaining, and callers emit a returned package through
+bounded `Package::write_to` rather than obtaining raw source bytes.
+
+The private ownership chain is the unique root `Document.iwa`/object 1/type-1
+`KN.DocumentArchive`, its required local field-2 show reference, then one
+referenced object in exactly one component with one type-2 `KN.ShowArchive`.
+The nonzero reference must occur once in aggregate metadata; any field-local
+evidence must be unique at `[2]` and cannot compete on another path. External,
+missing, duplicated, or contradictory selected ownership fails closed. A null
+root show reads as default settings but cannot be materialized by this edit, so
+only its exact no-op is supported.
+
+The root and show readers each run strict raw preflight before forcing private
+Buffa lazy views and cross-checking the full selected values. Root provenance
+is five generated files/58,630 bytes under 60 KiB, aggregate SHA-256
+`7918aad2578cf3bd07eb0be36f2e31d11f93391584308c1e4adc1fd86ed065fd`;
+show provenance is five files/138,661 bytes under 140 KiB, SHA-256
+`747fe9f99dc5bb1855aae1bfcb16065a5fe6305bdbf8730a21ef24bb75e915ee`.
+The complete known Show/SlideTree envelope and slide limit are validated, but
+the repeated slide tree is hand-routed and never retained by generated code.
+Ratchets forbid repeated views and production encoders. Exact raw records own
+preservation.
+
+A changed publication additionally requires canonical object framing and
+rejects selected merge/base/diff state. It raw-splices only the presentation
+size and eight optional show scalars, rewrites one IWA component, and fully
+reopens/verifies the retained-limit candidate. Size and slide-number changes
+remove any root `preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg`;
+playback-only changes preserve them. All slide components and slide-node
+thumbnail/playback caches remain exact under either policy. Component and
+preview counts are diagnosed independently.
+
+Semantic no-ops preserve every byte/cache, share the source, and skip
+reassembly/reopen. Changed patch application verifies exact source and stored
+target state before reopening the target; inverse application restores the
+exact complete source. Legacy nested `Index.zip` retains reads and exact
+no-ops, but changed edits intentionally fail with
+`show::Error::UnsupportedSource` under Preserve policy instead of running the
+old normalizing writer.
+
+Deletion gate 3 removes `KeynoteEditor::show_settings` and
+`set_show_settings`, the editor `show_settings` module and source,
+`examples/edit_keynote_show.rs`, and their direct mutation/compatibility tests.
+The focused example now owns semantic staging, exact inverse, distinct-output
+and no-clobber temporary handling, and `write_to`. Boundary ratchets prevent
+the host surface or physical focused-API leaks from returning.
+
+This does not delete every host Show consumer: read-only
+`KeynoteDocument::show` still decodes a Prost `KN.ShowArchive`, and other
+creation/slide/media/transition/soundtrack/graph paths remain. Thus the direct
+editor mutation vertical exits without retiring the monolith, a manifest
+edge, or an ordered debt.
+
+The current deterministic gate passes 19/19 focused show-settings cases,
+106/106 full codec cases, 49/49 focused Keynote codec cases, Keynote all-target
+checking, the host library check, umbrella facade compilation, strict rustdoc,
+and 80/80 boundary regressions. Both focused live audits are empty; the general
+repository checker retains only 14 unrelated pre-existing diagnostics. The
+fuzz target passes `cargo check`; its stable-built executable completed 32
+bounded cases with expected missing-sanitizer-symbol warnings. A sanitizer run
+through cargo-fuzz remains unavailable because it requires nightly.
+
+Apple Keynote 14.4 (7043.0.93) passed two native gates from exact source
+`f3adcde9315b6df580805bcb63c995cc1e1ef569a4befa06a102485e13c883b2`.
+The pristine slide-number Rust candidate
+`6d28d461c1203f00384fe6a758df1f903c7555b90ff02d2dc32d856aa9056c13`
+became `031a701040ed1ea9a5111fe3e298bcddcf33d498891f827b703d01328ba17224`
+after native Save As/close/exact-path reopen. The pristine Custom 1280-by-720
+candidate `67e9ff0557683af105dfe57f999acabcde23f121f7aebb06102c93e03121c027`
+became `a3a2f6e072db4bd952f2c02e528f25c3656dba5810fbff75e93b5a699aac0eda`.
+Both Rust inverses restored the exact source. Both artifacts opened without
+repair/recovery/conversion, auto-played, and retained Self-Playing, Loop, Play
+on Open, five-second transitions, two-second builds, and their respective
+Widescreen 1920-by-1080/Custom 1280-by-720 inspectors through exact-path
+reopen.
+
+Each Rust candidate deleted all three root previews; Keynote regenerated them
+on resave. All four `Index/Slide*.iwa` hashes remained exact across each
+candidate/resave pair. Keynote did normalize explicit slide-number true to
+absence: restaging absence is an exact `031a7010...` no-op, while restaging
+true changes the artifact. Same-settings no-op and inverse on the native size
+resave are exact at `a3a2f6e0...`. The native gate therefore proves slide-cache
+preservation and conservative root-preview invalidation, not persistence of
+the slide-number scalar.
+
+Exit debt remains in the host Prost Show read/other generated consumers,
+aggregate transaction peak-memory and total-work accounting, complete
+fallible-allocation proof, group-aware changed splicing, stable versioned
+semantic patch serialization with read/write sets/composition/merge/history,
+and library-owned atomic durable filesystem publication. `write_to` is bounded
+exact streaming, not flush/sync/rename/durability. A full sanitizer-backed fuzz
+campaign remains explicit verification work.

@@ -15,10 +15,11 @@ yet moved to a concrete format crate.
 New semantic code belongs in `litchi-pages`, `litchi-numbers`, or
 `litchi-keynote`; use `litchi::iwork` for a supported cross-format snapshot.
 In particular, ordinary Keynote slide title, body, and speaker-notes reads or
-edits must use `litchi-keynote::Package` and `SlideSelector`, not
-`litchi_iwa::Document` or `KeynoteEditor`. The concrete package keeps native
-identifiers and raw records private, validates semantic ownership, and creates
-exact-source checked commits.
+edits must use `litchi-keynote::Package` and `SlideSelector`, and
+presentation-wide dimensions and playback settings must use
+`litchi_keynote::show`, not `litchi_iwa::Document` or `KeynoteEditor`. The
+concrete package keeps native identifiers and raw records private, validates
+semantic ownership, and creates exact-source checked commits.
 
 ```rust,no_run
 use litchi_keynote::{Package, SlideSelector};
@@ -27,15 +28,46 @@ let package = Package::open("input.key")?;
 let mut edit = package.edit_slide_body(SlideSelector::index(0))?;
 edit.set("Updated body")?;
 let commit = edit.commit()?;
-assert!(!commit.package().source_bytes().is_empty());
+let mut output = Vec::new();
+commit.package().write_to(&mut output)?;
+assert!(!output.is_empty());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 To publish a changed package, use the focused
-`litchi-keynote/examples/edit_slide_text.rs` workflow. It requires a distinct,
-new output path, writes a sibling temporary file, synchronizes it, and uses
-no-clobber publication; do not write `source_bytes()` directly to an existing
-path.
+`litchi-keynote/examples/edit_slide_text.rs` or
+`litchi-keynote/examples/edit_show_settings.rs` workflow. Each requires a
+distinct, new output path, writes with `Package::write_to` through a sibling
+temporary file, synchronizes it, and uses no-clobber publication; do not write
+directly to an existing path.
+
+Presentation settings use the same immutable package chain and no native
+identifiers:
+
+```rust,no_run
+use litchi_keynote::{
+    Package,
+    show::{Mode, Size},
+};
+
+let package = Package::open("input.key")?;
+let before = package.show_settings()?;
+let mut settings = before;
+settings.set_size(Size::new(1920.0, 1080.0)?);
+settings.set_mode(Some(Mode::SelfPlaying))?;
+settings.set_loop_presentation(Some(true));
+
+let commit = package.edit_show_settings()?.set(settings).commit()?;
+assert_eq!(
+    commit.package().show_settings()?.mode(),
+    Some(Mode::SelfPlaying),
+);
+let restored = commit
+    .package()
+    .apply_show_settings(&commit.patch().inverse())?;
+assert_eq!(restored.package().show_settings()?, before);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
 ## Usage
 
@@ -78,7 +110,8 @@ println!("objects: {}", stats.total_objects);
 - Legacy host editors for Numbers sheets/tables/cells/formulas, Pages
   body/header/footer/text-box text, and unmigrated Keynote slide graphs and
   arbitrary text boxes. Selector-first Keynote title, body, and speaker-notes
-  text transactions are owned by `litchi-keynote::Package`.
+  text and presentation-settings transactions are owned by
+  `litchi-keynote::Package`.
 - `litchi-pages::Package` selector-first section-text reads and, for rooted
   exact sources with one unambiguous native body storage,
   set/clear/UTF-16-span transactions with reversible patches. Checked
@@ -1182,10 +1215,6 @@ keynote.set_slide_name(0, Some("Opening"))?;
 keynote.set_slide_number_visible(0, true)?;
 let layout = keynote.default_slide_layout()?;
 keynote.add_slide(layout)?;
-let mut show = keynote.show_settings()?;
-show.set_loop_presentation(Some(true));
-show.set_mode(Some(litchi_iwa::keynote::Mode::SelfPlaying))?;
-keynote.set_show_settings(show)?;
 let mut soundtrack = keynote
     .soundtrack_settings()?
     .ok_or("presentation has no soundtrack object")?;
@@ -1434,7 +1463,9 @@ let body = body.commit()?;
 let mut notes = body.package().edit_slide_notes(selector)?;
 notes.set("Presenter cue")?;
 let notes = notes.commit()?;
-assert!(!notes.package().source_bytes().is_empty());
+let mut output = Vec::new();
+notes.package().write_to(&mut output)?;
+assert!(!output.is_empty());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -1708,12 +1739,25 @@ drawable fields. Pages exposes aspect-ratio constraints for anchored text
 boxes but can disable its Lock control for that placement mode. See
 `edit_pages_text_box_properties`.
 
-Keynote show dimensions and playback flags, slide skip state, and navigator
-name use bounded compatibility-editor mutations. Modern slide-transition
-transactions are also available from `litchi_keynote::Package`: selectors never
-expose native identities; exact-source commits and their inverse patches
-reopen and verify the complete candidate; and a clear emits Keynote's real
-`none` representation while retaining start timing and the native random seed.
+Keynote show dimensions and playback flags are owned by
+`litchi_keynote::show::{Settings, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` and the focused `litchi_keynote::Package::{show_settings,
+edit_show_settings, apply_show_settings}` transaction. It uses semantic
+settings only, preserves unknown content in an exact source, and produces an
+immutable committed package plus an exact-source inverse patch. Read-only
+legacy nested-`Index.zip` input remains preservable and can be streamed back
+unchanged with `Package::write_to`; a changed settings commit deliberately
+returns `litchi_keynote::show::Error::UnsupportedSource` rather than normalize
+or rebuild that legacy layout. See
+`litchi-keynote/examples/edit_show_settings.rs` for safe distinct-output,
+sibling-temporary, no-clobber publication.
+
+Slide skip state and navigator name remain bounded compatibility-editor
+operations. Modern slide-transition transactions are also available from
+`litchi_keynote::Package`: selectors never expose native identities;
+exact-source commits and their inverse patches reopen and verify the complete
+candidate; and a clear emits Keynote's real `none` representation while
+retaining start timing and the native random seed.
 The private Buffa projection exposes typed None, Dissolve, Magic Move, and
 future effects plus twist, mosaic, bounce, Magic Move fading, timing curves,
 text delivery, motion blur, travel distance, animation color, seeds, detail,

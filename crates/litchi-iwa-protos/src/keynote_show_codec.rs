@@ -40,17 +40,25 @@ const SIZE_WIDTH_FIELD: u32 = 1;
 const SIZE_HEIGHT_FIELD: u32 = 2;
 
 const MIN_SIGN_EXTENDED_INT32: u64 = 0xffff_ffff_8000_0000;
+const MAX_RECURSION_LIMIT: u32 = 64;
 
 /// Finite resource profile for one Keynote show projection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DecodeOptions {
     max_message_bytes: usize,
     max_slide_references: usize,
+    max_fields: usize,
+    max_work_bytes: usize,
     recursion_limit: u32,
 }
 
 impl DecodeOptions {
     /// Build an explicit finite profile.
+    ///
+    /// The compatibility constructor derives conservative field and aggregate
+    /// scan-work ceilings from the byte ceiling. Callers that already have
+    /// independent wire limits can replace those two ceilings with the
+    /// `with_max_*` builders.
     #[must_use]
     pub const fn new(
         max_message_bytes: usize,
@@ -60,8 +68,24 @@ impl DecodeOptions {
         Self {
             max_message_bytes,
             max_slide_references,
+            max_fields: max_message_bytes.saturating_mul(4),
+            max_work_bytes: max_message_bytes.saturating_mul(8),
             recursion_limit,
         }
+    }
+
+    /// Replace the aggregate handwritten field-visit ceiling.
+    #[must_use]
+    pub const fn with_max_fields(mut self, max_fields: usize) -> Self {
+        self.max_fields = max_fields;
+        self
+    }
+
+    /// Replace the aggregate strict-plus-Buffa scan-work ceiling in bytes.
+    #[must_use]
+    pub const fn with_max_work_bytes(mut self, max_work_bytes: usize) -> Self {
+        self.max_work_bytes = max_work_bytes;
+        self
     }
 
     fn buffa(self) -> BuffaDecodeOptions {
@@ -72,13 +96,12 @@ impl DecodeOptions {
             .with_recursion_limit(self.recursion_limit)
     }
 
-    fn descend(self) -> Result<Self, DecodeError> {
-        let recursion_limit = self
-            .recursion_limit
-            .checked_sub(1)
-            .ok_or_else(DecodeError::recursion_limit)?;
+    fn descend(self, budget: &Budget) -> Result<Self, DecodeError> {
+        if self.recursion_limit <= 1 {
+            return Err(budget.nesting_limit());
+        }
         Ok(Self {
-            recursion_limit,
+            recursion_limit: self.recursion_limit - 1,
             ..self
         })
     }
@@ -90,22 +113,41 @@ pub struct DecodeError {
     kind: DecodeErrorKind,
 }
 
+/// A content-free exact byte or nesting resource failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum WireResourceLimit {
+    /// Complete input bytes exceeded the configured or Buffa hard ceiling.
+    Bytes {
+        /// Exact input or configured value that exceeded the ceiling.
+        observed: usize,
+        /// Exact applied ceiling.
+        maximum: usize,
+    },
+    /// Configured or traversed nesting exceeded its exact ceiling.
+    Nesting {
+        /// Exact configured value or first rejected depth.
+        observed: u32,
+        /// Exact applied ceiling.
+        maximum: u32,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DecodeErrorKind {
     Wire(buffa::DecodeError),
+    Resource(WireResourceLimit),
     MissingRequired(&'static str),
     DuplicateSingular(&'static str),
     NonCanonical(&'static str),
     SlideReferenceLimit { observed: usize, maximum: usize },
+    FieldLimit { observed: usize, maximum: usize },
+    WorkLimit { observed: usize, maximum: usize },
     Allocation { amount: usize },
     Projection,
 }
 
 impl DecodeError {
-    fn recursion_limit() -> Self {
-        buffa::DecodeError::RecursionLimitExceeded.into()
-    }
-
     const fn missing_required(field: &'static str) -> Self {
         Self {
             kind: DecodeErrorKind::MissingRequired(field),
@@ -130,6 +172,18 @@ impl DecodeError {
         }
     }
 
+    const fn field_limit(observed: usize, maximum: usize) -> Self {
+        Self {
+            kind: DecodeErrorKind::FieldLimit { observed, maximum },
+        }
+    }
+
+    const fn work_limit(observed: usize, maximum: usize) -> Self {
+        Self {
+            kind: DecodeErrorKind::WorkLimit { observed, maximum },
+        }
+    }
+
     const fn allocation(amount: usize) -> Self {
         Self {
             kind: DecodeErrorKind::Allocation { amount },
@@ -148,9 +202,12 @@ impl DecodeError {
         match self.kind {
             DecodeErrorKind::MissingRequired(field) => Some(field),
             DecodeErrorKind::Wire(_)
+            | DecodeErrorKind::Resource(_)
             | DecodeErrorKind::DuplicateSingular(_)
             | DecodeErrorKind::NonCanonical(_)
             | DecodeErrorKind::SlideReferenceLimit { .. }
+            | DecodeErrorKind::FieldLimit { .. }
+            | DecodeErrorKind::WorkLimit { .. }
             | DecodeErrorKind::Allocation { .. }
             | DecodeErrorKind::Projection => None,
         }
@@ -162,9 +219,12 @@ impl DecodeError {
         match self.kind {
             DecodeErrorKind::DuplicateSingular(field) => Some(field),
             DecodeErrorKind::Wire(_)
+            | DecodeErrorKind::Resource(_)
             | DecodeErrorKind::MissingRequired(_)
             | DecodeErrorKind::NonCanonical(_)
             | DecodeErrorKind::SlideReferenceLimit { .. }
+            | DecodeErrorKind::FieldLimit { .. }
+            | DecodeErrorKind::WorkLimit { .. }
             | DecodeErrorKind::Allocation { .. }
             | DecodeErrorKind::Projection => None,
         }
@@ -176,9 +236,12 @@ impl DecodeError {
         match self.kind {
             DecodeErrorKind::NonCanonical(reason) => Some(reason),
             DecodeErrorKind::Wire(_)
+            | DecodeErrorKind::Resource(_)
             | DecodeErrorKind::MissingRequired(_)
             | DecodeErrorKind::DuplicateSingular(_)
             | DecodeErrorKind::SlideReferenceLimit { .. }
+            | DecodeErrorKind::FieldLimit { .. }
+            | DecodeErrorKind::WorkLimit { .. }
             | DecodeErrorKind::Allocation { .. }
             | DecodeErrorKind::Projection => None,
         }
@@ -190,12 +253,42 @@ impl DecodeError {
         match self.kind {
             DecodeErrorKind::SlideReferenceLimit { observed, maximum } => Some((observed, maximum)),
             DecodeErrorKind::Wire(_)
+            | DecodeErrorKind::Resource(_)
             | DecodeErrorKind::MissingRequired(_)
             | DecodeErrorKind::DuplicateSingular(_)
             | DecodeErrorKind::NonCanonical(_)
+            | DecodeErrorKind::FieldLimit { .. }
+            | DecodeErrorKind::WorkLimit { .. }
             | DecodeErrorKind::Allocation { .. }
             | DecodeErrorKind::Projection => None,
         }
+    }
+
+    /// Exact observed and configured field counts for a field-limit failure.
+    #[must_use]
+    pub const fn field_limit_values(&self) -> Option<(usize, usize)> {
+        let DecodeErrorKind::FieldLimit { observed, maximum } = self.kind else {
+            return None;
+        };
+        Some((observed, maximum))
+    }
+
+    /// Exact observed and configured work bytes for a work-limit failure.
+    #[must_use]
+    pub const fn work_limit_values(&self) -> Option<(usize, usize)> {
+        let DecodeErrorKind::WorkLimit { observed, maximum } = self.kind else {
+            return None;
+        };
+        Some((observed, maximum))
+    }
+
+    /// Exact byte or nesting resource failure, when applicable.
+    #[must_use]
+    pub const fn wire_resource_limit(&self) -> Option<WireResourceLimit> {
+        let DecodeErrorKind::Resource(limit) = self.kind else {
+            return None;
+        };
+        Some(limit)
     }
 
     /// Requested retained-reference capacity for an allocation failure.
@@ -204,10 +297,13 @@ impl DecodeError {
         match self.kind {
             DecodeErrorKind::Allocation { amount } => Some(amount),
             DecodeErrorKind::Wire(_)
+            | DecodeErrorKind::Resource(_)
             | DecodeErrorKind::MissingRequired(_)
             | DecodeErrorKind::DuplicateSingular(_)
             | DecodeErrorKind::NonCanonical(_)
             | DecodeErrorKind::SlideReferenceLimit { .. }
+            | DecodeErrorKind::FieldLimit { .. }
+            | DecodeErrorKind::WorkLimit { .. }
             | DecodeErrorKind::Projection => None,
         }
     }
@@ -217,6 +313,14 @@ impl fmt::Display for DecodeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             DecodeErrorKind::Wire(error) => error.fmt(formatter),
+            DecodeErrorKind::Resource(WireResourceLimit::Bytes { observed, maximum }) => write!(
+                formatter,
+                "Keynote show projection byte limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            DecodeErrorKind::Resource(WireResourceLimit::Nesting { observed, maximum }) => write!(
+                formatter,
+                "Keynote show projection nesting limit exceeded: observed {observed}, maximum {maximum}"
+            ),
             DecodeErrorKind::MissingRequired(field) => {
                 write!(formatter, "missing required field {field}")
             },
@@ -229,6 +333,14 @@ impl fmt::Display for DecodeError {
             DecodeErrorKind::SlideReferenceLimit { observed, maximum } => write!(
                 formatter,
                 "Keynote show has {observed} slide references; maximum is {maximum}"
+            ),
+            DecodeErrorKind::FieldLimit { observed, maximum } => write!(
+                formatter,
+                "Keynote show projection visited {observed} fields; maximum is {maximum}"
+            ),
+            DecodeErrorKind::WorkLimit { observed, maximum } => write!(
+                formatter,
+                "Keynote show projection requires {observed} work bytes; maximum is {maximum}"
             ),
             DecodeErrorKind::Allocation { amount } => write!(
                 formatter,
@@ -243,10 +355,18 @@ impl fmt::Display for DecodeError {
 
 impl std::error::Error for DecodeError {}
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "All present and future non-resource Buffa failures retain their exact wire error."
+)]
 impl From<buffa::DecodeError> for DecodeError {
     fn from(error: buffa::DecodeError) -> Self {
         Self {
-            kind: DecodeErrorKind::Wire(error),
+            kind: match error {
+                buffa::DecodeError::MessageTooLarge
+                | buffa::DecodeError::RecursionLimitExceeded => DecodeErrorKind::Projection,
+                other => DecodeErrorKind::Wire(other),
+            },
         }
     }
 }
@@ -414,15 +534,76 @@ struct RawReference {
 struct ShowPreflight<'source> {
     slide_tree: &'source [u8],
     slide_count: usize,
+    projected_nested_bytes: usize,
     size: RawSize,
+    raw_settings: RawSettings,
+    references: ShowReferences,
     has_deprecated_root_slide_node: bool,
     has_slide_list: bool,
+}
+
+#[derive(Debug)]
+struct Budget {
+    fields: usize,
+    work_bytes: usize,
+    max_fields: usize,
+    max_work_bytes: usize,
+    max_nesting: u32,
+}
+
+impl Budget {
+    const fn new(options: DecodeOptions) -> Self {
+        Self {
+            fields: 0,
+            work_bytes: 0,
+            max_fields: options.max_fields,
+            max_work_bytes: options.max_work_bytes,
+            max_nesting: options.recursion_limit,
+        }
+    }
+
+    fn charge_field(&mut self) -> Result<(), DecodeError> {
+        let observed = self.fields.saturating_add(1);
+        if observed > self.max_fields {
+            return Err(DecodeError::field_limit(observed, self.max_fields));
+        }
+        self.fields = observed;
+        Ok(())
+    }
+
+    fn charge_work(&mut self, bytes: usize) -> Result<(), DecodeError> {
+        let observed = self.work_bytes.saturating_add(bytes);
+        if observed > self.max_work_bytes {
+            return Err(DecodeError::work_limit(observed, self.max_work_bytes));
+        }
+        self.work_bytes = observed;
+        Ok(())
+    }
+
+    const fn nesting_limit(&self) -> DecodeError {
+        DecodeError {
+            kind: DecodeErrorKind::Resource(WireResourceLimit::Nesting {
+                observed: self.max_nesting.saturating_add(1),
+                maximum: self.max_nesting,
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ShowReferences {
+    ui_state: Option<RawReference>,
+    theme: RawReference,
+    stylesheet: RawReference,
+    recording: Option<RawReference>,
+    soundtrack: Option<RawReference>,
+    slide_list: Option<RawReference>,
 }
 
 #[derive(Clone, Copy, Debug)]
 enum StrictValue<'source> {
     Varint(u64),
-    Fixed64,
+    Fixed64(u64),
     LengthDelimited(&'source [u8]),
     Group,
     Fixed32(u32),
@@ -465,7 +646,7 @@ impl<'source> StrictField<'source> {
         }
         match self.value {
             StrictValue::Varint(value) => Ok(value),
-            StrictValue::Fixed64
+            StrictValue::Fixed64(_)
             | StrictValue::LengthDelimited(_)
             | StrictValue::Group
             | StrictValue::Fixed32(_) => Err(DecodeError::projection()),
@@ -480,7 +661,7 @@ impl<'source> StrictField<'source> {
         match self.value {
             StrictValue::LengthDelimited(value) => Ok(value),
             StrictValue::Varint(_)
-            | StrictValue::Fixed64
+            | StrictValue::Fixed64(_)
             | StrictValue::Group
             | StrictValue::Fixed32(_) => Err(DecodeError::projection()),
         }
@@ -491,59 +672,42 @@ impl<'source> StrictField<'source> {
         match self.value {
             StrictValue::Fixed32(value) => Ok(value),
             StrictValue::Varint(_)
-            | StrictValue::Fixed64
+            | StrictValue::Fixed64(_)
             | StrictValue::LengthDelimited(_)
             | StrictValue::Group => Err(DecodeError::projection()),
         }
     }
-}
 
-#[derive(Clone, Debug)]
-struct StrictFields<'source> {
-    remaining: &'source [u8],
-    recursion_limit: u32,
-}
-
-impl<'source> StrictFields<'source> {
-    const fn new(source: &'source [u8], recursion_limit: u32) -> Self {
-        Self {
-            remaining: source,
-            recursion_limit,
-        }
-    }
-
-    fn next_field(&mut self) -> Result<Option<StrictField<'source>>, DecodeError> {
-        match parse_strict_field(&mut self.remaining, self.recursion_limit)? {
-            Some(ParseItem::Field(field)) => Ok(Some(field)),
-            Some(ParseItem::EndGroup(number)) => {
-                Err(buffa::DecodeError::InvalidEndGroup(number).into())
-            },
-            None => Ok(None),
+    fn fixed64_bits(self) -> Result<u64, DecodeError> {
+        self.require_wire_type(buffa::encoding::WireType::Fixed64)?;
+        match self.value {
+            StrictValue::Fixed64(value) => Ok(value),
+            StrictValue::Varint(_)
+            | StrictValue::LengthDelimited(_)
+            | StrictValue::Group
+            | StrictValue::Fixed32(_) => Err(DecodeError::projection()),
         }
     }
 }
-
-impl<'source> Iterator for StrictFields<'source> {
-    type Item = Result<StrictField<'source>, DecodeError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.next_field() {
-            Ok(Some(field)) => Some(Ok(field)),
-            Ok(None) => None,
-            Err(error) => {
-                self.remaining = &[];
-                Some(Err(error))
-            },
-        }
-    }
-}
-
-impl std::iter::FusedIterator for StrictFields<'_> {}
 
 #[derive(Clone, Copy, Debug)]
 enum ParseItem<'source> {
     Field(StrictField<'source>),
     EndGroup(u32),
+}
+
+fn next_strict_field<'source>(
+    source: &mut &'source [u8],
+    recursion_limit: u32,
+    budget: &mut Budget,
+) -> Result<Option<StrictField<'source>>, DecodeError> {
+    match parse_strict_field(source, recursion_limit, budget)? {
+        Some(ParseItem::Field(field)) => Ok(Some(field)),
+        Some(ParseItem::EndGroup(number)) => {
+            Err(buffa::DecodeError::InvalidEndGroup(number).into())
+        },
+        None => Ok(None),
+    }
 }
 
 /// Decode one bounded Keynote show payload.
@@ -554,19 +718,21 @@ enum ParseItem<'source> {
 /// source order. Generated Buffa types never cross this API boundary.
 pub fn decode_show(source: &[u8], options: DecodeOptions) -> Result<ShowSnapshot, DecodeError> {
     validate_decode_input(source, options)?;
-    let preflight = preflight_show(source, options)?;
+    let mut budget = Budget::new(options);
+    let preflight = preflight_show(source, options, &mut budget)?;
     let mut slide_node_identifiers = Vec::new();
     slide_node_identifiers
         .try_reserve_exact(preflight.slide_count)
         .map_err(|_error| DecodeError::allocation(preflight.slide_count))?;
 
-    let settings = project_settings(source, options, preflight.size)?;
+    let settings = project_settings(source, options, &preflight, &mut budget)?;
 
     project_slide_tree(
         preflight.slide_tree,
-        options.descend()?,
+        options.descend(&budget)?,
         preflight.slide_count,
         &mut slide_node_identifiers,
+        &mut budget,
     )?;
     Ok(ShowSnapshot {
         slide_node_identifiers: slide_node_identifiers.into_boxed_slice(),
@@ -588,22 +754,37 @@ pub fn decode_settings(
     options: DecodeOptions,
 ) -> Result<SettingsSnapshot, DecodeError> {
     validate_decode_input(source, options)?;
-    let preflight = preflight_show(source, options)?;
-    project_settings(source, options, preflight.size)
+    let mut budget = Budget::new(options);
+    let preflight = preflight_show(source, options, &mut budget)?;
+    project_settings(source, options, &preflight, &mut budget)
 }
 
 fn validate_decode_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
-    const MAX_RECURSION_LIMIT: u32 = 64;
-
     let max_buffa_message_bytes = usize::try_from(buffa::MAX_MESSAGE_BYTES)
-        .map_err(|_conversion| buffa::DecodeError::MessageTooLarge)?;
-    if options.max_message_bytes > max_buffa_message_bytes
-        || source.len() > options.max_message_bytes
-    {
-        return Err(buffa::DecodeError::MessageTooLarge.into());
+        .map_err(|_conversion| DecodeError::projection())?;
+    if options.max_message_bytes > max_buffa_message_bytes {
+        return Err(DecodeError {
+            kind: DecodeErrorKind::Resource(WireResourceLimit::Bytes {
+                observed: options.max_message_bytes,
+                maximum: max_buffa_message_bytes,
+            }),
+        });
+    }
+    if source.len() > options.max_message_bytes {
+        return Err(DecodeError {
+            kind: DecodeErrorKind::Resource(WireResourceLimit::Bytes {
+                observed: source.len(),
+                maximum: options.max_message_bytes,
+            }),
+        });
     }
     if options.recursion_limit == 0 || options.recursion_limit > MAX_RECURSION_LIMIT {
-        return Err(DecodeError::recursion_limit());
+        return Err(DecodeError {
+            kind: DecodeErrorKind::Resource(WireResourceLimit::Nesting {
+                observed: options.recursion_limit,
+                maximum: MAX_RECURSION_LIMIT,
+            }),
+        });
     }
     Ok(())
 }
@@ -611,48 +792,80 @@ fn validate_decode_input(source: &[u8], options: DecodeOptions) -> Result<(), De
 fn project_settings(
     source: &[u8],
     options: DecodeOptions,
-    preflight_size: RawSize,
+    preflight: &ShowPreflight<'_>,
+    budget: &mut Budget,
 ) -> Result<SettingsSnapshot, DecodeError> {
+    budget.charge_work(source.len())?;
     let view: projection::KeynoteShowArchiveLazyView<'_> =
         options.buffa().decode_lazy_view(source)?;
-    let projected_size = force_show_projection(&view)?;
-    if projected_size.width.to_bits() != preflight_size.width.to_bits()
-        || projected_size.height.to_bits() != preflight_size.height.to_bits()
+    budget.charge_work(preflight.projected_nested_bytes)?;
+    let (projected_size, projected_references) = force_show_projection(&view)?;
+    let projected_settings = RawSettings {
+        slide_numbers_visible: view.slide_numbers_visible,
+        loop_presentation: view.loop_presentation,
+        mode: view.mode,
+        autoplay_transition_delay: view.autoplay_transition_delay,
+        autoplay_build_delay: view.autoplay_build_delay,
+        idle_timer_active: view.idle_timer_active,
+        idle_timer_delay: view.idle_timer_delay,
+        automatically_plays_upon_open: view.automatically_plays_upon_open,
+    };
+    if projected_size.width.to_bits() != preflight.size.width.to_bits()
+        || projected_size.height.to_bits() != preflight.size.height.to_bits()
+        || projected_references != preflight.references
+        || !same_raw_settings(projected_settings, preflight.raw_settings)
     {
         return Err(DecodeError::projection());
     }
     Ok(SettingsSnapshot {
         size: projected_size,
-        raw_settings: RawSettings {
-            slide_numbers_visible: view.slide_numbers_visible,
-            loop_presentation: view.loop_presentation,
-            mode: view.mode,
-            autoplay_transition_delay: view.autoplay_transition_delay,
-            autoplay_build_delay: view.autoplay_build_delay,
-            idle_timer_active: view.idle_timer_active,
-            idle_timer_delay: view.idle_timer_delay,
-            automatically_plays_upon_open: view.automatically_plays_upon_open,
-        },
+        raw_settings: projected_settings,
     })
 }
 
-fn preflight_show(source: &[u8], options: DecodeOptions) -> Result<ShowPreflight<'_>, DecodeError> {
-    let nested_options = options.descend()?;
+fn preflight_show<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<ShowPreflight<'source>, DecodeError> {
+    budget.charge_work(source.len())?;
+    let nested_options = options.descend(budget)?;
     let mut seen = 0u32;
     let mut slide_tree = None;
     let mut size = None;
+    let mut ui_state = None;
+    let mut theme = None;
+    let mut stylesheet = None;
+    let mut recording = None;
+    let mut soundtrack = None;
+    let mut slide_list = None;
+    let mut raw_settings = RawSettings {
+        slide_numbers_visible: None,
+        loop_presentation: None,
+        mode: None,
+        autoplay_transition_delay: None,
+        autoplay_build_delay: None,
+        idle_timer_active: None,
+        idle_timer_delay: None,
+        automatically_plays_upon_open: None,
+    };
     let mut has_slide_list = false;
+    let mut projected_nested_bytes = 0usize;
 
-    for field_result in StrictFields::new(source, options.recursion_limit) {
-        let field = field_result?;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
         match field.number {
             SHOW_UI_STATE_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.uiState")?;
-                preflight_reference(field.length_delimited()?, nested_options)?;
+                let payload = field.length_delimited()?;
+                projected_nested_bytes = add_nested_bytes(projected_nested_bytes, payload.len())?;
+                ui_state = Some(preflight_reference(payload, nested_options, budget)?);
             },
             SHOW_THEME_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.theme")?;
-                preflight_reference(field.length_delimited()?, nested_options)?;
+                let payload = field.length_delimited()?;
+                projected_nested_bytes = add_nested_bytes(projected_nested_bytes, payload.len())?;
+                theme = Some(preflight_reference(payload, nested_options, budget)?);
             },
             SHOW_SLIDE_TREE_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.slideTree")?;
@@ -660,11 +873,15 @@ fn preflight_show(source: &[u8], options: DecodeOptions) -> Result<ShowPreflight
             },
             SHOW_SIZE_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.size")?;
-                size = Some(preflight_size(field.length_delimited()?, nested_options)?);
+                let payload = field.length_delimited()?;
+                projected_nested_bytes = add_nested_bytes(projected_nested_bytes, payload.len())?;
+                size = Some(preflight_size(payload, nested_options, budget)?);
             },
             SHOW_STYLESHEET_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.stylesheet")?;
-                preflight_reference(field.length_delimited()?, nested_options)?;
+                let payload = field.length_delimited()?;
+                projected_nested_bytes = add_nested_bytes(projected_nested_bytes, payload.len())?;
+                stylesheet = Some(preflight_reference(payload, nested_options, budget)?);
             },
             SHOW_SLIDE_NUMBERS_VISIBLE_FIELD => {
                 mark_singular(
@@ -672,19 +889,21 @@ fn preflight_show(source: &[u8], options: DecodeOptions) -> Result<ShowPreflight
                     field.number,
                     "KN.ShowArchive.slideNumbersVisible",
                 )?;
-                require_canonical_bool(field.varint()?)?;
+                raw_settings.slide_numbers_visible = Some(require_canonical_bool(field.varint()?)?);
             },
             SHOW_RECORDING_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.recording")?;
-                preflight_reference(field.length_delimited()?, nested_options)?;
+                let payload = field.length_delimited()?;
+                projected_nested_bytes = add_nested_bytes(projected_nested_bytes, payload.len())?;
+                recording = Some(preflight_reference(payload, nested_options, budget)?);
             },
             SHOW_LOOP_PRESENTATION_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.loop_presentation")?;
-                require_canonical_bool(field.varint()?)?;
+                raw_settings.loop_presentation = Some(require_canonical_bool(field.varint()?)?);
             },
             SHOW_MODE_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.mode")?;
-                require_canonical_int32(field.varint()?)?;
+                raw_settings.mode = Some(require_canonical_int32(field.varint()?)?);
             },
             SHOW_AUTOPLAY_TRANSITION_DELAY_FIELD => {
                 mark_singular(
@@ -692,7 +911,8 @@ fn preflight_show(source: &[u8], options: DecodeOptions) -> Result<ShowPreflight
                     field.number,
                     "KN.ShowArchive.autoplay_transition_delay",
                 )?;
-                field.require_wire_type(buffa::encoding::WireType::Fixed64)?;
+                raw_settings.autoplay_transition_delay =
+                    Some(f64::from_bits(field.fixed64_bits()?));
             },
             SHOW_AUTOPLAY_BUILD_DELAY_FIELD => {
                 mark_singular(
@@ -700,19 +920,21 @@ fn preflight_show(source: &[u8], options: DecodeOptions) -> Result<ShowPreflight
                     field.number,
                     "KN.ShowArchive.autoplay_build_delay",
                 )?;
-                field.require_wire_type(buffa::encoding::WireType::Fixed64)?;
+                raw_settings.autoplay_build_delay = Some(f64::from_bits(field.fixed64_bits()?));
             },
             SHOW_IDLE_TIMER_ACTIVE_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.idle_timer_active")?;
-                require_canonical_bool(field.varint()?)?;
+                raw_settings.idle_timer_active = Some(require_canonical_bool(field.varint()?)?);
             },
             SHOW_IDLE_TIMER_DELAY_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.idle_timer_delay")?;
-                field.require_wire_type(buffa::encoding::WireType::Fixed64)?;
+                raw_settings.idle_timer_delay = Some(f64::from_bits(field.fixed64_bits()?));
             },
             SHOW_SOUNDTRACK_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.soundtrack")?;
-                preflight_reference(field.length_delimited()?, nested_options)?;
+                let payload = field.length_delimited()?;
+                projected_nested_bytes = add_nested_bytes(projected_nested_bytes, payload.len())?;
+                soundtrack = Some(preflight_reference(payload, nested_options, budget)?);
             },
             SHOW_AUTOMATICALLY_PLAYS_UPON_OPEN_FIELD => {
                 mark_singular(
@@ -720,12 +942,15 @@ fn preflight_show(source: &[u8], options: DecodeOptions) -> Result<ShowPreflight
                     field.number,
                     "KN.ShowArchive.automatically_plays_upon_open",
                 )?;
-                require_canonical_bool(field.varint()?)?;
+                raw_settings.automatically_plays_upon_open =
+                    Some(require_canonical_bool(field.varint()?)?);
             },
             SHOW_SLIDE_LIST_FIELD => {
                 mark_singular(&mut seen, field.number, "KN.ShowArchive.slideList")?;
                 has_slide_list = true;
-                preflight_reference(field.length_delimited()?, nested_options)?;
+                let payload = field.length_delimited()?;
+                projected_nested_bytes = add_nested_bytes(projected_nested_bytes, payload.len())?;
+                slide_list = Some(preflight_reference(payload, nested_options, budget)?);
             },
             _ => {},
         }
@@ -739,11 +964,22 @@ fn preflight_show(source: &[u8], options: DecodeOptions) -> Result<ShowPreflight
         slide_tree.ok_or_else(|| DecodeError::missing_required("KN.ShowArchive.slideTree"))?;
     let selected_size = size.ok_or_else(|| DecodeError::missing_required("KN.ShowArchive.size"))?;
     let (slide_count, has_deprecated_root_slide_node) =
-        preflight_slide_tree(selected_slide_tree, nested_options)?;
+        preflight_slide_tree(selected_slide_tree, nested_options, budget)?;
     Ok(ShowPreflight {
         slide_tree: selected_slide_tree,
         slide_count,
+        projected_nested_bytes,
         size: selected_size,
+        raw_settings,
+        references: ShowReferences {
+            ui_state,
+            theme: theme.ok_or_else(|| DecodeError::missing_required("KN.ShowArchive.theme"))?,
+            stylesheet: stylesheet
+                .ok_or_else(|| DecodeError::missing_required("KN.ShowArchive.stylesheet"))?,
+            recording,
+            soundtrack,
+            slide_list,
+        },
         has_deprecated_root_slide_node,
         has_slide_list,
     })
@@ -752,12 +988,14 @@ fn preflight_show(source: &[u8], options: DecodeOptions) -> Result<ShowPreflight
 fn preflight_slide_tree(
     source: &[u8],
     options: DecodeOptions,
+    budget: &mut Budget,
 ) -> Result<(usize, bool), DecodeError> {
-    let reference_options = options.descend()?;
+    budget.charge_work(source.len())?;
+    let reference_options = options.descend(budget)?;
     let mut root_seen = false;
     let mut slide_count = 0usize;
-    for field_result in StrictFields::new(source, options.recursion_limit) {
-        let field = field_result?;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
         match field.number {
             SLIDE_TREE_ROOT_FIELD => {
                 if root_seen {
@@ -766,10 +1004,10 @@ fn preflight_slide_tree(
                     ));
                 }
                 root_seen = true;
-                preflight_reference(field.length_delimited()?, reference_options)?;
+                preflight_reference(field.length_delimited()?, reference_options, budget)?;
             },
             SLIDE_TREE_SLIDES_FIELD => {
-                preflight_reference(field.length_delimited()?, reference_options)?;
+                preflight_reference(field.length_delimited()?, reference_options, budget)?;
                 slide_count = slide_count.checked_add(1).ok_or_else(|| {
                     DecodeError::slide_reference_limit(usize::MAX, options.max_slide_references)
                 })?;
@@ -786,13 +1024,18 @@ fn preflight_slide_tree(
     Ok((slide_count, root_seen))
 }
 
-fn preflight_reference(source: &[u8], options: DecodeOptions) -> Result<RawReference, DecodeError> {
+fn preflight_reference(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<RawReference, DecodeError> {
+    budget.charge_work(source.len())?;
     let mut seen = 0u32;
     let mut identifier = None;
     let mut deprecated_type = None;
     let mut deprecated_is_external = None;
-    for field_result in StrictFields::new(source, options.recursion_limit) {
-        let field = field_result?;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
         match field.number {
             REFERENCE_IDENTIFIER_FIELD => {
                 mark_singular(&mut seen, field.number, "TSP.Reference.identifier")?;
@@ -800,9 +1043,7 @@ fn preflight_reference(source: &[u8], options: DecodeOptions) -> Result<RawRefer
             },
             REFERENCE_DEPRECATED_TYPE_FIELD => {
                 mark_singular(&mut seen, field.number, "TSP.Reference.deprecated_type")?;
-                let value = field.varint()?;
-                require_canonical_int32(value)?;
-                deprecated_type = Some(decode_int32(value));
+                deprecated_type = Some(require_canonical_int32(field.varint()?)?);
             },
             REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
                 mark_singular(
@@ -810,9 +1051,7 @@ fn preflight_reference(source: &[u8], options: DecodeOptions) -> Result<RawRefer
                     field.number,
                     "TSP.Reference.deprecated_is_external",
                 )?;
-                let value = field.varint()?;
-                require_canonical_bool(value)?;
-                deprecated_is_external = Some(value == 1);
+                deprecated_is_external = Some(require_canonical_bool(field.varint()?)?);
             },
             _ => {},
         }
@@ -826,12 +1065,17 @@ fn preflight_reference(source: &[u8], options: DecodeOptions) -> Result<RawRefer
     })
 }
 
-fn preflight_size(source: &[u8], options: DecodeOptions) -> Result<RawSize, DecodeError> {
+fn preflight_size(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<RawSize, DecodeError> {
+    budget.charge_work(source.len())?;
     let mut seen = 0u32;
     let mut width = None;
     let mut height = None;
-    for field_result in StrictFields::new(source, options.recursion_limit) {
-        let field = field_result?;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
         match field.number {
             SIZE_WIDTH_FIELD => {
                 mark_singular(&mut seen, field.number, "TSP.Size.width")?;
@@ -854,35 +1098,76 @@ fn preflight_size(source: &[u8], options: DecodeOptions) -> Result<RawSize, Deco
 
 fn force_show_projection(
     view: &projection::KeynoteShowArchiveLazyView<'_>,
-) -> Result<RawSize, DecodeError> {
-    if let Some(reference) = view.ui_state.get()? {
-        force_reference_projection(&reference)?;
-    }
-    let theme = view
+) -> Result<(RawSize, ShowReferences), DecodeError> {
+    let ui_state = view
+        .ui_state
+        .get()?
+        .as_ref()
+        .map(force_reference_projection)
+        .transpose()?;
+    let theme_view = view
         .theme
         .get()?
         .ok_or_else(|| DecodeError::missing_required("KN.ShowArchive.theme"))?;
-    force_reference_projection(&theme)?;
+    let theme = force_reference_projection(&theme_view)?;
     let size = view
         .size
         .get()?
         .ok_or_else(|| DecodeError::missing_required("KN.ShowArchive.size"))?;
     let raw_size = force_size_projection(&size)?;
-    let stylesheet = view
+    let stylesheet_view = view
         .stylesheet
         .get()?
         .ok_or_else(|| DecodeError::missing_required("KN.ShowArchive.stylesheet"))?;
-    force_reference_projection(&stylesheet)?;
-    if let Some(reference) = view.recording.get()? {
-        force_reference_projection(&reference)?;
-    }
-    if let Some(reference) = view.soundtrack.get()? {
-        force_reference_projection(&reference)?;
-    }
-    if let Some(reference) = view.slide_list.get()? {
-        force_reference_projection(&reference)?;
-    }
-    Ok(raw_size)
+    let stylesheet = force_reference_projection(&stylesheet_view)?;
+    let recording = view
+        .recording
+        .get()?
+        .as_ref()
+        .map(force_reference_projection)
+        .transpose()?;
+    let soundtrack = view
+        .soundtrack
+        .get()?
+        .as_ref()
+        .map(force_reference_projection)
+        .transpose()?;
+    let slide_list = view
+        .slide_list
+        .get()?
+        .as_ref()
+        .map(force_reference_projection)
+        .transpose()?;
+    Ok((
+        raw_size,
+        ShowReferences {
+            ui_state,
+            theme,
+            stylesheet,
+            recording,
+            soundtrack,
+            slide_list,
+        },
+    ))
+}
+
+fn same_raw_settings(left: RawSettings, right: RawSettings) -> bool {
+    left.slide_numbers_visible == right.slide_numbers_visible
+        && left.loop_presentation == right.loop_presentation
+        && left.mode == right.mode
+        && left.autoplay_transition_delay.map(f64::to_bits)
+            == right.autoplay_transition_delay.map(f64::to_bits)
+        && left.autoplay_build_delay.map(f64::to_bits)
+            == right.autoplay_build_delay.map(f64::to_bits)
+        && left.idle_timer_active == right.idle_timer_active
+        && left.idle_timer_delay.map(f64::to_bits) == right.idle_timer_delay.map(f64::to_bits)
+        && left.automatically_plays_upon_open == right.automatically_plays_upon_open
+}
+
+fn add_nested_bytes(total: usize, amount: usize) -> Result<usize, DecodeError> {
+    total
+        .checked_add(amount)
+        .ok_or_else(DecodeError::projection)
 }
 
 fn force_reference_projection(
@@ -916,15 +1201,18 @@ fn project_slide_tree(
     options: DecodeOptions,
     expected_slide_count: usize,
     output: &mut Vec<u64>,
+    budget: &mut Budget,
 ) -> Result<(), DecodeError> {
-    let reference_options = options.descend()?;
-    for field_result in StrictFields::new(source, options.recursion_limit) {
-        let field = field_result?;
+    budget.charge_work(source.len())?;
+    let reference_options = options.descend(budget)?;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
         if field.number != SLIDE_TREE_ROOT_FIELD && field.number != SLIDE_TREE_SLIDES_FIELD {
             continue;
         }
         let payload = field.length_delimited()?;
-        let strict = preflight_reference(payload, reference_options)?;
+        let strict = preflight_reference(payload, reference_options, budget)?;
+        budget.charge_work(payload.len())?;
         let projected_view: projection::ReferenceLazyView<'_> =
             reference_options.buffa().decode_lazy_view(payload)?;
         let projected_reference = force_reference_projection(&projected_view)?;
@@ -962,20 +1250,20 @@ fn require_seen(seen: u32, field_number: u32, name: &'static str) -> Result<(), 
     Ok(())
 }
 
-fn require_canonical_bool(value: u64) -> Result<(), DecodeError> {
+fn require_canonical_bool(value: u64) -> Result<bool, DecodeError> {
     if value > 1 {
         return Err(DecodeError::noncanonical("bool scalar is not zero or one"));
     }
-    Ok(())
+    Ok(value == 1)
 }
 
-fn require_canonical_int32(value: u64) -> Result<(), DecodeError> {
+fn require_canonical_int32(value: u64) -> Result<i32, DecodeError> {
     if value > 0x7fff_ffff && value < MIN_SIGN_EXTENDED_INT32 {
         return Err(DecodeError::noncanonical(
             "int32 scalar is not a sign-extended 32-bit value",
         ));
     }
-    Ok(())
+    Ok(decode_int32(value))
 }
 
 #[allow(
@@ -990,11 +1278,13 @@ fn decode_int32(value: u64) -> i32 {
 fn parse_strict_field<'source>(
     source: &mut &'source [u8],
     recursion_limit: u32,
+    budget: &mut Budget,
 ) -> Result<Option<ParseItem<'source>>, DecodeError> {
     if source.is_empty() {
         return Ok(None);
     }
     let (encoded_tag, canonical_key) = take_varint(source)?;
+    budget.charge_field()?;
     let raw_tag =
         u32::try_from(encoded_tag).map_err(|_error| buffa::DecodeError::InvalidFieldNumber)?;
     let field_number = raw_tag >> 3;
@@ -1009,8 +1299,13 @@ fn parse_strict_field<'source>(
             (StrictValue::Varint(value), canonical)
         },
         buffa::encoding::WireType::Fixed64 => {
-            take_exact(source, 8)?;
-            (StrictValue::Fixed64, true)
+            let bytes = take_exact(source, 8)?;
+            let bits = u64::from_le_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_error| buffa::DecodeError::UnexpectedEof)?,
+            );
+            (StrictValue::Fixed64(bits), true)
         },
         buffa::encoding::WireType::LengthDelimited => {
             let (encoded_length, canonical) = take_varint(source)?;
@@ -1024,8 +1319,8 @@ fn parse_strict_field<'source>(
         buffa::encoding::WireType::StartGroup => {
             let child_limit = recursion_limit
                 .checked_sub(1)
-                .ok_or_else(DecodeError::recursion_limit)?;
-            skip_strict_group(source, field_number, child_limit)?;
+                .ok_or_else(|| budget.nesting_limit())?;
+            skip_strict_group(source, field_number, child_limit, budget)?;
             (StrictValue::Group, true)
         },
         buffa::encoding::WireType::EndGroup => return Ok(Some(ParseItem::EndGroup(field_number))),
@@ -1053,9 +1348,10 @@ fn skip_strict_group(
     source: &mut &[u8],
     expected_field_number: u32,
     recursion_limit: u32,
+    budget: &mut Budget,
 ) -> Result<(), DecodeError> {
     loop {
-        match parse_strict_field(source, recursion_limit)? {
+        match parse_strict_field(source, recursion_limit, budget)? {
             Some(ParseItem::Field(_)) => {},
             Some(ParseItem::EndGroup(field_number)) if field_number == expected_field_number => {
                 return Ok(());
@@ -1771,6 +2067,138 @@ mod tests {
         assert!(decode_show(&source, DecodeOptions::new(source.len(), 1, 1)).is_err());
         assert!(decode_show(&source, DecodeOptions::new(usize::MAX, 1, 8)).is_err());
         assert!(decode_show(&source, DecodeOptions::new(source.len(), 1, 65)).is_err());
+    }
+
+    #[test]
+    fn exact_full_show_resource_boundaries_are_typed_and_inclusive()
+    -> Result<(), Box<dyn std::error::Error>> {
+        const EXACT_FIELDS: usize = 12;
+        const EXACT_WORK: usize = 94;
+
+        let source = minimal_show(&[7]);
+        assert_eq!(source.len(), 26);
+        let exact = DecodeOptions::new(source.len(), 1, 3)
+            .with_max_fields(EXACT_FIELDS)
+            .with_max_work_bytes(EXACT_WORK);
+        assert_eq!(decode_show(&source, exact)?.slide_node_identifiers(), [7]);
+
+        let bytes = assert_error(decode_show(
+            &source,
+            DecodeOptions::new(source.len() - 1, 1, 3)
+                .with_max_fields(EXACT_FIELDS)
+                .with_max_work_bytes(EXACT_WORK),
+        ));
+        assert_eq!(
+            bytes.wire_resource_limit(),
+            Some(WireResourceLimit::Bytes {
+                observed: source.len(),
+                maximum: source.len() - 1,
+            })
+        );
+
+        let fields = assert_error(decode_show(
+            &source,
+            DecodeOptions::new(source.len(), 1, 3)
+                .with_max_fields(EXACT_FIELDS - 1)
+                .with_max_work_bytes(EXACT_WORK),
+        ));
+        assert_eq!(
+            fields.field_limit_values(),
+            Some((EXACT_FIELDS, EXACT_FIELDS - 1))
+        );
+
+        let work = assert_error(decode_show(
+            &source,
+            DecodeOptions::new(source.len(), 1, 3)
+                .with_max_fields(EXACT_FIELDS)
+                .with_max_work_bytes(EXACT_WORK - 1),
+        ));
+        assert_eq!(work.work_limit_values(), Some((EXACT_WORK, EXACT_WORK - 1)));
+
+        let nesting = assert_error(decode_show(
+            &source,
+            DecodeOptions::new(source.len(), 1, 2)
+                .with_max_fields(EXACT_FIELDS)
+                .with_max_work_bytes(EXACT_WORK),
+        ));
+        assert_eq!(
+            nesting.wire_resource_limit(),
+            Some(WireResourceLimit::Nesting {
+                observed: 3,
+                maximum: 2,
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn settings_only_has_an_exact_smaller_aggregate_budget()
+    -> Result<(), Box<dyn std::error::Error>> {
+        const EXACT_FIELDS: usize = 10;
+        const EXACT_WORK: usize = 86;
+
+        let source = minimal_show(&[7]);
+        let exact = DecodeOptions::new(source.len(), 1, 3)
+            .with_max_fields(EXACT_FIELDS)
+            .with_max_work_bytes(EXACT_WORK);
+        assert_eq!(
+            decode_settings(&source, exact)?.size().width().to_bits(),
+            1024.0f32.to_bits()
+        );
+
+        let fields = assert_error(decode_settings(
+            &source,
+            DecodeOptions::new(source.len(), 1, 3)
+                .with_max_fields(EXACT_FIELDS - 1)
+                .with_max_work_bytes(EXACT_WORK),
+        ));
+        assert_eq!(
+            fields.field_limit_values(),
+            Some((EXACT_FIELDS, EXACT_FIELDS - 1))
+        );
+
+        let work = assert_error(decode_settings(
+            &source,
+            DecodeOptions::new(source.len(), 1, 3)
+                .with_max_fields(EXACT_FIELDS)
+                .with_max_work_bytes(EXACT_WORK - 1),
+        ));
+        assert_eq!(work.work_limit_values(), Some((EXACT_WORK, EXACT_WORK - 1)));
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_resource_profiles_and_structural_wire_adversaries_are_typed() {
+        let source = minimal_show(&[]);
+        for (configured, expected) in [(0, 0), (65, 65)] {
+            let error = assert_error(decode_settings(
+                &source,
+                DecodeOptions::new(source.len(), 0, configured),
+            ));
+            assert_eq!(
+                error.wire_resource_limit(),
+                Some(WireResourceLimit::Nesting {
+                    observed: expected,
+                    maximum: 64,
+                })
+            );
+        }
+
+        let malformed: [&[u8]; 8] = [
+            &[0x80],
+            &[0x00],
+            &[0x0f],
+            &[0x1a, 0x02, 0x12],
+            &[0x0b],
+            &[0x0c],
+            &[0x12, 0x01, 0x80],
+            &[
+                0x08, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02,
+            ],
+        ];
+        for bytes in malformed {
+            assert!(decode_settings(bytes, DecodeOptions::new(bytes.len().max(1), 0, 8),).is_err());
+        }
     }
 
     #[test]

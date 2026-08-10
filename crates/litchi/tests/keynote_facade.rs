@@ -3,7 +3,25 @@
 use std::io;
 use std::path::PathBuf;
 
+use litchi::keynote::show::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Mode, Patch, Settings, Size,
+};
 use litchi::keynote::{Package, Position, SlideNotesError, SlideSelector, SlideTextRole, TextSpan};
+
+trait ExactPackageBytes {
+    fn exact_bytes(&self) -> &'static [u8];
+}
+
+impl ExactPackageBytes for Package {
+    fn exact_bytes(&self) -> &'static [u8] {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts every package byte");
+        Box::leak(bytes.into_boxed_slice())
+    }
+}
+
+fn assert_send_sync<T: Send + Sync>() {}
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote/basic.key")
@@ -25,7 +43,7 @@ fn slide_skip_state_is_available_through_the_root_facade() -> Result<(), Box<dyn
 
     assert!(commit.patch().is_noop());
     assert!(!commit.diagnostics().changed());
-    assert_eq!(commit.package().source_bytes(), package.source_bytes());
+    assert_eq!(commit.package().exact_bytes(), package.exact_bytes());
     Ok(())
 }
 
@@ -33,40 +51,65 @@ fn slide_skip_state_is_available_through_the_root_facade() -> Result<(), Box<dyn
 fn slide_order_transaction_is_available_through_the_root_facade()
 -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let mut edit = package.edit_slide_order();
     edit.move_slide(SlideSelector::index(0), Position::new(0))?;
     let commit = edit.commit()?;
 
     assert!(commit.patch().is_noop());
     assert!(!commit.diagnostics().changed());
-    assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(commit.package().exact_bytes(), source_snapshot);
 
     let reapplied = package.apply_slide_order(commit.patch())?;
     assert!(reapplied.patch().is_noop());
-    assert_eq!(reapplied.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(reapplied.package().exact_bytes(), source_snapshot);
     Ok(())
 }
 
 #[test]
 fn show_settings_transaction_is_available_through_the_root_facade()
 -> Result<(), Box<dyn std::error::Error>> {
+    assert_send_sync::<Settings>();
+    assert_send_sync::<Mode>();
+    assert_send_sync::<Size>();
+    assert_send_sync::<Edit<'static>>();
+    assert_send_sync::<Patch>();
+    assert_send_sync::<Commit>();
+    assert_send_sync::<Diagnostics>();
+    assert_send_sync::<Error>();
+    assert_send_sync::<LimitKind>();
+
     let package = Package::open(fixture_path())?;
-    assert_eq!(package.show_settings()?, *package.show()?.settings());
-    let source_pointer = package.source_bytes().as_ptr();
-    let mut edit = package.edit_show_settings()?;
-    let settings = *edit.settings();
-    edit.set_settings(settings)?;
-    let commit = edit.commit()?;
+    let source_snapshot = package.exact_bytes();
+    let before = package.show_settings()?;
+    assert_eq!(before, *package.show()?.settings());
 
-    assert!(commit.patch().is_noop());
-    assert!(!commit.diagnostics().changed());
-    assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+    let noop = package.edit_show_settings()?.set(before).commit()?;
+    assert_eq!(noop.patch().before(), before);
+    assert_eq!(noop.patch().after(), before);
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.diagnostics().touched_components(), 0);
+    assert!(!noop.diagnostics().full_reparse_performed());
+    assert_eq!(noop.package().exact_bytes(), source_snapshot);
 
-    let reapplied = package.apply_show_settings(commit.patch())?;
-    assert!(reapplied.patch().is_noop());
-    assert!(!reapplied.diagnostics().changed());
-    assert_eq!(reapplied.package().source_bytes().as_ptr(), source_pointer);
+    let mut after = before;
+    after.set_loop_presentation(Some(!before.loop_presentation().unwrap_or(false)));
+    let changed = package.edit_show_settings()?.set(after).commit()?;
+    assert_eq!(changed.patch().before(), before);
+    assert_eq!(changed.patch().after(), after);
+    assert_eq!(changed.package().show_settings()?, after);
+    assert!(changed.diagnostics().changed());
+    assert!(changed.diagnostics().touched_components() >= 1);
+    assert!(changed.diagnostics().full_reparse_performed());
+    assert_eq!(package.exact_bytes(), source_snapshot);
+    assert_ne!(changed.package().exact_bytes(), source_snapshot);
+
+    let restored = changed
+        .package()
+        .apply_show_settings(&changed.patch().inverse())?;
+    assert_eq!(restored.package().exact_bytes(), source_snapshot);
+    assert_eq!(restored.package().show_settings()?, before);
     Ok(())
 }
 
@@ -74,7 +117,7 @@ fn show_settings_transaction_is_available_through_the_root_facade()
 fn slide_transition_transaction_is_available_through_the_root_facade()
 -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let selector = SlideSelector::index(0);
     let transition = package
         .slide_transition(selector)?
@@ -85,12 +128,12 @@ fn slide_transition_transaction_is_available_through_the_root_facade()
 
     assert!(commit.patch().is_noop());
     assert!(!commit.diagnostics().changed());
-    assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(commit.package().exact_bytes(), source_snapshot);
 
     let reapplied = package.apply_slide_transition(commit.patch())?;
     assert!(reapplied.patch().is_noop());
     assert!(!reapplied.diagnostics().changed());
-    assert_eq!(reapplied.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(reapplied.package().exact_bytes(), source_snapshot);
     Ok(())
 }
 
@@ -99,7 +142,7 @@ fn slide_notes_transaction_is_available_through_the_root_facade()
 -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
     let selector = SlideSelector::index(0);
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
 
     if let Some(notes) = package.slide_notes(selector)? {
         let mut edit = package.edit_slide_notes(selector)?;
@@ -108,17 +151,17 @@ fn slide_notes_transaction_is_available_through_the_root_facade()
 
         assert!(commit.patch().is_noop());
         assert!(!commit.diagnostics().changed());
-        assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+        assert_eq!(commit.package().exact_bytes(), source_snapshot);
 
         let reapplied = package.apply_slide_notes(commit.patch())?;
         assert!(reapplied.patch().is_noop());
-        assert_eq!(reapplied.package().source_bytes().as_ptr(), source_pointer);
+        assert_eq!(reapplied.package().exact_bytes(), source_snapshot);
     } else {
         assert!(matches!(
             package.edit_slide_notes(selector),
             Err(SlideNotesError::NotesStorageNotFound)
         ));
-        assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+        assert_eq!(package.exact_bytes(), source_snapshot);
     }
     Ok(())
 }
@@ -127,8 +170,8 @@ fn slide_notes_transaction_is_available_through_the_root_facade()
 fn slide_text_transaction_is_available_through_the_root_facade()
 -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
-    let source_pointer = package.source_bytes().as_ptr();
-    let source_bytes = package.source_bytes();
+    let source_snapshot = package.exact_bytes();
+    let source_bytes = package.exact_bytes();
 
     let title = package
         .slide_text(SlideSelector::index(0), SlideTextRole::Title)?
@@ -153,7 +196,7 @@ fn slide_text_transaction_is_available_through_the_root_facade()
     let no_op = no_op.commit()?;
     assert!(no_op.patch().is_noop());
     assert!(!no_op.diagnostics().changed());
-    assert_eq!(no_op.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(no_op.package().exact_bytes(), source_snapshot);
 
     let replacement = "Litchi native Keynote fixture — root facade";
     let mut edit = package.edit_slide_text(SlideSelector::index(0), SlideTextRole::Title)?;
@@ -174,7 +217,7 @@ fn slide_text_transaction_is_available_through_the_root_facade()
 
     let inverse = changed.patch().inverse();
     let restored = changed.package().apply_slide_text(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), source_bytes);
+    assert_eq!(restored.package().exact_bytes(), source_bytes);
     assert_eq!(
         restored.package().slide_title(SlideSelector::index(0))?,
         Some(title)
@@ -190,8 +233,8 @@ fn slide_text_transaction_is_available_through_the_root_facade()
 fn slide_body_span_edit_uses_only_public_semantic_facade_types()
 -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
-    let source_pointer = package.source_bytes().as_ptr();
-    let source_bytes = package.source_bytes();
+    let source_snapshot = package.exact_bytes();
+    let source_bytes = package.exact_bytes();
     let slides = package.slides()?;
     let slide = slides
         .first()
@@ -228,8 +271,8 @@ fn slide_body_span_edit_uses_only_public_semantic_facade_types()
     assert!(changed.diagnostics().changed());
     assert_eq!(changed.diagnostics().touched_components(), 2);
     assert!(changed.diagnostics().full_reparse_performed());
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
-    assert_eq!(package.source_bytes(), source_bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
+    assert_eq!(package.exact_bytes(), source_bytes);
     assert_eq!(changed.package().slide_title(selector)?, Some(title));
     assert_eq!(
         changed.package().slide_body(selector)?,
@@ -242,7 +285,7 @@ fn slide_body_span_edit_uses_only_public_semantic_facade_types()
     let restored = changed
         .package()
         .apply_slide_text(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), source_bytes);
+    assert_eq!(restored.package().exact_bytes(), source_bytes);
     assert_eq!(restored.package().slide_body(selector)?, Some(body));
     Ok(())
 }
@@ -252,7 +295,7 @@ fn slide_body_span_edit_uses_only_public_semantic_facade_types()
 fn focused_slide_text_edit_does_not_mutate_the_read_only_iwork_snapshot()
 -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
-    let document = litchi::iwork::Document::from_bytes(package.source_bytes())?;
+    let document = litchi::iwork::Document::from_bytes(package.exact_bytes())?;
     let snapshot = document.snapshot();
     let original_slide = snapshot
         .slide(0)
@@ -278,7 +321,7 @@ fn focused_slide_text_edit_does_not_mutate_the_read_only_iwork_snapshot()
         .ok_or_else(|| io::Error::other("fresh iWork snapshot lost its slide"))?;
     assert_eq!(fresh_original_slide.title(), Some(original_title.as_str()));
 
-    let candidate = litchi::iwork::Document::from_bytes(changed.package().source_bytes())?;
+    let candidate = litchi::iwork::Document::from_bytes(changed.package().exact_bytes())?;
     let candidate_snapshot = candidate.snapshot();
     let candidate_slide = candidate_snapshot
         .slide(0)

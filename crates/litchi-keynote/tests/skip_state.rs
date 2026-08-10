@@ -17,6 +17,19 @@ const FIRST_NODE: u64 = 3;
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+trait ExactPackageBytes {
+    fn exact_bytes(&self) -> &'static [u8];
+}
+
+impl ExactPackageBytes for Package {
+    fn exact_bytes(&self) -> &'static [u8] {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts every package byte");
+        Box::leak(bytes.into_boxed_slice())
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum FirstNodeEncoding {
     Canonical,
@@ -266,12 +279,12 @@ fn semantic_state_and_exact_noop_are_selector_first() -> Result<(), Box<dyn std:
     assert!(show.slides()[1].is_skipped());
     assert_eq!(show.select_slide("Agenda")?, Some(&show.slides()[1]));
 
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let mut edit = package.edit();
     edit.include_slide(SlideSelector::name("Intro"))?;
     let commit = edit.commit()?;
-    assert_eq!(commit.package().source_bytes(), bytes);
-    assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(commit.package().exact_bytes(), bytes);
+    assert_eq!(commit.package().exact_bytes(), source_snapshot);
     assert!(commit.patch().is_noop());
     assert_eq!(
         commit.patch().source_fingerprint(),
@@ -280,7 +293,7 @@ fn semantic_state_and_exact_noop_are_selector_first() -> Result<(), Box<dyn std:
     assert!(!commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().touched_components(), 0);
     assert!(!commit.diagnostics().full_reparse_performed());
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
 
     assert!(matches!(
         package.edit().commit(),
@@ -295,7 +308,7 @@ fn semantic_state_and_exact_noop_are_selector_first() -> Result<(), Box<dyn std:
     let bounded_commit = bounded.commit()?;
     assert!(bounded_commit.package().show()?.slides()[0].is_skipped());
     assert!(bounded_commit.package().show()?.slides()[1].is_skipped());
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     Ok(())
 }
 
@@ -331,14 +344,14 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
 -> Result<(), Box<dyn std::error::Error>> {
     let bytes = synthetic_package(FirstNodeEncoding::Canonical, "Intro", "Agenda")?;
     let package = Package::from_bytes(&bytes)?;
-    let source_copy = package.source_bytes().to_vec();
+    let source_copy = package.exact_bytes().to_vec();
     let before_node = node_payload(&bytes, FIRST_NODE)?;
 
     let mut edit = package.edit();
     edit.skip_slide(0usize)?;
     let commit = edit.commit()?;
     assert!(commit.package().show()?.slides()[0].is_skipped());
-    assert_eq!(package.source_bytes(), source_copy);
+    assert_eq!(package.exact_bytes(), source_copy);
     assert!(!commit.patch().is_noop());
     assert_eq!(commit.patch().position(), Position::new(0));
     assert!(!commit.patch().before());
@@ -347,7 +360,7 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
     assert_eq!(commit.diagnostics().touched_components(), 1);
     assert!(commit.diagnostics().full_reparse_performed());
 
-    let after_node = node_payload(commit.package().source_bytes(), FIRST_NODE)?;
+    let after_node = node_payload(commit.package().exact_bytes(), FIRST_NODE)?;
     assert_eq!(
         fields_except_skip(&after_node)?,
         fields_except_skip(&before_node)?
@@ -367,7 +380,7 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
     assert_eq!(unknown_after, unknown_before);
 
     let decompressed_before = decompressed_document(&bytes)?;
-    let decompressed_after = decompressed_document(commit.package().source_bytes())?;
+    let decompressed_after = decompressed_document(commit.package().exact_bytes())?;
     assert_eq!(decompressed_after.len(), decompressed_before.len());
     let changed_iwa_bytes = decompressed_before
         .iter()
@@ -378,7 +391,7 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
     assert_eq!(changed_iwa_bytes, [(0, 1)]);
 
     let before_catalog = Catalog::from_bytes(&bytes)?;
-    let after_catalog = Catalog::from_bytes(commit.package().source_bytes())?;
+    let after_catalog = Catalog::from_bytes(commit.package().exact_bytes())?;
     let mut changed = 0;
     for (before, after) in before_catalog.iter().zip(after_catalog.iter()) {
         assert_eq!(before.name(), after.name());
@@ -402,8 +415,8 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
 
     let applied = package.apply(commit.patch())?;
     assert_eq!(
-        applied.package().source_bytes(),
-        commit.package().source_bytes()
+        applied.package().exact_bytes(),
+        commit.package().exact_bytes()
     );
     let inverse = commit.patch().inverse();
     assert!(inverse.before());
@@ -414,12 +427,12 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
     );
     assert_eq!(inverse.inverse(), commit.patch().clone());
     let reverted = commit.package().apply(&inverse)?;
-    assert_eq!(reverted.package().source_bytes(), bytes);
+    assert_eq!(reverted.package().exact_bytes(), bytes);
     assert!(!reverted.package().show()?.slides()[0].is_skipped());
     let forwarded_again = reverted.package().apply(commit.patch())?;
     assert_eq!(
-        forwarded_again.package().source_bytes(),
-        commit.package().source_bytes()
+        forwarded_again.package().exact_bytes(),
+        commit.package().exact_bytes()
     );
     assert_eq!(forwarded_again.patch(), commit.patch());
 
@@ -447,7 +460,7 @@ fn include_commit_changes_true_to_false_and_is_deterministic()
     edit.include_slide(1usize)?;
     let commit = edit.commit()?;
     assert!(!commit.package().show()?.slides()[1].is_skipped());
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     assert!(!commit.patch().is_noop());
     assert_eq!(commit.patch().position(), Position::new(1));
     assert!(commit.patch().before());
@@ -460,8 +473,8 @@ fn include_commit_changes_true_to_false_and_is_deterministic()
     repeated_edit.include_slide(1usize)?;
     let repeated = repeated_edit.commit()?;
     assert_eq!(
-        repeated.package().source_bytes(),
-        commit.package().source_bytes()
+        repeated.package().exact_bytes(),
+        commit.package().exact_bytes()
     );
     assert_eq!(repeated.patch(), commit.patch());
     assert_eq!(repeated.diagnostics(), commit.diagnostics());

@@ -8,7 +8,6 @@
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs::OpenOptions;
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use litchi_keynote::{Package, SlideSelector, TextSpan};
@@ -72,13 +71,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
     }
     let commit = edit.commit()?;
-    write_new(&output, commit.package().source_bytes())?;
+    write_new(&output, commit.package())?;
 
     if let Some(inverse_path) = inverse_output {
         let restored = commit
             .package()
             .apply_slide_notes(&commit.patch().inverse())?;
-        write_new(&inverse_path, restored.package().source_bytes())?;
+        write_new(&inverse_path, restored.package())?;
     }
 
     println!(
@@ -134,9 +133,9 @@ fn text_argument(
     })
 }
 
-fn write_new(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
+fn write_new(path: &Path, package: &Package) -> Result<(), Box<dyn Error>> {
     let mut destination = OpenOptions::new().write(true).create_new(true).open(path)?;
-    destination.write_all(bytes)?;
+    package.write_to(&mut destination)?;
     destination.sync_all()?;
     Ok(())
 }
