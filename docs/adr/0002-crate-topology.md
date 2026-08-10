@@ -1284,3 +1284,98 @@ still owns unmigrated editing and compatibility behavior, the wider Numbers
 payload graph still contains bounded eager Prost paths, and root preparation
 can transiently materialize unrelated ZIP members. Those ownership, Buffa,
 and aggregate peak-memory boundaries remain open.
+
+## 2026-08-09 amendment: focused Keynote title/body ownership
+
+`litchi-keynote::Package` now owns selector-first reads and exact-source text
+transactions for an existing slide's existing semantic title and body
+placeholders. The role-aware surface consists of `slide_text`,
+`edit_slide_text`, and `apply_slide_text`, with `slide_title`, `slide_body`,
+`edit_slide_title`, and `edit_slide_body` conveniences. Its format-owned
+`SlideTextRole`, edit, commit, patch, diagnostics, error, and limit types use
+the shared archive-free `TextPosition` and `TextSpan`. Callers select a slide
+by exact navigator name or checked semantic position; placeholder, storage,
+component, and protobuf identities remain private.
+
+The slide-text Buffa seam has two format-ownership projections. The existing
+speaker-notes codec now also projects `KN.SlideArchive` fields 5 and 6, the
+optional title- and body-placeholder references; its required style,
+transition, and in-document fields and its name and note fields remain part of
+the same bounded slide-owner snapshot. The new placeholder codec projects the
+selected `KN.PlaceholderArchive` kind and the singular required inheritance
+chain `PlaceholderArchive -> TSWP.ShapeInfoArchive -> TSD.ShapeArchive ->
+TSD.DrawableArchive`, ending at `ShapeInfoArchive.owned_storage` field 4.
+The selected read forces the slide-owner view. Package-wide ownership proof
+first raw-scans fields 5 and 6 of every slide candidate and forces that Buffa
+view only for a candidate that references the selected placeholder. It
+similarly raw-scans every placeholder candidate and forces the placeholder
+view only when its modern or deprecated storage edge can reference the
+selected storage. The same bounded raw scanner audits
+`ShapeInfoArchive.deprecated_storage` field 2, `ShapeInfoArchive.text_flow`
+field 3, standalone shape-info references, embedded `TSP.Reference` metadata,
+and `NoteArchive.containedStorage` field 1. Alias discovery does not force the
+Buffa `NoteArchive` view. The existing
+`litchi-iwa-text-wire` storage codec and raw text rewrite remain the text-value
+seam; this amendment does not make the whole operation a two-message Buffa
+decode.
+
+Schema-directed raw preflight precedes each Buffa access, and the lazy fields
+used for authorization are forced. The two owner projections have no
+production encoding path or unknown-field retention. Accepted raw records,
+exact IWA object headers, and the caller-owned package source remain the
+preservation authority, subject to an explicit rendered-cache exception. A
+changed edit commit proves role-correct exclusive ownership, performs one
+checked UTF-16 set, clear, insert, delete, or replacement, and rewrites the
+selected storage plus the selected `KN.SlideNodeArchive` preview state. Those
+objects occupy one or two distinct IWA components, which are the value reported
+by `SlideTextDiagnostics::touched_components`. The slide-node rewrite removes
+its thumbnail references and rendered thumbnail fields, marks thumbnails
+dirty, prunes the referenced preview object IDs and preview-owned aggregate or
+field data-reference occurrences, retains proven unrelated data references,
+and rejects ambiguous aggregate-only ownership. A selected
+slide that already carries the separate cached title/body strings in
+`KN.SlideArchive` fields 37 or 38 is rejected until that cache has a proven
+rewrite rule.
+
+The physical `litchi-iwa-archive` owner now supplies bounded, exact-name,
+deletion-aware flat-package reassembly. The Keynote transaction uses it to
+delete any root `preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg`
+members while retaining the raw physical records of every other unedited ZIP
+member. Storage, slide-node, and preview mutations publish atomically as one
+candidate. These deletions are not IWA components and are therefore not added to
+`touched_components`. Keynote and package preview consumers can otherwise keep
+rendering pixels produced before the semantic text edit.
+
+The changed candidate fully reopens under the retained limits and verifies the
+selected semantic text, invalidated slide node, absent root previews, remaining
+object graph, and unselected semantic slide state before publication. Applying
+a changed patch does not reassemble the package; it reopens and verifies the
+exact target bytes already stored in the patch and reports the originating
+edit's one- or two-component count. An exact edit no-op relies on the immutable
+selected snapshot established when editing began, while an exact patch no-op
+checks artifact identity. Both leave all caches and previews byte-identical and
+return a snapshot that shares its source allocation without whole-source
+validation or a candidate reparse. Applying a changed
+inverse patch likewise reopens and verifies the exact original artifact,
+including its former preview members and cache state.
+
+The migration host no longer provides its nine raw-index
+`set`/`replace`/`clear_slide_{title,body,notes}` methods or their private
+storage-resolution helpers. This is a breaking replacement, not a
+compatibility shim: title and body callers must use a semantic selector and
+role, checked UTF-16 spans, and the immutable commit/package flow, while notes
+callers use the previously accepted `SlideNotesEdit` transaction. The focused
+owner also rejects ambiguous or shared graphs that the old raw-index editor
+could reach. Changed-output compatibility is semantic rather than byte-local to
+the storage: callers and differential tests must allow the declared selected
+slide-node invalidation and root-preview deletion, while exact no-ops remain
+byte-identical. The host's slide-creation, placeholder visibility/layout,
+arbitrary text-box, generic text-storage, and other unmigrated editor surfaces
+remain separate compatibility work.
+
+This vertical does not create or delete title/body placeholder graphs and does
+not cover arbitrary text boxes. It also makes no claim of durable patch
+serialization, atomic filesystem publication, whole-Keynote Buffa conversion,
+or deletion of the migration host. No manifest edge is removed: the checked
+metadata/policy inventory is 64 workspace packages, 235 internal dependency
+declarations, and 14 ordered migration debts.

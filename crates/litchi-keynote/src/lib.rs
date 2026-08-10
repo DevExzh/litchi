@@ -133,6 +133,46 @@
 //! assert_eq!(restored.package().slide_notes("Appendix")?, Some(before));
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! # Edit slide title or body text
+//!
+//! Title and body placeholders are distinct semantic roles. Only an existing,
+//! exclusively owned placeholder storage is edited; this API never exposes or
+//! synthesizes native object identifiers. An absent role placeholder is `None`,
+//! while `Some("")` denotes an existing placeholder with empty storage.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{Package, TextSpan};
+//!
+//! let package = Package::open("input.key")?;
+//! let title_before = package
+//!     .slide_title("Appendix")?
+//!     .ok_or_else(|| io::Error::other("slide has no existing title storage"))?;
+//! let body_before = package
+//!     .slide_body("Appendix")?
+//!     .ok_or_else(|| io::Error::other("slide has no existing body storage"))?;
+//!
+//! let mut title = package.edit_slide_title("Appendix")?;
+//! title.replace(TextSpan::from_utf16_indexes(0, 0)?, "Draft: ")?;
+//! let title_commit = title.commit()?;
+//! let mut body = title_commit.package().edit_slide_body("Appendix")?;
+//! body.set("Draft body")?;
+//! let body_commit = body.commit()?;
+//! assert!(body_commit.package().slide_title("Appendix")?.unwrap().starts_with("Draft: "));
+//! assert_eq!(body_commit.package().slide_body("Appendix")?, Some("Draft body".to_owned()));
+//!
+//! let title_restored = body_commit
+//!     .package()
+//!     .apply_slide_text(&body_commit.patch().inverse())?;
+//! let restored = title_restored
+//!     .package()
+//!     .apply_slide_text(&title_commit.patch().inverse())?;
+//! assert_eq!(restored.package().slide_title("Appendix")?, Some(title_before));
+//! assert_eq!(restored.package().slide_body("Appendix")?, Some(body_before));
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 #![forbid(unsafe_code)]
 
@@ -168,8 +208,10 @@ pub use package::{
     ShowSettingsLimitKind, ShowSettingsPatch, SlideNotesCommit, SlideNotesDiagnostics,
     SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
     SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
-    SlideTransitionCommit, SlideTransitionDiagnostics, SlideTransitionEdit, SlideTransitionError,
-    SlideTransitionLimitKind, SlideTransitionPatch, Stats, TextStorageFailure,
+    SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
+    SlideTextPatch, SlideTextRole, SlideTransitionCommit, SlideTransitionDiagnostics,
+    SlideTransitionEdit, SlideTransitionError, SlideTransitionLimitKind, SlideTransitionPatch,
+    Stats, TextStorageFailure,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use show::{Mode, Settings, Show, Size};

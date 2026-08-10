@@ -9,6 +9,8 @@ mod limits;
 mod show_settings;
 mod slide_notes;
 mod slide_order;
+mod slide_preview;
+mod slide_text;
 mod slide_transition;
 
 use std::fmt;
@@ -59,6 +61,10 @@ pub use slide_notes::{
 pub use slide_order::{
     SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,
     SlideOrderPatch,
+};
+pub use slide_text::{
+    SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
+    SlideTextPatch, SlideTextRole,
 };
 pub use slide_transition::{
     SlideTransitionCommit, SlideTransitionDiagnostics, SlideTransitionEdit, SlideTransitionError,
@@ -928,6 +934,10 @@ impl Package {
             .body_placeholder
             .as_ref()
             .map(|reference| reference.identifier);
+        let slide_number = slide
+            .slide_number_placeholder
+            .as_ref()
+            .map(|reference| reference.identifier);
         if let Some(identifier) = title
             && let Some(storage) =
                 self.drawable_storage(identifier, true, budget, SemanticPath::SlideTitle { index })?
@@ -943,7 +953,10 @@ impl Package {
             builder.push_text_storage(storage);
         }
         for (drawable_index, drawable) in slide.owned_drawables.iter().enumerate() {
-            if Some(drawable.identifier) == title || Some(drawable.identifier) == body {
+            if Some(drawable.identifier) == title
+                || Some(drawable.identifier) == body
+                || Some(drawable.identifier) == slide_number
+            {
                 continue;
             }
             if let Some(storage) = self.drawable_storage(

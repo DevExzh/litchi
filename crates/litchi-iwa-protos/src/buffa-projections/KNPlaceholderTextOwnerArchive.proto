@@ -1,0 +1,36 @@
+// Wire-only Buffa projection derived from these canonical declarations:
+//
+// - `../protos/TSPMessages.proto`: `TSP.Reference`;
+// - `../protos/TSDArchives.proto`: `TSD.DrawableArchive` and
+//   `TSD.ShapeArchive`;
+// - `../protos/TSWPArchives.proto`: `TSWP.ShapeInfoArchive`;
+// - `../protos/KNArchives.proto`: `KN.PlaceholderArchive`.
+//
+// Only the required inheritance chain, optional owned-storage edge, and
+// optional placeholder kind are visible. Caller-owned IWA bytes remain the
+// sole preservation representation.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message DrawableArchive {}
+
+message ShapeArchive {
+  required .LitchiIwaProjection.DrawableArchive super = 1;
+}
+
+message ShapeInfoArchive {
+  required .LitchiIwaProjection.ShapeArchive super = 1;
+  optional .LitchiIwaProjection.Reference owned_storage = 4;
+}
+
+message PlaceholderArchive {
+  required .LitchiIwaProjection.ShapeInfoArchive super = 1;
+  optional int32 kind = 2 [default = 0];
+}

@@ -183,11 +183,50 @@ mod buffa_keynote_document_generated {
     ));
 }
 
-/// Private strict Buffa lazy-view projection for Keynote speaker-note owners.
+/// Private strict Buffa lazy-view projection for Keynote placeholder text.
+///
+/// Generated code sees only the singular inheritance chain, optional kind,
+/// and optional owned-storage edge. Caller-owned bytes remain authoritative.
+#[doc(hidden)]
+mod buffa_keynote_placeholder_text_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-placeholder-text/iwa_keynote_placeholder_text_buffa_protos.rs"
+    ));
+}
+
+/// Private strict Buffa lazy-view projection for focused Keynote slide owners.
 ///
 /// Generated code sees only exact references, selector-facing slide scalars,
-/// and required slide/note envelopes. Unknown source bytes remain solely in
-/// the caller-owned IWA payload and are never retained by the projection.
+/// semantic note/title/body edges, and required slide/note envelopes. Unknown
+/// bytes remain solely in caller-owned IWA and are never retained here.
 #[doc(hidden)]
 mod buffa_keynote_speaker_notes_generated {
     #![allow(
@@ -446,6 +485,11 @@ pub mod group_node_category_codec;
 /// Buffa sidecar. Generated types remain inaccessible to downstream crates.
 #[doc(hidden)]
 pub mod keynote_document_codec;
+
+/// Internal strict Keynote placeholder text-owner projection. Generated types
+/// remain inaccessible and source bytes stay authoritative.
+#[doc(hidden)]
+pub mod keynote_placeholder_text_codec;
 
 /// Internal strict Keynote speaker-note owner projection. Generated types
 /// remain inaccessible to downstream crates and source bytes stay authoritative.

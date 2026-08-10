@@ -683,3 +683,71 @@ The host is still required for the remaining compatibility and edit surfaces.
 Focused eager Prost payload paths, full Buffa migration, root preparation's
 unrelated-sidecar peak memory, durable publication, and the final host removal
 remain outside this cutover.
+
+## 2026-08-09 current-status amendment: Keynote title/body text owner
+
+The concrete Keynote package now owns reads and checked UTF-16 transactions for
+text in an existing slide's existing title or body placeholder. Its public API
+is role-aware and selector-first, distinguishes absent placeholders from empty
+storages, and exposes no native identifier, component name, generated message,
+or raw record. A changed edit commit proves exclusive role-correct ownership,
+rewrites the selected text storage and invalidates the selected slide node's
+rendered-thumbnail state, including its preview object references and
+preview-owned selected-message aggregate/field data-reference occurrences.
+Proven unrelated data references remain exact; ambiguous aggregate-only
+ownership fails closed. These occupy one or two
+distinct IWA components; diagnostics report that unique component count. The
+commit also deletes any
+root `preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg` through the
+archive owner's bounded deletion-aware reassembly path. Preview entry deletions
+are not counted as touched IWA components. All mutations publish atomically in
+one candidate. Retained ZIP entries and all IWA
+objects other than the selected storage and slide node remain the preservation
+set.
+
+The candidate fully reopens under the retained limits and checks selected
+text, slide-node invalidation, root-preview absence, physical object
+preservation, and unselected slide semantics. Applying a changed patch reopens
+and verifies its stored target bytes but does not reassemble them. An exact
+no-op relies on the immutable selected snapshot established when the edit
+started, leaves previews and caches untouched, reports zero components, skips
+whole-source validation and candidate reparse, and shares the source allocation.
+A changed inverse patch is exact-source checked and restores the
+complete original artifact, including preview/cache state, after reopen and
+verification. Slides with native field-37/38 cached title/body strings remain
+fail-closed because this vertical does not yet own their rewrite.
+
+The exact format-ownership seam reuses the private speaker-notes Buffa view for
+`KN.SlideArchive` title/body fields 5 and 6 and adds a private placeholder view
+for the required placeholder/shape inheritance chain, optional owned-storage
+field 4, and placeholder kind. The selected read forces the slide view, while
+package-wide proof raw-scans every slide and note candidate. A slide candidate
+is forced through the slide view only when its raw edge matches the selected
+placeholder. Placeholder candidates are likewise raw-scanned before the
+relevant owner is forced through the placeholder view.
+The scanner also polices deprecated storage, text-flow, standalone shape-info,
+and embedded reference aliases. It does not force the Buffa `NoteArchive`
+view. Text decoding and splicing continue through `litchi-iwa-text-wire`. Raw
+source remains the unknown-content and rewrite authority.
+
+The migration host's nine title/body/notes set, replace, and clear methods are
+removed. This is intentionally breaking: callers replace raw indices and
+mutable editor calls with `SlideSelector`, checked UTF-16 spans, and focused
+`SlideTextEdit` or `SlideNotesEdit` commits. It is not a source- or
+behavior-compatible alias for malformed, ambiguous, or shared graphs that the
+focused owners reject.
+
+The cache-hardened sequential output has SHA-256
+`f3b13cd5bd614d93493cc6780ff177e6a203d990d15b9d5c592687ef40a48263`.
+Apple Keynote opened it without repair, displayed both requested Unicode values
+and the untouched date, regenerated all three root previews on native Save As,
+and completed close/reopen without warning. The native copy has SHA-256
+`cb3f9b05613505bb422942ca43e237a731454f58753ee65f26ae639187b96a6c`;
+focused reread matched, and both same-value edits were exact zero-component
+no-ops. ADR 0008 records the complete gate and inverse hashes.
+
+No title/body placeholder creation or deletion, arbitrary text-box editing,
+durable patch serialization, atomic filesystem publication, whole-Keynote
+Buffa conversion, or host deletion follows from this transfer. The current
+metadata/policy inventory is 64 workspace packages, 235 internal declarations,
+and 14 ordered migration debts.

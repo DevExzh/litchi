@@ -486,7 +486,16 @@ class BoundaryPolicyTests(unittest.TestCase):
             path = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
             path.parent.mkdir(parents=True)
             path.write_text(
-                "pub mod iwa;\npub use litchi_iwa::Document;\n",
+                "\n".join(
+                    [
+                        "pub mod iwa;",
+                        "pub(crate) mod iwa;",
+                        "pub use litchi_iwa::Document;",
+                        "pub use crate::iwa::Document as LegacyDocument;",
+                        "pub(super) use litchi_iwa::{Document, Error};",
+                    ]
+                )
+                + "\n",
                 encoding="utf-8",
             )
 
@@ -495,10 +504,55 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [
                     "retired litchi facade public iwa module: "
                     "crates/litchi/src/lib.rs:1",
-                    "retired litchi facade public iwa re-export: "
+                    "retired litchi facade public iwa module: "
                     "crates/litchi/src/lib.rs:2",
+                    "retired litchi facade public iwa re-export: "
+                    "crates/litchi/src/lib.rs:3",
+                    "retired litchi facade public iwa re-export: "
+                    "crates/litchi/src/lib.rs:4",
+                    "retired litchi facade public iwa re-export: "
+                    "crates/litchi/src/lib.rs:5",
                 ],
             )
+
+    def test_litchi_facade_iwa_source_policy_ignores_private_and_unrelated_code(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "\n".join(
+                    [
+                        "// pub mod iwa;",
+                        'const NOTE: &str = "pub use litchi_iwa::Document";',
+                        "/*",
+                        "pub mod iwa;",
+                        "/* pub use crate::iwa::Document; */",
+                        "pub use litchi_iwa::Document;",
+                        "*/",
+                        'const RAW_NOTE: &str = r#"',
+                        "pub mod iwa;",
+                        "pub use litchi_iwa::Document;",
+                        '"#;',
+                        "mod iwa;",
+                        "use litchi_iwa::Document;",
+                        "pub mod iwatch;",
+                        "pub use crate::iwork::Document;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            focused = root / "crates/litchi-keynote/src/lib.rs"
+            focused.parent.mkdir(parents=True)
+            focused.write_text(
+                "pub mod iwa;\npub use litchi_iwa::Document;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_litchi_facade_source_topology(root), [])
 
     def test_litchi_facade_requires_an_empty_default_feature(self) -> None:
         snapshot = valid_snapshot(self.policy)
@@ -636,6 +690,108 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "crates/litchi-xlsx/src/views",
                 ],
             )
+
+    def test_retired_iwa_keynote_method_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_METHODS,
+            (
+                "set_slide_title",
+                "replace_slide_title",
+                "clear_slide_title",
+                "set_slide_body",
+                "replace_slide_body",
+                "clear_slide_body",
+                "set_slide_notes",
+                "replace_slide_notes",
+                "clear_slide_notes",
+                "slide_storage",
+                "slide_notes_storage",
+            ),
+        )
+
+    def test_retired_iwa_keynote_methods_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/editor.rs"
+            path.parent.mkdir(parents=True)
+            declarations = [
+                ("set_slide_title", "fn r#set_slide_title() {}"),
+                ("replace_slide_title", "pub fn replace_slide_title() {}"),
+                ("clear_slide_title", "pub(crate) const fn clear_slide_title() {}"),
+                ("set_slide_body", "pub(super) async fn set_slide_body() {}"),
+                ("replace_slide_body", "pub(in crate) unsafe fn replace_slide_body() {}"),
+                ("clear_slide_body", 'pub extern "C" fn clear_slide_body() {}'),
+                ("set_slide_notes", "const fn set_slide_notes() {}"),
+                ("replace_slide_notes", "async fn replace_slide_notes() {}"),
+                ("clear_slide_notes", "unsafe fn clear_slide_notes() {}"),
+                ("slide_storage", 'extern "Rust" fn slide_storage() {}'),
+                (
+                    "slide_notes_storage",
+                    "pub async unsafe fn slide_notes_storage() {}",
+                ),
+            ]
+            path.write_text(
+                "\n".join(declaration for _, declaration in declarations) + "\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_keynote_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                sorted(
+                    "retired litchi-iwa Keynote method "
+                    f"{name}: crates/litchi-iwa/src/keynote/legacy/editor.rs:{index}"
+                    for index, (name, _) in enumerate(declarations, start=1)
+                ),
+            )
+
+    def test_iwa_keynote_method_policy_matches_only_exact_host_declarations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "\n".join(
+                    [
+                        "// pub fn set_slide_title() {}",
+                        'const ADR_NOTE: &str = "fn clear_slide_notes";',
+                        "/* pub fn set_slide_body() {}",
+                        "   /* fn replace_slide_notes() {} */",
+                        "   fn slide_notes_storage() {} */",
+                        'const RAW_NOTE: &str = r###"fn clear_slide_title() {}"###;',
+                        'const BYTE_RAW_NOTE: &[u8] = br##"fn clear_slide_body() {}"##;',
+                        'const C_RAW_NOTE: &CStr = cr#"fn set_slide_notes() {}"#;',
+                        'const ESCAPED_NOTE: &str = "\\" fn slide_storage() {}";',
+                        "pub fn set_slide_title_text() {}",
+                        "pub fn replace_slide_body_text() {}",
+                        "pub fn slide_storage_snapshot() {}",
+                        "pub fn legacy_set_slide_notes() {}",
+                        "pub fn clear_slide_notes_legacy() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            non_rust = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "retired.txt"
+            non_rust.write_text("pub fn set_slide_title() {}\n", encoding="utf-8")
+            outside_host_scope = root / "crates/litchi-iwa/src/pages/editor.rs"
+            outside_host_scope.parent.mkdir(parents=True)
+            outside_host_scope.write_text(
+                "pub fn set_slide_title() {}\n",
+                encoding="utf-8",
+            )
+            focused = root / "crates/litchi-keynote/src/package/slide_text.rs"
+            focused.parent.mkdir(parents=True)
+            focused.write_text(
+                "pub fn set_slide_title() {}\npub fn clear_slide_notes() {}\n",
+                encoding="utf-8",
+            )
+            adr = root / "docs/adr/0028-keynote-slide-text.md"
+            adr.parent.mkdir(parents=True)
+            adr.write_text("Retire `set_slide_title`.\n", encoding="utf-8")
+
+            self.assertEqual(boundaries.audit_iwa_keynote_source_topology(root), [])
 
     def test_legacy_xlsb_sheet_view_names_and_methods_are_forbidden(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
