@@ -6,7 +6,8 @@ use std::path::PathBuf;
 use litchi::keynote::show::{
     Commit, Diagnostics, Edit, Error, LimitKind, Mode, Patch, Settings, Size,
 };
-use litchi::keynote::{Package, Position, SlideNotesError, SlideSelector, SlideTextRole, TextSpan};
+use litchi::keynote::slide::placeholder::Kind;
+use litchi::keynote::{Package, Position, SlideNotesError, SlideSelector, TextSpan};
 
 trait ExactPackageBytes {
     fn exact_bytes(&self) -> &'static [u8];
@@ -184,6 +185,108 @@ fn slide_transition_transaction_is_available_through_the_root_facade()
 }
 
 #[test]
+fn slide_placeholder_visibility_transaction_reaches_the_root_facade()
+-> Result<(), Box<dyn std::error::Error>> {
+    use litchi::keynote::slide::placeholder::{
+        Commit, Diagnostics, Edit, Error, Kind, LimitKind, Patch, State,
+    };
+
+    assert_send_sync::<Kind>();
+    assert_send_sync::<State>();
+    assert_send_sync::<Edit<'static>>();
+    assert_send_sync::<Patch>();
+    assert_send_sync::<Commit>();
+    assert_send_sync::<Diagnostics>();
+    assert_send_sync::<Error>();
+    assert_send_sync::<LimitKind>();
+
+    let package = Package::open(fixture_path())?;
+    let source = package.exact_bytes();
+    let selector = SlideSelector::index(0);
+    let kind = Kind::Title;
+    let before = package
+        .slide_placeholder_visibility(selector, kind)?
+        .ok_or_else(|| io::Error::other("native Keynote file has no title placeholder"))?;
+    assert_eq!(before, State::Visible);
+
+    let edit = package.edit_slide_placeholder_visibility(selector, kind)?;
+    assert_eq!(edit.position(), Position::new(0));
+    assert_eq!(edit.kind(), kind);
+    assert_eq!(edit.state(), before);
+    let edit_debug = format!("{edit:?}");
+    assert!(!edit_debug.contains("identifier"));
+    assert!(!edit_debug.contains(".iwa"));
+
+    let noop = edit.set(before).commit()?;
+    assert_eq!(noop.patch().position(), Position::new(0));
+    assert_eq!(noop.patch().kind(), kind);
+    assert_eq!(noop.patch().before(), before);
+    assert_eq!(noop.patch().after(), before);
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.diagnostics().touched_components(), 0);
+    assert_eq!(noop.diagnostics().deleted_previews(), 0);
+    assert!(!noop.diagnostics().full_reparse_performed());
+    assert_eq!(noop.package().exact_bytes(), source);
+
+    let noop_applied = package.apply_slide_placeholder_visibility(noop.patch())?;
+    assert!(!noop_applied.diagnostics().changed());
+    assert_eq!(noop_applied.package().exact_bytes(), source);
+
+    let changed = package
+        .edit_slide_placeholder_visibility(selector, kind)?
+        .hide()
+        .commit()?;
+    assert_eq!(changed.patch().position(), Position::new(0));
+    assert_eq!(changed.patch().kind(), kind);
+    assert_eq!(changed.patch().before(), State::Visible);
+    assert_eq!(changed.patch().after(), State::Hidden);
+    assert!(!changed.patch().is_noop());
+    assert!(changed.diagnostics().changed());
+    assert!(changed.diagnostics().touched_components() >= 1);
+    assert!(changed.diagnostics().deleted_previews() >= 1);
+    assert!(changed.diagnostics().full_reparse_performed());
+    assert_eq!(
+        changed
+            .package()
+            .slide_placeholder_visibility(selector, kind)?,
+        Some(State::Hidden)
+    );
+    assert_eq!(package.exact_bytes(), source);
+    assert_ne!(changed.package().exact_bytes(), source);
+    let patch_debug = format!("{:?}", changed.patch());
+    assert!(!patch_debug.contains("identifier"));
+    assert!(!patch_debug.contains(".iwa"));
+
+    let applied = package.apply_slide_placeholder_visibility(changed.patch())?;
+    assert!(applied.diagnostics().changed());
+    assert_eq!(
+        applied
+            .package()
+            .slide_placeholder_visibility(selector, kind)?,
+        Some(State::Hidden)
+    );
+    assert_eq!(
+        applied.package().exact_bytes(),
+        changed.package().exact_bytes()
+    );
+
+    let inverse = changed.patch().inverse();
+    let restored = changed
+        .package()
+        .apply_slide_placeholder_visibility(&inverse)?;
+    assert!(restored.diagnostics().changed());
+    assert_eq!(
+        restored
+            .package()
+            .slide_placeholder_visibility(selector, kind)?,
+        Some(State::Visible)
+    );
+    assert_eq!(restored.package().exact_bytes(), source);
+    Ok(())
+}
+
+#[test]
 fn slide_notes_transaction_is_available_through_the_root_facade()
 -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
@@ -220,10 +323,10 @@ fn slide_text_transaction_is_available_through_the_root_facade()
     let source_bytes = package.exact_bytes();
 
     let title = package
-        .slide_text(SlideSelector::index(0), SlideTextRole::Title)?
+        .slide_text(SlideSelector::index(0), Kind::Title)?
         .ok_or_else(|| io::Error::other("native Keynote file has no title placeholder"))?;
     let body = package
-        .slide_text(SlideSelector::index(0), SlideTextRole::Body)?
+        .slide_text(SlideSelector::index(0), Kind::Body)?
         .ok_or_else(|| io::Error::other("native Keynote file has no body placeholder"))?;
     assert_eq!(title, "Litchi native Keynote fixture");
     assert_eq!(body, "Buffa lazy-view migration verification");
@@ -245,10 +348,10 @@ fn slide_text_transaction_is_available_through_the_root_facade()
     assert_eq!(no_op.package().exact_bytes(), source_snapshot);
 
     let replacement = "Litchi native Keynote fixture — root facade";
-    let mut edit = package.edit_slide_text(SlideSelector::index(0), SlideTextRole::Title)?;
+    let mut edit = package.edit_slide_text(SlideSelector::index(0), Kind::Title)?;
     edit.set(replacement)?;
     let changed = edit.commit()?;
-    assert_eq!(changed.patch().role(), SlideTextRole::Title);
+    assert_eq!(changed.patch().role(), Kind::Title);
     assert_eq!(changed.patch().before(), title);
     assert_eq!(changed.patch().after(), replacement);
     assert!(changed.diagnostics().changed());
@@ -296,7 +399,7 @@ fn slide_body_span_edit_uses_only_public_semantic_facade_types()
     let span = TextSpan::from_utf16_indexes(6, 15)?;
     let mut edit = package.edit_slide_body(selector)?;
     assert_eq!(edit.position(), Position::new(slide.index()));
-    assert_eq!(edit.role(), SlideTextRole::Body);
+    assert_eq!(edit.role(), Kind::Body);
     assert_eq!(edit.text(), body);
     assert_eq!(edit.span(), None);
     edit.replace(span, "selector-first")?;
@@ -307,7 +410,7 @@ fn slide_body_span_edit_uses_only_public_semantic_facade_types()
 
     let changed = edit.commit()?;
     assert_eq!(changed.patch().position(), Position::new(slide.index()));
-    assert_eq!(changed.patch().role(), SlideTextRole::Body);
+    assert_eq!(changed.patch().role(), Kind::Body);
     assert_eq!(changed.patch().span(), span);
     assert_eq!(changed.patch().before(), body);
     assert_eq!(

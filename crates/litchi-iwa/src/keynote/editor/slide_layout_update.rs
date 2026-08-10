@@ -1,6 +1,7 @@
 //! Transactional reassignment of a live slide to a theme layout.
 
 use super::*;
+use litchi_keynote::slide::placeholder::Kind as PlaceholderKind;
 use slide_create::layout::{read_layout_graph, resolve_layout};
 
 mod wire;
@@ -75,13 +76,13 @@ impl KeynoteEditor {
             slide_index,
             &current_slide,
             &target.slide,
-            KeynoteSlideTextPlaceholder::Title,
+            PlaceholderKind::Title,
         )?;
         let body = placeholder_plan(
             slide_index,
             &current_slide,
             &target.slide,
-            KeynoteSlideTextPlaceholder::Body,
+            PlaceholderKind::Body,
         )?;
         let preserved_text_boxes = self
             .slide_text_storages(slide_index)?
@@ -179,21 +180,26 @@ fn placeholder_plan(
     slide_index: usize,
     current: &kn::SlideArchive,
     target: &kn::SlideArchive,
-    placeholder: KeynoteSlideTextPlaceholder,
+    placeholder: PlaceholderKind,
 ) -> Result<Option<PlaceholderPlan>> {
     let (current_reference, target_reference, reference_field, label) = match placeholder {
-        KeynoteSlideTextPlaceholder::Title => (
+        PlaceholderKind::Title => (
             current.title_placeholder.as_ref(),
             target.title_placeholder.as_ref(),
             SLIDE_TITLE_PLACEHOLDER_FIELD,
             "title",
         ),
-        KeynoteSlideTextPlaceholder::Body => (
+        PlaceholderKind::Body => (
             current.body_placeholder.as_ref(),
             target.body_placeholder.as_ref(),
             SLIDE_BODY_PLACEHOLDER_FIELD,
             "body",
         ),
+        _ => {
+            return Err(Error::InvalidFormat(
+                "unsupported Keynote slide placeholder kind".to_owned(),
+            ));
+        },
     };
     let Some(current_reference) = current_reference else {
         if target_reference.is_none() {

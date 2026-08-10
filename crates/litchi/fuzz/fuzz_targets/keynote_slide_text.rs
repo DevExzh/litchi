@@ -6,9 +6,12 @@ use std::hint::black_box;
 use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
+use litchi::keynote::slide::placeholder::{
+    Commit as VisibilityCommit, Error as VisibilityError, Kind, State,
+};
 use litchi::keynote::{
     Limits, Package, ReadOptions, SemanticLimits, SlideSelector, SlideTextCommit, SlideTextError,
-    SlideTextRole, TextPosition, TextSpan,
+    TextPosition, TextSpan,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;
@@ -83,11 +86,11 @@ fn exercise_package(package: &Package, data: &[u8]) {
     let arbitrary_position = usize::from(read_u16(data, 2));
     let arbitrary_name = replacement(data);
 
-    for role in [SlideTextRole::Title, SlideTextRole::Body] {
+    for role in [Kind::Title, Kind::Body] {
         let direct = package.slide_text(SlideSelector::index(0), role);
         let convenience = match role {
-            SlideTextRole::Title => package.slide_title(SlideSelector::index(0)),
-            SlideTextRole::Body => package.slide_body(SlideSelector::index(0)),
+            Kind::Title => package.slide_title(SlideSelector::index(0)),
+            Kind::Body => package.slide_body(SlideSelector::index(0)),
             _ => continue,
         };
         assert_eq!(direct, convenience);
@@ -95,18 +98,50 @@ fn exercise_package(package: &Package, data: &[u8]) {
         observe_result(package.slide_text(SlideSelector::index(arbitrary_position), role));
         observe_result(package.slide_text(SlideSelector::name(arbitrary_name.as_ref()), role));
         exercise_content_free_selector_error(package, role);
+        exercise_visibility_reads(package, role, arbitrary_position, arbitrary_name.as_ref());
     }
 
     let role = if control(data, 1) & 1 == 0 {
-        SlideTextRole::Title
+        Kind::Title
     } else {
-        SlideTextRole::Body
+        Kind::Body
     };
     exercise_operation(package, role, data);
     exercise_staging_error(package, role, data);
+    exercise_placeholder_visibility(package, role, data);
 }
 
-fn exercise_operation(package: &Package, role: SlideTextRole, data: &[u8]) {
+fn exercise_visibility_reads(package: &Package, kind: Kind, position: usize, name: &str) {
+    observe_result(package.slide_placeholder_visibility(SlideSelector::index(0), kind));
+    observe_result(package.slide_placeholder_visibility(SlideSelector::index(position), kind));
+    observe_result(package.slide_placeholder_visibility(SlideSelector::name(name), kind));
+    if let Err(error) =
+        package.slide_placeholder_visibility(SlideSelector::name(PRIVATE_SELECTOR), kind)
+    {
+        observe_redacted(error, PRIVATE_SELECTOR);
+    }
+}
+
+fn exercise_placeholder_visibility(package: &Package, kind: Kind, data: &[u8]) {
+    let Ok(edit) = package.edit_slide_placeholder_visibility(SlideSelector::index(0), kind) else {
+        return;
+    };
+    let before = edit.state();
+    black_box((edit.position(), edit.kind(), before));
+    let edit = match control(data, 11) % 4 {
+        0 => edit.set(before),
+        1 => edit.hide(),
+        2 => edit.show(),
+        _ => match before {
+            State::Visible => edit.hide(),
+            State::Hidden => edit.show(),
+            _ => return,
+        },
+    };
+    publish_visibility_and_reverse(package, edit.commit());
+}
+
+fn exercise_operation(package: &Package, role: Kind, data: &[u8]) {
     let Ok(mut edit) = package.edit_slide_text(SlideSelector::index(0), role) else {
         return;
     };
@@ -215,7 +250,80 @@ fn publish_and_reverse(package: &Package, result: Result<SlideTextCommit, SlideT
     );
 }
 
-fn exercise_staging_error(package: &Package, role: SlideTextRole, data: &[u8]) {
+fn publish_visibility_and_reverse(
+    package: &Package,
+    result: Result<VisibilityCommit, VisibilityError>,
+) {
+    let commit = match result {
+        Ok(commit) => commit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    let patch = commit.patch().clone();
+    let diagnostics = commit.diagnostics();
+    assert_eq!(diagnostics.changed(), !patch.is_noop());
+    if patch.is_noop() {
+        assert_eq!(diagnostics.touched_components(), 0);
+        assert_eq!(diagnostics.deleted_previews(), 0);
+    } else {
+        assert!(diagnostics.touched_components() > 0);
+    }
+    assert_eq!(diagnostics.full_reparse_performed(), !patch.is_noop());
+    assert_eq!(
+        commit
+            .package()
+            .slide_placeholder_visibility(patch.position(), patch.kind())
+            .unwrap_or_else(|error| panic!("committed visibility must be readable: {error}")),
+        Some(patch.after()),
+    );
+    black_box((
+        patch.position(),
+        patch.kind(),
+        patch.before(),
+        patch.after(),
+        patch.source_fingerprint(),
+        patch.target_fingerprint(),
+        patch.is_noop(),
+    ));
+
+    let applied = package
+        .apply_slide_placeholder_visibility(&patch)
+        .unwrap_or_else(|error| panic!("fresh visibility patch must apply: {error}"));
+    assert_eq!(
+        package_bytes(applied.package()),
+        package_bytes(commit.package())
+    );
+
+    let inverse = patch.inverse();
+    assert_eq!(inverse.inverse(), patch);
+    if !patch.is_noop() {
+        match applied.package().apply_slide_placeholder_visibility(&patch) {
+            Err(error) => observe_error(error),
+            Ok(_) => panic!("a changed visibility patch must conflict with its target package"),
+        }
+        match package.apply_slide_placeholder_visibility(&inverse) {
+            Err(error) => observe_error(error),
+            Ok(_) => panic!("a changed visibility inverse must conflict with its source package"),
+        }
+    }
+
+    let restored = applied
+        .package()
+        .apply_slide_placeholder_visibility(&inverse)
+        .unwrap_or_else(|error| panic!("fresh visibility inverse must apply: {error}"));
+    assert_eq!(package_bytes(restored.package()), package_bytes(package));
+    assert_eq!(
+        restored
+            .package()
+            .slide_placeholder_visibility(inverse.position(), inverse.kind())
+            .unwrap_or_else(|error| panic!("restored visibility must be readable: {error}")),
+        Some(inverse.after()),
+    );
+}
+
+fn exercise_staging_error(package: &Package, role: Kind, data: &[u8]) {
     let Ok(mut edit) = package.edit_slide_text(SlideSelector::index(0), role) else {
         return;
     };
@@ -255,7 +363,7 @@ fn exercise_staging_error(package: &Package, role: SlideTextRole, data: &[u8]) {
     }
 }
 
-fn exercise_content_free_selector_error(package: &Package, role: SlideTextRole) {
+fn exercise_content_free_selector_error(package: &Package, role: Kind) {
     if let Err(error) = package.slide_text(SlideSelector::name(PRIVATE_SELECTOR), role) {
         observe_redacted(error, PRIVATE_SELECTOR);
     }

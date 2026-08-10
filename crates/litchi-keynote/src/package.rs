@@ -10,6 +10,7 @@ mod rendering_invalidation;
 pub(crate) mod show_settings;
 mod slide_notes;
 mod slide_order;
+pub(crate) mod slide_placeholder_visibility;
 mod slide_preview;
 mod slide_text;
 pub(crate) mod slide_transition;
@@ -60,7 +61,7 @@ pub use slide_order::{
 };
 pub use slide_text::{
     SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
-    SlideTextPatch, SlideTextRole,
+    SlideTextPatch,
 };
 
 /// Checked physical resource limits for Keynote package ingress.

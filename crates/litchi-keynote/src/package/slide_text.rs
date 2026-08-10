@@ -28,28 +28,9 @@ use super::{
     SHAPE_INFO_MESSAGE_TYPE, SLIDE_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE, SemanticBudget,
     SemanticLimitKind, SemanticPath, unique_payload,
 };
-use crate::SlideSelector;
+use crate::{SlideSelector, slide::placeholder::Kind};
 
 const PREVIEW_ENTRY_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
-
-/// The semantic placeholder text owned by a Keynote slide.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum SlideTextRole {
-    /// The slide's title placeholder.
-    Title,
-    /// The slide's body placeholder.
-    Body,
-}
-
-impl fmt::Display for SlideTextRole {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::Title => "title",
-            Self::Body => "body",
-        })
-    }
-}
 
 /// A finite resource governed while slide text is read or rewritten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -132,7 +113,7 @@ pub enum SlideTextError {
     #[error("the selected Keynote slide has no existing {role} placeholder")]
     TextStorageNotFound {
         /// Semantic placeholder role that is absent.
-        role: SlideTextRole,
+        role: Kind,
     },
     /// A staged span exceeds the selected storage's UTF-16 length.
     #[error("the Keynote slide-text span exceeds the selected text length")]
@@ -262,7 +243,7 @@ impl ReferenceSemantics {
 pub struct SlideTextEdit<'a> {
     source: &'a Package,
     position: Position,
-    role: SlideTextRole,
+    role: Kind,
     placeholder_identifier: u64,
     storage_identifier: u64,
     before: String,
@@ -284,7 +265,7 @@ impl<'a> SlideTextEdit<'a> {
     fn new<'selector>(
         source: &'a Package,
         selector: impl Into<SlideSelector<'selector>>,
-        role: SlideTextRole,
+        role: Kind,
     ) -> Result<Self, SlideTextError> {
         let position = resolve_position(source, selector.into())?;
         let snapshot = text_snapshot_at(source, position, role)?
@@ -308,7 +289,7 @@ impl<'a> SlideTextEdit<'a> {
 
     /// Return the semantic placeholder role selected when this edit began.
     #[must_use]
-    pub const fn role(&self) -> SlideTextRole {
+    pub const fn role(&self) -> Kind {
         self.role
     }
 
@@ -566,7 +547,7 @@ pub struct SlideTextPatch {
     source_fingerprint: u64,
     target_fingerprint: u64,
     position: Position,
-    role: SlideTextRole,
+    role: Kind,
     placeholder_identifier: u64,
     storage_identifier: u64,
     span: TextSpan,
@@ -597,7 +578,7 @@ impl SlideTextPatch {
 
     /// Return the semantic placeholder role selected by this patch.
     #[must_use]
-    pub const fn role(&self) -> SlideTextRole {
+    pub const fn role(&self) -> Kind {
         self.role
     }
 
@@ -758,7 +739,7 @@ impl Package {
     pub fn slide_text<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-        role: SlideTextRole,
+        role: Kind,
     ) -> Result<Option<String>, SlideTextError> {
         let position = resolve_position(self, selector.into())?;
         Ok(text_snapshot_at(self, position, role)?.map(|snapshot| snapshot.text))
@@ -777,7 +758,7 @@ impl Package {
         &self,
         selector: impl Into<SlideSelector<'selector>>,
     ) -> Result<Option<String>, SlideTextError> {
-        self.slide_text(selector, SlideTextRole::Title)
+        self.slide_text(selector, Kind::Title)
     }
 
     /// Read one slide's existing body placeholder text.
@@ -793,7 +774,7 @@ impl Package {
         &self,
         selector: impl Into<SlideSelector<'selector>>,
     ) -> Result<Option<String>, SlideTextError> {
-        self.slide_text(selector, SlideTextRole::Body)
+        self.slide_text(selector, Kind::Body)
     }
 
     /// Start one selector-first title/body text edit.
@@ -809,7 +790,7 @@ impl Package {
     pub fn edit_slide_text<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-        role: SlideTextRole,
+        role: Kind,
     ) -> Result<SlideTextEdit<'_>, SlideTextError> {
         SlideTextEdit::new(self, selector, role)
     }
@@ -827,7 +808,7 @@ impl Package {
         &self,
         selector: impl Into<SlideSelector<'selector>>,
     ) -> Result<SlideTextEdit<'_>, SlideTextError> {
-        self.edit_slide_text(selector, SlideTextRole::Title)
+        self.edit_slide_text(selector, Kind::Title)
     }
 
     /// Start one selector-first slide-body edit.
@@ -843,7 +824,7 @@ impl Package {
         &self,
         selector: impl Into<SlideSelector<'selector>>,
     ) -> Result<SlideTextEdit<'_>, SlideTextError> {
-        self.edit_slide_text(selector, SlideTextRole::Body)
+        self.edit_slide_text(selector, Kind::Body)
     }
 
     /// Apply an exact-source-checked slide-text patch.
@@ -943,7 +924,7 @@ fn resolve_position(
 fn text_snapshot_at(
     package: &Package,
     position: Position,
-    role: SlideTextRole,
+    role: Kind,
 ) -> Result<Option<TextSnapshot>, SlideTextError> {
     let record = package
         .slide_record_at(position.get())
@@ -960,8 +941,8 @@ fn text_snapshot_at(
     )
     .map_err(map_speaker_notes_codec_error)?;
     let placeholder = match role {
-        SlideTextRole::Title => owner.title_placeholder(),
-        SlideTextRole::Body => owner.body_placeholder(),
+        Kind::Title => owner.title_placeholder(),
+        Kind::Body => owner.body_placeholder(),
     };
     let Some(placeholder_identifier) = placeholder.map(|reference| reference.identifier().get())
     else {
@@ -1024,25 +1005,23 @@ fn text_snapshot_at(
     }))
 }
 
-fn validate_placeholder_kind(role: SlideTextRole, kind: Option<i32>) -> Result<(), SlideTextError> {
+fn validate_placeholder_kind(role: Kind, kind: Option<i32>) -> Result<(), SlideTextError> {
     // Absence and explicit zero both mean the native generic placeholder.
     // Any non-generic explicit kind must agree with the slide's role edge;
     // slide-number, object, opposite-role, and future tags are not writable
     // through this focused capability.
     match (role, kind) {
-        (_, None | Some(0)) | (SlideTextRole::Title, Some(2)) | (SlideTextRole::Body, Some(3)) => {
-            Ok(())
-        },
+        (_, None | Some(0)) | (Kind::Title, Some(2)) | (Kind::Body, Some(3)) => Ok(()),
         _ => Err(SlideTextError::DependentContent),
     }
 }
 
-const fn semantic_path(position: Position, role: SlideTextRole) -> SemanticPath {
+const fn semantic_path(position: Position, role: Kind) -> SemanticPath {
     match role {
-        SlideTextRole::Title => SemanticPath::SlideTitle {
+        Kind::Title => SemanticPath::SlideTitle {
             index: position.get(),
         },
-        SlideTextRole::Body => SemanticPath::SlideBody {
+        Kind::Body => SemanticPath::SlideBody {
             index: position.get(),
         },
     }
@@ -1153,7 +1132,7 @@ fn map_placeholder_codec_error(
 fn rewrite_text(
     source: &Package,
     position: Position,
-    role: SlideTextRole,
+    role: Kind,
     expected_placeholder_identifier: u64,
     expected_storage_identifier: u64,
     span: TextSpan,
@@ -1347,7 +1326,7 @@ fn verify_candidate(
     source: &Package,
     candidate: &Package,
     position: Position,
-    role: SlideTextRole,
+    role: Kind,
     expected: &str,
     slide_node_identifier: u64,
     require_invalidated_previews: bool,
@@ -1422,12 +1401,12 @@ fn verify_candidate(
             return Err(SlideTextError::Verification);
         }
         match role {
-            SlideTextRole::Title => {
+            Kind::Title => {
                 if new.title() != nonempty(expected) {
                     return Err(SlideTextError::Verification);
                 }
             },
-            SlideTextRole::Body => {
+            Kind::Body => {
                 if old.title() != new.title() {
                     return Err(SlideTextError::Verification);
                 }
@@ -1593,7 +1572,7 @@ fn nonempty(text: &str) -> Option<&str> {
 fn prove_exclusive_text_ownership(
     package: &Package,
     position: Position,
-    role: SlideTextRole,
+    role: Kind,
     placeholder_identifier: u64,
     storage_identifier: u64,
 ) -> Result<(), SlideTextError> {
@@ -1657,11 +1636,11 @@ fn prove_exclusive_text_ownership(
                                 .body_placeholder()
                                 .map(|reference| reference.identifier().get());
                             let matches_role = match role {
-                                SlideTextRole::Title => {
+                                Kind::Title => {
                                     projected_title == Some(placeholder_identifier)
                                         && projected_body != Some(placeholder_identifier)
                                 },
-                                SlideTextRole::Body => {
+                                Kind::Body => {
                                     projected_body == Some(placeholder_identifier)
                                         && projected_title != Some(placeholder_identifier)
                                 },
@@ -1932,7 +1911,7 @@ fn unique_nested_payload<'a>(
 fn prove_metadata_ownership(
     package: &Package,
     expected_slide_identifier: u64,
-    role: SlideTextRole,
+    role: Kind,
     placeholder_identifier: u64,
     storage_identifier: u64,
 ) -> Result<(), SlideTextError> {
@@ -1967,8 +1946,8 @@ fn prove_metadata_ownership(
                     for reference in &field.object_references {
                         if *reference == placeholder_identifier {
                             let role_path = match role {
-                                SlideTextRole::Title => [5],
-                                SlideTextRole::Body => [6],
+                                Kind::Title => [5],
+                                Kind::Body => [6],
                             };
                             match field.path.as_slice() {
                                 path if path == role_path => {

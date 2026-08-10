@@ -1177,3 +1177,91 @@ direct mutation tests, the duplicate host count test, and the old host example.
 Shared private attached-table primitives and the private Pages/Keynote package
 bridges remain; no flat compatibility alias or shim replaces the deleted host
 methods.
+
+## 2026-08-10 amendment: focused Keynote placeholder visibility API
+
+The canonical family is
+`litchi_keynote::slide::placeholder::{Kind, State, Edit, Patch, Commit,
+Diagnostics, Error, LimitKind}`. `Package::{slide_placeholder_visibility,
+edit_slide_placeholder_visibility, apply_slide_placeholder_visibility}` are the
+selector-first entry points. Flat `Placeholder*`, `PlaceholderVisibility*`,
+`SlidePlaceholder*`, `SlidePlaceholderVisibility*`, or
+`SlideTextPlaceholder*` transaction aliases, crate-root aliases, package-owner
+exports, and glob re-exports are not part of the surface.
+
+`Kind` contains only `Title` and `Body`; `State` distinguishes `Visible` from
+`Hidden`. Read returns `Result<Option<State>, Error>` so a missing role remains
+distinct from an existing hidden placeholder. Edit returns
+`Error::PlaceholderNotFound { kind }` when the selected role is absent;
+infallible consuming `Edit::{set, show, hide}` can change only an existing role
+and consuming `Edit::commit` returns the immutable verified package, patch,
+and content-free diagnostics.
+
+Public signatures expose no slide/node/placeholder object identifier,
+component/member name, native reference list, field number, generated/wire
+type, source bytes, or retained artifact accessor. Exact navigator-name or
+checked-position selectors replace host numeric-index mutation, while edit and
+patch `Debug` output remains redacted. Errors keep selector ambiguity/missing
+position/name, missing placeholder, invalid or unsupported source, resource or
+allocation failure, verification, and exact-source conflict typed without
+leaking document content. `LimitKind` bounds package bytes/entries, slides,
+references, and wire bytes/fields/nesting/work.
+
+Visibility owns only direct per-slide participation of an existing title/body
+placeholder. Hidden state preserves its reference, graph, text, and storage;
+visible state requires one occurrence in each selected ownership list. Showing
+appends the exact role-reference bytes at the end of both lists, as independent
+native title and body oracles established. Changed commits also delete existing
+root previews and invalidate the selected SlideNode's rendered thumbnails
+before exact candidate reopen; no-op preserves all caches.
+
+The direction-aware node exact-delta verifier uses linear payload
+occurrence/kind and metadata declaration indexes instead of repeated per-ID
+rescans; 4,096 to 8,192 distinct references remain within 2.3 times measured
+work. Work includes each `MessageInfo`, each `FieldInfo`, and each field-path
+element even when metadata records are empty. A 4,096-empty-`FieldInfo`
+regression proves atomic refusal under zero-work and payload-only allowances.
+Full precharge includes selected and nonselected payload bytes; each
+`MessageInfo` scalar/base record, version/diff vector, and diff/removal path;
+each `FieldInfo` record, path, version vector, and feature identifier; and both
+Work and References for every aggregate or `FieldInfo` reference occurrence.
+Conditional invalidation charges this structure before broad validation and
+also charges `header_length` before core replacement; exact verification
+charges the same complete source and candidate structure before equality. A
+256 KiB sibling plus 2,048-element reference/vector metadata regression proves
+atomic low-allowance refusal for exact verification and mutation.
+Conditional invalidation reuses one payload scan for any rewrite, while exact
+verification neither clones the node nor reruns invalidation. Both consume the
+transaction's remaining work/reference allowance and merge exact reports into
+the same budget. Before allocating its output, the slide router charges exact
+`source.len() + output_len + 2 * parsed_fields` work.
+
+This API does not add `Kind::SlideNumber`, select a layout placeholder, create
+or delete placeholder graphs, edit slide styles, or absorb layout ownership.
+Changed admission refuses style-level title/body visibility, a selected build
+dependency, or selected direct-cache state rather than treating any of them as
+authority for a wider mutation. Host slide-number and layout APIs, snapshot
+reads, creation, and the shared private placeholder-ownership machinery remain
+outside this handoff.
+
+Patches are exact-source, reversible, process-local values that privately hold
+the complete source and target artifacts plus compact semantic/owner/cache
+preconditions. Apply reopens only the retained exact target; inverse restores
+the complete source caches and previews. `Package::write_to` remains the
+bounded exact-output seam and does not make patches serialized, compact,
+atomic, or durable. Physical legacy nested sources remain readable and exact
+for no-op paths but refuse changed publication under Preserve.
+
+The completed retirement boundary is the three direct public
+`KeynoteEditor` visibility setters, public `KeynoteSlideTextPlaceholder`, the
+direct `placeholder_visibility` module/source and mutation tests, and
+`set_keynote_placeholder_visibility.rs`. `KeynoteSlideInfo` title/body
+visibility snapshot fields, `set_slide_layout`, `set_slide_number_visible`, and
+their retained private helpers are not aliases or shims for this transaction.
+Mixed layout reads migrated to `slide::placeholder::Kind`, and the focused
+`SlideTextRole` title/body discriminator was removed rather than retained as a
+parallel enum. Host `KeynoteSlideTextRole` remains the aggregate discriminator
+for title, body, text-box, and shape reads; it is not an alias for this
+transaction. The implementation, native, compatibility, and host-removal gates
+enumerated in ADR 0003 passed; the final optimized totals include 94/94 focused
+library tests, 18/18 preview tests, and the unchanged 5/5 visibility tests.

@@ -10,7 +10,7 @@ use std::ffi::{OsStr, OsString};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use litchi_keynote::{Package, SlideSelector, SlideTextRole, TextSpan};
+use litchi_keynote::{Package, SlideSelector, TextSpan, slide::placeholder::Kind};
 use tempfile::NamedTempFile;
 
 const USAGE: &str = "usage: edit_slide_text <input.key> <output.key> \\
@@ -126,10 +126,10 @@ fn parse_selector(value: &str) -> Result<SelectedSlide, Box<dyn Error>> {
     ))
 }
 
-fn parse_role(value: &str) -> Result<SlideTextRole, Box<dyn Error>> {
+fn parse_role(value: &str) -> Result<Kind, Box<dyn Error>> {
     match value {
-        "title" => Ok(SlideTextRole::Title),
-        "body" => Ok(SlideTextRole::Body),
+        "title" => Ok(Kind::Title),
+        "body" => Ok(Kind::Body),
         _ => Err(invalid_input("text role must be title or body")),
     }
 }

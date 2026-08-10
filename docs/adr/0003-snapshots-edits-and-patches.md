@@ -464,3 +464,141 @@ primitives used by Numbers structural edits remain. The patch is therefore a
 process-local two-artifact capability, not a compact or durable operation.
 ADR 0003's stable semantic serialization, read/write sets, composition, merge,
 bounded history, and library-owned atomic durable publication remain deferred.
+
+## 2026-08-10 amendment: Keynote title/body placeholder visibility
+
+This amendment supersedes direct mutable title/body placeholder visibility.
+`Package::edit_slide_placeholder_visibility` resolves an exact navigator name
+or checked position and one semantic
+`slide::placeholder::Kind::{Title, Body}` against an immutable base snapshot.
+Infallible consuming `Edit::{set, show, hide}` stages one complete `State`;
+commit never mutates the source package.
+
+`Package::slide_placeholder_visibility` returns `Option<State>` because a
+layout-provided role may be absent. `None` means no existing title/body
+placeholder graph, not hidden. The edit entry point returns typed
+`Error::PlaceholderNotFound { kind }` for that absence and never creates or
+adopts a placeholder. `State::Hidden` instead retains the role reference,
+placeholder object, text storage, text, and presentation while removing the
+placeholder from both per-slide drawing ownership lists.
+
+An exact equal edit shares the source artifact and preserves every preview and
+cache. A changed edit proves Document-to-Show-to-SlideTree-to-SlideNode-to-
+SlideArchive ownership, the selected SlideArchive title/body reference, its
+unique local Placeholder owner, exact aggregate and optional matching
+field-local metadata, role kind, parent slide, and unlocked state. The selected
+placeholder must occur either once in both SlideArchive owned-drawable field 7
+and z-order field 42 (`Visible`) or in neither (`Hidden`); disagreement,
+duplicate ownership, role aliasing, merge/diff state, group-bearing or
+noncanonical selected framing, and ambiguous rooted ownership fail closed.
+
+Showing appends the exact existing raw title/body role-reference record at the
+end of both ownership lists; hiding removes its single exact record from both.
+All other list members retain their bytes and order. Independent native Keynote
+title and body oracles established that append-at-end behavior; neither role is
+inferred from the other.
+
+The initial native gate used pristine SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+The Rust title-hidden artifact was
+`df119410433b97b9993d46619764a8ffb75f257b16c0680cd54faabd9a453cdd`;
+its diagnostics reported `changed=true`, two touched components, and three
+deleted root previews. Keynote 14.4 opened it without warning and showed Title
+off and Body on while retaining the body and date content. Native Save As,
+close, and reopen produced a 475,102-byte artifact with SHA-256
+`c5c996415191758b9fc638a8fdf024a912a6fe2ac4c3989970f0cb611e0670e3`
+and the same UI state. Applying the exact Rust inverse restored the pristine
+SHA-256. This closes title-hide interoperability and exact inverse restoration;
+the independent title-show and body-show oracles close the opposite direction.
+
+Both focused show directions also pass exact retained-artifact gates from
+Apple-authored hidden sources. Apple-hidden title SHA-256
+`d61a92b212d8a0f001bdfc24490d846e065b96885f0d0d0b86ef0be9f10e7580`
+produced Rust-shown
+`3d36d31c6222b7622cab180f6dd9559ccf43f4b481e6b245c9d2c56fe8852b2c`
+and its inverse restored the exact Apple-hidden title source. Apple-hidden body
+`05ca9617ea5a23c57252c28c3029af96d4ec54345de331571d89b612566b8416`
+produced Rust-shown
+`3e8855e954c16bd32350e057665b5ee4758a02e85ad23c3c6543f1caef177b13`
+and its inverse restored the exact Apple-hidden body source. Each forward show
+reported `changed=true`, two touched components, and three deleted root
+previews. Together with the native oracles, these gates establish both show
+directions and exact reversibility over Apple-authored hidden artifacts.
+
+The focused mutation refuses selected build dependencies, direct slide
+title/body cache fields, and style-level title/body visibility overrides rather
+than rewriting broader layout or animation state. An admitted changed commit
+rewrites the SlideArchive ownership lists and invalidates rendering: it removes
+the zero to three root previews and clears the selected SlideNode thumbnail
+payload/metadata while marking thumbnails dirty. Co-located owners rewrite one
+component and split owners two, each once; candidate reopening verifies the
+requested state, invalidated render caches, rooted ownership, and exact
+locality. Its direction-aware SlideNode exact-delta proof builds one linear
+payload occurrence/kind index and one metadata declaration index per side,
+rather than rescanning payload and metadata for every identifier. Doubling the
+distinct-reference regression from 4,096 to 8,192 consumes no more than 2.3
+times the measured work. Work also charges every `MessageInfo` and every
+`FieldInfo` plus its path, including structurally empty records. The 4,096
+empty-`FieldInfo` regression proves that zero-work and payload-only allowances
+reject conditional mutation and exact-equality verification without changing
+the source node. Full structural precharge covers selected and nonselected
+message payload bytes; each `MessageInfo` record including its scalar/base
+state, version/diff vectors, diff and removal paths; every `FieldInfo` record,
+path, version vector, and feature identifier; and one unit of both Work and
+References for each aggregate or `FieldInfo` reference occurrence. Conditional
+invalidation performs that precharge before broad validation and additionally
+charges `header_length` before the core replacement walk; exact verification
+precharges the same complete structure for both source and candidate before
+archive equality. The 256 KiB sibling payload with 2,048-element
+reference/vector metadata regression proves that low Work and References
+allowances reject both exact verification and conditional mutation atomically.
+Conditional invalidation scans the selected payload once, reuses that scan for
+any rewrite, and exact verification compares source and candidate without
+cloning a node or rerunning invalidation. Both receive the transaction's
+remaining work/reference allowance and merge their exact reports into the same
+budget. The slide ownership router separately charges exact
+`source.len() + output_len + 2 * parsed_fields` work before allocating output,
+so exhausted transaction work cannot fail only after that allocation.
+
+Placeholder text/storage, the other placeholder role, slide-number state,
+layout/style identity, builds, transitions, notes, and unrelated
+members/objects/messages/unknown fields remain exact.
+
+`slide::placeholder::Patch` privately retains complete exact source and target
+artifacts, semantic before/after state, the checked position and role, and
+private placeholder/owner preconditions. Exact artifact bytes and selected
+semantic/ownership state, not diagnostic fingerprints, authorize apply. A
+no-op apply shares the source; a changed apply reopens and verifies the retained
+target and cache direction; replay, tamper, and the wrong source conflict.
+`inverse` swaps shared artifacts and semantic/cache direction so a valid
+inverse-on-target restores the complete accepted source including SlideNode
+caches and root previews.
+
+Preserve policy keeps physical legacy nested-`Index.zip` sources readable and
+exact on no-op paths, while a changed edit is `Error::UnsupportedSource` rather
+than physical normalization. These complete-source/target patches remain
+process-local, reversible, and non-durable; stable semantic serialization,
+read/write sets, composition, merge, bounded history, and library-owned atomic
+durable publication remain deferred.
+
+The completed host cut removed
+`KeynoteEditor::{set_slide_text_placeholder_visible, set_slide_title_visible,
+set_slide_body_visible}`, the public `KeynoteSlideTextPlaceholder` type, the
+150-line `placeholder_visibility` module/source, two whole direct mutation
+tests, their exclusive `TEST_TITLE_PLACEHOLDER_FIELD` constant, and the 30-line
+`set_keynote_placeholder_visibility.rs` example. Mixed layout reads now use
+the canonical `slide::placeholder::Kind`; the focused `SlideTextRole`
+discriminator was consolidated into that same type rather than retained as a
+second title/body enum. Host `KeynoteSlideTextRole` remains for aggregate
+title/body/text-box/shape reads and is not a transaction alias. The cut retains
+`KeynoteSlideInfo::{is_title_visible, is_body_visible}` snapshot reads and the
+private ownership substrate still used by aggregate slide decoding, layout
+changes, and slide-number visibility. This handoff does not retire or claim
+semantic ownership of `set_slide_layout`, `set_slide_number_visible`, layout
+placeholder creation/adoption, or slide-number placeholders.
+
+Final gates passed: 94/94 focused library tests, 18/18 preview tests, 5/5
+placeholder-visibility tests, 25/25 slide-text tests, 8/8 facade tests, 7/7
+doctests, and 129/129 boundary-checker tests. The all-target check, strict
+library Clippy, strict rustdoc, bounded fuzz smoke, exact patch/inverse gates,
+and native Keynote interoperability also passed.

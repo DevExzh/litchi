@@ -8,6 +8,9 @@ use crate::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 use litchi_iwa_common::shape::fill::{Opacity, StopMidpoint, StopPosition};
 use litchi_keynote::slide::media::MovieKind;
+use litchi_keynote::slide::placeholder::{
+    Kind as FocusedPlaceholderKind, State as FocusedPlaceholderState,
+};
 use litchi_keynote::soundtrack::{Mode as SoundtrackMode, Settings as SoundtrackSettings};
 use litchi_keynote::{Package as FocusedKeynotePackage, SlideSelector};
 use std::time::Duration;
@@ -20,7 +23,6 @@ const TEST_IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const TEST_MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const TEST_LIVE_VIDEO_INFO_FIELD: u32 = 100;
 const TEST_LIVE_VIDEO_INFO_PAYLOAD: &[u8] = &[0x08, 0x01];
-const TEST_TITLE_PLACEHOLDER_FIELD: u32 = 5;
 const TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
 const TEST_SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
 const TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
@@ -36,6 +38,17 @@ const TEST_MOVIE_VIDEO: &[u8] = b"\0\0\0\x18ftypqt  movie-data";
 const TEST_MOVIE_VIDEO_REPLACEMENT: &[u8] = b"\0\0\0\x18ftypqt  replacement";
 const TEST_MOVIE_POSTER: &[u8] = b"\x89PNG\r\n\x1a\nmovie-poster";
 const TEST_MOVIE_POSTER_REPLACEMENT: &[u8] = b"\x89PNG\r\n\x1a\nreplacement";
+
+fn focused_placeholder_visibility(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    kind: FocusedPlaceholderKind,
+) -> Option<FocusedPlaceholderState> {
+    FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap())
+        .unwrap()
+        .slide_placeholder_visibility(SlideSelector::index(slide_index), kind)
+        .unwrap()
+}
 
 #[test]
 fn slide_background_crud_inherits_and_culls_native_variations() {
@@ -3533,175 +3546,6 @@ fn slide_number_visibility_rejects_inconsistent_native_state_transactionally() {
 }
 
 #[test]
-fn slide_text_placeholder_visibility_matches_native_ownership_and_preserves_references() {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Slide-4.iwa", |archive| {
-            let slide = archive.object_mut(4).unwrap();
-            let message = slide.messages[0].clone();
-            let data = transform_length_delimited_fields_at_path(
-                &message.data,
-                &[TEST_TITLE_PLACEHOLDER_FIELD],
-                |reference| {
-                    let mut reference = reference.to_vec();
-                    append_unknown_varint(&mut reference, 98, 980);
-                    Ok(reference)
-                },
-            )?;
-            slide.replace_message(
-                0,
-                RawMessage {
-                    type_: message.type_,
-                    data,
-                },
-            )?;
-            Ok(())
-        })
-        .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
-    let before = editor.slides().unwrap();
-    assert_eq!(before[0].is_title_visible, Some(true));
-    assert_eq!(before[0].is_body_visible, Some(true));
-    let document_before = editor
-        .package()
-        .archive("Index/Document.iwa")
-        .unwrap()
-        .to_bytes()
-        .unwrap();
-    let raw_title = {
-        let archive = editor.package().archive("Index/Slide-4.iwa").unwrap();
-        repeated_length_delimited_payloads(
-            &archive.object(4).unwrap().messages[0].data,
-            TEST_TITLE_PLACEHOLDER_FIELD,
-        )
-        .unwrap()[0]
-            .to_vec()
-    };
-
-    editor.set_slide_title_visible(0, false).unwrap();
-    let hidden = editor.slides().unwrap();
-    assert_eq!(hidden[0].is_title_visible, Some(false));
-    assert_eq!(hidden[0].is_body_visible, Some(true));
-    assert_eq!(hidden[0].title.as_deref(), Some("Old title"));
-    let hidden_bytes = editor.to_bytes().unwrap();
-    editor.set_slide_title_visible(0, false).unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), hidden_bytes);
-
-    editor.set_slide_title_visible(0, true).unwrap();
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    let slide: kn::SlideArchive = graph
-        .decode_type(4, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
-        .unwrap();
-    assert_eq!(
-        slide
-            .owned_drawables
-            .iter()
-            .map(|reference| reference.identifier)
-            .collect::<Vec<_>>(),
-        vec![6, 5]
-    );
-    assert_eq!(
-        slide
-            .drawables_z_order
-            .iter()
-            .map(|reference| reference.identifier)
-            .collect::<Vec<_>>(),
-        vec![6, 5]
-    );
-    let archive = editor.package().archive("Index/Slide-4.iwa").unwrap();
-    let data = &archive.object(4).unwrap().messages[0].data;
-    for field in [
-        TEST_SLIDE_OWNED_DRAWABLES_FIELD,
-        TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD,
-    ] {
-        assert_eq!(
-            repeated_length_delimited_payloads(data, field)
-                .unwrap()
-                .last()
-                .copied(),
-            Some(raw_title.as_slice())
-        );
-    }
-    assert_eq!(
-        editor
-            .package()
-            .archive("Index/Document.iwa")
-            .unwrap()
-            .to_bytes()
-            .unwrap(),
-        document_before
-    );
-
-    editor
-        .set_slide_text_placeholder_visible(0, KeynoteSlideTextPlaceholder::Body, false)
-        .unwrap();
-    let updated = editor.slides().unwrap();
-    assert_eq!(updated[0].is_title_visible, Some(true));
-    assert_eq!(updated[0].is_body_visible, Some(false));
-    assert_eq!(updated[0].body.as_deref(), Some("Old body 🚀"));
-    let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(reparsed.slides().unwrap(), updated);
-}
-
-#[test]
-fn slide_text_placeholder_visibility_rejects_missing_or_inconsistent_state() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.set_slide_title_visible(2, false).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-
-    let mut missing = test_package();
-    missing
-        .update_archive("Index/Slide-4.iwa", |archive| {
-            let slide = archive.object_mut(4).unwrap();
-            let message = slide.messages[0].clone();
-            let mut decoded = kn::SlideArchive::decode(message.data.as_slice())?;
-            decoded.body_placeholder = None;
-            decoded
-                .owned_drawables
-                .retain(|reference| reference.identifier != 6);
-            decoded
-                .drawables_z_order
-                .retain(|reference| reference.identifier != 6);
-            slide.replace_message(
-                0,
-                RawMessage {
-                    type_: message.type_,
-                    data: decoded.encode_to_vec(),
-                },
-            )?;
-            Ok(())
-        })
-        .unwrap();
-    let mut missing_editor = KeynoteEditor::from_package(missing).unwrap();
-    assert_eq!(missing_editor.slides().unwrap()[0].is_body_visible, None);
-    let missing_before = missing_editor.to_bytes().unwrap();
-    assert!(missing_editor.set_slide_body_visible(0, true).is_err());
-    assert_eq!(missing_editor.to_bytes().unwrap(), missing_before);
-
-    let mut inconsistent = test_package();
-    inconsistent
-        .update_archive("Index/Slide-4.iwa", |archive| {
-            let slide = archive.object_mut(4).unwrap();
-            let message = slide.messages[0].clone();
-            let mut decoded = kn::SlideArchive::decode(message.data.as_slice())?;
-            decoded
-                .drawables_z_order
-                .retain(|reference| reference.identifier != 5);
-            slide.replace_message(
-                0,
-                RawMessage {
-                    type_: message.type_,
-                    data: decoded.encode_to_vec(),
-                },
-            )?;
-            Ok(())
-        })
-        .unwrap();
-    assert!(KeynoteEditor::from_package(inconsistent).is_err());
-}
-
-#[test]
 fn transition_custom_parameters_reader_rejects_malformed_wire() {
     for mutation in 0..10 {
         let mut package = test_package();
@@ -3960,8 +3804,14 @@ fn updates_slide_layout_transactionally_without_replacing_user_content() {
         slide.layout.as_ref().map(|layout| layout.id),
         Some(title_only)
     );
-    assert_eq!(slide.is_title_visible, Some(true));
-    assert_eq!(slide.is_body_visible, Some(false));
+    assert_eq!(
+        focused_placeholder_visibility(&editor, 0, FocusedPlaceholderKind::Title),
+        Some(FocusedPlaceholderState::Visible)
+    );
+    assert_eq!(
+        focused_placeholder_visibility(&editor, 0, FocusedPlaceholderKind::Body),
+        Some(FocusedPlaceholderState::Hidden)
+    );
     assert_eq!(slide.title.as_deref(), Some("Old title"));
     assert_eq!(slide.body.as_deref(), Some("Old body 🚀"));
     assert_eq!(slide.notes.as_deref(), Some("Speaker 🚀"));
@@ -4011,8 +3861,14 @@ fn updates_slide_layout_transactionally_without_replacing_user_content() {
 
     editor.set_slide_layout(0, title_and_bullets).unwrap();
     let slide = &editor.slides().unwrap()[0];
-    assert_eq!(slide.is_title_visible, Some(true));
-    assert_eq!(slide.is_body_visible, Some(true));
+    assert_eq!(
+        focused_placeholder_visibility(&editor, 0, FocusedPlaceholderKind::Title),
+        Some(FocusedPlaceholderState::Visible)
+    );
+    assert_eq!(
+        focused_placeholder_visibility(&editor, 0, FocusedPlaceholderKind::Body),
+        Some(FocusedPlaceholderState::Visible)
+    );
     assert_eq!(slide.title.as_deref(), Some("Old title"));
     assert_eq!(slide.body.as_deref(), Some("Old body 🚀"));
     let graph = ObjectGraph::read(editor.package()).unwrap();
@@ -4649,7 +4505,10 @@ fn slide_layout_update_hides_a_retained_placeholder_missing_from_the_layout() {
         .set_slide_layout(0, KeynoteSlideLayoutId::new(37).unwrap())
         .unwrap();
     let slide = &editor.slides().unwrap()[0];
-    assert_eq!(slide.is_body_visible, Some(false));
+    assert_eq!(
+        focused_placeholder_visibility(&editor, 0, FocusedPlaceholderKind::Body),
+        Some(FocusedPlaceholderState::Hidden)
+    );
     assert_eq!(slide.body.as_deref(), Some("Old body 🚀"));
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let body: kn::PlaceholderArchive = graph
