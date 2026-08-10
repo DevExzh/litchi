@@ -107,9 +107,10 @@ fn slide_background_crud_inherits_and_culls_native_variations() {
         .message_data_type(no_fill_variation, 9, "KN.SlideStyleArchive")
         .unwrap();
     let properties = required_length_delimited_payload(raw, 11, "slide style").unwrap();
-    assert_eq!(
-        required_length_delimited_payload(properties, 1, "slide fill").unwrap(),
-        []
+    assert!(
+        required_length_delimited_payload(properties, 1, "slide fill")
+            .unwrap()
+            .is_empty()
     );
 
     assert!(editor.reset_slide_background(0).unwrap());

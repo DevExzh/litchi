@@ -99,9 +99,9 @@ pub(crate) fn resolve_doc_lists(
             ));
         }
         if properties.list_level == Some(12)
-            || !properties
+            || properties
                 .list_format_override
-                .is_some_and(|value| value != 0)
+                .is_none_or(|value| value == 0)
         {
             resolved.push(None);
             continue;

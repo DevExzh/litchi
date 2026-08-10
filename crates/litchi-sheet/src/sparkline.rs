@@ -4,6 +4,10 @@
 //! adapters own formulas, colors, XML/BRT encoding, and lexical preservation.
 
 /// The visual form of a sparkline group.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`SparklineType` is the public cross-format schema name; shortening it to `Type` would make imports ambiguous"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SparklineType {
     /// A line sparkline.
@@ -16,7 +20,10 @@ pub enum SparklineType {
 
 impl SparklineType {
     /// Semantic name used by XLSB and the OOXML specifications.
-    #[allow(non_upper_case_globals)]
+    #[allow(
+        non_upper_case_globals,
+        reason = "`Stacked` is a compatibility spelling for the `WinLoss` enum variant"
+    )]
     pub const Stacked: Self = Self::WinLoss;
 }
 

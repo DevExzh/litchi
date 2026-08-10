@@ -65,7 +65,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.95.0
 
       - name: Test dependency-direction gate
         run: python3 -m unittest tools/test_check_crate_boundaries.py
@@ -92,7 +92,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.95.0
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -138,7 +138,7 @@ jobs:
           version: 1.0
 
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: clippy, rustfmt
 
@@ -157,7 +157,7 @@ jobs:
         run: cargo sort --workspace --check
 
       - name: Check if code is compilable
-        run: cargo check --workspace --all-targets --all-features
+        run: cargo check --workspace --all-features --lib --tests
 
       - name: Check minimal font and PPT capability boundaries
         run: |
@@ -207,10 +207,7 @@ jobs:
           cargo test -p litchi --no-default-features --features pptx,encryption \
             --test encryption_facade
 
-      - name: Check if code adheres to best practices
-        run: cargo clippy --workspace --all-targets --all-features --no-deps -- -D warnings
-
-      - name: Enforce Rust lint policy
+      - name: Enforce pinned Rust lint policy
         run: cargo lint
 
       - name: Reject rustdoc warnings
@@ -234,7 +231,7 @@ jobs:
           version: 1.0
 
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.95.0
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2

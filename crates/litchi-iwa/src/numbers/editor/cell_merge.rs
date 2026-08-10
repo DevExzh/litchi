@@ -2234,13 +2234,13 @@ mod tests {
         let owner = formula_owner_at_host(editor, 1, 1);
         let record = &owner.cell_dependencies.as_ref().unwrap().cell_record[0];
         assert_eq!((record.row, record.column), (1, 1));
-        assert_eq!(
+        assert!(
             record
                 .expanded_edges
                 .as_ref()
                 .unwrap()
-                .internal_owner_id_for_edge,
-            []
+                .internal_owner_id_for_edge
+                .is_empty()
         );
         let dependency = &owner.range_dependencies.as_ref().unwrap().back_dependency[0];
         assert_eq!(

@@ -53,10 +53,10 @@ See [Project][] for more info.
 * install the local guard once with `pre-commit install`
 * run `cargo fmt`, `cargo lint`, and `cargo test --workspace --all-features` locally
   before opening a pull request
-* `cargo lint` is the repository's strict lint policy. It checks all workspace
-  libraries and tests, denies warnings, and includes limits for control-flow
-  complexity, nesting, function length, argument count, type complexity, and
-  other risky implementation patterns
+* `cargo lint` is the repository's pinned production-library lint policy. It
+  checks every workspace library with `clippy::all` and denies warnings. Test
+  targets are compiled by the separate `cargo check --workspace --all-features
+  --lib --tests` gate; examples may require consumer-owned fixtures and setup
 * non-trivial changes are often best discussed in an issue first, to prevent
   you from doing unnecessary work
 * for ambitious tasks, you should try to get your work in front of the

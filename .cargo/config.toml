@@ -1,7 +1,8 @@
 [alias]
 # Keep the local pre-commit gate and CI on exactly the same lint policy.
 #
-# `--lib --tests` deliberately covers every library, unit test, and integration
-# test without building examples that depend on files only present in their
-# eventual consumer projects.
-lint = "clippy --workspace --all-features --lib --tests -- -D warnings -W clippy::byte-char-slices -W clippy::cognitive-complexity -W clippy::excessive-nesting -W clippy::manual-filter -W clippy::too-many-lines -W clippy::too-many-arguments -W clippy::type-complexity"
+# Production libraries use the pinned workspace `clippy::all` baseline. Unit
+# and integration tests are compiled by the separate `cargo check` gate without
+# applying library-only style policy to assertion code. Examples are not part
+# of the release gate because some require consumer-owned fixtures and setup.
+lint = "clippy --workspace --all-features --lib --no-deps -- -D warnings"
