@@ -108,8 +108,8 @@ println!("objects: {}", stats.total_objects);
   lossless table mutation and owned annotation cleanup
 - Native cross-suite ranged text-comment and ordered direct-reply CRUD with
   nonempty typed bodies, stable IDs and metadata, and scratch-package creation
-- Lossless Pages document body/header/footer visibility, facing-page layout,
-  automatic hyphenation, and ligature options
+- `litchi-pages::Package` owns lossless Pages page-layout transactions for
+  dimensions, margins, scale, orientation, and vertical body layout
 - Typed Numbers table header/footer counts, freeze state, and repeating-header
   settings with lossless optional-field presence
 - Typed Numbers full-table sort-rule configuration CRUD with lossless native
@@ -995,7 +995,6 @@ use litchi_iwa::numbers::{
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_pages::header_footer::Kind;
-use litchi_pages::page_layout::Orientation;
 use litchi_pages::section::Background;
 use litchi_iwa::keynote::{
     KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor, KeynoteFlipDirection,
@@ -1151,10 +1150,6 @@ let inserted = pages.insert_section(section_id, 8, "Methods")?;
 pages.remove_section(inserted.object_id)?;
 let appended = pages.append_section(section_id, "Appendix")?;
 pages.remove_section(appended.object_id)?;
-let mut layout = pages.page_layout()?;
-layout.set_top_margin(Some(54.0))?;
-layout.set_orientation(Some(Orientation::Portrait))?;
-pages.set_page_layout(layout)?;
 if let Some(text_box) = pages.drawable_text_storages()?.first() {
     pages.set_drawable_text(text_box.drawable_object_id, "Updated text box")?;
     let geometry = pages.text_box_geometry(text_box.drawable_object_id)?;
@@ -1291,6 +1286,48 @@ keynote.remove_slide(copy.index)?;
 keynote.save("updated.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+### Pages page layout uses the focused package transaction
+
+Page dimensions, margins, scale, orientation, and vertical body layout are no
+longer `PagesEditor` operations. `litchi_pages::Package` exposes only the
+validated semantic `Layout`; it does not expose native IDs, components, or raw
+records. The package and every commit are immutable, so begin each later edit
+from `commit.package()`.
+
+```rust,no_run
+use litchi_pages::{
+    Package,
+    page_layout::Orientation,
+};
+
+let package = Package::open("input.pages")?;
+let mut edit = package.edit_page_layout()?;
+let mut layout = edit.layout();
+layout.set_top_margin(Some(54.0))?;
+layout.set_orientation(Some(Orientation::Portrait))?;
+edit.set_layout(layout)?;
+let commit = edit.commit()?;
+
+assert_eq!(commit.package().page_layout()?, layout);
+
+let restored = commit
+    .package()
+    .apply_page_layout(&commit.patch().inverse())?;
+assert_eq!(restored.package().source_bytes(), package.source_bytes());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+An unchanged layout reuses the exact source allocation and keeps preview and
+view-state caches. A changed layout requires an exact flat package; normalized
+legacy sources are read-only for this transaction and return
+`PageLayoutError::UnsupportedSource` when changed. Changed commits update the
+private derived layout state, invalidate and remove stale root previews, and
+fully reopen the candidate before publication. The inverse patch restores the
+exact original package. See `litchi-pages/examples/edit_page_layout.rs` for a
+complete command-line workflow; it requires a distinct new output path and
+publishes through a synchronized sibling temporary file with no-clobber
+publication.
 
 ### Numbers table locks use the focused package API
 
@@ -1582,19 +1619,19 @@ changed nested-`Index.zip` packages still require the migration host.
 Changed no-root/fallback bodies are likewise unsupported until their physical
 ownership has an explicit preservation-safe mutation boundary.
 
-Pages page dimensions, margins, scale, orientation, and vertical-layout flags
-are also patched directly in the protobuf wire stream. Unknown Apple fields
-retain their original bytes and positions; duplicate singular fields, wrong
-wire types, and truncated payloads fail transactionally instead of being
-normalized by a decode/re-encode cycle. The Document formatter's body, header,
-footer, facing-page, automatic-hyphenation, and ligature toggles are likewise
-writable through lossless optional settings; absent values retain Pages'
-effective defaults. See `edit_pages_document_options`. Page orientation,
-facing-page section
-starts, and continue/restart numbering behavior use lossless enums; future
-native values remain available as typed `Unknown` variants. Starting page
-numbers use a validated non-zero type. See `edit_pages_layout`; selector-first
-section pagination now lives in `litchi-pages/examples/edit_section_pagination.rs`.
+The legacy `PagesEditor` still owns document body/header/footer visibility,
+facing-page layout, automatic hyphenation, and ligature options; absent values
+retain Pages' effective defaults. See `edit_pages_document_options`.
+Page dimensions, margins, scale, orientation, and vertical-layout flags belong
+to the selector-free, document-wide `litchi-pages::Package` transaction shown
+above and in `litchi-pages/examples/edit_page_layout.rs`. That transaction
+retains unknown source bytes, rejects malformed selected fields rather than
+normalizing them, requires an exact source for changes, invalidates dependent
+layout caches, removes stale root previews, and supports exact inverse patches.
+Facing-page section starts and continue/restart numbering behavior use lossless
+enums; future native values remain available as typed `Unknown` variants.
+Starting page numbers use a validated non-zero type. Selector-first section
+pagination lives in `litchi-pages/examples/edit_section_pagination.rs`.
 Reachable `TP.PlaceholderArchive` and `TSWP.ShapeInfoArchive` drawables expose
 their owned text storages in stable object order. Text-box content supports
 UTF-16 range replacement, whole-value update, and clear operations; detached

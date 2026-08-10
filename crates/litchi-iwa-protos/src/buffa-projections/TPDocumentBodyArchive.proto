@@ -1,16 +1,17 @@
 // Wire-only Buffa projection derived from these canonical IWA declarations:
 //
 // - `TSPMessages.proto`: the three scalar fields of `TSP.Reference`;
-// - `TPArchives.proto`: `TP.DocumentArchive.body_storage` (field 4) and
-//   `section` (field 5);
+// - `TPArchives.proto`: `TP.DocumentArchive.body_storage` (field 4),
+//   `section` (field 5), and page-layout scalar fields 30--39 and 42;
 // - `TSWPArchives.proto`: the two fields of
 //   `TSWP.ObjectAttributeTable.ObjectAttribute`, used as a section boundary.
 //
 // `TP.DocumentArchive.super`, field 15, is deliberately absent. The strict
 // adapter checks its required outer framing but leaves its payload opaque.
-// Section-table repetition is routed from caller-owned source bytes, so this
-// projection contains no collection-valued message field and never owns an
-// input-width collection. Caller-owned IWA bytes remain authoritative.
+// Section-table repetition is routed from caller-owned source bytes, while
+// page layout consists only of optional scalars. This projection therefore
+// contains no collection-valued message field and never owns an input-width
+// collection. Caller-owned IWA bytes remain authoritative.
 syntax = "proto2";
 
 package LitchiIwaProjection;
@@ -24,6 +25,17 @@ message Reference {
 message PagesDocumentBodyArchive {
   optional .LitchiIwaProjection.Reference body_storage = 4;
   optional .LitchiIwaProjection.Reference initial_section = 5;
+  optional float page_width = 30;
+  optional float page_height = 31;
+  optional float left_margin = 32;
+  optional float right_margin = 33;
+  optional float top_margin = 34;
+  optional float bottom_margin = 35;
+  optional float header_margin = 36;
+  optional float footer_margin = 37;
+  optional float page_scale = 38;
+  optional bool lays_out_body_vertically = 39;
+  optional uint32 orientation = 42 [default = 0];
 }
 
 message PagesSectionBoundaryEntry {

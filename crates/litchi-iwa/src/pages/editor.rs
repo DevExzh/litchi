@@ -15,7 +15,6 @@ use litchi_pages::footnote::{
     Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
     Numbering as FootnoteNumbering, Settings as FootnoteSettings,
 };
-use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
 use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 use prost::Message;
 
@@ -4667,7 +4666,6 @@ mod footnotes;
 mod images;
 mod movies;
 mod number_attachments;
-mod page_layout;
 mod section_background;
 mod section_content;
 mod section_settings;

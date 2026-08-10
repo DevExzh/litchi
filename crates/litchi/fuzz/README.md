@@ -23,6 +23,13 @@ seed. It covers name and index selectors, exact no-op and changed commits,
 exact-source patch conflicts, inversion, and content-redacted errors without
 writing a package to disk.
 
+`pages_page_layout` is the focused Pages document-layout target. It offers
+arbitrary bytes to checked Pages package ingress and reuses them as bounded
+layout commands against the native `basic.pages` seed. It covers public layout
+reads and validation, exact no-op and changed commits, exact-source patch
+conflicts, inversion, content-redacted failures, and exact restoration without
+writing a package to disk.
+
 `parse_iwork` uses tighter limits than the public defaults: 2 MiB of source
 bytes, 512 package entries, 8 MiB per expanded entry and decoded IWA item,
 32 MiB aggregate expanded bytes, 4,096 values of each semantic collection,
@@ -44,12 +51,19 @@ expanded bytes. Its semantic profile admits at most 4,096 objects, 128 sheets,
 retained text. Fuzzer-derived selector names are limited to 512 input bytes;
 keep `-max_len` at 1 KiB so most work reaches the fixed native seed.
 
+`pages_page_layout` accepts at most 256 KiB of source bytes, 128 package
+entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
+expanded bytes. Layout commands consume only a small fixed prefix; keep
+`-max_len` at 512 bytes to retain malformed-ingress mutation while ensuring
+every input also reaches the fixed native seed.
+
 All targets currently share this package's single `litchi` dependency with
 the `iwork` feature. Cargo unifies dependency features for the package, so the
-focused Keynote and Numbers binaries compile the complete root iWork feature
-set rather than isolated concrete-format graphs. Their source-level imports
-remain confined to the relevant public facade, but true dependency isolation
-requires separate owner-specific fuzz packages or dependencies.
+focused Keynote, Numbers, and Pages binaries compile the complete root iWork
+feature set rather than isolated concrete-format graphs. The focused targets'
+source-level imports remain confined to the relevant public facade, but true
+dependency isolation requires separate owner-specific fuzz packages or
+dependencies.
 
 ## Native seed provenance
 
@@ -94,6 +108,13 @@ Run the focused Numbers target without a checked-in duplicate corpus:
 ```sh
 cargo +nightly fuzz run numbers_table_lock -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Pages target without a checked-in duplicate corpus:
+
+```sh
+cargo +nightly fuzz run pages_page_layout -- \
+  -max_len=512 -timeout=10 -rss_limit_mb=2048
 ```
 
 The native packages currently store ZIP members with CRC protection. Most

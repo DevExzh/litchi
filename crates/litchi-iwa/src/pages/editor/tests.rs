@@ -14,7 +14,7 @@ use litchi_pages::footnote::{
     Numbering as FootnoteNumbering, Settings as FootnoteSettings,
 };
 use litchi_pages::header_footer::{Kind, Template};
-use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
+use litchi_pages::page_layout::Orientation as PageOrientation;
 use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 
 #[test]
@@ -90,108 +90,6 @@ fn semantic_body_update_and_clear_are_transactional() {
     assert_eq!(editor.body_text().unwrap(), "A東京B");
     editor.clear_body().unwrap();
     assert_eq!(editor.body_text().unwrap(), "");
-}
-
-#[test]
-fn page_layout_crud_preserves_unknown_wire_and_restores_exact_bytes() {
-    let mut package = test_package("Body");
-    let unknown = {
-        let mut field = litchi_iwa_common::varint::encode_varint(99 << 3);
-        field.extend(litchi_iwa_common::varint::encode_varint(999));
-        field
-    };
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(1).unwrap();
-            let mut message = object.messages[0].clone();
-            message.data.extend_from_slice(&unknown);
-            Ok(object.replace_message(0, message).map(|_| ())?)
-        })
-        .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
-    let baseline = editor.to_bytes().unwrap();
-    let original_payload = editor
-        .package()
-        .archive("Index/Document.iwa")
-        .unwrap()
-        .objects[0]
-        .messages[0]
-        .data
-        .clone();
-
-    let layout = PageLayout::new(
-        Some(612.0),
-        Some(792.0),
-        Some(72.0),
-        Some(72.0),
-        Some(54.0),
-        Some(54.0),
-        Some(24.0),
-        Some(24.0),
-        Some(1.0),
-        Some(PageOrientation::Landscape),
-        Some(false),
-    )
-    .unwrap();
-    editor.set_page_layout(layout).unwrap();
-    assert_eq!(editor.page_layout().unwrap(), layout);
-    let updated = editor
-        .package()
-        .archive("Index/Document.iwa")
-        .unwrap()
-        .objects[0]
-        .messages[0]
-        .data
-        .clone();
-    assert!(updated.starts_with(&original_payload));
-    assert_eq!(
-        updated
-            .windows(unknown.len())
-            .filter(|window| *window == unknown)
-            .count(),
-        1
-    );
-
-    let mut unknown_orientation = layout;
-    unknown_orientation
-        .set_orientation(Some(PageOrientation::Unknown(9)))
-        .unwrap();
-    editor.set_page_layout(unknown_orientation).unwrap();
-    assert_eq!(editor.page_layout().unwrap(), unknown_orientation);
-    let before_invalid = editor.to_bytes().unwrap();
-    assert!(
-        unknown_orientation
-            .set_orientation(Some(PageOrientation::Unknown(0)))
-            .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), before_invalid);
-
-    editor.set_page_layout(PageLayout::default()).unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-}
-
-#[test]
-fn page_layout_rejects_duplicate_scalar_fields_transactionally() {
-    let mut package = test_package("Body");
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(1).unwrap();
-            let mut message = object.messages[0].clone();
-            for width in [612.0_f32, 640.0] {
-                message
-                    .data
-                    .extend(litchi_iwa_common::varint::encode_varint((30 << 3) | 5));
-                message.data.extend(width.to_bits().to_le_bytes());
-            }
-            Ok(object.replace_message(0, message).map(|_| ())?)
-        })
-        .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
-    let before = editor.to_bytes().unwrap();
-    let mut layout = editor.page_layout().unwrap();
-    layout.set_page_width(Some(700.0)).unwrap();
-    assert!(editor.set_page_layout(layout).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]
@@ -927,37 +825,6 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
         .set_section_name(section_id, Some("Renamed"))
         .unwrap();
     assert_eq!(editor.sections()[0].name.as_deref(), Some("Renamed"));
-    let mut layout = editor.page_layout().unwrap();
-    layout.set_page_width(Some(612.0)).unwrap();
-    layout.set_page_height(Some(792.0)).unwrap();
-    layout.set_left_margin(Some(72.0)).unwrap();
-    layout.set_right_margin(Some(72.0)).unwrap();
-    layout.set_top_margin(Some(54.0)).unwrap();
-    layout.set_bottom_margin(Some(54.0)).unwrap();
-    layout.set_header_margin(Some(24.0)).unwrap();
-    layout.set_footer_margin(Some(24.0)).unwrap();
-    layout.set_page_scale(Some(1.0)).unwrap();
-    let before = editor.to_bytes().unwrap();
-    assert!(
-        PageLayout::new(
-            Some(f32::NAN),
-            layout.page_height(),
-            layout.left_margin(),
-            layout.right_margin(),
-            layout.top_margin(),
-            layout.bottom_margin(),
-            layout.header_margin(),
-            layout.footer_margin(),
-            layout.page_scale(),
-            layout.orientation(),
-            layout.lays_out_body_vertically(),
-        )
-        .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), before);
-    editor.set_page_layout(layout).unwrap();
-    assert_eq!(editor.page_layout().unwrap(), layout);
-
     let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let regions = reparsed.header_footers().unwrap();
     assert_eq!(regions[0].template, Template::Odd);
@@ -967,7 +834,6 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
     assert_eq!(regions[0].storage.storage.text(), "A東京B");
     assert!(regions[1].storage.storage.is_empty());
     assert_eq!(reparsed.sections()[0].name.as_deref(), Some("Renamed"));
-    assert_eq!(reparsed.page_layout().unwrap(), layout);
 }
 
 #[test]

@@ -34,6 +34,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "pages_page_layout"
+path = "fuzz_targets/pages_page_layout.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1
