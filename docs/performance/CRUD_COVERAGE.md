@@ -2,13 +2,13 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 106 selectable
+This is a coverage map, not a completion claim. It compares the 107 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
 | Required scenario | Current status | Measured coverage |
 |---|---|---|
-| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; no smart-detection handoff case |
+| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; the public PPT root slide-order snapshot has its own measured validation path; no smart-detection handoff case |
 | List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; DOCX section listing remains missing |
 | Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX/ODT paragraph, one PPT shape and one PPTX/ODP slide; broader properties/images remain missing |
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX/ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part; semantic image selection remains missing |
@@ -42,8 +42,9 @@ semantic conversion remain.
 ## Highest-return next cases
 
 1. Attribute remaining final owner/public-reader work after the accepted native
-   XLS editor reuse and DOC batched stream publication; preserve exact-source
-   patch/inverse and the rejected DOC move as independent guardrails.
+   XLS editor reuse, DOC batched stream publication, and PPT root-open reuse;
+   preserve exact-source patch/inverse and the rejected DOC move as independent
+   guardrails.
 2. Extend native RTF coverage beyond the accepted ordinary parser-state and
    ASCII transport batching changes to formatting/media, compressed and
    legacy-code-page input, malformed/security cases, real producers and broad
@@ -93,6 +94,11 @@ Change 0023 removes two intermediate strings per block only from ODT full-text
 extraction. Structured queries retain their former ownership contract, and
 source-backed ODF reads, repeated ODT/ODP scans, unchanged-member publication,
 structural/bulk edits and broader producer/security coverage remain open.
+
+Change 0024 removes one duplicate CFB index open from public PPT root
+slide-order capture. It retains independent live-document, slide-order,
+review-history and public-reader validation; it does not imply completion of
+PPT edit/publication, real-producer, security, or broader OLE2 CRUD coverage.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

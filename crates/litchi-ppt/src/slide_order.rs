@@ -405,7 +405,7 @@ impl Snapshot {
         let presentation = package.presentation()?;
         let directory = presentation.slide_directory();
         let (document_persist_id, document_bytes) =
-            crate::embedded::object::Editor::inspect_live_document(&bytes)?;
+            crate::embedded::object::Editor::inspect_live_document_from_ole(package.ole_file())?;
         if document_persist_id != directory.document_persist_id() {
             return Err(PackageError::Corrupted(
                 "PPT slide-order snapshot resolved inconsistent live document identities".into(),
@@ -5821,6 +5821,21 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.into_inner()
+    }
+
+    #[test]
+    fn open_ole_live_document_inspection_matches_byte_ingress() {
+        let bytes = authored_fixture();
+        let expected = crate::embedded::object::Editor::inspect_live_document(&bytes).unwrap();
+        let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes.as_slice())).unwrap();
+        let actual =
+            crate::embedded::object::Editor::inspect_live_document_from_ole(&mut ole).unwrap();
+
+        assert_eq!(actual, expected);
+        assert_eq!(
+            Snapshot::from_bytes(bytes).unwrap().document_persist_id,
+            actual.0
+        );
     }
 
     fn authored_table_fixture() -> Vec<u8> {

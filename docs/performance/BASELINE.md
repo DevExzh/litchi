@@ -220,11 +220,11 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **106
+The stage-1 records above are retained unchanged. The current harness has **107
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, 16 opt-in
 DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, and 21 opt-in
-ODT/ODS/ODP semantic cases, and 18 opt-in native DOC/XLS/PPT semantic cases. It
+ODT/ODS/ODP semantic cases, and 19 opt-in native DOC/XLS/PPT semantic cases. It
 remains an incomplete program and CRUD matrix.
 
 - The XLSX row-start index is accepted for the narrow-range case: ABBA p50
@@ -355,6 +355,13 @@ remains an incomplete program and CRUD matrix.
   Structured queries remain near neutral. The unchanged open guard moves
   +3.94% p50/+4.17% mean and its +10.95% p99 trigger is disclosed. See
   [`0023`](changes/0023-odt-full-text-owned-blocks.md).
+- Native PPT root slide-order capture now reuses the validated `OleFile`
+  already owned by its package instead of rebuilding the CFB index. Four-cycle
+  large-corpus ABBA improves p50 8.78% and mean 10.58%; allocation calls fall
+  5.01%, temporary allocations 12.22%, and peak heap/RSS remain flat. All
+  independent live-document, slide-order, review-history and public-reader
+  checks remain. See
+  [`0024`](changes/0024-ppt-slide-order-open-reuse.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
@@ -363,7 +370,7 @@ bounded by `SourceCacheLimits`, but are not yet charged to the hierarchical
 `Budget`.
 
 Consolidated changed-crate tests and focused changed-crate formatter,
-warning-denied Clippy and rustdoc gates passed. The latest focused ODT tranche
-also compiled the ODF fuzz target offline. A workspace all-target/all-feature
-gate was not rerun because iWork was explicitly excluded while its crates are
-changing independently.
+warning-denied Clippy and rustdoc gates passed. The ODT tranche compiled the
+ODF fuzz target offline; the PPT tranche has no dedicated fuzz target in the
+current tree. A workspace all-target/all-feature gate was not rerun because
+iWork was explicitly excluded while its crates are changing independently.

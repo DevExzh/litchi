@@ -1,0 +1,2607 @@
+reading file "/tmp/ppt-slide-order-before.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-before-ppt-slide-order --warmup 0 --samples 1000 --case ppt_slide_order_snapshot_open --writer-shape large --json /tmp/ppt-slide-order-before-heaptrack.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+595127 calls to allocation functions with 295.12K peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h2e575ca87cc6ab29E.llvm.11029687063915831966
+  in /tmp/litchi-perf-before-ppt-slide-order
+77000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits::h82cbffaac6e437cf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+36000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits::h82cbffaac6e437cf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+32000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits::h82cbffaac6e437cf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+23000 calls with 615B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children_strict::hcdaab8d955dab781
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children_strict::hcdaab8d955dab781
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+23000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_with_limits::hd202e1471b3a286c
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 404127 from 502 other places
+
+65000 calls to allocation functions with 0B peak consumption from
+litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+  in /tmp/litchi-perf-before-ppt-slide-order
+23000 calls with 0B peak consumption from:
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::from_record_with_limits::h8d8869bdf42653e7
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::parse_with_limits::hed22755f9ad6084e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt19document_comparison7package26snapshot_from_presentation17h91ab13bc8490672fE.llvm.15115718617616079441
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+17000 calls with 0B peak consumption from:
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::from_record_with_limits::h8d8869bdf42653e7
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::parse_with_limits::hed22755f9ad6084e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt19document_comparison7package26snapshot_from_presentation17h91ab13bc8490672fE.llvm.15115718617616079441
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+7000 calls with 0B peak consumption from:
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::from_record_with_limits::h8d8869bdf42653e7
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::parse_with_limits::hed22755f9ad6084e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt19document_comparison7package26snapshot_from_presentation17h91ab13bc8490672fE.llvm.15115718617616079441
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+6000 calls with 0B peak consumption from:
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::from_record_with_limits::h8d8869bdf42653e7
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::parse_with_limits::hed22755f9ad6084e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt19document_comparison7package26snapshot_from_presentation17h91ab13bc8490672fE.llvm.15115718617616079441
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+5000 calls with 0B peak consumption from:
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::from_record_with_limits::h8d8869bdf42653e7
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::parse_with_limits::hed22755f9ad6084e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt19document_comparison7package26snapshot_from_presentation17h91ab13bc8490672fE.llvm.15115718617616079441
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 7000 from 4 other places
+
+65000 calls to allocation functions with 0B peak consumption from
+_ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+  in /tmp/litchi-perf-before-ppt-slide-order
+13000 calls with 0B peak consumption from:
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+13000 calls with 0B peak consumption from:
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+10000 calls with 0B peak consumption from:
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+7000 calls with 0B peak consumption from:
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+6000 calls with 0B peak consumption from:
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 16000 from 6 other places
+
+56081 calls to allocation functions with 0B peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h6464526c3ff1b6b8E.llvm.521929143331856660
+  in /tmp/litchi-perf-before-ppt-slide-order
+5000 calls with 0B peak consumption from:
+    litchi_cfb::file::collect_sector_chain::he753e58606d1c572
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h6e4b271c25685e00
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h63e64a57461748eb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+5000 calls with 0B peak consumption from:
+    litchi_cfb::file::collect_sector_chain::he753e58606d1c572
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h6e4b271c25685e00
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h63e64a57461748eb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+3000 calls with 0B peak consumption from:
+    litchi_cfb::file::collect_sector_chain_exact::hd71255b383c6244b
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::validate_stream_allocations::h6065f4e11518b1fa
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+3000 calls with 0B peak consumption from:
+    litchi_cfb::file::collect_sector_chain_exact::hd71255b383c6244b
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::validate_stream_allocations::h6065f4e11518b1fa
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+3000 calls with 0B peak consumption from:
+    litchi_cfb::file::collect_sector_chain_exact::hd71255b383c6244b
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::validate_stream_allocations::h6065f4e11518b1fa
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hddce9bf071bbdd3a
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 37081 from 98 other places
+
+36042 calls to allocation functions with 364B peak consumption from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-perf-before-ppt-slide-order
+12000 calls with 0B peak consumption from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::read_header::h4459c0063403c25f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+12000 calls with 0B peak consumption from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::read_header::h4459c0063403c25f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+4000 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::decode_utf16le::h4f250ff96da269a0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::parse_directory_entry::h64d8d1cc49a1cf16
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::build_storage_tree_iterative::h10df1493f1c7c166
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+4000 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::decode_utf16le::h4f250ff96da269a0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::parse_directory_entry::h64d8d1cc49a1cf16
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::build_storage_tree_iterative::h10df1493f1c7c166
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hddce9bf071bbdd3a
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::decode_utf16le::h4f250ff96da269a0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::parse_directory_entry::h64d8d1cc49a1cf16
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 3042 from 17 other places
+
+15028 calls to allocation functions with 18.19K peak consumption from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /tmp/litchi-perf-before-ppt-slide-order
+4000 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::he0f963376f4bdbbb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+4000 calls with 0B peak consumption from:
+    _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hfc3c1535591c12f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::he0f963376f4bdbbb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hfc3c1535591c12f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::lifecycle::open::find_stream::hb7ab1857ddcbe037
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h4c06b9d483f67e05
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hddce9bf071bbdd3a
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h4c06b9d483f67e05
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hddce9bf071bbdd3a
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 4028 from 22 other places
+
+12010 calls to allocation functions with 0B peak consumption from
+_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+  in /tmp/litchi-perf-before-ppt-slide-order
+5000 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hddce9bf071bbdd3a
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+5000 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    litchi_ppt::document_comparison::codec::find_pp10_blob::h8edcc23466666f50
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::read_review::ha2b19579134044ea
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::from_record_with_limits::h8d8869bdf42653e7
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::parse_with_limits::hed22755f9ad6084e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt19document_comparison7package26snapshot_from_presentation17h91ab13bc8490672fE.llvm.15115718617616079441
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    litchi_ppt::document_comparison::codec::find_pp10_blob::h8edcc23466666f50
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::read_review::ha2b19579134044ea
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+5 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h0133b18e7c97ce40
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h4536a4c3e24e0569
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::build_writer_corpus::h98f0d205e0ff7183
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 5 from 1 other places
+
+7010 calls to allocation functions with 736B peak consumption from
+_ZN9hashbrown3raw13RawTableInner22fallible_with_capacity17hf14ce0a88d71684dE.llvm.6984107316200286978
+  in /tmp/litchi-perf-before-ppt-slide-order
+3000 calls with 0B peak consumption from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h30dd97f3b6dc9d75
+      in /tmp/litchi-perf-before-ppt-slide-order
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h5cb1b3ecdf222cd7
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping::h5c6e63d5b31d284b
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h481ab2927b5d4ffb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h481ab2927b5d4ffb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    litchi_ppt::document_structure::validation::validate_document::he1231902c13cd007
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    litchi_ppt::document_structure::validation::validate_document::he1231902c13cd007
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 10 from 7 other places
+
+6000 calls to allocation functions with 0B peak consumption from
+_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hfc3c1535591c12f9
+  in /tmp/litchi-perf-before-ppt-slide-order
+4000 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::he0f963376f4bdbbb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    litchi_ppt::embedded::object::editor::lifecycle::open::find_stream::hb7ab1857ddcbe037
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    litchi_ppt::embedded::object::editor::lifecycle::open::find_stream::hb7ab1857ddcbe037
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+5001 calls to allocation functions with 0B peak consumption from
+_ZN9hashbrown3raw13RawTableInner22fallible_with_capacity17h76734c234aec5211E.llvm.6247495593680743966
+  in /tmp/litchi-perf-before-ppt-slide-order
+2000 calls with 0B peak consumption from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::hbf4ad60e45e4e9fc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h19c841b95d0ff3e1
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::validation::parse_slide_list::h4413581b2cf50027
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::validation::validate_document::he1231902c13cd007
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::hbf4ad60e45e4e9fc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h19c841b95d0ff3e1
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::mapping::chain::read::h4778dd316fc9a91c
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping::h5c6e63d5b31d284b
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::hbf4ad60e45e4e9fc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h19c841b95d0ff3e1
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::mapping::chain::read::h4778dd316fc9a91c
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 calls with 0B peak consumption from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::hbf4ad60e45e4e9fc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h19c841b95d0ff3e1
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::validation::parse_master_list::h258cc57b35a86344
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::validation::validate_document::he1231902c13cd007
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1 calls with 0B peak consumption from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::hbf4ad60e45e4e9fc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h19c841b95d0ff3e1
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::mapping::chain::read::h4778dd316fc9a91c
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping::h5c6e63d5b31d284b
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hcadd344a12643fdf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+
+PEAK MEMORY CONSUMERS
+295.12K peak memory consumed over 595127 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h2e575ca87cc6ab29E.llvm.11029687063915831966
+  in /tmp/litchi-perf-before-ppt-slide-order
+37.26K consumed over 16 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits::h82cbffaac6e437cf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hcadd344a12643fdf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+36.55K consumed over 77 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits::h82cbffaac6e437cf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hcadd344a12643fdf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+30.67K consumed over 11 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::factory::SlideFactory::parse_slide::hd729ee45af89afc6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h420d1decd6ddfebb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    alloc::vec::in_place_collect::_$LT$impl$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$u20$for$u20$alloc..vec..Vec$LT$T$GT$$GT$::from_iter::hcfd41ed9c905b382
+      in /tmp/litchi-perf-before-ppt-slide-order
+    core::iter::adapters::try_process::hc2a6c43535ba7fb0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::slides::h75a33155880ee58f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+30.67K consumed over 11 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::factory::SlideFactory::parse_slide::hd729ee45af89afc6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h420d1decd6ddfebb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    alloc::vec::in_place_collect::_$LT$impl$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$u20$for$u20$alloc..vec..Vec$LT$T$GT$$GT$::from_iter::hcfd41ed9c905b382
+      in /tmp/litchi-perf-before-ppt-slide-order
+    core::iter::adapters::try_process::hc2a6c43535ba7fb0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::slides::h75a33155880ee58f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::text::h170ffe1042a8451d
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+30.32K consumed over 44 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve_exact::h1f8b71b4ac1dc330
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::parse_container_children::h132931f726af0eb4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt7records6record6Record10parse_impl17h4d574bf757ed09b5E.llvm.13742382293669864325
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::factory::SlideFactory::parse_slide::hd729ee45af89afc6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h420d1decd6ddfebb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    alloc::vec::in_place_collect::_$LT$impl$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$u20$for$u20$alloc..vec..Vec$LT$T$GT$$GT$::from_iter::hcfd41ed9c905b382
+      in /tmp/litchi-perf-before-ppt-slide-order
+    core::iter::adapters::try_process::hc2a6c43535ba7fb0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::slides::h75a33155880ee58f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::text::h170ffe1042a8451d
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 129.67K from 502 other places
+
+155.55K peak memory consumed over 40 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h74ba8c770cd99f88E.llvm.18344005967514530378
+  in /tmp/litchi-perf-before-ppt-slide-order
+77.31K consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hbd2db2504bf758e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::writer::core::write_sector_aligned::h751a766b44f14924
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::writer::core::OleWriter::write_to::h16f155394f736139
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::writer::core::package::_$LT$impl$u20$litchi_ppt..writer..core..model..Writer$GT$::write_to::h307155612528ed6f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::write_fresh_ppt::ha4c78feb9daa291d
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::build_writer_corpus::h98f0d205e0ff7183
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+37.38K consumed over 1 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::ha4e90f48c0992244
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h22970f61fd2c9c13
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::build_writer_corpus::h98f0d205e0ff7183
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+37.38K consumed over 1 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::ha4e90f48c0992244
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h22970f61fd2c9c13
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hcadd344a12643fdf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1.28K consumed over 1 calls from:
+    litchi_cfb::file::try_filled_vec::h43ba806db64fd409
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h0133b18e7c97ce40
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h4536a4c3e24e0569
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::h371ad6a38f75acde
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+832B consumed over 1 calls from:
+    litchi_cfb::file::try_filled_vec::h2f2757150df04aac
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h0133b18e7c97ce40
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h4536a4c3e24e0569
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::h371ad6a38f75acde
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 1.36K from 32 other places
+
+73.73K peak memory consumed over 12 calls from
+litchi_ppt::slide::types::semantic::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::shapes::hb2171237aad64263
+  in /tmp/litchi-perf-before-ppt-slide-order
+73.73K consumed over 12 calls from:
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+73.73K peak memory consumed over 1 calls from
+0x72725f8b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+48.96K peak memory consumed over 1002 calls from
+litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+  in /tmp/litchi-perf-before-ppt-slide-order
+40.96K consumed over 1 calls from:
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+8.00K consumed over 1 calls from:
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+42.11K peak memory consumed over 5000 calls from
+alloc::sync::Arc$LT$T$C$A$GT$::from_box_in::h3e111b3e3be43259
+  in /tmp/litchi-perf-before-ppt-slide-order
+40.98K consumed over 1000 calls from:
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1.14K consumed over 1000 calls from:
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+27.63K peak memory consumed over 25 calls from
+alloc::str::join_generic_copy::h0de00ce83ec3269b
+  in /tmp/litchi-perf-before-ppt-slide-order
+9.23K consumed over 1 calls from:
+    litchi_ppt::presentation::model::Presentation::text::h170ffe1042a8451d
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+9.20K consumed over 12 calls from:
+    litchi_ppt::slide::types::semantic::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::text::h957af2cb71bdc4d5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+8.44K consumed over 11 calls from:
+    litchi_ppt::slide::types::semantic::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::text::h957af2cb71bdc4d5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::hec6e8563ef8f22a9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::text::h170ffe1042a8451d
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+767B consumed over 1 calls from:
+    litchi_ppt::slide::types::semantic::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::text::h957af2cb71bdc4d5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::hec6e8563ef8f22a9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::text::h170ffe1042a8451d
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+23.04K peak memory consumed over 288 calls from
+_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5e0468bd29066b51
+  in /tmp/litchi-perf-before-ppt-slide-order
+23.04K consumed over 144 calls from:
+    litchi_ppt::shapes::textbox::TextBox::from_odraw::ha867282774b7c9c3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::types::codec::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::convert_odraw_shape::ha67cd1f114a90b74
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::types::semantic::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::shapes::hb2171237aad64263
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+20.74K peak memory consumed over 288 calls from
+_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h04317add77c2637c
+  in /tmp/litchi-perf-before-ppt-slide-order
+20.74K consumed over 144 calls from:
+    litchi_ppt::shapes::textbox::TextBox::from_odraw::ha867282774b7c9c3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::types::codec::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::convert_odraw_shape::ha67cd1f114a90b74
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::types::semantic::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::shapes::hb2171237aad64263
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+18.19K peak memory consumed over 15028 calls from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /tmp/litchi-perf-before-ppt-slide-order
+9.07K consumed over 144 calls from:
+    _$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h04317add77c2637c
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::shapes::textbox::TextBox::from_odraw::ha867282774b7c9c3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::types::codec::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::convert_odraw_shape::ha67cd1f114a90b74
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::types::semantic::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::shapes::hb2171237aad64263
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+9.07K consumed over 144 calls from:
+    _$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5e0468bd29066b51
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::shapes::textbox::TextBox::from_odraw::ha867282774b7c9c3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::types::codec::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::convert_odraw_shape::ha67cd1f114a90b74
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::types::semantic::_$LT$impl$u20$litchi_ppt..slide..types..Slide$GT$::shapes::hb2171237aad64263
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+36B consumed over 1 calls from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h4c06b9d483f67e05
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h0133b18e7c97ce40
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h4536a4c3e24e0569
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::h371ad6a38f75acde
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+10B consumed over 1 calls from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h4c06b9d483f67e05
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h0133b18e7c97ce40
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h4536a4c3e24e0569
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::h371ad6a38f75acde
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 0B from 22 other places
+
+
+MOST TEMPORARY ALLOCATIONS
+26027 temporary allocations of 36042 allocations in total (72.21%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-perf-before-ppt-slide-order
+12000 temporary allocations of 12000 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::read_header::h4459c0063403c25f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+12000 temporary allocations of 12000 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::read_header::h4459c0063403c25f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::read_header::h4459c0063403c25f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::read_header::h4459c0063403c25f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+12 temporary allocations of 12 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::read_header::h4459c0063403c25f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hcadd344a12643fdf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 15B from 17 other places
+
+22025 temporary allocations of 56081 allocations in total (39.27%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h6464526c3ff1b6b8E.llvm.521929143331856660
+  in /tmp/litchi-perf-before-ppt-slide-order
+4000 temporary allocations of 5000 allocations in total (80.00%) from:
+    litchi_cfb::file::collect_sector_chain::he753e58606d1c572
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h6e4b271c25685e00
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h63e64a57461748eb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+4000 temporary allocations of 5000 allocations in total (80.00%) from:
+    litchi_cfb::file::collect_sector_chain::he753e58606d1c572
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h6e4b271c25685e00
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h63e64a57461748eb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+3000 temporary allocations of 3000 allocations in total (100.00%) from:
+    litchi_cfb::file::collect_sector_chain_exact::hd71255b383c6244b
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::validate_stream_allocations::h6065f4e11518b1fa
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+3000 temporary allocations of 3000 allocations in total (100.00%) from:
+    litchi_cfb::file::collect_sector_chain_exact::hd71255b383c6244b
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::validate_stream_allocations::h6065f4e11518b1fa
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hddce9bf071bbdd3a
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    litchi_cfb::file::collect_sector_chain_exact::hd71255b383c6244b
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::validate_stream_allocations::h6065f4e11518b1fa
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hddce9bf071bbdd3a
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 7.03K from 98 other places
+
+8877 temporary allocations of 595127 allocations in total (1.49%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h2e575ca87cc6ab29E.llvm.11029687063915831966
+  in /tmp/litchi-perf-before-ppt-slide-order
+2000 temporary allocations of 2000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::habc1e328419a62fb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::group_into_slide_atoms_sets::hef90d7c33a98182d
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    litchi_cfb::file::try_push::h78dfb1582a47f659
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    litchi_cfb::file::try_push::h78dfb1582a47f659
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hddce9bf071bbdd3a
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::habc1e328419a62fb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::records::record::Record::group_into_slide_atoms_sets::hef90d7c33a98182d
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    litchi_cfb::file::try_vec_with_capacity::h7c3c1c0ec52018a1
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2cd9b086a6c64be0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::open::ha98c2ada42ceba53
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::package::codec::_$LT$impl$u20$litchi_ppt..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hddce9bf071bbdd3a
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 2.88K from 502 other places
+
+2000 temporary allocations of 12010 allocations in total (16.65%) from
+_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+  in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    litchi_ppt::document_comparison::codec::find_pp10_blob::h8edcc23466666f50
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::read_review::ha2b19579134044ea
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::from_record_with_limits::h8d8869bdf42653e7
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::parse_with_limits::hed22755f9ad6084e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt19document_comparison7package26snapshot_from_presentation17h91ab13bc8490672fE.llvm.15115718617616079441
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    litchi_ppt::document_comparison::codec::find_pp10_blob::h8edcc23466666f50
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::codec::read_review::ha2b19579134044ea
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 0B from 1 other places
+
+1003 temporary allocations of 1003 allocations in total (100.00%) from
+_$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::hbce0f2057d2202c8
+  in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_ppt::slide::directory::SlideDirectory::build_with_limits::h53a8f09e79a8e2f9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hcadd344a12643fdf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    once_cell::unsync::OnceCell$LT$T$GT$::get_or_try_init::h17acc02151f57241
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::factory::SlideFactory::parse_slide::hd729ee45af89afc6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h420d1decd6ddfebb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    alloc::vec::in_place_collect::_$LT$impl$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$u20$for$u20$alloc..vec..Vec$LT$T$GT$$GT$::from_iter::hcfd41ed9c905b382
+      in /tmp/litchi-perf-before-ppt-slide-order
+    core::iter::adapters::try_process::hc2a6c43535ba7fb0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::slides::h75a33155880ee58f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    once_cell::unsync::OnceCell$LT$T$GT$::get_or_try_init::h17acc02151f57241
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide::factory::SlideFactory::parse_slide::hd729ee45af89afc6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h420d1decd6ddfebb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    alloc::vec::in_place_collect::_$LT$impl$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$u20$for$u20$alloc..vec..Vec$LT$T$GT$$GT$::from_iter::hcfd41ed9c905b382
+      in /tmp/litchi-perf-before-ppt-slide-order
+    core::iter::adapters::try_process::hc2a6c43535ba7fb0
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::slides::h75a33155880ee58f
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::model::Presentation::text::h170ffe1042a8451d
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+1001 temporary allocations of 1001 allocations in total (100.00%) from
+litchi_ppt::parsers::parser::RecordParser::extract_all_text::ha454a19b16087401
+  in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits::h82cbffaac6e437cf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hf4011dc5ea83f4a6
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits::h82cbffaac6e437cf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::presentation::package::_$LT$impl$u20$litchi_ppt..presentation..model..Presentation$GT$::from_ole_with_options::hcadd344a12643fdf
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::verify_semantic_ppt::h2835d609f1f4e081
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+1000 temporary allocations of 65000 allocations in total (1.54%) from
+litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+  in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 7000 allocations in total (14.29%) from:
+    litchi_ppt::document_comparison::codec::encode_document::h4f2b5024d07bfaa3
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::from_record_with_limits::h8d8869bdf42653e7
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_comparison::transaction::Snapshot::parse_with_limits::hed22755f9ad6084e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN10litchi_ppt19document_comparison7package26snapshot_from_presentation17h91ab13bc8490672fE.llvm.15115718617616079441
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 0B from 4 other places
+
+1000 temporary allocations of 65000 allocations in total (1.54%) from
+_ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+  in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 7000 allocations in total (14.29%) from:
+    _ZN10litchi_ppt18document_structure5codec13encode_record17h0b5450ece872c04eE.llvm.12841219496254957040
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 0B from 6 other places
+
+1000 temporary allocations of 3000 allocations in total (33.33%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he38c929dd3d0292bE.llvm.6247495593680743966
+  in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hc57d264f25007020
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::he0f963376f4bdbbb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::embedded::object::editor::Editor::inspect_live_document::h6d9a680d62aff2e4
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+
+1000 temporary allocations of 7010 allocations in total (14.27%) from
+_ZN9hashbrown3raw13RawTableInner22fallible_with_capacity17hf14ce0a88d71684dE.llvm.6984107316200286978
+  in /tmp/litchi-perf-before-ppt-slide-order
+1000 temporary allocations of 1000 allocations in total (100.00%) from:
+    litchi_ppt::document_structure::validation::validate_document::he1231902c13cd007
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::document_structure::transaction::Snapshot::parse_with_limits::hb8b39bafb347b7c5
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes_with_limits::he3039792ef2b04b9
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_ppt::slide_order::Snapshot::from_bytes::h6a5354b70121069e
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::run_semantic_ppt::h47e3db3a5c77a841
+      in /tmp/litchi-perf-before-ppt-slide-order
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-ppt-slide-order
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /tmp/litchi-perf-before-ppt-slide-order
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-ppt-slide-order
+    main
+      in /tmp/litchi-perf-before-ppt-slide-order
+  and 0B from 7 other places
+
+
+total runtime: 0.33s.
+calls to allocation functions: 897632 (2695591/s)
+temporary memory allocations: 65472 (196612/s)
+peak heap memory consumption: 808.53K
+peak RSS (including heaptrack overhead): 11.74M
+total memory leaked: 544B

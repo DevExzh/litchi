@@ -314,6 +314,7 @@ enum Case {
     PptSemanticListSlides,
     PptSemanticOneShapeText,
     PptSemanticFullText,
+    PptSlideOrderSnapshotOpen,
     PptSemanticNoopEditSave,
     PptSemanticOneEditSave,
     XlsxOpenOwned,
@@ -464,6 +465,7 @@ impl Case {
             Self::PptSemanticListSlides => "ppt_semantic_list_slides",
             Self::PptSemanticOneShapeText => "ppt_semantic_one_shape_text",
             Self::PptSemanticFullText => "ppt_semantic_full_text",
+            Self::PptSlideOrderSnapshotOpen => "ppt_slide_order_snapshot_open",
             Self::PptSemanticNoopEditSave => "ppt_semantic_noop_edit_save",
             Self::PptSemanticOneEditSave => "ppt_semantic_one_edit_save",
             Self::XlsxOpenOwned => "xlsx_open_owned",
@@ -610,6 +612,7 @@ impl Case {
                 | Self::PptSemanticListSlides
                 | Self::PptSemanticOneShapeText
                 | Self::PptSemanticFullText
+                | Self::PptSlideOrderSnapshotOpen
                 | Self::PptSemanticNoopEditSave
                 | Self::PptSemanticOneEditSave
         )
@@ -2005,6 +2008,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_semantic_list_slides" => Some(Case::PptSemanticListSlides),
         "ppt_semantic_one_shape_text" => Some(Case::PptSemanticOneShapeText),
         "ppt_semantic_full_text" => Some(Case::PptSemanticFullText),
+        "ppt_slide_order_snapshot_open" => Some(Case::PptSlideOrderSnapshotOpen),
         "ppt_semantic_noop_edit_save" => Some(Case::PptSemanticNoopEditSave),
         "ppt_semantic_one_edit_save" => Some(Case::PptSemanticOneEditSave),
         "xlsx_open_owned" => Some(Case::XlsxOpenOwned),
@@ -2148,6 +2152,7 @@ fn print_usage() {
                                        xls_semantic_noop_edit_save,xls_semantic_one_edit_save,\n\
                                        ppt_semantic_open,ppt_semantic_list_slides,\n\
                                        ppt_semantic_one_shape_text,ppt_semantic_full_text,\n\
+                                       ppt_slide_order_snapshot_open,\n\
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
                                        xlsx_open_owned,xlsx_list_sheets,xlsx_first_cell,\n\
                                        xlsx_full_cell_scan,xlsx_narrow_column_range_scan,\n\
@@ -3257,6 +3262,7 @@ fn run_case_with_config(
         | Case::PptSemanticListSlides
         | Case::PptSemanticOneShapeText
         | Case::PptSemanticFullText
+        | Case::PptSlideOrderSnapshotOpen
         | Case::PptSemanticNoopEditSave
         | Case::PptSemanticOneEditSave => {
             run_semantic_ppt(case, corpus, warmup_iterations, samples)
@@ -4283,6 +4289,7 @@ fn run_semantic_ppt(
         corpus.archive.clone()
     };
     let mut elapsed = Vec::with_capacity(samples);
+    let mut final_slide_order_snapshot = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         match case {
             Case::PptSemanticOpen => {
@@ -4344,6 +4351,20 @@ fn run_semantic_ppt(
                 std::hint::black_box(text);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
+            Case::PptSlideOrderSnapshotOpen => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let snapshot = Snapshot::from_bytes(owned)?;
+                let duration = started.elapsed();
+                if snapshot.slide_count() != slide_count {
+                    return Err(
+                        "PPT slide-order snapshot count differs from writer specification".into(),
+                    );
+                }
+                std::hint::black_box(&snapshot);
+                final_slide_order_snapshot = Some(snapshot);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
             Case::PptSemanticNoopEditSave | Case::PptSemanticOneEditSave => {
                 let source = Snapshot::from_bytes(corpus.archive.clone())?;
                 let updated = case == Case::PptSemanticOneEditSave;
@@ -4389,6 +4410,9 @@ fn run_semantic_ppt(
             },
             _ => return Err("non-PPT semantic case passed to PPT runner".into()),
         }
+    }
+    if let Some(snapshot) = final_slide_order_snapshot {
+        verify_semantic_ppt(snapshot.bytes(), shape, None)?;
     }
     Ok(result(case, corpus, elapsed, None))
 }
@@ -7101,6 +7125,12 @@ mod tests {
                 assert!(measured.sink.is_none());
             }
         }
+
+        let ppt = build_writer_corpus(Case::PptFreshWriteTo, WriterShape::Tiny).unwrap();
+        let measured = run_case(Case::PptSlideOrderSnapshotOpen, &ppt, 0, 1).unwrap();
+        assert_eq!(measured.case, "ppt_slide_order_snapshot_open");
+        assert_eq!(measured.elapsed_ns.samples.len(), 1);
+        assert!(measured.sink.is_none());
     }
 
     #[test]
