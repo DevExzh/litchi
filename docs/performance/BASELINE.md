@@ -300,11 +300,24 @@ remains an incomplete program and CRUD matrix.
 - The same deterministic native DOC/XLS/PPT writer artifacts now have public
   open/list/one/full/no-op/one-edit semantic baselines. On the large shapes,
   one-edit/save p50 is 1.416 ms for DOC, 1.722 ms for XLS, and 0.357 ms for
-  PPT; XLS open is 1.383 ms. Heaptrack reaches complete workbook reopen and
-  per-cell map construction under XLS commit, making it the next measured
-  native candidate. See
+  PPT; XLS open is 1.383 ms. See
   [`0015`](changes/0015-native-ole2-semantic-baseline.md) and the
   [`raw report`](results/ole2-semantic-baseline-a57506d23-2026-08-11.json).
+- Reusing the already rendered/reopened CFB editor in native XLS commit removes
+  one discarded BIFF owner parse and redundant package capture. Large one-cell
+  edit/save p50 improves 7.72%, with peak heap and uninstrumented RSS flat.
+  See [`0016`](changes/0016-xls-commit-editor-reuse.md).
+- Native DOC paragraph commit now applies its ordinary WordDocument and table
+  stream replacements to one isolated candidate and publishes the CFB once.
+  Large one-edit/save p50 improves 10.52%; the final strict revision-owner and
+  independent public-document reopens remain. See
+  [`0017`](changes/0017-doc-batched-stream-publication.md).
+- Eligible same-topology ODS worksheet commits now serialize only changed
+  modeled rows and copy untouched XML spans exactly. Large/medium one-cell
+  edit-save p50 improves 9.54% / 7.22%, allocation calls fall 5.85%, and peak
+  heap falls 27.18%. Structural edits retain full-table fallback and changed
+  opaque rows refuse publication. See
+  [`0018`](changes/0018-ods-row-local-publication.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

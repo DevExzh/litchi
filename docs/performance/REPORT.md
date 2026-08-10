@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest semantic tranche: `a57506d2339ed9384629bbe8accc958279cba0b3`
+Production base for the latest semantic tranche: `397abec7412cc7f5b2223865611f4cb06e65f77b`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -31,7 +31,10 @@ is still not broad program or CRUD coverage.
 | ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP corpora; ODP is coverage-only and ODT has the focused follow-up below; changed ODS publication still rewrites the package |
 | RTF semantic baseline and text paths | Medium/large full-text p50 **-38.39% / -27.08%**; one-edit/save **-33.40% / -25.79%** | Generated native RTF text corpus; open guard +0.96% / +3.41%; formatting/media/security matrices remain missing |
 | ODT shared transaction bytes | Medium/large no-op edit-save p50 **-27.05% / -18.51%**; exactly two allocations and one archive copy removed per snapshot | Existing-document snapshot handoff only; changed edit/save and open guardrails remain within 3%; changed publication still rewrites the package |
-| Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Baseline-only generated writer corpora; no production optimization claim; XLS commit/reopen is the next profiled candidate |
+| Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
+| Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
+| Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
+| ODS row-local publication | Large/medium one-cell edit-save p50 **-9.54% / -7.22%**; allocation calls **-5.85%**, peak heap **-27.18%** | Same-topology modeled rows only; structural edits fall back and touched opaque rows refuse |
 
 Raw evidence: [`XLSX before A`](results/abba-xlsx-range-before-a.json),
 [`after A`](results/abba-xlsx-range-after-a.json),
@@ -95,6 +98,26 @@ Its complete latency table, Heaptrack/RSS evidence, hardware counters, and
 ranked next target are in
 [`change 0015`](changes/0015-native-ole2-semantic-baseline.md).
 
+The accepted native XLS follow-up reuses its validated object editor; its
+primary raw reports are
+[`before A`](results/abba-xls-commit-reuse-one-edit-before-a.json) and
+[`after A`](results/abba-xls-commit-reuse-one-edit-after-a.json), with pooled
+statistics and all four legs in
+[`change 0016`](changes/0016-xls-commit-editor-reuse.md). The DOC follow-up
+batches ordinary stream replacement; its primary raw reports are
+[`before A`](results/abba-doc-stream-batch-one-edit-before-a.json) and
+[`after A`](results/abba-doc-stream-batch-one-edit-after-a.json), with the
+complete record in
+[`change 0017`](changes/0017-doc-batched-stream-publication.md).
+
+The ODS row-local publication evidence is
+[`before A`](results/abba-ods-row-splice-one-edit-before-a.json),
+[`after A`](results/abba-ods-row-splice-one-edit-after-a.json),
+[`after B`](results/abba-ods-row-splice-one-edit-after-b.json), and
+[`before B`](results/abba-ods-row-splice-one-edit-before-b.json). Medium,
+guardrail, allocation, RSS and hardware-counter evidence is summarized in
+[`change 0018`](changes/0018-ods-row-local-publication.md).
+
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
 charged to hierarchical `Budget`. Raw ZIP preservation is now integrated for
 owned same-topology OPC mutations; broader source-backed editing is pending.
@@ -108,7 +131,10 @@ See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0012`](changes/0012-docx-coalesced-paragraph-edits.md), and
 [`0013`](changes/0013-rtf-semantic-baseline-and-text-paths.md), and
 [`0014`](changes/0014-odt-shared-snapshot-bytes.md), and
-[`0015`](changes/0015-native-ole2-semantic-baseline.md).
+[`0015`](changes/0015-native-ole2-semantic-baseline.md),
+[`0016`](changes/0016-xls-commit-editor-reuse.md),
+[`0017`](changes/0017-doc-batched-stream-publication.md), and
+[`0018`](changes/0018-ods-row-local-publication.md).
 
 Consolidated changed-crate tests passed, along with focused changed-crate
 warning-denied Clippy and formatter checks. An umbrella all-feature `litchi`
@@ -135,9 +161,12 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | PPTX 1% edit/save, 10,000 text boxes | 399.320 ms | 361.915 ms | -9.37% p50 / -9.37% mean | Allocation calls -11.67%; peak heap flat; profiler RSS +1.28% |
 | ODS no-op edit/save, 32,768 cells | 76.894 ms | 67.838 ms | -11.78% p50 / -12.08% mean | Peak heap flat; profiler RSS -0.13% |
 | ODS one-cell edit/save, 32,768 cells | 384.150 ms | 376.237 ms | -2.06% p50 / -2.19% mean | Changed package rewrite/readback still dominates |
+| ODS row-local one-cell edit/save, 32,768 cells | 359.011 ms | 324.774 ms | **-9.54% p50 / -9.32% mean** | Allocation calls -5.85%; peak heap -27.18%; uninstrumented RSS improved |
 | RTF full text, 10,000 paragraphs | 33.095 us | 24.134 us | -27.08% p50 / -25.37% mean | One fragment-vector allocation removed per first materialization |
 | RTF one paragraph edit/save, 10,000 paragraphs | 12.408 ms | 9.208 ms | -25.79% p50 / -25.53% mean | Allocation calls -707 over 100 samples; peak heap flat; RSS +0.32% (flat) |
 | ODT no-op edit/save, 10,000 paragraphs | 3.950 us | 3.219 us | -18.51% p50 / -29.58% mean | Exactly two allocations and one 28.42 KiB archive copy removed per snapshot; peak heap/RSS flat |
+| Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
+| Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
 
 The underlying records are:
 
@@ -153,6 +182,9 @@ The underlying records are:
 - [`0013-rtf-semantic-baseline-and-text-paths.md`](changes/0013-rtf-semantic-baseline-and-text-paths.md)
 - [`0014-odt-shared-snapshot-bytes.md`](changes/0014-odt-shared-snapshot-bytes.md)
 - [`0015-native-ole2-semantic-baseline.md`](changes/0015-native-ole2-semantic-baseline.md)
+- [`0016-xls-commit-editor-reuse.md`](changes/0016-xls-commit-editor-reuse.md)
+- [`0017-doc-batched-stream-publication.md`](changes/0017-doc-batched-stream-publication.md)
+- [`0018-ods-row-local-publication.md`](changes/0018-ods-row-local-publication.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -181,6 +213,12 @@ rather than hidden in an aggregate.
 - Fresh XLS and PPT writers transfer already-owned generated stream buffers to
   CFB without a second payload copy. DOC deliberately retains its measured
   faster exact-sized copy.
+- Native XLS changed commit reuses the already rendered/reopened object editor
+  instead of discarding one BIFF owner parse and reopening/capturing the CFB a
+  second time before final validation.
+- Native DOC applies ordinary WordDocument and table-stream replacements to
+  one isolated object-editor candidate and renders/reopens the CFB once rather
+  than once per replacement.
 - DOCX one-paragraph selection no longer constructs the complete paragraph
   collection, and source-backed paragraph counts no longer construct any
   paragraph views. Complete XML validation and limits still run.
@@ -195,6 +233,9 @@ rather than hidden in an aggregate.
 - ODS unified snapshot construction reuses its one validated package for full
   facade readback instead of cloning package bytes and parsing the package a
   second time.
+- Eligible same-topology ODS worksheet commits serialize only changed modeled
+  rows instead of regenerating every worksheet row; untouched XML source spans
+  are copied exactly and structural edits retain full-table fallback.
 - RTF first full-text materialization retains only a byte count during parse,
   then allocates the final string once and copies blocks in one pass instead of
   allocating and joining a temporary fragment vector.
@@ -244,8 +285,10 @@ During the stage-1 capture, hardware counters were unavailable because that
 host had `perf_event_paranoid=4`. The later targeted-OPC capture ran after the
 environment reported `1`: matched process counters show cycles -69.21% and
 instructions -69.85% for that one save cell. No counter claim is retroactively
-made for stage 1 or generalized to other workloads; lock-wait evidence remains
-missing.
+made for stage 1 or generalized to other workloads. Later XLS, DOC and ODS
+change records also retain matched process counters; the row-local ODS workload
+reports cycles -5.47%, instructions -6.92%, and cache misses -6.58%.
+Lock-wait evidence remains missing.
 
 ## Remaining highest-impact work
 
@@ -262,10 +305,11 @@ threshold tuning/contention work beyond the committed explicit scaling curves,
 and broad format-semantic CRUD coverage beyond the generated text/grid slices
 (bulk action distinctions, dependency-copy, merge/split, patch timing, repair,
 security, malformed and real-producer corpora, plus broader ODF and RTF
-coverage). Native DOC/XLS/PPT semantic baselines now rank XLS one-cell
-publication and its complete workbook reopen as the next source-audited
-non-iWork candidate; broader ODT source-backed reads and changed publication
-remain open.
+coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS
+editor-reuse and DOC batched-publication follow-ups. Remaining native work
+requires new attribution inside the retained final owner/public-reader
+validation layers. Broader ODF source-backed reads, package-parse reuse,
+unchanged ZIP-member publication and structural-edit profiles remain open.
 iWork work is deliberately deferred while the `iwa-*` crates are changing
 independently.
 The scenario-by-scenario gap map and next case queue are in

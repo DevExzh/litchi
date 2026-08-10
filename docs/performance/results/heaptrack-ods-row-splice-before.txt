@@ -1,0 +1,14 @@
+Profile: /tmp/ods-next-before.heaptrack.zst.zst
+Binary: /tmp/litchi-perf-before-ods-397abec74
+Binary SHA-256: 45fc835674fcea43ccc9ee10956dd244cc2ca2e7c4ff7756dc7a7ca909e8bcb9
+Command: --warmup 0 --samples 1 --case ods_semantic_one_edit_save --semantic-shape large
+
+total runtime: 2.36s
+calls to allocation functions: 6179548
+temporary memory allocations: 1464538
+peak heap memory consumption: 65.23M
+peak RSS (including heaptrack overhead): 73.99M
+total memory leaked: 1.78K
+
+Generated with heaptrack and summarized with:
+heaptrack_print

@@ -28,7 +28,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Patch encode/apply/invert/merge | Partial | DOCX coalesced replacement correctness covers deterministic durable encode/decode/apply/inverse, but no durable lifecycle timing; broader formats/merge remain missing |
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
-| Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests; no format-semantic extension corpus |
+| Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests plus exact untouched opaque ODS-row preservation during a neighboring cell edit; broader format-semantic extension corpora remain missing |
 | Replace one low-level Part, preserve the rest | Covered for owned same-topology OPC | Change 0008 tests and matched save benchmark; source-backed editing remains missing |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
@@ -41,9 +41,9 @@ semantic conversion remain.
 
 ## Highest-return next cases
 
-1. Measure a source-audited XLS commit/reopen optimization against the new
-   native baseline; preserve exact-source patch/inverse and the rejected DOC
-   move as independent guardrails.
+1. Attribute remaining final owner/public-reader work after the accepted native
+   XLS editor reuse and DOC batched stream publication; preserve exact-source
+   patch/inverse and the rejected DOC move as independent guardrails.
 2. Extend native RTF coverage to formatting/media, compressed and legacy-code-
    page input, malformed/security cases, real producers and broad edits.
 3. Separate logical authoring/append time from final serialization and reopen
@@ -59,7 +59,7 @@ semantic conversion remain.
 9. Smart detection versus prepared-source reuse. OOXML smart results retain an
    adoptable parsed OPC package; ODF detection/handoff remains unmeasured.
 10. Broaden ODF beyond generated text/grid/deck cases: source-backed selectors,
-   changed publication, 1% and bulk edits,
+   unchanged ZIP-member publication, structural, 1% and bulk edits,
    unknown extensions, real producers, media, security and source-backed I/O.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
 
@@ -69,10 +69,11 @@ snapshot while retaining the exact no-op, limits, envelope, patch, and readback
 contracts. Direct byte ingress and changed publication remain covered by item
 10 rather than being implied complete.
 
-The former native DOC/XLS/PPT baseline item is complete in change 0015. It
-provides 36 release records and ranks XLS one-cell publication first; it does
-not claim broad native-format CRUD, real-producer, security, or preservation
-coverage.
+The former native DOC/XLS/PPT baseline item is complete in change 0015. Changes
+0016 and 0017 accept the first XLS and DOC publication follow-ups without
+removing final validation. Change 0018 accepts same-topology ODS row-local
+publication and exact untouched opaque-row preservation. None claims broad
+native-format or ODF CRUD, real-producer, security, or preservation coverage.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0014`](changes/0014-odt-shared-snapshot-bytes.md)
+Evidence through: [`change 0018`](changes/0018-ods-row-local-publication.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -141,7 +141,15 @@ the same ODS package twice: once for package/resource validation and again for
 complete `Spreadsheet` readback. It now moves the one validated package into a
 crate-private facade constructor. Large no-op edit/save p50 falls 11.78%; the
 large changed case improves 2.06% because full spreadsheet rewrite/readback
-dominates. Exact source bytes, resource bounds and facade readback remain.
+dominates.
+
+Eligible same-topology worksheet commits now reuse the bounded flat-ODS row
+splicer: only changed modeled rows are serialized and untouched source spans
+are copied exactly. Large/medium one-cell edit-save p50 falls 9.54% / 7.22%,
+allocation calls fall 5.85%, and peak heap falls 27.18%. Structural changes
+fall back to full-table replacement; an opaque untouched row is preserved
+byte-for-byte, while touching it refuses publication. Compactness, package
+reopen, snapshot parsing and complete typed-sheet readback remain mandatory.
 
 ODT transaction snapshots created from an already validated `Document`
 previously allocated and copied the complete package solely to establish the
@@ -192,10 +200,14 @@ Confirmed source facts:
   separate determinism audit; it is not treated as a performance result.
 
 The harness now measures native DOC/XLS/PPT open/list/one/full/no-op/one-edit
-flows over deterministic writer artifacts. Large one-edit/save p50 is 1.722 ms
-for XLS, 1.416 ms for DOC, and 0.357 ms for PPT. Heaptrack reaches complete
-workbook reopen and per-cell `BTreeMap` insertion under XLS commit; that is the
-next native production candidate. The previous spare-capacity DOC move remains
+flows over deterministic writer artifacts. From the original baseline, large
+one-edit/save p50 was 1.722 ms for XLS, 1.416 ms for DOC, and 0.357 ms for PPT.
+XLS changed commit now reuses its already validated CFB editor instead of
+discarding one BIFF parse and repeating the CFB open/capture; p50 improves
+7.72%. DOC publishes its ordinary WordDocument and table-stream replacements
+as one failure-atomic object-editor batch instead of rendering/reopening the
+CFB after each stream; p50 improves 10.52%. Both retain their final owner and
+independent public-reader reopens. The previous spare-capacity DOC move remains
 rejected and must remain an independent writer guardrail.
 
 ## Native OLE2 semantic path
@@ -209,18 +221,20 @@ checks stay outside timing.
 
 Measured large-corpus priorities:
 
-1. XLS one-cell publication (1.722 ms p50) rebuilds the Workbook stream,
-   reconstructs CFB, fully reopens ordinary workbook semantics, then reopens
-   the exact cell-value owner. Profiled allocation sites include the ordinary
-   workbook cell `BTreeMap` and cell-value entry-vector growth.
-2. DOC one-paragraph publication (1.416 ms p50) retains complete revision,
-   style/property and document readback; a reuse proposal needs more precise
-   per-stage attribution before any implementation.
+1. XLS one-cell publication originally measured 1.722 ms p50. Reusing the
+   rendered/reopened CFB editor removes a discarded BIFF parse and redundant
+   package capture, but complete Workbook and exact cell-owner readback still
+   dominate the accepted 1.639 ms path.
+2. DOC one-paragraph publication originally measured 1.416 ms p50. Batching
+   its ordinary two-stream replacement removes one intermediate CFB
+   render/reopen, while complete revision, style/property and independent
+   document readback remain in the accepted 1.348 ms path.
 3. PPT one-shape publication (0.357 ms p50) is materially smaller and is not
    the first target from this matrix.
 
-See [`change 0015`](changes/0015-native-ole2-semantic-baseline.md) and its
-[`raw JSON`](results/ole2-semantic-baseline-a57506d23-2026-08-11.json).
+See [`change 0015`](changes/0015-native-ole2-semantic-baseline.md),
+[`change 0016`](changes/0016-xls-commit-editor-reuse.md), and
+[`change 0017`](changes/0017-doc-batched-stream-publication.md).
 
 ## RTF path
 
@@ -271,9 +285,9 @@ pattern elsewhere.
 | 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet. | Broader source-backed selectors, edits and real workbook matrices. |
 | 9 | Confirmed structurally: small XLSX edits scan/rebuild/reparse the complete touched sheet and repackage all Parts. | First/middle/last cell, 1% updates, and commit-versus-save separation. |
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
-| 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers, child lookup descends the validated tree by cached exact keys, and native DOC/XLS/PPT semantic baselines now exist. | Profile and optimize XLS commit/reopen first; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
+| 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers; child lookup descends the validated tree; native DOC/XLS/PPT semantic baselines, XLS editor reuse and DOC batched publication are accepted. | Attribute the remaining final editor render/owner/public-reader work; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
-| 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable. Measured for ODT existing-document snapshots: one package clone and two allocations per handoff were removable. Both are implemented without changing readback or source lineage. | Broader ODF source-backed read and unchanged-member publication profiles. |
+| 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable. Same-topology ODS row-local publication now avoids serializing untouched rows. Measured ODT snapshot byte sharing is also accepted. All retain readback and source lineage. | Broader ODF source-backed reads, unchanged ZIP-member publication, package-parse reuse, and structural-edit profiles. |
 | 14 | Confirmed for DOCX direct-body batches: repeated full XML rebuild/parse work was removable while retaining ordinary durable operations and complete readback. | Real-producer/extension/security corpora and broader structural/bulk edit semantics. |
 | 15 | Measured and implemented for RTF full-text and text-only edit/save paths: temporary fragment/property vectors and per-character ASCII writes were removable. | Extend the accepted native matrix to formatting/media, compressed/code-page, malformed/security, real-producer and broad edit scenarios. |
 
@@ -293,9 +307,9 @@ The order below is provisional until baseline measurements are recorded.
 | 8 | Extend the accepted XLSX row-start index to broader selector and edit matrices. | Sparse range queries after sheet load. | Low-medium | Narrow ranges are accepted; preservation/readback gates and broad CRUD coverage remain unchanged. |
 | 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Implemented for canonical direct-body DOCX batches and PPTX selected-scene reuse; complete source validation and candidate readback remain. See changes 0010 and 0012. |
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
-| 11 | Extend ODF beyond the accepted ODS snapshot reuse: source-backed selectors and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Public semantic baselines now exist; exact no-op and full readback must remain. |
+| 11 | Extend ODF beyond accepted ODS snapshot and row-local reuse: source-backed selectors, package-parse reuse and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Same-topology ODS row splicing is accepted; structural fallback, exact no-op and full readback must remain. See changes 0011, 0014 and 0018. |
 | 12 | Add native RTF public semantic cases and remove measured full-text/edit work. | RTF open/list/full-text/stream-save/no-op/one-edit. | Low-medium | Implemented; cached text and native forward-only output contracts remain. See change 0013. |
-| 13 | Optimize the measured native XLS one-cell commit/reopen path. | OLE2 spreadsheet edit/publication rather than substrate-only insertion. | Medium-high | Baseline implemented in change 0015; preserve exact-source patch/inverse, complete BIFF/CFB validation, semantic readback, and an independent open guard. |
+| 13 | Attribute and reduce remaining native XLS/DOC final-publication work. | OLE2 spreadsheet/document edit publication rather than substrate-only insertion. | Medium-high | Editor reuse and DOC stream batching are accepted in changes 0016/0017; exact patches, complete BIFF/CFB or DOC validation and independent public readback remain. |
 | 14 | Share existing ODT transaction bytes when a validated document creates a snapshot. | ODT no-op and changed edit/save. | Low-medium | Implemented with private `Arc` identity proof; no-op p50 -18.51% large, guardrails within 3%. See change 0014. |
 | 15 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
 

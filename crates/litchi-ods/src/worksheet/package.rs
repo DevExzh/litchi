@@ -112,9 +112,40 @@ pub(crate) fn replace_tables(xml: &str, sheets: &[Sheet]) -> Result<String> {
 pub(crate) fn replace_changed_rows(
     xml: &str,
     original: &[Sheet],
-    candidate: &[Option<Sheet>],
+    candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
 ) -> Result<String> {
+    replace_changed_rows_impl(xml, original, candidate, max_output_bytes, false)?.ok_or_else(|| {
+        invalid("flat ODS row transaction is not eligible for row-local publication")
+    })
+}
+
+/// Try a row-local packaged worksheet publication without changing the
+/// established structural-edit fallback.
+pub(crate) fn try_replace_changed_rows(
+    xml: &str,
+    original: &[Sheet],
+    candidate: &[Sheet],
+    max_output_bytes: usize,
+) -> Result<Option<String>> {
+    if original.len() != candidate.len() {
+        return Ok(None);
+    }
+    let changed = original
+        .iter()
+        .zip(candidate)
+        .map(|(before, after)| (before != after).then_some(after))
+        .collect::<Vec<_>>();
+    replace_changed_rows_impl(xml, original, &changed, max_output_bytes, true)
+}
+
+fn replace_changed_rows_impl(
+    xml: &str,
+    original: &[Sheet],
+    candidate: &[Option<&Sheet>],
+    max_output_bytes: usize,
+    allow_ineligible: bool,
+) -> Result<Option<String>> {
     validation::validate_content_xml_size(xml)?;
     if candidate.len() > validation::MAX_PHYSICAL_RUNS {
         return Err(Error::InvalidFormat(format!(
@@ -126,6 +157,9 @@ pub(crate) fn replace_changed_rows(
         validation::validate_sheet(sheet)?;
     }
     if original.len() != candidate.len() {
+        if allow_ineligible {
+            return Ok(None);
+        }
         return Err(invalid(
             "flat ODS row transaction cannot add or remove worksheets",
         ));
@@ -138,13 +172,28 @@ pub(crate) fn replace_changed_rows(
     if tables.len() != original.len() {
         return Err(invalid("flat ODS table inventory changed since parsing"));
     }
+    if allow_ineligible {
+        for table in &tables {
+            for child in direct_children_any(&spans, *table) {
+                if !is_element(&spans[child], TABLE_NAMESPACE, "table-row") {
+                    return Err(Error::InvalidFormat(
+                        "ODS worksheet edit cannot replace a table containing unmodeled direct children"
+                            .to_string(),
+                    ));
+                }
+            }
+        }
+    }
 
     let mut edits = Vec::new();
     for (sheet_index, ((before, after), table)) in
         original.iter().zip(candidate).zip(tables).enumerate()
     {
         let Some(after) = after else { continue };
-        if before.name != after.name {
+        if before.name != after.name || before.style_name != after.style_name {
+            if allow_ineligible {
+                return Ok(None);
+            }
             return Err(invalid("flat ODS row transaction cannot rename worksheets"));
         }
         let mut rows = direct_children(&spans, table, TABLE_NAMESPACE, "table-row");
@@ -170,6 +219,9 @@ pub(crate) fn replace_changed_rows(
         let old_end = before.rows.len() - suffix;
         let new_end = after.rows.len() - suffix;
         if prefix == old_end {
+            if allow_ineligible {
+                return Ok(None);
+            }
             return Err(invalid(
                 "flat ODS row insertion requires an existing physical row anchor",
             ));
@@ -185,7 +237,7 @@ pub(crate) fn replace_changed_rows(
         ));
     }
 
-    apply_edits_bounded(xml, edits, max_output_bytes)
+    apply_edits_bounded(xml, edits, max_output_bytes).map(Some)
 }
 
 fn apply_edits_bounded(
@@ -237,39 +289,60 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span: &Span) -> Result<()>
     let row = xml
         .get(span.start..span.end)
         .ok_or_else(|| invalid("flat ODS row span is invalid"))?;
-    let root = spans
-        .iter()
-        .find(|candidate| candidate.parent.is_none())
-        .ok_or_else(|| invalid("flat ODS document root is missing"))?;
-    if root.empty {
-        return Err(invalid("flat ODS document root cannot be empty"));
+    let mut ancestors = Vec::new();
+    let mut parent = span.parent;
+    while let Some(index) = parent {
+        let ancestor = spans
+            .get(index)
+            .ok_or_else(|| invalid("flat ODS row ancestor span is invalid"))?;
+        if ancestor.empty {
+            return Err(invalid("flat ODS row ancestor cannot be empty"));
+        }
+        ancestors.push(ancestor);
+        parent = ancestor.parent;
     }
-    let opening = xml
-        .get(root.start..root.tag_end)
-        .ok_or_else(|| invalid("flat ODS document root span is invalid"))?;
-    let mut source = String::with_capacity(opening.len() + row.len() + root.qname.len() + 4);
-    source.push_str(opening);
+    if ancestors.is_empty() {
+        return Err(invalid("flat ODS row has no document ancestors"));
+    }
+    let mut source = String::new();
+    for ancestor in ancestors.iter().rev() {
+        source.push_str(
+            xml.get(ancestor.start..ancestor.tag_end)
+                .ok_or_else(|| invalid("flat ODS row ancestor opening span is invalid"))?,
+        );
+    }
     source.push_str(row);
-    source.push_str("</");
-    source.push_str(&root.qname);
-    source.push('>');
+    for ancestor in &ancestors {
+        source.push_str("</");
+        source.push_str(&ancestor.qname);
+        source.push('>');
+    }
     let mut reader = NsReader::from_str(&source);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
-    let mut first_element = true;
+    let mut row_depth = 0usize;
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid flat ODS row XML: {error}")))?;
         match event {
-            Event::Start(element) | Event::Empty(element) => {
-                if first_element {
-                    first_element = false;
+            Event::Start(element) => {
+                let namespace = resolve_namespace(&namespace)?;
+                let local = decode(element.local_name().as_ref(), "row element local name")?;
+                if row_depth == 0 {
+                    if is_element_name(namespace.as_deref(), &local, TABLE_NAMESPACE, "table-row") {
+                        validate_modeled_attributes(
+                            &reader,
+                            &element,
+                            namespace.as_deref(),
+                            &local,
+                        )?;
+                        row_depth = 1;
+                    }
                     buffer.clear();
                     continue;
                 }
-                let namespace = resolve_namespace(&namespace)?;
-                let local = decode(element.local_name().as_ref(), "row element local name")?;
+                row_depth = row_depth.saturating_add(1);
                 if !is_modeled_row_element(namespace.as_deref(), &local) {
                     return Err(Error::InvalidFormat(format!(
                         "flat ODS edit would discard unmodeled row element '{local}'"
@@ -277,16 +350,54 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span: &Span) -> Result<()>
                 }
                 validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local)?;
             },
-            Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {
+            Event::Empty(element) => {
+                let namespace = resolve_namespace(&namespace)?;
+                let local = decode(element.local_name().as_ref(), "row element local name")?;
+                if row_depth == 0 {
+                    if is_element_name(namespace.as_deref(), &local, TABLE_NAMESPACE, "table-row") {
+                        validate_modeled_attributes(
+                            &reader,
+                            &element,
+                            namespace.as_deref(),
+                            &local,
+                        )?;
+                    }
+                    buffer.clear();
+                    continue;
+                }
+                if !is_modeled_row_element(namespace.as_deref(), &local) {
+                    return Err(Error::InvalidFormat(format!(
+                        "flat ODS edit would discard unmodeled row element '{local}'"
+                    )));
+                }
+                validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local)?;
+            },
+            Event::Comment(_) | Event::PI(_) | Event::DocType(_) if row_depth > 0 => {
                 return Err(invalid("flat ODS edit would discard unmodeled row markup"));
             },
-            Event::End(_) => {},
+            Event::End(_) if row_depth > 0 => row_depth -= 1,
             Event::Eof => break,
-            Event::Decl(_) | Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {},
+            Event::Decl(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::End(_) => {},
         }
         buffer.clear();
     }
     Ok(())
+}
+
+fn is_element_name(
+    namespace: Option<&str>,
+    local: &str,
+    expected_namespace: &str,
+    expected_local: &str,
+) -> bool {
+    namespace == Some(expected_namespace) && local == expected_local
 }
 
 fn is_modeled_row_element(namespace: Option<&str>, local: &str) -> bool {

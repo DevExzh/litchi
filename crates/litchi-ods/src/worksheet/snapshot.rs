@@ -269,7 +269,19 @@ impl Edit {
             return Ok(Commit::unchanged(self.before));
         }
         let package = Package::from_bytes(self.before.source.as_ref().to_vec())?;
-        let content = super::package::replace_tables(package.content_xml(), &self.draft)?;
+        let content = match super::package::try_replace_changed_rows(
+            package.content_xml(),
+            self.before.sheets(),
+            &self.draft,
+            validation::MAX_CONTENT_XML_BYTES,
+        )? {
+            Some(content)
+                if litchi_odf_common::compact_xml::validate(content.as_bytes()).is_ok() =>
+            {
+                content
+            },
+            Some(_) | None => super::package::replace_tables(package.content_xml(), &self.draft)?,
+        };
         litchi_odf_common::compact_xml::validate(content.as_bytes()).map_err(Error::from)?;
         let target = Snapshot::from_bytes(package.replace_content_xml(&content)?.into_bytes())?;
         if target.sheets() != self.draft {

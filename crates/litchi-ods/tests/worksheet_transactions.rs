@@ -3,6 +3,30 @@ use litchi_ods::{
     Builder, Cell, CellValue, MutableSpreadsheet, Sheet, Spreadsheet, worksheet::Snapshot,
 };
 
+const OPAQUE_ROW: &str = concat!(
+    r#"<table:table-row><table:table-cell office:value-type="string">"#,
+    r#"<text:p>opaque owner</text:p><office:annotation office:name="vendor-note">"#,
+    r#"<text:p>retain exactly</text:p></office:annotation>"#,
+    r#"</table:table-cell></table:table-row>"#,
+);
+
+fn row_splice_content() -> String {
+    format!(
+        concat!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+            r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+            r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+            r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+            r#"<office:body><office:spreadsheet><table:table table:name="Data">"#,
+            "{OPAQUE_ROW}",
+            r#"<table:table-row><table:table-cell office:value-type="string">"#,
+            r#"<text:p>replace me</text:p></table:table-cell></table:table-row>"#,
+            r#"</table:table></office:spreadsheet></office:body></office:document-content>"#,
+        ),
+        OPAQUE_ROW = OPAQUE_ROW,
+    )
+}
+
 #[test]
 fn worksheet_patch_round_trips_cells_order_and_inverse() -> litchi_core::Result<()> {
     let source = Builder::new().build()?;
@@ -68,5 +92,54 @@ fn mutable_facade_publishes_batched_worksheet_edits() -> litchi_core::Result<()>
         litchi_core::Error::InvalidFormat("the formula cell is missing".to_string())
     })?;
     assert_eq!(cell.formula.as_deref(), Some("of:=1"));
+    Ok(())
+}
+
+#[test]
+fn row_local_commit_preserves_untouched_opaque_rows_and_refuses_touched_ones()
+-> litchi_core::Result<()> {
+    let source = Builder::new().content_xml(row_splice_content()).build()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.set_cell(
+        "Data",
+        1,
+        0,
+        Cell::new(CellValue::Text("changed".to_string()), "changed"),
+    )?
+    .ok_or_else(|| {
+        litchi_core::Error::InvalidFormat("the selected worksheet is missing".to_string())
+    })?;
+    let commit = edit.commit()?;
+    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    assert!(reopened.content_xml().contains(OPAQUE_ROW));
+    assert!(matches!(
+        reopened.cell("Data", 1, 0),
+        Some(litchi_ods::CellView::Stored(cell)) if cell.text == "changed"
+    ));
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())?
+            .snapshot()
+            .as_bytes(),
+        source
+    );
+
+    let untouched = Snapshot::from_bytes(source.clone())?;
+    let mut refused = untouched.edit();
+    refused
+        .set_cell(
+            "Data",
+            0,
+            0,
+            Cell::new(CellValue::Text("unsafe".to_string()), "unsafe"),
+        )?
+        .ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("the selected worksheet is missing".to_string())
+        })?;
+    assert!(refused.commit().is_err());
+    assert_eq!(untouched.as_bytes(), source);
     Ok(())
 }
