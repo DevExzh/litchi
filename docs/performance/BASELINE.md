@@ -220,11 +220,12 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **107
+The stage-1 records above are retained unchanged. The current harness has **109
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
-simulated-range cases, two opt-in execution-scaling cases, 16 opt-in
+simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
+commit/read attribution case, 16 opt-in
 DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, and 21 opt-in
-ODT/ODS/ODP semantic cases, and 19 opt-in native DOC/XLS/PPT semantic cases. It
+ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 remains an incomplete program and CRUD matrix.
 
 - The XLSX row-start index is accepted for the narrow-range case: ABBA p50
@@ -362,6 +363,17 @@ remains an incomplete program and CRUD matrix.
   independent live-document, slide-order, review-history and public-reader
   checks remain. See
   [`0024`](changes/0024-ppt-slide-order-open-reuse.md).
+- Eligible changed XLSX worksheets now hand their exact commit-validated store
+  to the published snapshot under a 4,096-cell / 1 MiB XML bound. Medium commit
+  plus first read improves 23.23% p50 and allocation calls fall 21.01%; the
+  unrestricted dense-wide candidate was rejected at +8.99% peak heap. See
+  [`0025`](changes/0025-xlsx-validated-store-handoff.md).
+- Direct PPT text-edit setup now uses its complete editor preflight for live
+  persisted-record resolution instead of reopening and recapturing the CFB.
+  Large direct edit/save improves 14.12% p50 and 15.39% mean; allocation calls
+  fall 3.53%, peak heap/RSS remain flat, and the minor-fault increase is
+  disclosed. See
+  [`0026`](changes/0026-ppt-text-edit-resolver-reuse.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

@@ -1,0 +1,10 @@
+reading file "target/perf/ppt-text-edit-before.heaptrack.zst.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/frozen-ppt-text-edit/before --warmup 0 --samples 1000 --case ppt_text_edit_one_edit_save --writer-shape large --json target/perf/ppt-text-edit-before-heaptrack.json
+finished reading file, now analyzing data:
+
+total runtime: 1.105000s.
+calls to allocation functions: 3433239 (3107003/s)
+temporary memory allocations: 380942 (344743/s)
+peak heap memory consumption: 859.30K
+peak RSS (including heaptrack overhead): 11.95M
+total memory leaked: 544B

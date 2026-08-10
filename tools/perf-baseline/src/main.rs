@@ -315,6 +315,7 @@ enum Case {
     PptSemanticOneShapeText,
     PptSemanticFullText,
     PptSlideOrderSnapshotOpen,
+    PptTextEditOneEditSave,
     PptSemanticNoopEditSave,
     PptSemanticOneEditSave,
     XlsxOpenOwned,
@@ -467,6 +468,7 @@ impl Case {
             Self::PptSemanticOneShapeText => "ppt_semantic_one_shape_text",
             Self::PptSemanticFullText => "ppt_semantic_full_text",
             Self::PptSlideOrderSnapshotOpen => "ppt_slide_order_snapshot_open",
+            Self::PptTextEditOneEditSave => "ppt_text_edit_one_edit_save",
             Self::PptSemanticNoopEditSave => "ppt_semantic_noop_edit_save",
             Self::PptSemanticOneEditSave => "ppt_semantic_one_edit_save",
             Self::XlsxOpenOwned => "xlsx_open_owned",
@@ -615,6 +617,7 @@ impl Case {
                 | Self::PptSemanticOneShapeText
                 | Self::PptSemanticFullText
                 | Self::PptSlideOrderSnapshotOpen
+                | Self::PptTextEditOneEditSave
                 | Self::PptSemanticNoopEditSave
                 | Self::PptSemanticOneEditSave
         )
@@ -2012,6 +2015,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_semantic_one_shape_text" => Some(Case::PptSemanticOneShapeText),
         "ppt_semantic_full_text" => Some(Case::PptSemanticFullText),
         "ppt_slide_order_snapshot_open" => Some(Case::PptSlideOrderSnapshotOpen),
+        "ppt_text_edit_one_edit_save" => Some(Case::PptTextEditOneEditSave),
         "ppt_semantic_noop_edit_save" => Some(Case::PptSemanticNoopEditSave),
         "ppt_semantic_one_edit_save" => Some(Case::PptSemanticOneEditSave),
         "xlsx_open_owned" => Some(Case::XlsxOpenOwned),
@@ -2157,6 +2161,7 @@ fn print_usage() {
                                        ppt_semantic_open,ppt_semantic_list_slides,\n\
                                        ppt_semantic_one_shape_text,ppt_semantic_full_text,\n\
                                        ppt_slide_order_snapshot_open,\n\
+                                       ppt_text_edit_one_edit_save,\n\
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
                                        xlsx_open_owned,xlsx_list_sheets,xlsx_first_cell,\n\
                                        xlsx_full_cell_scan,xlsx_narrow_column_range_scan,\n\
@@ -3271,6 +3276,9 @@ fn run_case_with_config(
         | Case::PptSemanticNoopEditSave
         | Case::PptSemanticOneEditSave => {
             run_semantic_ppt(case, corpus, warmup_iterations, samples)
+        },
+        Case::PptTextEditOneEditSave => {
+            run_ppt_text_edit_one_edit_save(corpus, warmup_iterations, samples)
         },
         Case::XlsxOpenOwned => run_xlsx_open_owned(corpus, warmup_iterations, samples),
         Case::XlsxListSheets => run_xlsx_list_sheets(corpus, warmup_iterations, samples),
@@ -4423,6 +4431,76 @@ fn run_semantic_ppt(
         verify_semantic_ppt(snapshot.bytes(), shape, None)?;
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_ppt_text_edit_one_edit_save(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_ppt::text_edit::{Snapshot, Target};
+
+    let shape = writer_shape(corpus)?;
+    if shape == WriterShape::PayloadHeavy {
+        return Err("payload-heavy PPT corpus is excluded from semantic cases".into());
+    }
+    let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
+    let linear = slide_count * boxes_per_slide / 2;
+    let selected = (linear / boxes_per_slide, linear % boxes_per_slide);
+    let target = Target::new(Position::new(selected.0), Position::new(selected.1));
+    let source_text = writer_text("ppt", selected.0, selected.1, 0);
+    let replacement = updated_writer_text("ppt", selected.0, selected.1, 0);
+
+    let expected_changed = {
+        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let mut edit = source.edit_text(target)?;
+        if edit.text() != source_text {
+            return Err("PPT text-edit source differs from writer specification".into());
+        }
+        edit.set_text(replacement.clone())?;
+        edit.commit()?.snapshot().bytes().to_vec()
+    };
+
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut final_publication = None;
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Snapshot construction is deliberately outside the measured interval:
+        // this case attributes the public text-edit transaction itself.
+        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let started = Instant::now();
+        let mut edit = source.edit_text(target)?;
+        edit.set_text(replacement.clone())?;
+        let commit = edit.commit()?;
+        let duration = started.elapsed();
+
+        if commit.patch().is_empty()
+            || commit.patch().before() != corpus.archive
+            || commit.patch().after() != expected_changed
+            || commit.snapshot().bytes() != expected_changed
+        {
+            return Err("PPT text-edit publication differs from specification".into());
+        }
+        std::hint::black_box(commit.snapshot());
+        final_publication = Some((source, commit));
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let (source, commit) = final_publication.ok_or("PPT text-edit case produced no publication")?;
+    let applied = commit.patch().apply(&source)?;
+    if applied.bytes() != commit.snapshot().bytes() {
+        return Err("PPT text-edit exact patch replay differs from commit".into());
+    }
+    let restored = commit.patch().inverse().apply(&applied)?;
+    if restored.bytes() != source.bytes() {
+        return Err("PPT text-edit inverse did not restore exact source bytes".into());
+    }
+    let readback = commit.snapshot().edit_text(target)?;
+    if readback.target() != target || readback.text() != replacement {
+        return Err("PPT text-edit public readback differs from replacement".into());
+    }
+    verify_semantic_ppt(commit.snapshot().bytes(), shape, Some(selected))?;
+
+    Ok(result(Case::PptTextEditOneEditSave, corpus, elapsed, None))
 }
 
 fn run_semantic_rtf(
@@ -7203,10 +7281,15 @@ mod tests {
         }
 
         let ppt = build_writer_corpus(Case::PptFreshWriteTo, WriterShape::Tiny).unwrap();
-        let measured = run_case(Case::PptSlideOrderSnapshotOpen, &ppt, 0, 1).unwrap();
-        assert_eq!(measured.case, "ppt_slide_order_snapshot_open");
-        assert_eq!(measured.elapsed_ns.samples.len(), 1);
-        assert!(measured.sink.is_none());
+        for case in [
+            Case::PptSlideOrderSnapshotOpen,
+            Case::PptTextEditOneEditSave,
+        ] {
+            let measured = run_case(case, &ppt, 0, 1).unwrap();
+            assert_eq!(measured.case, case.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert!(measured.sink.is_none());
+        }
     }
 
     #[test]

@@ -204,12 +204,16 @@ impl Snapshot {
     /// Returns a typed refusal when the target cannot be resolved to one safe
     /// text atom.
     pub fn edit_text(&self, target: Target) -> Result<Transaction> {
+        // Resolve the semantic selector without surfacing its result yet. The
+        // editor preflight below remains the first observable failure, while
+        // keeping the two allocation-heavy owners sequential.
+        let shape_target = resolve_shape_target(&self.bytes, target);
         // The shared incremental owner rejects signed and encrypted CFB
         // envelopes before any candidate is staged. Surface that capability
         // boundary as a typed refusal instead of trying to normalize it.
-        crate::embedded::object::Editor::open_records(self.bytes.to_vec())
+        let editor = crate::embedded::object::Editor::open_records(self.bytes.to_vec())
             .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
-        let resolved = resolve(&self.bytes, target)?;
+        let resolved = resolve_with_shape_target(target, shape_target?, &editor)?;
         Ok(Transaction {
             source: self.clone(),
             resolved,
@@ -635,6 +639,19 @@ fn presentation(bytes: &[u8]) -> PackageResult<Presentation> {
 
 fn resolve(bytes: &[u8], target: Target) -> Result<Resolved> {
     let location = resolve_shape(bytes, target)?;
+    resolved_from_location(target, location)
+}
+
+fn resolve_with_shape_target(
+    target: Target,
+    shape_target: (u32, u32),
+    editor: &crate::embedded::object::Editor,
+) -> Result<Resolved> {
+    let location = resolve_shape_record(shape_target.0, shape_target.1, editor)?;
+    resolved_from_location(target, location)
+}
+
+fn resolved_from_location(target: Target, location: ShapeLocation) -> Result<Resolved> {
     let text = inspect_slide(&location.slide_record, location.shape_id)?;
     Ok(Resolved {
         target,
@@ -649,6 +666,12 @@ fn resolve(bytes: &[u8], target: Target) -> Result<Resolved> {
 }
 
 fn resolve_shape(bytes: &[u8], target: Target) -> Result<ShapeLocation> {
+    let (persist_id, shape_id) = resolve_shape_target(bytes, target)?;
+    let editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+    resolve_shape_record(persist_id, shape_id, &editor)
+}
+
+fn resolve_shape_target(bytes: &[u8], target: Target) -> Result<(u32, u32)> {
     let presentation = presentation(bytes)?;
     let slides = presentation.slides()?;
     let slide = slides
@@ -660,12 +683,18 @@ fn resolve_shape(bytes: &[u8], target: Target) -> Result<ShapeLocation> {
         .shapes()?
         .get(target.shape.get())
         .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
-    let native_shape_id = native_shape_id(shape);
-    let slide_record = crate::embedded::object::Editor::open_records(bytes.to_vec())?
-        .persisted_record(slide.persist_id())?;
+    Ok((slide.persist_id(), native_shape_id(shape)))
+}
+
+fn resolve_shape_record(
+    persist_id: u32,
+    shape_id: u32,
+    editor: &crate::embedded::object::Editor,
+) -> Result<ShapeLocation> {
+    let slide_record = editor.persisted_record(persist_id)?;
     Ok(ShapeLocation {
-        persist_id: slide.persist_id(),
-        shape_id: native_shape_id,
+        persist_id,
+        shape_id,
         slide_record,
     })
 }
@@ -1419,6 +1448,30 @@ mod tests {
         Target::new(Position::new(0), Position::new(0))
     }
 
+    fn with_storage(source: Vec<u8>, path: &[&str]) -> Vec<u8> {
+        use litchi_cfb::{OleFile, OleWriter};
+
+        let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+        let streams = source_file
+            .list_streams()
+            .into_iter()
+            .map(|stream_path| {
+                let refs = stream_path.iter().map(String::as_str).collect::<Vec<_>>();
+                let data = source_file.open_stream(&refs).unwrap();
+                (stream_path, data)
+            })
+            .collect::<Vec<_>>();
+        let mut writer = OleWriter::new();
+        for (stream_path, data) in streams {
+            let refs = stream_path.iter().map(String::as_str).collect::<Vec<_>>();
+            writer.create_stream(&refs, &data).unwrap();
+        }
+        writer.create_storage(path).unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
     fn durable_limits() -> litchi_core::patch::PatchLimits {
         litchi_core::patch::PatchLimits::new(
             litchi_core::patch::BlobLimits::new(0, 0, 0),
@@ -1463,6 +1516,37 @@ mod tests {
         let undone = commit.patch().inverse().apply(commit.snapshot()).unwrap();
         assert_eq!(undone.bytes(), source.bytes());
         assert!(commit.patch().apply(&undone).is_ok());
+    }
+
+    #[test]
+    fn supplied_shape_target_resolution_matches_standalone_resolution() {
+        let bytes = fixture("abc");
+        let target = target();
+        let standalone = super::resolve(&bytes, target).unwrap();
+        let shape_target = super::resolve_shape_target(&bytes, target).unwrap();
+        let editor = crate::embedded::object::Editor::open_records(bytes.clone()).unwrap();
+        let supplied = super::resolve_with_shape_target(target, shape_target, &editor).unwrap();
+
+        assert_eq!(supplied.target, standalone.target);
+        assert_eq!(supplied.slide_persist_id, standalone.slide_persist_id);
+        assert_eq!(supplied.native_shape_id, standalone.native_shape_id);
+        assert_eq!(supplied.slide_record, standalone.slide_record);
+        assert_eq!(supplied.kind, standalone.kind);
+        assert_eq!(supplied.payload, standalone.payload);
+        assert_eq!(supplied.text, standalone.text);
+        assert_eq!(supplied.can_resize, standalone.can_resize);
+    }
+
+    #[test]
+    fn protected_source_refusal_precedes_target_resolution() {
+        let source = Snapshot::from_bytes(with_storage(fixture("abc"), &["_SIGNATURES"]))
+            .expect("signed PPT remains readable");
+        let out_of_range = Target::new(Position::new(1), Position::new(0));
+
+        assert!(matches!(
+            source.edit_text(out_of_range),
+            Err(Error::Refused(Refusal::UnsupportedSource))
+        ));
     }
 
     #[test]
