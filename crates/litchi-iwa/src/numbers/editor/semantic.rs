@@ -50,7 +50,6 @@ use crate::text::{
     TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextPosition, TextRange,
     TextScript, TextStorageInfo, TextStyle,
 };
-use crate::wire::{patch_length_delimited_field, patch_nested_length_delimited_field};
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
 use litchi_iwa_common::comment::{
     Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId, TableCellComment,

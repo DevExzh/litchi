@@ -1562,3 +1562,89 @@ semantic patch serialization with read/write sets/composition/merge/history,
 and library-owned atomic durable filesystem publication. `write_to` is bounded
 exact streaming, not flush/sync/rename/durability. A full sanitizer-backed fuzz
 campaign remains explicit verification work.
+
+## 2026-08-10 amendment: Numbers names mutation exit
+
+Deletion gate 3 now passes for the public Numbers editor sheet/table rename
+surface. The focused owner is nested
+`litchi-numbers::names::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`;
+the umbrella facade keeps `litchi::numbers::names` rather than flat aliases.
+`Package::edit_names` is an infallible empty batch, consuming stages resolve
+semantic sheet/table selectors against one immutable base, and
+`Package::apply_names` owns exact replay/inverse. No native ID, component,
+archive/generated/wire value, or raw source slice crosses these signatures.
+`source_bytes` is crate-private and `write_to` owns exact output.
+
+The mutation graph is rooted from TN document field 1 through the local
+Sheet/FormBasedSheet sequence. A table traverses the rooted sheet drawable
+path `[2]` or `[1, 2]` to one TableInfo, then required field 2 to one
+TableModel. Each followed edge needs exact aggregate reference metadata and
+optional unique matching field evidence; every selected model needs one and
+only one rooted TableInfo owner. Strict raw decoding is cross-checked against
+forced Buffa views for sheet/form names and TableModel identity/name. The
+projection has five generated files/82,641 bytes and deterministic SHA-256
+`944b7637fd6bf0eb895174b1e9229aa9eb9c393e05c666a86dd2843792eefe3e`.
+Raw records remain the preservation owner.
+
+The edit validates the final batch, so swaps and collision-away renames are
+atomic while duplicate targets and final sheet/table namespace collisions fail
+without publication. Changed table renames refuse selected table locks, any
+rooted pivot owner, and rooted volatile sheet/table-name dependencies. A
+sheet-only rename remains allowed when an unselected table is locked. The
+native Θ(T²) pivot dependency traversal is conservatively work-bounded before
+native scanning. Touched components are grouped and rewritten once, followed
+by complete reopen and exact locality verification.
+
+Changed batches delete every existing root `preview.jpg`,
+`preview-micro.jpg`, and `preview-web.jpg`, diagnose previews separately from
+components, and preserve `Index/ViewState.iwa` plus unrelated ZIP/IWA state
+exactly. No-ops share the source and skip changed guards/cache/reassembly.
+Changed patch application reopens the exact stored target; inverse restores
+the source including previews. Canonical/form and accepted legacy native
+message variants remain supported when rooted ownership is unambiguous.
+Nested legacy physical packages retain reads/exact no-ops but changed rename
+fails as `names::Error::UnsupportedSource`.
+
+The host deletion removes `NumbersEditor::rename_sheet`, `rename_table`, their
+direct tests, and `examples/rename_numbers_items.rs`. The focused example now
+owns semantic batch selection, exact inverse, bounded `write_to`, and synced
+no-clobber publication. The private `rename_attached_table_in_package` helper
+remains for Numbers sheet duplication, and its `rename_table_in_package`
+wrapper remains because Pages and Keynote attached-table flows consume it.
+Therefore this exits the public Numbers editor mutation family, not every
+shared native rename helper, and removes no manifest edge. Ordered debt 015
+(`litchi-iwa -> litchi-numbers`) remains; inventory stays at 64 packages, 235
+internal dependency declarations, and 14 ordered debts.
+
+The deterministic gate passes 10/10 focused tests, 105/105 Numbers library
+tests, the 1/1 root-facade test with `--features numbers`, 89/89 boundary
+regressions, both live focused audits, `litchi-numbers --all-targets` checking,
+`litchi-iwa --lib` checking, and strict rustdoc. Host
+`litchi-iwa --all-targets` is not claimed because unrelated examples remain
+red. Stable fuzz build plus eight bounded control-flow runs passed with
+expected missing sanitizer symbols; that smoke is not ASan.
+
+Apple Numbers 14.4 (7043.0.93) opened source
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+changed to pristine Rust candidate
+`22f8bc21223317318ec23ec764b8998af77a2c7800c68cbe88351abdb26b6e56`
+without warning, repair, recovery, or conversion. Public inverse restored the
+source. The unlocked table was selectable/editable; UI showed sheet
+`Líneas 你好 🧪`, table `表 Café №42`, exact B2 and B3=42. Save As, close, and
+exact-path reopen produced
+`e1803b0568454a345f7962c5b4c72e8cb3d78adb2c87d5db1e6c58288a9413c4`,
+regenerated three previews, and retained the data. Equal restage, no-op apply,
+and inverse were byte-exact at the resave hash.
+
+The independent locked oracle
+`eb2e29c97c415c1b61ed1f8fe766e7211ed386c825c32dec056b72c9398d3e09`
+reported `Locked`/`Locked items cannot be edited`, disabled cells, enabled
+Unlock, and no title change after Edit. This is the native protection evidence
+for table-rename refusal and the sheet-only exception.
+
+Exit debt remains in the bounded but native Θ(T²) preflight, aggregate
+peak-memory/total-work accounting, complete fallible-allocation proof,
+process-local complete-artifact patches and absent stable semantic patch
+serialization/read-write sets/composition/merge/history, library-owned atomic
+durable publication, and sanitizer-backed fuzzing. `write_to` does not itself
+flush, sync, rename, or make output durable.

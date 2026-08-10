@@ -80,13 +80,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         .as_ref()
         .map(|_| commit.package().apply_table_lock(&commit.patch().inverse()))
         .transpose()?;
-    if inverse
-        .as_ref()
-        .is_some_and(|restored| restored.package().source_bytes() != package.source_bytes())
-    {
-        return Err(invalid_input(
-            "inverse patch did not restore the exact input package",
-        ));
+    if let Some(restored) = inverse.as_ref() {
+        if exact_bytes(restored.package())? != exact_bytes(&package)? {
+            return Err(invalid_input(
+                "inverse patch did not restore the exact input package",
+            ));
+        }
     }
 
     save_new(&output, commit.package())?;
@@ -162,6 +161,12 @@ fn save_new(path: &Path, package: &Package) -> Result<(), Box<dyn Error>> {
         .persist_noclobber(path)
         .map_err(|error| Box::new(error.error))?;
     Ok(())
+}
+
+fn exact_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
 }
 
 fn invalid_input(message: impl Into<String>) -> Box<dyn Error> {

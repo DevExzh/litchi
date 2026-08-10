@@ -86,13 +86,19 @@ impl DecodedSheet {
 
     /// Consumes the archive adapter into the canonical dependency-free sheet.
     pub(super) fn into_semantic(self) -> super::Result<crate::Sheet> {
-        let mut builder = crate::sheet::Builder::new(self.name, self.index);
+        let mut tables = Vec::new();
+        tables
+            .try_reserve_exact(self.tables.len())
+            .map_err(|_error| {
+                super::Error::Common(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers rooted semantic sheet tables",
+                    amount: self.tables.len(),
+                })
+            })?;
         for table in self.tables {
             let semantic = table.into_semantic()?;
-            builder
-                .push_table(semantic)
-                .map_err(|failure| map_table_error(failure.into_parts().0))?;
+            tables.push(semantic);
         }
-        Ok(builder.finish())
+        crate::Sheet::try_from_tables(self.name, self.index, tables).map_err(map_table_error)
     }
 }

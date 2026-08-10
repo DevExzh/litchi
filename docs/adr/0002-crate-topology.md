@@ -1823,3 +1823,112 @@ library-owned atomic durable filesystem replacement. `write_to` provides
 bounded exact output and sink-offset errors but does not flush, sync, rename,
 or make publication durable. A full sanitizer-backed fuzz campaign remains a
 verification gate rather than an architectural claim.
+
+## 2026-08-10 amendment: Numbers names ownership
+
+`litchi-numbers` now owns atomic sheet/table naming through the canonical
+nested `names::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` family
+(with semantic `Path` and `InvalidReason`). `Package::edit_names` creates an
+infallible, allocation-free empty batch; consuming `rename_sheet` and
+`rename_table` stages operations against the immutable base snapshot, and
+`Package::apply_names` applies the exact-source reversible patch. The root
+`litchi::numbers::names` facade reexports that focused owner without flat
+aliases. Its signatures expose neither native identities nor generated/wire
+types or source slices. `Package::source_bytes` is crate-private and callers
+stream exact output with `Package::write_to`.
+
+The changed owner graph starts at `Index/Document.iwa`, object 1, whose field-1
+local references select the rooted sheet sequence. Each selected object must
+contain exactly one `TN.SheetArchive` or `TN.FormBasedSheetArchive`; ordinary
+sheet name field 1 or nested form `super.name` is the sheet owner. A table
+follows the selected sheet drawable at `[2]` or form path `[1, 2]` to one
+canonical/legacy TableInfo, then its required local field-2 reference to one
+canonical/legacy TableModel, whose required field 8 owns the display name and
+field 1 supplies the stable table identity. Every followed local reference
+must occur exactly once in aggregate metadata and, when field metadata is
+present, exactly once at the expected path. Selected table models must have
+one competing-root-free rooted TableInfo owner; detached/unselected objects
+remain outside this vertical.
+
+Names are decoded by strict raw preflight and forced private Buffa lazy views.
+The projection borrows the required sheet name, forces nested form `super`, and
+cross-checks both required TableModel identity/name strings without allocating
+owned text. Its five generated files total 82,641 bytes with deterministic
+aggregate SHA-256
+`944b7637fd6bf0eb895174b1e9229aa9eb9c393e05c666a86dd2843792eefe3e`.
+Raw field records retain preservation and rewrite authority.
+
+Batch semantics are final-state atomic: sheet names are unique workbook-wide,
+table names are unique within each sheet, swaps and collision-away batches are
+valid, and duplicate targets or final collisions fail before publication.
+Changed table renames refuse an interactively locked selected table, any
+rooted pivot owner in the workbook, and rooted nonempty volatile
+sheet/table-name dependencies. Sheet-only renames remain allowed when an
+unselected table is locked. Changed planning is conservatively pre-bounded,
+including the native quadratic table dependency scan, before native work.
+Every touched IWA component is rewritten once and the complete candidate is
+reopened under retained limits.
+
+All accepted non-name fields, messages, objects, components, ZIP records, and
+`Index/ViewState.iwa` remain exact. Every changed batch deletes the existing
+zero-to-three root `preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg`
+entries, with component and preview counts reported separately. Exact semantic
+no-ops share the source, preserve previews and ViewState, and skip changed-only
+framing, cache, lock/dependency, reassembly, and reopen work. Changed patch
+application reopens its stored target after exact artifact/state checks; the
+inverse restores the complete source, including previews.
+
+Canonical and form sheets plus the accepted canonical/legacy TableInfo and
+TableModel message variants remain supported when their rooted graph is
+unambiguous. Legacy nested physical packages remain readable and exact for
+no-ops, but a changed rename returns `names::Error::UnsupportedSource` rather
+than normalizing provenance.
+
+The host `NumbersEditor::{rename_sheet, rename_table}`, their direct tests,
+and `litchi-iwa/examples/rename_numbers_items.rs` are deleted. The focused
+`litchi-numbers/examples/edit_names.rs` owns selector-based batch staging,
+optional inverse verification, and synced no-clobber publication through
+`write_to`. The private `rename_attached_table_in_package` helper remains for
+Numbers sheet duplication, and its `rename_table_in_package` wrapper remains
+for Pages and Keynote table workflows; this retires the Numbers editor surface,
+not those shared internal mutation primitives. No crate edge is removed, so
+ordered debt 015 (`litchi-iwa -> litchi-numbers`) remains. The inventory stays
+64 packages, 235 internal dependency declarations, and 14 ordered debts.
+
+Verification passes 10/10 focused names tests, 105/105 `litchi-numbers`
+library tests, the 1/1 root facade test with `--features numbers`, 89/89
+boundary regressions, both live Numbers names/host audits,
+`litchi-numbers --all-targets` checking, `litchi-iwa --lib` checking, and
+strict rustdoc. Host `litchi-iwa --all-targets` is not claimed because
+unrelated examples remain red. The fuzz target builds on stable and its
+control-flow executable completed eight bounded runs with expected
+missing-sanitizer-symbol warnings; this is not an ASan campaign.
+
+Apple Numbers 14.4 (7043.0.93) opened the Unicode candidate without warning,
+repair, recovery, or conversion. Source SHA-256 was
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`;
+the Rust candidate was
+`22f8bc21223317318ec23ec764b8998af77a2c7800c68cbe88351abdb26b6e56`,
+and its public inverse restored the exact source. Numbers displayed sheet
+`Líneas 你好 🧪`, table `表 Café №42`, the exact B2 marker, and B3 value 42.
+Save As, close, and exact-path reopen succeeded and produced native SHA-256
+`e1803b0568454a345f7962c5b4c72e8cb3d78adb2c87d5db1e6c58288a9413c4`,
+with all three previews regenerated. Equal restaging, no-op application, and
+its inverse were all byte-exact at that native hash.
+
+The ordinary Unicode source was unlocked: its table was selectable/editable
+and renamed successfully. A separate locked protection oracle, SHA-256
+`eb2e29c97c415c1b61ed1f8fe766e7211ed386c825c32dec056b72c9398d3e09`,
+reported `Locked` and `Locked items cannot be edited` through Numbers
+accessibility state; cells were disabled, Unlock was enabled, and the Edit
+table-title action made no change. The focused API likewise rejects a locked
+table rename while permitting a sheet-only rename.
+
+Remaining debt includes the conservative native Θ(T²) pivot preflight despite
+its up-front work bound, aggregate transaction peak-memory and total-work
+accounting, a complete fallible-allocation proof, stable versioned patch
+serialization with semantic operations/read-write sets/composition/merge and
+history, and library-owned atomic durable filesystem replacement. Patches
+retain complete source/target artifacts process-locally; `write_to` does not
+flush, sync, rename, or make publication durable. A sanitizer-backed fuzz
+campaign also remains open.

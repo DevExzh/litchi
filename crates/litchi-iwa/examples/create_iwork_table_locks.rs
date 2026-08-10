@@ -1,6 +1,5 @@
 //! Create Pages, Numbers, and Keynote files with locked native tables.
 
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
@@ -33,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     lock.lock();
     let locked_numbers = lock.commit()?;
-    write_new(&numbers_path, locked_numbers.package().source_bytes())?;
+    write_new(&numbers_path, locked_numbers.package())?;
     assert_eq!(
         NumbersPackage::open(&numbers_path)?.table_lock(
             SheetSelector::index(0),
@@ -83,13 +82,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn write_new(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+fn write_new(path: &Path, package: &NumbersPackage) -> Result<(), Box<dyn std::error::Error>> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let mut temporary = NamedTempFile::new_in(parent)?;
-    temporary.write_all(bytes)?;
+    package.write_to(temporary.as_file_mut())?;
     temporary.as_file().sync_all()?;
     temporary
         .persist_noclobber(path)

@@ -21,6 +21,8 @@ mod function_map;
 )]
 mod index;
 mod limits;
+/// Exact-source sheet and table name transactions.
+pub(crate) mod names;
 #[allow(
     dead_code,
     reason = "Decoded sheets expose only the construction path used at package ingress."
@@ -210,15 +212,33 @@ pub enum Error {
 }
 
 /// Failure while streaming an exact Numbers package artifact to a caller-owned sink.
-#[derive(Debug, Error)]
-#[error("could not write Numbers package after {bytes_written} bytes: {source}")]
+///
+/// Its `Display` and `Debug` representations report only the offset reached
+/// by prior conforming successful writes and the sink error kind; they never
+/// include package bytes or sink error text.
+#[derive(Error)]
+#[error("could not write Numbers package after {bytes_written} bytes ({kind:?})")]
 pub struct WriteError {
     source: io::Error,
+    kind: io::ErrorKind,
     bytes_written: usize,
 }
 
+impl fmt::Debug for WriteError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("WriteError")
+            .field("bytes_written", &self.bytes_written)
+            .field("io_error_kind", &self.kind)
+            .finish_non_exhaustive()
+    }
+}
+
 impl WriteError {
-    /// Return the number of package bytes accepted before the failure.
+    /// Return the byte offset reached by prior conforming successful writes.
+    ///
+    /// A `WriteZero` or trait-violating over-report is detected at this offset;
+    /// it does not establish how many bytes that call's sink actually accepted.
     #[must_use]
     pub const fn bytes_written(&self) -> usize {
         self.bytes_written
@@ -542,7 +562,7 @@ impl Package {
     /// Unsupported ZIP members and unmodeled protobuf fields remain in this
     /// source even though the ordinary package API exposes semantic values.
     #[must_use]
-    pub fn source_bytes(&self) -> &[u8] {
+    pub(crate) fn source_bytes(&self) -> &[u8] {
         &self.state.source
     }
 
@@ -550,16 +570,26 @@ impl Package {
     ///
     /// The emitted bytes are the exact source retained by this immutable
     /// snapshot, including unsupported ZIP members and unmodeled fields.
+    /// This streaming primitive does not flush or synchronize `writer`, and it
+    /// does not atomically publish a destination. Callers that need durable or
+    /// atomic replacement must provide that policy around the sink.
     ///
     /// # Costs
     ///
-    /// Writes package bytes once without constructing another package buffer.
+    /// Streams `O(package size)` bytes in one forward pass without constructing
+    /// another package-sized buffer. Partial or interrupted writes may call the
+    /// sink more than once.
     ///
     /// # Errors
     ///
-    /// Returns an error carrying the exact number of bytes accepted when the
-    /// caller-owned sink cannot accept the complete artifact.
-    pub fn write_to(&self, writer: &mut impl Write) -> std::result::Result<(), WriteError> {
+    /// Returns [`WriteError`] with the byte offset reached by prior conforming
+    /// successful writes. A zero-length write or over-report is detected at
+    /// that offset; an over-report does not establish its actual accepted-byte
+    /// count. Bytes accepted before an error remain in the caller-owned sink.
+    pub fn write_to<W: Write + ?Sized>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<(), WriteError> {
         let source = self.source_bytes();
         let mut bytes_written = 0_usize;
         while bytes_written < source.len() {
@@ -571,6 +601,7 @@ impl Package {
                             io::ErrorKind::WriteZero,
                             "sink accepted no package bytes",
                         ),
+                        kind: io::ErrorKind::WriteZero,
                         bytes_written,
                     });
                 },
@@ -581,13 +612,16 @@ impl Package {
                             io::ErrorKind::InvalidData,
                             "sink reported accepting more bytes than supplied",
                         ),
+                        kind: io::ErrorKind::InvalidData,
                         bytes_written,
                     });
                 },
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
-                Err(source) => {
+                Err(write_error) => {
+                    let kind = write_error.kind();
                     return Err(WriteError {
-                        source,
+                        source: write_error,
+                        kind,
                         bytes_written,
                     });
                 },
@@ -1231,6 +1265,134 @@ mod tests {
     use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
     use litchi_iwa_protos::{kn, tp, tsa, tsce, tsk, tst};
     use std::io::Write;
+
+    #[test]
+    fn write_to_accepts_a_dynamically_dispatched_sink() -> Result<()> {
+        let bytes = package_bytes(&tn::DocumentArchive::default())?;
+        let package = Package::from_bytes(&bytes)?;
+        let mut written = Vec::new();
+        let sink: &mut dyn Write = &mut written;
+
+        package
+            .write_to(sink)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+
+        assert_eq!(written, bytes);
+        Ok(())
+    }
+
+    #[test]
+    fn write_to_reports_progress_and_handles_adversarial_sinks() -> Result<()> {
+        struct FailingWriter {
+            remaining: usize,
+            output: Vec<u8>,
+            flushes: usize,
+        }
+
+        impl Write for FailingWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if self.remaining == 0 {
+                    return Err(io::Error::other("authored secret"));
+                }
+                let amount = bytes.len().min(self.remaining);
+                self.output.extend_from_slice(&bytes[..amount]);
+                self.remaining -= amount;
+                Ok(amount)
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                self.flushes += 1;
+                Ok(())
+            }
+        }
+
+        struct InterruptedWriter {
+            interrupted: bool,
+            output: Vec<u8>,
+            flushes: usize,
+        }
+
+        impl Write for InterruptedWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if !self.interrupted {
+                    self.interrupted = true;
+                    return Err(io::Error::from(io::ErrorKind::Interrupted));
+                }
+                self.output.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                self.flushes += 1;
+                Ok(())
+            }
+        }
+
+        struct ZeroWriter;
+
+        impl Write for ZeroWriter {
+            fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+                Ok(0)
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        struct OverReportingWriter;
+
+        impl Write for OverReportingWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                Ok(bytes.len().saturating_add(1))
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let bytes = package_bytes(&tn::DocumentArchive::default())?;
+        let package = Package::from_bytes(&bytes)?;
+
+        let mut failing = FailingWriter {
+            remaining: 7,
+            output: Vec::new(),
+            flushes: 0,
+        };
+        let error = package.write_to(&mut failing).unwrap_err();
+        assert_eq!(error.bytes_written(), 7);
+        assert_eq!(error.io_error().kind(), io::ErrorKind::Other);
+        assert_eq!(failing.output, bytes[..7]);
+        assert_eq!(failing.flushes, 0);
+        assert!(!format!("{error:?}").contains("authored secret"));
+        assert!(!error.to_string().contains("authored secret"));
+
+        let mut interrupted = InterruptedWriter {
+            interrupted: false,
+            output: Vec::new(),
+            flushes: 0,
+        };
+        package
+            .write_to(&mut interrupted)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+        assert!(interrupted.interrupted);
+        assert_eq!(interrupted.output, bytes);
+        assert_eq!(interrupted.flushes, 0);
+
+        let zero_error = package.write_to(&mut ZeroWriter).unwrap_err();
+        assert_eq!(zero_error.bytes_written(), 0);
+        assert_eq!(zero_error.io_error().kind(), io::ErrorKind::WriteZero);
+
+        let over_report_error = package.write_to(&mut OverReportingWriter).unwrap_err();
+        assert_eq!(over_report_error.bytes_written(), 0);
+        assert_eq!(
+            over_report_error.io_error().kind(),
+            io::ErrorKind::InvalidData
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn common_limits_normalize_to_every_numbers_payload_resource() {

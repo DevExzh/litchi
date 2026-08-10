@@ -2772,27 +2772,6 @@ fn formula_cells_can_be_cleared_with_refcount_cleanup() {
 }
 
 #[test]
-fn renames_root_ordered_sheet_and_table() {
-    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    assert_eq!(editor.sheets().unwrap()[0].name, "Sheet 1");
-    editor
-        .rename_sheet(test_sheet_selector(&editor, 2), "Résumé 東京")
-        .unwrap();
-    editor
-        .rename_table(test_table_selector(&editor, 10), "Inventory 🚀")
-        .unwrap();
-    assert_eq!(editor.sheets().unwrap()[0].name, "Résumé 東京");
-    assert_eq!(editor.tables().unwrap()[0].name, "Inventory 🚀");
-    let before = editor.to_bytes().unwrap();
-    assert!(
-        editor
-            .rename_sheet(test_sheet_selector(&editor, 2), "")
-            .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), before);
-}
-
-#[test]
 fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
     let editor = NumbersDocumentBuilder::new()
         .table_name("Locked Table")
@@ -2814,7 +2793,9 @@ fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
     lock.lock();
     let locked = lock.commit().unwrap();
 
-    let mut editor = NumbersEditor::from_bytes(locked.package().source_bytes()).unwrap();
+    let mut locked_bytes = Vec::new();
+    locked.package().write_to(&mut locked_bytes).unwrap();
+    let mut editor = NumbersEditor::from_bytes(&locked_bytes).unwrap();
     let duplicate = editor
         .duplicate_table(test_table_selector(&editor, table.object_id))
         .unwrap();
@@ -2831,8 +2812,12 @@ fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
         .unwrap();
     unlock_duplicate.unlock();
     let unlocked_duplicate = unlock_duplicate.commit().unwrap();
-    let mut editor =
-        NumbersEditor::from_bytes(unlocked_duplicate.package().source_bytes()).unwrap();
+    let mut unlocked_duplicate_bytes = Vec::new();
+    unlocked_duplicate
+        .package()
+        .write_to(&mut unlocked_duplicate_bytes)
+        .unwrap();
+    let mut editor = NumbersEditor::from_bytes(&unlocked_duplicate_bytes).unwrap();
     let focused = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         focused
@@ -2856,7 +2841,9 @@ fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
         .unwrap();
     unlock_original.unlock();
     let restored = unlock_original.commit().unwrap();
-    assert_eq!(restored.package().source_bytes(), baseline);
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes).unwrap();
+    assert_eq!(restored_bytes, baseline);
 }
 
 #[test]
@@ -3375,7 +3362,7 @@ fn formula_table_duplicate_rejects_unsupported_dependencies_transactionally() {
 }
 
 #[test]
-fn rename_and_resize_preserve_unknown_wire_and_restore_exact_component() {
+fn resize_preserves_unknown_wire_and_restores_exact_component() {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -3419,28 +3406,6 @@ fn rename_and_resize_preserve_unknown_wire_and_restore_exact_component() {
         .unwrap();
 
     editor
-        .rename_sheet(test_sheet_selector(&editor, 2), "Temporary Sheet")
-        .unwrap();
-    editor
-        .rename_table(test_table_selector(&editor, 10), "Temporary Table")
-        .unwrap();
-    editor
-        .rename_table(test_table_selector(&editor, 10), "Table 1")
-        .unwrap();
-    editor
-        .rename_sheet(test_sheet_selector(&editor, 2), "Sheet 1")
-        .unwrap();
-    assert_eq!(
-        editor
-            .package()
-            .archive("Index/Document.iwa")
-            .unwrap()
-            .to_bytes()
-            .unwrap(),
-        baseline
-    );
-
-    editor
         .resize_table(test_table_selector(&editor, 10), 6, 6)
         .unwrap();
     editor
@@ -3455,87 +3420,6 @@ fn rename_and_resize_preserve_unknown_wire_and_restore_exact_component() {
             .unwrap(),
         baseline
     );
-}
-
-#[test]
-fn form_sheet_rename_preserves_unknown_outer_and_nested_fields() {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(2).unwrap();
-            let sheet = tn::SheetArchive::decode(object.messages[0].data.as_slice()).unwrap();
-            let mut data = tn::FormBasedSheetArchive {
-                super_: sheet,
-                ..Default::default()
-            }
-            .encode_to_vec();
-            data = crate::wire::transform_length_delimited_field(&data, 1, |nested| {
-                let mut nested = nested.to_vec();
-                append_unknown_varint(&mut nested, 98, 980);
-                Ok(nested)
-            })?;
-            append_unknown_varint(&mut data, 99, 990);
-            Ok(object
-                .replace_message(0, RawMessage { type_: 3, data })
-                .map(|_| ())?)
-        })
-        .unwrap();
-    let mut editor = NumbersEditor::from_package(package).unwrap();
-    let baseline = editor
-        .package()
-        .archive("Index/Document.iwa")
-        .unwrap()
-        .to_bytes()
-        .unwrap();
-    editor
-        .rename_sheet(test_sheet_selector(&editor, 2), "Form Temporary")
-        .unwrap();
-    assert_eq!(editor.sheets().unwrap()[0].name, "Form Temporary");
-    editor
-        .rename_sheet(test_sheet_selector(&editor, 2), "Sheet 1")
-        .unwrap();
-    assert_eq!(
-        editor
-            .package()
-            .archive("Index/Document.iwa")
-            .unwrap()
-            .to_bytes()
-            .unwrap(),
-        baseline
-    );
-}
-
-#[test]
-fn table_rename_rejects_duplicate_name_fields_transactionally() {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(10).unwrap();
-            let message = object.messages[0].clone();
-            let data = crate::wire::append_repeated_length_delimited_field(
-                &message.data,
-                8,
-                b"Duplicate",
-            )?;
-            Ok(object
-                .replace_message(
-                    0,
-                    RawMessage {
-                        type_: message.type_,
-                        data,
-                    },
-                )
-                .map(|_| ())?)
-        })
-        .unwrap();
-    let mut editor = NumbersEditor::from_package(package).unwrap();
-    let before = editor.to_bytes().unwrap();
-    assert!(
-        editor
-            .rename_table(test_table_selector(&editor, 10), "Rejected")
-            .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]
@@ -8049,11 +7933,6 @@ fn detached_table_models_are_not_exposed_or_writable() {
     assert!(editor.tables().unwrap().is_empty());
 
     let before = editor.to_bytes().unwrap();
-    assert!(
-        editor
-            .rename_table(test_table_selector(&editor, 10), "Detached")
-            .is_err()
-    );
     assert!(editor.set_cell(10, 0, 0, cell_number(1.0)).is_err());
     assert!(
         editor

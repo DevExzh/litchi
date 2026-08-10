@@ -21,6 +21,8 @@ pub mod cell;
 pub mod document;
 /// Dependency-free formula vocabulary shared by Numbers, Pages, and Keynote.
 pub mod formula;
+/// Atomic, preservation-safe Numbers sheet and table name transactions.
+pub mod names;
 /// Native Numbers package parsing and semantic projection.
 pub mod package;
 /// Human-readable and checked positional selectors for Numbers objects.
@@ -48,8 +50,8 @@ pub use package::{
     ResourceError as PackageResourceError, Result as PackageResult, SemanticLimitKind,
     SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
     SemanticPath as PackageSemanticPath, TableLockCommit, TableLockDiagnostics, TableLockEdit,
-    TableLockError, TableLockLimitKind, TableLockPatch, compatibility_tables_from_bytes,
-    compatibility_tables_from_bytes_with_options,
+    TableLockError, TableLockLimitKind, TableLockPatch, WriteError,
+    compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
 };
 pub use selector::{SheetSelector, TableSelector};
 pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};
