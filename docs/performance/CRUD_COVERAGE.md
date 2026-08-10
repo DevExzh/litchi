@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 108 selectable
+This is a coverage map, not a completion claim. It compares the 109 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -42,7 +42,8 @@ semantic conversion remain.
 ## Highest-return next cases
 
 1. Attribute remaining final owner/public-reader work after the accepted native
-   XLS editor reuse, DOC batched stream publication, and PPT root-open reuse;
+   XLS editor reuse, DOC batched stream publication, PPT root-open reuse and
+   direct PPT text-edit resolver reuse;
    preserve exact-source patch/inverse and the rejected DOC move as independent
    guardrails.
 2. Extend native RTF coverage beyond the accepted ordinary parser-state and
@@ -105,6 +106,11 @@ reuses commit-time validation only for bounded changed worksheets with exact
 part and style/shared-string identity. The dense-wide handoff was rejected on
 peak memory and remains a cold-cache fallback; broader XLSX bulk, structural,
 source-backed and preservation scenarios remain open.
+
+Change 0026 adds a distinct direct PPT text-edit attribution case and removes
+one repeated editor open from target resolution. The fresh commit editor,
+exact source comparison, patch/inverse and complete readback remain; this does
+not complete PPT anchors, broad edits, real-producer or security coverage.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

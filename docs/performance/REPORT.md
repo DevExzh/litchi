@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest tranche: `2c93ab84277ce073c67feed8c0622fa4d6f2d4ca`
+Production base for the latest tranche: `f9cd26da793a8342393e6c6d2862c5c56bc3734d`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,11 +13,11 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **108 selectable cases**: 36 default cases and 198 default
+harness contains **109 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, 16
 opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, 21 opt-in
-ODT/ODS/ODP semantic cases, and 19 opt-in native DOC/XLS/PPT semantic cases. It
+ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
 | Change | Current evidence | Scope / limitation |
@@ -37,6 +37,7 @@ is still not broad program or CRUD coverage.
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
 | Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
+| Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
 | Bounded XLSX validated-store handoff | Medium one-cell commit + first read p50 **-23.23%**, mean **-23.15%**; allocation calls **-21.01%** | At most 4,096 cells / 1 MiB XML with exact byte and lineage identity; peak heap +4.29%; unrestricted dense-wide candidate rejected at +8.99% peak heap |
 | ODS row-local publication | Large/medium one-cell edit-save p50 **-9.54% / -7.22%**; allocation calls **-5.85%**, peak heap **-27.18%** | Same-topology modeled rows only; structural edits fall back and touched opaque rows refuse |
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
@@ -245,6 +246,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
+| Native PPT direct text edit/save, 144 shapes | 206.209 us | 177.089 us | **-14.12% p50 / -15.39% mean** | Allocation calls -3.53%, temporary allocations -6.05%; peak heap/RSS flat; minor faults +315.43% with zero major faults |
 | XLSX one-cell commit + first read, 4,096 cells | 4.431 ms | 3.402 ms | **-23.23% p50 / -23.15% mean** | Allocation calls -21.01%; peak heap +4.29%; unrestricted dense-wide retention rejected |
 
 The underlying records are:
@@ -271,6 +273,7 @@ The underlying records are:
 - [`0023-odt-full-text-owned-blocks.md`](changes/0023-odt-full-text-owned-blocks.md)
 - [`0024-ppt-slide-order-open-reuse.md`](changes/0024-ppt-slide-order-open-reuse.md)
 - [`0025-xlsx-validated-store-handoff.md`](changes/0025-xlsx-validated-store-handoff.md)
+- [`0026-ppt-text-edit-resolver-reuse.md`](changes/0026-ppt-text-edit-resolver-reuse.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -367,6 +370,10 @@ remain linked from change 0023.
   store into the published snapshot after byte and style/shared-string lineage
   checks. Retention is capped at 4,096 cells and 1 MiB of worksheet XML; larger
   sheets keep the cold-cache path.
+- Direct PPT text-edit setup uses its full editor preflight to resolve the
+  selected persisted record instead of opening and capturing the CFB a second
+  time. Commit still opens a fresh editor and performs exact source comparison,
+  publication, complete snapshot reopen and semantic readback.
 
 No unsafe code, ambient I/O, dependency edge, public archive type, or global
 synchronization primitive was introduced. Exact-source authorization is
@@ -376,7 +383,7 @@ ZIP layouts use the fully validated rewrite path before any sink output.
 
 ## Evidence and verification
 
-The standalone harness provides 108 selectable cases and a 198-record default
+The standalone harness provides 109 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora.
@@ -433,6 +440,11 @@ cycles 24.29% and allocation calls 21.01% on the medium attribution process.
 Peak heap rises 4.29% under the bound and uninstrumented RSS is flat. The
 unrestricted dense-wide prototype's 8.99% peak-heap increase triggered its
 rejection and the retained cold-cache fallback.
+The direct PPT text-edit follow-up removes one repeated editor open and cuts
+task clock 3.60%, allocation calls 3.53% and temporary allocations 6.05%.
+Peak heap and uninstrumented RSS remain flat. Its +315.43% minor-fault trigger
+has zero major faults and is disclosed rather than presented as a
+memory-locality improvement.
 Lock-wait evidence remains missing.
 
 ## Remaining highest-impact work
@@ -453,7 +465,8 @@ and broad format-semantic CRUD coverage beyond the generated text/grid slices
 (bulk action distinctions, dependency-copy, merge/split, patch timing, repair,
 security, malformed and real-producer corpora, plus broader ODF and RTF
 coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS
-editor-reuse, DOC batched-publication, and PPT root-open reuse follow-ups.
+editor-reuse, DOC batched-publication, PPT root-open reuse and direct PPT
+text-edit resolver reuse follow-ups.
 Remaining native work requires new attribution inside the retained final
 owner/public-reader validation layers. ODT full-text block ownership is
 accepted, but broader ODF

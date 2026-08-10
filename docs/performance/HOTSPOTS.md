@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0025`](changes/0025-xlsx-validated-store-handoff.md)
+Evidence through: [`change 0026`](changes/0026-ppt-text-edit-resolver-reuse.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -231,6 +231,11 @@ Confirmed source facts:
   CFB index. Large root-open p50 improves 8.78% and allocation calls fall
   5.01%; the stream/current-user/live-persist and higher-level snapshot checks
   remain.
+- Direct PPT text editing now holds its semantic selector result until the
+  complete protection/editor preflight succeeds, then uses that editor for
+  persisted-record resolution instead of opening the CFB editor a second time.
+  Large direct edit/save p50 improves 14.12%; commit-time fresh-editor source
+  comparison, publication and complete readback remain.
 
 The harness now measures native DOC/XLS/PPT open/list/one/full/no-op/one-edit
 flows over deterministic writer artifacts. From the original baseline, large
@@ -241,8 +246,9 @@ discarding one BIFF parse and repeating the CFB open/capture; p50 improves
 as one failure-atomic object-editor batch instead of rendering/reopening the
 CFB after each stream; p50 improves 10.52%. Both retain their final owner and
 independent public-reader reopens. PPT root snapshot capture separately reuses
-its first validated CFB open and improves p50 8.78%; one-shape edit/save moves
-only 1.78% because broader edit/publication work remains. The previous
+its first validated CFB open and improves p50 8.78%. Direct text-edit setup now
+reuses its full editor preflight for record resolution and improves 14.12% p50;
+the broader root one-shape edit/save improves 3.59%. The previous
 spare-capacity DOC move remains rejected and must remain an independent writer
 guardrail.
 
@@ -265,15 +271,16 @@ Measured large-corpus priorities:
    its ordinary two-stream replacement removes one intermediate CFB
    render/reopen, while complete revision, style/property and independent
    document readback remain in the accepted 1.348 ms path.
-3. PPT one-shape publication (0.357 ms p50) is materially smaller and is not
-   the first publication target from this matrix. Its newly measured root
-   snapshot capture improves from 37.522 to 34.227 us p50 by reusing the
-   package-owned CFB index while retaining the independent validation layers.
+3. PPT one-shape publication (0.357 ms original p50) retains its complete
+   commit and public readback. Root snapshot capture improves from 37.522 to
+   34.227 us p50, while the direct text-edit transaction improves from 206.209
+   to 177.089 us by removing its second editor open.
 
 See [`change 0015`](changes/0015-native-ole2-semantic-baseline.md),
 [`change 0016`](changes/0016-xls-commit-editor-reuse.md), and
 [`change 0017`](changes/0017-doc-batched-stream-publication.md), and
-[`change 0024`](changes/0024-ppt-slide-order-open-reuse.md).
+[`change 0024`](changes/0024-ppt-slide-order-open-reuse.md), and
+[`change 0026`](changes/0026-ppt-text-edit-resolver-reuse.md).
 
 ## RTF path
 
@@ -339,7 +346,7 @@ pattern elsewhere.
 | 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet. | Broader source-backed selectors, edits and real workbook matrices. |
 | 9 | Refined by measurement: small XLSX edits scan/rebuild/reparse the complete touched sheet; bounded commits can reuse the validation store for first read, while large sheets fall back cold. | Bulk action-plan work, first/middle/last cells, 1% updates, structural edits, large-sheet retention and commit-versus-save separation. |
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
-| 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers; child lookup descends the validated tree; native DOC/XLS/PPT semantic baselines, XLS editor reuse, DOC batched publication and PPT root-open reuse are accepted. | Attribute the remaining final editor render/owner/public-reader work; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
+| 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers; child lookup descends the validated tree; native DOC/XLS/PPT semantic baselines, XLS editor reuse, DOC batched publication, PPT root-open reuse and PPT text-edit resolver reuse are accepted. | Attribute the remaining final editor render/owner/public-reader work; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
 | 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable. Same-topology ODS row-local publication now avoids serializing untouched rows. ODT snapshot byte sharing and consuming full-text block strings are accepted. Direct ODS target-package adoption was only -0.44% p50 and was reverted; ODT final-document adoption improved changed save but regressed a common read guard and was also reverted. All accepted paths retain readback and source lineage. | Broader ODF source-backed reads, repeated ODT/ODP semantic scans, unchanged ZIP-member publication, differently attributed package-parse reuse, and structural-edit profiles. |
 | 14 | Confirmed for DOCX direct-body batches: repeated full XML rebuild/parse work was removable while retaining ordinary durable operations and complete readback. | Real-producer/extension/security corpora and broader structural/bulk edit semantics. |
