@@ -45,40 +45,6 @@ pub(super) fn settings_from_model(model: &TableModelArchive) -> Result<Settings>
     })
 }
 
-impl NumbersEditor {
-    /// Read the lossless header and footer configuration of an attached table.
-    pub fn table_header_settings(
-        &self,
-        selector: litchi_numbers::TableSelector<'_>,
-    ) -> Result<Settings> {
-        let table_id = super::selectors::table_id(self, selector)?;
-        read_attached_table_header_settings(&self.package, table_id)
-    }
-
-    /// Replace an attached table's header and footer configuration transactionally.
-    pub fn set_table_header_settings(
-        &mut self,
-        selector: litchi_numbers::TableSelector<'_>,
-        settings: Settings,
-    ) -> Result<()> {
-        let table_id = super::selectors::table_id(self, selector)?;
-        if self.table_header_settings(selector)? == settings {
-            return Ok(());
-        }
-        let mut staged = self.package.clone();
-        set_attached_table_header_settings(&mut staged, table_id, settings)?;
-
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_header_settings(selector)? != settings {
-            return Err(Error::InvalidFormat(
-                "Numbers table header settings failed round-trip validation".to_owned(),
-            ));
-        }
-        self.package = staged;
-        Ok(())
-    }
-}
-
 fn read_table_header_settings(
     package: &IWorkPackage,
     descriptor: &TableDescriptor,
@@ -194,19 +160,4 @@ fn validate_table_header_settings(model: &TableModelArchive, settings: Settings)
         )));
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn header_count_accepts_only_native_non_zero_range() {
-        assert!(Count::new(0).is_err());
-        for count in 1..=5 {
-            assert_eq!(Count::new(count).unwrap().get(), count);
-        }
-        assert!(Count::new(6).is_err());
-        assert!(Count::new(usize::MAX).is_err());
-    }
 }

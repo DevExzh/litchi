@@ -115,6 +115,66 @@ For safe filesystem publication, use
 output through `Package::write_to` into a synchronized sibling temporary file
 and publishes it without clobbering an existing target.
 
+## Focused Numbers table-header edits
+
+Enable the `numbers` feature to use the focused immutable Numbers package API
+through `litchi::numbers`. Header and footer settings use sheet and
+sheet-scoped table selectors, never native object IDs. Assigning `None` clears
+a field to native absence (effective zero or `false`); use `Some(Count::ONE)`
+for a footer row and `Some(true)`/`Some(false)` to explicitly freeze or repeat
+headers.
+
+```toml
+[dependencies]
+litchi = { version = "0", default-features = false, features = ["numbers"] }
+```
+
+```rust,no_run
+use litchi::numbers::{
+    Package, SheetSelector, TableSelector,
+    table::headers::{Count, Settings},
+};
+
+let package = Package::open("input.numbers")?;
+let sheet = SheetSelector::name("Summary");
+let table = TableSelector::name("Revenue");
+let mut settings: Settings = package.table_header_settings(sheet, table)?;
+settings.header_rows = Some(Count::TWO);
+settings.footer_rows = Some(Count::ONE);
+settings.header_rows_frozen = Some(true);
+settings.repeating_header_rows_enabled = Some(true);
+
+let commit = package
+    .edit_table_headers(sheet, table)?
+    .set(settings)
+    .commit()?;
+
+let restored = commit
+    .package()
+    .apply_table_headers(&commit.patch().inverse())?;
+let mut output = Vec::new();
+restored.package().write_to(&mut output)?;
+assert!(!output.is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The transaction types are in
+`litchi::numbers::table::headers::transaction`. An unchanged edit is an exact
+no-op; a changed edit fully reopens its candidate and removes stale root
+previews. Applying the inverse to the committed package restores the exact
+source. Changed legacy nested `Index.zip` input is refused with
+`transaction::Error::UnsupportedSource` rather than being normalized. See
+`litchi-numbers/examples/edit_table_headers.rs` for safe distinct-output,
+no-clobber publication with `Package::write_to`.
+
+Footer rows and row/column freeze flags are in the supported focused scope.
+The effective boolean accessors are a native-bool oracle, reporting only the
+optional native value (`None` is effectively `false`), never inferred UI state.
+For safety, the transaction returns `UnsupportedDependency` for any
+header/footer section-count change with an active pivot or group, header
+row/column count changes backed by a rooted header-name manager, and repeat
+flag changes on a legacy sheet topology.
+
 ## Feature Flags
 
 Default features are empty. Enable only what the application needs; spelling

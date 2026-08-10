@@ -39,6 +39,13 @@ seed. It covers name and index selectors, exact no-op and changed commits,
 exact-source patch conflicts, inversion, and content-redacted errors without
 writing a package to disk.
 
+`numbers_table_headers` is the focused table header/footer target. It offers
+arbitrary bytes to bounded Numbers ingress and reuses a fixed prefix for exact
+no-op or combined count/freeze/repeat changes on the first table in native
+`basic.numbers`. It covers index and name reads, typed selection and limit
+errors, diagnostics, exact-source application and conflicts, inversion,
+redaction, and byte-exact restoration through public in-memory `write_to`.
+
 `numbers_names` is the focused atomic sheet/table-names target. It offers
 arbitrary bytes to bounded Numbers package ingress and reuses a fixed command
 prefix for no-op, sheet, table, and combined renames against the native
@@ -91,6 +98,11 @@ expanded bytes. Its semantic profile admits at most 4,096 objects, 128 sheets,
 512 tables, 8,192 references, 65,536 materialized cells, and 512 KiB of
 retained text. Fuzzer-derived selector names are limited to 512 input bytes;
 keep `-max_len` at 1 KiB so most work reaches the fixed native seed.
+
+`numbers_table_headers` reuses the same finite Numbers physical and semantic
+profile. Header commands consume only a small fixed prefix; keep `-max_len` at
+512 bytes so arbitrary ingress stays bounded while every input also reaches
+the native transaction.
 
 `numbers_names` uses the same finite Numbers physical and semantic profile.
 Fuzzer-derived names are decoded lossily as UTF-8, reject NUL, and consume at
@@ -178,6 +190,13 @@ Run the focused Numbers target without a checked-in duplicate corpus:
 ```sh
 cargo +nightly fuzz run numbers_table_lock -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-header target:
+
+```sh
+cargo +nightly fuzz run numbers_table_headers -- \
+  -max_len=512 -timeout=10 -rss_limit_mb=2048
 ```
 
 Run the focused Numbers names target without a checked-in duplicate corpus:

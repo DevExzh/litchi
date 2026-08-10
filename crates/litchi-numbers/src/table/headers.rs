@@ -4,30 +4,39 @@
 //! publication remain owned by the concrete IWA adapter. This module only
 //! models the compact values that callers use to describe table sections.
 
+/// Exact-source transactions for one rooted table's header and footer settings.
+pub mod transaction {
+    pub use crate::package::table_headers::{
+        Commit, Diagnostics, Edit, Error, InvalidReason, LimitKind, Patch, Path,
+    };
+}
+
 use std::fmt;
 use std::num::NonZeroU8;
 
 const MAX_COUNT: u8 = 5;
 
-/// A non-zero table header, footer, or repeating-axis count.
+/// A non-zero table-section count.
 ///
-/// A missing field in [`Settings`] represents zero. Keeping zero out of this
+/// A missing field in [`Settings`] remains structurally absent; the effective
+/// count accessors interpret that absence as zero. Keeping zero out of this
 /// type makes accidental native-sentinel writes impossible and lets the
-/// semantic value remain one byte wide.
+/// semantic value remain one byte wide. Header repetition is modeled by
+/// independent Boolean fields on [`Settings`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct Count(NonZeroU8);
 
 impl Count {
-    /// One header, footer, or repeating-axis row or column.
+    /// One header row, header column, or footer row.
     pub const ONE: Self = Self(NonZeroU8::MIN);
-    /// Two header, footer, or repeating-axis rows or columns.
+    /// Two header rows, header columns, or footer rows.
     pub const TWO: Self = Self(NonZeroU8::new(2).expect("two is non-zero"));
-    /// Three header, footer, or repeating-axis rows or columns.
+    /// Three header rows, header columns, or footer rows.
     pub const THREE: Self = Self(NonZeroU8::new(3).expect("three is non-zero"));
-    /// Four header, footer, or repeating-axis rows or columns.
+    /// Four header rows, header columns, or footer rows.
     pub const FOUR: Self = Self(NonZeroU8::new(4).expect("four is non-zero"));
-    /// Five header, footer, or repeating-axis rows or columns.
+    /// Five header rows, header columns, or footer rows.
     pub const FIVE: Self = Self(NonZeroU8::new(5).expect("five is non-zero"));
 
     /// Validates and constructs a non-zero native count.
@@ -72,7 +81,7 @@ impl From<Count> for usize {
     }
 }
 
-/// Lossless optional header, footer, and repeating-axis settings.
+/// Lossless optional header, footer, freeze, and print-repetition settings.
 ///
 /// `None` preserves native field absence. In particular, it is not silently
 /// normalized to an explicit false or zero during a read-modify-write cycle.

@@ -33,6 +33,7 @@ mod sheet;
     reason = "Private native tables retain sidecar helpers while the public surface exposes only semantic tables."
 )]
 mod table;
+pub(crate) mod table_headers;
 mod table_lock;
 
 use std::collections::HashSet;

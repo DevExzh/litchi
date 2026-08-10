@@ -366,3 +366,101 @@ transition snapshot or creation support. `KeynoteSlideInfo.transition` and
 `transition_wire.rs` remain for `KeynoteEditor::slides()` aggregate decoding
 and no-op validation; the separate `creation.rs::transition()` helper and the
 `create_keynote_transition` workflow remain for creation.
+
+## 2026-08-10 amendment: Numbers table-header settings transaction
+
+This amendment supersedes the immediate mutable Numbers editor operation with
+a selector-first immutable transaction. `Package::edit_table_headers` resolves
+one exact-name or checked-position sheet/table pair against a base snapshot and
+retains its checked semantic path plus private owner preconditions. Infallible
+consuming `table::headers::transaction::Edit::set(self, Settings) -> Self`
+stages one complete archive-free value; commit never mutates the source
+package.
+
+Settings equality is presence-sensitive. An equal edit, including one against
+a locked table or a supported physical legacy source, is an exact no-op that
+shares the source artifact, preserves root previews, reports no touched
+component or deletion, and skips changed-only ownership, lock, dependency,
+transaction-work, reassembly, and reopen work. A changed edit proves the
+rooted Document-to-Sheet/FormBasedSheet-to-TableInfo-to-TableModel chain and
+its exact aggregate plus optional matching field-local reference metadata. It
+rejects ambiguous, detached, aliased, merge/diff, noncanonical, or
+interactively locked selected ownership before publication.
+
+Changed admission also fails closed with typed `UnsupportedDependency`. A
+valid TableModel pivot owner in field 85 refuses every changed edit. Header-row
+or header-column count changes refuse present category/haunted/category-owner
+fields 81, 84, or 86, a nonempty group-by field 83, and any rooted
+HeaderNameMgr. Footer changes additionally refuse active grouping decoded from
+fields 81 or 86 and nonempty field 83. Selected TableInfo fields 4, 5, 7, 8,
+15, and 17, or a true field 16, refuse header-count changes; fields 5, 15, and
+17, or a true field 16, also refuse footer changes. Reference-bearing
+dependencies must be unique local objects with exact declared metadata and may
+not alias the document, selected
+sheet, TableInfo, or TableModel; malformed dependency state is `InvalidSource`,
+not a normalization opportunity. Repeating-header changes also refuse the
+deprecated sheet-level repeating-header field 4.
+
+Present header/footer counts retain the checked `1..=5` domain. Effective
+header plus footer rows must fit the declared row count, and effective header
+columns must fit the declared column count. The seven selected TableModel
+fields preserve absence independently from explicit Boolean values; changed
+publication neither materializes absent false values nor erases explicit false
+values. Input/output, package, payload, reference, wire-output, wire
+field/nesting/work, transaction-work, and allocation failures remain typed and
+bounded.
+
+An admitted changed commit conservatively preflights aggregate source work,
+rewrites the selected TableModel component once, deletes the zero to three
+existing root previews as the explicit rendering-cache closure, fully reopens
+the candidate under retained limits, and verifies requested presence, bounds,
+ownership, and byte locality. `Index/ViewState.iwa` and all unrelated ZIP/IWA
+entries, objects, messages, unknown fields, and detached state remain exact.
+
+`table::headers::transaction::Patch` privately retains exact immutable source
+and target artifacts, exact selected source and target payloads for a change,
+semantic before/after settings, the checked path, and private owner
+preconditions. Exact bytes and selected payload state, not a diagnostic
+fingerprint, authorize apply. No-op apply shares the source. Changed apply
+conflict-checks the source settings and retained source payload, charges the
+source topology plus distinct retained target bytes against the aggregate
+transaction-work ceiling before reopening the target, and verifies the exact
+retained target payload and locality. It applies only that already-verified
+artifact; it does not restage or merge a semantic operation. A valid inverse
+swaps both artifacts and payloads and restores the complete source including
+previews.
+
+Unique role-specific modern and legacy TableInfo/TableModel messages are
+edited in place without type promotion; mixed or duplicate candidates fail
+closed. The Preserve policy keeps physical legacy nested-`Index.zip` sources
+readable and exact on no-op paths, while changed publication returns
+`transaction::Error::UnsupportedSource` rather than normalizing the physical
+topology.
+
+Two native Numbers 14.4 oracles define the admitted closure. Changing source
+SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+to two header rows and columns preserved B2/B3 but produced SHA-256
+`5c2323b509e5ea9a975b5f254bbd46cf42657aa1c3858d2c7e98f30f07e4b40c`
+after changing TableModel, HeaderNameMgr, a new manager tile, and CalcEngine
+formula/dependency state. That is refusal evidence, not count-parity evidence.
+A Boolean-only native Save As changed TableModel field 12 from explicit true
+to absent while preserving B2/B3 and all counts. Its freeze-off SHA-256
+`015568e6b922e80fbfb760491dc49994ccc2218356ed197131beb46c1bd75850`
+and same-state native control SHA-256
+`df44ed7d0b12c1d372dad7ad7361ed1140d41967921ee42b71a4072b78615721`
+regenerated semantically equivalent ViewState topology and payload with only
+allocated reference identities differing. This supports the focused writer's
+exact preservation of the source ViewState; it does not claim byte-identical
+native Save As output.
+
+The public host cut removes only
+`NumbersEditor::{table_header_settings, set_table_header_settings}`, their
+direct Numbers mutation tests, the duplicate host count test, and
+`edit_numbers_table_headers.rs`. Private
+`table_header_settings_in_package`/`set_table_header_settings_in_package`
+bridges used by Pages/Keynote table workflows and the lower attached-table
+primitives used by Numbers structural edits remain. The patch is therefore a
+process-local two-artifact capability, not a compact or durable operation.
+ADR 0003's stable semantic serialization, read/write sets, composition, merge,
+bounded history, and library-owned atomic durable publication remain deferred.

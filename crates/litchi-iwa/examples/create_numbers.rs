@@ -3,11 +3,12 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 
 use litchi_iwa::numbers::{
     FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocumentBuilder,
+    NumbersEditor,
 };
 use litchi_iwa::text::{Font, TextStyle};
-use litchi_numbers::TableSelector;
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 use litchi_numbers::table::topology::RowInsertion;
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
@@ -37,8 +38,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_cells(table_id, updates)?;
     editor.set_table_cell_text_style(table_id, 1, 0, TextStyle::default().with_bold(true))?;
     editor.set_table_cell_text_font(table_id, 1, 0, Font::named("CourierNewPSMT")?)?;
-    editor.set_table_header_settings(
-        table,
+    editor = set_focused_table_headers(
+        editor,
         HeaderSettings {
             header_rows: Some(HeaderCount::ONE),
             header_columns: Some(HeaderCount::ONE),
@@ -70,4 +71,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.save(output)?;
     Ok(())
+}
+
+fn set_focused_table_headers(
+    editor: NumbersEditor,
+    settings: HeaderSettings,
+) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
+        .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(NumbersEditor::from_bytes(&bytes)?)
 }

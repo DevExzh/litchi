@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
@@ -56,6 +57,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_numbers_names_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_table_header_settings_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_info_projection_provenance(proto_directory, buffa_projection_directory)?;
@@ -187,6 +192,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_numbers_names_projection_budget(&buffa_numbers_names_out_directory)?;
+
+    // Numbers table-header settings require only dimensions and nine scalar
+    // header/footer/freeze/repetition facts. Keep required style/data-store
+    // references and all repeated table content outside generated code.
+    let buffa_table_header_settings_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-header-settings");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableHeaderSettingsArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_table_header_settings_out_directory)
+        .include_file("iwa_numbers_table_header_settings_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_table_header_settings_projection_budget(&buffa_table_header_settings_out_directory)?;
 
     // Keynote's show reader projects only scalar settings, required direct
     // references, and presentation size. The repeated slide tree is routed by
@@ -576,7 +601,7 @@ required string table_name = 8;\n\
             .iter()
             .all(|declaration| tables.matches(declaration).count() == 1)
         || projection_schema != PROJECTION_SCHEMA
-        || projection.len() > 2 * 1024
+        || projection.len() > 1024
         || projection.contains("repeated ")
         || !ROUTER_DECLARATIONS
             .iter()
@@ -590,7 +615,91 @@ required string table_name = 8;\n\
         || production_codec.contains(".encode(")
     {
         return Err(
-            "derived Numbers names projection/codec drifted from TN sheet/form or TST table-model fields, exceeded its 2 KiB source budget, exposed generated code, introduced generated repeated storage, or added production encoding"
+            "derived Numbers names projection/codec drifted from TN sheet/form or TST table-model fields, exceeded its 1 KiB source budget, exposed generated code, introduced generated repeated storage, or added production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_table_header_settings_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TST_FIELDS: [&str; 9] = [
+        "required uint32 number_of_rows = 6;",
+        "required uint32 number_of_columns = 7;",
+        "optional uint32 number_of_header_rows = 9;",
+        "optional uint32 number_of_header_columns = 10;",
+        "optional uint32 number_of_footer_rows = 11;",
+        "optional bool header_rows_frozen = 12;",
+        "optional bool header_columns_frozen = 13;",
+        "optional bool repeating_header_rows_enabled = 29;",
+        "optional bool repeating_header_columns_enabled = 32;",
+    ];
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message NumbersTableHeaderSettingsArchive {\n\
+required uint32 number_of_rows = 6;\n\
+required uint32 number_of_columns = 7;\n\
+optional uint32 number_of_header_rows = 9;\n\
+optional uint32 number_of_header_columns = 10;\n\
+optional uint32 number_of_footer_rows = 11;\n\
+optional bool header_rows_frozen = 12;\n\
+optional bool header_columns_frozen = 13;\n\
+optional bool repeating_header_rows_enabled = 29;\n\
+optional bool repeating_header_columns_enabled = 32;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 10] = [
+        "const TABLE_ROWS_FIELD: u32 = 6;",
+        "const TABLE_COLUMNS_FIELD: u32 = 7;",
+        "const HEADER_ROWS_FIELD: u32 = 9;",
+        "const HEADER_COLUMNS_FIELD: u32 = 10;",
+        "const FOOTER_ROWS_FIELD: u32 = 11;",
+        "const HEADER_ROWS_FROZEN_FIELD: u32 = 12;",
+        "const HEADER_COLUMNS_FROZEN_FIELD: u32 = 13;",
+        "const REPEATING_HEADER_ROWS_FIELD: u32 = 29;",
+        "const REPEATING_HEADER_COLUMNS_FIELD: u32 = 32;",
+        "const MAX_RECURSION: u32 = 64;",
+    ];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_numbers_table_header_settings_generated {",
+        "\"/buffa-numbers-table-header-settings/iwa_numbers_table_header_settings_buffa_protos.rs\"",
+    ];
+
+    let tables = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTableHeaderSettingsArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let codec = fs::read_to_string("src/numbers_table_header_settings_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if !TST_FIELDS
+        .iter()
+        .all(|declaration| tables.matches(declaration).count() == 1)
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 1024
+        || projection_schema.contains("repeated ")
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| codec.matches(declaration).count() == 1)
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Numbers table-header settings projection/codec drifted from TST.TableModelArchive scalar fields, exceeded its 1 KiB source budget, exposed generated code, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
     }
@@ -1344,6 +1453,49 @@ fn enforce_numbers_names_projection_budget(directory: &Path) -> Result<(), Box<d
     {
         return Err(format!(
             "Numbers names projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_table_header_settings_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // Buffa 0.9.1 emits 51,480 bytes for the nine scalar settings. Leave only
+    // a narrow codegen/formatter allowance without admitting table data.
+    const MAX_GENERATED_BYTES: u64 = 52 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut generated_repeated_views = 0usize;
+    let mut generated_lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        generated_repeated_views = generated_repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        generated_lazy_repeated_views = generated_lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || generated_repeated_views != 0
+        || generated_lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "Numbers table-header settings projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

@@ -1091,3 +1091,89 @@ field, slide readers, and `transition_wire.rs` remain for
 separately retains `creation.rs::transition()` and the creation example. This
 is therefore public legacy editor retirement, not deletion of all host
 transition vocabulary or creation ownership.
+
+## 2026-08-10 amendment: focused Numbers table-header transaction API
+
+The existing semantic family remains
+`litchi_numbers::table::headers::{Count, Settings}`. The focused transaction
+family is nested separately as
+`litchi_numbers::table::headers::transaction::{Edit, Patch, Commit,
+Diagnostics, Error, LimitKind, Path, InvalidReason}`. Flat `HeaderSettings*`,
+`TableHeader*`, `TableHeaders*`, or `TableHeaderSettings*` transaction aliases,
+crate-root aliases, and glob re-exports are not part of the surface.
+
+The package entry points are `Package::{table_header_settings,
+edit_table_headers, apply_table_headers}`. Read/edit methods take semantic sheet
+and table selectors, resolve exact names or checked zero-based positions against
+the immutable base snapshot, and expose no native object identifier,
+component/member name, generated/wire type, raw field, source bytes, or
+retained artifact accessor. `Edit::settings` returns the compact
+presence-sensitive staged value; infallible consuming
+`Edit::set(self, Settings) -> Self` replaces it as one unit, and consuming
+`Edit::commit` returns the immutable verified package, patch, and content-free
+diagnostics.
+
+`Path` identifies a checked semantic sheet/table position without names or
+native identifiers. `InvalidReason` carries only the numeric row-section or
+header-column capacity facts needed to explain a bound failure. The transaction
+`Error` keeps selector failure, invalid source, unsupported physical source or
+dependency, selected table lock, invalid settings, resource ceiling,
+allocation, verification, and exact-source patch conflict typed and otherwise
+content-redacted. `LimitKind` names the finite input/output, package-entry,
+payload, reference, wire byte/output/field/nesting/work, and aggregate
+transaction-work ceilings; allocation is a separate typed error.
+
+Presence is semantic state: `None` differs from an explicitly encoded false,
+while present counts are nonzero and at most five. Header rows plus footer rows
+must fit declared rows and header columns must fit declared columns. A locked
+table remains readable and admits an exact no-op, but a changed edit is a typed
+`TableLocked` refusal. Changed publication rewrites one selected component,
+deletes existing root previews, reopens under retained limits, and verifies
+exact locality; no-op shares the source and skips changed-only work.
+
+Ordinary and FormBasedSheet ownership paths accept one unambiguous
+role-specific modern or legacy TableInfo/TableModel message and retain its
+physical type. Mixed or duplicate role candidates are invalid. Under Preserve,
+a physical legacy nested-`Index.zip` source remains readable and byte-exact for
+an equal edit, while a changed edit is `Error::UnsupportedSource`.
+
+`Error::UnsupportedDependency` is deliberately conservative. A valid
+TableModel field-85 pivot owner blocks every changed edit. Header-row/column
+count changes block on present fields 81/84/86, nonempty field 83, rooted
+HeaderNameMgr state, selected TableInfo fields 4/5/7/8/15/17, or a true
+TableInfo field 16. Footer changes block on nonempty field 83, active grouping
+decoded through fields 81/86, selected TableInfo fields 5/15/17, or a true
+TableInfo field 16; dependency references are exact, local, non-aliased
+ownership proofs. Repeating-header changes block on deprecated sheet field 4.
+Malformed,
+duplicate, contradictory, or role-aliased dependency state is `InvalidSource`;
+neither family is normalized or left stale.
+
+Patches are exact-source, reversible, process-local values that privately hold
+the complete source/target artifacts and exact selected source/target payloads
+for a change. Changed apply verifies exact source settings and payload, charges
+the source topology and distinct retained target bytes before target reopen,
+then verifies the retained target payload and exact locality. Apply never
+restages or merges a semantic edit; inverse swaps both artifact and payload
+preconditions. `Package::write_to` remains the bounded exact-output seam and
+does not make the patch serialized, compact, atomic, or durable.
+
+The native count oracle changed
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+to
+`5c2323b509e5ea9a975b5f254bbd46cf42657aa1c3858d2c7e98f30f07e4b40c`
+and demonstrated HeaderNameMgr/tile/CalcEngine work beyond TableModel. The
+Boolean-only freeze-off save
+`015568e6b922e80fbfb760491dc49994ccc2218356ed197131beb46c1bd75850`
+and same-state native control
+`df44ed7d0b12c1d372dad7ad7361ed1140d41967921ee42b71a4072b78615721`
+preserved B2/B3 and counts and regenerated semantically equivalent ViewState
+with different allocated references. That supports raw ViewState preservation
+by the focused edit, not byte-stable native Save As output.
+
+The retired public boundary is
+`NumbersEditor::{table_header_settings, set_table_header_settings}`, their
+direct mutation tests, the duplicate host count test, and the old host example.
+Shared private attached-table primitives and the private Pages/Keynote package
+bridges remain; no flat compatibility alias or shim replaces the deleted host
+methods.

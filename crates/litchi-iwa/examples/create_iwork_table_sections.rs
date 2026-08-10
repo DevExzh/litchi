@@ -4,12 +4,12 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_numbers::TableSelector;
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 4;
@@ -43,8 +43,8 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
         .build()?;
     let table_id = editor.tables()?.remove(0).id();
     let table = TableSelector::index(0);
-    editor.set_table_header_settings(
-        table,
+    editor = set_focused_table_headers(
+        editor,
         HeaderSettings {
             header_rows: Some(HeaderCount::ONE),
             header_columns: Some(HeaderCount::ONE),
@@ -62,6 +62,20 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
     editor.remove_table_column(table, ColumnDeletion::header(0))?;
     editor.save(deletions)?;
     Ok(())
+}
+
+fn set_focused_table_headers(
+    editor: NumbersEditor,
+    settings: HeaderSettings,
+) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
+        .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(NumbersEditor::from_bytes(&bytes)?)
 }
 
 fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {

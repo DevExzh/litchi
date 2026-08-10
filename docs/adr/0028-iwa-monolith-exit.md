@@ -1741,3 +1741,106 @@ peak-memory/total-work and complete fallible-allocation proof, process-local
 complete-artifact patches without stable semantic serialization/read-write
 sets/composition/merge/history, library-owned durable atomic publication, and
 sanitizer-backed fuzzing. `write_to` is not a durability boundary.
+
+## 2026-08-10 amendment: Numbers table-header host-mutation exit
+
+Deletion gate 3 advances through Numbers table-header settings. The semantic unit
+already exists as archive-free `table::headers::{Count, Settings}`; the focused
+owner adds canonical nested
+`table::headers::transaction::{Edit, Patch, Commit, Diagnostics, Error,
+LimitKind, Path, InvalidReason}` types and
+`Package::{table_header_settings, edit_table_headers, apply_table_headers}`.
+Read/edit selection takes an explicit sheet plus sheet-scoped table rather than
+the host's workbook-wide catalog. `Edit::settings` borrows staged state;
+infallible consuming `Edit::set(self, Settings) -> Self` replaces it. No physical/native vocabulary
+or new source artifact accessor belongs in those signatures, and exact package
+output remains `write_to`.
+
+Changed admission must prove the rooted Document field-1 Sheet/FormBasedSheet
+owner, its `[2]`/`[1, 2]` TableInfo path, and TableInfo field-2 TableModel
+reference. Local edges resolve uniquely with exact aggregate and optional
+matching field metadata; competing rooted TableInfo ownership and selected
+metadata contradiction are refused, while detached/unrooted pseudo-owners stay
+opaque and exact.
+
+A changed transaction refuses a locked selected table, enforces present count
+range `1..=5`, ensures header plus footer rows and header columns fit the
+declared table dimensions, and retains absence versus explicit values for
+fields 9/10/11/12/13/29/32. Strict selected framing, all finite resource
+ceilings, and complete locality verification are part of the deletion gate.
+
+The selected raw record is cross-checked through five private Buffa generated
+files/51,480 bytes with no repeated views and SHA-256
+`5a94caa4620c56bb464792084c01325cef01744bebac97ef948466b9dea105dd`.
+Raw bytes remain authoritative.
+
+Field-85 pivot state blocks every change. Fields 81/84/86 or nonempty 83 block
+header counts; active field-81/83/86 category/group state also blocks section
+counts. Strict TableInfo aliases 4/5/7/8/15/16/17 gate their corresponding
+header/section counts, rooted HeaderNameMgr gates header counts, and deprecated
+sheet field 4 gates repetition. Each refusal is `UnsupportedDependency`.
+Footer/freeze/repeat and dependency-free counts stay in scope. For admitted
+changes, only selected TableModel header fields are authorized to differ; this
+does not claim that all native counts have a TableModel-only closure.
+
+Admitted changes rewrite the selected component once and delete each existing
+root preview because header settings affect rendering.
+`Index/ViewState.iwa`, unrelated objects/messages/members, unknowns, and
+detached state remain exact. A no-op shares the source and preserves previews;
+changed apply reopens its exact retained target, while inverse restores the
+complete source and previews. Changed apply first matches the retained selected
+source payload and preflights conservative source-plus-target transaction work.
+
+The host-retirement inventory is exactly the public Numbers editor header
+read/write pair, two whole dedicated mutation tests, one duplicated `Count`
+unit test, and `edit_numbers_table_headers.rs`. Ten mixed structural/sort tests
+and seven creation/topology examples survive via private helpers or focused
+package handoffs. The `table_headers` module/source, wire codec, attached
+helpers, package bridge, row/column/sort callers, and Pages/Keynote owners
+remain; this is not module deletion.
+
+Rooted canonical/legacy roles remain supported when unambiguous, while changed
+nested legacy physical packages return `UnsupportedSource`. Locked reads and
+no-ops remain valid; changed edits refuse and invalidate root previews. No
+manifest edge is removed, so debt 015 and the current 64 packages/235 internal
+declarations/14 ordered debts remain.
+
+The native refusal oracle used Numbers 14.4 to change source
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+to two header rows/columns without warning while preserving B2/B3. Its
+136,213-byte save
+`5c2323b509e5ea9a975b5f254bbd46cf42657aa1c3858d2c7e98f30f07e4b40c`
+changed TableModel, HeaderNameMgr, a new manager tile object, and CalcEngine
+formula/dependency state. This supports fail-closed dependency refusal, not a
+Rust writer or native count-parity claim.
+
+The separate freeze oracle toggled Freeze Header Rows off, preserved 1/1
+counts and B2/B3, and saved 136,199 bytes at
+`015568e6b922e80fbfb760491dc49994ccc2218356ed197131beb46c1bd75850`.
+Only TableModel 904538 field 12 moved from true-present to absent and the
+HeaderNameMgr stayed exact. A native off-to-on control produced
+`df44ed7d0b12c1d372dad7ad7361ed1140d41967921ee42b71a4072b78615721`.
+Native Save regenerated equivalent ViewState with different IDs, so this is
+compatibility evidence, not raw ViewState equality.
+
+The exit gate passes 6/6 focused tests with default features and 6/6 without,
+4/4 codec tests, 2/2 facade tests with `--features numbers`, and 113/113
+boundary regressions. `cargo check -p litchi-numbers --all-targets`,
+formatting, diff, warning-denied no-dependency rustdoc, and doctests (one compile-fail pass, one
+ignored example) are green. Strict Clippy reports no new header-file finding;
+unrelated baseline codec/extractor/table warnings keep the full crate gate red.
+
+The fuzz target checks and its stable fixed-input control-flow smoke ran eight
+cases with expected missing-sanitizer-symbol warnings; this is not a
+fuzzing/ASan result and no nightly run occurred. Focused CLI source/inverse
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+produced candidate
+`a8b88d21806b547a5265c60662610f68f524173cac1ca4252d368596c8ef8d2a`,
+diagnosing changed=true, one touched component, and three deleted previews.
+No native UI open of that Rust candidate is claimed.
+
+Exit debt remains in aggregate memory/work and complete fallible allocation,
+process-local full-artifact patches without stable semantic serialization/
+composition/merge/history, library-owned durable atomic publication, baseline
+Clippy cleanup, and sanitizer-backed fuzzing. No dependency edge or debt item
+is removed by this vertical.

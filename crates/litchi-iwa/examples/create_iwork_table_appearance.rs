@@ -10,6 +10,7 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_appearance::{
     TableAppearance, TableGridlineVisibility, TableGridlines, TableRowBanding, TableRowSizing,
 };
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 const APPEARANCE: TableAppearance = TableAppearance {
     row_banding: TableRowBanding::Enabled,
@@ -36,9 +37,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Appearance")
         .table_dimensions(6, 3)
         .build()?;
-    let numbers_table = numbers.tables()?.remove(0);
-    numbers.set_table_header_settings(
-        numbers_table.object_id,
+    let numbers_table = TableSelector::index(0);
+    numbers = set_focused_table_headers(
+        numbers,
         HeaderSettings {
             header_rows: Some(HeaderCount::ONE),
             header_columns: Some(HeaderCount::ONE),
@@ -46,10 +47,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         },
     )?;
-    numbers.set_table_appearance(numbers_table.object_id, APPEARANCE)?;
+    numbers.set_table_appearance(numbers_table, APPEARANCE)?;
     numbers.save(&numbers_path)?;
     assert_eq!(
-        NumbersEditor::open(&numbers_path)?.table_appearance(numbers_table.object_id)?,
+        NumbersEditor::open(&numbers_path)?.table_appearance(numbers_table)?,
         APPEARANCE
     );
 
@@ -108,4 +109,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         APPEARANCE
     );
     Ok(())
+}
+
+fn set_focused_table_headers(
+    editor: NumbersEditor,
+    settings: HeaderSettings,
+) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
+        .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(NumbersEditor::from_bytes(&bytes)?)
 }

@@ -1262,3 +1262,106 @@ peak-memory/work and complete fallible-allocation accounting, process-local
 complete-artifact patches without stable semantic serialization/read-write
 sets/composition/merge/history, durable atomic library publication, and a
 sanitizer-backed fuzz campaign.
+
+## 2026-08-10 current-status amendment: Numbers table headers
+
+The existing archive-free `table::headers::{Count, Settings}` remains the
+semantic owner; this work adds nested
+`table::headers::transaction::{Edit, Patch, Commit, Diagnostics, Error,
+LimitKind, Path, InvalidReason}` types rather than duplicating header settings.
+`Package::{table_header_settings, edit_table_headers, apply_table_headers}`
+uses an explicit sheet selector plus sheet-scoped table selector and keeps
+native IDs, components, generated/wire types, and raw artifacts out of the
+focused signatures. `Edit::settings` borrows the staged state;
+`Edit::set(self, Settings) -> Self` is consuming and infallible. Exact output
+uses `write_to`.
+
+Changed ownership follows the rooted Document-to-Sheet/FormBasedSheet-to-
+TableInfo-to-TableModel chain, including sheet path `[2]`, form path `[1, 2]`,
+and TableInfo field 2. Unique resolution, exact aggregate reference metadata,
+optional unique matching field evidence, and one rooted selected TableInfo
+owner are required. Competing rooted ownership and selected metadata
+contradictions fail closed; detached/unrooted references remain opaque.
+
+Changed edits refuse an interactively locked selected table. Present counts
+remain in `1..=5`; header rows plus footer rows must fit declared rows and
+header columns must fit declared columns. Optional count/Boolean presence in
+TableModel fields 9/10/11/12/13/29/32 is semantic state, not a default to
+normalize. Selected raw framing and bounded work must be validated before the
+candidate is rewritten.
+
+Strict raw/Buffa cross-checking uses five generated files/51,480 bytes, no
+repeated views, with SHA-256
+`5a94caa4620c56bb464792084c01325cef01744bebac97ef948466b9dea105dd`;
+raw records remain authoritative.
+
+Field-85 pivot state blocks any change. Fields 81/84/86 or nonempty 83 block
+header counts; active field-81/83/86 category/group state also blocks section
+counts. Strict TableInfo role aliases 4/5/7/8/15/16/17 gate counts according
+to header versus section role; rooted HeaderNameMgr gates header counts, and
+deprecated sheet field 4 gates repetition. These are typed
+`UnsupportedDependency` refusals. Footer/freeze/repeat and dependency-free
+counts remain supported; admitted locality is not a general TableModel-only
+count-parity claim.
+
+Changed publication fully reopens and locality-checks the candidate, deletes
+the existing zero-to-three root previews, and preserves `Index/ViewState.iwa`
+plus all unrelated ZIP/IWA state. No-ops share exact source state, preserve
+previews, and perform no changed-only lock/reassembly/reopen work. Exact patch
+apply conflicts on the wrong artifact or selected source payload, charges
+source-plus-target work before reopening a changed retained target, and inverse
+restores the complete source.
+
+The host cut removes exactly the two public Numbers editor methods, two whole
+dedicated mutation tests, one duplicated `Count` test, and
+`edit_numbers_table_headers.rs`. Ten mixed structural/sort tests and seven
+creation/topology examples survive through private helpers or focused package
+handoffs. The `table_headers` module/source, wire codec, attached helpers,
+package bridge, structural/sort callers, and Pages/Keynote owners remain.
+
+The sheet-scoped selector is a deliberate break from the old workbook-wide
+catalog. Rooted canonical/legacy roles remain supported when unambiguous;
+changed nested legacy physical packages refuse as `UnsupportedSource`. Locked
+reads/no-ops remain valid, while changes refuse and delete root previews. No
+edge or debt changes: debt 015 remains and inventory stays 64 packages, 235
+internal dependency declarations, and 14 ordered debts.
+
+The native refusal oracle changed source
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+in Numbers 14.4 to 2/2 header rows/columns without warning and preserved B2/B3.
+The 136,213-byte save
+`5c2323b509e5ea9a975b5f254bbd46cf42657aa1c3858d2c7e98f30f07e4b40c`
+changed TableModel, HeaderNameMgr, a new manager tile object, and CalcEngine
+formula/dependency state. It justifies typed dependency refusal and is not a
+Rust writer/count-parity gate.
+
+The compatible freeze oracle toggled Freeze Header Rows off from the same
+source, retained 1/1 counts and B2/B3, and saved 136,199 bytes at
+`015568e6b922e80fbfb760491dc49994ccc2218356ed197131beb46c1bd75850`.
+Only TableModel 904538 field 12 changed from true-present to absent;
+HeaderNameMgr stayed exact. The native off-to-on control hash was
+`df44ed7d0b12c1d372dad7ad7361ed1140d41967921ee42b71a4072b78615721`.
+Both saves regenerated equivalent ViewState with different IDs, so no native
+raw-byte equality is claimed.
+
+Verification passes 6/6 focused tests with defaults and 6/6 without default
+features, 4/4 codec tests, 2/2 root-facade tests with `--features numbers`, and
+113/113 boundary regressions. `cargo check -p litchi-numbers --all-targets`,
+formatting, diff, warning-denied no-dependency rustdoc, and the doctest gate
+(one compile-fail pass, one ignored example) are green. Strict Clippy has no new
+header-file
+finding, but full-crate Clippy remains blocked by unrelated baseline warnings.
+
+The fuzz bin checks; its stable fixed-input smoke completed eight runs with
+expected missing-sanitizer-symbol warnings, so no fuzzing/sanitizer
+claim is made. Focused CLI source/inverse
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+produced changed artifact
+`a8b88d21806b547a5265c60662610f68f524173cac1ca4252d368596c8ef8d2a`
+with changed=true, one touched component, and three deleted previews. It was
+not a native UI-open gate.
+
+Remaining debt is aggregate memory/work and fallible-allocation accounting,
+process-local complete-artifact patches without stable semantic operations,
+composition/merge/history, durable atomic library save, baseline Clippy
+cleanup, and sanitizer-backed fuzzing.
