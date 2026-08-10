@@ -1831,6 +1831,7 @@ fn shadow(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_keynote::slide::placeholder::{Kind, State};
     use litchi_keynote::{Package as FocusedKeynotePackage, SlideSelector};
 
     fn focused_bytes(package: &FocusedKeynotePackage) -> Vec<u8> {
@@ -2087,66 +2088,118 @@ mod tests {
 
     #[test]
     fn generated_presentation_materializes_native_slide_number_placeholders() {
-        let mut hidden = KeynoteEditor::create().unwrap();
+        let hidden = KeynoteEditor::create().unwrap();
+        let hidden = FocusedKeynotePackage::from_bytes(&hidden.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            hidden.slides().unwrap()[0].is_slide_number_visible,
-            Some(false)
+            hidden
+                .slide_placeholder_visibility(0usize, Kind::SlideNumber)
+                .unwrap(),
+            Some(State::Hidden)
         );
-        hidden.set_slide_number_visible(0, true).unwrap();
+        let shown = hidden
+            .edit_slide_placeholder_visibility(0usize, Kind::SlideNumber)
+            .unwrap()
+            .show()
+            .commit()
+            .unwrap();
         assert_eq!(
-            hidden.slides().unwrap()[0].is_slide_number_visible,
-            Some(true)
+            shown
+                .package()
+                .slide_placeholder_visibility(0usize, Kind::SlideNumber)
+                .unwrap(),
+            Some(State::Visible)
         );
-        hidden.set_slide_number_visible(0, false).unwrap();
+        let hidden_again = shown
+            .package()
+            .edit_slide_placeholder_visibility(0usize, Kind::SlideNumber)
+            .unwrap()
+            .hide()
+            .commit()
+            .unwrap();
         assert_eq!(
-            hidden.slides().unwrap()[0].is_slide_number_visible,
-            Some(false)
+            hidden_again
+                .package()
+                .slide_placeholder_visibility(0usize, Kind::SlideNumber)
+                .unwrap(),
+            Some(State::Hidden)
         );
 
         let mut visible = KeynoteDocumentBuilder::new()
             .slide_number_visible(true)
             .build()
             .unwrap();
-        assert_eq!(
-            visible.slides().unwrap()[0].is_slide_number_visible,
-            Some(true)
-        );
-
         let layout = visible.default_slide_layout().unwrap();
         let created = visible.add_slide(layout).unwrap();
-        assert_eq!(created.is_slide_number_visible, Some(false));
-        visible.set_slide_number_visible(1, true).unwrap();
-        assert_eq!(
-            visible.slides().unwrap()[1].is_slide_number_visible,
-            Some(true)
-        );
-        assert_eq!(visible.slide_text_storages(1).unwrap().len(), 2);
+        assert_eq!(created.index, 1);
 
         let focused = FocusedKeynotePackage::from_bytes(&visible.to_bytes().unwrap()).unwrap();
         focused.validate().unwrap();
         let selector = SlideSelector::index(1);
-        let mut body = focused.edit_slide_body(selector).unwrap();
+        assert_eq!(
+            focused
+                .slide_placeholder_visibility(0usize, Kind::SlideNumber)
+                .unwrap(),
+            Some(State::Visible)
+        );
+        assert_eq!(
+            focused
+                .slide_placeholder_visibility(selector, Kind::SlideNumber)
+                .unwrap(),
+            Some(State::Hidden)
+        );
+        assert_eq!(focused.slide_title(selector).unwrap().as_deref(), Some(""));
+        assert_eq!(focused.slide_body(selector).unwrap().as_deref(), Some(""));
+
+        let shown = focused
+            .edit_slide_placeholder_visibility(selector, Kind::SlideNumber)
+            .unwrap()
+            .show()
+            .commit()
+            .unwrap();
+        assert_eq!(
+            shown
+                .package()
+                .slide_placeholder_visibility(selector, Kind::SlideNumber)
+                .unwrap(),
+            Some(State::Visible)
+        );
+
+        let mut body = shown.package().edit_slide_body(selector).unwrap();
         body.set("Numbered slide body").unwrap();
         let body = body.commit().unwrap();
-
-        let mut reopened = KeynoteEditor::from_bytes(&focused_bytes(body.package())).unwrap();
         assert_eq!(
-            reopened
-                .slides()
-                .unwrap()
-                .iter()
-                .map(|slide| slide.is_slide_number_visible)
-                .collect::<Vec<_>>(),
-            [Some(true), Some(true)]
+            body.package()
+                .slide_placeholder_visibility(0usize, Kind::SlideNumber)
+                .unwrap(),
+            Some(State::Visible)
         );
         assert_eq!(
-            reopened.slides().unwrap()[1].body.as_deref(),
+            body.package()
+                .slide_placeholder_visibility(selector, Kind::SlideNumber)
+                .unwrap(),
+            Some(State::Visible)
+        );
+        assert_eq!(
+            body.package().slide_body(selector).unwrap().as_deref(),
             Some("Numbered slide body")
         );
-        reopened.set_slide_number_visible(1, false).unwrap();
+        let hidden = body
+            .package()
+            .edit_slide_placeholder_visibility(selector, Kind::SlideNumber)
+            .unwrap()
+            .hide()
+            .commit()
+            .unwrap();
         assert_eq!(
-            reopened.slides().unwrap()[1].is_slide_number_visible,
-            Some(false)
+            hidden
+                .package()
+                .slide_placeholder_visibility(selector, Kind::SlideNumber)
+                .unwrap(),
+            Some(State::Hidden)
+        );
+        assert_eq!(
+            hidden.package().slide_body(selector).unwrap().as_deref(),
+            Some("Numbered slide body")
         );
     }
 

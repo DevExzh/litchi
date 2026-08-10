@@ -142,6 +142,7 @@ fn verify_selected_component(
                     source,
                     old,
                     new,
+                    selection.kind,
                     source_node_invalidated,
                     target_node_invalidated,
                     budget,
@@ -166,15 +167,15 @@ fn verify_slide_object(
 ) -> Result<(), Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     verify_selected_object(source, candidate, SLIDE_MESSAGE_TYPE, |old, new| {
-        budget.charge_work(old.len())?;
-        budget.charge_work(new.len())?;
         let forward = visibility_payload_delta_matches(
             old,
             new,
             before.placeholder_identifier,
+            before.kind,
             before.state,
             after.state,
             limits,
+            budget,
         )?;
         if forward {
             return Ok(true);
@@ -183,9 +184,11 @@ fn verify_slide_object(
             new,
             old,
             before.placeholder_identifier,
+            before.kind,
             after.state,
             before.state,
             limits,
+            budget,
         )
     })
 }
@@ -194,6 +197,7 @@ fn verify_node_object(
     package: &Package,
     source: &ArchiveObject,
     candidate: &ArchiveObject,
+    kind: super::Kind,
     source_invalidated: bool,
     target_invalidated: bool,
     budget: &mut TransactionBudget,
@@ -204,13 +208,25 @@ fn verify_node_object(
         (true, false) => crate::package::slide_preview::InvalidationDirection::Inverse,
         (false, false) => return Err(Error::Verification),
     };
-    let (matches, report) = crate::package::slide_preview::exact_invalidation_delta_with_allowance(
-        source,
-        candidate,
-        direction,
-        limits,
-        budget.preview_allowance(),
-    )
+    let (matches, report) = if kind == super::Kind::SlideNumber {
+        crate::package::slide_preview::exact_slide_number_delta_with_allowance(
+            source,
+            candidate,
+            source_invalidated,
+            target_invalidated,
+            direction,
+            limits,
+            budget.preview_allowance(),
+        )
+    } else {
+        crate::package::slide_preview::exact_invalidation_delta_with_allowance(
+            source,
+            candidate,
+            direction,
+            limits,
+            budget.preview_allowance(),
+        )
+    }
     .map_err(|error| budget.map_preview_budget_error(error))?;
     budget.charge_preview_report(report)?;
     if !matches {

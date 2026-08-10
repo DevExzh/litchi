@@ -3,7 +3,10 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_keynote::{Package, SlideSelector, slide::placeholder::Kind};
+use litchi_keynote::{
+    Package, SlideSelector,
+    slide::placeholder::{Kind, State},
+};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,11 +23,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let layout = keynote.default_slide_layout()?;
     keynote.add_slide(layout)?;
-    keynote.set_slide_number_visible(1, true)?;
 
     let package = Package::from_bytes(&keynote.to_bytes()?)
         .map_err(|error| std::io::Error::other(format!("focused reopen failed: {error:?}")))?;
-    let mut title = package
+    let numbered = package
+        .edit_slide_placeholder_visibility(SlideSelector::index(1), Kind::SlideNumber)
+        .map_err(|error| {
+            std::io::Error::other(format!("slide-number preflight failed: {error:?}"))
+        })?
+        .set(State::Visible)
+        .commit()
+        .map_err(|error| std::io::Error::other(format!("slide-number commit failed: {error:?}")))?;
+    let mut title = numbered
+        .package()
         .edit_slide_text(SlideSelector::index(1), Kind::Title)
         .map_err(|error| std::io::Error::other(format!("title preflight failed: {error:?}")))?;
     title.set("Second slide")?;

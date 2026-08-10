@@ -20,6 +20,7 @@ const SLIDE_MESSAGE_TYPE: u32 = 5;
 const BODY_REFERENCE_FIELD: u32 = 6;
 const OWNED_DRAWABLES_FIELD: u32 = 7;
 const DRAWABLES_Z_ORDER_FIELD: u32 = 42;
+const SLIDE_NUMBER_REFERENCE_FIELD: u32 = 20;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -138,6 +139,41 @@ fn malformed_body_reference(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
                     if field.number() == BODY_REFERENCE_FIELD {
                         rewritten
                             .extend_from_slice(&length_field(BODY_REFERENCE_FIELD, &external)?);
+                    } else {
+                        rewritten.extend_from_slice(field.raw());
+                    }
+                }
+            },
+            _ => return Err(io::Error::other("unknown reference corruption mode").into()),
+        }
+        Ok(rewritten)
+    })
+}
+
+fn malformed_slide_number_reference(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
+    rewrite_slide_payload(source, |payload| {
+        let view = WireView::parse(payload)?;
+        let number = view
+            .fields()
+            .find(|field| field.number() == SLIDE_NUMBER_REFERENCE_FIELD)
+            .ok_or_else(|| io::Error::other("missing native slide-number reference"))?;
+        let mut rewritten = payload.to_vec();
+        match mode {
+            0 => rewritten.extend_from_slice(&length_field(
+                SLIDE_NUMBER_REFERENCE_FIELD,
+                number.payload(),
+            )?),
+            1 => rewritten.extend_from_slice(&[0xa0, 1, 0]),
+            2 => {
+                let mut external = number.payload().to_vec();
+                external.extend_from_slice(&[0x18, 1]);
+                rewritten.clear();
+                for field in view.fields() {
+                    if field.number() == SLIDE_NUMBER_REFERENCE_FIELD {
+                        rewritten.extend_from_slice(&length_field(
+                            SLIDE_NUMBER_REFERENCE_FIELD,
+                            &external,
+                        )?);
                     } else {
                         rewritten.extend_from_slice(field.raw());
                     }
@@ -289,5 +325,58 @@ fn reference_limit_is_charged_on_placeholder_edit_admission() -> TestResult<()> 
         })
     ));
     assert_eq!(bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn native_slide_number_hidden_noop_show_apply_and_inverse_are_exact() -> TestResult<()> {
+    let package = Package::open(fixture())?;
+    let source = bytes(&package)?;
+    assert_eq!(
+        package.slide_placeholder_visibility(0usize, Kind::SlideNumber)?,
+        Some(State::Hidden)
+    );
+    let noop = package
+        .edit_slide_placeholder_visibility(0usize, Kind::SlideNumber)?
+        .set(State::Hidden)
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(bytes(noop.package())?, source);
+    let shown = package
+        .edit_slide_placeholder_visibility(0usize, Kind::SlideNumber)?
+        .show()
+        .commit()?;
+    assert!(shown.diagnostics().changed());
+    assert_eq!(shown.diagnostics().touched_components(), 2);
+    assert_eq!(shown.diagnostics().deleted_previews(), 3);
+    assert_eq!(
+        shown
+            .package()
+            .slide_placeholder_visibility(0usize, Kind::SlideNumber)?,
+        Some(State::Visible)
+    );
+    let target = bytes(shown.package())?;
+    let applied = package.apply_slide_placeholder_visibility(shown.patch())?;
+    assert_eq!(bytes(applied.package())?, target);
+    let restored = shown
+        .package()
+        .apply_slide_placeholder_visibility(&shown.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn slide_number_role_reference_corruption_is_atomic() -> TestResult<()> {
+    let native = Package::open(fixture())?;
+    let source = bytes(&native)?;
+    for mode in 0..3 {
+        let malformed = malformed_slide_number_reference(&source, mode)?;
+        let package = Package::from_bytes(&malformed)?;
+        assert!(matches!(
+            package.edit_slide_placeholder_visibility(0usize, Kind::SlideNumber),
+            Err(Error::InvalidSource)
+        ));
+        assert_eq!(bytes(&package)?, malformed);
+    }
     Ok(())
 }

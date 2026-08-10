@@ -33,11 +33,12 @@ const NATIVE_KEYNOTE: &[u8] = include_bytes!("../../../../test-data/iwork/keynot
 
 fuzz_target!(|data: &[u8]| {
     // The checked public ingress rejects an oversized slice before copying it.
-    if let Ok(package) = Package::from_bytes_with_options(data, fuzz_options()) {
-        match package.validate() {
+    match Package::from_bytes_with_options(data, fuzz_options()) {
+        Ok(package) => match package.validate() {
             Ok(()) => exercise_package(&package, data),
             Err(error) => observe_error(error),
-        }
+        },
+        Err(error) => observe_error(error),
     }
 
     // ZIP checksums make arbitrary bytes unlikely to reach the semantic codec.
@@ -98,8 +99,11 @@ fn exercise_package(package: &Package, data: &[u8]) {
         observe_result(package.slide_text(SlideSelector::index(arbitrary_position), role));
         observe_result(package.slide_text(SlideSelector::name(arbitrary_name.as_ref()), role));
         exercise_content_free_selector_error(package, role);
-        exercise_visibility_reads(package, role, arbitrary_position, arbitrary_name.as_ref());
     }
+    for kind in [Kind::Title, Kind::Body, Kind::SlideNumber] {
+        exercise_visibility_reads(package, kind, arbitrary_position, arbitrary_name.as_ref());
+    }
+    exercise_slide_text_unsupported_kind(package);
 
     let role = if control(data, 1) & 1 == 0 {
         Kind::Title
@@ -109,6 +113,25 @@ fn exercise_package(package: &Package, data: &[u8]) {
     exercise_operation(package, role, data);
     exercise_staging_error(package, role, data);
     exercise_placeholder_visibility(package, role, data);
+    exercise_placeholder_visibility(package, Kind::SlideNumber, data);
+}
+
+fn exercise_slide_text_unsupported_kind(package: &Package) {
+    for result in [
+        package
+            .slide_text(SlideSelector::index(0), Kind::SlideNumber)
+            .map(|_| ()),
+        package
+            .edit_slide_text(SlideSelector::index(0), Kind::SlideNumber)
+            .map(|_| ()),
+    ] {
+        assert!(matches!(
+            result,
+            Err(SlideTextError::UnsupportedKind {
+                kind: Kind::SlideNumber
+            })
+        ));
+    }
 }
 
 fn exercise_visibility_reads(package: &Package, kind: Kind, position: usize, name: &str) {

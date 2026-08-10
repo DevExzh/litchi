@@ -163,6 +163,53 @@ no-op, and an inverse is exact-source checked. For safe publication, use
 through `Package::write_to` into a synchronized sibling temporary file and
 publishes without clobbering an existing target.
 
+## Focused Keynote per-slide slide-number visibility
+
+`Kind::SlideNumber` uses the same `litchi::keynote` selector-first transaction
+for one existing slide. It is distinct from the presentation-wide
+`show::Settings::slide_numbers_visible` flag: use the show-settings transaction
+when changing the whole presentation. A per-slide read returns `None` if the
+layout provides no slide-number placeholder, `Some(State::Visible)` if it
+draws, and `Some(State::Hidden)` when its placeholder, storage/text graph, and
+layout reference are retained without per-slide drawing.
+
+```rust,no_run
+use litchi::keynote::{
+    Package, SlideSelector,
+    slide::placeholder::{Kind, State},
+};
+
+let package = Package::open("input.key")?;
+let slide = SlideSelector::index(0);
+let commit = package
+    .edit_slide_placeholder_visibility(slide, Kind::SlideNumber)?
+    .set(State::Hidden)
+    .commit()?;
+assert_eq!(
+    commit
+        .package()
+        .slide_placeholder_visibility(slide, Kind::SlideNumber)?,
+    Some(State::Hidden),
+);
+
+let restored = commit
+    .package()
+    .apply_slide_placeholder_visibility(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+This transaction does not create a placeholder or modify its storage/text,
+layout, or slide creation policy. It is an exact no-op for an unchanged state;
+a changed exact-source commit invalidates stale rendering state and its inverse
+restores the exact source. Use
+`litchi-keynote/examples/edit_slide_number_visibility.rs` for distinct-output,
+sibling-temporary, no-clobber publication with `Package::write_to`.
+
 ## Focused Numbers table-header edits
 
 Enable the `numbers` feature to use the focused immutable Numbers package API

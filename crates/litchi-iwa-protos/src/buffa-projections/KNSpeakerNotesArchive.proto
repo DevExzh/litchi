@@ -31,6 +31,7 @@ message SlideArchive {
   optional .LitchiIwaProjection.Reference body_placeholder = 6;
   optional string name = 10;
   required bool in_document = 19;
+  optional .LitchiIwaProjection.Reference slide_number_placeholder = 20;
   optional .LitchiIwaProjection.Reference note = 27;
 }
 

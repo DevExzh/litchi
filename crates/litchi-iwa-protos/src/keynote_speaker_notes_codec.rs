@@ -23,6 +23,7 @@ const SLIDE_TITLE_PLACEHOLDER_FIELD: u32 = 5;
 const SLIDE_BODY_PLACEHOLDER_FIELD: u32 = 6;
 const SLIDE_NAME_FIELD: u32 = 10;
 const SLIDE_IN_DOCUMENT_FIELD: u32 = 19;
+const SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
 const SLIDE_NOTE_FIELD: u32 = 27;
 const TRANSITION_ATTRIBUTES_FIELD: u32 = 2;
 const NOTE_STORAGE_FIELD: u32 = 1;
@@ -117,6 +118,7 @@ pub struct SlideNotesOwnerSnapshot<'source> {
     body_placeholder: Option<ReferenceSnapshot>,
     name: Option<&'source str>,
     in_document: bool,
+    slide_number_placeholder: Option<ReferenceSnapshot>,
     note: Option<ReferenceSnapshot>,
 }
 
@@ -149,6 +151,12 @@ impl<'source> SlideNotesOwnerSnapshot<'source> {
     #[must_use]
     pub const fn in_document(self) -> bool {
         self.in_document
+    }
+
+    /// Optional edge to the slide-number placeholder owner.
+    #[must_use]
+    pub const fn slide_number_placeholder(self) -> Option<ReferenceSnapshot> {
+        self.slide_number_placeholder
     }
 
     /// Optional edge to `KN.NoteArchive`.
@@ -582,6 +590,7 @@ fn preflight_slide<'source>(
     let mut body_placeholder = None;
     let mut name = None;
     let mut in_document = None;
+    let mut slide_number_placeholder = None;
     let mut note = None;
     let mut remaining = source;
     while let Some(field) = next_strict_field(&mut remaining, options, budget)? {
@@ -646,6 +655,18 @@ fn preflight_slide<'source>(
                 }
                 in_document = Some(require_canonical_bool(field.varint()?)?);
             },
+            SLIDE_NUMBER_PLACEHOLDER_FIELD => {
+                if slide_number_placeholder.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "KN.SlideArchive.slideNumberPlaceholder",
+                    ));
+                }
+                slide_number_placeholder = Some(preflight_reference(
+                    field.length_delimited()?,
+                    nested,
+                    budget,
+                )?);
+            },
             SLIDE_NOTE_FIELD => {
                 if note.is_some() {
                     return Err(DecodeError::duplicate_singular("KN.SlideArchive.note"));
@@ -669,6 +690,7 @@ fn preflight_slide<'source>(
         name,
         in_document: in_document
             .ok_or_else(|| DecodeError::missing_required("KN.SlideArchive.inDocument"))?,
+        slide_number_placeholder,
         note,
     })
 }
@@ -825,12 +847,18 @@ fn force_slide_projection<'source>(
         .get()?
         .map(|reference| force_reference_projection(&reference))
         .transpose()?;
+    let slide_number_placeholder = view
+        .slide_number_placeholder
+        .get()?
+        .map(|reference| force_reference_projection(&reference))
+        .transpose()?;
     Ok(SlideNotesOwnerSnapshot {
         style,
         title_placeholder,
         body_placeholder,
         name: view.name,
         in_document: view.in_document,
+        slide_number_placeholder,
         note,
     })
 }

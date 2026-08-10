@@ -1,4 +1,4 @@
-//! Exact-source title/body placeholder visibility transactions.
+//! Exact-source per-slide placeholder-visibility transactions.
 
 #![allow(
     clippy::cast_sign_loss,
@@ -11,6 +11,7 @@
 mod errors;
 mod resolve;
 mod rewrite;
+mod slide_number;
 mod verification;
 
 use std::collections::{HashMap, HashSet};
@@ -43,6 +44,13 @@ use errors::{
 };
 use resolve::focused_slide;
 use rewrite::rewrite_visibility;
+use slide_number::{
+    PLACEHOLDER_FIELD as SLIDE_NUMBER_PLACEHOLDER_FIELD, node_visible as slide_number_node_visible,
+    placeholder_owner as slide_number_placeholder_owner,
+    validate_global_ownership as validate_global_slide_number_ownership,
+    validate_node_references as validate_slide_number_node_references,
+    validate_storage as validate_slide_number_storage,
+};
 use verification::verify_artifact_delta;
 
 const TITLE_REFERENCE_FIELD: u32 = 5;
@@ -50,7 +58,6 @@ const BODY_REFERENCE_FIELD: u32 = 6;
 const OWNED_DRAWABLES_FIELD: u32 = 7;
 const Z_ORDER_FIELD: u32 = 42;
 const OBJECT_PLACEHOLDER_FIELD: u32 = 30;
-const SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
 const SLIDE_STYLE_FIELD: u32 = 1;
 const SLIDE_BUILDS_FIELD: u32 = 2;
 const SLIDE_LAYERING_FIELD: u32 = 41;
@@ -64,27 +71,27 @@ const SLIDE_KNOWN_REFERENCE_FIELDS: [u32; 8] = [27, 29, 31, 35, 36, 39, 43, 44];
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
-    /// Bytes consumed while opening an exact package source.
+    /// Bytes consumed while opening the source package.
     InputBytes,
-    /// Bytes produced by a rewrite or package reassembly.
+    /// Bytes produced for the resulting package.
     OutputBytes,
-    /// Physical package entries.
+    /// Package entries.
     Entries,
-    /// Bytes in one physical package entry.
+    /// Bytes in one package entry.
     EntryBytes,
-    /// Aggregate bytes across physical entries.
+    /// Aggregate bytes across package entries.
     TotalBytes,
-    /// Rooted slides visited while resolving a selector.
+    /// Slides visited while resolving a selector.
     Slides,
-    /// Rooted object references visited during ownership proof.
+    /// Relationships visited while proving the selected state is safe.
     References,
-    /// Bytes in a selected protobuf wire payload.
+    /// Bytes in selected encoded data.
     WireBytes,
-    /// Fields visited in bounded wire payloads.
+    /// Fields visited in selected encoded data.
     WireFields,
-    /// Nested wire-message depth.
+    /// Nested encoded-data depth.
     WireNesting,
-    /// Aggregate wire scanning and rewrite work.
+    /// Aggregate scanning and update work.
     WireWork,
 }
 
@@ -110,7 +117,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// The source has no exact editable flat-package artifact.
+    /// The source cannot support a changed exact-source visibility transaction.
     #[error("this Keynote source does not support placeholder-visibility edits")]
     UnsupportedSource,
     /// More than one rooted slide has the requested exact name.
@@ -125,16 +132,16 @@ pub enum Error {
         /// Requested zero-based semantic position.
         position: Position,
     },
-    /// The selected slide has no dedicated placeholder for the requested role.
+    /// The selected slide has no existing placeholder for the requested role.
     #[error("the selected Keynote slide has no existing {kind} placeholder")]
     PlaceholderNotFound {
-        /// Missing semantic title/body role.
+        /// Missing semantic role.
         kind: Kind,
     },
-    /// Selected ownership, metadata, framing, or dependency evidence is unsafe.
+    /// The selected presentation state cannot safely support the requested change.
     #[error("the Keynote placeholder visibility cannot be edited safely")]
     InvalidSource,
-    /// A finite package or wire resource ceiling was exceeded.
+    /// A finite transaction resource ceiling was exceeded.
     #[error(
         "Keynote placeholder-visibility {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
@@ -146,16 +153,16 @@ pub enum Error {
         /// Configured maximum.
         maximum: u64,
     },
-    /// A fallible transaction allocation failed.
+    /// A bounded transaction allocation failed.
     #[error("could not allocate {amount} units for the Keynote placeholder-visibility transaction")]
     Allocation {
         /// Requested elements or bytes.
         amount: usize,
     },
-    /// Candidate semantic, locality, or rendering-cache verification failed.
+    /// Candidate semantic or rendering verification failed.
     #[error("the edited Keynote placeholder visibility failed verification")]
     Verification,
-    /// A process-local patch was applied to a different exact source artifact.
+    /// A process-local patch was applied to a different exact package snapshot.
     #[error("the Keynote placeholder-visibility patch does not match the exact source package")]
     PatchConflict,
 }
@@ -196,32 +203,46 @@ impl<'a> Edit<'a> {
 
     #[must_use]
     /// Return the selected zero-based slide position.
+    ///
+    /// This is a constant-time accessor.
     pub const fn position(&self) -> Position {
         self.position
     }
     #[must_use]
-    /// Return the selected title/body role.
+    /// Return the selected placeholder role.
+    ///
+    /// This is a constant-time accessor.
     pub const fn kind(&self) -> Kind {
         self.kind
     }
     #[must_use]
     /// Return the currently staged visibility.
+    ///
+    /// This is a constant-time accessor.
     pub const fn state(&self) -> State {
         self.state
     }
     #[must_use]
     /// Stage an explicit visibility value without publishing it.
+    ///
+    /// This consumes the edit, is allocation-free, and never creates or
+    /// deletes a placeholder. It affects only the already selected slide and
+    /// role.
     pub const fn set(mut self, state: State) -> Self {
         self.state = state;
         self
     }
     #[must_use]
-    /// Stage visible state.
+    /// Stage [`State::Visible`] without publishing it.
+    ///
+    /// This has the same constant-time, allocation-free cost as [`Self::set`].
     pub const fn show(self) -> Self {
         self.set(State::Visible)
     }
     #[must_use]
-    /// Stage hidden state.
+    /// Stage [`State::Hidden`] without publishing it.
+    ///
+    /// This has the same constant-time, allocation-free cost as [`Self::set`].
     pub const fn hide(self) -> Self {
         self.set(State::Hidden)
     }
@@ -230,14 +251,17 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns a typed source, resource, allocation, or verification error.
+    /// Returns [`Error::UnsupportedSource`] when a changed exact-source
+    /// publication is unavailable, or a typed source, resource, allocation, or
+    /// verification error. Failures do not publish a partial package.
     ///
     /// # Costs
     ///
-    /// An exact semantic no-op shares the source artifact and performs no
-    /// rewrite, cache scan, reassembly, or candidate reopen. A changed commit
-    /// scans the rooted slide chain, rewrites one or two IWA components,
-    /// deletes existing root previews, and reopens one complete candidate.
+    /// An exact semantic no-op returns the existing immutable package snapshot
+    /// and performs no publication or candidate reopen. A changed commit
+    /// validates the selected slide's supported closure, updates only the
+    /// affected presentation state, invalidates derived rendering state,
+    /// removes stale package-root previews, and reopens one complete candidate.
     pub fn commit(self) -> Result<Commit, Error> {
         let catalog = physical_catalog(self.source)?;
         let source = catalog.shared_source();
@@ -293,7 +317,11 @@ impl<'a> Edit<'a> {
                 source_preview_count,
                 target_preview_count: 0,
                 source_node_invalidated,
-                target_node_invalidated: true,
+                target_node_invalidated: if self.kind == Kind::SlideNumber {
+                    self.state == State::Visible
+                } else {
+                    true
+                },
             },
             package,
             diagnostics: Diagnostics::published(touched_components, source_preview_count),
@@ -302,6 +330,9 @@ impl<'a> Edit<'a> {
 }
 
 /// A process-local exact-source reversible visibility patch.
+///
+/// A patch is not a serialized interchange format. It is applicable only to
+/// the exact package snapshot from which it was committed.
 #[derive(Clone, PartialEq)]
 pub struct Patch {
     artifacts: ExactArtifacts,
@@ -351,24 +382,28 @@ impl Patch {
         self.after
     }
     #[must_use]
-    /// Return a diagnostic fingerprint of the retained source artifact.
+    /// Return a diagnostic fingerprint of the retained source package snapshot.
     ///
-    /// Fingerprints never authorize application; exact bytes do.
+    /// Fingerprints never authorize application; the retained exact source
+    /// snapshot does.
     pub const fn source_fingerprint(&self) -> u64 {
         self.artifacts.source_fingerprint()
     }
     #[must_use]
-    /// Return a diagnostic fingerprint of the retained target artifact.
+    /// Return a diagnostic fingerprint of the retained target package snapshot.
+    ///
+    /// This value is process-local diagnostic evidence, not a stable package
+    /// identity or patch-application authority.
     pub const fn target_fingerprint(&self) -> u64 {
         self.artifacts.target_fingerprint()
     }
     #[must_use]
-    /// Return whether semantic state and retained artifacts are both exact no-ops.
+    /// Return whether semantic state and retained package snapshots are both exact no-ops.
     pub fn is_noop(&self) -> bool {
         self.before == self.after && self.artifacts.is_byte_noop()
     }
     #[must_use]
-    /// Build the exact inverse in `O(1)` by swapping retained artifacts.
+    /// Build the exact inverse in `O(1)` by swapping retained package snapshots.
     pub fn inverse(&self) -> Self {
         Self {
             artifacts: self.artifacts.inverse(),
@@ -412,22 +447,24 @@ impl Diagnostics {
         }
     }
     #[must_use]
-    /// Return whether publication changed the exact package artifact.
+    /// Return whether publication changed the exact package snapshot.
     pub const fn changed(self) -> bool {
         self.changed
     }
     #[must_use]
-    /// Return how many distinct IWA components changed.
+    /// Return how many distinct underlying components changed.
+    ///
+    /// Removing stale package-root previews is not included in this count.
     pub const fn touched_components(self) -> usize {
         self.touched_components
     }
     #[must_use]
-    /// Return how many root preview members were deleted directionally.
+    /// Return how many stale package-root previews were deleted directionally.
     pub const fn deleted_previews(self) -> usize {
         self.deleted_previews
     }
     #[must_use]
-    /// Return whether a changed candidate was physically reopened.
+    /// Return whether a changed candidate was reopened for verification.
     pub const fn full_reparse_performed(self) -> bool {
         self.full_reparse_performed
     }
@@ -479,8 +516,10 @@ pub(super) struct Selection<'a> {
 
 pub(super) struct TransactionBudget {
     references: usize,
+    fields: usize,
     work: usize,
     maximum_references: usize,
+    maximum_fields: usize,
     maximum_work: usize,
 }
 
@@ -527,14 +566,14 @@ impl PlaceholderDependencyPath {
 
 impl TransactionBudget {
     fn new(package: &Package) -> Result<Self, Error> {
+        let wire_limits = package.wire_limits().map_err(map_wire_error)?;
         Ok(Self {
             references: 0,
+            fields: 0,
             work: 0,
             maximum_references: package.semantic_limits().max_references(),
-            maximum_work: package
-                .wire_limits()
-                .map_err(map_wire_error)?
-                .max_rewrite_work(),
+            maximum_fields: wire_limits.max_fields(),
+            maximum_work: wire_limits.max_rewrite_work(),
         })
     }
 
@@ -564,6 +603,21 @@ impl TransactionBudget {
                 kind: LimitKind::WireWork,
                 observed: self.work as u64,
                 maximum: self.maximum_work as u64,
+            });
+        }
+        Ok(())
+    }
+
+    fn charge_fields(&mut self, amount: usize) -> Result<(), Error> {
+        self.fields = self
+            .fields
+            .checked_add(amount)
+            .ok_or(Error::InvalidSource)?;
+        if self.fields > self.maximum_fields {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireFields,
+                observed: self.fields as u64,
+                maximum: self.maximum_fields as u64,
             });
         }
         Ok(())
@@ -621,21 +675,24 @@ impl TransactionBudget {
 impl Package {
     /// Read an existing placeholder's per-slide visibility.
     ///
-    /// `None` means that the selected slide has no dedicated reference for the
-    /// requested role. [`Some(State::Hidden)`](State::Hidden) means that the
-    /// placeholder still exists and retains its content, but participates in
-    /// neither drawing ownership list.
+    /// `None` means that the selected slide has no existing placeholder for
+    /// the requested role. [`Some(State::Hidden)`](State::Hidden) means that
+    /// the role exists but does not display on that slide; hidden title and
+    /// body roles retain their text.
+    ///
+    /// [`Kind::SlideNumber`] is a per-slide setting. It does not read or
+    /// change the separate show-wide slide-number preference.
     ///
     /// # Errors
     /// Returns a typed selector error for a missing or ambiguous slide, a
-    /// source error for malformed role/list ownership, or an exact resource or
-    /// allocation error from bounded focused resolution.
+    /// source error when the selected presentation state is unsupported, or a
+    /// resource or allocation error from bounded focused resolution.
     ///
     /// # Costs
     ///
-    /// Position selection reads the rooted Show/node/Slide chain without
-    /// decoding slide text storage. Name selection scans rooted slide names.
-    /// No physical member is rewritten or reopened.
+    /// Position selection reads selected slide metadata without decoding title
+    /// or body text. Name selection scans navigator names. This read publishes
+    /// no output and reopens no candidate package.
     pub fn slide_placeholder_visibility<'s>(
         &self,
         selector: impl Into<SlideSelector<'s>>,
@@ -644,7 +701,11 @@ impl Package {
         Ok(select(self, selector.into(), kind, false)?.map(|selection| selection.state))
     }
 
-    /// Start a selector-first placeholder visibility edit.
+    /// Start a selector-first per-slide placeholder-visibility edit.
+    ///
+    /// The edit affects only the selected slide and role. In particular,
+    /// selecting [`Kind::SlideNumber`] does not change the show-wide
+    /// slide-number preference.
     ///
     /// # Errors
     /// Returns [`Error::PlaceholderNotFound`] when the requested role is
@@ -670,16 +731,17 @@ impl Package {
     ///
     /// # Errors
     /// Returns [`Error::PatchConflict`] when the patch does not authorize the
-    /// exact source artifact or its selected snapshot. Changed application can
+    /// exact source package snapshot or its selected state. Changed application can
     /// also return typed source, resource, allocation, candidate-reopen, or
     /// verification failures.
     ///
     /// # Costs
     ///
-    /// An authorized exact no-op returns immediately after artifact checking,
-    /// without selector resolution or cache inspection. Changed application
-    /// opens the retained target once and verifies rooted semantics, exact ZIP
-    /// locality, selected IWA deltas, and directional cache state.
+    /// An authorized exact no-op returns immediately after package-snapshot
+    /// checking, without selector resolution or cache inspection. Changed
+    /// application opens the retained target once and verifies the selected
+    /// semantic state, preservation of unselected content, and directional
+    /// rendering-cache and package-root-preview state.
     pub fn apply_slide_placeholder_visibility(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = physical_catalog(self)?.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
@@ -762,11 +824,18 @@ pub(super) fn select_with_budget<'a>(
     let (_node_index, node_payload) = selected_message(node, SLIDE_NODE_MESSAGE_TYPE)?;
     let (slide_index, slide_payload) = selected_message(slide, SLIDE_MESSAGE_TYPE)?;
     budget.charge_work(slide_payload.len())?;
-    let snapshot = visibility_snapshot(
-        slide_payload,
-        kind,
-        package.wire_limits().map_err(map_wire_error)?,
-    )?;
+    let limits = package.wire_limits().map_err(map_wire_error)?;
+    let node_slide_number_visible = if kind == Kind::SlideNumber {
+        slide_number_node_visible(node_payload, limits, budget)?
+    } else {
+        false
+    };
+    let snapshot_scan_work = slide_payload
+        .len()
+        .checked_mul(3)
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_work(snapshot_scan_work)?;
+    let snapshot = visibility_snapshot(slide_payload, kind, node_slide_number_visible, limits)?;
     let Some((placeholder_identifier, state)) = snapshot else {
         return Ok(None);
     };
@@ -776,13 +845,19 @@ pub(super) fn select_with_budget<'a>(
     let (placeholder_index, placeholder_payload) =
         selected_message(placeholder, PLACEHOLDER_MESSAGE_TYPE)?;
     budget.charge_work(placeholder_payload.len())?;
-    let owner = keynote_placeholder_text_codec::decode_placeholder_text_owner(
-        placeholder_payload,
-        placeholder_options(package, placeholder_payload)?,
-    )
-    .map_err(map_placeholder_error)?;
+    let owner = if kind == Kind::SlideNumber {
+        None
+    } else {
+        Some(
+            keynote_placeholder_text_codec::decode_placeholder_text_owner(
+                placeholder_payload,
+                placeholder_options(package, placeholder_payload)?,
+            )
+            .map_err(map_placeholder_error)?,
+        )
+    };
     if mutation {
-        let limits = package.wire_limits().map_err(map_wire_error)?;
+        let mutation_limits = package.wire_limits().map_err(map_wire_error)?;
         let reserved_count = record
             .rooted_node_identifiers
             .len()
@@ -811,32 +886,47 @@ pub(super) fn select_with_budget<'a>(
             &record.rooted_slide_identifiers,
             record.slide_identifier,
             placeholder_identifier,
-            limits,
+            mutation_limits,
             budget,
         )?;
+        if kind == Kind::SlideNumber {
+            validate_global_slide_number_ownership(
+                package,
+                record.slide_identifier,
+                placeholder_identifier,
+                mutation_limits,
+                budget,
+            )?;
+        }
+        let (owner_kind, storage_identifier) = if kind == Kind::SlideNumber {
+            slide_number_placeholder_owner(placeholder_payload, mutation_limits)?
+        } else {
+            let decoded_owner = owner.as_ref().ok_or(Error::InvalidSource)?;
+            (
+                decoded_owner.kind(),
+                decoded_owner
+                    .owned_storage()
+                    .ok_or(Error::InvalidSource)?
+                    .identifier()
+                    .get(),
+            )
+        };
         if slide_component != placeholder_component
-            || owner.kind()
+            || owner_kind
                 != Some(match kind {
                     Kind::Title => 2,
                     Kind::Body => 3,
+                    Kind::SlideNumber => 1,
                 })
         {
             return Err(Error::InvalidSource);
         }
         validate_selected_metadata(slide, slide_index, placeholder_identifier, kind)?;
-        let storage_identifier = owner
-            .owned_storage()
-            .ok_or(Error::InvalidSource)?
-            .identifier()
-            .get();
-        if !reserved_identifiers.insert(storage_identifier) {
-            return Err(Error::InvalidSource);
-        }
         validate_placeholder_metadata(
             placeholder,
             placeholder_index,
             record.slide_identifier,
-            storage_identifier,
+            (storage_identifier != 0).then_some(storage_identifier),
         )?;
         let placeholder_dependencies = validate_placeholder_reference_closure(
             placeholder,
@@ -844,15 +934,34 @@ pub(super) fn select_with_budget<'a>(
             placeholder_payload,
             &reserved_identifiers,
             storage_identifier,
-            limits,
+            mutation_limits,
             budget,
         )?;
+        let extra_roles = usize::from(storage_identifier != 0)
+            .checked_add(usize::from(
+                kind == Kind::SlideNumber && storage_identifier != 0,
+            ))
+            .and_then(|count| count.checked_add(placeholder_dependencies.len()))
+            .ok_or(Error::InvalidSource)?;
         reserved_identifiers
-            .try_reserve(placeholder_dependencies.len())
+            .try_reserve(extra_roles)
             .map_err(|_allocation| Error::Allocation {
-                amount: placeholder_dependencies.len(),
+                amount: extra_roles,
             })?;
+        if storage_identifier != 0 && !reserved_identifiers.insert(storage_identifier) {
+            return Err(Error::InvalidSource);
+        }
         reserved_identifiers.extend(placeholder_dependencies);
+        if kind == Kind::SlideNumber && storage_identifier != 0 {
+            validate_slide_number_storage(
+                package,
+                slide_component,
+                storage_identifier,
+                &mut reserved_identifiers,
+                mutation_limits,
+                budget,
+            )?;
+        }
         validate_component_framing(package, slide_component, budget)?;
         if node_component != slide_component {
             validate_component_framing(package, node_component, budget)?;
@@ -866,9 +975,18 @@ pub(super) fn select_with_budget<'a>(
             record.slide_identifier,
             placeholder_identifier,
             kind,
-            &reserved_identifiers,
+            &mut reserved_identifiers,
             budget,
         )?;
+        if kind == Kind::SlideNumber {
+            validate_slide_number_node_references(
+                node,
+                node_payload,
+                &reserved_identifiers,
+                mutation_limits,
+                budget,
+            )?;
+        }
     }
     Ok(Some(Selection {
         position: record.position,
@@ -910,6 +1028,7 @@ fn validate_rooted_placeholder_locality(
             .get(index)
             .ok_or(Error::InvalidSource)?;
         validate_merge_metadata(slide, info)?;
+        charge_reference_metadata_scan(slide, index, budget)?;
         if info.object_references.contains(&placeholder_identifier) {
             return Err(Error::InvalidSource);
         }
@@ -941,16 +1060,18 @@ fn validate_rooted_placeholder_locality(
 fn visibility_snapshot(
     source: &[u8],
     kind: Kind,
+    node_slide_number_visible: bool,
     limits: WireLimits,
 ) -> Result<Option<(u64, State)>, Error> {
     let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
     let role_field = match kind {
         Kind::Title => TITLE_REFERENCE_FIELD,
         Kind::Body => BODY_REFERENCE_FIELD,
+        Kind::SlideNumber => SLIDE_NUMBER_PLACEHOLDER_FIELD,
     };
     let other_field = match kind {
         Kind::Title => BODY_REFERENCE_FIELD,
-        Kind::Body => TITLE_REFERENCE_FIELD,
+        Kind::Body | Kind::SlideNumber => TITLE_REFERENCE_FIELD,
     };
     let mut role = None;
     let mut other = None;
@@ -966,10 +1087,24 @@ fn visibility_snapshot(
         }
     }
     let Some(identifier) = role else {
-        return Ok(None);
+        return if kind == Kind::SlideNumber && node_slide_number_visible {
+            Err(Error::InvalidSource)
+        } else {
+            Ok(None)
+        };
     };
     if other == Some(identifier) {
         return Err(Error::InvalidSource);
+    }
+    for field in view.fields() {
+        if matches!(
+            field.number(),
+            TITLE_REFERENCE_FIELD | BODY_REFERENCE_FIELD | SLIDE_NUMBER_PLACEHOLDER_FIELD
+        ) && field.number() != role_field
+            && strict_reference(field, limits)? == identifier
+        {
+            return Err(Error::InvalidSource);
+        }
     }
     let mut owned = 0usize;
     let mut z_order = 0usize;
@@ -985,14 +1120,25 @@ fn visibility_snapshot(
             }
         }
     }
-    match (owned, z_order) {
-        (0, 0) => Ok(Some((identifier, State::Hidden))),
-        (1, 1) => Ok(Some((identifier, State::Visible))),
+    match (kind, owned, z_order, node_slide_number_visible) {
+        (Kind::SlideNumber, 0, 0, false) => Ok(Some((identifier, State::Hidden))),
+        (Kind::SlideNumber, 1, 1, true) => Ok(Some((identifier, State::Visible))),
+        (Kind::SlideNumber, _, _, _) => Err(Error::InvalidSource),
+        (_, 0, 0, _) => Ok(Some((identifier, State::Hidden))),
+        (_, 1, 1, _) => Ok(Some((identifier, State::Visible))),
         _ => Err(Error::InvalidSource),
     }
 }
 
 fn strict_reference(field: WireFieldView<'_>, limits: WireLimits) -> Result<u64, Error> {
+    strict_reference_with_zero(field, limits, false)
+}
+
+fn strict_reference_with_zero(
+    field: WireFieldView<'_>,
+    limits: WireLimits,
+    allow_zero: bool,
+) -> Result<u64, Error> {
     field.validate_canonical_framing().map_err(map_wire_error)?;
     if field.wire_type() != 2 {
         return Err(Error::InvalidSource);
@@ -1029,9 +1175,10 @@ fn strict_reference(field: WireFieldView<'_>, limits: WireLimits) -> Result<u64,
             _ => {},
         }
     }
-    let resolved_identifier = identifier
-        .filter(|value| *value != 0)
-        .ok_or(Error::InvalidSource)?;
+    let resolved_identifier = identifier.ok_or(Error::InvalidSource)?;
+    if resolved_identifier == 0 && !allow_zero {
+        return Err(Error::InvalidSource);
+    }
     if !matches!(external, None | Some(0)) {
         return Err(Error::InvalidSource);
     }
@@ -1106,6 +1253,7 @@ fn validate_selected_metadata(
     let role_path = [match kind {
         Kind::Title => TITLE_REFERENCE_FIELD,
         Kind::Body => BODY_REFERENCE_FIELD,
+        Kind::SlideNumber => SLIDE_NUMBER_PLACEHOLDER_FIELD,
     }];
     let mut role_seen = false;
     for field in &info.field_infos {
@@ -1132,7 +1280,7 @@ fn validate_placeholder_metadata(
     object: &ArchiveObject,
     message_index: usize,
     slide_identifier: u64,
-    storage_identifier: u64,
+    storage_identifier: Option<u64>,
 ) -> Result<(), Error> {
     let info = object
         .archive_info
@@ -1140,19 +1288,29 @@ fn validate_placeholder_metadata(
         .get(message_index)
         .ok_or(Error::InvalidSource)?;
     validate_merge_metadata(object, info)?;
-    if slide_identifier == storage_identifier
+    if storage_identifier.is_none()
+        && (info.object_references.contains(&0)
+            || info
+                .field_infos
+                .iter()
+                .any(|field| field.object_references.contains(&0)))
+    {
+        return Err(Error::InvalidSource);
+    }
+    if storage_identifier == Some(slide_identifier)
         || info
             .object_references
             .iter()
             .filter(|identifier| **identifier == slide_identifier)
             .count()
             > 1
-        || info
-            .object_references
-            .iter()
-            .filter(|identifier| **identifier == storage_identifier)
-            .count()
-            != 1
+        || storage_identifier.is_some_and(|candidate_storage_identifier| {
+            info.object_references
+                .iter()
+                .filter(|identifier| **identifier == candidate_storage_identifier)
+                .count()
+                != 1
+        })
     {
         return Err(Error::InvalidSource);
     }
@@ -1165,11 +1323,13 @@ fn validate_placeholder_metadata(
             .iter()
             .filter(|identifier| **identifier == slide_identifier)
             .count();
-        let storage_occurrences = field
-            .object_references
-            .iter()
-            .filter(|identifier| **identifier == storage_identifier)
-            .count();
+        let storage_occurrences = storage_identifier.map_or(0, |candidate_storage_identifier| {
+            field
+                .object_references
+                .iter()
+                .filter(|identifier| **identifier == candidate_storage_identifier)
+                .count()
+        });
         if parent_occurrences != 0
             && (field.path.as_slice() != [1, 1, 1, 2]
                 || parent_occurrences != 1
@@ -1396,6 +1556,59 @@ fn validate_reference_metadata(
     Ok(())
 }
 
+fn charge_reference_metadata_scan(
+    object: &ArchiveObject,
+    message_index: usize,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    let info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(Error::InvalidSource)?;
+    let metadata_work = info
+        .object_references
+        .len()
+        .checked_mul(8)
+        .and_then(|work| work.checked_add(1))
+        .and_then(|initial_work| {
+            info.field_infos
+                .iter()
+                .try_fold(initial_work, |accumulated_work, field| {
+                    field
+                        .path
+                        .as_slice()
+                        .len()
+                        .checked_mul(4)
+                        .and_then(|path| accumulated_work.checked_add(path))
+                        .and_then(|path_work| {
+                            field
+                                .object_references
+                                .len()
+                                .checked_mul(8)
+                                .and_then(|refs| path_work.checked_add(refs))
+                        })
+                        .and_then(|work| work.checked_add(1))
+                })
+        })
+        .and_then(|one_pass| one_pass.checked_mul(2))
+        .ok_or(Error::InvalidSource)?;
+    let references = info
+        .object_references
+        .len()
+        .checked_add(
+            info.field_infos
+                .iter()
+                .try_fold(0usize, |count, field| {
+                    count.checked_add(field.object_references.len())
+                })
+                .ok_or(Error::InvalidSource)?,
+        )
+        .ok_or(Error::InvalidSource)?;
+    budget.charge_work(metadata_work)?;
+    budget.charge_references(references)
+}
+
 pub(super) fn validate_reference_metadata_set(
     object: &ArchiveObject,
     message_index: usize,
@@ -1487,7 +1700,7 @@ fn validate_mutation_payload(
     slide_identifier: u64,
     placeholder_identifier: u64,
     kind: Kind,
-    reserved_identifiers: &HashSet<u64>,
+    reserved_identifiers: &mut HashSet<u64>,
     budget: &mut TransactionBudget,
 ) -> Result<(), Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
@@ -1505,6 +1718,14 @@ fn validate_mutation_payload(
         .ok_or(Error::InvalidSource)?;
     budget.charge_work(slide_work)?;
     let mut style = None;
+    let mut other_roles = HashSet::new();
+    if kind == Kind::SlideNumber {
+        other_roles
+            .try_reserve(field_count)
+            .map_err(|_allocation| Error::Allocation {
+                amount: field_count,
+            })?;
+    }
     for field in slide.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if matches!(field.wire_type(), 3 | 4) {
@@ -1526,16 +1747,34 @@ fn validate_mutation_payload(
             3 => return Err(Error::UnsupportedSource),
             TITLE_REFERENCE_FIELD
             | BODY_REFERENCE_FIELD
+            | SLIDE_NUMBER_PLACEHOLDER_FIELD
             | OWNED_DRAWABLES_FIELD
             | Z_ORDER_FIELD => {
                 budget.charge_reference()?;
-                let _identifier = strict_reference(field, limits)?;
+                let identifier = strict_reference(field, limits)?;
+                if kind == Kind::SlideNumber {
+                    let controlled = field.number() == SLIDE_NUMBER_PLACEHOLDER_FIELD
+                        || matches!(field.number(), OWNED_DRAWABLES_FIELD | Z_ORDER_FIELD);
+                    if identifier == placeholder_identifier && !controlled {
+                        return Err(Error::InvalidSource);
+                    }
+                    if identifier != placeholder_identifier {
+                        let inserted = other_roles.insert(identifier);
+                        if !inserted
+                            && !matches!(field.number(), OWNED_DRAWABLES_FIELD | Z_ORDER_FIELD)
+                        {
+                            return Err(Error::InvalidSource);
+                        }
+                    }
+                }
             },
-            SLIDE_NUMBER_PLACEHOLDER_FIELD
-            | OBJECT_PLACEHOLDER_FIELD
-            | SLIDE_TEMPLATE_REFERENCE_FIELD => {
+            OBJECT_PLACEHOLDER_FIELD | SLIDE_TEMPLATE_REFERENCE_FIELD => {
                 budget.charge_reference()?;
-                if strict_reference(field, limits)? == placeholder_identifier {
+                let identifier = strict_reference(field, limits)?;
+                if identifier == placeholder_identifier {
+                    return Err(Error::InvalidSource);
+                }
+                if kind == Kind::SlideNumber && !other_roles.insert(identifier) {
                     return Err(Error::InvalidSource);
                 }
             },
@@ -1547,6 +1786,9 @@ fn validate_mutation_payload(
                 }
                 if number == 43 {
                     return Err(Error::UnsupportedSource);
+                }
+                if kind == Kind::SlideNumber && !other_roles.insert(identifier) {
+                    return Err(Error::InvalidSource);
                 }
             },
             SLIDE_LAYERING_FIELD => {
@@ -1561,8 +1803,16 @@ fn validate_mutation_payload(
     for path in [&[28, 2][..], &[45, 1, 1][..]] {
         if let Some(field) = nested_unique_field(slide_payload, path, limits)? {
             budget.charge_reference()?;
-            if strict_reference(field, limits)? == placeholder_identifier {
+            let identifier = strict_reference(field, limits)?;
+            if identifier == placeholder_identifier {
                 return Err(Error::InvalidSource);
+            }
+            if kind == Kind::SlideNumber {
+                // These maps point back to already-owned drawables in native
+                // slides, so their exact reference may legitimately repeat a
+                // field-7/42 dependency. They still cannot alias the selected
+                // slide-number placeholder or any reserved closure role.
+                other_roles.insert(identifier);
             }
         }
     }
@@ -1576,12 +1826,44 @@ fn validate_mutation_payload(
     {
         return Err(Error::InvalidSource);
     }
+    if kind == Kind::SlideNumber
+        && other_roles.iter().any(|identifier| {
+            reserved_identifiers.contains(identifier)
+                || *identifier == style_identifier
+                || builds.contains(identifier)
+        })
+    {
+        return Err(Error::InvalidSource);
+    }
     validate_slide_dependency_metadata(
         slide_object,
         slide_message_index,
         style_identifier,
         &builds,
     )?;
+    let added_roles = builds
+        .len()
+        .checked_add(1)
+        .and_then(|count| count.checked_add(other_roles.len()))
+        .ok_or(Error::InvalidSource)?;
+    reserved_identifiers
+        .try_reserve(added_roles)
+        .map_err(|_allocation| Error::Allocation {
+            amount: added_roles,
+        })?;
+    if !reserved_identifiers.insert(style_identifier) {
+        return Err(Error::InvalidSource);
+    }
+    for build_identifier in &builds {
+        if !reserved_identifiers.insert(*build_identifier) {
+            return Err(Error::InvalidSource);
+        }
+    }
+    for identifier in other_roles {
+        if !reserved_identifiers.insert(identifier) {
+            return Err(Error::InvalidSource);
+        }
+    }
     for build_identifier in builds {
         validate_build_dependency(
             package,
@@ -1591,7 +1873,7 @@ fn validate_mutation_payload(
             budget,
         )?;
     }
-    validate_style_visibility(package, style_identifier, budget)?;
+    validate_style_visibility(package, style_identifier, kind, budget)?;
     validate_placeholder_owner(placeholder_payload, slide_identifier, kind, limits, budget)?;
     Ok(())
 }
@@ -1675,14 +1957,20 @@ fn validate_placeholder_owner(
     }
     let deprecated = nested_unique_field(payload, &[1, 2], limits)?
         .map(|field| {
-            budget.charge_reference()?;
-            strict_reference(field, limits)
+            let identifier = strict_reference_with_zero(field, limits, kind == Kind::SlideNumber)?;
+            if identifier != 0 {
+                budget.charge_reference()?;
+            }
+            Ok(identifier)
         })
         .transpose()?;
     let modern = nested_unique_field(payload, &[1, 4], limits)?
         .map(|field| {
-            budget.charge_reference()?;
-            strict_reference(field, limits)
+            let identifier = strict_reference_with_zero(field, limits, kind == Kind::SlideNumber)?;
+            if identifier != 0 {
+                budget.charge_reference()?;
+            }
+            Ok(identifier)
         })
         .transpose()?;
     if deprecated.is_some() && modern.is_some() && deprecated != modern {
@@ -1691,6 +1979,7 @@ fn validate_placeholder_owner(
     let expected_kind = match kind {
         Kind::Title => 2,
         Kind::Body => 3,
+        Kind::SlideNumber => 1,
     };
     let kind_field = nested_unique_field(payload, &[2], limits)?.ok_or(Error::InvalidSource)?;
     if canonical_varint(kind_field)? != expected_kind {
@@ -1702,6 +1991,7 @@ fn validate_placeholder_owner(
 fn validate_style_visibility(
     package: &Package,
     identifier: u64,
+    kind: Kind,
     budget: &mut TransactionBudget,
 ) -> Result<(), Error> {
     let (_component, object) = package
@@ -1724,7 +2014,11 @@ fn validate_style_visibility(
             WireView::parse_with_limits(properties.payload(), limits).map_err(map_wire_error)?;
         for field in view.fields() {
             field.validate_canonical_framing().map_err(map_wire_error)?;
-            if matches!(field.number(), 4 | 5) {
+            let selected_override = match kind {
+                Kind::Title | Kind::Body => matches!(field.number(), 4 | 5),
+                Kind::SlideNumber => field.number() == 6,
+            };
+            if selected_override {
                 return Err(Error::UnsupportedSource);
             }
         }

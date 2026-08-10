@@ -170,11 +170,19 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! # Show or hide a slide placeholder
+//! # Show or hide a per-slide placeholder
 //!
 //! Missing and hidden placeholders remain distinct: a read returns `None` for
-//! a missing role and `Some(State::Hidden)` for an existing placeholder whose
-//! content is retained outside both drawing ownership lists.
+//! a missing role and `Some(State::Hidden)` for an existing role that does not
+//! display on the selected slide. Hidden title/body roles retain their text.
+//! `Kind::SlideNumber` controls only the selected slide's existing number
+//! placeholder; it is independent of the show-wide slide-number preference
+//! and is not accepted by the slide-text APIs.
+//!
+//! An unchanged edit is an exact no-op. A changed edit invalidates derived
+//! rendering state and removes stale package-root previews before a complete
+//! candidate reopen. Its inverse applies only to the exact committed package
+//! snapshot and restores the original package state.
 //!
 //! ```no_run
 //! use std::io;

@@ -9207,3 +9207,141 @@ control-flow smoke completes, but expected missing sanitizer symbols mean it is
 not sanitizer-backed fuzz evidence. The two-way native/exact-artifact results
 above complete compatibility verification. No dependency edge or debt item is
 removed.
+
+## 2026-08-11 amendment: per-slide Keynote slide-number cutover
+
+The title/body placeholder transaction now admits `Kind::SlideNumber` for
+visibility only. This supersedes only the preceding amendment's statement that
+per-slide slide-number mutation remains in the host. It does not absorb
+presentation-wide `KN.ShowArchive.slideNumbersVisible` field 6, which remains
+part of `show::Settings`, nor layout, creation, text, or style mutation. The
+canonical surface remains
+`slide::placeholder::{Kind, State, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` plus the three Package read/edit/apply methods. `Edit::set`,
+`show`, and `hide` are consuming and infallible staging; preflight, commit, and
+apply carry typed failures. Slide text deliberately rejects
+`Kind::SlideNumber`.
+
+Migration is one-for-one:
+
+- `KeynoteEditor::set_slide_number_visible(index, value)` becomes
+  `Package::edit_slide_placeholder_visibility(SlideSelector::index(index),
+  Kind::SlideNumber)?`, then consuming `.show()` or `.hide()`, `.commit()`, and
+  `write_to`.
+- `KeynoteSlideInfo::is_slide_number_visible` remains a host read for existing
+  broad callers; focused code uses
+  `Package::slide_placeholder_visibility(..., Kind::SlideNumber)`.
+- The surviving slide-number creation example builds the graph in the host,
+  reopens it as a focused Package, commits the semantic visibility edit, and
+  writes the result. The focused owner does not synthesize a missing
+  placeholder.
+
+Preflight proves the rooted Document field-2 -> Show/SlideTree `[3,2]` ->
+SlideNode field-2 -> SlideArchive owner. SlideArchive field 20 must identify
+one native-kind-1 slide-number placeholder. Visible is exactly Node field 18
+true plus one selected reference in each of Slide fields 7 and 42; hidden is
+field 18 false/absent plus no selected reference in either field. Showing
+appends the canonical reference after the existing occurrences of each field;
+hiding removes only the selected occurrences. Global scanning rejects a
+competing rooted slide owner, aliases into title/body/object/template/build or
+the reserved storage/dependency closure, and contradictory membership. Strict
+field-18 parsing rejects duplicates, noncanonical keys, and values other than
+zero or one. Exact hidden no-ops preserve absent versus explicit false; a
+changed hide uses canonical false, with exact inverse bytes retained by the
+patch.
+
+Storage id zero is a supported native form and introduces no metadata reference
+to zero. A nonzero storage must be one same-component type-2001
+`TSWP.StorageArchive`: kind absent/3, `in_document=true`, text one U+FFFC, and
+one attachment-table entry at character zero resolving to one same-component
+type-2043 slide-number attachment. The storage's aggregate metadata and
+optional dependency declarations/paths must exactly account for the attachment
+and its style-sheet/attribute-table closure. The attachment has empty/absent
+textual super, absent/zero kind, and no object references. Style visibility
+overrides and unsupported closures return `UnsupportedSource`. Legacy nested
+packages remain readable and exact no-ops remain exact, but changed edits are
+the intentional `UnsupportedSource` compatibility break.
+
+The format seam combines strict raw framing with forced Buffa lazy views. The
+new `KNSlideNumberArchive.proto` projection covers Node field 18, storage
+fields 1 and 10 plus the borrowed field-9 attachment table, and the attachment
+textual super. Handwritten code routes the repeated table without a generated
+repeated view or encoder, then cross-checks Buffa against raw parsing. Rooted
+ownership/storage work lives in
+`package/slide_placeholder_visibility/slide_number.rs`; the scalar splice and
+direction-aware exact-delta check live in
+`package/slide_preview/slide_number.rs`; shared transaction, drawable
+membership, and reopen verification remain in their focused modules. The
+generated build evidence is five files/112,101 bytes, zero repeated views,
+cap 116 KiB, and aggregate SHA-256
+`eacce4103b5c9f9f32fd98639b81249ae1d15fcd63da6fe636569e0a2a324c30`.
+It measures deterministic build output, not preservation provenance.
+
+Resource enforcement includes message bytes, fields, aggregate work, nesting,
+rooted objects, payload occurrence and metadata declaration indexes, every
+aggregate/`FieldInfo` reference, selected and nonselected payload bytes,
+header length, output allocation, forward/inverse exact-delta verification,
+and archive reassembly. The codec report is merged into the transaction
+budget. Index allocation is bounded and fallible; there is no full node or
+payload clone and no verification rewrite. Low allowances reject atomically
+with content-redacted diagnostics.
+
+No-op commit/apply shares the exact source and performs no reassembly, reopen,
+component touch, or preview deletion. A changed commit rewrites the Node and
+Slide archives, deletes each existing root preview, reassembles, and reopens.
+A changed apply checks the exact retained selected source and exact stored
+target, charges source-plus-target transaction work, then reopens the target.
+The patch can restore absent/false framing and exact list positions for an
+exact inverse, but remains process-local and unversioned.
+
+Only Node field 18 and the selected Slide field-7/field-42 membership are
+mutable. One component is touched when Node and Slide co-reside and two when
+split. Unlike title/body visibility, the selected node thumbnail/cache is not
+invalidated. `Index/ViewState.iwa`, other slide roles and slides, storage,
+attachment, content, geometry, style, dependency bytes, unknowns, and global
+Show field 6 remain exact. Changed output deliberately removes root
+`preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg`; those are the sole
+preservation exception beyond the selected semantic delta.
+
+The host retirement removes one public mutator,
+`KeynoteEditor::set_slide_number_visible`; the complete 172-line
+`keynote/editor/slide_number.rs` source and module; the 23-line direct mutation
+example; and two whole direct tests plus four exclusive constants and their
+fixture helper. The 53-line creation example remains, with its post-build edit
+migrated to the focused package. Creation helpers/tests,
+`KeynoteSlideInfo::is_slide_number_visible`, shared ownership, layout, title/body
+visibility, and global Show settings remain. No Cargo edge or recorded debt is
+removed.
+
+The exact Rust/native gate starts from 500,058-byte `basic.key`, SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+The 455,859-byte shown candidate was
+`a2dafcd4ffc57bafc3bbf7d7cd4ee8131bab2c06dd52adc292632d4208c126be`,
+with changed=true, two touched components, three deleted previews, and an
+inverse exactly restoring the source. Keynote 14.4 (7043.0.93) opened it
+warning-free, displayed slide attachment `1`, checked Format > Slide Number,
+and preserved title/body/date. Save As, close, and exact-path reopen preserved
+state and content at 500,192 bytes and SHA-256
+`b1edd073d309157d27508baf4aedbe93d6dee0687f727dd71f1e8232f6171882`.
+Native Save As regenerated root preview hashes
+`a7e0fafd160545583d3613b25211925991d9c70a47102cce49b7ddb53d3baab9`,
+`fd4d7f8601683d404104d9535fda1fa957f05913a1a40b29c35c51d0e2c1e8db`,
+and `c76e1b0b4b2c833232bc23d9c0bbb70255f557233ceba15f24d93d91baab43b0`,
+while cached Data9074 remained exact at
+`575645e2455199d7cc0c65fab8002b9e025765ba19b8b03c6e51c000f4915e89`.
+Independent Apple-only hidden/visible/rehidden controls confirmed that the
+selected native delta is field 18 false-to-true, retained field 20, one
+field-7 and one field-42 append, metadata lengths only, exact cache data, and
+an exact global Show field-6 closure.
+
+The frozen-tree gate passes 8/8 focused slide-number codec tests, 98/98
+Keynote library tests, 7/7 focused placeholder-visibility integration tests,
+22/22 filtered slide-preview tests, 9/9 facade tests with `--features keynote`,
+and 7/7 doctests. Keynote all-target checking, strict Keynote library Clippy
+and rustdoc, host library check/no-run and examples, formatting, and diff
+checks pass. The fuzz target checks and completes a bounded 16-run stable
+control-flow smoke; expected missing sanitizer symbols make this control-flow
+evidence, not sanitizer-backed fuzzing. Boundary regressions pass 138/138;
+the live slide-number host, placeholder host, and focused audits are clean.
+The full checker retains only the unchanged 14 dependency-policy baselines.
+Exact-artifact and native compatibility verification is complete.
