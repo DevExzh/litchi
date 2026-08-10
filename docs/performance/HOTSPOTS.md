@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0021`](changes/0021-opc-shared-regenerated-payload.md)
+Evidence through: [`change 0022`](changes/0022-zip-generated-local-span-move.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -61,8 +61,11 @@ Current work shape:
   while retained-source peak heap originally rose 37%; see change 0008. The
   changed Part now shares its existing immutable logical payload with the ZIP
   regeneration layer, removing one measured 4.19 MiB copy and reducing the
-  matched peak by 3.42%; see change 0021. The separate generated-local-entry
-  buffer and retained eager source remain.
+  matched peak by 3.42%; see change 0021. After validation, the ZIP layer also
+  moves that entry's generated local span instead of cloning it, removing a
+  second 4.20 MiB allocation and reducing matched peak heap another 3.20%; see
+  change 0022. The required compressor/archive buffer and retained eager source
+  remain.
 
 ## XLSX selective read and edit path
 
@@ -304,7 +307,7 @@ pattern elsewhere.
 | 3 | Superseded for source-backed OPC: finite weighted LRU, per-entry single-flight and content-free diagnostics exist; legacy eager open does not use that cache. | Cache bytes are not yet charged to the hierarchical Budget; add contention and retention measurements. |
 | 4 | Measured: ordinary OPC open is serial and explicit eager open has a local bounded session. Six large ZIP tasks reach 4.52x p50 at 12 CPUs; small tasks regress. | Broader real-package scaling and threshold tuning. |
 | 5 | Confirmed: stored entries are CRC-checked then copied. | Stored-media one-Part read and package-open copied-byte/RSS deltas. |
-| 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their existing immutable logical payload with the ZIP regeneration layer; borrowed/topology-changing/unsupported sources rewrite fully. | Real media-heavy 1% updates, source-backed editable publication, and attribution of the remaining retained-source/generated-local-entry memory cost. |
+| 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their immutable logical payload and validated generated local span without extra copies; borrowed/topology-changing/unsupported sources rewrite fully. | Real media-heavy 1% updates, source-backed editable publication, and attribution of the remaining retained-source/compressor-buffer memory cost. |
 | 7 | Confirmed structurally: duplicate indexes, boxed Parts, source-XML map, and linear fallback exist. | Allocation profiles, type sizes, cache counters and repeated noncanonical lookup. |
 | 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet. | Broader source-backed selectors, edits and real workbook matrices. |
 | 9 | Confirmed structurally: small XLSX edits scan/rebuild/reparse the complete touched sheet and repackage all Parts. | First/middle/last cell, 1% updates, and commit-versus-save separation. |
@@ -322,7 +325,7 @@ The order below is provisional until baseline measurements are recorded.
 | Rank | Candidate | Expected CRUD reach | Risk | ADR fit |
 |---:|---|---|---|---|
 | 1 | Extend source-backed OPC from selective reads to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets the measured exact-source peak-memory cost. | High | Positional source/descriptors are implemented; cache Budget charging and CRUD coverage remain. |
-| 2 | Extend targeted OPC preservation to source-backed editable packages and attribute the remaining generated-local-entry buffer. | Targeted OOXML save, especially media-heavy packages; reduces the remaining peak-memory tradeoff. | High | Owned same-topology sharing is accepted in change 0021; topology fallback and framing preservation are tested. |
+| 2 | Extend targeted OPC preservation to source-backed editable packages and attribute the remaining retained source and required compressor buffer. | Targeted OOXML save, especially media-heavy packages; reduces the remaining peak-memory tradeoff. | High | Owned same-topology payload sharing and validated local-span movement are accepted in changes 0021 and 0022; topology fallback and framing preservation are tested. |
 | 3 | Tune explicit bounded-session thresholds and complete remaining I/O budget policy. | Large multi-Part open/save/validation. | Medium-high | 1/2/4/8/12 evidence exists; large tasks scale, small tasks regress; no hidden Rayon path remains. |
 | 4 | Build one validated OPC publication plan and reuse its generated XML and Part order during emission. | Every rewritten OPC save. | Low-medium | Implemented; see `changes/0001-opc-publication-plan.md`. |
 | 5 | Exact owned-source OPC no-op publication. | Owned DOCX/PPTX/XLSX open/read/no-op save. | Medium | Implemented; same-topology mutations now use targeted preservation. See changes 0004 and 0008. |

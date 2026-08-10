@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest tranche: `5d043f0070d1e5100a1d252b4abfc61262ef413a`
+Production base for the latest tranche: `b974fa4e45e66b604a62c0f9aa6dd14b0f2f7f16`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -37,7 +37,8 @@ is still not broad program or CRUD coverage.
 | ODS row-local publication | Large/medium one-cell edit-save p50 **-9.54% / -7.22%**; allocation calls **-5.85%**, peak heap **-27.18%** | Same-topology modeled rows only; structural edits fall back and touched opaque rows refuse |
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
-| OPC shared changed-Part payload | Few-large compressible targeted save **-20.73%** p50 / **-18.49%** mean; cache misses **-31.12%** | Removes one 4.19 MiB handoff copy; peak heap -3.42%, uninstrumented RSS +0.22% (flat); source retention and local-entry compression buffer remain |
+| OPC shared changed-Part payload | Few-large compressible targeted save **-20.73%** p50 / **-18.49%** mean; cache misses **-31.12%** | Removes one 4.19 MiB handoff copy; peak heap -3.42%, uninstrumented RSS +0.22% (flat); the remaining local-span copy is removed by the follow-up below |
+| ZIP generated local-span move | Few-large compressible/incompressible targeted save **-4.09% / -2.70%** p50; means **-4.08% / -2.25%** | Removes the separate 4.20 MiB post-validation local-span copy; peak heap -3.20%, uninstrumented RSS -0.10% (flat); required compressor/archive buffer remains |
 
 Raw evidence: [`XLSX before A`](results/abba-xlsx-range-before-a.json),
 [`after A`](results/abba-xlsx-range-after-a.json),
@@ -148,6 +149,15 @@ No-op/edge guardrails, allocation attribution, RSS and hardware counters are
 summarized in
 [`change 0021`](changes/0021-opc-shared-regenerated-payload.md).
 
+The generated-local-span evidence is
+[`before A`](results/abba-opc-local-span-move-before-a.json),
+[`after A`](results/abba-opc-local-span-move-after-a.json),
+[`after B`](results/abba-opc-local-span-move-after-b.json), and
+[`before B`](results/abba-opc-local-span-move-before-b.json). Repeated small,
+edge, tiny and exact-no-op guardrails, allocation attribution, RSS and hardware
+counters are summarized in
+[`change 0022`](changes/0022-zip-generated-local-span-move.md).
+
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
 charged to hierarchical `Budget`. Raw ZIP preservation is now integrated for
 owned same-topology OPC mutations; broader source-backed editing is pending.
@@ -167,11 +177,14 @@ See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0018`](changes/0018-ods-row-local-publication.md), and
 [`0019`](changes/0019-rtf-parser-state-specialization.md), and
 [`0020`](changes/0020-rtf-ascii-transport-batching.md), and
-[`0021`](changes/0021-opc-shared-regenerated-payload.md).
+[`0021`](changes/0021-opc-shared-regenerated-payload.md), and
+[`0022`](changes/0022-zip-generated-local-span-move.md).
 
 Consolidated changed-crate tests passed, along with focused changed-crate
-warning-denied Clippy and formatter checks. An umbrella all-feature `litchi`
-attempt exhausted local disk; it is not reported as a passing umbrella gate.
+warning-denied Clippy, rustdoc and formatter checks. The workspace all-target,
+all-feature check reached the affected packages, then failed only in
+concurrently changing iWork examples; it is not reported as a passing
+workspace gate.
 
 ## Accepted results
 
@@ -225,6 +238,7 @@ The underlying records are:
 - [`0019-rtf-parser-state-specialization.md`](changes/0019-rtf-parser-state-specialization.md)
 - [`0020-rtf-ascii-transport-batching.md`](changes/0020-rtf-ascii-transport-batching.md)
 - [`0021-opc-shared-regenerated-payload.md`](changes/0021-opc-shared-regenerated-payload.md)
+- [`0022-zip-generated-local-span-move.md`](changes/0022-zip-generated-local-span-move.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -255,7 +269,10 @@ the rejected handoff contributes no production or test code.
   spans and central records, including unknown non-part members.
 - The changed ordinary Part now shares its already-owned immutable logical
   payload with ZIP regeneration rather than allocating and copying it again.
-  Generated XML and the separate local-entry compression buffer stay owned.
+  Generated XML and the required compressor/archive buffer stay owned.
+- After the generated member has passed complete ZIP validation, its local span
+  now moves into the prepared entry instead of being allocated and copied a
+  second time. Central-directory framing remains separately retained.
 - Rewritten OPC publication constructs and audits generated XML and stable
   Part order once before emission rather than once for validation and again
   for writing.
@@ -354,8 +371,10 @@ cycles -11.22%, instructions -18.40%, and branches -14.04%; its per-byte
 `SmallVec::extend` share falls from 15.37% to 2.56% on open. The OPC
 shared-payload follow-up removes one 4.19 MiB allocation, cuts peak heap 3.42%,
 task clock 21.08%, cycles 19.41% and cache misses 31.12% on its matched
-few-large compressible process. Its uninstrumented RSS is flat. Lock-wait
-evidence remains missing.
+few-large compressible process. The local-span follow-up removes the next 4.20
+MiB allocation, cuts peak heap another 3.20% and task clock 2.11%; its other
+major hardware counters stay within 5%. Uninstrumented RSS is flat for both.
+Lock-wait evidence remains missing.
 
 ## Remaining highest-impact work
 
@@ -365,8 +384,9 @@ single-flight now exist, but cache bytes are not yet charged to the hierarchical
 budget and broad edit/patch coverage is incomplete. Raw ZIP preservation is
 integrated for eager owned same-topology mutation, but not for source-backed
 editable packages. The changed-Part handoff copy is removed; eager retained
-source and the generated-local-entry buffer remain to be attributed and
-reduced independently.
+source and the required compressor/archive buffer remain to be attributed and
+reduced independently. The post-validation generated-local-span copy is also
+removed.
 
 Other high-priority gaps are cold-filesystem and real range-source matrices,
 threshold tuning/contention work beyond the committed explicit scaling curves,

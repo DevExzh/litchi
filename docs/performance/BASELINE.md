@@ -341,6 +341,13 @@ remains an incomplete program and CRUD matrix.
   within 3% p50/p95 except a +3.00% many-small p95, and uninstrumented RSS is
   flat (+0.22%). See
   [`0021`](changes/0021-opc-shared-regenerated-payload.md).
+- The shared ZIP writer now moves each validated generated local span instead
+  of cloning it after archive inspection. Heaptrack removes the remaining
+  4.20 MiB local-span allocation and peak heap falls 3.20%. Few-large
+  compressible/incompressible p50 improves 4.09%/2.70%; repeated small and
+  exact-no-op guardrails remain within 5% on p50 and mean, and uninstrumented
+  RSS is flat (-0.10%). See
+  [`0022`](changes/0022-zip-generated-local-span-move.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
@@ -348,7 +355,8 @@ See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 bounded by `SourceCacheLimits`, but are not yet charged to the hierarchical
 `Budget`.
 
-Consolidated changed-crate tests and focused changed-crate formatter and
-warning-denied Clippy gates passed. The attempted umbrella all-feature `litchi`
-run exhausted local disk and is therefore not counted as a passing umbrella
+Consolidated changed-crate tests and focused changed-crate formatter,
+warning-denied Clippy and rustdoc gates passed. The workspace all-target,
+all-feature check reached the affected packages, then failed only in
+concurrently changing iWork examples; it is not counted as a passing workspace
 verification result.

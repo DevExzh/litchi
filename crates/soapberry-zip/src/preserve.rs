@@ -454,28 +454,33 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         },
         _ => return Err(unsupported("generated compression method")),
     }
-    let bytes = writer.finish()?;
-    let archive = ZipArchive::from_slice(&bytes)?;
-    if archive.is_zip64() || archive.entries_hint() != 1 {
-        return Err(unsupported("generated ZIP64 output"));
-    }
-    let directory_offset = usize::try_from(archive.directory_offset())
-        .map_err(|_| unsupported("generated archive layout"))?;
-    let eocd_offset = usize::try_from(archive.eocd_offset())
-        .map_err(|_| unsupported("generated archive layout"))?;
-    if directory_offset > eocd_offset || eocd_offset > bytes.len() {
-        return Err(unsupported("generated archive layout"));
-    }
-    let mut entries = archive.entries();
-    let record = entries
-        .next_entry()?
-        .ok_or_else(|| unsupported("generated archive entry"))?;
-    if entries.next_entry()?.is_some() || record.is_zip64() {
-        return Err(unsupported("generated archive layout"));
-    }
+    let mut bytes = writer.finish()?;
+    let (directory_offset, eocd_offset) = {
+        let archive = ZipArchive::from_slice(&bytes)?;
+        if archive.is_zip64() || archive.entries_hint() != 1 {
+            return Err(unsupported("generated ZIP64 output"));
+        }
+        let directory_offset = usize::try_from(archive.directory_offset())
+            .map_err(|_| unsupported("generated archive layout"))?;
+        let eocd_offset = usize::try_from(archive.eocd_offset())
+            .map_err(|_| unsupported("generated archive layout"))?;
+        if directory_offset > eocd_offset || eocd_offset > bytes.len() {
+            return Err(unsupported("generated archive layout"));
+        }
+        let mut entries = archive.entries();
+        let record = entries
+            .next_entry()?
+            .ok_or_else(|| unsupported("generated archive entry"))?;
+        if entries.next_entry()?.is_some() || record.is_zip64() {
+            return Err(unsupported("generated archive layout"));
+        }
+        (directory_offset, eocd_offset)
+    };
+    let mut central = bytes.split_off(directory_offset);
+    central.truncate(eocd_offset - directory_offset);
     Ok(PreparedEntry {
-        local: PreparedLocal::Generated(bytes[..directory_offset].to_vec()),
-        central: bytes[directory_offset..eocd_offset].to_vec(),
+        local: PreparedLocal::Generated(bytes),
+        central,
     })
 }
 
@@ -815,6 +820,38 @@ mod tests {
 
         let prepared = generated_entry(&entry).unwrap();
         assert!(matches!(prepared.local, PreparedLocal::Generated(_)));
+        assert_eq!(Arc::strong_count(&data), 2);
+    }
+
+    #[test]
+    fn generated_entry_splits_large_local_and_central_spans() {
+        let data = Arc::new(
+            (0..256 * 1024)
+                .map(|index| u8::try_from(index % 251).unwrap())
+                .collect::<Vec<_>>(),
+        );
+        let entry = RegeneratedEntry::new_shared("large.bin", Arc::clone(&data))
+            .compression_method(CompressionMethod::Deflate);
+
+        let prepared = generated_entry(&entry).unwrap();
+        let PreparedLocal::Generated(local) = prepared.local else {
+            panic!("generated entry must retain generated local bytes");
+        };
+        let local_header = ZipLocalFileHeaderFixed::parse(&local).unwrap();
+        let central_header = ZipFileHeaderFixed::parse(&prepared.central).unwrap();
+
+        assert_eq!(local_header.file_name_len as usize, b"large.bin".len());
+        assert_eq!(
+            &local
+                [ZipLocalFileHeaderFixed::SIZE..ZipLocalFileHeaderFixed::SIZE + b"large.bin".len()],
+            b"large.bin"
+        );
+        assert_eq!(
+            prepared.central.len(),
+            ZipFileHeaderFixed::SIZE + central_header.variable_length()
+        );
+        assert_eq!(central_header.local_header_offset, 0);
+        assert_eq!(central_header.uncompressed_size as usize, data.len());
         assert_eq!(Arc::strong_count(&data), 2);
     }
 

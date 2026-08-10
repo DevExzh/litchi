@@ -1,0 +1,265 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cycles:P'
+# Event count (approx.): 3026017677
+#
+# Overhead  Command          Shared Object                          Symbol
+# ........  ...............  .....................................  .................................................................................................................
+#
+    23.24%  litchi-perf-aft  libc.so.6                              [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |
+               |--7.22%--0x47
+               |
+                --3.44%--0
+
+    18.03%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate
+
+    10.62%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+            |
+            ---zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+
+     9.77%  litchi-perf-aft  libc.so.6                              [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+
+     9.51%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---zlib_rs::deflate::algorithm::medium::deflate_medium
+
+     4.86%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---zlib_rs::deflate::longest_match::longest_match
+
+     3.89%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::compare256::avx2::compare256
+            |
+            ---zlib_rs::deflate::compare256::avx2::compare256
+
+     3.20%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::flush_block_only
+            |
+            ---zlib_rs::deflate::flush_block_only
+               |
+                --3.09%--0x1eff0f1eff0f1eff
+
+     1.50%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] litchi_perf_baseline::payload_bytes
+            |
+            ---litchi_perf_baseline::payload_bytes
+
+     1.16%  litchi-perf-aft  libc.so.6                              [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+
+     1.12%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::compare256::compare256_slice
+            |
+            ---zlib_rs::deflate::compare256::compare256_slice
+
+     0.61%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d6600b7
+            |
+            ---0xffffffff9d6600b7
+               |
+                --0.50%--0xffffffff9c82e7e3
+                          0xffffffff9c82f8db
+                          0xffffffff9c82ff44
+                          0xffffffff9c83021a
+                          0xffffffff9c4d7f29
+                          0xffffffff9d64e923
+                          0xffffffff9d800bc7
+
+     0.43%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c848383
+     0.35%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c5a56ba
+     0.35%  git              [unknown]                              [k] 0xffffffff9c929ddd
+     0.35%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d5cfb97
+     0.32%  rustc            libc.so.6                              [.] malloc
+     0.31%  rustc            ld-linux-x86-64.so.2                   [.] _dl_relocate_object
+     0.28%  git              [unknown]                              [k] 0xffffffff9cc69fbc
+     0.27%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d800f30
+     0.27%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] sha2::sha256::x86_sha::compress
+     0.23%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] _ZN7zlib_rs7deflate9BitWriter18send_bits_overflow17h7cd345ed93756f3fE.llvm.6877377404663027520
+     0.23%  git              [unknown]                              [k] 0xffffffff9cb6832f
+     0.20%  rustc            [unknown]                              [k] 0xffffffff9d6600b7
+     0.20%  git              libc.so.6                              [.] __strncmp_evex
+     0.20%  rustc            rustup                                 [.] toml::de::parser::parse_document
+     0.19%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d800ba0
+     0.19%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d6602e0
+     0.16%  rustc            [unknown]                              [k] 0xffffffff9c848383
+     0.16%  git              [unknown]                              [k] 0xffffffff9c91b273
+     0.16%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::inflate::inflate_fast_help_avx2
+     0.12%  rustc            rustup                                 [.] toml::de::parser::key::State::close_key
+     0.12%  rustc            [unknown]                              [k] 0xffffffff9d6602e0
+     0.12%  rustc            [unknown]                              [k] 0xffffffff9c7c6082
+     0.12%  rustc            [unknown]                              [k] 0xffffffff9c5a56ba
+     0.12%  git              [unknown]                              [k] 0xffffffff9ca06050
+     0.08%  rustc            libc.so.6                              [.] _int_malloc
+     0.08%  rustc            rustup                                 [.] toml_parser::decoder::string::decode_basic_string
+     0.08%  git              [unknown]                              [k] 0xffffffff9c7c6082
+     0.08%  git              [unknown]                              [k] 0xffffffff9ca06019
+     0.08%  rustc            libc.so.6                              [.] _int_free
+     0.08%  rustc            rustup                                 [.] <alloc::vec::Vec<toml_parser::parser::event::Event> as toml_parser::parser::event::EventReceiver>::newline
+     0.08%  git              [unknown]                              [k] 0xffffffff9d5d0308
+     0.08%  rustc            [unknown]                              [k] 0xffffffff9d5cfb97
+     0.08%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] soapberry_zip::writer::ZipArchiveWriter<W>::finish
+     0.08%  rustc            [unknown]                              [k] 0xffffffff9d800ba0
+     0.08%  rustc            [unknown]                              [k] 0xffffffff9c7d8dce
+     0.08%  litchi-perf-aft  libc.so.6                              [.] _int_malloc
+     0.08%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d5cfb9a
+     0.08%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::deflate
+     0.08%  litchi-perf-aft  libc.so.6                              [.] __memmove_avx512_unaligned
+     0.08%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::Heap::pqdownheap
+     0.08%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c5a5c2c
+     0.08%  litchi-perf-aft  libc.so.6                              [.] malloc
+     0.08%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] _RNvXs_NtNtCsgEmfK2I1SDS_4core3str7patternNtB4_12CharSearcherNtB4_8Searcher10next_match
+     0.08%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::BitWriter::send_tree
+     0.08%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] soapberry_zip::preserve::PreservationIndex<R>::write_to
+     0.07%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] hashbrown::map::HashMap<K,V,S,A>::get
+     0.07%  git              [unknown]                              [k] 0xffffffff9d800ba0
+     0.04%  git              git                                    [.] 0x00000000001b3dc0
+     0.04%  git              git                                    [.] 0x00000000002e172c
+     0.04%  git              [unknown]                              [k] 0xffffffff9d6573dc
+     0.04%  git              [unknown]                              [k] 0xffffffff9c8f5e61
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c86ec8c
+     0.04%  git              [unknown]                              [k] 0xffffffff9d6600b7
+     0.04%  git              [unknown]                              [k] 0xffffffff9c91b205
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c567a52
+     0.04%  git              [unknown]                              [k] 0xffffffff9c95273e
+     0.04%  git              [unknown]                              [k] 0xffffffff9d6599f2
+     0.04%  git              [unknown]                              [k] 0xffffffff9c912800
+     0.04%  git              [unknown]                              [k] 0xffffffff9c952814
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c817e2e
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c7c6082
+     0.04%  rustc            rustup                                 [.] toml_parser::parser::document::opt_dot_keys
+     0.04%  git              [unknown]                              [k] 0xffffffff9c86ecba
+     0.04%  rustc            rustup                                 [.] rustup::dist::manifest::Package::get_target
+     0.04%  rustc            ld-linux-x86-64.so.2                   [.] strcmp
+     0.04%  rustc            rustup                                 [.] toml::de::parser::value::on_scalar
+     0.04%  git              git                                    [.] 0x00000000002b36c4
+     0.04%  git              [unknown]                              [k] 0xffffffff9c5a56ba
+     0.04%  git              [unknown]                              [k] 0xffffffff9c824e53
+     0.04%  git              [unknown]                              [k] 0xffffffff9c827a44
+     0.04%  git              [unknown]                              [k] 0xffffffff9c8fba47
+     0.04%  git              [unknown]                              [k] 0xffffffff9c90b3c5
+     0.04%  git              [unknown]                              [k] 0xffffffff9c90b3fc
+     0.04%  git              [unknown]                              [k] 0xffffffff9c91b251
+     0.04%  git              [unknown]                              [k] 0xffffffff9ca06098
+     0.04%  git              [unknown]                              [k] 0xffffffff9ca06185
+     0.04%  git              [unknown]                              [k] 0xffffffff9ca061c6
+     0.04%  git              [unknown]                              [k] 0xffffffff9cd41703
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c5a5bc4
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9ca0875d
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9cb52e62
+     0.04%  rustc            rustup                                 [.] <toml_parser::parser::event::ValidateWhitespace as toml_parser::parser::event::EventReceiver>::newline
+     0.04%  git              [unknown]                              [k] 0xffffffff9c9f2d0c
+     0.04%  git              git                                    [.] 0x00000000001d3ac4
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c8570a5
+     0.04%  rustc            libc.so.6                              [.] __memcmp_evex_movbe
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c827cc6
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c877989
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9caf4030
+     0.04%  rustc            rustup                                 [.] <alloc::vec::Vec<toml_parser::parser::event::Event> as toml_parser::parser::event::EventReceiver>::simple_key
+     0.04%  git              [unknown]                              [k] 0xffffffff9c86724c
+     0.04%  rustc            libc.so.6                              [.] __strlen_evex
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c5ea5ad
+     0.04%  git              [unknown]                              [k] 0xffffffff9c9f29b5
+     0.04%  rustc            ld-linux-x86-64.so.2                   [.] _dl_lookup_symbol_x
+     0.04%  git              [unknown]                              [k] 0xffffffff9c7c79d6
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c877b1d
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c827cc6
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9d65f8cb
+     0.04%  rustc            libc.so.6                              [.] __cxa_atexit
+     0.04%  git              [unknown]                              [k] 0xffffffff9ca05ff6
+     0.04%  rustc            libc.so.6                              [.] __cxa_finalize
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c8481c2
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c86e928
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] soapberry_zip::preserve::validate_local_span
+     0.04%  git              git                                    [.] 0x00000000002e1c8d
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::gen_codes
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c7c6067
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c83e7fd
+     0.04%  rustc            libc.so.6                              [.] realloc
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d5c3c3c
+     0.04%  litchi-perf-aft  libc.so.6                              [.] _int_free
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] hashbrown::map::HashMap<K,V,S,A>::insert
+     0.04%  git              git                                    [.] 0x00000000001ae785
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] hashbrown::map::HashMap<K,V,S,A>::get
+     0.04%  litchi-perf-aft  libc.so.6                              [.] malloc_consolidate
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c7d873c
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c7d673d
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c9cee97
+     0.04%  rustc            rustup                                 [.] err_string_data_cmp
+     0.04%  git              [unknown]                              [k] 0xffffffff9c9137f6
+     0.04%  rustc            rustup                                 [.] regex_automata::nfa::thompson::compiler::Compiler::c
+     0.04%  rustc            rustup                                 [.] core::ptr::drop_in_place<regex_syntax::ast::Ast>
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] litchi_opc::pkgwriter::PackageWriter::write_to_stream
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c510d95
+     0.04%  git              [unknown]                              [k] 0xffffffff9c9df051
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c7d8dce
+     0.04%  git              [unknown]                              [k] 0xffffffff9c9f2c4c
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c859877
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c55a5b6
+     0.04%  git              libc.so.6                              [.] __strlen_evex
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] zlib_rs::deflate::scan_tree
+     0.04%  rustc            rustup                                 [.] regex_automata::util::determinize::state::StateBuilderMatches::into_nfa
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d64e1db
+     0.04%  git              [unknown]                              [k] 0xffffffff9c8f5b48
+     0.04%  git              [unknown]                              [k] 0xffffffff9c8ecce5
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9d5d0305
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d5ae3af
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9d6485b4
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9d5ae18c
+     0.04%  git              git                                    [.] 0x00000000001b3ddd
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c83ea45
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c510e63
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c7d8c36
+     0.04%  git              libc.so.6                              [.] __GI___readdir64
+     0.04%  git              [unknown]                              [k] 0xffffffff9d5c3518
+     0.04%  git              libc.so.6                              [.] malloc_consolidate
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] <flate2::zio::Writer<W,D> as std::io::Write>::flush
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c5e248b
+     0.04%  git              [unknown]                              [k] 0xffffffff9c8c4c98
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c7c79d6
+     0.04%  litchi-perf-aft  libc.so.6                              [.] cfree@GLIBC_2.2.5
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] litchi_opc::pkgwriter::PublicationPlan::from_package
+     0.04%  litchi-perf-aft  libc.so.6                              [.] realloc
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c897477
+     0.04%  git              [unknown]                              [k] 0xffffffff9c86c21f
+     0.04%  git              git                                    [.] 0x0000000000209f43
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] litchi_opc::content_type::validate_content_type
+     0.04%  git              git                                    [.] 0x00000000002e1ce3
+     0.04%  git              [unknown]                              [k] 0xffffffff9cb6830a
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c8ebebc
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] _RNvXsq_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt7Display3fmt
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c921dce
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c85af50
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] xml_minifier::audit::check_attribute_layout
+     0.04%  rustc            [unknown]                              [k] 0xffffffff9c560571
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] _RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c5a2ab6
+     0.04%  git              [unknown]                              [k] 0xffffffff9c82fbb9
+     0.04%  litchi-perf-aft  litchi-perf-after-opc-local-span-move  [.] std::io::Write::write_all
+     0.04%  git              [unknown]                              [k] 0xffffffff9d5cfb9a
+     0.04%  git              git                                    [.] 0x00000000002e2d47
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c9f06d8
+     0.04%  git              git                                    [.] 0x000000000024725b
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9cb6512c
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c85a372
+     0.04%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c58a785
+     0.04%  git              git                                    [.] strcmp@plt
+     0.04%  git              [unknown]                              [k] 0xffffffff9c90b43e
+     0.04%  git              [unknown]                              [k] 0xffffffff9d650650
+     0.03%  git              ld-linux-x86-64.so.2                   [.] _dl_load_cache_lookup
+     0.03%  git              ld-linux-x86-64.so.2                   [.] _dl_lookup_symbol_x
+     0.02%  litchi-perf-aft  ld-linux-x86-64.so.2                   [.] _dl_lookup_symbol_x
+     0.00%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9d5b7ce1
+     0.00%  litchi-perf-aft  [unknown]                              [k] 0xffffffff9c4557c7
+     0.00%  perf-exec        [unknown]                              [k] 0xffffffff9c79d895
+     0.00%  perf-exec        [unknown]                              [k] 0xffffffff9c7a9d94
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
