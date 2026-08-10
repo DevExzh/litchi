@@ -1,4 +1,4 @@
-# OPC, CFB, legacy-writer, and XLSX performance baseline
+# OPC, CFB, legacy-writer, XLSX, DOCX, and PPTX performance baseline
 
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
@@ -11,6 +11,9 @@ identifies its exact input or packaged output.
 
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
+
+The DOCX/PPTX semantic matrix is deliberately opt-in. It measures only current
+public APIs and therefore does not change the default 36 cases / 198 records.
 
 ## Run
 
@@ -63,6 +66,15 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 \
   --case xlsx_source_open,xlsx_source_list_sheets,xlsx_source_first_cell,xlsx_source_narrow_column_range_scan \
   --xlsx-shape tiny --json -
+```
+
+Run the complete tiny semantic DOCX/PPTX smoke matrix (16 records):
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 0 --samples 1 --semantic-shape tiny \
+  --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
+  --json target/perf/semantic-office-smoke.json
 ```
 
 Exercise deterministic high-latency, range-bounded positional I/O without a
@@ -139,6 +151,28 @@ complete logical cell order and rounds up to one cell where necessary.
 Its narrow range is `B1:B256`, which returns 256 cells while making the
 worksheet store examine the 65,536 stored cells in those rows. This preserves a
 high-contrast public end-to-end case without relying on internal APIs.
+
+## Opt-in DOCX/PPTX semantic corpus matrix
+
+`--semantic-shape` creates complete public-API packages in memory. Text names,
+edit selection, object order, and output verification are fixed. The one-percent
+set is evenly spaced in the complete paragraph or text-box order and rounds up
+to one object. `*_create_small` runs only for `tiny`, so its corpus metadata is
+always truthful.
+
+| Shape | DOCX paragraphs | PPTX slides × text boxes | DOCX ~1% edits | PPTX ~1% edits |
+|---|---:|---:|---:|---:|
+| `tiny` | 24 | 3 × 4 | 1 | 1 |
+| `medium` | 200 | 12 × 8 | 2 | 1 |
+| `large` | 10,000 | 100 × 100 | 100 | 100 |
+
+The DOCX cases use `Package::from_reader`, `document().paragraph(index)`,
+paragraph enumeration/text extraction, document transactions, and `to_stream`.
+The seekable stream is instrumented with the existing `sink` schema field.
+PPTX uses `Package::from_bytes`/`from_vec`, presentation slide/text views,
+opened-presentation transactions, and `to_bytes`. PPTX currently has no public
+writer-sink API, so PPTX save records intentionally leave `sink` as `null`
+rather than claiming unobservable write behavior.
 
 OPC parts retain their deterministic `benchmark/parts/00000.bin` names, and
 the middle entry remains the fixed `zip_read_one` target. CFB streams are
@@ -253,6 +287,29 @@ remain distinguishable.
 - `cfb_bulk_read_scaling`: use `SharedOleFile::bulk_read` with a caller-sized
   local pool, prewarmed outside timing, and verify every stream in input order.
   Neither scaling case uses the global Rayon pool.
+- `docx_semantic_open`: open a complete in-memory DOCX through public
+  `Package::from_reader`; the prepared owned input clone is outside timing.
+- `docx_semantic_list_paragraphs` / `docx_semantic_one_paragraph` /
+  `docx_semantic_full_text`: list every paragraph, inspect one middle paragraph
+  through `document().paragraph(index)`, or extract complete document text.
+- `docx_semantic_create_small`: author and serialize the tiny corpus entirely
+  through public DOCX APIs, then reopen and fully verify it.
+- `docx_semantic_noop_edit_save`, `docx_semantic_one_edit_save`, and
+  `docx_semantic_one_percent_edit_save`: time document transaction capture,
+  no-op/one/~1% paragraph replacement, publication, and seekable-stream save;
+  reopen and verify every paragraph, full text, and recorded sink behavior.
+- `pptx_semantic_open`: open a complete in-memory PPTX through public
+  `Package::from_bytes`.
+- `pptx_semantic_list_slides` / `pptx_semantic_one_slide` /
+  `pptx_semantic_full_text`: enumerate the slide graph, inspect one middle
+  slide's shape scene, or flatten all slide text.
+- `pptx_semantic_create_small`: author and serialize the tiny corpus entirely
+  through public PPTX APIs, then reopen and fully verify it.
+- `pptx_semantic_noop_edit_save`, `pptx_semantic_one_edit_save`, and
+  `pptx_semantic_one_percent_edit_save`: move owned input into `from_vec`,
+  time opened-presentation transaction capture, no-op/one/~1% text-box edits,
+  commit, publication, and `to_bytes`, then reopen and verify all slides,
+  shapes, and text. The public API has no save-to-sink method.
 
 For both CFB stream-insertion cases, payload generation/cloning and writer
 construction happen before timing, while writer and source destruction happen

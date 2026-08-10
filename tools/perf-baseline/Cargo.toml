@@ -8,8 +8,10 @@ publish = false
 litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
 litchi-core = { path = "../../crates/litchi-core" }
 litchi-doc = { path = "../../crates/litchi-doc" }
+litchi-docx = { path = "../../crates/litchi-docx" }
 litchi-opc = { path = "../../crates/litchi-opc" }
 litchi-ppt = { path = "../../crates/litchi-ppt" }
+litchi-pptx = { path = "../../crates/litchi-pptx" }
 litchi-xls = { path = "../../crates/litchi-xls" }
 litchi-xlsx = { path = "../../crates/litchi-xlsx" }
 serde = { version = "1", features = ["derive"] }

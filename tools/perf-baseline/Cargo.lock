@@ -795,6 +795,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-docx"
+version = "0.0.1"
+dependencies = [
+ "atoi_simd",
+ "base64",
+ "bitflags",
+ "caseless",
+ "chrono",
+ "litchi-core",
+ "litchi-drawingml",
+ "litchi-ooxml-common",
+ "litchi-opc",
+ "quick-xml",
+ "serde_json",
+ "smallvec",
+ "thiserror",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "litchi-drawingml"
 version = "0.0.1"
 dependencies = [
@@ -872,8 +892,10 @@ dependencies = [
  "litchi-cfb",
  "litchi-core",
  "litchi-doc",
+ "litchi-docx",
  "litchi-opc",
  "litchi-ppt",
+ "litchi-pptx",
  "litchi-xls",
  "litchi-xlsx",
  "serde",
@@ -902,6 +924,26 @@ dependencies = [
  "url",
  "zerocopy",
  "zerocopy-derive",
+ "zeroize",
+]
+
+[[package]]
+name = "litchi-pptx"
+version = "0.0.1"
+dependencies = [
+ "base64",
+ "bitflags",
+ "caseless",
+ "chrono",
+ "litchi-core",
+ "litchi-drawingml",
+ "litchi-ooxml-common",
+ "litchi-opc",
+ "quick-xml",
+ "rand 0.10.2",
+ "sha2 0.11.0",
+ "thiserror",
+ "unicode-normalization",
  "zeroize",
 ]
 

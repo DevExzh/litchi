@@ -10,7 +10,7 @@ use std::{
     collections::BTreeSet,
     error::Error,
     fs::{self, File},
-    io::{self, Cursor, Write},
+    io::{self, Cursor, Seek, SeekFrom, Write},
     num::{NonZeroU64, NonZeroUsize},
     ops::Range,
     path::PathBuf,
@@ -23,6 +23,7 @@ use std::{
 };
 
 use litchi_cfb::{OleFile, OleWriter, SharedOleFile, SharedOleFileLimits};
+use litchi_core::Position;
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, SourceVersion,
 };
@@ -47,6 +48,8 @@ const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
 const CFB_CORPUS_GENERATOR: &str = "litchi-cfb-synthetic-v1";
 const LEGACY_WRITER_CORPUS_GENERATOR: &str = "litchi-legacy-writer-v1";
 const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
+const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
+const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
 static NEXT_INSTRUMENTED_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -105,6 +108,51 @@ enum XlsxShape {
     Tiny,
     Medium,
     DenseWide,
+}
+
+/// Small, complete public-API DOCX/PPTX corpora.  These cases are opt-in so
+/// their intentionally semantic workload does not alter the substrate matrix.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SemanticShape {
+    Tiny,
+    Medium,
+    Large,
+}
+
+impl SemanticShape {
+    const ALL: [Self; 3] = [Self::Tiny, Self::Medium, Self::Large];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Tiny => "tiny",
+            Self::Medium => "medium",
+            Self::Large => "large",
+        }
+    }
+
+    const fn docx_paragraphs(self) -> usize {
+        match self {
+            Self::Tiny => 24,
+            Self::Medium => 200,
+            Self::Large => 10_000,
+        }
+    }
+
+    const fn pptx_slides(self) -> usize {
+        match self {
+            Self::Tiny => 3,
+            Self::Medium => 12,
+            Self::Large => 100,
+        }
+    }
+
+    const fn pptx_text_boxes_per_slide(self) -> usize {
+        match self {
+            Self::Tiny => 4,
+            Self::Medium => 8,
+            Self::Large => 100,
+        }
+    }
 }
 
 impl XlsxShape {
@@ -218,6 +266,22 @@ enum Case {
     XlsxRangeSourceNarrowColumnRangeScan,
     OpcOpenSessionScaling,
     CfbBulkReadScaling,
+    DocxSemanticOpen,
+    DocxSemanticListParagraphs,
+    DocxSemanticOneParagraph,
+    DocxSemanticFullText,
+    DocxSemanticCreateSmall,
+    DocxSemanticNoopEditSave,
+    DocxSemanticOneEditSave,
+    DocxSemanticOnePercentEditSave,
+    PptxSemanticOpen,
+    PptxSemanticListSlides,
+    PptxSemanticOneSlide,
+    PptxSemanticFullText,
+    PptxSemanticCreateSmall,
+    PptxSemanticNoopEditSave,
+    PptxSemanticOneEditSave,
+    PptxSemanticOnePercentEditSave,
 }
 
 impl Case {
@@ -308,6 +372,22 @@ impl Case {
             },
             Self::OpcOpenSessionScaling => "opc_open_session_scaling",
             Self::CfbBulkReadScaling => "cfb_bulk_read_scaling",
+            Self::DocxSemanticOpen => "docx_semantic_open",
+            Self::DocxSemanticListParagraphs => "docx_semantic_list_paragraphs",
+            Self::DocxSemanticOneParagraph => "docx_semantic_one_paragraph",
+            Self::DocxSemanticFullText => "docx_semantic_full_text",
+            Self::DocxSemanticCreateSmall => "docx_semantic_create_small",
+            Self::DocxSemanticNoopEditSave => "docx_semantic_noop_edit_save",
+            Self::DocxSemanticOneEditSave => "docx_semantic_one_edit_save",
+            Self::DocxSemanticOnePercentEditSave => "docx_semantic_one_percent_edit_save",
+            Self::PptxSemanticOpen => "pptx_semantic_open",
+            Self::PptxSemanticListSlides => "pptx_semantic_list_slides",
+            Self::PptxSemanticOneSlide => "pptx_semantic_one_slide",
+            Self::PptxSemanticFullText => "pptx_semantic_full_text",
+            Self::PptxSemanticCreateSmall => "pptx_semantic_create_small",
+            Self::PptxSemanticNoopEditSave => "pptx_semantic_noop_edit_save",
+            Self::PptxSemanticOneEditSave => "pptx_semantic_one_edit_save",
+            Self::PptxSemanticOnePercentEditSave => "pptx_semantic_one_percent_edit_save",
         }
     }
 
@@ -377,6 +457,41 @@ impl Case {
         )
     }
 
+    const fn uses_semantic_docx(self) -> bool {
+        matches!(
+            self,
+            Self::DocxSemanticOpen
+                | Self::DocxSemanticListParagraphs
+                | Self::DocxSemanticOneParagraph
+                | Self::DocxSemanticFullText
+                | Self::DocxSemanticCreateSmall
+                | Self::DocxSemanticNoopEditSave
+                | Self::DocxSemanticOneEditSave
+                | Self::DocxSemanticOnePercentEditSave
+        )
+    }
+
+    const fn uses_semantic_pptx(self) -> bool {
+        matches!(
+            self,
+            Self::PptxSemanticOpen
+                | Self::PptxSemanticListSlides
+                | Self::PptxSemanticOneSlide
+                | Self::PptxSemanticFullText
+                | Self::PptxSemanticCreateSmall
+                | Self::PptxSemanticNoopEditSave
+                | Self::PptxSemanticOneEditSave
+                | Self::PptxSemanticOnePercentEditSave
+        )
+    }
+
+    const fn is_semantic_create_small(self) -> bool {
+        matches!(
+            self,
+            Self::DocxSemanticCreateSmall | Self::PptxSemanticCreateSmall
+        )
+    }
+
     const fn is_scaling(self) -> bool {
         matches!(self, Self::OpcOpenSessionScaling | Self::CfbBulkReadScaling)
     }
@@ -410,6 +525,7 @@ struct Options {
     payloads: Vec<PayloadKind>,
     writer_shapes: Vec<WriterShape>,
     xlsx_shapes: Vec<XlsxShape>,
+    semantic_shapes: Vec<SemanticShape>,
     range_simulation: RangeSimulationConfig,
     execution_workers: Vec<usize>,
     output: Option<PathBuf>,
@@ -478,6 +594,7 @@ struct Configuration {
     payload_kinds: Vec<&'static str>,
     writer_shapes: Vec<&'static str>,
     xlsx_shapes: Vec<&'static str>,
+    semantic_shapes: Vec<&'static str>,
     range_simulation: RangeSimulationConfig,
     execution_workers: Vec<usize>,
 }
@@ -765,6 +882,51 @@ impl Write for CountingSink {
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
+    }
+}
+
+/// A seekable counterpart used only where the public DOCX API requires it.
+/// The summary counts actual writes even when the ZIP serializer rewrites a
+/// header after seeking; `bytes` remains the final accepted package.
+#[derive(Debug, Default)]
+struct CountingSeekSink {
+    cursor: Cursor<Vec<u8>>,
+    summary: SinkSummary,
+}
+
+impl CountingSeekSink {
+    fn into_parts(self) -> (Vec<u8>, SinkSummary) {
+        (self.cursor.into_inner(), self.summary)
+    }
+}
+
+impl Write for CountingSeekSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let accepted = self.cursor.write(bytes)?;
+        let accepted_u64 = u64::try_from(accepted)
+            .map_err(|_error| io::Error::other("seekable sink write length does not fit u64"))?;
+        self.summary.accepted_bytes = self
+            .summary
+            .accepted_bytes
+            .checked_add(accepted_u64)
+            .ok_or_else(|| io::Error::other("seekable sink byte count overflows u64"))?;
+        self.summary.write_calls = self
+            .summary
+            .write_calls
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("seekable sink write count overflows u64"))?;
+        self.summary.largest_write = self.summary.largest_write.max(accepted_u64);
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.cursor.flush()
+    }
+}
+
+impl Seek for CountingSeekSink {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        self.cursor.seek(position)
     }
 }
 
@@ -1139,11 +1301,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .any(|case| case.uses_synthetic_cfb())
                 .then(|| build_cfb_corpus(*shape, *payload))
                 .transpose()?;
-            for case in options
-                .cases
-                .iter()
-                .filter(|case| !case.is_fresh_writer() && !case.uses_xlsx())
-            {
+            for case in options.cases.iter().filter(|case| {
+                !case.is_fresh_writer()
+                    && !case.uses_xlsx()
+                    && !case.uses_semantic_docx()
+                    && !case.uses_semantic_pptx()
+            }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
                         .as_ref()
@@ -1204,6 +1367,42 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.uses_semantic_docx()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_semantic_docx_corpus(*shape)?;
+            for case in options.cases.iter().filter(|case| {
+                case.uses_semantic_docx()
+                    && (*shape == SemanticShape::Tiny || !case.is_semantic_create_small())
+            }) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_semantic_pptx()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_semantic_pptx_corpus(*shape)?;
+            for case in options.cases.iter().filter(|case| {
+                case.uses_semantic_pptx()
+                    && (*shape == SemanticShape::Tiny || !case.is_semantic_create_small())
+            }) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
     let report = Report {
         schema_version: SCHEMA_VERSION,
         tool: Tool {
@@ -1234,6 +1433,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .iter()
                 .map(|shape| shape.name())
                 .collect(),
+            semantic_shapes: options
+                .semantic_shapes
+                .iter()
+                .map(|shape| shape.name())
+                .collect(),
             range_simulation: options.range_simulation,
             execution_workers: options.execution_workers,
         },
@@ -1251,6 +1455,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut payloads = PayloadKind::ALL.to_vec();
     let mut writer_shapes = WriterShape::ALL.to_vec();
     let mut xlsx_shapes = XlsxShape::ALL.to_vec();
+    let mut semantic_shapes = SemanticShape::ALL.to_vec();
     let mut range_simulation = RangeSimulationConfig::default();
     let mut execution_workers = default_execution_workers()?;
     let mut output = None;
@@ -1284,6 +1489,10 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
             },
             "--xlsx-shape" => {
                 xlsx_shapes = parse_selection(arguments.next(), "--xlsx-shape", parse_xlsx_shape)?;
+            },
+            "--semantic-shape" => {
+                semantic_shapes =
+                    parse_selection(arguments.next(), "--semantic-shape", parse_semantic_shape)?;
             },
             "--range-fixed-latency-us" => {
                 range_simulation.fixed_latency_us =
@@ -1329,6 +1538,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         payloads,
         writer_shapes,
         xlsx_shapes,
+        semantic_shapes,
         range_simulation,
         execution_workers,
         output,
@@ -1446,6 +1656,22 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "opc_open_session_scaling" => Some(Case::OpcOpenSessionScaling),
         "cfb_bulk_read_scaling" => Some(Case::CfbBulkReadScaling),
+        "docx_semantic_open" => Some(Case::DocxSemanticOpen),
+        "docx_semantic_list_paragraphs" => Some(Case::DocxSemanticListParagraphs),
+        "docx_semantic_one_paragraph" => Some(Case::DocxSemanticOneParagraph),
+        "docx_semantic_full_text" => Some(Case::DocxSemanticFullText),
+        "docx_semantic_create_small" => Some(Case::DocxSemanticCreateSmall),
+        "docx_semantic_noop_edit_save" => Some(Case::DocxSemanticNoopEditSave),
+        "docx_semantic_one_edit_save" => Some(Case::DocxSemanticOneEditSave),
+        "docx_semantic_one_percent_edit_save" => Some(Case::DocxSemanticOnePercentEditSave),
+        "pptx_semantic_open" => Some(Case::PptxSemanticOpen),
+        "pptx_semantic_list_slides" => Some(Case::PptxSemanticListSlides),
+        "pptx_semantic_one_slide" => Some(Case::PptxSemanticOneSlide),
+        "pptx_semantic_full_text" => Some(Case::PptxSemanticFullText),
+        "pptx_semantic_create_small" => Some(Case::PptxSemanticCreateSmall),
+        "pptx_semantic_noop_edit_save" => Some(Case::PptxSemanticNoopEditSave),
+        "pptx_semantic_one_edit_save" => Some(Case::PptxSemanticOneEditSave),
+        "pptx_semantic_one_percent_edit_save" => Some(Case::PptxSemanticOnePercentEditSave),
         _ => None,
     }
 }
@@ -1486,6 +1712,15 @@ fn parse_xlsx_shape(value: &str) -> Option<XlsxShape> {
     }
 }
 
+fn parse_semantic_shape(value: &str) -> Option<SemanticShape> {
+    match value {
+        "tiny" => Some(SemanticShape::Tiny),
+        "medium" => Some(SemanticShape::Medium),
+        "large" => Some(SemanticShape::Large),
+        _ => None,
+    }
+}
+
 fn print_usage() {
     println!(
         "Usage: cargo run --release --manifest-path tools/perf-baseline/Cargo.toml -- [OPTIONS]\n\n\
@@ -1514,10 +1749,19 @@ fn print_usage() {
                                        xlsx_range_source_first_cell,\n\
                                        xlsx_range_source_narrow_column_range_scan,\n\
                                        opc_open_session_scaling,cfb_bulk_read_scaling\n\
+                                       docx_semantic_open,docx_semantic_list_paragraphs,\n\
+                                       docx_semantic_one_paragraph,docx_semantic_full_text,\n\
+                                       docx_semantic_create_small,docx_semantic_noop_edit_save,\n\
+                                       docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,\n\
+                                       pptx_semantic_open,pptx_semantic_list_slides,\n\
+                                       pptx_semantic_one_slide,pptx_semantic_full_text,\n\
+                                       pptx_semantic_create_small,pptx_semantic_noop_edit_save,\n\
+                                       pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save\n\
            --shape LIST                tiny,many-small,few-large,wide-root\n\
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
+           --semantic-shape LIST       tiny,medium,large (only used by opt-in DOCX/PPTX semantic cases)\n\
            --range-fixed-latency-us N  Fixed latency per request (default: {DEFAULT_RANGE_FIXED_LATENCY_US})\n\
            --range-request-overhead-us N\n\
                                        Request overhead (default: {DEFAULT_RANGE_REQUEST_OVERHEAD_US})\n\
@@ -1816,6 +2060,144 @@ fn write_fresh_ppt(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
     Ok((output.into_inner(), text_box_count, content_bytes))
+}
+
+fn semantic_shape(corpus: &Corpus) -> Result<SemanticShape, Box<dyn Error>> {
+    match corpus.manifest.shape {
+        "tiny" => Ok(SemanticShape::Tiny),
+        "medium" => Ok(SemanticShape::Medium),
+        "large" => Ok(SemanticShape::Large),
+        _ => Err("semantic corpus has an unknown shape".into()),
+    }
+}
+
+fn semantic_docx_text(index: usize, updated: bool) -> String {
+    let state = if updated { "updated" } else { "source" };
+    format!("litchi-perf-baseline-docx-semantic-v1-{state}-{index:05}")
+}
+
+fn semantic_pptx_text(slide: usize, shape: usize, updated: bool) -> String {
+    let state = if updated { "updated" } else { "source" };
+    format!("litchi-perf-baseline-pptx-semantic-v1-{state}-{slide:03}-{shape:03}")
+}
+
+fn semantic_update_indices(count: usize) -> Result<Vec<usize>, Box<dyn Error>> {
+    if count == 0 {
+        return Err("semantic corpus has no editable objects".into());
+    }
+    let updates = count
+        .checked_add(99)
+        .ok_or("semantic update count overflows usize")?
+        / 100;
+    Ok((0..updates).map(|index| index * count / updates).collect())
+}
+
+fn semantic_docx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = litchi_docx::Package::new()?;
+    let document = package.document_mut()?;
+    for index in 0..shape.docx_paragraphs() {
+        document.add_paragraph_with_text(&semantic_docx_text(index, false));
+    }
+    let mut output = Cursor::new(Vec::new());
+    package.to_stream(&mut output)?;
+    Ok(output.into_inner())
+}
+
+fn build_semantic_docx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let archive = semantic_docx_bytes(shape)?;
+    let package = litchi_docx::Package::from_reader(Cursor::new(archive.clone()))?;
+    verify_semantic_docx(&package, shape, &[])?;
+    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let target_payload = semantic_docx_text(0, false).into_bytes();
+    let content_bytes = (0..shape.docx_paragraphs())
+        .try_fold(0usize, |total, index| {
+            total.checked_add(semantic_docx_text(index, false).len())
+        })
+        .ok_or("semantic DOCX text byte count overflows usize")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("docx-semantic-{}", shape.name()),
+            generator: SEMANTIC_DOCX_CORPUS_GENERATOR,
+            package_format: "DOCX/OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-semantic-text",
+            compression: "deflate",
+            entry_count: shape.docx_paragraphs(),
+            archive_member_count,
+            entry_bytes: semantic_docx_text(0, false).len(),
+            uncompressed_payload_bytes: content_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "paragraph:0".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            xlsx: None,
+        },
+        archive,
+        target_name: "paragraph:0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = litchi_pptx::Package::new()?;
+    let presentation = package.presentation_mut()?;
+    for slide_index in 0..shape.pptx_slides() {
+        let slide = presentation.add_slide()?;
+        for shape_index in 0..shape.pptx_text_boxes_per_slide() {
+            slide.add_text_box(
+                &semantic_pptx_text(slide_index, shape_index, false),
+                36 + i64::try_from(shape_index % 4)? * 180,
+                36 + i64::try_from(shape_index / 4)? * 90,
+                144,
+                54,
+            );
+        }
+    }
+    Ok(package.to_bytes()?)
+}
+
+fn build_semantic_pptx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let archive = semantic_pptx_bytes(shape)?;
+    let package = litchi_pptx::Package::from_bytes(&archive)?;
+    verify_semantic_pptx(&package, shape, &[])?;
+    let count = shape
+        .pptx_slides()
+        .checked_mul(shape.pptx_text_boxes_per_slide())
+        .ok_or("semantic PPTX shape count overflows usize")?;
+    let content_bytes = (0..shape.pptx_slides())
+        .try_fold(0usize, |total, slide| {
+            (0..shape.pptx_text_boxes_per_slide()).try_fold(total, |total, object| {
+                total.checked_add(semantic_pptx_text(slide, object, false).len())
+            })
+        })
+        .ok_or("semantic PPTX text byte count overflows usize")?;
+    let target_payload = semantic_pptx_text(0, 0, false).into_bytes();
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("pptx-semantic-{}", shape.name()),
+            generator: SEMANTIC_PPTX_CORPUS_GENERATOR,
+            package_format: "PPTX/OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-semantic-text",
+            compression: "deflate",
+            entry_count: count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: semantic_pptx_text(0, 0, false).len(),
+            uncompressed_payload_bytes: content_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "slide:0/shape:0".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            xlsx: None,
+        },
+        archive,
+        target_name: "slide:0/shape:0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
 }
 
 fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
@@ -2209,6 +2591,26 @@ fn run_case_with_config(
                 range_simulation,
             )
         },
+        Case::DocxSemanticOpen
+        | Case::DocxSemanticListParagraphs
+        | Case::DocxSemanticOneParagraph
+        | Case::DocxSemanticFullText
+        | Case::DocxSemanticCreateSmall
+        | Case::DocxSemanticNoopEditSave
+        | Case::DocxSemanticOneEditSave
+        | Case::DocxSemanticOnePercentEditSave => {
+            run_semantic_docx(case, corpus, warmup_iterations, samples)
+        },
+        Case::PptxSemanticOpen
+        | Case::PptxSemanticListSlides
+        | Case::PptxSemanticOneSlide
+        | Case::PptxSemanticFullText
+        | Case::PptxSemanticCreateSmall
+        | Case::PptxSemanticNoopEditSave
+        | Case::PptxSemanticOneEditSave
+        | Case::PptxSemanticOnePercentEditSave => {
+            run_semantic_pptx(case, corpus, warmup_iterations, samples)
+        },
         Case::OpcOpenSessionScaling | Case::CfbBulkReadScaling => {
             Err("scaling case requires an explicit worker count".into())
         },
@@ -2421,6 +2823,312 @@ fn xlsx_output_ceiling(bytes: usize) -> Result<u64, Box<dyn Error>> {
         .checked_mul(2)
         .and_then(|value| value.checked_add(64 * 1024))
         .ok_or_else(|| "XLSX sequential output ceiling overflows u64".into())
+}
+
+fn verify_semantic_docx(
+    package: &litchi_docx::Package,
+    shape: SemanticShape,
+    updated: &[usize],
+) -> Result<(), Box<dyn Error>> {
+    let document = package.document()?;
+    if document.paragraph_count()? != shape.docx_paragraphs() {
+        return Err("semantic DOCX paragraph count differs from specification".into());
+    }
+    let paragraphs = document.paragraphs()?;
+    if paragraphs.len() != shape.docx_paragraphs() {
+        return Err("semantic DOCX paragraph list differs from specification".into());
+    }
+    let mut full_text = Vec::with_capacity(paragraphs.len());
+    for (index, paragraph) in paragraphs.into_iter().enumerate() {
+        let expected = semantic_docx_text(index, updated.contains(&index));
+        let actual = paragraph.text()?;
+        if actual != expected {
+            return Err("semantic DOCX paragraph text differs from specification".into());
+        }
+        full_text.push(actual);
+    }
+    if document.text()? != full_text.concat() {
+        return Err("semantic DOCX full text differs from paragraph scan".into());
+    }
+    Ok(())
+}
+
+fn verify_semantic_pptx(
+    package: &litchi_pptx::Package,
+    shape: SemanticShape,
+    updated: &[usize],
+) -> Result<(), Box<dyn Error>> {
+    let presentation = package.presentation()?;
+    if presentation.slide_count()? != shape.pptx_slides() {
+        return Err("semantic PPTX slide count differs from specification".into());
+    }
+    let mut presentation_text = Vec::with_capacity(shape.pptx_slides());
+    for slide_index in 0..shape.pptx_slides() {
+        let slide = presentation
+            .slide(slide_index)?
+            .ok_or("semantic PPTX slide is missing")?;
+        let scene = slide.shapes()?;
+        if scene.len() != shape.pptx_text_boxes_per_slide() {
+            return Err("semantic PPTX shape count differs from specification".into());
+        }
+        let mut slide_text = Vec::with_capacity(scene.len());
+        for (shape_index, object) in scene.iter().enumerate() {
+            let linear = slide_index * shape.pptx_text_boxes_per_slide() + shape_index;
+            let expected = semantic_pptx_text(slide_index, shape_index, updated.contains(&linear));
+            if object.text() != Some(expected.as_str()) {
+                return Err("semantic PPTX shape text differs from specification".into());
+            }
+            slide_text.push(expected);
+        }
+        let expected_slide_text = slide_text.join("\n");
+        if slide.text()? != expected_slide_text {
+            return Err("semantic PPTX slide text differs from shape scan".into());
+        }
+        presentation_text.push(expected_slide_text);
+    }
+    if presentation.text()? != presentation_text.join("\n") {
+        return Err("semantic PPTX full text differs from slide scan".into());
+    }
+    Ok(())
+}
+
+fn run_semantic_docx(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let updates = semantic_update_indices(shape.docx_paragraphs())?;
+    let selected = match case {
+        Case::DocxSemanticOneEditSave => vec![updates[0]],
+        Case::DocxSemanticOnePercentEditSave => updates,
+        _ => Vec::new(),
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sinks = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        match case {
+            Case::DocxSemanticCreateSmall => {
+                let started = Instant::now();
+                let bytes = semantic_docx_bytes(SemanticShape::Tiny)?;
+                let duration = started.elapsed();
+                let reopened = litchi_docx::Package::from_reader(Cursor::new(bytes.clone()))?;
+                verify_semantic_docx(&reopened, SemanticShape::Tiny, &[])?;
+                if bytes != corpus.archive && shape == SemanticShape::Tiny {
+                    return Err(
+                        "semantic DOCX creation digest differs from its deterministic corpus"
+                            .into(),
+                    );
+                }
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocxSemanticOpen => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let package = litchi_docx::Package::from_reader(Cursor::new(owned))?;
+                let duration = started.elapsed();
+                verify_semantic_docx(&package, shape, &[])?;
+                std::hint::black_box(package.document()?.paragraph_count()?);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocxSemanticListParagraphs => {
+                let package =
+                    litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let paragraphs = document.paragraphs()?;
+                let duration = started.elapsed();
+                if paragraphs.len() != shape.docx_paragraphs() {
+                    return Err("semantic DOCX paragraph list differs from specification".into());
+                }
+                verify_semantic_docx(&package, shape, &[])?;
+                std::hint::black_box(paragraphs);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocxSemanticOneParagraph => {
+                let package =
+                    litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
+                let document = package.document()?;
+                let index = shape.docx_paragraphs() / 2;
+                let started = Instant::now();
+                let paragraph = document.paragraph(index)?;
+                let duration = started.elapsed();
+                if paragraph
+                    .ok_or("semantic DOCX selected paragraph is missing")?
+                    .text()?
+                    != semantic_docx_text(index, false)
+                {
+                    return Err(
+                        "semantic DOCX selected paragraph differs from specification".into(),
+                    );
+                }
+                verify_semantic_docx(&package, shape, &[])?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocxSemanticFullText => {
+                let package =
+                    litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let text = document.text()?;
+                let duration = started.elapsed();
+                verify_semantic_docx(&package, shape, &[])?;
+                std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocxSemanticNoopEditSave
+            | Case::DocxSemanticOneEditSave
+            | Case::DocxSemanticOnePercentEditSave => {
+                let mut package =
+                    litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
+                let started = Instant::now();
+                let mut edit = package.edit_document()?;
+                for index in &selected {
+                    edit.replace_paragraph_text(
+                        Position::new(*index),
+                        semantic_docx_text(*index, true),
+                    )?;
+                }
+                let mut sink = CountingSeekSink::default();
+                let commit = package.publish_document_edit(edit)?;
+                package.to_stream(&mut sink)?;
+                let duration = started.elapsed();
+                if commit.patch().changed() == selected.is_empty()
+                    || commit.diagnostics().operations() != selected.len()
+                {
+                    return Err("semantic DOCX commit has an unexpected operation count".into());
+                }
+                let (bytes, summary) = sink.into_parts();
+                let reopened = litchi_docx::Package::from_reader(Cursor::new(bytes))?;
+                verify_semantic_docx(&reopened, shape, &selected)?;
+                if iteration >= warmup_iterations {
+                    sinks.push(summary);
+                }
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            _ => return Err("non-DOCX semantic case passed to DOCX runner".into()),
+        }
+    }
+    let sink = (!sinks.is_empty())
+        .then(|| deterministic_sink_summary(&sinks, "semantic DOCX edit/save"))
+        .transpose()?;
+    Ok(result(case, corpus, elapsed, sink))
+}
+
+fn run_semantic_pptx(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let total = shape.pptx_slides() * shape.pptx_text_boxes_per_slide();
+    let updates = semantic_update_indices(total)?;
+    let selected = match case {
+        Case::PptxSemanticOneEditSave => vec![updates[0]],
+        Case::PptxSemanticOnePercentEditSave => updates,
+        _ => Vec::new(),
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        match case {
+            Case::PptxSemanticCreateSmall => {
+                let started = Instant::now();
+                let bytes = semantic_pptx_bytes(SemanticShape::Tiny)?;
+                let duration = started.elapsed();
+                let reopened = litchi_pptx::Package::from_bytes(&bytes)?;
+                verify_semantic_pptx(&reopened, SemanticShape::Tiny, &[])?;
+                if bytes != corpus.archive && shape == SemanticShape::Tiny {
+                    return Err(
+                        "semantic PPTX creation digest differs from its deterministic corpus"
+                            .into(),
+                    );
+                }
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::PptxSemanticOpen => {
+                let started = Instant::now();
+                let package = litchi_pptx::Package::from_bytes(&corpus.archive)?;
+                let duration = started.elapsed();
+                verify_semantic_pptx(&package, shape, &[])?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::PptxSemanticListSlides => {
+                let package = litchi_pptx::Package::from_bytes(&corpus.archive)?;
+                let presentation = package.presentation()?;
+                let started = Instant::now();
+                let slides = presentation.slides()?;
+                let duration = started.elapsed();
+                if slides.len() != shape.pptx_slides() {
+                    return Err("semantic PPTX slide list differs from specification".into());
+                }
+                verify_semantic_pptx(&package, shape, &[])?;
+                std::hint::black_box(slides);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::PptxSemanticOneSlide => {
+                let package = litchi_pptx::Package::from_bytes(&corpus.archive)?;
+                let presentation = package.presentation()?;
+                let index = shape.pptx_slides() / 2;
+                let started = Instant::now();
+                let slide = presentation.slide(index)?;
+                let duration = started.elapsed();
+                let slide = slide.ok_or("semantic PPTX selected slide is missing")?;
+                if slide.shapes()?.len() != shape.pptx_text_boxes_per_slide() {
+                    return Err(
+                        "semantic PPTX selected slide shape count differs from specification"
+                            .into(),
+                    );
+                }
+                verify_semantic_pptx(&package, shape, &[])?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::PptxSemanticFullText => {
+                let package = litchi_pptx::Package::from_bytes(&corpus.archive)?;
+                let presentation = package.presentation()?;
+                let started = Instant::now();
+                let text = presentation.text()?;
+                let duration = started.elapsed();
+                verify_semantic_pptx(&package, shape, &[])?;
+                std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::PptxSemanticNoopEditSave
+            | Case::PptxSemanticOneEditSave
+            | Case::PptxSemanticOnePercentEditSave => {
+                let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+                let started = Instant::now();
+                let mut edit = package.opened_presentation_transaction()?;
+                for linear in &selected {
+                    let slide = *linear / shape.pptx_text_boxes_per_slide();
+                    let object = *linear % shape.pptx_text_boxes_per_slide();
+                    if !edit.set_shape_text(
+                        slide,
+                        object,
+                        semantic_pptx_text(slide, object, true),
+                    )? {
+                        return Err("semantic PPTX edit unexpectedly reported no change".into());
+                    }
+                }
+                let commit = edit.commit()?;
+                if commit.is_changed() == selected.is_empty() {
+                    return Err("semantic PPTX commit has unexpected changed state".into());
+                }
+                package.apply_opened_presentation_commit(commit)?;
+                let bytes = package.to_bytes()?;
+                let duration = started.elapsed();
+                let reopened = litchi_pptx::Package::from_bytes(&bytes)?;
+                verify_semantic_pptx(&reopened, shape, &selected)?;
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            _ => return Err("non-PPTX semantic case passed to PPTX runner".into()),
+        }
+    }
+    Ok(result(case, corpus, elapsed, None))
 }
 
 fn run_xlsx_open_owned(
@@ -4309,8 +5017,9 @@ mod tests {
 
     use super::{
         Case, CorpusShape, CountingSink, InstrumentedSource, PayloadKind, RangeSimulationConfig,
-        RequestSizeBuckets, SimulatedRangeSource, SourceBackedPackage, WriterShape, XlsxShape,
-        build_cfb_corpus, build_opc_corpus, build_writer_corpus, build_xlsx_corpus, payload_bytes,
+        RequestSizeBuckets, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
+        XlsxShape, build_cfb_corpus, build_opc_corpus, build_semantic_docx_corpus,
+        build_semantic_pptx_corpus, build_writer_corpus, build_xlsx_corpus, payload_bytes,
         resolve_execution_workers, run_case, run_case_with_config, run_scaling_case,
         simulated_request_delay, statistics,
     };
@@ -4361,6 +5070,23 @@ mod tests {
         let writer_results = 3 * WriterShape::ALL.len();
         let xlsx_results = 15 * XlsxShape::ALL.len();
         assert_eq!(substrate_results + writer_results + xlsx_results, 198);
+    }
+
+    #[test]
+    fn semantic_docx_and_pptx_tiny_corpora_are_deterministic_and_editable() {
+        let docx = build_semantic_docx_corpus(SemanticShape::Tiny).unwrap();
+        let docx_again = build_semantic_docx_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(docx.archive, docx_again.archive);
+        assert_eq!(docx.manifest.entry_count, 24);
+        let docx_result = run_case(Case::DocxSemanticOnePercentEditSave, &docx, 0, 1).unwrap();
+        assert!(docx_result.sink.is_some());
+
+        let pptx = build_semantic_pptx_corpus(SemanticShape::Tiny).unwrap();
+        let pptx_again = build_semantic_pptx_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(pptx.archive, pptx_again.archive);
+        assert_eq!(pptx.manifest.entry_count, 12);
+        let pptx_result = run_case(Case::PptxSemanticOnePercentEditSave, &pptx, 0, 1).unwrap();
+        assert!(pptx_result.sink.is_none());
     }
 
     #[test]
