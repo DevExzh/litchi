@@ -501,7 +501,7 @@ fn validate_xml_document(bytes: &[u8], label: &str) -> Result<()> {
         return invalid(format!("{label} exceeds size limit"));
     }
     let text = std::str::from_utf8(bytes)
-        .map_err(|_| Error::InvalidFormat(format!("{label} is not UTF-8")))?;
+        .map_err(|_error| Error::InvalidFormat(format!("{label} is not UTF-8")))?;
     if text.contains("<!DOCTYPE") || text.contains("<!ENTITY") {
         return invalid(format!("{label} contains a DTD"));
     }
@@ -825,14 +825,14 @@ fn locate_images(xml: &str) -> Result<Vec<ObjectSpan>> {
     let mut spans = Vec::new();
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("XML position overflow".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("XML position overflow".to_string()))?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid image host XML: {error}")))?;
         let is_draw =
             matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == DRAW_NS);
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("XML position overflow".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("XML position overflow".to_string()))?;
         match event {
             Event::Start(element) => {
                 if is_draw && element.local_name().as_ref() == b"image" {

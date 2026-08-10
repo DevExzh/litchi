@@ -9,6 +9,7 @@ use crate::{
     frame::{Frame, Properties},
     map::{Area, AreaKind, AreaProperties, ImageMap},
     source::Source,
+    surface::{Surface, SurfaceLocation},
 };
 use litchi_core::{Error, FileFormat, Metadata, Result};
 use litchi_odf_common::{
@@ -45,6 +46,8 @@ struct State {
     sites: Vec<FrameSite>,
     metadata: Option<Metadata>,
     active_content: Vec<ActiveContent>,
+    forms: Vec<Surface>,
+    extensions: Vec<Surface>,
 }
 
 #[derive(Clone, Debug)]
@@ -166,6 +169,18 @@ impl FlatImage {
     #[must_use]
     pub fn active_content(&self) -> &[ActiveContent] {
         &self.0.active_content
+    }
+
+    /// Returns inert ODF form and `XForms` occurrences in source order.
+    #[must_use]
+    pub fn forms(&self) -> &[Surface] {
+        &self.0.forms
+    }
+
+    /// Returns inert producer-extension elements and attributes in source order.
+    #[must_use]
+    pub fn extensions(&self) -> &[Surface] {
+        &self.0.extensions
     }
 
     /// Classifies one style name/family dependency without changing XML.
@@ -960,6 +975,13 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
             Root::Content => ActiveContentLocation::ContentXml,
         },
     )?;
+    let surfaces = crate::surface::scan_xml(
+        xml,
+        match root {
+            Root::Flat => SurfaceLocation::FlatXml,
+            Root::Content => SurfaceLocation::ContentXml,
+        },
+    )?;
     Ok(State {
         bytes: input_bytes,
         root,
@@ -967,6 +989,8 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
         sites,
         metadata,
         active_content,
+        forms: surfaces.forms,
+        extensions: surfaces.extensions,
     })
 }
 

@@ -22,25 +22,17 @@ impl DatabaseField {
         let mut xml = format!(
             "<text:{local} xmlns:text=\"{TEXT_DATABASE_NAMESPACE}\" xmlns:style=\"{STYLE_NAMESPACE}\" xmlns:form=\"{FORM_NAMESPACE}\" xmlns:xlink=\"{XLINK_NAMESPACE}\""
         );
-        let mut attribute = |prefix: &str, name: &str, value: &str| {
-            xml.push(' ');
-            xml.push_str(prefix);
-            xml.push(':');
-            xml.push_str(name);
-            xml.push_str("=\"");
-            push_xml_attribute(&mut xml, value);
-            xml.push('"');
-        };
         if let Some(value) = field.source.database_name.as_deref() {
-            attribute("text", "database-name", value);
+            push_attribute(&mut xml, "text", "database-name", value);
         }
-        attribute("text", "table-name", &field.source.table_name);
+        push_attribute(&mut xml, "text", "table-name", &field.source.table_name);
         if let Some(value) = field.source.table_type {
-            attribute("text", "table-type", value.as_str());
+            push_attribute(&mut xml, "text", "table-type", value.as_str());
         }
         match field.kind {
             DatabaseFieldKind::Display => {
-                attribute(
+                push_attribute(
+                    &mut xml,
                     "text",
                     "column-name",
                     field.column_name.as_deref().ok_or_else(|| {
@@ -50,31 +42,32 @@ impl DatabaseField {
                     })?,
                 );
                 if let Some(value) = field.data_style_name.as_deref() {
-                    attribute("style", "data-style-name", value);
+                    push_attribute(&mut xml, "style", "data-style-name", value);
                 }
             },
             DatabaseFieldKind::Next => {
                 if let Some(value) = field.condition.as_deref() {
-                    attribute("text", "condition", value);
+                    push_attribute(&mut xml, "text", "condition", value);
                 }
             },
             DatabaseFieldKind::RowSelect => {
                 if let Some(value) = field.condition.as_deref() {
-                    attribute("text", "condition", value);
+                    push_attribute(&mut xml, "text", "condition", value);
                 }
                 if let Some(value) = field.row_number {
-                    attribute("text", "row-number", value.as_str());
+                    push_attribute(&mut xml, "text", "row-number", value.as_str());
                 }
             },
             DatabaseFieldKind::RowNumber => {
                 if let Some(value) = field.value {
-                    attribute("text", "value", value.as_str());
+                    push_attribute(&mut xml, "text", "value", value.as_str());
                 }
                 if let Some(value) = field.number_format.as_deref() {
-                    attribute("style", "num-format", value);
+                    push_attribute(&mut xml, "style", "num-format", value);
                 }
                 if let Some(value) = field.number_letter_sync {
-                    attribute(
+                    push_attribute(
+                        &mut xml,
                         "style",
                         "num-letter-sync",
                         if value { "true" } else { "false" },
@@ -83,7 +76,6 @@ impl DatabaseField {
             },
             DatabaseFieldKind::Name => {},
         }
-        let _ = attribute;
         if field.source.connection_resource.is_none() && field.display_text.is_empty() {
             xml.push_str("/>");
             return Ok(xml);
@@ -100,4 +92,14 @@ impl DatabaseField {
         xml.push('>');
         Ok(xml)
     }
+}
+
+fn push_attribute(xml: &mut String, prefix: &str, name: &str, value: &str) {
+    xml.push(' ');
+    xml.push_str(prefix);
+    xml.push(':');
+    xml.push_str(name);
+    xml.push_str("=\"");
+    push_xml_attribute(xml, value);
+    xml.push('"');
 }

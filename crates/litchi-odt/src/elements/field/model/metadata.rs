@@ -376,7 +376,7 @@ fn append_note_body_spaces(output: &mut String, element: &MetaFieldElement) -> R
             attribute.namespace_uri == TEXT_DATABASE_NAMESPACE && attribute.local_name == "c"
         })
         .map(|attribute| {
-            attribute.value.parse::<usize>().map_err(|_| {
+            attribute.value.parse::<usize>().map_err(|_error| {
                 Error::InvalidFormat("text:s text:c must be a non-negative integer".to_string())
             })
         })

@@ -21,6 +21,21 @@ const MAX_OFFICE_MARGIN_INCHES: f64 = 49.0;
 pub struct PageMargin(f64);
 
 impl PageMargin {
+    /// Construct a margin from inches.
+    pub fn from_inches(value: f64) -> Result<Self> {
+        validate_margin(value, "page")
+    }
+
+    /// Construct a margin from typographic points.
+    pub fn from_points(value: f64) -> Result<Self> {
+        Self::from_inches(value / 72.0)
+    }
+
+    /// Construct a margin from millimeters.
+    pub fn from_millimeters(value: f64) -> Result<Self> {
+        Self::from_inches(value / 25.4)
+    }
+
     /// Margin in the native `SpreadsheetML` unit, inches.
     #[must_use]
     pub fn inches(self) -> f64 {
@@ -40,8 +55,10 @@ impl PageMargin {
     }
 }
 
+impl Eq for PageMargin {}
+
 /// The six required margins from one worksheet `pageMargins` element.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Margins {
     left: PageMargin,
     right: PageMargin,
@@ -52,6 +69,26 @@ pub struct Margins {
 }
 
 impl Margins {
+    /// Construct a complete six-value worksheet margin set.
+    #[must_use]
+    pub const fn new(
+        left: PageMargin,
+        right: PageMargin,
+        top: PageMargin,
+        bottom: PageMargin,
+        header: PageMargin,
+        footer: PageMargin,
+    ) -> Self {
+        Self {
+            left,
+            right,
+            top,
+            bottom,
+            header,
+            footer,
+        }
+    }
+
     #[must_use]
     pub fn left(&self) -> PageMargin {
         self.left
@@ -76,6 +113,54 @@ impl Margins {
     pub fn footer(&self) -> PageMargin {
         self.footer
     }
+}
+
+/// Serialize one complete core worksheet `pageMargins` element.
+#[must_use]
+pub fn write_page_margins(value: &Margins) -> Vec<u8> {
+    format!("<pageMargins{}/>", margin_attributes(value)).into_bytes()
+}
+
+/// Replace, insert, or remove direct worksheet page margins.
+pub fn replace_page_margins(xml: &[u8], value: Option<&Margins>) -> Result<Vec<u8>> {
+    let _ = parse_page_margins(xml)?;
+    let attributes = value.map(margin_attributes);
+    let output = crate::raw::worksheet_property::replace_direct_empty(
+        xml,
+        "pageMargins",
+        attributes.as_deref(),
+        &[
+            b"pageSetup",
+            b"headerFooter",
+            b"rowBreaks",
+            b"colBreaks",
+            b"customProperties",
+            b"cellWatches",
+            b"ignoredErrors",
+            b"smartTags",
+            b"drawing",
+            b"legacyDrawing",
+            b"legacyDrawingHF",
+            b"picture",
+            b"oleObjects",
+            b"controls",
+            b"webPublishItems",
+            b"tableParts",
+            b"extLst",
+        ],
+        "page-margin worksheet output",
+    )?;
+    if parse_page_margins(&output)?.as_ref() != value {
+        return Err(invalid("worksheet page-margin write verification failed"));
+    }
+    Ok(output)
+}
+
+fn margin_attributes(value: &Margins) -> String {
+    format!(
+        " left=\"{}\" right=\"{}\" top=\"{}\" bottom=\"{}\" header=\"{}\" footer=\"{}\"",
+        value.left.0, value.right.0, value.top.0, value.bottom.0, value.header.0, value.footer.0,
+    )
 }
 
 /// Parse a worksheet's optional core `pageMargins` element.
@@ -307,13 +392,16 @@ fn parse_margin(raw: &str, name: &[u8]) -> Result<PageMargin> {
             String::from_utf8_lossy(name)
         ))
     })?;
+    validate_margin(value, &String::from_utf8_lossy(name))
+}
+
+fn validate_margin(value: f64, name: &str) -> Result<PageMargin> {
     if !value.is_finite() || !(0.0..MAX_OFFICE_MARGIN_INCHES).contains(&value) {
         return Err(invalid(format!(
-            "{} page margin is outside Office's [0, 49) range",
-            String::from_utf8_lossy(name)
+            "{name} page margin is outside Office's [0, 49) range"
         )));
     }
-    Ok(PageMargin(value))
+    Ok(PageMargin(if value == 0.0 { 0.0 } else { value }))
 }
 
 fn missing(name: &str) -> Error {
@@ -368,6 +456,40 @@ mod tests {
         assert_eq!(margins.right().inches(), 0.0);
         assert_eq!(margins.top().points(), 72.0);
         assert_eq!(margins.bottom().millimeters(), 50.8);
+    }
+
+    #[test]
+    fn authors_inserts_and_removes_byte_minimal_margins() {
+        let margins = Margins::new(
+            PageMargin::from_inches(0.7).unwrap(),
+            PageMargin::from_inches(0.8).unwrap(),
+            PageMargin::from_points(72.0).unwrap(),
+            PageMargin::from_millimeters(25.4).unwrap(),
+            PageMargin::from_inches(0.3).unwrap(),
+            PageMargin::from_inches(0.4).unwrap(),
+        );
+        assert_eq!(
+            write_page_margins(&margins),
+            br#"<pageMargins left="0.7" right="0.8" top="1" bottom="1" header="0.3" footer="0.4"/>"#
+        );
+
+        let source = format!(
+            r#"{START}<sheetData/><printOptions gridLines="1"/><pageSetup orientation="portrait"/></worksheet>"#
+        );
+        let replaced = replace_page_margins(source.as_bytes(), Some(&margins)).unwrap();
+        assert_eq!(parse_page_margins(&replaced).unwrap(), Some(margins));
+        let replaced = std::str::from_utf8(&replaced).unwrap();
+        assert!(replaced.contains(std::str::from_utf8(&write_page_margins(&margins)).unwrap()));
+        assert!(replaced.find("<printOptions").unwrap() < replaced.find("<pageMargins").unwrap());
+        assert!(replaced.find("<pageMargins").unwrap() < replaced.find("<pageSetup").unwrap());
+
+        let removed = replace_page_margins(replaced.as_bytes(), None).unwrap();
+        assert_eq!(parse_page_margins(&removed).unwrap(), None);
+        assert!(
+            !std::str::from_utf8(&removed)
+                .unwrap()
+                .contains("pageMargins")
+        );
     }
 
     #[test]

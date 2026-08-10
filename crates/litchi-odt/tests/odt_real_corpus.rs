@@ -1,7 +1,7 @@
 //! Real Writer corpus compatibility through the current ODT facade.
 
 use litchi_core::Error;
-use litchi_odt::{Document, ScriptResourceKind};
+use litchi_odt::{Document, ScriptResourceKind, core::OwnedPackage, transaction::Position};
 use std::path::{Path, PathBuf};
 
 fn corpus() -> PathBuf {
@@ -80,6 +80,29 @@ fn writer_packages_expose_fixture_specific_semantics() -> Result<(), Error> {
 
     let toc = Document::open(corpus().join("writer-table-of-contents.odt"))?;
     assert_eq!(toc.text_indexes()?.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn genuine_formatted_metadata_survives_a_public_paragraph_transaction_exactly() -> Result<(), Error>
+{
+    let path = corpus().join("writer-header-footer.odt");
+    let source_bytes = std::fs::read(&path)?;
+    let source_package = OwnedPackage::from_bytes(source_bytes.clone())?;
+    let source_meta = source_package.get_file("meta.xml")?;
+    let document = Document::from_bytes(source_bytes)?;
+    let mut edit = document.edit()?;
+    edit.replace_paragraph(Position::new(0), "provenance-safe paragraph")?;
+    let commit = edit.commit()?;
+
+    let reopened = commit.snapshot().document()?;
+    assert!(reopened.text()?.contains("provenance-safe paragraph"));
+    let changed = OwnedPackage::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    assert_eq!(changed.get_file("meta.xml")?, source_meta);
+    let manifest = String::from_utf8(changed.get_file("META-INF/manifest.xml")?)
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+    assert!(!manifest.contains("manifest:full-path=\"META-INF/\""));
+    assert!(!manifest.contains("manifest:full-path=\"META-INF/manifest.xml\""));
     Ok(())
 }
 

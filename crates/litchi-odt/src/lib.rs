@@ -66,21 +66,17 @@
 
 #![forbid(unsafe_code)]
 #![allow(
-    clippy::absurd_extreme_comparisons,
     clippy::allow_attributes_without_reason,
     clippy::arbitrary_source_item_ordering,
     clippy::case_sensitive_file_extension_comparisons,
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
     clippy::collapsible_if,
     clippy::default_trait_access,
     clippy::doc_markdown,
     clippy::format_push_string,
     clippy::inline_always,
     clippy::items_after_statements,
-    clippy::let_underscore_must_use,
     clippy::many_single_char_names,
-    clippy::map_err_ignore,
     clippy::match_same_arms,
     clippy::match_wildcard_for_single_variants,
     clippy::missing_errors_doc,
@@ -104,7 +100,7 @@
     clippy::useless_asref,
     clippy::wildcard_enum_match_arm,
     clippy::wildcard_imports,
-    reason = "legacy ODT API shape and naming are compatibility constraints; these style-only lints are quarantined while correctness lints remain reported"
+    reason = "legacy ODT API shape and naming are compatibility constraints; broad style lints and legacy XML-position truncation remain quarantined"
 )]
 pub use litchi_odf_common::core;
 pub use litchi_odf_common::{constants, coordinates, datatype, namespace};

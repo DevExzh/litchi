@@ -369,7 +369,7 @@ pub(super) fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
                     if text_element && matches!(local.as_ref(), b"p" | b"h") {
                         let story = next_story(&mut table, &mut body_paragraph)?;
                         let qname = std::str::from_utf8(element.name().as_ref())
-                            .map_err(|_| make_error("non-UTF-8 story element name"))?
+                            .map_err(|_error| make_error("non-UTF-8 story element name"))?
                             .to_string();
                         stories.push(StorySite {
                             story,
@@ -634,7 +634,7 @@ fn append_text_control_boundaries(
             .map(|value| {
                 value
                     .parse::<usize>()
-                    .map_err(|_| make_error("invalid text:s count"))
+                    .map_err(|_error| make_error("invalid text:s count"))
             })
             .transpose()?
             .unwrap_or(1),

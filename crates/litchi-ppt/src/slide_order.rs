@@ -23,7 +23,7 @@ use crate::package::{Error as PackageError, Package, RecordLimits};
 pub type History = litchi_core::patch::History<Snapshot>;
 
 /// A native owner edge that must be closed before a slide can be transferred.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TransferDependency {
     /// The slide points at a notes persist object.
     SpeakerNotes,
@@ -31,9 +31,21 @@ pub enum TransferDependency {
     CommentAuthorCatalog,
     /// Interactive actions require the document hyperlink relationship table.
     HyperlinkAction,
-    /// `OfficeArt` shape identifiers, drawing-group state, and picture-store
-    /// references are presentation-global.
+    /// `OfficeArt` shape identifiers and drawing-group state are
+    /// presentation-global.
     DrawingGroup,
+    /// A connector rule refers to a shape outside the transferred slide's
+    /// closed drawing identity set.
+    ConnectorRule,
+    /// Another `OfficeArt` shape-reference family (arc/callout/deleted-shape
+    /// rule, drawing selection, or linked-shape property) is present.
+    OtherOfficeArtShapeReference,
+    /// BLIP-bearing `OfficeArt` properties require a closed picture-store copy
+    /// and index remap that this transfer owner does not perform.
+    PictureStore,
+    /// Animation and build records address shape identities through graphs
+    /// whose complete fixed-width reference closure is not modeled here.
+    AnimationBuildGraph,
     /// An `ExObjRefAtom` can address media, a chart, or another OLE object in
     /// the document external-object relationship table.
     ExternalObjectRelationship,
@@ -48,7 +60,11 @@ impl fmt::Display for TransferDependency {
             Self::SpeakerNotes => "speaker-notes",
             Self::CommentAuthorCatalog => "comment-author-catalog",
             Self::HyperlinkAction => "hyperlink-action",
-            Self::DrawingGroup => "drawing-group/picture-store",
+            Self::DrawingGroup => "drawing-group",
+            Self::ConnectorRule => "open connector rule",
+            Self::OtherOfficeArtShapeReference => "other OfficeArt shape reference",
+            Self::PictureStore => "picture-store/BLIP",
+            Self::AnimationBuildGraph => "animation/build graph",
             Self::ExternalObjectRelationship => "external media/chart/OLE relationship",
             Self::ActiveOrUnknownExternalObject => "active or unknown external object",
         })
@@ -282,6 +298,16 @@ impl Snapshot {
         self.document.slides().len()
     }
 
+    /// Whether one slide is omitted from the presentation sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the position is absent.
+    pub fn slide_hidden(&self, position: Position) -> Result<bool> {
+        self.require_position(position)?;
+        Ok(self.document.slides()[position.get()].flags() & (1 << 2) != 0)
+    }
+
     /// Returns the checked complete host anchor for one existing shape.
     ///
     /// # Errors
@@ -345,6 +371,7 @@ impl Snapshot {
             document: self.document.edit(),
             changes: Vec::new(),
             structural: Vec::new(),
+            visibility_changes: Vec::new(),
             text_changes: Vec::new(),
             anchor_changes: Vec::new(),
             media_path_changes: Vec::new(),
@@ -412,10 +439,11 @@ impl Snapshot {
     /// either presentation.
     ///
     /// The bounded closure reuses a byte-identical master plus matching
-    /// comment-author, hyperlink, drawing-group/picture-store, sound, and
-    /// external-media owners already present in the receiver. Native IDs are
-    /// never guessed or renumbered. Notes, active OLE/macro/program actions,
-    /// and missing or mismatched owners are refused explicitly.
+    /// comment-author, hyperlink, sound, and external-media owners already
+    /// present in the receiver. Ordinary shapes and connector rules are
+    /// deterministically rewritten to target-owned unused drawing IDs. Notes,
+    /// BLIPs, animation/build graphs, active OLE/macro/program actions, and
+    /// missing or mismatched owners are refused explicitly.
     ///
     /// # Errors
     ///
@@ -639,6 +667,37 @@ pub struct ExternalMediaPlaybackChange {
     after: crate::external_media::Playback,
 }
 
+/// One fixed-width replacement of a slide's hidden flag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SlideVisibilityChange {
+    position: Position,
+    slide_id: u32,
+    before: bool,
+    after: bool,
+    before_order: [u8; 32],
+    after_order: [u8; 32],
+}
+
+impl SlideVisibilityChange {
+    /// Semantic slide position resolved against the transaction-local order.
+    #[must_use]
+    pub const fn position(self) -> Position {
+        self.position
+    }
+
+    /// Hidden state required before the replacement.
+    #[must_use]
+    pub const fn before(self) -> bool {
+        self.before
+    }
+
+    /// Replacement hidden state.
+    #[must_use]
+    pub const fn after(self) -> bool {
+        self.after
+    }
+}
+
 impl ExternalMediaPlaybackChange {
     /// External-object identifier retained by the replacement.
     #[must_use]
@@ -821,6 +880,7 @@ struct ListChange {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum StructuralChange {
     Move(Change),
+    Visibility(SlideVisibilityChange),
     Remove(ListChange),
     Insert(ListChange),
 }
@@ -833,6 +893,7 @@ pub struct Transaction {
     document: document_structure::Transaction,
     changes: Vec<Change>,
     structural: Vec<StructuralChange>,
+    visibility_changes: Vec<SlideVisibilityChange>,
     text_changes: Vec<ShapeTextChange>,
     anchor_changes: Vec<ShapeAnchorChange>,
     media_path_changes: Vec<ExternalMediaPathChange>,
@@ -860,6 +921,12 @@ impl Transaction {
     #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
+    }
+
+    /// Fixed-width slide visibility changes staged in call order.
+    #[must_use]
+    pub fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
+        &self.visibility_changes
     }
 
     /// Checked shape-text replacements staged in this root transaction.
@@ -912,6 +979,39 @@ impl Transaction {
         };
         self.changes.push(change);
         self.structural.push(StructuralChange::Move(change));
+        Ok(())
+    }
+
+    /// Changes whether one slide is hidden during presentation.
+    ///
+    /// Only bit 2 of the live `SlidePersistAtom.flags` field is changed. The
+    /// operation composes with order, shape, and inert media changes and is
+    /// carried by exact, inverse, durable, history, and merge surfaces.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the position is absent or a package error
+    /// when the fixed-width document mutation fails validation.
+    pub fn set_slide_hidden(&mut self, position: Position, hidden: bool) -> Result<()> {
+        self.require_position(position)?;
+        let selected = self.document.slides()?[position.get()];
+        let before = selected.flags() & (1 << 2) != 0;
+        if before == hidden {
+            return Ok(());
+        }
+        let before_order = order_digest(&self.document)?;
+        self.document.set_slide_hidden(position.get(), hidden)?;
+        let after_order = order_digest(&self.document)?;
+        let change = SlideVisibilityChange {
+            position,
+            slide_id: selected.slide_id(),
+            before,
+            after: hidden,
+            before_order,
+            after_order,
+        };
+        self.visibility_changes.push(change);
+        self.structural.push(StructuralChange::Visibility(change));
         Ok(())
     }
 
@@ -1176,20 +1276,21 @@ impl Transaction {
         let source = self.source;
         let working = self.working;
         if document_commit.patch().is_empty() {
-            let patch = Patch::new(
-                source,
-                working.clone(),
-                self.changes,
-                self.structural,
-                self.text_changes,
-                self.anchor_changes,
-                self.media_path_changes,
-                self.media_playback_changes,
-                self.formatting,
-                true,
-                artifact_hash(working.bytes()),
-                artifact_hash(working.bytes()),
-            );
+            let patch = Patch {
+                before: source,
+                after: working.clone(),
+                changes: self.changes,
+                structural: self.structural,
+                visibility_changes: self.visibility_changes,
+                text_changes: self.text_changes,
+                anchor_changes: self.anchor_changes,
+                media_path_changes: self.media_path_changes,
+                media_playback_changes: self.media_playback_changes,
+                formatting: self.formatting,
+                formatting_first: true,
+                structural_before_artifact: artifact_hash(working.bytes()),
+                structural_after_artifact: artifact_hash(working.bytes()),
+            };
             return Ok(Commit {
                 snapshot: working,
                 patch,
@@ -1236,20 +1337,21 @@ impl Transaction {
             )
             .into());
         }
-        let patch = Patch::new(
-            source,
-            snapshot.clone(),
-            self.changes,
-            self.structural,
-            self.text_changes,
-            self.anchor_changes,
-            self.media_path_changes,
-            self.media_playback_changes,
-            self.formatting,
-            true,
-            artifact_hash(working.bytes()),
-            artifact_hash(snapshot.bytes()),
-        );
+        let patch = Patch {
+            before: source,
+            after: snapshot.clone(),
+            changes: self.changes,
+            structural: self.structural,
+            visibility_changes: self.visibility_changes,
+            text_changes: self.text_changes,
+            anchor_changes: self.anchor_changes,
+            media_path_changes: self.media_path_changes,
+            media_playback_changes: self.media_playback_changes,
+            formatting: self.formatting,
+            formatting_first: true,
+            structural_before_artifact: artifact_hash(working.bytes()),
+            structural_after_artifact: artifact_hash(snapshot.bytes()),
+        };
         Ok(Commit { snapshot, patch })
     }
 
@@ -1305,6 +1407,7 @@ pub struct Patch {
     after: Snapshot,
     changes: Vec<Change>,
     structural: Vec<StructuralChange>,
+    visibility_changes: Vec<SlideVisibilityChange>,
     text_changes: Vec<ShapeTextChange>,
     anchor_changes: Vec<ShapeAnchorChange>,
     media_path_changes: Vec<ExternalMediaPathChange>,
@@ -1316,40 +1419,16 @@ pub struct Patch {
 }
 
 impl Patch {
-    fn new(
-        before: Snapshot,
-        after: Snapshot,
-        changes: Vec<Change>,
-        structural: Vec<StructuralChange>,
-        text_changes: Vec<ShapeTextChange>,
-        anchor_changes: Vec<ShapeAnchorChange>,
-        media_path_changes: Vec<ExternalMediaPathChange>,
-        media_playback_changes: Vec<ExternalMediaPlaybackChange>,
-        formatting: Vec<FormattingChange>,
-        formatting_first: bool,
-        structural_before_artifact: String,
-        structural_after_artifact: String,
-    ) -> Self {
-        Self {
-            before,
-            after,
-            changes,
-            structural,
-            text_changes,
-            anchor_changes,
-            media_path_changes,
-            media_playback_changes,
-            formatting,
-            formatting_first,
-            structural_before_artifact,
-            structural_after_artifact,
-        }
-    }
-
     /// Semantic moves represented by this patch.
     #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
+    }
+
+    /// Slide hidden-state replacements composed into this root patch.
+    #[must_use]
+    pub fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
+        &self.visibility_changes
     }
 
     /// Shape-text replacements composed into this root patch.
@@ -1412,21 +1491,37 @@ impl Patch {
     /// Returns the exact-source-checked inverse patch.
     #[must_use]
     pub fn inverse(&self) -> Self {
-        Self::new(
-            self.after.clone(),
-            self.before.clone(),
-            self.changes
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+            changes: self
+                .changes
                 .iter()
                 .rev()
                 .copied()
                 .map(Change::inverse)
                 .collect(),
-            self.structural
+            structural: self
+                .structural
                 .iter()
                 .rev()
                 .map(inverse_structural)
                 .collect(),
-            self.text_changes
+            visibility_changes: self
+                .visibility_changes
+                .iter()
+                .rev()
+                .map(|change| SlideVisibilityChange {
+                    position: change.position,
+                    slide_id: change.slide_id,
+                    before: change.after,
+                    after: change.before,
+                    before_order: change.after_order,
+                    after_order: change.before_order,
+                })
+                .collect(),
+            text_changes: self
+                .text_changes
                 .iter()
                 .rev()
                 .map(|change| ShapeTextChange {
@@ -1435,7 +1530,8 @@ impl Patch {
                     after: change.before.clone(),
                 })
                 .collect(),
-            self.anchor_changes
+            anchor_changes: self
+                .anchor_changes
                 .iter()
                 .rev()
                 .map(|change| ShapeAnchorChange {
@@ -1444,7 +1540,8 @@ impl Patch {
                     after: change.before,
                 })
                 .collect(),
-            self.media_path_changes
+            media_path_changes: self
+                .media_path_changes
                 .iter()
                 .rev()
                 .map(|change| ExternalMediaPathChange {
@@ -1453,7 +1550,8 @@ impl Patch {
                     after: change.before.clone(),
                 })
                 .collect(),
-            self.media_playback_changes
+            media_playback_changes: self
+                .media_playback_changes
                 .iter()
                 .rev()
                 .map(|change| ExternalMediaPlaybackChange {
@@ -1462,7 +1560,8 @@ impl Patch {
                     after: change.before,
                 })
                 .collect(),
-            self.formatting
+            formatting: self
+                .formatting
                 .iter()
                 .rev()
                 .map(|change| match change {
@@ -1496,10 +1595,10 @@ impl Patch {
                     },
                 })
                 .collect(),
-            !self.formatting_first,
-            self.structural_after_artifact.clone(),
-            self.structural_before_artifact.clone(),
-        )
+            formatting_first: !self.formatting_first,
+            structural_before_artifact: self.structural_after_artifact.clone(),
+            structural_after_artifact: self.structural_before_artifact.clone(),
+        }
     }
 
     /// Converts this patch to the common bounded deterministic-JSON envelope.
@@ -1602,6 +1701,27 @@ impl Patch {
                         move_change.from,
                         &self.structural_after_artifact,
                         move_change.after_order,
+                    )?,
+                ),
+                StructuralChange::Visibility(visibility_change) => (
+                    durable_visibility_operation(
+                        limits,
+                        visibility_change,
+                        &self.structural_before_artifact,
+                        visibility_change.before_order,
+                    )?,
+                    durable_visibility_operation(
+                        limits,
+                        &SlideVisibilityChange {
+                            position: visibility_change.position,
+                            slide_id: visibility_change.slide_id,
+                            before: visibility_change.after,
+                            after: visibility_change.before,
+                            before_order: visibility_change.after_order,
+                            after_order: visibility_change.before_order,
+                        },
+                        &self.structural_after_artifact,
+                        visibility_change.after_order,
                     )?,
                 ),
                 StructuralChange::Remove(list_change) => {
@@ -1833,6 +1953,23 @@ fn durable_operation(
         format!("slide:{}", from.get()),
         preconditions,
         destination_value,
+    )
+}
+
+fn durable_visibility_operation(
+    limits: litchi_core::patch::PatchLimits,
+    change: &SlideVisibilityChange,
+    artifact: &str,
+    order: [u8; 32],
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let mut preconditions = structural_preconditions(artifact, order);
+    preconditions.insert("hidden".to_string(), serde_json::Value::Bool(change.before));
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "presentation.slide-hidden.set",
+        format!("slide:{}", change.position.get()),
+        preconditions,
+        serde_json::Value::Bool(change.after),
     )
 }
 
@@ -2284,6 +2421,27 @@ fn apply_durable_structural(
                 .map(Position::new)
                 .ok_or_else(|| invalid_durable_patch("slide destination must fit usize"))?;
             transaction.move_slide(position, destination)
+        },
+        "presentation.slide-hidden.set" if operation.preconditions.len() == 3 => {
+            let expected_hidden = operation
+                .preconditions
+                .get("hidden")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| invalid_durable_patch("missing slide-hidden precondition"))?;
+            transaction.require_position(position)?;
+            let current_hidden =
+                transaction.document.slides()?[position.get()].flags() & (1 << 2) != 0;
+            if current_hidden != expected_hidden {
+                return Err(PackageError::InvalidFormat(
+                    "PPT durable slide-hidden semantic precondition does not match".into(),
+                )
+                .into());
+            }
+            let replacement = operation
+                .value
+                .as_bool()
+                .ok_or_else(|| invalid_durable_patch("slide-hidden value must be boolean"))?;
+            transaction.set_slide_hidden(position, replacement)
         },
         "slide-order.remove" if operation.preconditions.len() == 3 && operation.value.is_null() => {
             transaction.require_position(position)?;
@@ -2805,8 +2963,9 @@ struct SlideRelationships {
     sound_ids: BTreeSet<u32>,
     external_object_ids: BTreeSet<u32>,
     shape_ids: BTreeSet<u32>,
+    connector_shape_ids: BTreeSet<u32>,
     active_action: bool,
-    unsafe_drawing_reference: bool,
+    unsupported_dependencies: BTreeSet<TransferDependency>,
 }
 
 fn scan_slide_relationships(root: &crate::Record) -> Result<SlideRelationships> {
@@ -2832,7 +2991,9 @@ fn scan_ppt_record(record: &crate::Record, output: &mut SlideRelationships) -> R
             | crate::RecordType::DiagramBuild
             | crate::RecordType::ParaBuild
     ) {
-        output.unsafe_drawing_reference = true;
+        output
+            .unsupported_dependencies
+            .insert(TransferDependency::AnimationBuildGraph);
     }
     for child in &record.children {
         scan_ppt_record(child, output)?;
@@ -2852,14 +3013,66 @@ fn option_has_blip_reference(instance: u16, payload: &[u8]) -> Result<bool> {
         .any(|property| u16::from_le_bytes([property[0], property[1]]) & 0x4000 != 0))
 }
 
+fn option_has_linked_shape_reference(instance: u16, payload: &[u8]) -> Result<bool> {
+    let property_bytes = usize::from(instance)
+        .checked_mul(6)
+        .ok_or_else(|| PackageError::Corrupted("OfficeArt property count overflow".into()))?;
+    let properties = payload
+        .get(..property_bytes)
+        .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
+    Ok(properties.chunks_exact(6).any(|property| {
+        let opid = u16::from_le_bytes([property[0], property[1]]) & 0x3fff;
+        opid == 0x008a && property[2..6].iter().any(|byte| *byte != 0)
+    }))
+}
+
+fn scan_connector_rule(payload: &[u8], output: &mut SlideRelationships) -> Result<()> {
+    if payload.len() != 24 {
+        return Err(PackageError::Corrupted(
+            "OfficeArtFConnectorRule payload must contain 24 bytes".into(),
+        )
+        .into());
+    }
+    for offset in [4, 8, 12] {
+        output
+            .connector_shape_ids
+            .insert(read_payload_u32(payload, offset)?);
+    }
+    Ok(())
+}
+
 fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTreeMap<u32, u32>> {
+    if donor
+        .unsupported_dependencies
+        .contains(&TransferDependency::PictureStore)
+    {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::PictureStore,
+        }));
+    }
+    if donor
+        .unsupported_dependencies
+        .contains(&TransferDependency::AnimationBuildGraph)
+    {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::AnimationBuildGraph,
+        }));
+    }
+    if donor
+        .unsupported_dependencies
+        .contains(&TransferDependency::OtherOfficeArtShapeReference)
+    {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::OtherOfficeArtShapeReference,
+        }));
+    }
+    if !donor.connector_shape_ids.is_subset(&donor.shape_ids) {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::ConnectorRule,
+        }));
+    }
     if donor.shape_ids.is_empty() {
         return Ok(BTreeMap::new());
-    }
-    if donor.unsafe_drawing_reference {
-        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: TransferDependency::DrawingGroup,
-        }));
     }
     let live_persist_ids = target
         .document
@@ -2929,10 +3142,32 @@ fn scan_officeart_records(bytes: &[u8], output: &mut SlideRelationships) -> Resu
                 0xF00A => {
                     output.shape_ids.insert(read_payload_u32(payload, 0)?);
                 },
-                0xF00B if option_has_blip_reference(instance, payload)? => {
-                    output.unsafe_drawing_reference = true;
+                0xF00B | 0xF121 | 0xF122 => {
+                    if option_has_blip_reference(instance, payload)? {
+                        output
+                            .unsupported_dependencies
+                            .insert(TransferDependency::PictureStore);
+                    }
+                    if option_has_linked_shape_reference(instance, payload)? {
+                        output
+                            .unsupported_dependencies
+                            .insert(TransferDependency::OtherOfficeArtShapeReference);
+                    }
                 },
-                0xF012 => output.unsafe_drawing_reference = true,
+                0xF012 if version == 1 && instance == 0 => {
+                    scan_connector_rule(payload, output)?;
+                },
+                0xF012 => {
+                    return Err(PackageError::Corrupted(
+                        "OfficeArtFConnectorRule has an invalid record header".into(),
+                    )
+                    .into());
+                },
+                0xF014 | 0xF017 | 0xF11D | 0xF119 => {
+                    output
+                        .unsupported_dependencies
+                        .insert(TransferDependency::OtherOfficeArtShapeReference);
+                },
                 0xF00D | 0xF011 => scan_host_records(payload, output)?,
                 _ if version == 0x0f => scan_officeart_records(payload, output)?,
                 _ => {},
@@ -2962,7 +3197,9 @@ fn scan_host_records(bytes: &[u8], output: &mut SlideRelationships) -> Result<()
                     | crate::RecordType::DiagramBuild
                     | crate::RecordType::ParaBuild
             ) {
-                output.unsafe_drawing_reference = true;
+                output
+                    .unsupported_dependencies
+                    .insert(TransferDependency::AnimationBuildGraph);
             }
             Ok(())
         },
@@ -3305,9 +3542,18 @@ fn rewrite_officeart_records(
     visit_raw_records_mut(
         bytes,
         "OfficeArt drawing",
-        |version, _instance, kind, payload| {
+        |version, instance, kind, payload| {
             match kind {
                 0xF00A => rewrite_u32_reference(payload, drawings, "OfficeArtSp.spid")?,
+                0xF012 if version == 1 && instance == 0 => {
+                    rewrite_connector_rule(payload, drawings)?;
+                },
+                0xF012 => {
+                    return Err(PackageError::Corrupted(
+                        "OfficeArtFConnectorRule has an invalid record header".into(),
+                    )
+                    .into());
+                },
                 0xF00D | 0xF011 => {
                     rewrite_host_records(payload, hyperlinks, sounds, external_objects, drawings)?;
                 },
@@ -3325,6 +3571,25 @@ fn rewrite_officeart_records(
             Ok(())
         },
     )
+}
+
+fn rewrite_connector_rule(payload: &mut [u8], drawings: &BTreeMap<u32, u32>) -> Result<()> {
+    if payload.len() != 24 {
+        return Err(PackageError::Corrupted(
+            "OfficeArtFConnectorRule payload must contain 24 bytes".into(),
+        )
+        .into());
+    }
+    for offset in [4, 8, 12] {
+        let source_id = read_payload_u32(payload, offset)?;
+        let target_id = drawings.get(&source_id).ok_or_else(|| {
+            PackageError::Corrupted(format!(
+                "OfficeArtFConnectorRule references unmapped shape {source_id}"
+            ))
+        })?;
+        payload[offset..offset + 4].copy_from_slice(&target_id.to_le_bytes());
+    }
+    Ok(())
 }
 
 fn rewrite_host_records(
@@ -3501,8 +3766,12 @@ const fn transfer_dependency_order(dependency: TransferDependency) -> u8 {
         TransferDependency::CommentAuthorCatalog => 1,
         TransferDependency::HyperlinkAction => 2,
         TransferDependency::DrawingGroup => 3,
-        TransferDependency::ExternalObjectRelationship => 4,
-        TransferDependency::ActiveOrUnknownExternalObject => 5,
+        TransferDependency::ConnectorRule => 4,
+        TransferDependency::OtherOfficeArtShapeReference => 5,
+        TransferDependency::PictureStore => 6,
+        TransferDependency::AnimationBuildGraph => 7,
+        TransferDependency::ExternalObjectRelationship => 8,
+        TransferDependency::ActiveOrUnknownExternalObject => 9,
     }
 }
 
@@ -3520,6 +3789,16 @@ fn normalized_payload(payload: &SlidePayload) -> SlidePayload {
 fn inverse_structural(structural_change: &StructuralChange) -> StructuralChange {
     match structural_change {
         StructuralChange::Move(move_change) => StructuralChange::Move(move_change.inverse()),
+        StructuralChange::Visibility(change) => {
+            StructuralChange::Visibility(SlideVisibilityChange {
+                position: change.position,
+                slide_id: change.slide_id,
+                before: change.after,
+                after: change.before,
+                before_order: change.after_order,
+                after_order: change.before_order,
+            })
+        },
         StructuralChange::Remove(list_change) => StructuralChange::Insert(ListChange {
             position: list_change.position,
             before_order: list_change.after_order,
@@ -3543,6 +3822,16 @@ fn replay_structural_changes(
         match structural_change {
             StructuralChange::Move(move_change) => {
                 document.move_slide(move_change.from.get(), move_change.destination.get())?;
+            },
+            StructuralChange::Visibility(change) => {
+                let current = document.slides()?[change.position.get()].flags() & (1 << 2) != 0;
+                if current != change.before {
+                    return Err(PackageError::Corrupted(
+                        "PPT structural rebase selected a different slide visibility state".into(),
+                    )
+                    .into());
+                }
+                document.set_slide_hidden(change.position.get(), change.after)?;
             },
             StructuralChange::Remove(remove_change) => {
                 let removed = document.remove_slide(remove_change.position.get())?;
@@ -3594,6 +3883,9 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
                 for position in start..=end {
                     effects.insert(format!("slide-list/position:{position}"));
                 }
+            },
+            StructuralChange::Visibility(change) => {
+                effects.insert(format!("slide-id:{}/hidden", change.slide_id));
             },
             StructuralChange::Remove(list_change) | StructuralChange::Insert(list_change) => {
                 effects.insert(format!(
@@ -4382,5 +4674,158 @@ mod tests {
         let mut relationships = SlideRelationships::default();
         scan_interactive_atom(&active, &mut relationships).unwrap();
         assert!(relationships.active_action);
+    }
+
+    #[test]
+    fn connector_rules_remap_three_shape_ids_without_changing_record_width() {
+        let mut payload = Vec::new();
+        for value in [1_u32, 0x0401, 0x0402, 0x0403, 7, 9] {
+            payload.extend_from_slice(&value.to_le_bytes());
+        }
+        let mut record = Vec::new();
+        record.extend_from_slice(&1_u16.to_le_bytes());
+        record.extend_from_slice(&0xF012_u16.to_le_bytes());
+        record.extend_from_slice(&24_u32.to_le_bytes());
+        record.extend_from_slice(&payload);
+        let before_len = record.len();
+
+        let mut relationships = SlideRelationships::default();
+        scan_officeart_records(&record, &mut relationships).unwrap();
+        assert_eq!(
+            relationships.connector_shape_ids,
+            BTreeSet::from([0x0401, 0x0402, 0x0403])
+        );
+
+        rewrite_officeart_records(
+            &mut record,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            &BTreeMap::from([(0x0401, 0x0801), (0x0402, 0x0802), (0x0403, 0x0803)]),
+        )
+        .unwrap();
+        assert_eq!(record.len(), before_len);
+        assert_eq!(read_payload_u32(&record[8..], 0).unwrap(), 1);
+        assert_eq!(read_payload_u32(&record[8..], 4).unwrap(), 0x0801);
+        assert_eq!(read_payload_u32(&record[8..], 8).unwrap(), 0x0802);
+        assert_eq!(read_payload_u32(&record[8..], 12).unwrap(), 0x0803);
+        assert_eq!(read_payload_u32(&record[8..], 16).unwrap(), 7);
+        assert_eq!(read_payload_u32(&record[8..], 20).unwrap(), 9);
+
+        assert!(rewrite_connector_rule(&mut payload, &BTreeMap::from([(0x0401, 0x0801)])).is_err());
+    }
+
+    #[test]
+    fn connector_picture_store_and_animation_build_refusals_are_distinct() {
+        let source = Snapshot::from_bytes(fixture("basic_test_ppt_file.ppt")).unwrap();
+        let mut linked_shape_property = Vec::new();
+        linked_shape_property.extend_from_slice(&0x008a_u16.to_le_bytes());
+        linked_shape_property.extend_from_slice(&0x0401_u32.to_le_bytes());
+        assert!(option_has_linked_shape_reference(1, &linked_shape_property).unwrap());
+        linked_shape_property[0..2].copy_from_slice(&0x4001_u16.to_le_bytes());
+        assert!(option_has_blip_reference(1, &linked_shape_property).unwrap());
+
+        let connector = SlideRelationships {
+            connector_shape_ids: BTreeSet::from([0x0401]),
+            ..SlideRelationships::default()
+        };
+        assert!(matches!(
+            drawing_remaps(&source, &connector),
+            Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::ConnectorRule
+            }))
+        ));
+
+        let other_reference = SlideRelationships {
+            unsupported_dependencies: BTreeSet::from([
+                TransferDependency::OtherOfficeArtShapeReference,
+            ]),
+            ..SlideRelationships::default()
+        };
+        assert!(matches!(
+            drawing_remaps(&source, &other_reference),
+            Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::OtherOfficeArtShapeReference
+            }))
+        ));
+
+        let picture = SlideRelationships {
+            unsupported_dependencies: BTreeSet::from([TransferDependency::PictureStore]),
+            ..SlideRelationships::default()
+        };
+        assert!(matches!(
+            drawing_remaps(&source, &picture),
+            Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::PictureStore
+            }))
+        ));
+
+        let animation = SlideRelationships {
+            unsupported_dependencies: BTreeSet::from([TransferDependency::AnimationBuildGraph]),
+            ..SlideRelationships::default()
+        };
+        assert!(matches!(
+            drawing_remaps(&source, &animation),
+            Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::AnimationBuildGraph
+            }))
+        ));
+    }
+
+    #[test]
+    fn slide_visibility_composes_with_order_and_round_trips_durably() {
+        let source = Snapshot::from_bytes(fixture("basic_test_ppt_file.ppt")).unwrap();
+        let original = source.slide_hidden(Position::new(0)).unwrap();
+        let mut edit = source.edit().unwrap();
+        edit.set_slide_hidden(Position::new(0), !original).unwrap();
+        edit.move_slide(Position::new(0), Position::new(1)).unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.patch().slide_visibility_changes().len(), 1);
+        assert_eq!(
+            commit.snapshot().slide_hidden(Position::new(1)).unwrap(),
+            !original
+        );
+        assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
+        assert_eq!(
+            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            source
+        );
+
+        let durable = commit.patch().to_durable(patch_limits()).unwrap();
+        let applied = source.apply_durable(&durable).unwrap();
+        assert_eq!(applied, *commit.snapshot());
+        let visibility_restored = applied.apply_durable(&durable.inverse()).unwrap();
+        assert_eq!(
+            visibility_restored.document.slides(),
+            source.document.slides()
+        );
+        assert_eq!(
+            slide_texts(visibility_restored.bytes()),
+            slide_texts(source.bytes())
+        );
+        let mut reopened = Package::from_reader(Cursor::new(visibility_restored.bytes())).unwrap();
+        assert_eq!(
+            reopened.presentation().unwrap().slide_count(),
+            source.slide_count()
+        );
+
+        let mut left = source.edit().unwrap();
+        left.set_slide_hidden(Position::new(0), !original).unwrap();
+        let left = left.commit().unwrap();
+        let mut right = source.edit().unwrap();
+        right.set_slide_hidden(Position::new(0), !original).unwrap();
+        let right = right.commit().unwrap();
+        let expected_conflict = format!(
+            "slide-id:{}/hidden",
+            left.patch().slide_visibility_changes()[0].slide_id
+        );
+        assert_eq!(
+            source
+                .plan_three_way(left.patch(), right.patch())
+                .unwrap()
+                .conflicts()[0]
+                .target(),
+            expected_conflict
+        );
     }
 }

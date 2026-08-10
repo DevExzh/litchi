@@ -1,7 +1,8 @@
 use litchi_odc::{
     AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, Chart, ChartClass,
-    DataPointSpec, Definition, DefinitionSnapshot, ExactAttribute, ExactTarget, History,
-    LegendSpec, Limits, Patch, SeriesSpec, StyleTarget, Text, chart::Dimension,
+    DataPointSpec, Definition, DefinitionSnapshot, ExactAttribute, ExactTarget, GridSpec, History,
+    LegendSpec, Limits, Patch, SeriesSpec, StyleElement, StyleTarget, Text,
+    chart::{Class, Dimension, Labels},
     validate_range_list,
 };
 use litchi_odf_common::core::{PackageWriter, Profile};
@@ -368,6 +369,207 @@ fn noncanonical_titles_footers_and_legends_have_controlled_exact_edits() -> Test
         changed.patch().inverse().apply(changed.chart())?.as_bytes(),
         source.as_bytes()
     );
+    Ok(())
+}
+
+#[test]
+fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> TestResult<()> {
+    // This vocabulary is exercised by checked-in LibreOffice FODS/FODT chart
+    // fragments. The generated standalone package remains test input and is
+    // not represented as producer-created ODC evidence.
+    let mut authored = definition();
+    authored.plot_area.data_source_labels = Some(Labels::Both);
+    authored.plot_area.axes[0].categories_cell_range_address = Some("Data.A2:.A6".into());
+    authored.plot_area.axes[0].grids.push(GridSpec {
+        class: Class::Major,
+        style_name: Some("grid-old".into()),
+        extensions: Default::default(),
+    });
+    authored.plot_area.wall = Some(StyleElement {
+        style_name: Some("wall-old".into()),
+        ..StyleElement::default()
+    });
+    authored.plot_area.floor = Some(StyleElement {
+        style_name: Some("floor-old".into()),
+        ..StyleElement::default()
+    });
+    authored.legend = Some(LegendSpec {
+        expansion: Some("high".into()),
+        ..LegendSpec::default()
+    });
+    let canonical = litchi_odc::serialize_content(&authored)?;
+    let noncanonical = canonical.replacen(
+        "><office:body>",
+        ">\n<!-- retained embedded-chart layout vocabulary -->\n<office:body>",
+        1,
+    );
+    let source = Chart::from_bytes(raw_negative_package(&noncanonical)?)?;
+    assert!(source.definition().is_err());
+
+    let mut edit = source.edit();
+    edit.update_axis(0, litchi_odc::AxisUpdate::styled("axis-new"))?;
+    edit.update_exact(
+        ExactTarget::PlotArea,
+        ExactAttribute::DataSourceHasLabels,
+        Some("row".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Axis(0),
+        ExactAttribute::Dimension,
+        Some("z".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Categories { axis: 0 },
+        ExactAttribute::CellRangeAddress,
+        Some("Data.B2:.B6".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Grid { axis: 0, index: 0 },
+        ExactAttribute::Class,
+        Some("minor".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Grid { axis: 0, index: 0 },
+        ExactAttribute::StyleName,
+        Some("grid-new".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Legend,
+        ExactAttribute::LegendExpansion,
+        Some("wide".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Wall,
+        ExactAttribute::StyleName,
+        Some("wall-new".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Floor,
+        ExactAttribute::StyleName,
+        Some("floor-new".into()),
+    )?;
+    let changed = edit.commit()?;
+    assert_eq!(changed.patch().changes().len(), 1);
+    assert_eq!(changed.patch().exact_changes().len(), 8);
+    let xml = changed.chart().content_xml();
+    assert!(xml.contains("<!-- retained embedded-chart layout vocabulary -->"));
+    assert!(xml.contains("chart:data-source-has-labels=\"row\""));
+    assert!(xml.contains("chart:dimension=\"z\""));
+    assert!(xml.contains("table:cell-range-address=\"Data.B2:.B6\""));
+    assert!(xml.contains("chart:class=\"minor\" chart:style-name=\"grid-new\""));
+    assert!(xml.contains("style:legend-expansion=\"wide\""));
+    assert!(xml.contains("<chart:wall chart:style-name=\"wall-new\"/>"));
+    assert!(xml.contains("<chart:floor chart:style-name=\"floor-new\"/>"));
+    assert_eq!(
+        changed.patch().inverse().apply(changed.chart())?.as_bytes(),
+        source.as_bytes()
+    );
+
+    let wire = changed.patch().to_bytes();
+    let decoded = Patch::from_bytes(&wire, source.limits())?;
+    assert_eq!(decoded.exact_changes(), changed.patch().exact_changes());
+    assert_eq!(
+        decoded.apply(&source)?.as_bytes(),
+        changed.chart().as_bytes()
+    );
+
+    let mut independent_edit = source.edit();
+    independent_edit.update_exact(
+        ExactTarget::Series(0),
+        ExactAttribute::StyleName,
+        Some("independent-series".into()),
+    )?;
+    let independent = independent_edit.commit()?;
+    let joined = changed.patch().join(independent.patch())?;
+    assert!(joined.is_merged());
+    let joined_chart = joined
+        .patch()
+        .ok_or("missing embedded-vocabulary join patch")?
+        .apply(&source)?;
+    assert!(joined_chart.content_xml().contains("chart:dimension=\"z\""));
+    assert!(
+        joined_chart
+            .content_xml()
+            .contains("chart:style-name=\"independent-series\"")
+    );
+
+    let destination_xml = noncanonical.replacen(
+        "<office:body>",
+        "<!-- independently retained destination -->\n<office:body>",
+        1,
+    );
+    let destination = Chart::from_bytes(raw_negative_package(&destination_xml)?)?;
+    let transfer = changed.patch().transfer_to(&destination)?;
+    assert!(transfer.is_merged());
+    let transferred = transfer
+        .patch()
+        .ok_or("missing embedded-vocabulary transfer patch")?
+        .apply(&destination)?;
+    assert!(
+        transferred
+            .content_xml()
+            .contains("<!-- independently retained destination -->")
+    );
+    assert!(transferred.content_xml().contains("chart:dimension=\"z\""));
+    assert!(
+        transferred
+            .content_xml()
+            .contains("style:legend-expansion=\"wide\"")
+    );
+    Ok(())
+}
+
+#[test]
+fn exact_enum_tokens_and_missing_namespace_insertions_fail_closed() -> TestResult<()> {
+    let mut authored = definition();
+    authored.plot_area.data_source_labels = Some(Labels::Both);
+    authored.legend = Some(LegendSpec {
+        expansion: Some("high".into()),
+        ..LegendSpec::default()
+    });
+    let source = Chart::from_bytes(raw_negative_package(&litchi_odc::serialize_content(
+        &authored,
+    )?)?)?;
+
+    for (target, attribute, value) in [
+        (
+            ExactTarget::PlotArea,
+            ExactAttribute::DataSourceHasLabels,
+            "rows",
+        ),
+        (
+            ExactTarget::Axis(0),
+            ExactAttribute::Dimension,
+            "horizontal",
+        ),
+        (
+            ExactTarget::Legend,
+            ExactAttribute::LegendExpansion,
+            "stretch",
+        ),
+        (
+            ExactTarget::Grid { axis: 0, index: 0 },
+            ExactAttribute::Class,
+            "medium",
+        ),
+    ] {
+        let mut edit = source.edit();
+        assert!(
+            edit.update_exact(target, attribute, Some(value.into()))
+                .is_err()
+        );
+    }
+
+    let mut without_expansion_definition = definition();
+    without_expansion_definition.legend = Some(LegendSpec::default());
+    let without_expansion = Chart::from_definition(without_expansion_definition)?;
+    let mut edit = without_expansion.edit();
+    edit.update_exact(
+        ExactTarget::Legend,
+        ExactAttribute::LegendExpansion,
+        Some("wide".into()),
+    )?;
+    assert!(edit.commit().is_err());
     Ok(())
 }
 

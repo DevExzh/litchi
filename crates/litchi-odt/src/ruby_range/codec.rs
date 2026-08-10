@@ -295,7 +295,7 @@ pub(super) fn collect_ruby_text_node(
     state
         .selected
         .try_reserve(selected_len)
-        .map_err(|_| bad("ruby text range allocation failed"))?;
+        .map_err(|_error| bad("ruby text range allocation failed"))?;
     state.selected.push_str(&text[local_start..local_end]);
     state.xml_end = span.end;
 

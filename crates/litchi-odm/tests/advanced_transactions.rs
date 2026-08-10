@@ -513,16 +513,22 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
         r#"<?xml version="1.0"?><office:document-content "#,
         r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
         r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
         r#"xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" "#,
         r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:scripts>"#,
         r#"<script:event-listener script:event-name="on-load" script:macro-name="Main.Run" xlink:href="vnd.sun.star.script:Main.Run"/>"#,
-        r#"</office:scripts><office:body><office:text><text:p>front</text:p>"#,
-        r#"<text:table-of-content text:name="Contents" xml:id="toc1"/>"#,
+        r#"</office:scripts><office:body><office:text><text:p text:style-name="Standard">front</text:p>"#,
+        r#"<text:table-of-content text:name="Contents" xml:id="toc1">"#,
+        r#"<text:table-of-content-source/><text:index-body><text:p>cached</text:p>"#,
+        r#"</text:index-body></text:table-of-content>"#,
         r#"<text:section text:name="Target"><text:p>target</text:p></text:section>"#,
         r#"<text:section text:name="LocalSource"><text:section-source text:section-name="Target"/>"#,
         r#"</text:section><text:section text:name="Dde"><office:dde-source/></text:section>"#,
         r#"<text:section text:name="Unresolved"><text:section-source text:section-name="Missing"/>"#,
         r#"</text:section>"#,
+        r#"<text:list><text:list-item><text:p>one</text:p></text:list-item></text:list>"#,
+        r#"<table:table><table:table-column/><table:table-row><table:table-cell>"#,
+        r#"<text:p>cell</text:p></table:table-cell></table:table-row></table:table>"#,
         r#"</office:text></office:body></office:document-content>"#,
     );
     let master = master_from_parts(content, STYLES, b"chapter");
@@ -535,6 +541,8 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
             Kind::Section(Position::new(1)),
             Kind::Section(Position::new(2)),
             Kind::Section(Position::new(3)),
+            Kind::List,
+            Kind::Table,
         ]
     );
     let local = &master.section_tree().local_references()[0];
@@ -662,6 +670,103 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     assert!(conflict.conflicts().conflicts().iter().any(
         |conflict| matches!(conflict, Conflict::GeneratedIndex(item) if *item == Position::new(1))
     ));
+
+    let mut body_edit = master.edit_with_policy(policy);
+    body_edit
+        .remove_body_item(Position::new(0))
+        .unwrap()
+        .remove_style(Origin::Styles, "Standard")
+        .unwrap();
+    let body_commit = body_edit.commit().unwrap();
+    let body_changed = body_commit.snapshot();
+    assert_eq!(
+        body_changed.structure().items()[0],
+        Kind::GeneratedIndex(IndexKind::TableOfContents)
+    );
+    assert!(!body_changed.content_xml().contains(">front</text:p>"));
+    assert!(
+        !body_changed
+            .styles()
+            .iter()
+            .any(|style| style.name() == "Standard")
+    );
+    assert_eq!(body_commit.patch().changes().body_items().len(), 1);
+    assert_eq!(
+        body_commit
+            .patch()
+            .inverse()
+            .apply(body_changed)
+            .unwrap()
+            .as_bytes(),
+        master.as_bytes()
+    );
+    assert_eq!(
+        body_commit
+            .patch()
+            .durable()
+            .unwrap()
+            .apply(&master)
+            .unwrap()
+            .as_bytes(),
+        body_changed.as_bytes()
+    );
+    let mut body_history = master.history(HistoryLimits::new(2, u64::MAX));
+    body_history.record(&body_commit).unwrap();
+    assert!(body_history.undo());
+    assert_eq!(body_history.current().as_bytes(), master.as_bytes());
+    assert!(body_history.redo());
+    assert_eq!(body_history.current().as_bytes(), body_changed.as_bytes());
+    let merged_body = body_commit
+        .patch()
+        .merge(index_commit.patch())
+        .unwrap()
+        .apply(&master)
+        .unwrap();
+    assert_eq!(
+        merged_body.structure().generated_indexes()[0].name(),
+        Some("Renamed Contents")
+    );
+    assert_eq!(
+        merged_body.structure().items()[0],
+        Kind::GeneratedIndex(IndexKind::TableOfContents)
+    );
+    let mut removed_index = master.edit_with_policy(policy);
+    removed_index.remove_body_item(Position::new(1)).unwrap();
+    let removed_index = removed_index.commit().unwrap();
+    let index_remove_conflict = removed_index
+        .patch()
+        .plan_three_way(index_commit.patch())
+        .unwrap();
+    assert!(
+        index_remove_conflict.conflicts().conflicts().iter().any(
+            |conflict| matches!(conflict, Conflict::BodyItem(item) if *item == Position::new(1))
+        )
+    );
+
+    let mut container_edit = master.edit_with_policy(policy);
+    container_edit
+        .remove_body_item(Position::new(6))
+        .unwrap()
+        .remove_body_item(Position::new(7))
+        .unwrap();
+    let container_commit = container_edit.commit().unwrap();
+    assert!(
+        !container_commit
+            .snapshot()
+            .structure()
+            .items()
+            .iter()
+            .any(|kind| matches!(kind, Kind::List | Kind::Table))
+    );
+    assert_eq!(
+        container_commit
+            .patch()
+            .inverse()
+            .apply(container_commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        master.as_bytes()
+    );
 
     let no_op = master.edit().commit().unwrap();
     assert_eq!(no_op.snapshot().as_bytes(), master.as_bytes());

@@ -165,9 +165,9 @@ fn scalar_attributes(value: &ScalarValue, include_type: bool) -> Result<String> 
             lexical,
             currency,
         } => {
-            let number = lexical
-                .parse::<f64>()
-                .map_err(|_| Error::InvalidFormat("invalid numeric form property".to_string()))?;
+            let number = lexical.parse::<f64>().map_err(|_error| {
+                Error::InvalidFormat("invalid numeric form property".to_string())
+            })?;
             if !number.is_finite() {
                 return invalid("non-finite numeric form property");
             }
@@ -234,7 +234,7 @@ pub fn insert_form_property_xml(
     owner_index: usize,
     property: &Property,
 ) -> Result<String> {
-    let _ = form_properties(xml)?;
+    form_properties(xml).map(|_| ())?;
     let scan = scan(xml)?;
     let owner = scan.owners.get(owner_index).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -280,7 +280,7 @@ pub fn replace_form_property_xml(
     property_index: usize,
     replacement: &Property,
 ) -> Result<String> {
-    let _ = form_properties(xml)?;
+    form_properties(xml).map(|_| ())?;
     let scan = scan(xml)?;
     let property = scan.properties.get(property_index).ok_or_else(|| {
         Error::InvalidFormat(format!("form property {property_index} is out of bounds"))
@@ -303,7 +303,7 @@ pub fn replace_form_property_xml(
 }
 
 pub fn remove_form_property_xml(xml: &str, property_index: usize) -> Result<String> {
-    let _ = form_properties(xml)?;
+    form_properties(xml).map(|_| ())?;
     let scan = scan(xml)?;
     let property = scan.properties.get(property_index).ok_or_else(|| {
         Error::InvalidFormat(format!("form property {property_index} is out of bounds"))
@@ -391,7 +391,7 @@ fn scan(xml: &str) -> Result<Scan> {
                 let mut property = None;
                 if form
                     && (local == b"form"
-                        || ControlKind::parse(std::str::from_utf8(local).map_err(|_| {
+                        || ControlKind::parse(std::str::from_utf8(local).map_err(|_error| {
                             Error::InvalidFormat("invalid form element name".to_string())
                         })?)
                         .is_some())
@@ -469,7 +469,7 @@ fn scan(xml: &str) -> Result<Scan> {
                 let local = local_name.as_ref();
                 if form
                     && (local == b"form"
-                        || ControlKind::parse(std::str::from_utf8(local).map_err(|_| {
+                        || ControlKind::parse(std::str::from_utf8(local).map_err(|_error| {
                             Error::InvalidFormat("invalid form element name".to_string())
                         })?)
                         .is_some())
@@ -619,7 +619,7 @@ fn validate_list_value(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Re
 fn qname(element: &BytesStart<'_>) -> Result<String> {
     std::str::from_utf8(element.name().as_ref())
         .map(str::to_owned)
-        .map_err(|_| Error::InvalidFormat("invalid form owner QName".to_string()))
+        .map_err(|_error| Error::InvalidFormat("invalid form owner QName".to_string()))
 }
 fn bind_if_needed(xml: &str, fragment: String) -> String {
     let mut fragment = fragment;

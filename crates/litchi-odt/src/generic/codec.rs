@@ -111,7 +111,8 @@ pub(super) fn validate_flat_document(xml: &str, family: Family) -> Result<()> {
     Ok(())
 }
 pub(super) fn decode_xml_part(bytes: Vec<u8>, path: &str) -> Result<String> {
-    String::from_utf8(bytes).map_err(|_| Error::InvalidFormat(format!("invalid UTF-8 in {path}")))
+    String::from_utf8(bytes)
+        .map_err(|_error| Error::InvalidFormat(format!("invalid UTF-8 in {path}")))
 }
 
 pub(super) fn classify_mimetype(mimetype: &str) -> Option<(Family, bool)> {

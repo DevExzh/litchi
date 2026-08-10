@@ -247,7 +247,9 @@ pub use ole_objects::{
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{OutlineProperties, parse_outline_properties};
 pub use package::Package;
-pub use page_margins::{Margins, PageMargin, parse_page_margins};
+pub use page_margins::{
+    Margins, PageMargin, parse_page_margins, replace_page_margins, write_page_margins,
+};
 pub use page_setup::{
     Comments, Copies, Dpi, ErrorMode, FirstPage, Fit, LexicalError, Measure, Order, Orientation,
     Paper, RangeError, RelId, Scale, Setup, Unit, parse_worksheet_page_setup,

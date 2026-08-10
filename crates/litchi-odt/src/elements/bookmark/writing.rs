@@ -292,7 +292,7 @@ fn scan_locations(xml: &str) -> Result<Scan> {
                 let local = local_name.as_ref();
                 if text_element && matches!(local, b"p" | b"h") {
                     let qname = std::str::from_utf8(element.name().as_ref())
-                        .map_err(|_| {
+                        .map_err(|_error| {
                             Error::InvalidFormat("non-UTF-8 bookmark paragraph name".to_string())
                         })?
                         .to_string();

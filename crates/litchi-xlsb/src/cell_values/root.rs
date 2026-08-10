@@ -10,7 +10,9 @@
     clippy::expect_used,
     clippy::float_cmp,
     clippy::let_underscore_must_use,
+    clippy::map_err_ignore,
     clippy::unnecessary_unwrap,
+    clippy::wildcard_enum_match_arm,
     reason = "new workbook transaction code uses checked wire conversions and explicit validation"
 )]
 
@@ -69,6 +71,12 @@ enum Operation {
     AddImage {
         sheet: usize,
         image: ImagePlan,
+    },
+    TransferDrawing {
+        source: Arc<[u8]>,
+        source_sheet: usize,
+        source_anchor: usize,
+        target_sheet: usize,
     },
 }
 
@@ -141,6 +149,7 @@ impl Operation {
                 ..
             } => Selection::Cell(*target_sheet, *target_reference),
             Self::AddImage { sheet, .. } => Selection::Drawing(*sheet),
+            Self::TransferDrawing { target_sheet, .. } => Selection::Drawing(*target_sheet),
         }
     }
 }
@@ -332,6 +341,39 @@ impl WorkbookEdit {
             None => image,
         };
         self.insert_image(target_sheet, image)
+    }
+
+    /// Transfer one ordinary chart, shape, group, or connector graph.
+    ///
+    /// Shape/group bytes and chart resource bytes are retained. Drawing object
+    /// IDs, colliding object names, relationship IDs, and copied part names are
+    /// remapped deterministically against the target. Selecting a connector
+    /// also transfers every shape/group anchor referenced by its endpoints.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed [`super::DrawingTransferRefusal`] for pictures (use
+    /// [`Self::transfer_image`]), foreign/OLE objects, relationship-bearing
+    /// shapes, ambiguous object IDs, unresolved connector endpoints, and chart
+    /// resources that escape the bounded chart-owned package graph.
+    pub fn transfer_drawing_object(
+        &mut self,
+        source: &Workbook,
+        source_sheet: usize,
+        source_anchor: usize,
+        target_sheet: usize,
+    ) -> Result<()> {
+        let source = Arc::from(workbook_bytes(source)?);
+        let operation = Operation::TransferDrawing {
+            source,
+            source_sheet,
+            source_anchor,
+            target_sheet,
+        };
+        let mut candidate = self.operations.clone();
+        candidate.push(operation.clone());
+        let _validated_candidate = replay(&self.before, &candidate)?;
+        self.stage(operation)
     }
 
     fn insert_authored_string(
@@ -676,6 +718,7 @@ impl WorkbookPatch {
                         size.checked_add(image.description.as_ref().map_or(0, String::len))
                     })
                 },
+                Operation::TransferDrawing { source, .. } => 33usize.checked_add(source.len()),
             }
             .ok_or(Error::CapacityOverflow {
                 resource: "workbook history operation bytes",
@@ -860,6 +903,18 @@ fn replay(before: &[u8], operations: &[Operation]) -> Result<Vec<u8>> {
                 *target_reference,
             )?,
             Operation::AddImage { sheet, image } => add_image(&mut workbook, *sheet, image)?,
+            Operation::TransferDrawing {
+                source,
+                source_sheet,
+                source_anchor,
+                target_sheet,
+            } => super::drawing_transfer::transfer(
+                &mut workbook,
+                source,
+                *source_sheet,
+                *source_anchor,
+                *target_sheet,
+            )?,
         }
     }
     validate_all_worksheets(&workbook)?;
@@ -1169,8 +1224,10 @@ fn transfer_cell(
         super::resources::transfer_style(&source.package, &mut package, source_cell.style())?;
     let value = match source_cell.value() {
         Value::SharedStringIndex(index) => {
-            let index = usize::try_from(*index).map_err(|_| {
-                Error::InvalidCellReference("shared-string index does not fit usize".to_string())
+            let index = usize::try_from(*index).map_err(|error| {
+                Error::InvalidCellReference(format!(
+                    "shared-string index does not fit usize: {error}"
+                ))
             })?;
             let string = source.shared_strings().get(index).ok_or_else(|| {
                 Error::InvalidCellReference(format!("source shared-string index {index} is absent"))
@@ -1314,7 +1371,7 @@ fn validate_all_worksheets(workbook: &Workbook) -> Result<()> {
     Ok(())
 }
 
-fn validated_workbook(bytes: &[u8]) -> Result<Workbook> {
+pub(super) fn validated_workbook(bytes: &[u8]) -> Result<Workbook> {
     let workbook = workbook_from_bytes(bytes)?;
     validate_all_worksheets(&workbook)?;
     Ok(workbook)
@@ -1374,6 +1431,19 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             if let Some(description) = &image.description {
                 output.extend_from_slice(description.as_bytes());
             }
+        },
+        Operation::TransferDrawing {
+            source,
+            source_sheet,
+            source_anchor,
+            target_sheet,
+        } => {
+            output.push(4);
+            push_usize(output, source.len())?;
+            push_usize(output, *source_sheet)?;
+            push_usize(output, *source_anchor)?;
+            push_usize(output, *target_sheet)?;
+            output.extend_from_slice(source);
         },
     }
     Ok(())
@@ -1451,6 +1521,19 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             let _validated_image = image.image()?;
             Ok(Operation::AddImage { sheet, image })
         },
+        4 => {
+            let source_len = read_next_usize(data, offset)?;
+            let source_sheet = read_next_usize(data, offset)?;
+            let source_anchor = read_next_usize(data, offset)?;
+            let target_sheet = read_next_usize(data, offset)?;
+            let source = Arc::from(read_slice(data, offset, source_len)?.to_vec());
+            Ok(Operation::TransferDrawing {
+                source,
+                source_sheet,
+                source_anchor,
+                target_sheet,
+            })
+        },
         _ => Err(Error::InvalidFormat(format!(
             "unknown workbook patch operation {tag}"
         ))),
@@ -1522,8 +1605,8 @@ fn validate_limits(limits: TransferLimits) -> Result<()> {
 }
 
 fn push_usize(output: &mut Vec<u8>, value: usize) -> Result<()> {
-    let value = u64::try_from(value).map_err(|_| Error::CapacityOverflow {
-        resource: "workbook patch length",
+    let value = u64::try_from(value).map_err(|error| {
+        Error::InvalidFormat(format!("workbook patch length exceeds u64: {error}"))
     })?;
     output.extend_from_slice(&value.to_le_bytes());
     Ok(())
@@ -1536,12 +1619,10 @@ fn read_usize(data: &[u8], offset: usize) -> Result<usize> {
             expected: offset.saturating_add(8),
             found: data.len(),
         })?;
-    usize::try_from(u64::from_le_bytes(bytes.try_into().map_err(|_| {
-        Error::InvalidFormat("invalid workbook patch length".to_string())
+    usize::try_from(u64::from_le_bytes(bytes.try_into().map_err(|error| {
+        Error::InvalidFormat(format!("invalid workbook patch length: {error}"))
     })?))
-    .map_err(|_| Error::CapacityOverflow {
-        resource: "workbook patch length",
-    })
+    .map_err(|error| Error::InvalidFormat(format!("workbook patch length exceeds usize: {error}")))
 }
 
 fn read_next_usize(data: &[u8], offset: &mut usize) -> Result<usize> {
@@ -1552,22 +1633,22 @@ fn read_next_usize(data: &[u8], offset: &mut usize) -> Result<usize> {
 
 fn read_next_u32(data: &[u8], offset: &mut usize) -> Result<u32> {
     let bytes = read_slice(data, offset, 4)?;
-    Ok(u32::from_le_bytes(bytes.try_into().map_err(|_| {
-        Error::InvalidFormat("invalid workbook patch coordinate".to_string())
+    Ok(u32::from_le_bytes(bytes.try_into().map_err(|error| {
+        Error::InvalidFormat(format!("invalid workbook patch coordinate: {error}"))
     })?))
 }
 
 fn read_next_u64(data: &[u8], offset: &mut usize) -> Result<u64> {
     let bytes = read_slice(data, offset, 8)?;
-    Ok(u64::from_le_bytes(bytes.try_into().map_err(|_| {
-        Error::InvalidFormat("invalid workbook patch u64".to_string())
+    Ok(u64::from_le_bytes(bytes.try_into().map_err(|error| {
+        Error::InvalidFormat(format!("invalid workbook patch u64: {error}"))
     })?))
 }
 
 fn read_next_i64(data: &[u8], offset: &mut usize) -> Result<i64> {
     let bytes = read_slice(data, offset, 8)?;
-    Ok(i64::from_le_bytes(bytes.try_into().map_err(|_| {
-        Error::InvalidFormat("invalid workbook patch i64".to_string())
+    Ok(i64::from_le_bytes(bytes.try_into().map_err(|error| {
+        Error::InvalidFormat(format!("invalid workbook patch i64: {error}"))
     })?))
 }
 

@@ -5,6 +5,8 @@ use crate::{
     active::{ActiveContent, ActiveContentLocation},
     frame::Frame,
     resource::{Edge, Graph, Node, Resource},
+    security::ProtectionInventory,
+    surface::{Surface, SurfaceLocation},
 };
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{
@@ -39,6 +41,9 @@ struct State {
     resources: Vec<Resource>,
     resource_graph: Graph,
     active_content: Vec<ActiveContent>,
+    forms: Vec<Surface>,
+    extensions: Vec<Surface>,
+    protection: ProtectionInventory,
 }
 
 /// An immutable, validated package snapshot.
@@ -54,20 +59,58 @@ impl Snapshot {
         Self::from_package(Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODI")?)
     }
 
+    pub(crate) fn from_bytes_with_password(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_package(Package::from_bytes_with_password(
+            bytes,
+            password,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODI",
+        )?)
+    }
+
     fn from_package(package: Package) -> Result<Self> {
         let content = FlatImage::from_content_xml(package.content_xml().as_bytes().to_vec())?;
         let resources = scan_resources(&package)?;
         let resource_graph = build_resource_graph(&package, &resources)?;
+        let files = package.files()?;
+        let protection = {
+            let archive = package.package().package()?;
+            let signature_members = files
+                .iter()
+                .filter(|path| is_signature_path(path))
+                .cloned()
+                .collect();
+            let encrypted_members = archive
+                .manifest()
+                .paths()
+                .filter(|path| {
+                    archive
+                        .manifest()
+                        .get_entry(path)
+                        .is_some_and(|entry| entry.encryption.is_some())
+                })
+                .map(str::to_owned)
+                .collect();
+            ProtectionInventory::new(signature_members, encrypted_members)
+        };
         let mut active_content = content.active_content().to_vec();
+        let mut forms = content.forms().to_vec();
+        let mut extensions = content.extensions().to_vec();
         if let Some(styles_xml) = package.styles_xml() {
             active_content.extend(crate::active::scan_xml(
                 styles_xml,
                 ActiveContentLocation::StylesXml,
             )?);
+            let styles_surfaces = crate::surface::scan_xml(styles_xml, SurfaceLocation::StylesXml)?;
+            forms.extend(styles_surfaces.forms);
+            extensions.extend(styles_surfaces.extensions);
         }
         active_content.extend(
-            package
-                .files()?
+            files
                 .into_iter()
                 .filter(|path| crate::active::is_package_script_member(path))
                 .map(ActiveContent::package_member),
@@ -77,12 +120,20 @@ impl Snapshot {
                 "ODI active-content inventory exceeds the item limit".into(),
             ));
         }
+        if forms.len() > crate::surface::MAX_ITEMS || extensions.len() > crate::surface::MAX_ITEMS {
+            return Err(Error::InvalidFormat(
+                "ODI surface inventory exceeds the item limit".into(),
+            ));
+        }
         Ok(Self(Arc::new(State {
             package,
             content,
             resources,
             resource_graph,
             active_content,
+            forms,
+            extensions,
+            protection,
         })))
     }
 
@@ -147,6 +198,30 @@ impl Snapshot {
         &self.0.active_content
     }
 
+    pub(crate) fn forms(&self) -> &[Surface] {
+        &self.0.forms
+    }
+
+    pub(crate) fn extensions(&self) -> &[Surface] {
+        &self.0.extensions
+    }
+
+    pub(crate) fn protection(&self) -> &ProtectionInventory {
+        &self.0.protection
+    }
+
+    pub(crate) fn digital_signatures(
+        &self,
+    ) -> Result<litchi_odf_common::signature::DigitalSignatures> {
+        self.0.package.package().digital_signatures()
+    }
+
+    pub(crate) fn verify_document_signatures(
+        &self,
+    ) -> Result<Vec<litchi_odf_common::signature::SignatureVerification>> {
+        self.0.package.package().verify_document_signatures()
+    }
+
     pub(crate) fn resource_bytes(&self, index: usize) -> Result<Option<Vec<u8>>> {
         let resource =
             self.0.resources.get(index).ok_or_else(|| {
@@ -168,12 +243,12 @@ impl Snapshot {
     pub(crate) fn rewrite_capability(&self) -> Result<crate::RewriteCapability> {
         let files = self.files()?;
         let mut blockers = Vec::new();
-        if files.iter().any(|path| is_signature_path(path)) {
+        if self.0.protection.is_signed() {
             blockers.push(crate::RewriteBlocker::Signature);
         }
         let archive = self.0.package.package();
         let inspected = archive.package()?;
-        if inspected.manifest().has_encrypted_entries() {
+        if self.0.protection.is_encrypted() {
             blockers.push(crate::RewriteBlocker::Encryption);
         }
         let mut noncompact_xml = false;
@@ -213,9 +288,14 @@ impl Snapshot {
         replacements: &[ResourceReplacement<'_>],
     ) -> Result<Self> {
         let files = self.files()?;
-        if files.iter().any(|path| is_signature_path(path)) {
+        if self.0.protection.is_signed() {
             return Err(Error::InvalidFormat(
                 "ODI package edits refuse signed packages".to_string(),
+            ));
+        }
+        if self.0.protection.is_encrypted() {
+            return Err(Error::InvalidFormat(
+                "ODI package edits refuse encrypted packages".to_string(),
             ));
         }
         ensure_compact_rewrite_source(self, &files)?;

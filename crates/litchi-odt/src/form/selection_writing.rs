@@ -1183,7 +1183,7 @@ fn parse_bool(v: &str, local: &str) -> Result<bool> {
 fn optional_u64(attrs: &[Attr], ns: &str, local: &str) -> Result<Option<u64>> {
     optional(attrs, ns, local)
         .map(|v| {
-            v.parse::<u64>().map_err(|_| {
+            v.parse::<u64>().map_err(|_error| {
                 Error::InvalidFormat(format!("invalid non-negative integer '{v}' for {local}"))
             })
         })
@@ -1295,7 +1295,7 @@ fn reject_duplicate(
 }
 fn qname(e: &BytesStart<'_>) -> Result<String> {
     String::from_utf8(e.name().as_ref().to_vec())
-        .map_err(|_| Error::InvalidFormat("invalid selection element name".to_string()))
+        .map_err(|_error| Error::InvalidFormat("invalid selection element name".to_string()))
 }
 fn apply(xml: &str, span: Range<usize>, replacement: &str) -> Result<String> {
     let mut out = String::with_capacity(xml.len() - span.len() + replacement.len());

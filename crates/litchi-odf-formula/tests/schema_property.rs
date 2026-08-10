@@ -112,6 +112,9 @@ fn independent_schema_breakers_reject_one_rule_at_a_time() {
         format!(r#"<math xmlns="{NS}"><matrix><matrixrow/></matrix></math>"#),
         format!(r#"<math xmlns="{NS}"><vector/></math>"#),
         format!(
+            r#"<math xmlns="{NS}"><piecewise><piece><cn>1</cn><cn>0</cn></piece></piecewise></math>"#
+        ),
+        format!(
             r#"<math xmlns="{NS}"><matrix><matrixrow><cn>1</cn></matrixrow><matrixrow><cn>2</cn><cn>3</cn></matrixrow></matrix></math>"#
         ),
         format!(

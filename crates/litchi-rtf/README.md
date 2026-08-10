@@ -48,14 +48,15 @@ assert_eq!(
 - Bounded source-checked `Document::edit()` transactions composing disjoint
   UTF-8 body spans, paragraph alignment, character bold ranges, ordinary
   paragraph insertion, table-cell text, header/footer text, comment bodies,
-  and footnote/endnote stories, with atomic commits, reversible durable
-  patches, deterministic sub-edit/three-way composition and commit-coupled
-  bounded history
+  footnote/endnote stories, and inert root shape text frames, with atomic
+  commits, reversible durable patches, deterministic sub-edit/three-way
+  composition and commit-coupled bounded history
 - Checked ordinary-root transfer plans for passive fields, nested table trees
   with inert drawings/breaks/cell fields, style dependency closures,
   picture-bullet lists with remapped shared pictures and overrides, and inert
-  embedded objects with remapped result pictures; opaque target destinations,
-  active links, and unresolved resource collisions fail closed
+  embedded objects with remapped result pictures and root text-frame shapes;
+  opaque target destinations, active links, and unresolved resource collisions
+  fail closed
 - Lazy borrowed `text::Story`, paragraph, inline, and run traversal
 - Sparse-safe `font::Catalog` and checked `color::Palette` resource views
 - Semantic run font/color resolution without numeric table references

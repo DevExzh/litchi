@@ -9,14 +9,17 @@
 //! dimensions expand with structural insertions, and whole-workbook publication
 //! validates style, shared-string, formula, and package dependency closure.
 //! Patches carry deterministic semantic deltas, exact before/after images,
-//! bounded durable transfer, three-way conflict reporting, and undo/redo.
+//! bounded durable transfer (including ordinary drawing graphs), three-way
+//! conflict reporting, and undo/redo.
 
+mod drawing_transfer;
 mod formula_transfer;
 mod resources;
 mod root;
 pub mod workbook;
 mod worksheet;
 
+pub use drawing_transfer::DrawingTransferRefusal;
 pub use root::{
     AuthoredStyle, WorkbookCommit, WorkbookEdit, WorkbookHistory, WorkbookMergeConflict,
     WorkbookMergeOutcome, WorkbookPatch,

@@ -1,6 +1,6 @@
 use super::super::{Collection, Editor};
 use crate::package::Error;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 #[test]
@@ -16,7 +16,7 @@ fn rejects_a_source_above_the_publication_limit_before_parsing() {
 
 #[test]
 fn rejects_a_projected_incremental_stream_above_the_publication_limit() {
-    let mut staged_storage = HashMap::new();
+    let mut staged_storage = BTreeMap::new();
     staged_storage.insert(1, vec![0; 8]);
     let editor = Editor {
         original: Arc::from(vec![0u8; 8]),

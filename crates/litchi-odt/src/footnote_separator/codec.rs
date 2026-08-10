@@ -486,5 +486,5 @@ fn splice(
 fn decode(value: &[u8]) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| make_error("non-UTF-8 footnote-separator name"))
+        .map_err(|_error| make_error("non-UTF-8 footnote-separator name"))
 }

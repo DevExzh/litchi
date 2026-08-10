@@ -81,6 +81,59 @@ impl SecurityPolicy {
     }
 }
 
+/// Explicit cryptographic package lifecycle request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CryptoOperation {
+    /// Cryptographically verify retained document or macro signatures.
+    VerifySignatures,
+    /// Add a new package signature.
+    AddSignature,
+    /// Remove retained signature owners.
+    ClearSignatures,
+    /// Encrypt package entries or change their password.
+    Encrypt,
+    /// Decrypt an editing snapshot in place.
+    DecryptForEditing,
+}
+
+/// Stable reason a crypto lifecycle request is outside the ODP editor boundary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CryptoRefusal {
+    /// No cryptographic signature verifier is connected to this facade.
+    SignatureVerificationUnavailable,
+    /// No signing key/certificate owner is connected to this facade.
+    SignatureAuthoringUnavailable,
+    /// Removing signatures requires an explicit external unsigned-copy workflow.
+    SignatureRemovalUnavailable,
+    /// Package encryption writing and password changes are unavailable.
+    EncryptionAuthoringUnavailable,
+    /// Password opening must occur through the ordinary password-aware read facade.
+    UsePasswordOpening,
+}
+
+/// Typed availability result for one cryptographic lifecycle operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CryptoCapability {
+    /// The requested operation is already satisfied and publication is an exact no-op.
+    AvailableNoOp,
+    /// The operation is explicitly outside this facade for the retained package.
+    Refused(CryptoRefusal),
+}
+
+impl CryptoCapability {
+    /// Borrow the refusal reason, if any.
+    #[must_use]
+    pub const fn refusal(self) -> Option<CryptoRefusal> {
+        match self {
+            Self::AvailableNoOp => None,
+            Self::Refused(reason) => Some(reason),
+        }
+    }
+}
+
 /// An immutable presentation package and its parsed slide projection.
 #[derive(Clone)]
 pub struct Snapshot {
@@ -158,6 +211,46 @@ impl Snapshot {
     pub fn security_policy(&self) -> Result<SecurityPolicy> {
         let package = OwnedPackage::from_shared_bytes(Arc::clone(&self.bytes))?;
         package_security_policy(&package)
+    }
+
+    /// Resolve one crypto lifecycle request without mutating the package.
+    ///
+    /// Signing, signature verification/removal, and encryption writing are
+    /// deliberately final-scoped as typed refusals until a key/certificate and
+    /// cryptographic verification owner is connected to the public ODP facade.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained package cannot be reopened.
+    pub fn crypto_capability(&self, operation: CryptoOperation) -> Result<CryptoCapability> {
+        let policy = self.security_policy()?;
+        Ok(match operation {
+            CryptoOperation::VerifySignatures => {
+                CryptoCapability::Refused(CryptoRefusal::SignatureVerificationUnavailable)
+            },
+            CryptoOperation::AddSignature => {
+                CryptoCapability::Refused(CryptoRefusal::SignatureAuthoringUnavailable)
+            },
+            CryptoOperation::ClearSignatures => match policy {
+                SecurityPolicy::SignedReadOnly | SecurityPolicy::SignedAndEncryptedReadOnly => {
+                    CryptoCapability::Refused(CryptoRefusal::SignatureRemovalUnavailable)
+                },
+                SecurityPolicy::Editable | SecurityPolicy::EncryptedReadOnly => {
+                    CryptoCapability::AvailableNoOp
+                },
+            },
+            CryptoOperation::Encrypt => {
+                CryptoCapability::Refused(CryptoRefusal::EncryptionAuthoringUnavailable)
+            },
+            CryptoOperation::DecryptForEditing => match policy {
+                SecurityPolicy::EncryptedReadOnly | SecurityPolicy::SignedAndEncryptedReadOnly => {
+                    CryptoCapability::Refused(CryptoRefusal::UsePasswordOpening)
+                },
+                SecurityPolicy::Editable | SecurityPolicy::SignedReadOnly => {
+                    CryptoCapability::AvailableNoOp
+                },
+            },
+        })
     }
 
     /// Read arbitrary source-backed story/list, table, and inert form owners.
@@ -1719,7 +1812,8 @@ impl Transaction {
             }
         }
         let reopened = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
-        validate_compact_xml_parts(&reopened)?;
+        let source_package = OwnedPackage::from_shared_bytes(Arc::clone(&self.source.bytes))?;
+        validate_compact_xml_parts(&reopened, &source_package)?;
         self.draft.verify_embedded_media(&reopened)?;
         if let Some(rdf) = &self.rdf
             && crate::rdf::graphs(&reopened)? != rdf.graphs
@@ -3124,7 +3218,7 @@ fn shape_resource(root: &Shape) -> Result<usize> {
     Ok(total)
 }
 
-fn validate_compact_xml_parts(package: &OwnedPackage) -> Result<()> {
+fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> Result<()> {
     let mut part_count = 0usize;
     let mut aggregate_bytes = 0usize;
     for path in package.files()? {
@@ -3134,6 +3228,18 @@ fn validate_compact_xml_parts(package: &OwnedPackage) -> Result<()> {
             continue;
         }
         let payload = package.get_file(&path)?;
+        if source.has_file(&path)?
+            && source
+                .get_file(&path)
+                .is_ok_and(|source_payload| source_payload == payload)
+        {
+            continue;
+        }
+        if let Ok(candidate) = std::str::from_utf8(&payload)
+            && litchi_odf_common::package::xml_splice_publication(source, &path, candidate).is_ok()
+        {
+            continue;
+        }
         part_count = part_count
             .checked_add(1)
             .ok_or_else(|| invalid_error("ODP XML part count overflow"))?;
@@ -3151,17 +3257,21 @@ fn validate_compact_xml_parts(package: &OwnedPackage) -> Result<()> {
             MAX_TEXT_BYTES,
             MAX_PACKAGE_BYTES,
         )
-        .map_err(|source| invalid_error(format!("invalid ODP XML audit limits: {source}")))?;
-        let _report = audit::verify(&payload, limits).map_err(|source| match source {
-            audit::Error::NotCompact(_) => {
-                Error::Unsupported(format!("ODP XML part '{path}' is not compact: {source}"))
-            },
+        .map_err(|config_error| {
+            invalid_error(format!("invalid ODP XML audit limits: {config_error}"))
+        })?;
+        let _report = audit::verify(&payload, limits).map_err(|audit_error| match audit_error {
+            audit::Error::NotCompact(_) => Error::Unsupported(format!(
+                "ODP XML part '{path}' is not compact: {audit_error}"
+            )),
             audit::Error::Limit { .. }
             | audit::Error::Encoding { .. }
             | audit::Error::Malformed { .. }
             | audit::Error::Doctype { .. }
             | audit::Error::Allocation
-            | _ => Error::InvalidFormat(format!("ODP XML part '{path}' failed audit: {source}")),
+            | _ => {
+                Error::InvalidFormat(format!("ODP XML part '{path}' failed audit: {audit_error}"))
+            },
         })?;
     }
     Ok(())

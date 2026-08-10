@@ -23,6 +23,26 @@ const STRING: u16 = 0x0207;
 const LABEL: u16 = 0x0204;
 const RSTRING: u16 = 0x00d6;
 const MUL_BLANK: u16 = 0x00be;
+const MERGED_CELLS: u16 = 0x00e5;
+const HLINK: u16 = 0x01b8;
+const HLINK_TOOLTIP: u16 = 0x0800;
+const MSO_DRAWING: u16 = 0x00ec;
+const OBJ: u16 = 0x005d;
+const SELECTION: u16 = 0x001d;
+
+#[derive(Clone, Copy)]
+pub(super) enum AxisShift {
+    Rows {
+        start: u16,
+        count: u16,
+        insert: bool,
+    },
+    Columns {
+        start: u8,
+        count: u8,
+        insert: bool,
+    },
+}
 
 #[derive(Clone)]
 struct RawRecord {
@@ -127,6 +147,34 @@ pub(super) fn validate_sheet_name(name: &str) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn certify_sst_insertion(
+    source: &super::Snapshot,
+    staged: &[super::ResourceChange],
+    candidate: &super::ResourceChange,
+) -> Result<()> {
+    let mut workbook = Vec::new();
+    workbook
+        .try_reserve_exact(source.inner.workbook_stream.len())
+        .map_err(|_error| Error::Allocation("certifying SST resource insertion"))?;
+    workbook.extend_from_slice(&source.inner.workbook_stream);
+    let mut resources: Vec<_> = staged
+        .iter()
+        .chain(std::iter::once(candidate))
+        .filter(|resource| {
+            matches!(
+                resource,
+                super::ResourceChange::SharedString { insert: true, .. }
+                    | super::ResourceChange::RichSharedString { insert: true, .. }
+            )
+        })
+        .collect();
+    resources.sort_by_key(|resource| super::resource_target(resource));
+    for resource in resources {
+        apply_resource(&mut workbook, resource)?;
+    }
+    Ok(())
+}
+
 fn operation_sheet(change: &StructuralChange) -> usize {
     match change {
         StructuralChange::Cell { sheet, .. }
@@ -136,7 +184,11 @@ fn operation_sheet(change: &StructuralChange) -> usize {
     }
 }
 
-pub(super) fn certify_shift(source: &super::Snapshot, sheet: usize) -> Result<()> {
+pub(super) fn certify_shift(
+    source: &super::Snapshot,
+    sheet: usize,
+    shift: AxisShift,
+) -> Result<()> {
     let workbook = &source.inner.workbook_stream;
     certify_workbook_shift(workbook)?;
     let workbook_index = source
@@ -162,7 +214,7 @@ pub(super) fn certify_shift(source: &super::Snapshot, sheet: usize) -> Result<()
     let worksheet = workbook.get(start..end).ok_or_else(|| {
         Error::InvalidData("worksheet dependency range is outside Workbook".into())
     })?;
-    certify_coordinate_shift(&raw_records(worksheet)?)
+    certify_coordinate_shift(worksheet, &raw_records(worksheet)?, shift)
 }
 
 fn resource_insert(resource: &super::ResourceChange) -> bool {
@@ -212,11 +264,6 @@ fn apply_shared_string_resource(
     insert: bool,
 ) -> Result<()> {
     let globals = workbook_globals(workbook)?;
-    if globals.iter().any(|record| record.kind == EXT_SST) {
-        return Err(Error::UnsafeEdit(
-            "SST resource authoring refuses an existing ExtSST offset cache".into(),
-        ));
-    }
     let sst_index = unique_kind(&globals, super::SST, "SST")?;
     let sst = &globals[sst_index];
     if sst.end - sst.start < 12 {
@@ -232,6 +279,23 @@ fn apply_shared_string_resource(
         family_end = record.end;
         last = record;
     }
+    let ext_sst = globals
+        .iter()
+        .filter(|record| record.kind == EXT_SST)
+        .try_fold(None, |found, record| {
+            if found.is_some() {
+                Err(Error::InvalidData("duplicate ExtSST record".into()))
+            } else {
+                Ok(Some(record.clone()))
+            }
+        })?;
+    if let Some(ext_sst) = &ext_sst
+        && ext_sst.start != family_end
+    {
+        return Err(Error::UnsafeEdit(
+            "ExtSST is not adjacent to its SST record family".into(),
+        ));
+    }
     if insert {
         let records = encode_sst_tail_records(text, formatting_runs)?;
         let total = records
@@ -246,11 +310,34 @@ fn apply_shared_string_resource(
         for record in records {
             bytes.extend_from_slice(&record);
         }
-        replace_range_and_adjust_bounds(workbook, family_end, family_end, &bytes)?;
         let updated = unique
             .checked_add(1)
             .ok_or_else(|| Error::InvalidData("SST unique count overflow".into()))?;
+        let updated_ext_sst = ext_sst
+            .as_ref()
+            .map(|record| {
+                let string_position = family_end
+                    .checked_add(4)
+                    .and_then(|value| u32::try_from(value).ok())
+                    .ok_or_else(|| {
+                        Error::InvalidData("ExtSST string position exceeds u32".into())
+                    })?;
+                update_ext_sst_record(workbook, record, unique, updated, Some(string_position))
+            })
+            .transpose()?;
+        replace_range_and_adjust_bounds(workbook, family_end, family_end, &bytes)?;
         workbook[sst.start + 8..sst.start + 12].copy_from_slice(&updated.to_le_bytes());
+        if let (Some(record), Some(updated_record)) = (&ext_sst, updated_ext_sst) {
+            let start = record
+                .start
+                .checked_add(bytes.len())
+                .ok_or_else(|| Error::InvalidData("shifted ExtSST offset overflow".into()))?;
+            let end = record
+                .end
+                .checked_add(bytes.len())
+                .ok_or_else(|| Error::InvalidData("shifted ExtSST range overflow".into()))?;
+            replace_range_and_adjust_bounds(workbook, start, end, &updated_record)?;
+        }
         return Ok(());
     }
     let expected = encode_sst_tail_records(text, formatting_runs)?;
@@ -280,15 +367,98 @@ fn apply_shared_string_resource(
             "SST inverse resource is still referenced by a LabelSst cell".into(),
         ));
     }
+    let updated_ext_sst = ext_sst
+        .as_ref()
+        .map(|record| update_ext_sst_record(workbook, record, unique, removed_index, None))
+        .transpose()?;
+    let tail_start = tail
+        .first()
+        .ok_or_else(|| Error::InvalidData("SST inverse tail is empty".into()))?
+        .start;
+    let removed_len = last
+        .end
+        .checked_sub(tail_start)
+        .ok_or_else(|| Error::InvalidData("SST inverse tail range is reversed".into()))?;
     workbook[sst.start + 8..sst.start + 12].copy_from_slice(&removed_index.to_le_bytes());
-    replace_range_and_adjust_bounds(
-        workbook,
-        tail.first()
-            .ok_or_else(|| Error::InvalidData("SST inverse tail is empty".into()))?
-            .start,
-        last.end,
-        &[],
-    )
+    replace_range_and_adjust_bounds(workbook, tail_start, last.end, &[])?;
+    if let (Some(record), Some(updated_record)) = (&ext_sst, updated_ext_sst) {
+        let start = record
+            .start
+            .checked_sub(removed_len)
+            .ok_or_else(|| Error::InvalidData("restored ExtSST offset underflow".into()))?;
+        let end = record
+            .end
+            .checked_sub(removed_len)
+            .ok_or_else(|| Error::InvalidData("restored ExtSST range underflow".into()))?;
+        replace_range_and_adjust_bounds(workbook, start, end, &updated_record)?;
+    }
+    Ok(())
+}
+
+fn update_ext_sst_record(
+    workbook: &[u8],
+    record: &RawRecord,
+    current_unique: u32,
+    target_unique: u32,
+    appended_string_position: Option<u32>,
+) -> Result<Vec<u8>> {
+    let payload_start = record
+        .start
+        .checked_add(4)
+        .ok_or_else(|| Error::InvalidData("ExtSST payload offset overflow".into()))?;
+    let payload = workbook
+        .get(payload_start..record.end)
+        .ok_or_else(|| Error::InvalidData("ExtSST payload is truncated".into()))?;
+    let current =
+        crate::shared_string_index::SharedStringIndex::parse_payload(current_unique, payload)?;
+    let target_bucket_size = ext_sst_bucket_size(target_unique)?;
+    if target_bucket_size != current.strings_per_bucket() {
+        return Err(Error::UnsafeEdit(
+            "SST authoring crosses an ExtSST bucket-size boundary".into(),
+        ));
+    }
+    let required = ext_sst_bucket_count(target_unique, target_bucket_size)?;
+    let mut buckets = current.buckets().to_vec();
+    match required.cmp(&buckets.len()) {
+        std::cmp::Ordering::Equal => {},
+        std::cmp::Ordering::Greater if required == buckets.len().saturating_add(1) => {
+            let position = appended_string_position.ok_or_else(|| {
+                Error::InvalidData("ExtSST insertion has no appended string position".into())
+            })?;
+            buckets.push(crate::shared_string_index::SharedStringBucket::try_new(
+                position, 4,
+            )?);
+        },
+        std::cmp::Ordering::Less if buckets.len() == required.saturating_add(1) => {
+            buckets.pop();
+        },
+        _ => {
+            return Err(Error::UnsafeEdit(
+                "SST authoring changes unsupported ExtSST bucket geometry".into(),
+            ));
+        },
+    }
+    crate::shared_string_index::SharedStringIndex::try_new(target_unique, buckets)?
+        .to_record_bytes()
+}
+
+fn ext_sst_bucket_size(unique: u32) -> Result<u16> {
+    let size = (unique / 128 + 1).max(8);
+    u16::try_from(size)
+        .map_err(|_error| Error::InvalidData("ExtSST bucket size exceeds u16".into()))
+}
+
+fn ext_sst_bucket_count(unique: u32, size: u16) -> Result<usize> {
+    if size == 0 {
+        return Err(Error::InvalidData("ExtSST bucket size is zero".into()));
+    }
+    let count = if unique == 0 {
+        0
+    } else {
+        (unique - 1) / u32::from(size) + 1
+    };
+    usize::try_from(count)
+        .map_err(|_error| Error::InvalidData("ExtSST bucket count exceeds usize".into()))
 }
 
 fn encode_sst_tail_records(
@@ -589,7 +759,6 @@ fn certify_workbook_shift(workbook: &[u8]) -> Result<()> {
     // Without a complete token/range rewriter, moving coordinates would make
     // them stale even when the selected worksheet itself has no Formula cell.
     const GLOBAL_OR_CROSS_SHEET_DEPENDENCIES: &[u16] = &[
-        FORMULA,
         TABLE,
         SHARED_FORMULA,
         ARRAY,
@@ -600,11 +769,10 @@ fn certify_workbook_shift(workbook: &[u8]) -> Result<()> {
         0x0879,
         0x087a,
         0x01be,
-        0x01b8,
-        0x00e5,
         0x009e,
     ];
-    if let Some(record) = raw_records(workbook)?
+    let records = raw_records(workbook)?;
+    if let Some(record) = records
         .iter()
         .find(|record| GLOBAL_OR_CROSS_SHEET_DEPENDENCIES.contains(&record.kind))
     {
@@ -612,6 +780,19 @@ fn certify_workbook_shift(workbook: &[u8]) -> Result<()> {
             "row/column movement cannot close workbook dependency record 0x{:04X}",
             record.kind
         )));
+    }
+    for record in records.iter().filter(|record| record.kind == FORMULA) {
+        certify_formula_shift(workbook, record)?;
+    }
+    for record in records.iter().filter(|record| record.kind == HLINK) {
+        let payload_start = record
+            .start
+            .checked_add(4)
+            .ok_or_else(|| Error::InvalidData("HLINK payload offset overflow".into()))?;
+        let payload = workbook
+            .get(payload_start..record.end)
+            .ok_or_else(|| Error::InvalidData("HLINK payload is truncated".into()))?;
+        certify_hyperlink_target(payload)?;
     }
     Ok(())
 }
@@ -651,7 +832,11 @@ fn rebuild_sheet(
         )
     });
     if shifting {
-        certify_coordinate_shift(&records)?;
+        for operation in operations {
+            if let Some(shift) = axis_shift(operation) {
+                certify_coordinate_shift(worksheet, &records, shift)?;
+            }
+        }
     }
 
     let mut rows = collect_rows(worksheet, &records[first_row..=last_dbcell])?;
@@ -782,14 +967,72 @@ fn rebuild_sheet(
     result.extend_from_slice(&between);
     result.extend_from_slice(&new_rows);
     result.extend_from_slice(&worksheet[row_table_end..]);
-    patch_selection_records(&mut result, operations)?;
+    patch_coordinate_dependencies(&mut result, operations)?;
     Ok(result)
+}
+
+fn axis_shift(operation: &StructuralChange) -> Option<AxisShift> {
+    match operation {
+        StructuralChange::Rows {
+            start,
+            count,
+            insert,
+            ..
+        } => Some(AxisShift::Rows {
+            start: *start,
+            count: *count,
+            insert: *insert,
+        }),
+        StructuralChange::Columns {
+            start,
+            count,
+            insert,
+            ..
+        } => Some(AxisShift::Columns {
+            start: *start,
+            count: *count,
+            insert: *insert,
+        }),
+        StructuralChange::Cell { .. } | StructuralChange::RenameSheet { .. } => None,
+    }
+}
+
+fn patch_coordinate_dependencies(
+    worksheet: &mut [u8],
+    operations: &[&StructuralChange],
+) -> Result<()> {
+    patch_selection_records(worksheet, operations)?;
+    let records = raw_records(worksheet)?;
+    for operation in operations {
+        let Some(shift) = axis_shift(operation) else {
+            continue;
+        };
+        for record in &records {
+            let payload_start = record
+                .start
+                .checked_add(4)
+                .ok_or_else(|| Error::InvalidData("coordinate payload offset overflow".into()))?;
+            let payload = worksheet
+                .get_mut(payload_start..record.end)
+                .ok_or_else(|| {
+                    Error::InvalidData("coordinate record payload is truncated".into())
+                })?;
+            match record.kind {
+                MERGED_CELLS => patch_merged_cells(payload, shift)?,
+                HLINK => patch_hyperlink(payload, shift)?,
+                HLINK_TOOLTIP => patch_hyperlink_tooltip(payload, shift)?,
+                MSO_DRAWING => patch_officeart(payload, shift)?,
+                _ => {},
+            }
+        }
+    }
+    Ok(())
 }
 
 fn patch_selection_records(worksheet: &mut [u8], operations: &[&StructuralChange]) -> Result<()> {
     let records = raw_records(worksheet)?;
     for operation in operations {
-        for record in records.iter().filter(|record| record.kind == 0x001d) {
+        for record in records.iter().filter(|record| record.kind == SELECTION) {
             let payload = worksheet
                 .get_mut(record.start + 4..record.end)
                 .ok_or_else(|| Error::InvalidData("SELECTION payload is truncated".into()))?;
@@ -800,6 +1043,13 @@ fn patch_selection_records(worksheet: &mut [u8], operations: &[&StructuralChange
 }
 
 fn patch_selection(payload: &mut [u8], operation: &StructuralChange) -> Result<()> {
+    let Some(shift) = axis_shift(operation) else {
+        return Ok(());
+    };
+    patch_selection_shift(payload, shift)
+}
+
+fn patch_selection_shift(payload: &mut [u8], shift: AxisShift) -> Result<()> {
     if payload.len() < 9 {
         return Err(Error::InvalidData(
             "SELECTION payload is shorter than nine bytes".into(),
@@ -818,41 +1068,38 @@ fn patch_selection(payload: &mut [u8], operation: &StructuralChange) -> Result<(
             "SELECTION range count does not match its payload".into(),
         ));
     }
-    match operation {
-        StructuralChange::Rows {
+    match shift {
+        AxisShift::Rows {
             start,
             count,
             insert,
-            ..
         } => {
             let active = binary::read_u16_le_at(payload, 1)?;
-            let active = shift_axis_point(active, *start, *count, *insert, 65_536)?;
+            let active = shift_axis_point(active, start, count, insert, 65_536)?;
             payload[1..3].copy_from_slice(&active.to_le_bytes());
             for range in payload[9..].chunks_exact_mut(6) {
                 let first = binary::read_u16_le_at(range, 0)?;
                 let last = binary::read_u16_le_at(range, 2)?;
-                let (first, last) = shift_axis_range(first, last, *start, *count, *insert, 65_536)?;
+                let (first, last) = shift_axis_range(first, last, start, count, insert, 65_536)?;
                 range[0..2].copy_from_slice(&first.to_le_bytes());
                 range[2..4].copy_from_slice(&last.to_le_bytes());
             }
         },
-        StructuralChange::Columns {
+        AxisShift::Columns {
             start,
             count,
             insert,
-            ..
         } => {
             let active = binary::read_u16_le_at(payload, 3)?;
-            let active =
-                shift_axis_point(active, u16::from(*start), u16::from(*count), *insert, 256)?;
+            let active = shift_axis_point(active, u16::from(start), u16::from(count), insert, 256)?;
             payload[3..5].copy_from_slice(&active.to_le_bytes());
             for range in payload[9..].chunks_exact_mut(6) {
                 let (first, last) = shift_axis_range(
                     u16::from(range[4]),
                     u16::from(range[5]),
-                    u16::from(*start),
-                    u16::from(*count),
-                    *insert,
+                    u16::from(start),
+                    u16::from(count),
+                    insert,
                     256,
                 )?;
                 range[4] = u8::try_from(first).map_err(|_error| {
@@ -863,7 +1110,6 @@ fn patch_selection(payload: &mut [u8], operation: &StructuralChange) -> Result<(
                 })?;
             }
         },
-        StructuralChange::Cell { .. } | StructuralChange::RenameSheet { .. } => {},
     }
     Ok(())
 }
@@ -878,7 +1124,7 @@ fn shift_axis_point(value: u16, start: u16, count: u16, insert: bool, limit: u32
         } else {
             value
                 .checked_add(count)
-                .ok_or_else(|| Error::InvalidData("SELECTION coordinate shift overflows".into()))?
+                .ok_or_else(|| Error::InvalidData("dependency coordinate shift overflows".into()))?
         }
     } else {
         let end = start.saturating_add(count).min(limit);
@@ -888,16 +1134,18 @@ fn shift_axis_point(value: u16, start: u16, count: u16, insert: bool, limit: u32
         } else if value >= end {
             value - removed
         } else {
-            start.min(limit - 1)
+            return Err(Error::UnsafeEdit(
+                "row/column deletion would erase a dependency coordinate".into(),
+            ));
         }
     };
     if shifted >= limit {
         return Err(Error::UnsafeEdit(
-            "row/column insertion moves a SELECTION coordinate outside BIFF8".into(),
+            "row/column insertion moves a dependency coordinate outside BIFF8".into(),
         ));
     }
     u16::try_from(shifted)
-        .map_err(|_error| Error::InvalidData("SELECTION coordinate exceeds u16".into()))
+        .map_err(|_error| Error::InvalidData("dependency coordinate exceeds u16".into()))
 }
 
 fn shift_axis_range(
@@ -909,7 +1157,7 @@ fn shift_axis_range(
     limit: u32,
 ) -> Result<(u16, u16)> {
     if first > last {
-        return Err(Error::InvalidData("SELECTION range is inverted".into()));
+        return Err(Error::InvalidData("dependency range is inverted".into()));
     }
     if insert && first < start && last >= start {
         let shifted_last = shift_axis_point(last, start, count, true, limit)?;
@@ -918,6 +1166,160 @@ fn shift_axis_range(
     let first = shift_axis_point(first, start, count, insert, limit)?;
     let last = shift_axis_point(last, start, count, insert, limit)?;
     Ok((first.min(last), first.max(last)))
+}
+
+fn patch_merged_cells(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    let count = usize::from(binary::read_u16_le_at(payload, 0)?);
+    let expected = count
+        .checked_mul(8)
+        .and_then(|value| value.checked_add(2))
+        .ok_or_else(|| Error::InvalidData("MergedCells range size overflow".into()))?;
+    if payload.len() != expected {
+        return Err(Error::InvalidData(
+            "MergedCells count does not match its payload".into(),
+        ));
+    }
+    for range in payload[2..].chunks_exact_mut(8) {
+        patch_ref8(range, shift)?;
+    }
+    Ok(())
+}
+
+fn patch_hyperlink(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    let range = payload
+        .get_mut(..8)
+        .ok_or_else(|| Error::InvalidData("HLINK range is truncated".into()))?;
+    patch_ref8(range, shift)
+}
+
+fn patch_hyperlink_tooltip(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    if binary::read_u16_le_at(payload, 0)? != HLINK_TOOLTIP {
+        return Err(Error::InvalidData(
+            "HLinkTooltip internal record type is invalid".into(),
+        ));
+    }
+    let range = payload
+        .get_mut(2..10)
+        .ok_or_else(|| Error::InvalidData("HLinkTooltip range is truncated".into()))?;
+    patch_ref8(range, shift)
+}
+
+fn patch_ref8(range: &mut [u8], shift: AxisShift) -> Result<()> {
+    if range.len() != 8 {
+        return Err(Error::InvalidData("Ref8 payload is not eight bytes".into()));
+    }
+    match shift {
+        AxisShift::Rows {
+            start,
+            count,
+            insert,
+        } => {
+            let first = binary::read_u16_le_at(range, 0)?;
+            let last = binary::read_u16_le_at(range, 2)?;
+            let (first, last) = shift_axis_range(first, last, start, count, insert, 65_536)?;
+            range[0..2].copy_from_slice(&first.to_le_bytes());
+            range[2..4].copy_from_slice(&last.to_le_bytes());
+        },
+        AxisShift::Columns {
+            start,
+            count,
+            insert,
+        } => {
+            let first = binary::read_u16_le_at(range, 4)?;
+            let last = binary::read_u16_le_at(range, 6)?;
+            let (first, last) =
+                shift_axis_range(first, last, u16::from(start), u16::from(count), insert, 256)?;
+            range[4..6].copy_from_slice(&first.to_le_bytes());
+            range[6..8].copy_from_slice(&last.to_le_bytes());
+        },
+    }
+    Ok(())
+}
+
+fn patch_officeart(data: &mut [u8], shift: AxisShift) -> Result<()> {
+    patch_officeart_records(data, shift)
+}
+
+fn patch_officeart_records(data: &mut [u8], shift: AxisShift) -> Result<()> {
+    let mut offset = 0_usize;
+    while offset < data.len() {
+        let header_end = offset
+            .checked_add(8)
+            .ok_or_else(|| Error::InvalidData("OfficeArt header range overflow".into()))?;
+        let header = data
+            .get(offset..header_end)
+            .ok_or_else(|| Error::UnsafeEdit("split OfficeArt records are not shiftable".into()))?;
+        let options = u16::from_le_bytes([header[0], header[1]]);
+        let kind = u16::from_le_bytes([header[2], header[3]]);
+        let length = usize::try_from(u32::from_le_bytes([
+            header[4], header[5], header[6], header[7],
+        ]))
+        .map_err(|_error| Error::InvalidData("OfficeArt length exceeds usize".into()))?;
+        let end = header_end
+            .checked_add(length)
+            .ok_or_else(|| Error::InvalidData("OfficeArt record range overflow".into()))?;
+        let payload = data
+            .get_mut(header_end..end)
+            .ok_or_else(|| Error::UnsafeEdit("split OfficeArt records are not shiftable".into()))?;
+        let version = options & 0x000f;
+        let instance = options >> 4;
+        if kind == 0xf010 {
+            if version != 0 || instance != 0 || payload.len() != 18 {
+                return Err(Error::UnsafeEdit(
+                    "worksheet drawing has a noncanonical ClientAnchor".into(),
+                ));
+            }
+            patch_client_anchor(payload, shift)?;
+        } else if version == 0x000f {
+            patch_officeart_records(payload, shift)?;
+        }
+        offset = end;
+    }
+    Ok(())
+}
+
+fn patch_client_anchor(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    let behavior = binary::read_u16_le_at(payload, 0)?;
+    match behavior {
+        0 => return Ok(()),
+        0b10 => {
+            return Err(Error::UnsafeEdit(
+                "size-only drawing anchors are not reversibly shiftable".into(),
+            ));
+        },
+        0b11 => {},
+        _ => {
+            return Err(Error::InvalidData(
+                "worksheet ClientAnchor has reserved behavior flags".into(),
+            ));
+        },
+    }
+    match shift {
+        AxisShift::Rows {
+            start,
+            count,
+            insert,
+        } => {
+            let first = binary::read_u16_le_at(payload, 6)?;
+            let last = binary::read_u16_le_at(payload, 14)?;
+            let (first, last) = shift_axis_range(first, last, start, count, insert, 65_536)?;
+            payload[6..8].copy_from_slice(&first.to_le_bytes());
+            payload[14..16].copy_from_slice(&last.to_le_bytes());
+        },
+        AxisShift::Columns {
+            start,
+            count,
+            insert,
+        } => {
+            let first = binary::read_u16_le_at(payload, 2)?;
+            let last = binary::read_u16_le_at(payload, 10)?;
+            let (first, last) =
+                shift_axis_range(first, last, u16::from(start), u16::from(count), insert, 256)?;
+            payload[2..4].copy_from_slice(&first.to_le_bytes());
+            payload[10..12].copy_from_slice(&last.to_le_bytes());
+        },
+    }
+    Ok(())
 }
 
 fn collect_rows(worksheet: &[u8], records: &[RawRecord]) -> Result<BTreeMap<u16, RowData>> {
@@ -1586,7 +1988,17 @@ fn shift_columns(
     for data in rows.values_mut() {
         let mut retained = Vec::new();
         for mut record in std::mem::take(&mut data.cell_records) {
-            if record_kind(&record)? == MUL_RK || record_kind(&record)? == MUL_BLANK {
+            let kind = record_kind(&record)?;
+            if matches!(kind, TABLE | SHARED_FORMULA | ARRAY) {
+                return Err(Error::UnsafeEdit(
+                    "column movement of formula ownership records is refused".into(),
+                ));
+            }
+            if !is_cell_record(kind) {
+                retained.push(record);
+                continue;
+            }
+            if kind == MUL_RK || kind == MUL_BLANK {
                 return Err(Error::UnsafeEdit(
                     "column movement across packed cell records is refused".into(),
                 ));
@@ -1621,10 +2033,14 @@ fn patch_row_number(data: &mut RowData, row: u16) -> Result<()> {
         .ok_or_else(|| Error::InvalidData("ROW record is truncated".into()))?
         .copy_from_slice(&row.to_le_bytes());
     for record in &mut data.cell_records {
-        if matches!(record_kind(record)?, TABLE | SHARED_FORMULA | ARRAY) {
+        let kind = record_kind(record)?;
+        if matches!(kind, TABLE | SHARED_FORMULA | ARRAY) {
             return Err(Error::UnsafeEdit(
                 "row movement of formula ownership records is refused".into(),
             ));
+        }
+        if !is_cell_record(kind) {
+            continue;
         }
         record
             .get_mut(4..6)
@@ -1879,23 +2295,21 @@ fn cell_column(record: &[u8]) -> Result<u8> {
         .map_err(|_error| Error::InvalidData("cell column exceeds BIFF8".into()))
 }
 
-fn certify_coordinate_shift(records: &[RawRecord]) -> Result<()> {
+fn certify_coordinate_shift(
+    worksheet: &[u8],
+    records: &[RawRecord],
+    shift: AxisShift,
+) -> Result<()> {
     const DEPENDENT: &[u16] = &[
-        FORMULA,
         TABLE,
         SHARED_FORMULA,
         ARRAY,
-        STRING,
-        0x00e5,
-        0x01b8,
         0x01be,
         0x01b2,
         0x01b0,
         0x0879,
         0x087a,
         0x001c,
-        0x005d,
-        0x00ec,
         0x007d,
         0x009e,
         0x0041,
@@ -1912,7 +2326,114 @@ fn certify_coordinate_shift(records: &[RawRecord]) -> Result<()> {
             record.kind
         )));
     }
+    for record in records {
+        let payload_start = record
+            .start
+            .checked_add(4)
+            .ok_or_else(|| Error::InvalidData("dependency payload offset overflow".into()))?;
+        let payload = worksheet
+            .get(payload_start..record.end)
+            .ok_or_else(|| Error::InvalidData("dependency record payload is truncated".into()))?;
+        match record.kind {
+            FORMULA => certify_formula_shift(worksheet, record)?,
+            SELECTION => certify_mutation(payload, shift, patch_selection_shift)?,
+            MERGED_CELLS => certify_mutation(payload, shift, patch_merged_cells)?,
+            HLINK => certify_mutation(payload, shift, patch_hyperlink)?,
+            HLINK_TOOLTIP => certify_mutation(payload, shift, patch_hyperlink_tooltip)?,
+            MSO_DRAWING => certify_mutation(payload, shift, patch_officeart)?,
+            OBJ => certify_simple_drawing_obj(payload)?,
+            _ => {},
+        }
+    }
     Ok(())
+}
+
+fn certify_hyperlink_target(payload: &[u8]) -> Result<()> {
+    let hyperlink = crate::hyperlinks::parse_hlink_record(payload)?;
+    if hyperlink.location().is_some() {
+        return Err(Error::UnsafeEdit(
+            "row/column movement refuses a hyperlink with an internal location dependency".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn certify_mutation(
+    payload: &[u8],
+    shift: AxisShift,
+    patch: fn(&mut [u8], AxisShift) -> Result<()>,
+) -> Result<()> {
+    let mut candidate = Vec::new();
+    candidate
+        .try_reserve_exact(payload.len())
+        .map_err(|_error| Error::Allocation("certifying coordinate dependency"))?;
+    candidate.extend_from_slice(payload);
+    patch(&mut candidate, shift)
+}
+
+fn certify_formula_shift(workbook: &[u8], record: &RawRecord) -> Result<()> {
+    if record.end.saturating_sub(record.start) < 26 {
+        return Err(Error::InvalidData("Formula record is truncated".into()));
+    }
+    let count_offset = record
+        .start
+        .checked_add(24)
+        .ok_or_else(|| Error::InvalidData("Formula token count offset overflow".into()))?;
+    let count = usize::from(binary::read_u16_le_at(workbook, count_offset)?);
+    let token_start = record
+        .start
+        .checked_add(26)
+        .ok_or_else(|| Error::InvalidData("Formula token offset overflow".into()))?;
+    let token_end = token_start
+        .checked_add(count)
+        .ok_or_else(|| Error::InvalidData("Formula token range overflow".into()))?;
+    if token_end != record.end {
+        return Err(Error::InvalidData(
+            "Formula token count does not match its record".into(),
+        ));
+    }
+    let tokens = workbook
+        .get(token_start..token_end)
+        .ok_or_else(|| Error::InvalidData("Formula tokens are outside Workbook".into()))?;
+    if !crate::formula::formula_is_reference_free(tokens) {
+        return Err(Error::UnsafeEdit(
+            "row/column movement requires a reference-free ordinary Formula".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn certify_simple_drawing_obj(payload: &[u8]) -> Result<()> {
+    let mut offset = 0_usize;
+    let mut subrecord = 0_usize;
+    loop {
+        let kind = binary::read_u16_le_at(payload, offset)?;
+        let length_offset = offset
+            .checked_add(2)
+            .ok_or_else(|| Error::InvalidData("Obj length offset overflow".into()))?;
+        let length = usize::from(binary::read_u16_le_at(payload, length_offset)?);
+        let end = offset
+            .checked_add(4)
+            .and_then(|value| value.checked_add(length))
+            .ok_or_else(|| Error::InvalidData("Obj subrecord range overflow".into()))?;
+        if end > payload.len() {
+            return Err(Error::InvalidData("Obj subrecord is truncated".into()));
+        }
+        match (subrecord, kind, length) {
+            (0, 0x0015, 18) => {},
+            (_, 0x0006, 2) if subrecord == 1 => {},
+            (_, 0, 0) if end == payload.len() => return Ok(()),
+            _ => {
+                return Err(Error::UnsafeEdit(
+                    "row/column movement only supports coordinate-free drawing Obj records".into(),
+                ));
+            },
+        }
+        offset = end;
+        subrecord = subrecord
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidData("Obj subrecord count overflow".into()))?;
+    }
 }
 
 fn replace_range_and_adjust_bounds(
@@ -2153,6 +2674,106 @@ fn is_cell_record(kind: u16) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn raw_record(kind: u16, payload: &[u8]) -> Vec<u8> {
+        let mut record = Vec::new();
+        record.extend_from_slice(&kind.to_le_bytes());
+        record.extend_from_slice(&u16::try_from(payload.len()).unwrap().to_le_bytes());
+        record.extend_from_slice(payload);
+        record
+    }
+
+    #[test]
+    fn ranges_and_move_size_anchors_shift_and_inverse_exactly() {
+        let insert_rows = AxisShift::Rows {
+            start: 3,
+            count: 2,
+            insert: true,
+        };
+        let delete_rows = AxisShift::Rows {
+            start: 3,
+            count: 2,
+            insert: false,
+        };
+        let original_range = [1, 0, 5, 0, 2, 0, 4, 0];
+        let mut range = original_range;
+        patch_ref8(&mut range, insert_rows).unwrap();
+        patch_ref8(&mut range, delete_rows).unwrap();
+        assert_eq!(range, original_range);
+
+        let original_anchor = [3, 0, 2, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0];
+        let mut anchor = original_anchor;
+        patch_client_anchor(&mut anchor, insert_rows).unwrap();
+        patch_client_anchor(&mut anchor, delete_rows).unwrap();
+        assert_eq!(anchor, original_anchor);
+
+        let insert_columns = AxisShift::Columns {
+            start: 3,
+            count: 2,
+            insert: true,
+        };
+        let delete_columns = AxisShift::Columns {
+            start: 3,
+            count: 2,
+            insert: false,
+        };
+        let mut range = original_range;
+        patch_ref8(&mut range, insert_columns).unwrap();
+        patch_ref8(&mut range, delete_columns).unwrap();
+        assert_eq!(range, original_range);
+        let mut anchor = original_anchor;
+        patch_client_anchor(&mut anchor, insert_columns).unwrap();
+        patch_client_anchor(&mut anchor, delete_columns).unwrap();
+        assert_eq!(anchor, original_anchor);
+
+        let destructive = AxisShift::Rows {
+            start: 4,
+            count: 2,
+            insert: false,
+        };
+        let mut destructive_range = original_range;
+        assert!(patch_ref8(&mut destructive_range, destructive).is_err());
+    }
+
+    #[test]
+    fn ext_sst_tail_resource_updates_bucket_and_inverts_exactly() {
+        let mut workbook = raw_record(0x0809, &[0; 12]);
+        let sst_start = workbook.len();
+        let mut sst_payload = Vec::new();
+        sst_payload.extend_from_slice(&8_u32.to_le_bytes());
+        sst_payload.extend_from_slice(&8_u32.to_le_bytes());
+        for _ in 0..8 {
+            sst_payload.extend_from_slice(&[0, 0, 0]);
+        }
+        workbook.extend_from_slice(&raw_record(super::super::SST, &sst_payload));
+        let bucket = crate::shared_string_index::SharedStringBucket::try_new(
+            u32::try_from(sst_start + 12).unwrap(),
+            12,
+        )
+        .unwrap();
+        let ext = crate::shared_string_index::SharedStringIndex::try_new(8, vec![bucket])
+            .unwrap()
+            .to_record_bytes()
+            .unwrap();
+        workbook.extend_from_slice(&ext);
+        workbook.extend_from_slice(&raw_record(0x000a, &[]));
+        let original = workbook.clone();
+
+        apply_shared_string_resource(&mut workbook, "ninth", &[], true).unwrap();
+        let globals = workbook_globals(&workbook).unwrap();
+        let ext = globals
+            .iter()
+            .find(|record| record.kind == EXT_SST)
+            .unwrap();
+        let index = crate::shared_string_index::SharedStringIndex::parse_payload(
+            9,
+            &workbook[ext.start + 4..ext.end],
+        )
+        .unwrap();
+        assert_eq!(index.buckets().len(), 2);
+        apply_shared_string_resource(&mut workbook, "ninth", &[], false).unwrap();
+        assert_eq!(workbook, original);
+    }
 
     #[test]
     fn interior_mulrk_deletion_splits_and_inverse_merges_exactly() {

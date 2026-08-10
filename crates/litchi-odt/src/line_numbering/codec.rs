@@ -236,7 +236,7 @@ fn locate_configuration(xml: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
                     styles_site = Some(StylesSite::Empty(
                         XmlSpan { start, end },
                         std::str::from_utf8(element.name().as_ref())
-                            .map_err(|_| {
+                            .map_err(|_error| {
                                 Error::InvalidFormat("invalid office:styles QName".to_string())
                             })?
                             .to_string(),
@@ -536,7 +536,7 @@ fn parse_nonnegative_integer(value: &str, name: &str) -> Result<u64> {
     }
     value
         .parse::<u64>()
-        .map_err(|_| Error::InvalidFormat(format!("{name} exceeds the u64 range")))
+        .map_err(|_error| Error::InvalidFormat(format!("{name} exceeds the u64 range")))
 }
 
 fn append_separator_text(output: &mut String, value: &str) -> Result<()> {

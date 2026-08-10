@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=Rich Text Format
+input=test-data/office-interop/litchi-changed/relsize-litchi.rtf
+output=test-data/office-interop/libreoffice-resaved/relsize-litchi.rtf
+status=success
+output_sha256=224707aea42c7b38712bc66a76424d3666b52794e2aed010fe64d5adda54f3d9

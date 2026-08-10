@@ -20,7 +20,7 @@ impl Package {
     /// by the package writer.
     pub(crate) fn with_replaced_content_xml(&self, content: String) -> Result<Self> {
         std::str::from_utf8(content.as_bytes())
-            .map_err(|_| Error::InvalidFormat("invalid UTF-8 in content.xml".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("invalid UTF-8 in content.xml".to_string()))?;
 
         let mut writer = crate::core::PackageWriter::new();
         writer.set_mimetype(&self.mimetype)?;
@@ -103,7 +103,7 @@ impl Package {
         // callers never receive a nominally valid package with binary content.
         let content = package.get_file(constants::ODF_CONTENT)?;
         std::str::from_utf8(&content)
-            .map_err(|_| Error::InvalidFormat("invalid UTF-8 in content.xml".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("invalid UTF-8 in content.xml".to_string()))?;
 
         Ok(Self {
             package,

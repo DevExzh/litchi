@@ -115,7 +115,7 @@ impl FromStr for Length {
         validate_decimal(number, value)?;
         let number = number
             .parse::<f64>()
-            .map_err(|_| make_error(format!("invalid hatch distance '{value}'")))?;
+            .map_err(|_error| make_error(format!("invalid hatch distance '{value}'")))?;
         Self::new(number, unit)
     }
 }
@@ -508,7 +508,7 @@ fn validate_text(value: &str, context: &str, empty_allowed: bool) -> Result<()> 
 fn decode_name(value: &[u8], context: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| make_error(format!("invalid UTF-8 in hatch {context} name")))
+        .map_err(|_error| make_error(format!("invalid UTF-8 in hatch {context} name")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

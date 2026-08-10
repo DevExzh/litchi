@@ -74,7 +74,7 @@ impl HyphenationLadder {
         }
         let n = x
             .parse()
-            .map_err(|_| bad("invalid hyphenation ladder count"))?;
+            .map_err(|_error| bad("invalid hyphenation ladder count"))?;
         if !(1..=MAX_COUNT).contains(&n) {
             return Err(bad("hyphenation ladder count out of range"));
         }
@@ -302,7 +302,7 @@ fn properties(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<
     let mut a = attrs(r, v, e)?;
     let num = |x: Option<String>, n: &str| -> Result<Option<u32>> {
         x.map(|x| {
-            let v = x.parse().map_err(|_| bad(format!("invalid {n}")))?;
+            let v = x.parse().map_err(|_error| bad(format!("invalid {n}")))?;
             if v > MAX_COUNT {
                 return Err(bad(format!("{n} out of range")));
             }

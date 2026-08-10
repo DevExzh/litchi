@@ -257,7 +257,9 @@ impl RotationAngle {
         Ok(Self(degrees))
     }
     fn parse(x: &str) -> Result<Self> {
-        let degrees: u16 = x.parse().map_err(|_| bad("invalid style:rotation-angle"))?;
+        let degrees: u16 = x
+            .parse()
+            .map_err(|_error| bad("invalid style:rotation-angle"))?;
         Self::new(degrees)
     }
     pub fn degrees(self) -> u16 {
@@ -799,7 +801,7 @@ fn cell_properties(
         decimal_places: take(&mut attrs, Ns::Style, b"decimal-places")
             .map(|x| {
                 x.parse::<u32>()
-                    .map_err(|_| bad("invalid style:decimal-places"))
+                    .map_err(|_error| bad("invalid style:decimal-places"))
             })
             .transpose()?,
         repeat_content: take(&mut attrs, Ns::Style, b"repeat-content")

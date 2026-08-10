@@ -115,3 +115,46 @@ fn generated_indexes_require_unique_addressable_names() {
     );
     assert!(Master::from_bytes(raw_package(&duplicate)).is_err());
 }
+
+#[test]
+fn common_body_children_are_schema_checked_at_raw_ingress() {
+    let invalid_list = COMPACT_CONTENT.replace(
+        r#"<text:section text:name="A"/>"#,
+        r#"<text:list><text:p>not-an-item</text:p></text:list>"#,
+    );
+    assert!(Master::from_bytes(raw_package(&invalid_list)).is_err());
+    let header_only_list = COMPACT_CONTENT.replace(
+        r#"<text:section text:name="A"/>"#,
+        r#"<text:list><text:list-header><text:p>header</text:p></text:list-header></text:list>"#,
+    );
+    assert!(Master::from_bytes(raw_package(&header_only_list)).is_err());
+
+    let invalid_table = COMPACT_CONTENT
+        .replace(
+            r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0""#,
+            concat!(
+                r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+                r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0""#,
+            ),
+        )
+        .replace(
+            r#"<text:section text:name="A"/>"#,
+            r#"<table:table><text:p>not-a-row</text:p></table:table>"#,
+        );
+    assert!(Master::from_bytes(raw_package(&invalid_table)).is_err());
+    let no_row_table = invalid_table.replace(
+        r#"<table:table><text:p>not-a-row</text:p></table:table>"#,
+        r#"<table:table><table:table-column/></table:table>"#,
+    );
+    assert!(Master::from_bytes(raw_package(&no_row_table)).is_err());
+
+    let invalid_index = COMPACT_CONTENT.replace(
+        r#"<text:section text:name="A"/>"#,
+        concat!(
+            r#"<text:table-of-content text:name="Contents">"#,
+            r#"<text:index-body/><text:table-of-content-source/>"#,
+            r#"</text:table-of-content>"#,
+        ),
+    );
+    assert!(Master::from_bytes(raw_package(&invalid_index)).is_err());
+}

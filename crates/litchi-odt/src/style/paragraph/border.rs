@@ -193,7 +193,7 @@ impl BackgroundTransparency {
         }
         let parsed = number
             .parse::<f64>()
-            .map_err(|_| bad("invalid style:background-transparency"))?;
+            .map_err(|_error| bad("invalid style:background-transparency"))?;
         if !(0.0..=100.0).contains(&parsed) {
             return Err(bad("style:background-transparency is out of range"));
         }

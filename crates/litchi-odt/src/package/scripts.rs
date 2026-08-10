@@ -452,7 +452,7 @@ fn validate_inert_href(href: &str) -> Result<()> {
     if href.starts_with('#') || href.starts_with("//") || uri_scheme(href).is_some() {
         return Ok(());
     }
-    let _ = resolve_package_path(href)?;
+    resolve_package_path(href).map(|_| ())?;
     Ok(())
 }
 
@@ -543,8 +543,9 @@ fn validate_resource(
 }
 
 fn validate_inert_xml(bytes: &[u8], allow_legacy_doctype: bool) -> Result<()> {
-    let _ = std::str::from_utf8(bytes)
-        .map_err(|_| Error::InvalidFormat("script XML is not UTF-8".to_string()))?;
+    std::str::from_utf8(bytes)
+        .map_err(|_error| Error::InvalidFormat("script XML is not UTF-8".to_string()))
+        .map(|_| ())?;
     let mut reader = Reader::from_reader(bytes);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();

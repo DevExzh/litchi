@@ -496,7 +496,7 @@ impl Field {
                         .element
                         .get_attribute("text:page-adjust")
                         .map(|value| {
-                            value.parse::<i64>().map_err(|_| {
+                            value.parse::<i64>().map_err(|_error| {
                                 Error::InvalidFormat(format!(
                                     "invalid text:page-adjust integer '{value}'"
                                 ))
@@ -591,7 +591,7 @@ impl Field {
                         .element
                         .get_attribute("text:page-adjust")
                         .map(|value| {
-                            value.parse::<i64>().map_err(|_| {
+                            value.parse::<i64>().map_err(|_error| {
                                 Error::InvalidFormat(format!(
                                     "invalid page-variable text:page-adjust integer '{value}'"
                                 ))
@@ -864,7 +864,7 @@ impl Field {
 pub(crate) fn validate_xml_schema_date(value: &str) -> Result<()> {
     let core = strip_xml_schema_timezone(value)?;
     validate_xml_schema_date_core(core)
-        .map_err(|_| Error::InvalidFormat(format!("invalid XML Schema date '{value}'")))
+        .map_err(|_error| Error::InvalidFormat(format!("invalid XML Schema date '{value}'")))
 }
 
 pub(crate) fn validate_xml_schema_date_time(value: &str) -> Result<()> {
@@ -991,7 +991,7 @@ fn parse_two_digits(value: Option<&str>, component: &str) -> Result<u8> {
     }
     value
         .parse::<u8>()
-        .map_err(|_| Error::InvalidFormat(format!("invalid XML Schema temporal {component}")))
+        .map_err(|_error| Error::InvalidFormat(format!("invalid XML Schema temporal {component}")))
 }
 
 fn decimal_mod(value: &str, modulus: u16) -> u16 {

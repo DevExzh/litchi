@@ -231,7 +231,8 @@ impl TableRow {
     pub fn repeat_count(&self) -> usize {
         self.element
             .get_int_attribute("table:number-rows-repeated")
-            .map_or(1, |n| n as usize)
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(1)
     }
 
     /// Set the number of times this row should be repeated.
@@ -391,7 +392,8 @@ impl TableCell {
     pub fn colspan(&self) -> usize {
         self.element
             .get_int_attribute("table:number-columns-spanned")
-            .map_or(1, |n| n as usize)
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(1)
     }
 
     /// Set the number of columns this cell spans
@@ -404,7 +406,8 @@ impl TableCell {
     pub fn rowspan(&self) -> usize {
         self.element
             .get_int_attribute("table:number-rows-spanned")
-            .map_or(1, |n| n as usize)
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(1)
     }
 
     /// Set the number of rows this cell spans
@@ -429,7 +432,8 @@ impl TableCell {
     pub fn repeat_count(&self) -> usize {
         self.element
             .get_int_attribute("table:number-columns-repeated")
-            .map_or(1, |n| n as usize)
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(1)
     }
 
     /// Set the number of times this cell should be repeated.
@@ -513,7 +517,8 @@ impl TableColumn {
     pub fn repeated(&self) -> usize {
         self.element
             .get_int_attribute("table:number-columns-repeated")
-            .map_or(1, |n| n as usize)
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(1)
     }
 
     /// Set the number of columns this column definition represents
@@ -649,7 +654,8 @@ impl TableElements {
                         let repeated = cell
                             .element
                             .get_int_attribute("table:number-columns-repeated")
-                            .map_or(1, |n| n as usize);
+                            .and_then(|value| usize::try_from(value).ok())
+                            .unwrap_or(1);
 
                         for _ in 0..repeated {
                             let mut new_cell = TableCell::new();

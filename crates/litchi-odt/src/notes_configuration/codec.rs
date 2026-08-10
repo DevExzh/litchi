@@ -511,7 +511,9 @@ fn locate_configuration(xml: &str, note_class: Class) -> Result<(Option<XmlSpan>
                     styles_site = Some(StylesSite::Empty(
                         XmlSpan { start, end },
                         std::str::from_utf8(element.name().as_ref())
-                            .map_err(|_| Error::InvalidFormat("invalid styles QName".to_string()))?
+                            .map_err(|_error| {
+                                Error::InvalidFormat("invalid styles QName".to_string())
+                            })?
                             .to_string(),
                     ));
                 }
@@ -656,7 +658,7 @@ fn parse_nonnegative_integer(value: &str, name: &str) -> Result<u64> {
     }
     value
         .parse::<u64>()
-        .map_err(|_| Error::InvalidFormat(format!("{name} exceeds the u64 range")))
+        .map_err(|_error| Error::InvalidFormat(format!("{name} exceeds the u64 range")))
 }
 
 fn require_whitespace(value: &str, context: &str) -> Result<()> {

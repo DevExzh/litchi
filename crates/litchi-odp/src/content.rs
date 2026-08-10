@@ -184,6 +184,61 @@ struct ResourceRemap {
     values: Vec<(String, String)>,
 }
 
+/// Namespace-aware selector for one producer or standard XML owner occurrence.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ElementSelector {
+    namespace: String,
+    local_name: String,
+    occurrence: usize,
+}
+
+impl ElementSelector {
+    /// Select one zero-based occurrence by expanded XML name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty/oversized namespace or invalid local name.
+    pub fn new(
+        namespace: impl Into<String>,
+        local_name: impl Into<String>,
+        occurrence: usize,
+    ) -> Result<Self> {
+        let namespace_value = namespace.into();
+        let local_name_value = local_name.into();
+        validate_text(&namespace_value)?;
+        validate_name(local_name_value.clone(), "element local")?;
+        if namespace_value.is_empty()
+            || local_name_value.contains(':')
+            || local_name_value.chars().any(char::is_whitespace)
+        {
+            return invalid("ODP element selector requires an expanded namespace and local name");
+        }
+        Ok(Self {
+            namespace: namespace_value,
+            local_name: local_name_value,
+            occurrence,
+        })
+    }
+
+    /// Expanded namespace URI.
+    #[must_use]
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    /// Element local name.
+    #[must_use]
+    pub fn local_name(&self) -> &str {
+        &self.local_name
+    }
+
+    /// Zero-based occurrence among matching descendants.
+    #[must_use]
+    pub const fn occurrence(&self) -> usize {
+        self.occurrence
+    }
+}
+
 /// Source-backed inventory of rich presentation owners.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Inventory {
@@ -262,6 +317,41 @@ impl TextBoxModel {
         *self = parse_text_box_model(self.page, xml.into())?;
         Ok(())
     }
+
+    /// Replace or remove one namespace-selected story/extension element.
+    ///
+    /// `None` removes the selected owner. A replacement must have the same
+    /// expanded root name, so the edit cannot accidentally change ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing occurrence or invalid replacement fragment.
+    pub fn edit_element(
+        &mut self,
+        selector: &ElementSelector,
+        replacement: Option<&str>,
+    ) -> Result<()> {
+        let edited = edit_selected_element(&self.xml, selector, replacement)?;
+        *self = parse_text_box_model(self.page, edited)?;
+        Ok(())
+    }
+
+    /// Replace one paragraph occurrence with a typed paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing paragraph or invalid authored content.
+    pub fn replace_paragraph(&mut self, occurrence: usize, paragraph: &Paragraph) -> Result<()> {
+        let edited = replace_matching_element(
+            &self.xml,
+            TEXT_NS,
+            &[b"p".as_slice(), b"h".as_slice()],
+            occurrence,
+            &paragraph.xml()?,
+        )?;
+        *self = parse_text_box_model(self.page, edited)?;
+        Ok(())
+    }
 }
 
 /// A source-backed arbitrary presentation table.
@@ -312,6 +402,39 @@ impl TableModel {
     /// Returns an error unless the fragment is a bounded uniquely named table frame.
     pub fn set_xml(&mut self, xml: impl Into<String>) -> Result<()> {
         *self = parse_table_model(self.page, xml.into())?;
+        Ok(())
+    }
+
+    /// Replace or remove one namespace-selected table/extension element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing occurrence or invalid replacement fragment.
+    pub fn edit_element(
+        &mut self,
+        selector: &ElementSelector,
+        replacement: Option<&str>,
+    ) -> Result<()> {
+        let edited = edit_selected_element(&self.xml, selector, replacement)?;
+        *self = parse_table_model(self.page, edited)?;
+        Ok(())
+    }
+
+    /// Replace the story inside one regular table-cell owner while preserving
+    /// its formula, repeat, span, value, style, and producer-extension attributes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing cell or invalid rich text.
+    pub fn replace_cell_story(&mut self, occurrence: usize, story: &RichText) -> Result<()> {
+        let edited = replace_element_content(
+            &self.xml,
+            TABLE_NS,
+            b"table-cell",
+            occurrence,
+            &story.xml()?,
+        )?;
+        *self = parse_table_model(self.page, edited)?;
         Ok(())
     }
 }
@@ -380,6 +503,73 @@ impl FormControlModel {
     ) -> Result<()> {
         *self = parse_form_control_model(self.page, declaration_xml.into(), visual_xml.into())?;
         Ok(())
+    }
+
+    /// Replace or remove one namespace-selected declaration extension owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing occurrence or invalid replacement fragment.
+    pub fn edit_declaration_element(
+        &mut self,
+        selector: &ElementSelector,
+        replacement: Option<&str>,
+    ) -> Result<()> {
+        let declaration = edit_selected_element(&self.declaration_xml, selector, replacement)?;
+        *self = parse_form_control_model(self.page, declaration, self.visual_xml.clone())?;
+        Ok(())
+    }
+
+    /// Replace or remove one namespace-selected visual-control extension owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing occurrence or invalid replacement fragment.
+    pub fn edit_visual_element(
+        &mut self,
+        selector: &ElementSelector,
+        replacement: Option<&str>,
+    ) -> Result<()> {
+        let visual = edit_selected_element(&self.visual_xml, selector, replacement)?;
+        *self = parse_form_control_model(self.page, self.declaration_xml.clone(), visual)?;
+        Ok(())
+    }
+
+    /// Set or remove one root `form:*` attribute without regenerating the control body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid local name/value or malformed declaration.
+    pub fn set_form_attribute(&mut self, local_name: &str, value: Option<&str>) -> Result<()> {
+        validate_name(local_name.to_string(), "form attribute")?;
+        if local_name.contains(':') || local_name.chars().any(char::is_whitespace) {
+            return invalid("ODP form attribute requires a local XML name");
+        }
+        if let Some(attribute_value) = value {
+            validate_text(attribute_value)?;
+        }
+        let declaration =
+            set_root_attribute(&self.declaration_xml, FORM_NS, local_name.as_bytes(), value)?;
+        *self = parse_form_control_model(self.page, declaration, self.visual_xml.clone())?;
+        Ok(())
+    }
+
+    /// Set or remove the common producer-visible label.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid text or malformed declaration XML.
+    pub fn set_label(&mut self, value: Option<&str>) -> Result<()> {
+        self.set_form_attribute("label", value)
+    }
+
+    /// Set or remove the common inert current value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid text or malformed declaration XML.
+    pub fn set_current_value(&mut self, value: Option<&str>) -> Result<()> {
+        self.set_form_attribute("current-value", value)
     }
 }
 
@@ -507,6 +697,33 @@ impl Paragraph {
     pub fn style_name(&self) -> Option<&str> {
         self.style_name.as_deref()
     }
+
+    fn xml(&self) -> Result<String> {
+        let mut output = String::from("<text:p");
+        optional_attribute(&mut output, "text:style-name", self.style_name())?;
+        output.push('>');
+        for run in self.runs() {
+            if let Some(href) = run.href() {
+                output.push_str("<text:a xlink:type=\"simple\" xlink:href=\"");
+                output.push_str(&escape_xml(href));
+                output.push_str("\">");
+            }
+            if let Some(style) = run.style_name() {
+                output.push_str("<text:span text:style-name=\"");
+                output.push_str(&escape_xml(style));
+                output.push_str("\">");
+            }
+            output.push_str(&escape_xml(run.text()));
+            if run.style_name().is_some() {
+                output.push_str("</text:span>");
+            }
+            if run.href().is_some() {
+                output.push_str("</text:a>");
+            }
+        }
+        output.push_str("</text:p>");
+        Ok(output)
+    }
 }
 
 /// Common rich text used by presentation text boxes and table cells.
@@ -550,29 +767,7 @@ impl RichText {
     pub(crate) fn xml(&self) -> Result<String> {
         let mut output = String::new();
         for paragraph in &self.paragraphs {
-            output.push_str("<text:p");
-            optional_attribute(&mut output, "text:style-name", paragraph.style_name())?;
-            output.push('>');
-            for run in paragraph.runs() {
-                if let Some(href) = run.href() {
-                    output.push_str("<text:a xlink:type=\"simple\" xlink:href=\"");
-                    output.push_str(&escape_xml(href));
-                    output.push_str("\">");
-                }
-                if let Some(style) = run.style_name() {
-                    output.push_str("<text:span text:style-name=\"");
-                    output.push_str(&escape_xml(style));
-                    output.push_str("\">");
-                }
-                output.push_str(&escape_xml(run.text()));
-                if run.style_name().is_some() {
-                    output.push_str("</text:span>");
-                }
-                if run.href().is_some() {
-                    output.push_str("</text:a>");
-                }
-            }
-            output.push_str("</text:p>");
+            output.push_str(&paragraph.xml()?);
         }
         Ok(output)
     }
@@ -1092,6 +1287,180 @@ fn count_elements(xml: &str, namespace: &[u8], locals: &[&[u8]]) -> Result<usize
     }
 }
 
+fn edit_selected_element(
+    xml: &str,
+    selector: &ElementSelector,
+    replacement: Option<&str>,
+) -> Result<String> {
+    let namespace = selector.namespace.as_bytes();
+    let local = selector.local_name.as_bytes();
+    let spans = locate_matching_elements(xml, namespace, &[local])?;
+    let selected = spans.get(selector.occurrence).ok_or_else(|| {
+        Error::InvalidFormat("ODP element selector occurrence is out of bounds".into())
+    })?;
+    let replacement_xml = replacement.map_or_else(
+        || Ok::<String, Error>(String::new()),
+        |fragment| {
+            validate_replacement_element(fragment, namespace, &[local])?;
+            Ok(fragment.to_string())
+        },
+    )?;
+    splice(xml, selected.start, selected.end, &replacement_xml)
+}
+
+fn replace_matching_element(
+    xml: &str,
+    namespace: &[u8],
+    locals: &[&[u8]],
+    occurrence: usize,
+    replacement: &str,
+) -> Result<String> {
+    let spans = locate_matching_elements(xml, namespace, locals)?;
+    let selected = spans.get(occurrence).ok_or_else(|| {
+        Error::InvalidFormat("ODP semantic element occurrence is out of bounds".into())
+    })?;
+    splice(xml, selected.start, selected.end, replacement)
+}
+
+fn validate_replacement_element(
+    replacement: &str,
+    namespace: &[u8],
+    locals: &[&[u8]],
+) -> Result<()> {
+    if replacement.is_empty()
+        || replacement.len() > MAX_TEXT_BYTES
+        || replacement.trim() != replacement
+    {
+        return invalid("ODP replacement element must be one bounded compact fragment");
+    }
+    let spans = locate_matching_elements(replacement, namespace, locals)?;
+    if !spans
+        .iter()
+        .any(|span| span.start == 0 && span.end == replacement.len())
+    {
+        return invalid("ODP replacement fragment root does not match the selected owner");
+    }
+    Ok(())
+}
+
+fn locate_matching_elements(xml: &str, namespace: &[u8], locals: &[&[u8]]) -> Result<Vec<Span>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut active = Vec::<(usize, usize, Vec<u8>)>::new();
+    let mut spans = Vec::new();
+    loop {
+        let start = usize::try_from(reader.buffer_position()).map_err(|cause| {
+            Error::InvalidFormat(format!("ODP element position does not fit usize: {cause}"))
+        })?;
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|cause| {
+                Error::InvalidFormat(format!("invalid ODP granular-owner XML: {cause}"))
+            })?;
+        let matches_namespace = resolved_namespace(&resolved) == Some(namespace);
+        drop(resolved);
+        let end = usize::try_from(reader.buffer_position()).map_err(|cause| {
+            Error::InvalidFormat(format!("ODP element position does not fit usize: {cause}"))
+        })?;
+        match event {
+            Event::Start(element) => {
+                if matches_namespace && locals.contains(&element.local_name().as_ref()) {
+                    active.push((depth, start, element.name().as_ref().to_vec()));
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat("ODP XML depth overflow".into()))?;
+                if depth > MAX_XML_DEPTH {
+                    return invalid("ODP granular-owner XML exceeds the depth limit");
+                }
+            },
+            Event::Empty(element)
+                if matches_namespace && locals.contains(&element.local_name().as_ref()) =>
+            {
+                spans.push(Span { start, end });
+            },
+            Event::End(element) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("ODP XML depth underflow".into()))?;
+                if active.last().is_some_and(|(owner_depth, _, qualified)| {
+                    *owner_depth == depth && qualified.as_slice() == element.name().as_ref()
+                }) {
+                    let (_, owner_start, _) = active.pop().ok_or_else(|| {
+                        Error::InvalidFormat("ODP granular-owner scan state disappeared".into())
+                    })?;
+                    spans.push(Span {
+                        start: owner_start,
+                        end,
+                    });
+                }
+            },
+            Event::DocType(_) => return invalid("DTDs are not allowed in ODP granular-owner XML"),
+            Event::Eof => break,
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+    if depth != 0 || !active.is_empty() {
+        return invalid("unterminated ODP granular-owner XML");
+    }
+    spans.sort_unstable_by_key(|span| span.start);
+    Ok(spans)
+}
+
+fn replace_element_content(
+    xml: &str,
+    namespace: &[u8],
+    local: &[u8],
+    occurrence: usize,
+    content: &str,
+) -> Result<String> {
+    let spans = locate_matching_elements(xml, namespace, &[local])?;
+    let selected = spans.get(occurrence).ok_or_else(|| {
+        Error::InvalidFormat("ODP element-content occurrence is out of bounds".into())
+    })?;
+    let fragment = xml
+        .get(selected.start..selected.end)
+        .ok_or_else(|| Error::InvalidFormat("invalid ODP element-content span".into()))?;
+    let opening_end = fragment
+        .find('>')
+        .ok_or_else(|| Error::InvalidFormat("ODP element start tag is incomplete".into()))?;
+    let opening = fragment
+        .get(..=opening_end)
+        .ok_or_else(|| Error::InvalidFormat("invalid ODP element opening span".into()))?;
+    let replacement = if opening.trim_end().ends_with("/>") {
+        let slash = opening
+            .rfind('/')
+            .ok_or_else(|| Error::InvalidFormat("ODP empty element has no closing slash".into()))?;
+        let qualified_end = fragment[1..]
+            .find(|character: char| {
+                character.is_ascii_whitespace() || character == '/' || character == '>'
+            })
+            .map_or(opening_end, |position| position + 1);
+        let qualified = fragment.get(1..qualified_end).ok_or_else(|| {
+            Error::InvalidFormat("invalid ODP element qualified-name span".into())
+        })?;
+        format!("{}>{content}</{qualified}>", &opening[..slash])
+    } else {
+        let closing_start = fragment.rfind("</").ok_or_else(|| {
+            Error::InvalidFormat("ODP non-empty element has no closing tag".into())
+        })?;
+        format!(
+            "{}{content}{}",
+            &fragment[..=opening_end],
+            &fragment[closing_start..]
+        )
+    };
+    splice(xml, selected.start, selected.end, &replacement)
+}
+
 fn first_element_local(xml: &str, namespace: &[u8]) -> Result<Option<String>> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
@@ -1125,6 +1494,172 @@ fn first_element_local(xml: &str, namespace: &[u8]) -> Result<Option<String>> {
         }
         buffer.clear();
     }
+}
+
+fn set_root_attribute(
+    xml: &str,
+    namespace: &[u8],
+    local: &[u8],
+    value: Option<&str>,
+) -> Result<String> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    loop {
+        let event = reader.read_event_into(&mut buffer).map_err(|cause| {
+            Error::InvalidFormat(format!("invalid ODP form-attribute XML: {cause}"))
+        })?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let end = usize::try_from(reader.buffer_position()).map_err(|cause| {
+                    Error::InvalidFormat(format!(
+                        "ODP form-attribute position does not fit usize: {cause}"
+                    ))
+                })?;
+                let mut qualified = None;
+                for raw_attribute in element.attributes() {
+                    let attribute = raw_attribute.map_err(|cause| {
+                        Error::InvalidFormat(format!("invalid ODP form attribute: {cause}"))
+                    })?;
+                    let (resolved, attribute_local) =
+                        reader.resolver().resolve_attribute(attribute.key);
+                    if resolved_namespace(&resolved) == Some(namespace)
+                        && attribute_local.as_ref() == local
+                    {
+                        qualified = Some(attribute.key.as_ref().to_vec());
+                        break;
+                    }
+                }
+                return rewrite_root_attribute_lexeme(xml, end, namespace, local, qualified, value);
+            },
+            Event::DocType(_) => return invalid("DTDs are not allowed in ODP form-attribute XML"),
+            Event::Eof => return invalid("ODP form declaration has no root element"),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+}
+
+fn rewrite_root_attribute_lexeme(
+    xml: &str,
+    root_end: usize,
+    namespace: &[u8],
+    local: &[u8],
+    qualified: Option<Vec<u8>>,
+    value: Option<&str>,
+) -> Result<String> {
+    if let Some(qualified_name) = qualified {
+        let (attribute_start, value_start, value_end, attribute_end) =
+            locate_root_attribute_lexeme(xml, root_end, &qualified_name)?;
+        return value.map_or_else(
+            || splice(xml, attribute_start, attribute_end, ""),
+            |attribute_value| splice(xml, value_start, value_end, &escape_xml(attribute_value)),
+        );
+    }
+    let Some(attribute_value) = value else {
+        return Ok(xml.to_string());
+    };
+    let namespace_uri = std::str::from_utf8(namespace).map_err(|cause| {
+        Error::InvalidFormat(format!("ODP form namespace is not UTF-8: {cause}"))
+    })?;
+    let prefix = namespace_declarations(xml)?
+        .into_iter()
+        .find_map(|(name, uri)| {
+            if uri == namespace_uri {
+                name.strip_prefix("xmlns:").map(str::to_string)
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| Error::InvalidFormat("ODP form namespace has no attribute prefix".into()))?;
+    let local_name = std::str::from_utf8(local).map_err(|cause| {
+        Error::InvalidFormat(format!("ODP form attribute local is not UTF-8: {cause}"))
+    })?;
+    let root = xml
+        .get(..root_end)
+        .ok_or_else(|| Error::InvalidFormat("invalid ODP form root span".into()))?;
+    let closing = root.rfind('>').ok_or_else(|| {
+        Error::InvalidFormat("ODP form root start tag has no closing delimiter".into())
+    })?;
+    let insertion = if root[..closing].trim_end().ends_with('/') {
+        root[..closing]
+            .rfind('/')
+            .ok_or_else(|| Error::InvalidFormat("ODP empty form root lost its slash".into()))?
+    } else {
+        closing
+    };
+    splice(
+        xml,
+        insertion,
+        insertion,
+        &format!(" {prefix}:{local_name}=\"{}\"", escape_xml(attribute_value)),
+    )
+}
+
+fn locate_root_attribute_lexeme(
+    xml: &str,
+    root_end: usize,
+    qualified: &[u8],
+) -> Result<(usize, usize, usize, usize)> {
+    let bytes = xml
+        .as_bytes()
+        .get(..root_end)
+        .ok_or_else(|| Error::InvalidFormat("invalid ODP form root attribute span".into()))?;
+    let mut position = bytes
+        .iter()
+        .position(u8::is_ascii_whitespace)
+        .ok_or_else(|| Error::InvalidFormat("ODP form root has no attributes".into()))?;
+    while position < bytes.len() {
+        let whitespace_start = position;
+        while position < bytes.len() && bytes[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        if position >= bytes.len() || matches!(bytes[position], b'>' | b'/') {
+            break;
+        }
+        let name_start = position;
+        while position < bytes.len()
+            && !bytes[position].is_ascii_whitespace()
+            && bytes[position] != b'='
+        {
+            position += 1;
+        }
+        let name_end = position;
+        while position < bytes.len() && bytes[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        if bytes.get(position) != Some(&b'=') {
+            return invalid("ODP form attribute has no equals delimiter");
+        }
+        position += 1;
+        while position < bytes.len() && bytes[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        let quote = *bytes
+            .get(position)
+            .ok_or_else(|| Error::InvalidFormat("ODP form attribute has no quote".into()))?;
+        if !matches!(quote, b'\'' | b'"') {
+            return invalid("ODP form attribute value is not quoted");
+        }
+        position += 1;
+        let value_start = position;
+        while position < bytes.len() && bytes[position] != quote {
+            position += 1;
+        }
+        let value_end = position;
+        position = position
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("ODP form attribute span overflow".into()))?;
+        if bytes.get(name_start..name_end) == Some(qualified) {
+            return Ok((whitespace_start, value_start, value_end, position));
+        }
+    }
+    invalid("ODP resolved form attribute disappeared from its root start tag")
 }
 
 pub(crate) fn prepare_object_transfer(

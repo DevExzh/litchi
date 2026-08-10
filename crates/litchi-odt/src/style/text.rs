@@ -544,7 +544,7 @@ fn properties(
     let mut seen = HashSet::new();
     for (namespace, local, lexical) in attrs(reader, version, start)? {
         let namespace = namespace.ok_or_else(|| bad("unknown style:text-properties namespace"))?;
-        let local = std::str::from_utf8(&local).map_err(|_| bad("malformed XML name"))?;
+        let local = std::str::from_utf8(&local).map_err(|_error| bad("malformed XML name"))?;
         let kind = TextPropertyKind::from_expanded(namespace, local)
             .ok_or_else(|| bad("unknown style:text-properties attribute or wrong namespace"))?;
         if !seen.insert(kind) {

@@ -117,7 +117,7 @@ pub(crate) fn replace_embedded_chart_content(
     let objects = objects(package, content, styles)?;
     let object = select_chart_object(&objects, index)?;
     // Opening first validates MIME type and the existing chart hierarchy.
-    let _ = open_embedded_chart(package, content, styles, index)?;
+    open_embedded_chart(package, content, styles, index).map(|_| ())?;
     validate_chart_content(chart_content)?;
     match &object.source {
         Source::PackageSubdocument { content_path, .. } => rebuild_package(
@@ -163,7 +163,7 @@ pub(crate) fn remove_embedded_chart(
 ) -> Result<Vec<u8>> {
     let current_objects = objects(package, content, styles)?;
     let object = select_chart_object(&current_objects, index)?;
-    let _ = open_embedded_chart(package, content, styles, index)?;
+    open_embedded_chart(package, content, styles, index).map(|_| ())?;
     let spans = locate_objects(content)?;
     let span = spans
         .get(index)
@@ -270,7 +270,7 @@ pub(crate) fn validate_chart_content(chart_content: &str) -> Result<()> {
     writer.set_mimetype(constants::ODF_CHART)?;
     writer.add_file(constants::ODF_CONTENT, chart_content.as_bytes())?;
     let bytes = writer.finish_to_bytes()?;
-    let _ = Document::from_bytes(bytes)?;
+    Document::from_bytes(bytes).map(|_| ())?;
     Ok(())
 }
 
@@ -747,7 +747,7 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
 }
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("XML position exceeds platform limits".to_string()))
+        .map_err(|_error| Error::InvalidFormat("XML position exceeds platform limits".to_string()))
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))

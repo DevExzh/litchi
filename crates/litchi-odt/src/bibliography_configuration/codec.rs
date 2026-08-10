@@ -671,7 +671,7 @@ fn namespace_uri(result: &ResolveResult<'_>) -> Result<Option<String>> {
 fn decode(value: &[u8], description: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| make_error(format!("invalid UTF-8 {description}")))
+        .map_err(|_error| make_error(format!("invalid UTF-8 {description}")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

@@ -695,13 +695,13 @@ fn scalar(attributes: &[Attribute], inherited: Option<&str>) -> Result<ScalarVal
         "boolean" => ScalarValue::Boolean(
             required(attributes, OFFICE, "boolean-value")?
                 .parse::<bool>()
-                .map_err(|_| err("invalid form boolean property"))?,
+                .map_err(|_error| err("invalid form boolean property"))?,
         ),
         "float" | "percentage" | "currency" => {
             let lexical = required(attributes, OFFICE, "value")?;
             let parsed = lexical
                 .parse::<f64>()
-                .map_err(|_| err("invalid numeric form property"))?;
+                .map_err(|_error| err("invalid numeric form property"))?;
             if !parsed.is_finite() {
                 return Err(err("non-finite numeric form property"));
             }
@@ -745,7 +745,7 @@ fn new_shape(part: Part, scope: Scope, attributes: Vec<Attribute>) -> Result<Sha
             .map(|value| {
                 value
                     .parse::<u32>()
-                    .map_err(|_| err("invalid draw:z-index"))
+                    .map_err(|_error| err("invalid draw:z-index"))
             })
             .transpose()?,
         x: owned(&attributes, SVG, "x"),
@@ -910,7 +910,7 @@ fn bool_attr(attributes: &[Attribute], namespace: &str, local: &str) -> Result<O
         .map(|value| {
             value
                 .parse::<bool>()
-                .map_err(|_| err(format!("invalid boolean form attribute '{local}'")))
+                .map_err(|_error| err(format!("invalid boolean form attribute '{local}'")))
         })
         .transpose()
 }
@@ -979,7 +979,7 @@ fn ns(value: &ResolveResult<'_>) -> Result<Option<String>> {
     match value {
         ResolveResult::Bound(Namespace(value)) => Ok(Some(
             std::str::from_utf8(value)
-                .map_err(|_| err("invalid form namespace URI"))?
+                .map_err(|_error| err("invalid form namespace URI"))?
                 .to_string(),
         )),
         ResolveResult::Unbound => Ok(None),
@@ -990,7 +990,7 @@ fn ns(value: &ResolveResult<'_>) -> Result<Option<String>> {
 fn name(value: &[u8]) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| err("invalid UTF-8 in form XML name"))
+        .map_err(|_error| err("invalid UTF-8 in form XML name"))
 }
 
 fn reference(value: &BytesRef<'_>) -> Result<String> {

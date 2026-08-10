@@ -133,7 +133,7 @@ fn append_line_break_xml(xml: &str, paragraph_index: usize) -> Result<String> {
 fn qualified_name(name: &[u8]) -> Result<String> {
     std::str::from_utf8(name)
         .map(str::to_string)
-        .map_err(|_| bad("ODF paragraph name is not valid UTF-8"))
+        .map_err(|_error| bad("ODF paragraph name is not valid UTF-8"))
 }
 
 fn line_break_fragment(paragraph_name: &str) -> String {

@@ -211,7 +211,7 @@ fn parse_level_common(attrs: &mut Attrs) -> Result<(u16, Option<String>)> {
         .take(Ns::Text, b"level")
         .ok_or_else(|| bad("list level missing text:level"))?
         .parse::<u16>()
-        .map_err(|_| bad("invalid text:level"))?;
+        .map_err(|_error| bad("invalid text:level"))?;
     if !(1..=MAX_LEVEL).contains(&level) {
         return Err(bad("text:level is outside the supported range"));
     }

@@ -13,7 +13,9 @@
     clippy::expect_used,
     clippy::float_cmp,
     clippy::let_underscore_must_use,
+    clippy::map_err_ignore,
     clippy::unnecessary_unwrap,
+    clippy::wildcard_enum_match_arm,
     reason = "DrawingML authoring uses checked object IDs, offsets, sizes, and relationship identities"
 )]
 
@@ -189,6 +191,58 @@ pub(crate) fn append_image_anchor(
     Ok(output)
 }
 
+/// Append already validated, self-contained top-level anchors while retaining
+/// every byte of the existing drawing part.
+pub(crate) fn append_drawing_anchors(source: &[u8], anchors: &[Vec<u8>]) -> Result<Vec<u8>> {
+    let before = crate::package::drawing::parse_drawing_part(source)?;
+    let root_end = drawing_root_end(source)?;
+    let added = anchors.iter().try_fold(0usize, |total, anchor| {
+        total
+            .checked_add(anchor.len())
+            .ok_or(Error::CapacityOverflow {
+                resource: "appended drawing anchor bytes",
+            })
+    })?;
+    let output_len = source
+        .len()
+        .checked_add(added)
+        .ok_or(Error::CapacityOverflow {
+            resource: "appended drawing bytes",
+        })?;
+    ensure_drawing_size(output_len)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "appended drawing bytes",
+            source,
+        })?;
+    output.extend_from_slice(&source[..root_end]);
+    for anchor in anchors {
+        output.extend_from_slice(anchor);
+    }
+    output.extend_from_slice(&source[root_end..]);
+    let after = crate::package::drawing::parse_drawing_part(&output)?;
+    let expected =
+        before
+            .anchors
+            .len()
+            .checked_add(anchors.len())
+            .ok_or(Error::CapacityOverflow {
+                resource: "appended drawing anchor count",
+            })?;
+    if after.anchors.len() != expected {
+        return Err(Error::InvalidFormat(
+            "appended drawing anchors failed inventory readback".to_string(),
+        ));
+    }
+    let xml = std::str::from_utf8(&output)
+        .map_err(|error| Error::Encoding(format!("drawing XML is not UTF-8: {error}")))?;
+    crate::shapes::read(xml)?
+        .ok_or_else(|| Error::Encoding("appended drawing lacks an xdr:wsDr root".to_string()))?;
+    Ok(output)
+}
+
 pub(crate) fn next_drawing_object_id(source: &[u8]) -> Result<u32> {
     let _inventory = crate::package::drawing::parse_drawing_part(source)?;
     let mut reader = quick_xml::Reader::from_reader(source);
@@ -231,8 +285,9 @@ fn drawing_root_end(source: &[u8]) -> Result<usize> {
     let mut reader = quick_xml::Reader::from_reader(source);
     let mut depth = 0usize;
     loop {
-        let position = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Encoding("drawing XML position exceeds usize".to_string()))?;
+        let position = usize::try_from(reader.buffer_position()).map_err(|error| {
+            Error::Encoding(format!("drawing XML position exceeds usize: {error}"))
+        })?;
         match reader
             .read_event()
             .map_err(|error| Error::Encoding(format!("invalid drawing XML: {error}")))?

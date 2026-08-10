@@ -125,9 +125,28 @@ pub fn content_splice_publication(
     source: &OwnedPackage,
     candidate: &str,
 ) -> Result<XmlSplicePublication> {
-    let source_part = XmlSourcePart::load(source, constants::ODF_CONTENT)?;
+    xml_splice_publication(source, constants::ODF_CONTENT, candidate)
+}
+
+/// Derive one audited, provenance-bearing splice publication for an XML part.
+///
+/// Exact source bytes produce a zero-edit publication. A changed candidate
+/// must differ by one safely aligned, compact authored fragment; all bytes
+/// outside that fragment retain their source-package provenance.
+///
+/// # Errors
+///
+/// Returns an error when the source part is unavailable, the change is not a
+/// single safely aligned splice, or the replacement fragment is not compact
+/// authored XML.
+pub fn xml_splice_publication(
+    source: &OwnedPackage,
+    path: &str,
+    candidate: &str,
+) -> Result<XmlSplicePublication> {
+    let source_part = XmlSourcePart::load(source, path)?;
     let source_xml = std::str::from_utf8(source_part.bytes()).map_err(|error| {
-        Error::InvalidFormat(format!("invalid UTF-8 in source content.xml: {error}"))
+        Error::InvalidFormat(format!("invalid UTF-8 in source {path}: {error}"))
     })?;
     let source_bytes = source_xml.as_bytes();
     let candidate_bytes = candidate.as_bytes();

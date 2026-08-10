@@ -371,11 +371,12 @@ impl Transaction {
         let scene = crate::shape::Scene::read(owner.blob())?;
         let _shape = scene.shape(key)?;
         let span = crate::tag::shape::selected_raw_span(owner.blob(), key)?;
-        let removed_relationships = shape_relationship_ids(&owner.blob()[span.clone()])?;
+        let removed_relationships =
+            shape_relationship_ids(&owner.blob()[span.clone()], owner.rels())?;
         let mut xml = Vec::with_capacity(owner.blob().len().saturating_sub(span.len()));
         xml.extend_from_slice(&owner.blob()[..span.start]);
         xml.extend_from_slice(&owner.blob()[span.end..]);
-        let retained_relationships = shape_relationship_ids(&xml)?;
+        let retained_relationships = shape_relationship_ids(&xml, owner.rels())?;
         let mut candidate = self.working.clone();
         let mut dependency_roots = Vec::new();
         {
@@ -472,7 +473,7 @@ impl Transaction {
                 crate::shape::Key::Index(root.common().index()),
             )?;
             let fragment = &source_owner.blob()[span.clone()];
-            relationship_ids.extend(shape_relationship_ids(fragment)?);
+            relationship_ids.extend(shape_relationship_ids(fragment, source_owner.rels())?);
             for connected_id in super::xml::connector_connection_ids(fragment)? {
                 let endpoint_root = root_by_shape_id.get(&connected_id).copied().ok_or_else(|| {
                     shape_transfer_refusal(
@@ -1368,6 +1369,13 @@ fn collect_transfer_shape_ids(
                     .unwrap_or("without a source name")
             ),
         )),
+        crate::shape::Shape::Frame(value) => Err(shape_transfer_refusal(
+            crate::ShapeTransferRefusal::UnclassifiedGraphicFrame,
+            format!(
+                "graphic frame {} has no recognized table, chart, diagram, or OLE payload",
+                value.common().name().unwrap_or("without a name")
+            ),
+        )),
         crate::shape::Shape::Group(group) => {
             insert_transfer_shape_id(shape, identities)?;
             for child in group.shapes() {
@@ -1614,8 +1622,11 @@ fn picture_fragment(
     )
 }
 
-fn shape_relationship_ids(fragment: &[u8]) -> Result<BTreeSet<String>> {
-    let mut reader = quick_xml::Reader::from_reader(fragment);
+fn shape_relationship_ids(
+    fragment: &[u8],
+    owner_relationships: &litchi_opc::Relationships,
+) -> Result<BTreeSet<String>> {
+    let mut reader = quick_xml::reader::NsReader::from_reader(fragment);
     reader.config_mut().trim_text(false);
     let mut relationships = BTreeSet::new();
     loop {
@@ -1627,7 +1638,7 @@ fn shape_relationship_ids(fragment: &[u8]) -> Result<BTreeSet<String>> {
                 for attribute in element.attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let key = attribute.key.as_ref();
-                    if !key.starts_with(b"r:") || !matches!(&key[2..], b"id" | b"embed" | b"link") {
+                    if key == b"xmlns" || key.starts_with(b"xmlns:") {
                         continue;
                     }
                     let value = attribute
@@ -1636,7 +1647,22 @@ fn shape_relationship_ids(fragment: &[u8]) -> Result<BTreeSet<String>> {
                             reader.decoder(),
                         )
                         .map_err(|error| Error::Xml(error.to_string()))?;
-                    relationships.insert(value.into_owned());
+                    let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
+                    let is_relationship_namespace = matches!(
+                        &namespace,
+                        quick_xml::name::ResolveResult::Bound(quick_xml::name::Namespace(value))
+                            if *value == litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE
+                                || *value == litchi_ooxml_common::relationships::STRICT_NAMESPACE
+                    );
+                    let is_inherited_relationship_alias = matches!(
+                        &namespace,
+                        quick_xml::name::ResolveResult::Unknown(prefix)
+                            if prefix.as_slice() == b"r"
+                                || owner_relationships.get(value.as_ref()).is_some()
+                    );
+                    if is_relationship_namespace || is_inherited_relationship_alias {
+                        relationships.insert(value.into_owned());
+                    }
                 }
             },
             quick_xml::events::Event::DocType(_) => {

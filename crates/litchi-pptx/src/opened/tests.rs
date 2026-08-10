@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use litchi_opc::{BlobPart, PackURI};
+use litchi_opc::{BlobPart, PackURI, TargetMode};
 
 use super::{History, Limits, Patch, Resolution};
 use crate::{Error, Package, Result};
@@ -61,17 +61,83 @@ fn add_group_connector_transfer_fixture(package: &mut Package) -> Result<()> {
         "image/png".into(),
         vec![137, 80, 78, 71, 9, 8, 7, 6],
     )))?;
+    let diagram_parts = [
+        (
+            "/ppt/diagrams/data1.xml",
+            litchi_opc::constants::content_type::DML_DIAGRAM_DATA,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
+            "rIdDiagramData",
+        ),
+        (
+            "/ppt/diagrams/layout1.xml",
+            litchi_opc::constants::content_type::DML_DIAGRAM_LAYOUT,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
+            "rIdDiagramLayout",
+        ),
+        (
+            "/ppt/diagrams/quickStyle1.xml",
+            litchi_opc::constants::content_type::DML_DIAGRAM_STYLE,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
+            "rIdDiagramStyle",
+        ),
+        (
+            "/ppt/diagrams/colors1.xml",
+            litchi_opc::constants::content_type::DML_DIAGRAM_COLORS,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
+            "rIdDiagramColors",
+        ),
+    ];
+    for (part_name, content_type, _, _) in diagram_parts {
+        package.opc.try_add_part(Box::new(BlobPart::new(
+            PackURI::new(part_name).map_err(Error::Invalid)?,
+            content_type.into(),
+            format!(r#"<dgm:test xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" name="{part_name}"/>"#).into_bytes(),
+        )))?;
+    }
+    let ole_name =
+        PackURI::new("/ppt/embeddings/oleObject-transfer.bin").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        ole_name.clone(),
+        litchi_opc::constants::content_type::OFC_OLE_OBJECT.into(),
+        vec![0xD0, 0xCF, 0x11, 0xE0, 1, 2, 3, 4],
+    )))?;
     let target = image_name.relative_ref(slide.base_uri());
     let relationship_id = package
         .opc
         .get_part_mut(&slide)?
         .relate_to(&target, litchi_opc::constants::relationship_type::IMAGE);
+    for (part_name, _, relationship_type, relationship_id) in diagram_parts {
+        let part_name = PackURI::new(part_name).map_err(Error::Invalid)?;
+        package
+            .opc
+            .get_part_mut(&slide)?
+            .rels_mut()
+            .try_add_relationship(
+                relationship_type.into(),
+                part_name.relative_ref(slide.base_uri()),
+                relationship_id.into(),
+                TargetMode::Internal,
+            )?;
+    }
+    package
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::OLE_OBJECT.into(),
+            ole_name.relative_ref(slide.base_uri()),
+            "rIdOleTransfer".into(),
+            TargetMode::Internal,
+        )?;
     let fragment = format!(
         r#"<p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:nvGrpSpPr><p:cNvPr id="20" name="Transfer group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/><a:chOff x="0" y="0"/><a:chExt cx="2000000" cy="1000000"/></a:xfrm></p:grpSpPr><p:pic><p:nvPicPr><p:cNvPr id="21" name="Group picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{relationship_id}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="900000" cy="900000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic><p:sp><p:nvSpPr><p:cNvPr id="22" name="Group target"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="1100000" y="0"/><a:ext cx="900000" cy="900000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp><p:cxnSp><p:nvCxnSpPr><p:cNvPr id="23" name="Group connector"/><p:cNvCxnSpPr><a:stCxn id="21" idx="0"/><a:endCxn id="22" idx="0"/></p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm><a:off x="900000" y="450000"/><a:ext cx="200000" cy="0"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp></p:grpSp>"#
     );
     let free_connector = r#"<p:cxnSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:nvCxnSpPr><p:cNvPr id="24" name="Free connector"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="100000" cy="100000"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp>"#;
     let external_connector = r#"<p:cxnSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:nvCxnSpPr><p:cNvPr id="25" name="External connector"/><p:cNvCxnSpPr><a:stCxn id="20" idx="0"/><a:endCxn id="22" idx="0"/></p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr><p:spPr><a:prstGeom prst="line"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp>"#;
     let unresolved_connector = r#"<p:cxnSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:nvCxnSpPr><p:cNvPr id="26" name="Unresolved connector"/><p:cNvCxnSpPr><a:stCxn id="999" idx="0"/></p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr><p:spPr><a:prstGeom prst="line"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp>"#;
+    let diagram = r#"<p:graphicFrame xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:nvGraphicFramePr><p:cNvPr id="27" name="Dependency diagram"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="0" y="0"/><a:ext cx="1000000" cy="1000000"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram"><dgm:relIds rel:dm="rIdDiagramData" rel:lo="rIdDiagramLayout" rel:qs="rIdDiagramStyle" rel:cs="rIdDiagramColors"/></a:graphicData></a:graphic></p:graphicFrame>"#;
+    let opaque_frame = r#"<p:graphicFrame xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:x="urn:opaque"><p:nvGraphicFramePr><p:cNvPr id="28" name="Opaque frame"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="0" y="0"/><a:ext cx="100000" cy="100000"/></p:xfrm><a:graphic><a:graphicData uri="urn:opaque"><x:payload/></a:graphicData></a:graphic></p:graphicFrame>"#;
+    let ole = r#"<p:graphicFrame xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:producer"><p:nvGraphicFramePr><p:cNvPr id="29" name="Inert OLE transfer"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="0" y="0"/><a:ext cx="100000" cy="100000"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole"><p:oleObj name="Inert" progId="Opaque.App" r:id="rIdOleTransfer" x:provenance="rIdOleTransfer"><p:embed/></p:oleObj></a:graphicData></a:graphic></p:graphicFrame>"#;
     let content_part =
         r#"<p:contentPart xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
     let unknown = r#"<p14:sp xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><p14:nvSpPr><p14:cNvPr id="30" name="Opaque extension shape"/></p14:nvSpPr></p14:sp>"#;
@@ -80,6 +146,9 @@ fn add_group_connector_transfer_fixture(package: &mut Package) -> Result<()> {
     let xml = super::xml::append_shape(&xml, free_connector.as_bytes())?;
     let xml = super::xml::append_shape(&xml, external_connector.as_bytes())?;
     let xml = super::xml::append_shape(&xml, unresolved_connector.as_bytes())?;
+    let xml = super::xml::append_shape(&xml, diagram.as_bytes())?;
+    let xml = super::xml::append_shape(&xml, opaque_frame.as_bytes())?;
+    let xml = super::xml::append_shape(&xml, ole.as_bytes())?;
     let xml = super::xml::append_shape(&xml, content_part.as_bytes())?;
     let xml = super::xml::append_shape(&xml, unknown.as_bytes())?;
     package.opc.get_part_mut(&slide)?.set_blob(xml);
@@ -880,6 +949,23 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
 #[test]
 fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result<()> {
     let mut source_package = opened_two_slide_package()?;
+    let authored_source = source_package.opened_presentation()?;
+    let mut authored_shapes = authored_source.edit();
+    let table_id = authored_shapes.add_table(
+        0_usize,
+        &[vec!["Transfer".into(), "Table".into()]],
+        (0, 0, 1_000_000, 500_000),
+    )?;
+    let chart = crate::chart::Chart::new(crate::chart::Type::Column, 0, 0, 1_000_000, 1_000_000)
+        .with_title("Transfer chart")
+        .add_series(
+            crate::chart::Series::new("Series")
+                .with_categories(vec!["A".into()])
+                .with_values(vec![1.0]),
+        );
+    let _chart_relationship_id = authored_shapes.add_chart(0_usize, &chart)?;
+    let authored_patch = authored_shapes.commit()?.into_patch();
+    source_package.apply_opened_presentation_patch(&authored_patch)?;
     add_group_connector_transfer_fixture(&mut source_package)?;
     let source_package = Package::from_bytes(&source_package.to_bytes()?)?;
     let source_root = source_package.opened_presentation()?;
@@ -907,10 +993,30 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
         .iter()
         .position(|shape| matches!(shape, crate::shape::Shape::Content(_)))
         .ok_or_else(|| Error::Invalid("source content-part shape disappeared".into()))?;
+    let diagram_position = source_scene
+        .iter()
+        .position(|shape| shape.name() == Some("Dependency diagram"))
+        .ok_or_else(|| Error::Invalid("source dependency diagram disappeared".into()))?;
+    let frame_position = source_scene
+        .iter()
+        .position(|shape| shape.name() == Some("Opaque frame"))
+        .ok_or_else(|| Error::Invalid("source opaque frame disappeared".into()))?;
+    let ole_position = source_scene
+        .iter()
+        .position(|shape| shape.name() == Some("Inert OLE transfer"))
+        .ok_or_else(|| Error::Invalid("source inert OLE shape disappeared".into()))?;
     let nested_position = source_scene
         .iter()
         .position(|shape| shape.name() == Some("Group picture"))
         .ok_or_else(|| Error::Invalid("source nested group picture disappeared".into()))?;
+    let table_position = source_scene
+        .iter()
+        .position(|shape| shape.id() == Some(table_id))
+        .ok_or_else(|| Error::Invalid("source table disappeared".into()))?;
+    let chart_position = source_scene
+        .iter()
+        .position(|shape| matches!(shape, crate::shape::Shape::Chart(_)))
+        .ok_or_else(|| Error::Invalid("source chart disappeared".into()))?;
 
     let mut destination = opened_two_slide_package()?;
     let before = part_states(&destination);
@@ -956,6 +1062,18 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
         }
     ));
     assert!(!content_refusal.is_changed());
+    let mut frame_refusal = destination_root.edit();
+    let frame_error = frame_refusal
+        .transfer_shape(&source_root, 0_usize, frame_position, 1_usize)
+        .expect_err("unclassified frame transfer must be classified");
+    assert!(matches!(
+        frame_error,
+        Error::ShapeTransfer {
+            kind: crate::ShapeTransferRefusal::UnclassifiedGraphicFrame,
+            ..
+        }
+    ));
+    assert!(!frame_refusal.is_changed());
     let mut nested_refusal = destination_root.edit();
     let nested_error = nested_refusal
         .transfer_shape(&source_root, 0_usize, nested_position, 1_usize)
@@ -974,6 +1092,14 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
         transfer.transfer_shape(&source_root, 0_usize, external_connector_position, 1_usize)?;
     let transferred_free_connector_id =
         transfer.transfer_shape(&source_root, 0_usize, free_connector_position, 1_usize)?;
+    let transferred_diagram_id =
+        transfer.transfer_shape(&source_root, 0_usize, diagram_position, 1_usize)?;
+    let transferred_ole_id =
+        transfer.transfer_shape(&source_root, 0_usize, ole_position, 1_usize)?;
+    let transferred_table_id =
+        transfer.transfer_shape(&source_root, 0_usize, table_position, 1_usize)?;
+    let transferred_chart_id =
+        transfer.transfer_shape(&source_root, 0_usize, chart_position, 1_usize)?;
     let transfer_patch = transfer.commit()?.into_patch();
     let transfer_patch = Patch::from_bytes(&transfer_patch.to_bytes()?)?;
     let mut notes = destination_root.edit();
@@ -1019,6 +1145,42 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
             .name()
             .is_some_and(|name| name.contains("Copy"))
     );
+    let transferred_diagram = scene
+        .roots()
+        .find(|shape| shape.id() == Some(transferred_diagram_id))
+        .ok_or_else(|| Error::Invalid("transferred diagram disappeared".into()))?;
+    assert!(matches!(
+        transferred_diagram,
+        crate::shape::Shape::Diagram(_)
+    ));
+    let diagram_xml = std::str::from_utf8(transferred_diagram.xml()?)
+        .map_err(|error| Error::Xml(error.to_string()))?;
+    for old_relationship in [
+        "rIdDiagramData",
+        "rIdDiagramLayout",
+        "rIdDiagramStyle",
+        "rIdDiagramColors",
+    ] {
+        assert!(!diagram_xml.contains(old_relationship));
+    }
+    for attribute in ["rel:dm=", "rel:lo=", "rel:qs=", "rel:cs="] {
+        assert!(diagram_xml.contains(attribute));
+    }
+    let transferred_ole = scene
+        .roots()
+        .find(|shape| shape.id() == Some(transferred_ole_id))
+        .ok_or_else(|| Error::Invalid("transferred inert OLE shape disappeared".into()))?;
+    assert!(matches!(transferred_ole, crate::shape::Shape::Ole(_)));
+    let ole_xml = std::str::from_utf8(transferred_ole.xml()?)
+        .map_err(|error| Error::Xml(error.to_string()))?;
+    assert!(!ole_xml.contains("r:id=\"rIdOleTransfer\""));
+    assert!(ole_xml.contains("x:provenance=\"rIdOleTransfer\""));
+    assert!(scene.roots().any(|shape| {
+        shape.id() == Some(transferred_table_id) && matches!(shape, crate::shape::Shape::Table(_))
+    }));
+    assert!(scene.roots().any(|shape| {
+        shape.id() == Some(transferred_chart_id) && matches!(shape, crate::shape::Shape::Chart(_))
+    }));
     let transferred = scene
         .iter()
         .find(|shape| shape.id() == Some(transferred_group_id))
@@ -1092,6 +1254,50 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
         }
     }
     assert!(copied_image.is_some());
+    let mut copied_diagram_types = std::collections::BTreeSet::new();
+    for relationship in destination_slide.rels().iter() {
+        if relationship.is_external() {
+            continue;
+        }
+        let target_name = relationship.target_partname()?;
+        let part = reopened.opc.get_part(&target_name)?;
+        if part
+            .content_type()
+            .starts_with("application/vnd.openxmlformats-officedocument.drawingml.diagram")
+        {
+            copied_diagram_types.insert(part.content_type().to_owned());
+        }
+    }
+    assert_eq!(
+        copied_diagram_types,
+        [
+            litchi_opc::constants::content_type::DML_DIAGRAM_COLORS.to_owned(),
+            litchi_opc::constants::content_type::DML_DIAGRAM_DATA.to_owned(),
+            litchi_opc::constants::content_type::DML_DIAGRAM_LAYOUT.to_owned(),
+            litchi_opc::constants::content_type::DML_DIAGRAM_STYLE.to_owned(),
+        ]
+        .into_iter()
+        .collect()
+    );
+    let mut copied_ole = false;
+    for relationship in destination_slide.rels().iter() {
+        if relationship.is_external() {
+            continue;
+        }
+        let target_name = relationship.target_partname()?;
+        let part = reopened.opc.get_part(&target_name)?;
+        if part.content_type() == litchi_opc::constants::content_type::OFC_OLE_OBJECT
+            && part.blob() == [0xD0, 0xCF, 0x11, 0xE0, 1, 2, 3, 4]
+        {
+            copied_ole = true;
+            break;
+        }
+    }
+    assert!(copied_ole);
+    assert_eq!(
+        crate::chart::related(&reopened.opc, destination_slide)?.len(),
+        1
+    );
     assert_eq!(
         reopened
             .notes()?

@@ -70,8 +70,9 @@ pub(crate) fn copy_canonical_attributes(
             continue;
         }
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
-        let local_name = std::str::from_utf8(local_name.as_ref())
-            .map_err(|_| Error::InvalidFormat(format!("non-UTF-8 {context} attribute name")))?;
+        let local_name = std::str::from_utf8(local_name.as_ref()).map_err(|_error| {
+            Error::InvalidFormat(format!("non-UTF-8 {context} attribute name"))
+        })?;
         let name = match namespace {
             ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE => {
                 format!("office:{local_name}")
@@ -100,7 +101,7 @@ pub(crate) fn copy_canonical_attributes(
             ResolveResult::Bound(_) | ResolveResult::Unbound => {
                 std::str::from_utf8(attribute.key.as_ref())
                     .map(str::to_string)
-                    .map_err(|_| {
+                    .map_err(|_error| {
                         Error::InvalidFormat(format!("non-UTF-8 {context} attribute name"))
                     })?
             },
@@ -135,7 +136,7 @@ pub(crate) fn append_text_control(
         b"s" => {
             let count = namespaced_attribute(reader, element, TEXT_NAMESPACE, b"c", "text:s")?
                 .map(|value| {
-                    value.parse::<usize>().map_err(|_| {
+                    value.parse::<usize>().map_err(|_error| {
                         Error::InvalidFormat("text:c must be a non-negative integer".to_string())
                     })
                 })

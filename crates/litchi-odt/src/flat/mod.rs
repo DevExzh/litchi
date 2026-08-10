@@ -184,7 +184,7 @@ impl Document {
                 resource: "flat ODT input",
                 source,
             })?;
-        let read_limit = u64::try_from(read_limit).map_err(|_| {
+        let read_limit = u64::try_from(read_limit).map_err(|_error| {
             resource_limit_error(
                 Resource::InputBytes,
                 read_limit,
@@ -324,7 +324,7 @@ impl Document {
             file.write_all(self.as_bytes())?;
             file.flush()?;
             file.sync_all()?;
-            let expected_len = u64::try_from(self.as_bytes().len()).map_err(|_| {
+            let expected_len = u64::try_from(self.as_bytes().len()).map_err(|_error| {
                 resource_limit_error(
                     Resource::OutputBytes,
                     self.as_bytes().len(),
@@ -347,7 +347,7 @@ impl Document {
             Ok(())
         })();
         if write_result.is_err() {
-            let _ = std::fs::remove_file(&temporary);
+            drop(std::fs::remove_file(&temporary));
         }
         write_result
     }
@@ -609,7 +609,7 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
         let is_office = is_bound(&namespace, OFFICE_NAMESPACE);
         let is_text = is_bound(&namespace, TEXT_NAMESPACE);
         let event = event.into_owned();
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_error| {
             resource_limit_error(
                 Resource::InputBytes,
                 usize::MAX,
@@ -680,7 +680,7 @@ fn classify_paragraph_end(
     let mut nested_depth = 0usize;
     let mut opaque = false;
     loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_error| {
             resource_limit_error(
                 Resource::InputBytes,
                 usize::MAX,
@@ -857,7 +857,7 @@ fn create_owned_sibling_temp(parent: &Path) -> Result<(PathBuf, std::fs::File)> 
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
                 value.checked_add(1)
             })
-            .map_err(|_| {
+            .map_err(|_error| {
                 resource_limit_error(
                     Resource::Work,
                     usize::MAX,
@@ -892,8 +892,7 @@ fn publish_owned_temp(temporary: &Path, destination: &Path) -> Result<()> {
 }
 
 #[cfg(windows)]
-fn publish_owned_temp(temporary: &Path, destination: &Path) -> Result<()> {
-    let _ = (temporary, destination);
+fn publish_owned_temp(_temporary: &Path, _destination: &Path) -> Result<()> {
     Err(Error::Unsupported(
         "atomic flat ODT publication is unavailable on Windows".to_string(),
     ))

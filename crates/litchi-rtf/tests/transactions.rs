@@ -589,6 +589,103 @@ fn note_and_annotation_edits_refuse_positioned_or_opaque_dependencies() {
 }
 
 #[test]
+fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens() {
+    let source = Document::from_bytes(include_bytes!(
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf"
+    ))
+    .unwrap();
+    let original = source.shapes()[0].clone();
+    let mut edit = source.edit();
+    edit.set_shape_text(0, "Edited frame\nsecond line").unwrap();
+    let commit = edit.commit().unwrap();
+    let edited = &commit.snapshot().shapes()[0];
+    assert_eq!(edited.text, "Edited frame\nsecond line");
+    assert_eq!(edited.position, original.position);
+    assert_eq!(edited.geometry, original.geometry);
+    assert_eq!(edited.properties, original.properties);
+    assert_eq!(edited.text_formatting, original.text_formatting);
+    assert_eq!(commit.snapshot().text(), source.text());
+
+    let output = commit.snapshot().to_bytes().unwrap();
+    assert!(String::from_utf8_lossy(&output).contains("\\shptxt Edited frame\\par second line"));
+    let reopened = Document::from_bytes(&output).unwrap();
+    assert_eq!(reopened.shapes()[0].text, "Edited frame\nsecond line");
+    assert_eq!(reopened.shapes()[0].geometry, original.geometry);
+
+    let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
+    let applied = source.apply_durable(&durable).unwrap();
+    assert_eq!(applied.to_bytes().unwrap(), output);
+    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    assert_eq!(restored.shapes()[0].text, original.text);
+
+    let mut history = History::new(source.clone(), HistoryLimits::new(2, 1024 * 1024));
+    history.record_commit(&commit).unwrap();
+    assert!(history.undo());
+    assert_eq!(history.current().shapes()[0].text, original.text);
+    assert!(history.redo());
+    assert_eq!(
+        history.current().shapes()[0].text,
+        "Edited frame\nsecond line"
+    );
+
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut first = source.edit();
+    first.set_shape_text(0, "First branch").unwrap();
+    let mut second = source.edit();
+    second.set_shape_text(0, "Second branch").unwrap();
+    let mut left = Composition::new(&source, limits);
+    left.join(first.into_sub_edit("first-shape", limits).unwrap())
+        .unwrap();
+    let mut right = Composition::new(&source, limits);
+    right
+        .join(second.into_sub_edit("second-shape", limits).unwrap())
+        .unwrap();
+    assert_eq!(MergePlan::new(left, right).unwrap().conflicts().len(), 1);
+
+    let target = Document::parse(r"{\rtf1 Target}").unwrap();
+    let transfer = TransferPlan::shape(&source, 0, &target).unwrap();
+    assert!(transfer.is_dependency_free());
+    let transferred = transfer.commit().unwrap();
+    assert_eq!(transferred.snapshot().shapes().len(), 1);
+    assert_eq!(transferred.snapshot().shapes()[0].text, original.text);
+    assert_eq!(
+        transferred.snapshot().shapes()[0].position,
+        target.text().len()
+    );
+    let transferred_output = transferred.snapshot().to_bytes().unwrap();
+    let transferred_reopen = Document::from_bytes(&transferred_output).unwrap();
+    assert_eq!(transferred_reopen.shapes()[0].geometry, original.geometry);
+    let transfer_durable = transferred.patch().to_durable(durable_limits(1)).unwrap();
+    let transfer_applied = target.apply_durable(&transfer_durable).unwrap();
+    assert_eq!(transfer_applied.to_bytes().unwrap(), transferred_output);
+    let transfer_restored = transfer_applied
+        .apply_durable(&transfer_durable.inverse())
+        .unwrap();
+    assert!(transfer_restored.shapes().is_empty());
+    assert_eq!(transfer_restored.text(), target.text());
+}
+
+#[test]
+fn shape_text_edit_and_transfer_refuse_active_links() {
+    let source = Document::parse(concat!(
+        r#"{\rtf1 A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}"#,
+        r#"{\sp{\sn hyperlink}{\sv }{\hl {\hlsrc src}{\hlloc http://example.test/x}{\hlfr Click}}}"#,
+        r#"{\shptxt x}}}B}"#,
+    ))
+    .unwrap();
+    let mut edit = source.edit();
+    assert!(matches!(
+        edit.set_shape_text(0, "changed"),
+        Err(Error::UnsupportedSource(_))
+    ));
+    let target = Document::parse(r"{\rtf1 Target}").unwrap();
+    assert!(matches!(
+        TransferPlan::shape(&source, 0, &target),
+        Err(Error::UnsupportedSource(_))
+    ));
+}
+
+#[test]
 fn destination_edit_refuses_unknown_syntax_without_mutating_source() {
     let source =
         Document::parse(r"{\rtf1\ansi{\*\vendor retained}\trowd\cellx1000\intbl A\cell\row}")

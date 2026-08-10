@@ -166,7 +166,9 @@ impl PageNumber {
         if x == "auto" {
             return Ok(Self::Auto);
         }
-        let n = x.parse().map_err(|_| bad("invalid style:page-number"))?;
+        let n = x
+            .parse()
+            .map_err(|_error| bad("invalid style:page-number"))?;
         if n == 0 || n > MAX_PAGE {
             return Err(bad("style:page-number out of range"));
         }

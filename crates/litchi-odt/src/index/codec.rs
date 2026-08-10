@@ -184,7 +184,7 @@ fn element_from_start(
     source: &BytesStart<'_>,
 ) -> Result<TextIndexElement> {
     let local_name = std::str::from_utf8(source.local_name().as_ref())
-        .map_err(|_| Error::InvalidFormat("non-UTF-8 text-index element name".to_string()))?
+        .map_err(|_error| Error::InvalidFormat("non-UTF-8 text-index element name".to_string()))?
         .to_string();
     let attributes = expanded_attributes(reader, source, "text index")?;
     Ok(TextIndexElement {
@@ -211,7 +211,7 @@ pub(crate) fn expanded_attributes(
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
         let namespace_uri = resolved_namespace(&namespace, context)?;
         let local_name = std::str::from_utf8(local_name.as_ref())
-            .map_err(|_| Error::InvalidFormat(format!("non-UTF-8 {context} attribute name")))?
+            .map_err(|_error| Error::InvalidFormat(format!("non-UTF-8 {context} attribute name")))?
             .to_string();
         if attributes.iter().any(|existing: &TextIndexAttribute| {
             existing.namespace_uri == namespace_uri && existing.local_name == local_name
@@ -239,7 +239,7 @@ fn resolved_namespace(namespace: &ResolveResult<'_>, context: &str) -> Result<Op
     match namespace {
         ResolveResult::Bound(Namespace(uri)) => std::str::from_utf8(uri)
             .map(|uri| Some(uri.to_string()))
-            .map_err(|_| Error::InvalidFormat(format!("non-UTF-8 {context} namespace URI"))),
+            .map_err(|_error| Error::InvalidFormat(format!("non-UTF-8 {context} namespace URI"))),
         ResolveResult::Unbound => Ok(None),
         ResolveResult::Unknown(prefix) => Err(Error::InvalidFormat(format!(
             "unknown {context} namespace prefix '{}'",

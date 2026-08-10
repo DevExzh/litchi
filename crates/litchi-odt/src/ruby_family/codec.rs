@@ -21,7 +21,7 @@ use super::{
 fn name(value: &[u8]) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| bad("invalid UTF-8 XML name"))
+        .map_err(|_error| bad("invalid UTF-8 XML name"))
 }
 type Attrs = Vec<(Ns, String, String)>;
 fn attributes(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Attrs> {

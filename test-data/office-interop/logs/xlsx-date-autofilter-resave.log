@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=Calc MS Excel 2007 XML
+input=test-data/office-interop/litchi-changed/date-autofilter-litchi.xlsx
+output=test-data/office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx
+status=success
+output_sha256=ade103f651e3f7cac423cd6b01d4d5a004d03470667723234105ba39672bc74d

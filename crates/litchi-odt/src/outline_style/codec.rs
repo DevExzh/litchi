@@ -772,8 +772,8 @@ fn handle_start(
     level: &mut Option<ActiveLevel>,
     properties: &mut Option<ActiveProperties>,
     text_properties_depth: &mut Option<usize>,
-    styles: &mut Vec<Style>,
-    names: &mut HashSet<String>,
+    _styles: &mut Vec<Style>,
+    _names: &mut HashSet<String>,
     total_attribute_bytes: &mut usize,
 ) -> Result<()> {
     let is_outline = current.0 == NamespaceKind::Text && current.1 == b"outline-style";
@@ -901,7 +901,6 @@ fn handle_start(
         }
         return Ok(());
     }
-    let _ = (styles, names);
     invalid("text:outline-level-style has an invalid child")
 }
 
@@ -915,7 +914,7 @@ fn parse_level(
     let level = take(&mut attributes, NamespaceKind::Text, "level")
         .ok_or_else(|| invalid_error("outline level requires text:level"))?
         .parse::<u16>()
-        .map_err(|_| invalid_error("text:level is outside the supported range"))?;
+        .map_err(|_error| invalid_error("text:level is outside the supported range"))?;
     if !(1..=MAX_OUTLINE_LEVELS).contains(&level) {
         return invalid("text:level is outside the supported range");
     }
@@ -1121,7 +1120,7 @@ fn attributes(
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace_uri = namespace_bytes(namespace);
         let local_name = String::from_utf8(local.as_ref().to_vec())
-            .map_err(|_| invalid_error("outline attribute name is not UTF-8"))?;
+            .map_err(|_error| invalid_error("outline attribute name is not UTF-8"))?;
         if !seen.insert((namespace_uri.clone(), local_name.clone())) {
             return invalid("duplicate expanded outline attribute");
         }
@@ -1141,7 +1140,7 @@ fn attributes(
         output.push(ResolvedAttribute {
             namespace: namespace_kind(&namespace_uri),
             namespace_uri: String::from_utf8(namespace_uri)
-                .map_err(|_| invalid_error("outline attribute namespace is not UTF-8"))?,
+                .map_err(|_error| invalid_error("outline attribute namespace is not UTF-8"))?,
             local_name,
             value,
         });

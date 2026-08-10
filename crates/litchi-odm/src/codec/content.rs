@@ -20,6 +20,7 @@ const MAX_IDENTITIES: usize = 1_000_000;
 const MAX_REFERENCES: usize = 1_000_000;
 const MAX_REFERENCE_BYTES: usize = 16 * 1024;
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
@@ -38,6 +39,25 @@ struct ActiveSection {
     name: String,
     child_seen: bool,
     source_seen: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum CommonBodyOwner {
+    List {
+        depth: usize,
+        header_seen: bool,
+        item_seen: bool,
+    },
+    Table {
+        depth: usize,
+        row_seen: bool,
+    },
+    GeneratedIndex {
+        depth: usize,
+        kind: crate::structure::IndexKind,
+        source_seen: bool,
+        body_seen: bool,
+    },
 }
 
 /// Bounded semantic projection retained by the package snapshot.
@@ -244,12 +264,13 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
 }
 
 fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
-    const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut depth = 0usize;
     let mut text_depth = None;
     let mut section_index = 0usize;
     let mut generated_index_names = HashSet::new();
+    let mut active_body_item = None;
+    let mut common_owner = None;
     let mut structure = crate::structure::Structure::default();
     loop {
         let event_start = position(&reader)?;
@@ -310,6 +331,15 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
         match event {
             Event::Start(element) => {
                 depth = depth.saturating_add(1);
+                observe_common_body_child(
+                    &mut common_owner,
+                    element.local_name().as_ref(),
+                    is_office,
+                    is_text,
+                    is_table,
+                    depth,
+                )?;
+                let item_count = structure.items.len();
                 observe_master_item(
                     element.local_name().as_ref(),
                     is_office,
@@ -323,9 +353,24 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
                     item_name,
                     item_xml_id,
                     item_name_span,
+                    event_start..event_end,
                 )?;
+                if structure.items.len() > item_count {
+                    active_body_item = Some((depth, item_count));
+                    common_owner = common_body_owner(structure.items[item_count], depth);
+                }
             },
             Event::Empty(element) => {
+                let virtual_depth = depth.saturating_add(1);
+                observe_common_body_child(
+                    &mut common_owner,
+                    element.local_name().as_ref(),
+                    is_office,
+                    is_text,
+                    is_table,
+                    virtual_depth,
+                )?;
+                let item_count = structure.items.len();
                 observe_master_item(
                     element.local_name().as_ref(),
                     is_office,
@@ -339,9 +384,33 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
                     item_name,
                     item_xml_id,
                     item_name_span,
+                    event_start..event_end,
                 )?;
+                if structure.items.len() > item_count
+                    && let Some(owner) =
+                        common_body_owner(structure.items[item_count], virtual_depth)
+                {
+                    validate_common_body_owner(owner)?;
+                }
             },
             Event::End(element) => {
+                if common_owner.is_some_and(|owner| common_body_owner_depth(owner) == depth) {
+                    validate_common_body_owner(
+                        common_owner
+                            .take()
+                            .ok_or_else(|| invalid("ODM common body owner disappeared"))?,
+                    )?;
+                }
+                if let Some((item_depth, item)) = active_body_item
+                    && item_depth == depth
+                {
+                    structure
+                        .item_spans
+                        .get_mut(item)
+                        .ok_or_else(|| invalid("ODM master-body item span disappeared"))?
+                        .end = event_end;
+                    active_body_item = None;
+                }
                 if text_depth == Some(depth)
                     && is_office
                     && element.local_name().as_ref() == b"text"
@@ -352,15 +421,190 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM content")),
             Event::Eof => break,
-            Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_)
-            | Event::GeneralRef(_) => {},
+            Event::Text(text) => {
+                validate_common_body_text(common_owner, depth, text.as_ref())?;
+            },
+            Event::CData(text) => {
+                validate_common_body_text(common_owner, depth, text.as_ref())?;
+            },
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::GeneralRef(_) => {},
         }
     }
     Ok(structure)
+}
+
+fn validate_common_body_text(
+    owner: Option<CommonBodyOwner>,
+    depth: usize,
+    text: &[u8],
+) -> Result<()> {
+    if owner.is_some_and(|owner| common_body_owner_depth(owner) == depth)
+        && !text.iter().all(u8::is_ascii_whitespace)
+    {
+        return Err(invalid(
+            "ODM list, table, and generated-index containers cannot contain direct text",
+        ));
+    }
+    Ok(())
+}
+
+fn common_body_owner(kind: crate::structure::Kind, depth: usize) -> Option<CommonBodyOwner> {
+    match kind {
+        crate::structure::Kind::List => Some(CommonBodyOwner::List {
+            depth,
+            header_seen: false,
+            item_seen: false,
+        }),
+        crate::structure::Kind::Table => Some(CommonBodyOwner::Table {
+            depth,
+            row_seen: false,
+        }),
+        crate::structure::Kind::GeneratedIndex(kind) => Some(CommonBodyOwner::GeneratedIndex {
+            depth,
+            kind,
+            source_seen: false,
+            body_seen: false,
+        }),
+        crate::structure::Kind::Paragraph
+        | crate::structure::Kind::Heading
+        | crate::structure::Kind::Section(_)
+        | crate::structure::Kind::Declarations
+        | crate::structure::Kind::Other => None,
+    }
+}
+
+const fn common_body_owner_depth(owner: CommonBodyOwner) -> usize {
+    match owner {
+        CommonBodyOwner::List { depth, .. }
+        | CommonBodyOwner::Table { depth, .. }
+        | CommonBodyOwner::GeneratedIndex { depth, .. } => depth,
+    }
+}
+
+fn observe_common_body_child(
+    owner: &mut Option<CommonBodyOwner>,
+    local: &[u8],
+    is_office: bool,
+    is_text: bool,
+    is_table: bool,
+    depth: usize,
+) -> Result<()> {
+    let Some(owner) = owner else {
+        return Ok(());
+    };
+    if depth != common_body_owner_depth(*owner).saturating_add(1) {
+        return Ok(());
+    }
+    match owner {
+        CommonBodyOwner::List {
+            header_seen,
+            item_seen,
+            ..
+        } => {
+            if !is_text || !matches!(local, b"list-item" | b"list-header") {
+                return Err(invalid(
+                    "ODM direct text:list children must be list items or a list header",
+                ));
+            }
+            if local == b"list-header" {
+                if *header_seen || *item_seen {
+                    return Err(invalid(
+                        "ODM text:list header must occur at most once before list items",
+                    ));
+                }
+                *header_seen = true;
+            } else {
+                *item_seen = true;
+            }
+        },
+        CommonBodyOwner::Table { row_seen, .. } => {
+            let table_child = is_table
+                && matches!(
+                    local,
+                    b"table-column"
+                        | b"table-columns"
+                        | b"table-column-group"
+                        | b"table-header-columns"
+                        | b"table-row"
+                        | b"table-rows"
+                        | b"table-row-group"
+                        | b"table-header-rows"
+                        | b"table-source"
+                );
+            if !(table_child || is_office && local == b"dde-source") {
+                return Err(invalid("ODM table has an unsupported direct child"));
+            }
+            if is_table
+                && matches!(
+                    local,
+                    b"table-row" | b"table-rows" | b"table-row-group" | b"table-header-rows"
+                )
+            {
+                *row_seen = true;
+            }
+        },
+        CommonBodyOwner::GeneratedIndex {
+            kind,
+            source_seen,
+            body_seen,
+            ..
+        } => {
+            if !is_text {
+                return Err(invalid("ODM generated index has a non-text direct child"));
+            }
+            if local == generated_index_source(*kind) {
+                if *source_seen || *body_seen {
+                    return Err(invalid(
+                        "ODM generated-index source must occur once before its body",
+                    ));
+                }
+                *source_seen = true;
+            } else if local == b"index-body" {
+                if !*source_seen || *body_seen {
+                    return Err(invalid(
+                        "ODM generated-index body must occur once after its source",
+                    ));
+                }
+                *body_seen = true;
+            } else {
+                return Err(invalid(
+                    "ODM generated index has an unsupported direct child",
+                ));
+            }
+        },
+    }
+    Ok(())
+}
+
+fn validate_common_body_owner(owner: CommonBodyOwner) -> Result<()> {
+    match owner {
+        CommonBodyOwner::List {
+            item_seen: true, ..
+        }
+        | CommonBodyOwner::Table { row_seen: true, .. }
+        | CommonBodyOwner::GeneratedIndex {
+            source_seen: true,
+            body_seen: true,
+            ..
+        } => Ok(()),
+        CommonBodyOwner::List { .. } => Err(invalid("ODM text:list has no list item")),
+        CommonBodyOwner::Table { .. } => Err(invalid("ODM table has no row content")),
+        CommonBodyOwner::GeneratedIndex { .. } => Err(invalid(
+            "ODM generated index requires a source and index body",
+        )),
+    }
+}
+
+const fn generated_index_source(kind: crate::structure::IndexKind) -> &'static [u8] {
+    match kind {
+        crate::structure::IndexKind::TableOfContents => b"table-of-content-source",
+        crate::structure::IndexKind::Illustration => b"illustration-index-source",
+        crate::structure::IndexKind::Table => b"table-index-source",
+        crate::structure::IndexKind::Object => b"object-index-source",
+        crate::structure::IndexKind::User => b"user-index-source",
+        crate::structure::IndexKind::Alphabetical => b"alphabetical-index-source",
+        crate::structure::IndexKind::Bibliography => b"bibliography-source",
+    }
 }
 
 #[allow(
@@ -380,6 +624,7 @@ fn observe_master_item(
     item_name: Option<String>,
     item_xml_id: Option<String>,
     item_name_span: Option<Range<usize>>,
+    source_span: Range<usize>,
 ) -> Result<()> {
     use crate::structure::{IndexKind, Kind};
 
@@ -415,6 +660,13 @@ fn observe_master_item(
             return Err(invalid("ODM master-body item count exceeds the limit"));
         }
         structure
+            .item_spans
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODM master-body item spans",
+                source,
+            })?;
+        structure
             .items
             .try_reserve(1)
             .map_err(|source| Error::Allocation {
@@ -423,6 +675,7 @@ fn observe_master_item(
             })?;
         let item = Position::new(structure.items.len());
         structure.items.push(kind);
+        structure.item_spans.push(source_span);
         if let Kind::GeneratedIndex(kind) = kind {
             let name = item_name
                 .as_ref()

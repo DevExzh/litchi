@@ -220,7 +220,7 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
                 append_text(&value, root_seen, root_closed, in_settings, &mut stack)?;
             },
             Event::GeneralRef(reference) => {
-                let name = std::str::from_utf8(reference.as_ref()).map_err(|_| {
+                let name = std::str::from_utf8(reference.as_ref()).map_err(|_error| {
                     Error::InvalidFormat("invalid XML character reference".to_string())
                 })?;
                 let value = resolve_reference(name)?;
@@ -506,11 +506,10 @@ fn validate_no_semantic_attributes(decoder: Decoder, start: &BytesStart<'_>) -> 
         if count > MAX_ATTRIBUTES {
             return invalid("settings element exceeds the attribute limit");
         }
-        let _ = attribute
+        attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid settings attribute: {error}"))
-            })?;
+            .map_err(|error| Error::InvalidFormat(format!("invalid settings attribute: {error}")))
+            .map(|_| ())?;
     }
     Ok(())
 }
@@ -545,7 +544,7 @@ fn parse_value(value_type: &str, text: &str) -> Result<ConfigValue> {
             "-INF" => f64::NEG_INFINITY,
             "NaN" => f64::NAN,
             _ => {
-                let value = trimmed.parse::<f64>().map_err(|_| {
+                let value = trimmed.parse::<f64>().map_err(|_error| {
                     Error::InvalidFormat("invalid double configuration value".to_string())
                 })?;
                 if !value.is_finite() {
@@ -579,7 +578,7 @@ fn decode_base64(value: &str) -> Result<Vec<u8>> {
     };
     base64::engine::general_purpose::STANDARD
         .decode(normalized.as_ref())
-        .map_err(|_| Error::InvalidFormat("invalid base64 configuration value".to_string()))
+        .map_err(|_error| Error::InvalidFormat("invalid base64 configuration value".to_string()))
 }
 
 fn parse_integer<T>(value: &str, kind: &str) -> Result<T>
@@ -588,7 +587,7 @@ where
 {
     value
         .parse::<T>()
-        .map_err(|_| Error::InvalidFormat(format!("invalid {kind} configuration value")))
+        .map_err(|_error| Error::InvalidFormat(format!("invalid {kind} configuration value")))
 }
 
 pub(super) fn is_datetime(value: &str) -> bool {
@@ -724,7 +723,7 @@ fn resolve_reference(name: &str) -> Result<String> {
         } else {
             return invalid("undeclared entity reference in settings XML");
         }
-        .map_err(|_| Error::InvalidFormat("invalid XML character reference".to_string()))?;
+        .map_err(|_error| Error::InvalidFormat("invalid XML character reference".to_string()))?;
     let character = char::from_u32(codepoint)
         .filter(|character| is_xml_character(*character))
         .ok_or_else(|| Error::InvalidFormat("invalid XML character reference".to_string()))?;

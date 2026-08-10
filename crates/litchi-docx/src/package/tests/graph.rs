@@ -275,7 +275,7 @@ fn durable_hyperlink_edit_round_trips_real_open_xml_sdk_fixture() {
 #[test]
 fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let donor_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><w:body><w:p><w:hyperlink r:id="donorLink"><w:r><w:t>linked transfer</w:t></w:r></w:hyperlink><w:r><w:drawing><a:blip r:embed="donorImage"/></w:drawing><w:t> image</w:t></w:r><w:sdt><w:sdtPr><w:tag w:val="outer-transfer"/></w:sdtPr><w:sdtContent><w:sdt><w:sdtPr><w:tag w:val="inner-transfer"/></w:sdtPr><w:sdtContent><w:hyperlink r:id="donorLink" w:tooltip="transferred nested link"><w:r><w:t>control transfer</w:t></w:r></w:hyperlink></w:sdtContent></w:sdt></w:sdtContent></w:sdt></w:p><w:sectPr/></w:body></w:document>"#;
-    let receiver_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>receiver</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#;
+    let receiver_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t>receiver</w:t></w:r><w:hyperlink r:id="receiverLink" w:tooltip="receiver link"><w:r><w:t>receiver linked</w:t></w:r></w:hyperlink></w:p><w:sectPr/></w:body></w:document>"#;
     let donor = transfer_package(donor_xml, "donorLink", "donorImage", b"same image");
     let mut receiver =
         transfer_package(receiver_xml, "receiverLink", "receiverImage", b"same image");
@@ -304,7 +304,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     );
 
     let source = receiver.document_snapshot().unwrap();
-    let composition_limits = litchi_core::patch::CompositionLimits::new(8, 8, 32, 8);
+    let composition_limits = litchi_core::patch::CompositionLimits::new(8, 16, 48, 8);
     let mut text = source.edit();
     text.replace_run_text(
         litchi_core::Position::new(0),
@@ -318,6 +318,23 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let mut transfer = source.edit();
     transfer
         .insert_paragraph_transfer(litchi_core::Position::new(1), &plan)
+        .unwrap()
+        .replace_body_hyperlink_texts(&[
+            crate::document::HyperlinkTextReplacement::new(
+                crate::document::ParagraphHyperlinkAddress::new(
+                    litchi_core::Position::new(0),
+                    litchi_core::Position::new(0),
+                ),
+                "receiver link edited",
+            ),
+            crate::document::HyperlinkTextReplacement::new(
+                crate::document::ParagraphHyperlinkAddress::new(
+                    litchi_core::Position::new(1),
+                    litchi_core::Position::new(0),
+                ),
+                "transferred outer link edited",
+            ),
+        ])
         .unwrap()
         .replace_nested_content_control_hyperlink_text(
             litchi_core::Position::new(1),
@@ -341,6 +358,21 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         std::str::from_utf8(commit.snapshot().xml_bytes())
             .unwrap()
             .contains("transferred control edited")
+    );
+    assert!(
+        std::str::from_utf8(commit.snapshot().xml_bytes())
+            .unwrap()
+            .contains("receiver link edited")
+    );
+    assert!(
+        std::str::from_utf8(commit.snapshot().xml_bytes())
+            .unwrap()
+            .contains("transferred outer link edited")
+    );
+    assert!(
+        std::str::from_utf8(commit.snapshot().xml_bytes())
+            .unwrap()
+            .contains("w:tooltip=\"receiver link\"")
     );
     assert!(
         std::str::from_utf8(commit.snapshot().xml_bytes())

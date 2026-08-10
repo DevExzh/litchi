@@ -299,7 +299,7 @@ pub fn parse_uint(value: &[u8]) -> Result<u64> {
 #[inline]
 pub fn parse_float(value: &[u8]) -> Result<f64> {
     let s = std::str::from_utf8(value)
-        .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in float value".to_string()))?;
+        .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in float value".to_string()))?;
 
     match parse_partial::<f64, _>(s) {
         Ok((num, _)) => Ok(num),
@@ -329,7 +329,7 @@ pub fn parse_float(value: &[u8]) -> Result<f64> {
 /// ```
 pub fn parse_length(value: &[u8]) -> Result<(f64, Cow<'_, str>)> {
     let s = std::str::from_utf8(value)
-        .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in length value".to_string()))?;
+        .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in length value".to_string()))?;
 
     // Try to parse the numeric part
     match parse_partial::<f64, _>(s) {
@@ -360,7 +360,7 @@ pub fn parse_length(value: &[u8]) -> Result<(f64, Cow<'_, str>)> {
 #[inline]
 pub fn parse_percentage(value: &[u8]) -> Result<f64> {
     let s = std::str::from_utf8(value)
-        .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in percentage value".to_string()))?;
+        .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in percentage value".to_string()))?;
 
     let trimmed = s.trim_end_matches('%').trim();
     match parse_partial::<f64, _>(trimmed) {
@@ -505,7 +505,7 @@ impl AttrParser {
         match attr_type {
             AttrType::String => Ok(ParsedValue::String(
                 String::from_utf8(value.to_vec())
-                    .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
+                    .map_err(|_error| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
             )),
             AttrType::Boolean => Ok(ParsedValue::Boolean(parse_bool(value)?)),
             AttrType::Integer => Ok(ParsedValue::Integer(parse_int(value)?)),
@@ -521,13 +521,13 @@ impl AttrParser {
             },
             AttrType::Duration => {
                 let value = std::str::from_utf8(value)
-                    .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?;
+                    .map_err(|_error| Error::InvalidFormat("Invalid UTF-8".to_string()))?;
                 crate::datatype::Duration::decode_exact(value)?;
                 Ok(ParsedValue::String(value.to_string()))
             },
             _ => Ok(ParsedValue::String(
                 String::from_utf8(value.to_vec())
-                    .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
+                    .map_err(|_error| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
             )),
         }
     }

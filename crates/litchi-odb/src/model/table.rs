@@ -95,6 +95,7 @@ pub struct Column {
     nullable: Option<bool>,
     empty_allowed: Option<bool>,
     autoincrement: Option<bool>,
+    default_value: Option<String>,
 }
 
 impl Column {
@@ -153,6 +154,13 @@ impl Column {
         self
     }
 
+    /// Sets the inert producer-encoded default value.
+    #[must_use]
+    pub fn with_default_value(mut self, value: impl Into<String>) -> Self {
+        self.default_value = Some(value.into());
+        self
+    }
+
     pub(crate) fn parsed(name: String, schema: ColumnSchema) -> Self {
         Self {
             name,
@@ -163,6 +171,7 @@ impl Column {
             nullable: schema.nullable,
             empty_allowed: schema.empty_allowed,
             autoincrement: schema.autoincrement,
+            default_value: schema.default_value,
         }
     }
 
@@ -213,6 +222,12 @@ impl Column {
     pub const fn autoincrement(&self) -> Option<bool> {
         self.autoincrement
     }
+
+    /// Returns the inert producer-encoded default value, if declared.
+    #[must_use]
+    pub fn default_value(&self) -> Option<&str> {
+        self.default_value.as_deref()
+    }
 }
 
 #[derive(Default)]
@@ -224,6 +239,7 @@ pub(crate) struct ColumnSchema {
     pub(crate) nullable: Option<bool>,
     pub(crate) empty_allowed: Option<bool>,
     pub(crate) autoincrement: Option<bool>,
+    pub(crate) default_value: Option<String>,
 }
 
 /// The constraint category of an ODF database key.
@@ -731,6 +747,37 @@ impl Table {
     #[must_use]
     pub fn indices(&self) -> &[Index] {
         &self.indices
+    }
+
+    /// Finds the first exact named column.
+    #[must_use]
+    pub fn column(&self, name: &str) -> Option<&Column> {
+        self.columns.iter().find(|column| column.name() == name)
+    }
+
+    /// Finds the first exact named constraint.
+    #[must_use]
+    pub fn key(&self, name: &str) -> Option<&Key> {
+        self.keys.iter().find(|key| key.name() == Some(name))
+    }
+
+    /// Finds the first exact named index.
+    #[must_use]
+    pub fn index(&self, name: &str) -> Option<&Index> {
+        self.indices.iter().find(|index| index.name() == name)
+    }
+
+    /// Returns the first primary-key constraint, if declared.
+    #[must_use]
+    pub fn primary_key(&self) -> Option<&Key> {
+        self.keys.iter().find(|key| key.kind() == KeyKind::Primary)
+    }
+
+    /// Iterates foreign-key constraints in declaration order.
+    pub fn foreign_keys(&self) -> impl Iterator<Item = &Key> {
+        self.keys
+            .iter()
+            .filter(|key| key.kind() == KeyKind::Foreign)
     }
 
     /// Returns the inert filter command, if declared.

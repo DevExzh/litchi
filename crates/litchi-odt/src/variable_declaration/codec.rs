@@ -772,7 +772,7 @@ pub(super) fn parse_part(
 
 #[allow(clippy::too_many_arguments)]
 fn start_group(
-    reader: &NsReader<&[u8]>,
+    _reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     part: Part,
     kind: Kind,
@@ -815,7 +815,6 @@ fn start_group(
             declarations: Vec::new(),
         },
     });
-    let _ = reader;
     Ok(())
 }
 
@@ -916,7 +915,7 @@ fn parse_declaration(
             )?;
             let level = required(&attributes, TEXT, "display-outline-level")?
                 .parse::<u8>()
-                .map_err(|_| invalid("invalid sequence display outline level"))?;
+                .map_err(|_error| invalid("invalid sequence display outline level"))?;
             if level > 10 {
                 return Err(invalid("sequence display outline level exceeds 10"));
             }
@@ -1021,11 +1020,11 @@ fn parse_user_value(kind: ValueType, attributes: &Attributes) -> Result<Value> {
             let value = if lexical.contains('T') {
                 DateValue::DateTime(
                     crate::datatype::DateTime::decode(&lexical)
-                        .map_err(|_| invalid("invalid user-field date-time"))?,
+                        .map_err(|_error| invalid("invalid user-field date-time"))?,
                 )
             } else {
                 DateValue::Date(
-                    Date::decode(&lexical).map_err(|_| invalid("invalid user-field date"))?,
+                    Date::decode(&lexical).map_err(|_error| invalid("invalid user-field date"))?,
                 )
             };
             Value::Date { value, lexical }
@@ -1033,13 +1032,13 @@ fn parse_user_value(kind: ValueType, attributes: &Attributes) -> Result<Value> {
         ValueType::Time => {
             let lexical = required(attributes, OFFICE, "time-value")?.to_string();
             let value = crate::datatype::Duration::decode_exact(&lexical)
-                .map_err(|_| invalid("invalid user-field duration"))?;
+                .map_err(|_error| invalid("invalid user-field duration"))?;
             Value::Time { value, lexical }
         },
         ValueType::Boolean => {
             let lexical = required(attributes, OFFICE, "boolean-value")?.to_string();
-            let value =
-                Boolean::decode(&lexical).map_err(|_| invalid("invalid user-field boolean"))?;
+            let value = Boolean::decode(&lexical)
+                .map_err(|_error| invalid("invalid user-field boolean"))?;
             Value::Boolean { value, lexical }
         },
         ValueType::String => Value::String {
@@ -1091,7 +1090,7 @@ fn parse_double(value: &str) -> Result<f64> {
         "NaN" => Ok(f64::NAN),
         _ => value
             .parse()
-            .map_err(|_| invalid("invalid XML Schema double")),
+            .map_err(|_error| invalid("invalid XML Schema double")),
     }
 }
 
@@ -1315,7 +1314,7 @@ fn namespace_uri(namespace: &ResolveResult<'_>) -> Result<Option<String>> {
 fn decode(value: &[u8], description: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| invalid(format!("non-UTF-8 {description}")))
+        .map_err(|_error| invalid(format!("non-UTF-8 {description}")))
 }
 
 fn validate_string(value: &str, limit: usize, description: &str) -> Result<()> {

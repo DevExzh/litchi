@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=MS Word 2007 XML
+input=test-data/office-interop/litchi-changed/document-properties-litchi.docx
+output=test-data/office-interop/libreoffice-resaved/document-properties-litchi.docx
+status=success
+output_sha256=0c10b6489e3b5c02d0470f213611e32fbaa0143746d69d0333bdca821d2c5e47

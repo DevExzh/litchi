@@ -488,20 +488,51 @@ impl<'source> Edit<'source> {
         if additions.is_empty() && directories.is_empty() {
             return invalid("ODB linked component package payload does not exist");
         }
-        let component_name = component.name().ok_or_else(|| {
-            Error::InvalidFormat("ODB transferred component has no name".to_string())
-        })?;
-        let active_dependencies = source
-            .component_active_content(component.kind(), component_name)?
-            .entries()
-            .len();
+        let active_dependencies =
+            crate::package::Snapshot::payload_active_content_count(&additions)?;
         if active_dependencies > 0 && active_content == crate::ActiveContentDisposition::Refuse {
             return Err(Error::Unsupported(format!(
                 "ODB component payload has {active_dependencies} active-content dependencies"
             )));
         }
-        self.payload_additions.extend(additions);
-        self.payload_directories.extend(directories);
+        for addition in additions {
+            if let Some(existing) = self
+                .payload_additions
+                .iter()
+                .find(|existing| existing.path == addition.path)
+            {
+                if existing.bytes != addition.bytes || existing.media_type != addition.media_type {
+                    return invalid("ODB component package dependencies conflict");
+                }
+                continue;
+            }
+            match self.source.package.file_matches(&addition)? {
+                Some(true) => {},
+                Some(false) => {
+                    return invalid("ODB component package dependency collides in destination");
+                },
+                None => self.payload_additions.push(addition),
+            }
+        }
+        for (path, media_type) in directories {
+            if let Some((_, existing)) = self
+                .payload_directories
+                .iter()
+                .find(|(existing, _)| existing == &path)
+            {
+                if existing != &media_type {
+                    return invalid("ODB component package directory dependencies conflict");
+                }
+                continue;
+            }
+            match self.source.package.directory_media_type(&path)? {
+                Some(existing) if existing == media_type => {},
+                Some(_) => {
+                    return invalid("ODB component package directory collides in destination");
+                },
+                None => self.payload_directories.push((path, media_type)),
+            }
+        }
         Ok(())
     }
 
@@ -2339,6 +2370,9 @@ fn serialize_column(column: &Column, definition: bool, prefix: &str) -> String {
     }
     push_bool(&mut attrs, "is-empty-allowed", column.empty_allowed());
     push_bool(&mut attrs, "is-autoincrement", column.autoincrement());
+    if let Some(value) = column.default_value() {
+        attrs.push(("default-value", value.to_owned()));
+    }
     empty_element(
         prefix,
         if definition {
@@ -2825,6 +2859,9 @@ fn validate_column(column: &Column) -> Result<()> {
     validate_name(column.name(), "column")?;
     if let Some(value) = column.type_name() {
         validate_value(value, "column type name")?;
+    }
+    if let Some(value) = column.default_value() {
+        validate_value(value, "column default value")?;
     }
     if column.precision() == Some(0) || column.scale() == Some(0) {
         return invalid("ODB column precision and scale must be positive");

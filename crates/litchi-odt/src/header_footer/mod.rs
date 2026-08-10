@@ -1,8 +1,10 @@
 //! Layered ODT master-page header/footer semantics.
 //!
-//! The owner facade keeps master-page content at the short contextual path and
-//! groups page-layout property vocabulary below `properties`. XML conversion
-//! and package/flat-document adapters live in their respective layers.
+//! The owner facade keeps master-page content at the short contextual path,
+//! groups page-layout property vocabulary below `properties`, and joins typed
+//! section margins, background, and columns into the durable layout owner.
+//! XML conversion and package/flat-document adapters live in their respective
+//! layers.
 
 mod codec;
 mod model;
@@ -17,8 +19,8 @@ pub use model::{
     Block, Child, ChildKind, Column, Field, FieldKind, Inline, Kind, Master, SenderKind,
 };
 pub use transaction::{
-    Commit, Dependency, DurablePatch, MergePlan, Patch, Resolution, Snapshot, Target, Transaction,
-    Transfer,
+    Commit, Dependency, DurablePatch, History, HistoryLimits, MergePlan, Patch, Resolution,
+    SectionLayout, SectionTransfer, Snapshot, Target, Transaction, Transfer,
 };
 
 pub use codec::parse_page_layout_header_footer_properties;

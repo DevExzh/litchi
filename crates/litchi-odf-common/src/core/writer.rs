@@ -7,6 +7,12 @@
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use litchi_core::{Error, Result, xml::escape_xml};
+use quick_xml::{
+    XmlVersion,
+    events::Event,
+    name::{Namespace, ResolveResult},
+    reader::NsReader,
+};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::collections::HashSet;
 use std::io::{self, Write};
@@ -19,6 +25,8 @@ use super::manifest::{
 };
 use super::package::OwnedPackage;
 use super::xml_splice::XmlSplicePublication;
+
+const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 
 /// Builder for creating ODF packages (ZIP archives)
 ///
@@ -50,6 +58,7 @@ pub struct PackageWriter<W: Write = io::Cursor<Vec<u8>>> {
     zip_writer: StreamingArchiveWriter<W>,
     mimetype: Option<String>,
     manifest_entries: Vec<ManifestEntry>,
+    manifest_version: String,
     wrote_any_entry: bool,
     wrote_mimetype: bool,
     wrote_payload_entry: bool,
@@ -138,6 +147,7 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
             zip_writer: StreamingArchiveWriter::new(),
             mimetype: None,
             manifest_entries: Vec::new(),
+            manifest_version: "1.3".to_string(),
             wrote_any_entry: false,
             wrote_mimetype: false,
             wrote_payload_entry: false,
@@ -166,6 +176,7 @@ impl<W: Write> PackageWriter<W> {
             zip_writer: StreamingArchiveWriter::with_writer(writer),
             mimetype: None,
             manifest_entries: Vec::new(),
+            manifest_version: "1.3".to_string(),
             wrote_any_entry: false,
             wrote_mimetype: false,
             wrote_payload_entry: false,
@@ -423,6 +434,7 @@ impl<W: Write> PackageWriter<W> {
         source: &OwnedPackage,
         excluded_paths: &HashSet<String>,
     ) -> Result<()> {
+        self.inherit_manifest_version(source)?;
         let package = source.package()?;
         if package.manifest().has_encrypted_entries() && self.encryption.is_none() {
             return Err(Error::InvalidFormat(
@@ -505,6 +517,7 @@ impl<W: Write> PackageWriter<W> {
     /// Returns an error when the source package cannot be read, contains
     /// unsupported encrypted entries, or an entry cannot be copied.
     pub fn copy_auxiliary_files_from(&mut self, source: &OwnedPackage) -> Result<()> {
+        self.inherit_manifest_version(source)?;
         let package = source.package()?;
         if package.manifest().has_encrypted_entries() && self.encryption.is_none() {
             return Err(Error::InvalidFormat(
@@ -560,6 +573,7 @@ impl<W: Write> PackageWriter<W> {
         excluded_paths: &[String],
         excluded_prefixes: &[String],
     ) -> Result<()> {
+        self.inherit_manifest_version(source)?;
         let package = source.package()?;
         if package.manifest().has_encrypted_entries() && self.encryption.is_none() {
             return Err(Error::InvalidFormat(
@@ -592,11 +606,23 @@ impl<W: Write> PackageWriter<W> {
         Ok(())
     }
 
+    fn inherit_manifest_version(&mut self, source: &OwnedPackage) -> Result<()> {
+        let bytes = source
+            .get_file("META-INF/manifest.xml")
+            .or_else(|_| source.get_file("manifest.xml"))?;
+        if let Some(version) = source_manifest_version(&bytes)? {
+            self.manifest_version = version;
+        }
+        Ok(())
+    }
+
     /// Generate the manifest.xml content
     fn generate_manifest(&self) -> String {
         let mut manifest = String::from(
-            r#"<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3">"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version=""#,
         );
+        manifest.push_str(&self.manifest_version);
+        manifest.push_str("\">");
 
         // Add manifest entries
         let mut seen_paths: HashSet<&str> = HashSet::with_capacity(self.manifest_entries.len());
@@ -604,7 +630,7 @@ impl<W: Write> PackageWriter<W> {
             if !seen_paths.insert(entry.full_path.as_str()) {
                 continue;
             }
-            Self::write_manifest_entry(&mut manifest, entry);
+            Self::write_manifest_entry(&mut manifest, entry, &self.manifest_version);
         }
 
         manifest.push_str("</manifest:manifest>");
@@ -647,21 +673,6 @@ impl<W: Write> PackageWriter<W> {
         if !self.wrote_mimetype {
             return Err(Error::InvalidFormat("MIME type not set".to_string()));
         }
-
-        // Add META-INF directory to manifest
-        self.manifest_entries.push(ManifestEntry {
-            full_path: "META-INF/".to_string(),
-            media_type: String::new(),
-            size: None,
-            encryption: None,
-        });
-
-        self.manifest_entries.push(ManifestEntry {
-            full_path: "META-INF/manifest.xml".to_string(),
-            media_type: "text/xml".to_string(),
-            size: None,
-            encryption: None,
-        });
 
         // Generate and write manifest
         let manifest_content = self.generate_manifest();
@@ -737,9 +748,13 @@ impl PackageWriter<BoundedBytes> {
 }
 
 impl<W: Write> PackageWriter<W> {
-    fn write_manifest_entry(xml: &mut String, entry: &ManifestEntry) {
+    fn write_manifest_entry(xml: &mut String, entry: &ManifestEntry, manifest_version: &str) {
         xml.push_str("<manifest:file-entry manifest:full-path=\"");
         xml.push_str(&escape_xml(&entry.full_path));
+        if entry.full_path == "/" {
+            xml.push_str("\" manifest:version=\"");
+            xml.push_str(manifest_version);
+        }
         xml.push_str("\" manifest:media-type=\"");
         xml.push_str(&escape_xml(&entry.media_type));
         xml.push('"');
@@ -891,6 +906,63 @@ impl Structure {
     #[must_use]
     pub fn default_settings_xml() -> String {
         r#"<?xml version="1.0" encoding="UTF-8"?><office:document-settings xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0" xmlns:ooo="http://openoffice.org/2004/office" office:version="1.3"><office:settings><config:config-item-set config:name="ooo:view-settings"><config:config-item config:name="ViewAreaTop" config:type="long">0</config:config-item><config:config-item config:name="ViewAreaLeft" config:type="long">0</config:config-item><config:config-item config:name="ViewAreaWidth" config:type="long">1</config:config-item><config:config-item config:name="ViewAreaHeight" config:type="long">1</config:config-item></config:config-item-set></office:settings></office:document-settings>"#.to_string()
+    }
+}
+
+fn source_manifest_version(bytes: &[u8]) -> Result<Option<String>> {
+    let mut reader = NsReader::from_reader(bytes);
+    let mut buffer = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid source manifest XML: {error}"))
+            })?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE)
+                    && element.local_name().as_ref() == b"manifest" =>
+            {
+                for raw_attribute in element.attributes() {
+                    let attribute = raw_attribute.map_err(|error| {
+                        Error::InvalidFormat(format!("invalid source manifest attribute: {error}"))
+                    })?;
+                    let (attribute_namespace, local) =
+                        reader.resolver().resolve_attribute(attribute.key);
+                    if matches!(attribute_namespace, ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE)
+                        && local.as_ref() == b"version"
+                    {
+                        let version = attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid source manifest version: {error}"
+                                ))
+                            })?
+                            .into_owned();
+                        if !matches!(version.as_str(), "1.0" | "1.1" | "1.2" | "1.3" | "1.4") {
+                            return Err(Error::InvalidFormat(format!(
+                                "unsupported source manifest version '{version}'"
+                            )));
+                        }
+                        return Ok(Some(version));
+                    }
+                }
+                return Ok(None);
+            },
+            Event::Eof => return Ok(None),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
     }
 }
 
@@ -1144,6 +1216,69 @@ mod tests {
         assert!(manifest.contains("manifest:manifest"));
         assert!(manifest.contains("content.xml"));
         assert!(manifest.contains("text/xml"));
+        assert!(manifest.contains("manifest:full-path=\"/\" manifest:version=\"1.3\""));
+        assert!(!manifest.contains("manifest:full-path=\"META-INF/\""));
+        assert!(!manifest.contains("manifest:full-path=\"META-INF/manifest.xml\""));
+    }
+
+    #[test]
+    fn finalized_manifest_does_not_describe_itself_or_meta_inf() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.graphics")
+            .unwrap();
+        writer.add_file("content.xml", b"<content/>").unwrap();
+
+        let bytes = writer.finish().unwrap();
+        let archive = ArchiveReader::new(&bytes).unwrap();
+        let manifest = archive.read("META-INF/manifest.xml").unwrap();
+        let manifest = std::str::from_utf8(&manifest).unwrap();
+
+        assert!(!manifest.contains("manifest:full-path=\"META-INF/\""));
+        assert!(!manifest.contains("manifest:full-path=\"META-INF/manifest.xml\""));
+    }
+
+    #[test]
+    fn source_manifest_version_is_retained_during_auxiliary_copy() {
+        let mut source_writer = PackageWriter::new();
+        source_writer.manifest_version = "1.2".to_string();
+        source_writer
+            .set_mimetype("application/vnd.oasis.opendocument.graphics")
+            .unwrap();
+        source_writer
+            .add_file_with_media_type("Pictures/pixel.png", b"pixel", "image/png")
+            .unwrap();
+        let source = OwnedPackage::from_bytes(source_writer.finish().unwrap()).unwrap();
+
+        let mut destination = PackageWriter::new();
+        destination
+            .set_mimetype("application/vnd.oasis.opendocument.graphics")
+            .unwrap();
+        destination.copy_auxiliary_files_from(&source).unwrap();
+        let bytes = destination.finish().unwrap();
+        let archive = ArchiveReader::new(&bytes).unwrap();
+        let manifest = archive.read("META-INF/manifest.xml").unwrap();
+        let manifest = std::str::from_utf8(&manifest).unwrap();
+
+        assert!(manifest.contains("manifest:manifest"));
+        assert!(manifest.contains("manifest:version=\"1.2\""));
+        assert!(manifest.contains("manifest:full-path=\"/\" manifest:version=\"1.2\""));
+    }
+
+    #[test]
+    fn source_manifest_version_accepts_odf_1_4_and_rejects_unknown_versions() {
+        let namespace = String::from_utf8_lossy(MANIFEST_NAMESPACE);
+        let manifest = |version: &str| {
+            format!(
+                "<manifest:manifest xmlns:manifest=\"{namespace}\" manifest:version=\"{version}\"/>"
+            )
+        };
+
+        assert_eq!(
+            source_manifest_version(manifest("1.4").as_bytes()).unwrap(),
+            Some("1.4".to_string())
+        );
+        assert!(source_manifest_version(manifest("1.5").as_bytes()).is_err());
     }
 
     #[test]

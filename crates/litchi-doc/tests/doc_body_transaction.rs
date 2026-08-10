@@ -7,7 +7,7 @@ use litchi_cfb::OleWriter;
 use litchi_core::Position;
 use litchi_doc::Package;
 use litchi_doc::body_text::{CharacterProperty, Projection, Snapshot, Story, TextTarget};
-use litchi_doc::writer::{FloatingPosition, Picture, Writer};
+use litchi_doc::writer::{FloatingPosition, Kind, Picture, Shape, Writer};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -265,10 +265,23 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
 }
 
 #[test]
-fn genuine_receivers_accept_bounded_inline_and_floating_picture_graphs() {
+fn genuine_receivers_accept_pictures_beside_shapes_and_textboxes() {
     let image = std::fs::read(fixture("test-data/images/png/lena.png")).expect("PNG fixture");
     for floating in [false, true] {
         let mut writer = Writer::new();
+        writer
+            .insert_floating_shape(
+                Shape::new(Kind::Rectangle, 640, 320).expect("neighbor shape"),
+                FloatingPosition::new(120, 160),
+            )
+            .expect("neighbor shape run");
+        writer
+            .insert_floating_text_box(
+                Shape::new(Kind::Rectangle, 680, 360).expect("neighbor textbox"),
+                FloatingPosition::new(180, 220),
+                "unrelated textbox content",
+            )
+            .expect("neighbor textbox run");
         let picture = Picture::new(image.clone()).expect("native PNG picture");
         if floating {
             writer
@@ -300,7 +313,7 @@ fn genuine_receivers_accept_bounded_inline_and_floating_picture_graphs() {
         let plan = receiver
             .plan_picture_transfer_from(
                 &donor,
-                TextTarget::body_paragraph(Position::new(0)),
+                TextTarget::body_paragraph(Position::new(2)),
                 TextTarget::body_paragraph(destination),
             )
             .expect("bounded genuine picture transfer");

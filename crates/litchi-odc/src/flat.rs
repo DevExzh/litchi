@@ -12,6 +12,7 @@ use std::{collections::BTreeSet, ops::Range, sync::Arc};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const CHART: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
+const STYLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const SVG: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const MAX_NAME_BYTES: usize = 64 * 1024;
@@ -21,8 +22,11 @@ struct State {
     bytes: Vec<u8>,
     chart: Element,
     axes: Vec<AxisRecord>,
+    axis_tags: Vec<EditableTag>,
+    axis_child_tags: Vec<(ExactTarget, EditableTag)>,
     chart_tag: EditableTag,
     plot_tag: EditableTag,
+    plot_component_tags: Vec<(ExactTarget, EditableTag)>,
     coordinate_region_tag: Option<EditableTag>,
     decorative_tags: Vec<(ExactTarget, EditableTag)>,
     series_tags: Vec<EditableTag>,
@@ -178,6 +182,25 @@ impl FlatChart {
                 .find(|(candidate, _tag)| *candidate == target)
                 .map(|(_target, tag)| tag)
                 .ok_or_else(|| invalid_error("flat ODC decorative selector is missing")),
+            ExactTarget::Axis(index) => self
+                .0
+                .axis_tags
+                .get(index)
+                .ok_or_else(|| invalid_error("flat ODC axis selector is out of bounds")),
+            ExactTarget::Categories { .. } | ExactTarget::Grid { .. } => self
+                .0
+                .axis_child_tags
+                .iter()
+                .find(|(candidate, _tag)| *candidate == target)
+                .map(|(_target, tag)| tag)
+                .ok_or_else(|| invalid_error("flat ODC axis-child selector is missing")),
+            ExactTarget::Wall | ExactTarget::Floor => self
+                .0
+                .plot_component_tags
+                .iter()
+                .find(|(candidate, _tag)| *candidate == target)
+                .map(|(_target, tag)| tag)
+                .ok_or_else(|| invalid_error("flat ODC plot-component selector is missing")),
             ExactTarget::Series(index) => self
                 .0
                 .series_tags
@@ -202,7 +225,7 @@ impl EditableTag {
     }
 }
 
-/// A byte-preserving exact-edit target outside the axis compatibility surface.
+/// A byte-preserving exact-edit target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ExactTarget {
     /// The root `chart:chart` element.
@@ -219,6 +242,24 @@ pub enum ExactTarget {
     Footer,
     /// The root chart legend.
     Legend,
+    /// A direct plot-area axis selected by zero-based position.
+    Axis(usize),
+    /// The categories binding inside one axis.
+    Categories {
+        /// Zero-based plot-area axis index.
+        axis: usize,
+    },
+    /// A grid inside one axis, selected by zero-based position within that axis.
+    Grid {
+        /// Zero-based plot-area axis index.
+        axis: usize,
+        /// Zero-based grid index within the selected axis.
+        index: usize,
+    },
+    /// The plot-area wall.
+    Wall,
+    /// The plot-area floor.
+    Floor,
     /// A direct plot-area series selected by zero-based position.
     Series(usize),
 }
@@ -239,6 +280,9 @@ pub enum ExactAttribute {
     AttachedAxis,
     LegendPosition,
     LegendAlign,
+    DataSourceHasLabels,
+    Dimension,
+    LegendExpansion,
 }
 
 /// One validated exact-span attribute change.
@@ -341,7 +385,7 @@ pub struct FlatChartEdit {
 }
 
 impl FlatChartEdit {
-    /// Stage a controlled attribute edit on the chart, plot area, or a series.
+    /// Stage a controlled chart attribute edit using an exact source span.
     ///
     /// `None` removes an existing optional attribute. Adding an absent
     /// attribute is supported only for chart-namespace attributes whose
@@ -362,6 +406,9 @@ impl FlatChartEdit {
             value.len() > MAX_NAME_BYTES || value.len() > self.source.0.limits.max_scalar_bytes()
         }) {
             return Err(invalid_error("flat ODC attribute exceeds its byte limit"));
+        }
+        if let Some(value) = after.as_deref() {
+            validate_exact_value(target, attribute, value)?;
         }
         let tag = self.source.tag(target)?;
         let before = tag.value(attribute).map(str::to_owned);
@@ -460,9 +507,9 @@ impl FlatChartEdit {
         let FlatChartEdit {
             source,
             changes,
-            exact_changes,
+            exact_changes: staged_exact_changes,
         } = self;
-        let mut replacements = Vec::with_capacity(changes.len() + exact_changes.len());
+        let mut replacements = Vec::with_capacity(changes.len() + staged_exact_changes.len());
         for change in &changes {
             let axis = &source.0.axes[change.index];
             if change.before != change.after {
@@ -488,7 +535,7 @@ impl FlatChartEdit {
                 )?;
             }
         }
-        for change in &exact_changes {
+        for change in &staged_exact_changes {
             let tag = source.tag(change.target)?;
             stage_exact_attribute(
                 &source,
@@ -522,11 +569,12 @@ impl FlatChartEdit {
                 return Err(invalid_error("flat ODC style edit failed typed readback"));
             }
         }
-        for change in &exact_changes {
+        for change in &staged_exact_changes {
             if snapshot.tag(change.target)?.value(change.attribute) != change.after.as_deref() {
                 return Err(invalid_error("flat ODC exact edit failed typed readback"));
             }
         }
+        let exact_changes = exact_changes_between(&source, &snapshot);
         Ok(FlatChartCommit {
             snapshot: snapshot.clone(),
             patch: FlatChartPatch {
@@ -627,11 +675,21 @@ impl FlatChartPatch {
             .changes
             .iter()
             .map(|change| SpliceTarget::Axis(change.index))
-            .chain(
-                self.exact_changes
-                    .iter()
-                    .map(|change| SpliceTarget::Exact(change.target)),
-            )
+            .chain(self.exact_changes.iter().map(|change| match change.target {
+                ExactTarget::Axis(index) => SpliceTarget::Axis(index),
+                exact_target @ (ExactTarget::Chart
+                | ExactTarget::PlotArea
+                | ExactTarget::CoordinateRegion
+                | ExactTarget::Title
+                | ExactTarget::Subtitle
+                | ExactTarget::Footer
+                | ExactTarget::Legend
+                | ExactTarget::Categories { .. }
+                | ExactTarget::Grid { .. }
+                | ExactTarget::Wall
+                | ExactTarget::Floor
+                | ExactTarget::Series(_)) => SpliceTarget::Exact(exact_target),
+            }))
             .collect::<BTreeSet<_>>();
         let mut splices = Vec::with_capacity(targets.len());
         for splice_target in std::mem::take(&mut targets) {
@@ -819,7 +877,9 @@ enum NamespaceKind {
 }
 
 pub(crate) fn exact_changes_between(source: &FlatChart, target: &FlatChart) -> Vec<ExactChange> {
-    if source.0.series_tags.len() != target.0.series_tags.len() {
+    if source.0.axes.len() != target.0.axes.len()
+        || source.0.series_tags.len() != target.0.series_tags.len()
+    {
         return Vec::new();
     }
     let targets = std::iter::once(ExactTarget::Chart)
@@ -831,6 +891,15 @@ pub(crate) fn exact_changes_between(source: &FlatChart, target: &FlatChart) -> V
             ExactTarget::Footer,
             ExactTarget::Legend,
         ])
+        .chain([ExactTarget::Wall, ExactTarget::Floor])
+        .chain((0..source.0.axis_tags.len()).map(ExactTarget::Axis))
+        .chain(
+            source
+                .0
+                .axis_child_tags
+                .iter()
+                .map(|(exact_target, _tag)| *exact_target),
+        )
         .chain((0..source.0.series_tags.len()).map(ExactTarget::Series));
     let mut changes = Vec::new();
     for exact_target in targets {
@@ -875,6 +944,7 @@ fn validate_exact_pair(target: ExactTarget, attribute: ExactAttribute) -> Result
             attribute,
             ExactAttribute::StyleName
                 | ExactAttribute::CellRangeAddress
+                | ExactAttribute::DataSourceHasLabels
                 | ExactAttribute::X
                 | ExactAttribute::Y
                 | ExactAttribute::Width
@@ -898,7 +968,18 @@ fn validate_exact_pair(target: ExactTarget, attribute: ExactAttribute) -> Result
                 | ExactAttribute::Y
                 | ExactAttribute::LegendPosition
                 | ExactAttribute::LegendAlign
+                | ExactAttribute::LegendExpansion
         ),
+        ExactTarget::Axis(_) => matches!(attribute, ExactAttribute::Dimension),
+        ExactTarget::Categories { .. } => {
+            matches!(attribute, ExactAttribute::CellRangeAddress)
+        },
+        ExactTarget::Grid { .. } => {
+            matches!(attribute, ExactAttribute::Class | ExactAttribute::StyleName)
+        },
+        ExactTarget::Wall | ExactTarget::Floor => {
+            matches!(attribute, ExactAttribute::StyleName)
+        },
         ExactTarget::Series(_) => matches!(
             attribute,
             ExactAttribute::Class
@@ -927,6 +1008,13 @@ fn exact_attribute(namespace: &ResolveResult<'_>, local: &[u8]) -> Option<ExactA
             b"attached-axis" => Some(ExactAttribute::AttachedAxis),
             b"legend-position" => Some(ExactAttribute::LegendPosition),
             b"legend-align" => Some(ExactAttribute::LegendAlign),
+            b"data-source-has-labels" => Some(ExactAttribute::DataSourceHasLabels),
+            b"dimension" => Some(ExactAttribute::Dimension),
+            _ => None,
+        }
+    } else if resolved(namespace, STYLE) {
+        match local {
+            b"legend-expansion" => Some(ExactAttribute::LegendExpansion),
             _ => None,
         }
     } else if resolved(namespace, SVG) {
@@ -963,6 +1051,44 @@ fn attribute_name(attribute: ExactAttribute) -> (&'static [u8], &'static str) {
         ExactAttribute::AttachedAxis => (CHART, "attached-axis"),
         ExactAttribute::LegendPosition => (CHART, "legend-position"),
         ExactAttribute::LegendAlign => (CHART, "legend-align"),
+        ExactAttribute::DataSourceHasLabels => (CHART, "data-source-has-labels"),
+        ExactAttribute::Dimension => (CHART, "dimension"),
+        ExactAttribute::LegendExpansion => (STYLE, "legend-expansion"),
+    }
+}
+
+fn validate_exact_value(target: ExactTarget, attribute: ExactAttribute, value: &str) -> Result<()> {
+    let valid = match attribute {
+        ExactAttribute::Class if matches!(target, ExactTarget::Grid { .. }) => {
+            matches!(value, "major" | "minor")
+        },
+        ExactAttribute::DataSourceHasLabels => {
+            matches!(value, "none" | "row" | "column" | "both")
+        },
+        ExactAttribute::Dimension => matches!(value, "x" | "y" | "z"),
+        ExactAttribute::LegendExpansion => {
+            matches!(value, "wide" | "high" | "balanced" | "custom")
+        },
+        ExactAttribute::Class
+        | ExactAttribute::StyleName
+        | ExactAttribute::Width
+        | ExactAttribute::Height
+        | ExactAttribute::X
+        | ExactAttribute::Y
+        | ExactAttribute::CellRangeAddress
+        | ExactAttribute::CellRange
+        | ExactAttribute::ValuesCellRangeAddress
+        | ExactAttribute::LabelCellAddress
+        | ExactAttribute::AttachedAxis
+        | ExactAttribute::LegendPosition
+        | ExactAttribute::LegendAlign => true,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(invalid_error(
+            "flat ODC attribute value is not an allowed ODF token",
+        ))
     }
 }
 
@@ -987,6 +1113,63 @@ fn push_decorative_tag(
 ) -> Result<()> {
     if tags.iter().any(|(candidate, _tag)| *candidate == target) {
         return Err(invalid_error("flat ODC decorative element is duplicated"));
+    }
+    tags.push((
+        target,
+        record_editable_tag(reader, element, tag, bytes, target, limits)?,
+    ));
+    Ok(())
+}
+
+fn push_axis_child_tag(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    tag: Range<usize>,
+    bytes: &[u8],
+    local: &[u8],
+    axis: usize,
+    tags: &mut Vec<(ExactTarget, EditableTag)>,
+    limits: crate::Limits,
+) -> Result<()> {
+    let target = if local == b"categories" {
+        let target = ExactTarget::Categories { axis };
+        if tags.iter().any(|(candidate, _tag)| *candidate == target) {
+            return Err(invalid_error("flat ODC axis categories are duplicated"));
+        }
+        target
+    } else {
+        let mut index = 0;
+        for (candidate, _tag) in &*tags {
+            if matches!(candidate, ExactTarget::Grid { axis: candidate_axis, .. } if *candidate_axis == axis)
+            {
+                index += 1;
+            }
+        }
+        ExactTarget::Grid { axis, index }
+    };
+    tags.push((
+        target,
+        record_editable_tag(reader, element, tag, bytes, target, limits)?,
+    ));
+    Ok(())
+}
+
+fn push_plot_component_tag(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    tag: Range<usize>,
+    bytes: &[u8],
+    local: &[u8],
+    tags: &mut Vec<(ExactTarget, EditableTag)>,
+    limits: crate::Limits,
+) -> Result<()> {
+    let target = if local == b"wall" {
+        ExactTarget::Wall
+    } else {
+        ExactTarget::Floor
+    };
+    if tags.iter().any(|(candidate, _tag)| *candidate == target) {
+        return Err(invalid_error("flat ODC plot component is duplicated"));
     }
     tags.push((
         target,
@@ -1022,11 +1205,15 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
     let mut chart_seen = false;
     let mut plot_depth = None;
     let mut plot_seen = false;
+    let mut axis_depth = None;
     let mut root_start_name = None;
     let mut root_end_name = None;
     let mut axes = Vec::new();
+    let mut axis_tags = Vec::new();
+    let mut axis_child_tags = Vec::new();
     let mut chart_tag = None;
     let mut plot_tag = None;
+    let mut plot_component_tags = Vec::new();
     let mut coordinate_region_tag = None;
     let mut decorative_tags = Vec::new();
     let mut series_tags = Vec::new();
@@ -1105,12 +1292,37 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                     && local.as_ref() == b"axis"
                     && plot_depth == Some(event_depth - 1)
                 {
+                    let index = axes.len();
                     push_axis(
                         &reader,
                         &element,
                         event_start..event_end,
                         &bytes,
                         &mut axes,
+                        limits,
+                    )?;
+                    axis_tags.push(record_editable_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        ExactTarget::Axis(index),
+                        limits,
+                    )?);
+                    axis_depth = Some((event_depth, index));
+                } else if namespace == NamespaceKind::Chart
+                    && matches!(local.as_ref(), b"categories" | b"grid")
+                    && let Some((parent_depth, axis)) = axis_depth
+                    && parent_depth == event_depth - 1
+                {
+                    push_axis_child_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        local.as_ref(),
+                        axis,
+                        &mut axis_child_tags,
                         limits,
                     )?;
                 } else if namespace == NamespaceKind::Chart
@@ -1141,6 +1353,19 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         ExactTarget::Series(index),
                         limits,
                     )?);
+                } else if namespace == NamespaceKind::Chart
+                    && plot_depth == Some(event_depth - 1)
+                    && matches!(local.as_ref(), b"wall" | b"floor")
+                {
+                    push_plot_component_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        local.as_ref(),
+                        &mut plot_component_tags,
+                        limits,
+                    )?;
                 } else if namespace == NamespaceKind::Chart
                     && chart_depth == Some(event_depth - 1)
                     && let Some(target) = decorative_target(local.as_ref())
@@ -1185,12 +1410,37 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                     && local.as_ref() == b"axis"
                     && plot_depth == Some(event_depth - 1)
                 {
+                    let index = axes.len();
                     push_axis(
                         &reader,
                         &element,
                         event_start..event_end,
                         &bytes,
                         &mut axes,
+                        limits,
+                    )?;
+                    axis_tags.push(record_editable_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        ExactTarget::Axis(index),
+                        limits,
+                    )?);
+                }
+                if namespace == NamespaceKind::Chart
+                    && matches!(local.as_ref(), b"categories" | b"grid")
+                    && let Some((parent_depth, axis)) = axis_depth
+                    && parent_depth == event_depth - 1
+                {
+                    push_axis_child_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        local.as_ref(),
+                        axis,
+                        &mut axis_child_tags,
                         limits,
                     )?;
                 }
@@ -1207,6 +1457,20 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         ExactTarget::Series(index),
                         limits,
                     )?);
+                }
+                if namespace == NamespaceKind::Chart
+                    && plot_depth == Some(event_depth - 1)
+                    && matches!(local.as_ref(), b"wall" | b"floor")
+                {
+                    push_plot_component_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        local.as_ref(),
+                        &mut plot_component_tags,
+                        limits,
+                    )?;
                 }
                 if namespace == NamespaceKind::Chart
                     && local.as_ref() == b"coordinate-region"
@@ -1258,6 +1522,12 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                 {
                     plot_depth = None;
                 }
+                if axis_depth.is_some_and(|(axis, _index)| axis == depth)
+                    && namespace == NamespaceKind::Chart
+                    && local.as_ref() == b"axis"
+                {
+                    axis_depth = None;
+                }
                 if chart_depth == Some(depth)
                     && namespace == NamespaceKind::Chart
                     && local.as_ref() == b"chart"
@@ -1306,6 +1576,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
         || office_chart_depth.is_some()
         || chart_depth.is_some()
         || plot_depth.is_some()
+        || axis_depth.is_some()
     {
         return Err(invalid_error("flat ODC structure is incomplete"));
     }
@@ -1337,8 +1608,11 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
         bytes,
         chart,
         axes,
+        axis_tags,
+        axis_child_tags,
         chart_tag: chart_tag.ok_or_else(|| invalid_error("flat ODC chart tag is missing"))?,
         plot_tag: plot_tag.ok_or_else(|| invalid_error("flat ODC plot-area tag is missing"))?,
+        plot_component_tags,
         coordinate_region_tag,
         decorative_tags,
         series_tags,

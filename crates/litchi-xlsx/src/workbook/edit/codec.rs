@@ -264,6 +264,7 @@ pub(super) fn create_sheets(
             columns,
             merges,
             page_breaks,
+            page_margins,
             page_setup,
             print_options,
         } = actions;
@@ -396,6 +397,14 @@ pub(super) fn create_sheets(
             });
             content = crate::page_breaks::replace(&content, page_breaks)?;
         }
+        if let Some(OptionalAction::Put(page_margins)) = &page_margins {
+            changes.push(Change::PageMargins {
+                sheet: name.as_str().into(),
+                before: None,
+                after: Some(*page_margins),
+            });
+            content = crate::page_margins::replace_page_margins(&content, Some(page_margins))?;
+        }
         if let Some(OptionalAction::Put(page_setup)) = &page_setup {
             changes.push(Change::PageSetup {
                 sheet: name.as_str().into(),
@@ -482,6 +491,18 @@ pub(super) fn create_sheets(
                     if &actual != expected {
                         return Err(invalid(format!(
                             "new worksheet page-break verification failed at {sheet}"
+                        )));
+                    }
+                },
+                Change::PageMargins {
+                    sheet,
+                    after: expected,
+                    ..
+                } => {
+                    let actual = crate::page_margins::parse_page_margins(&content)?;
+                    if &actual != expected {
+                        return Err(invalid(format!(
+                            "new worksheet page-margin verification failed at {sheet}"
                         )));
                     }
                 },

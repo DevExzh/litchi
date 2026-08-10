@@ -18,6 +18,8 @@ pub enum ShapeTransferRefusal {
     ContentPart,
     /// The selected closure contains an extension shape unknown to this release.
     UnknownExtensionShape,
+    /// A generic `graphicFrame` payload has no typed dependency vocabulary.
+    UnclassifiedGraphicFrame,
     /// A known common shape lacks its required non-visual identity.
     MissingIdentity,
     /// A connector endpoint does not resolve to a transferable shape on the source slide.
@@ -30,6 +32,7 @@ impl std::fmt::Display for ShapeTransferRefusal {
             Self::NestedShape => "nested shape selection",
             Self::ContentPart => "content-part shape",
             Self::UnknownExtensionShape => "unknown extension shape",
+            Self::UnclassifiedGraphicFrame => "unclassified graphic frame",
             Self::MissingIdentity => "missing non-visual identity",
             Self::UnresolvedConnectorEndpoint => "unresolved connector endpoint",
         })

@@ -90,9 +90,12 @@ pub fn replace_reference_mark_xml(
     replacement: &ReferenceMark,
 ) -> Result<String> {
     let (existing, scan) = validated_scan(xml)?;
-    let old = existing.get(ordinal).cloned().ok_or_else(|| {
-        Error::InvalidFormat(format!("reference-mark ordinal {ordinal} is out of bounds"))
-    })?;
+    existing
+        .get(ordinal)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!("reference-mark ordinal {ordinal} is out of bounds"))
+        })
+        .map(|_| ())?;
     ensure_unique_name(&existing, Some(ordinal), replacement.name())?;
     let location = scan.marks.get(ordinal).ok_or_else(|| {
         Error::InvalidFormat("reference-mark semantic and lexical scans disagree".to_string())
@@ -119,16 +122,18 @@ pub fn replace_reference_mark_xml(
             },
         ) => apply_edits(xml, vec![(end.clone(), close), (start.clone(), open)])?,
     };
-    let _ = old;
     Ok(output)
 }
 
 /// Remove marker elements while retaining all text and markup enclosed by a range.
 pub fn remove_reference_mark_xml(xml: &str, ordinal: usize) -> Result<String> {
     let (existing, scan) = validated_scan(xml)?;
-    let old = existing.get(ordinal).cloned().ok_or_else(|| {
-        Error::InvalidFormat(format!("reference-mark ordinal {ordinal} is out of bounds"))
-    })?;
+    existing
+        .get(ordinal)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!("reference-mark ordinal {ordinal} is out of bounds"))
+        })
+        .map(|_| ())?;
     let location = scan.marks.get(ordinal).ok_or_else(|| {
         Error::InvalidFormat("reference-mark semantic and lexical scans disagree".to_string())
     })?;
@@ -138,7 +143,6 @@ pub fn remove_reference_mark_xml(xml: &str, ordinal: usize) -> Result<String> {
             vec![(end.clone(), String::new()), (start.clone(), String::new())]
         },
     };
-    let _ = old;
     apply_edits(xml, edits)
 }
 
@@ -326,7 +330,7 @@ fn scan_locations(xml: &str) -> Result<Scan> {
                 let local = local_name.as_ref();
                 if text_element && matches!(local, b"p" | b"h") {
                     let qname = std::str::from_utf8(element.name().as_ref())
-                        .map_err(|_| {
+                        .map_err(|_error| {
                             Error::InvalidFormat(
                                 "non-UTF-8 reference-mark paragraph name".to_string(),
                             )

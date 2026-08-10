@@ -5,15 +5,22 @@
 )]
 
 use litchi_core::sheet::{CellValue, traits::WorkbookTrait};
-use litchi_xlsb::Workbook;
 use litchi_xlsb::cell_values::{
-    AuthoredStyle, CellFormula, Reference, TransferLimits, Value, WorkbookHistory, WorkbookPatch,
+    AuthoredStyle, CellFormula, DrawingTransferRefusal, Reference, TransferLimits, Value,
+    WorkbookHistory, WorkbookPatch,
 };
+use litchi_xlsb::chart::{Chart, ExternalDataPart};
 use litchi_xlsb::named_ranges::Definition as NamedRange;
 use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
 use litchi_xlsb::package::{SharedString, SharedStringRun};
+use litchi_xlsb::shapes::{
+    Anchor as ShapeAnchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset, Object as ShapeObject,
+    Preset,
+};
 use litchi_xlsb::styles::{Alignment, Fill, Font, HorizontalAlignment, VerticalAlignment};
 use litchi_xlsb::writer::{ChartAnchor, Image, ImageFormat, MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
+use litchi_xlsb::{Package, Workbook};
 use litchi_xlsb::{Parser, TableColumns, TableDataType, TableReference, TableRowType, Token};
 use std::fs::File;
 use std::io::Cursor;
@@ -35,6 +42,120 @@ fn producer_workbook(name: &str, initial_value: Option<&str>) -> Workbook {
     let mut bytes = Cursor::new(Vec::new());
     producer.save(&mut bytes).expect("producer save");
     Workbook::new(Cursor::new(bytes.into_inner())).expect("producer reopen")
+}
+
+fn shape_marker(column: u32, row: u32) -> CellMarker {
+    CellMarker {
+        column,
+        row,
+        column_offset: Emu(0),
+        row_offset: Emu(0),
+    }
+}
+
+fn shape_graph_workbook(name: &str) -> Workbook {
+    let child_anchor = ShapeAnchor::TwoCell {
+        from: shape_marker(0, 0),
+        to: shape_marker(1, 1),
+        edit_as: EditAs::TwoCell,
+    };
+    let group = GroupSpec::new(
+        "Pair",
+        ShapeAnchor::OneCell {
+            from: shape_marker(2, 1),
+            extent: EmuExtent {
+                width: Emu(4_000_000),
+                height: Emu(2_000_000),
+            },
+        },
+    )
+    .with_child(ShapeSpec::shape("Left", child_anchor, Preset::Rect, "L").into())
+    .with_child(ShapeSpec::shape("Right", child_anchor, Preset::Ellipse, "R").into());
+    let connection = ConnectionShapeSpec::new(
+        "Bridge",
+        ShapeAnchor::Absolute {
+            position: EmuOffset {
+                x: Emu(500_000),
+                y: Emu(500_000),
+            },
+            extent: EmuExtent {
+                width: Emu(1_000_000),
+                height: Emu(1_000_000),
+            },
+        },
+        Preset::StraightConnector1,
+        ConnectionEndSpec {
+            shape_name: "Left".to_string(),
+            site: 1,
+        },
+        ConnectionEndSpec {
+            shape_name: "Right".to_string(),
+            site: 2,
+        },
+    );
+    let mut sheet = MutableWorksheet::new(name);
+    sheet
+        .add_shape(ShapeSpec::shape(
+            "Standalone",
+            child_anchor,
+            Preset::RoundRect,
+            "S",
+        ))
+        .expect("standalone shape");
+    sheet.add_group(group).expect("shape group");
+    sheet.add_connection(connection).expect("shape connection");
+    let mut writer = WorkbookWriter::new();
+    writer.add_worksheet(sheet);
+    let mut bytes = Cursor::new(Vec::new());
+    writer.save(&mut bytes).expect("shape graph save");
+    Workbook::new(Cursor::new(bytes.into_inner())).expect("shape graph reopen")
+}
+
+fn collect_object_ids(object: &ShapeObject, output: &mut Vec<u32>) {
+    match object {
+        ShapeObject::Shape(shape) => output.extend(shape.non_visual.id),
+        ShapeObject::ConnectionShape(connection) => output.extend(connection.non_visual.id),
+        ShapeObject::Group(group) => {
+            output.extend(group.non_visual.id);
+            for child in &group.children {
+                collect_object_ids(child, output);
+            }
+        },
+        ShapeObject::OleObject(object) => output.extend(object.non_visual.id),
+        ShapeObject::Unknown(_) => {},
+    }
+}
+
+fn collect_object_names(object: &ShapeObject, output: &mut Vec<String>) {
+    match object {
+        ShapeObject::Shape(shape) => output.extend(shape.non_visual.name.clone()),
+        ShapeObject::ConnectionShape(connection) => {
+            output.extend(connection.non_visual.name.clone());
+        },
+        ShapeObject::Group(group) => {
+            output.extend(group.non_visual.name.clone());
+            for child in &group.children {
+                collect_object_names(child, output);
+            }
+        },
+        ShapeObject::OleObject(object) => output.extend(object.non_visual.name.clone()),
+        ShapeObject::Unknown(_) => {},
+    }
+}
+
+fn standard_drawing_xml(workbook: &Workbook) -> Vec<u8> {
+    let mut bytes = Cursor::new(Vec::new());
+    workbook.save(&mut bytes).expect("workbook package save");
+    let package = Package::from_slice(bytes.get_ref()).expect("package reopen");
+    package
+        .opc_package()
+        .iter_parts()
+        .find(|part| {
+            part.content_type() == "application/vnd.openxmlformats-officedocument.drawing+xml"
+        })
+        .expect("standard drawing part")
+        .blob()
+        .to_vec()
 }
 
 fn formula_dependency_workbook(source_order: bool) -> Workbook {
@@ -351,6 +472,215 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         appended_drawing.images[1].description.as_deref(),
         Some("appended image")
     );
+}
+
+#[test]
+fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
+    let source = shape_graph_workbook("Source shapes");
+    let mut empty_target = producer_workbook("Empty target", None);
+    let mut empty_edit = empty_target
+        .edit_workbook_structure()
+        .expect("empty drawing edit");
+    empty_edit
+        .transfer_drawing_object(&source, 0, 2, 0)
+        .expect("new connector drawing transfer");
+    let empty_commit = empty_edit.commit().expect("new drawing commit");
+    empty_target
+        .apply_workbook_structure(&empty_commit)
+        .expect("publish new drawing");
+    assert_eq!(
+        empty_target
+            .sheet_drawing(0)
+            .expect("new target drawing")
+            .drawing
+            .anchors
+            .len(),
+        2
+    );
+
+    let mut target = shape_graph_workbook("Target shapes");
+    let before = target.sheet_drawing(0).expect("target drawing");
+    assert_eq!(before.drawing.anchors.len(), 3);
+
+    let mut drawing_edit = target.edit_workbook_structure().expect("drawing edit");
+    drawing_edit
+        .transfer_drawing_object(&source, 0, 2, 0)
+        .expect("connector closure transfer");
+    let drawing_commit = drawing_edit.commit().expect("drawing commit");
+    let durable = drawing_commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable drawing patch");
+    let drawing_patch =
+        WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT).expect("drawing patch replay");
+
+    let mut rename_edit = target.edit_workbook_structure().expect("rename edit");
+    rename_edit
+        .rename_sheet(0, "Transferred graphs".to_string())
+        .expect("rename");
+    let rename_commit = rename_edit.commit().expect("rename commit");
+    let merged = drawing_patch
+        .merge_three_way(rename_commit.patch())
+        .expect("drawing/name merge");
+    assert!(merged.conflicts().is_empty());
+    let merged = merged.patch().expect("merged drawing patch").clone();
+    merged.apply(&mut target).expect("publish drawing graph");
+
+    let drawing = target.sheet_drawing(0).expect("transferred drawing");
+    assert_eq!(drawing.drawing.anchors.len(), 5);
+    assert_eq!(drawing.shapes.len(), 5);
+    let mut ids = Vec::new();
+    for anchored in &drawing.shapes {
+        collect_object_ids(&anchored.object, &mut ids);
+    }
+    let mut unique = ids.clone();
+    unique.sort_unstable();
+    unique.dedup();
+    assert_eq!(unique.len(), ids.len(), "all remapped IDs must be unique");
+    let mut names = Vec::new();
+    for anchored in &drawing.shapes {
+        collect_object_names(&anchored.object, &mut names);
+    }
+    let mut unique_names = names
+        .iter()
+        .map(|name| name.to_lowercase())
+        .collect::<Vec<_>>();
+    unique_names.sort_unstable();
+    unique_names.dedup();
+    assert_eq!(
+        unique_names.len(),
+        names.len(),
+        "all colliding imported names must be unique"
+    );
+    let ShapeObject::ConnectionShape(connection) = &drawing.shapes[4].object else {
+        panic!("transferred closure should end with its connector")
+    };
+    assert!(connection.start.is_some());
+    assert!(connection.end.is_some());
+
+    let mut history = WorkbookHistory::new(TransferLimits::DEFAULT).expect("drawing history");
+    history.push(merged).expect("retain drawing patch");
+    history.undo(&mut target).expect("undo drawing graph");
+    assert_eq!(
+        target
+            .sheet_drawing(0)
+            .expect("undone target drawing")
+            .drawing
+            .anchors
+            .len(),
+        3
+    );
+    history.redo(&mut target).expect("redo drawing graph");
+    assert_eq!(
+        target.worksheet_names(),
+        &["Transferred graphs".to_string()]
+    );
+}
+
+#[test]
+fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads() {
+    const GIF_1X1: &[u8] = &[
+        0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00,
+        0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
+    ];
+    let chart = Chart::bar_chart(
+        "Transferred chart",
+        "Source!$A$1:$A$2",
+        "Source!$B$1:$B$2",
+        ChartAnchor::new(0, 0, 7, 12),
+    )
+    .expect("chart")
+    .with_external_data_part(
+        ExternalDataPart::embedded_workbook(b"PK exact chart workbook".to_vec()),
+        Some(false),
+    );
+    let mut source_sheet = MutableWorksheet::new("Source");
+    source_sheet.add_chart(chart).expect("source chart");
+    let mut source_writer = WorkbookWriter::new();
+    source_writer.add_worksheet(source_sheet);
+    let mut source_bytes = Cursor::new(Vec::new());
+    source_writer.save(&mut source_bytes).expect("source save");
+    let source = Workbook::new(Cursor::new(source_bytes.into_inner())).expect("source reopen");
+
+    let mut target_sheet = MutableWorksheet::new("Target");
+    target_sheet
+        .add_image(
+            Image::new(
+                GIF_1X1.to_vec(),
+                ImageFormat::Gif,
+                ChartAnchor::new(8, 1, 10, 4),
+            )
+            .expect("target image")
+            .with_description("retained target image")
+            .expect("target description"),
+        )
+        .expect("add target image");
+    let mut target_writer = WorkbookWriter::new();
+    target_writer.add_worksheet(target_sheet);
+    let mut target_bytes = Cursor::new(Vec::new());
+    target_writer.save(&mut target_bytes).expect("target save");
+    let mut target = Workbook::new(Cursor::new(target_bytes.into_inner())).expect("target reopen");
+    let existing_drawing_xml = standard_drawing_xml(&target);
+
+    let mut edit = target
+        .edit_workbook_structure()
+        .expect("chart transfer edit");
+    edit.transfer_drawing_object(&source, 0, 0, 0)
+        .expect("chart graph transfer");
+    let commit = edit.commit().expect("chart transfer commit");
+    let durable = commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable chart graph");
+    WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
+        .expect("chart graph replay")
+        .apply(&mut target)
+        .expect("publish chart graph");
+
+    let transferred_drawing_xml = standard_drawing_xml(&target);
+    let root_close = existing_drawing_xml
+        .windows(b"</xdr:wsDr>".len())
+        .rposition(|window| window == b"</xdr:wsDr>")
+        .expect("drawing root close");
+    assert_eq!(
+        &transferred_drawing_xml[..root_close],
+        &existing_drawing_xml[..root_close],
+        "all existing drawing bytes before the root close stay exact"
+    );
+    let retained_suffix = &existing_drawing_xml[root_close..];
+    assert!(transferred_drawing_xml.ends_with(retained_suffix));
+
+    let drawing = target.sheet_drawing(0).expect("target chart drawing");
+    assert_eq!(drawing.drawing.anchors.len(), 2);
+    assert_eq!(drawing.images.len(), 1);
+    assert_eq!(drawing.images[0].data.as_ref(), GIF_1X1);
+    assert_eq!(
+        drawing.images[0].description.as_deref(),
+        Some("retained target image")
+    );
+    assert_eq!(drawing.charts.len(), 1);
+    let external = drawing.charts[0]
+        .external_data_part
+        .as_ref()
+        .expect("transferred embedded workbook");
+    let litchi_xlsb::chart::ExternalDataTarget::Embedded { data, .. } = &external.target else {
+        panic!("chart external data should stay embedded")
+    };
+    assert_eq!(data, b"PK exact chart workbook");
+
+    let mut picture_edit = target
+        .edit_workbook_structure()
+        .expect("picture refusal edit");
+    let error = picture_edit
+        .transfer_drawing_object(&target, 0, 0, 0)
+        .expect_err("pictures use the image API");
+    assert!(matches!(
+        error,
+        litchi_xlsb::cell_values::Error::DrawingTransfer(
+            DrawingTransferRefusal::PictureUsesImageTransfer
+        )
+    ));
 }
 
 #[test]

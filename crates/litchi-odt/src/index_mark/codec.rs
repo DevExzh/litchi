@@ -345,7 +345,7 @@ fn validate_mark_attributes(
         .parse::<usize>()
         .ok()
         .as_ref()
-        .is_none_or(|level| *level <= 0)
+        .is_none_or(|level| *level == 0)
     {
         return Err(Error::InvalidFormat(
             "text:outline-level must be a positive integer".to_string(),

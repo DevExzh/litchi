@@ -2,8 +2,8 @@ use litchi_odb::{
     ActiveContentDisposition, ActiveContentKind, Builder, ChangeKind, Column, Component,
     ComponentKind, CompositionLimits, Connection, Database, DependencyDisposition, EditPolicy,
     History, HistoryLimits, Index, IndexColumn, JoinedEdits, Key, KeyColumn, KeyKind, MergeChoice,
-    MergePlan, Patch, ProtectionOperation, ProtectionSupport, Query, QueryUpdateTarget,
-    SealedPatch, SignaturePolicy, Table, TableKind,
+    MergePlan, Patch, ProtectionOperation, ProtectionSupport, Query, QueryJoinKind,
+    QueryParameterKind, QueryUpdateTarget, SealedPatch, SignaturePolicy, Table, TableKind,
 };
 
 const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:database><d:data-source/><d:queries/></o:database></o:body></o:document-content>"#;
@@ -470,7 +470,10 @@ fn bounded_transfer_copies_only_inert_semantic_declarations() {
         .unwrap();
     author
         .add_query(
-            Query::new("transferred-query", "SELECT id FROM transferred")
+            Query::new(
+                "transferred-query",
+                "SELECT t.id FROM transferred t LEFT OUTER JOIN public.related r ON r.id=t.id WHERE t.id=:id AND r.flag=? AND ':ignored'='?'",
+            )
                 .with_column(Column::new("id"))
                 .with_filter_statement("id > 0")
                 .with_order_statement("id ASC")
@@ -511,9 +514,70 @@ fn bounded_transfer_copies_only_inert_semantic_declarations() {
     assert_eq!(update_target.name(), "transferred");
     assert_eq!(update_target.schema_name(), Some("public"));
     assert_eq!(update_target.catalog_name(), Some("main"));
+    let command = query.command_inventory().unwrap();
+    assert_eq!(command.parameters().len(), 2);
+    assert_eq!(command.parameters()[0].kind(), QueryParameterKind::Named);
+    assert_eq!(command.parameters()[0].name(), Some("id"));
+    assert_eq!(
+        command.parameters()[1].kind(),
+        QueryParameterKind::Positional
+    );
+    assert_eq!(command.joins().len(), 1);
+    assert_eq!(command.joins()[0].kind(), QueryJoinKind::Left);
+    assert_eq!(command.joins()[0].relation(), "public.related");
     assert!(catalog.components().iter().any(|component| {
         component.kind() == ComponentKind::Report && component.name() == Some("transferred-report")
     }));
+}
+
+#[test]
+#[expect(clippy::unwrap_used, reason = "fixed inert SQL inventory fixture")]
+fn query_command_inventory_is_bounded_lexical_metadata_only() {
+    let query = Query::new(
+        "inventory",
+        "SELECT * FROM base \
+         INNER JOIN one ON true \
+         LEFT JOIN two ON true \
+         RIGHT OUTER JOIN three ON true \
+         FULL JOIN four ON true \
+         CROSS JOIN [five table] \
+         NATURAL JOIN \"public\".six \
+         WHERE base.id=:named AND one.id=? AND base.kind::text=':ignored ? JOIN nope' \
+         -- :commented ? LEFT JOIN hidden\n\
+         /* :blocked ? RIGHT JOIN hidden */",
+    );
+    let inventory = query.command_inventory().unwrap();
+    assert_eq!(inventory.parameters().len(), 2);
+    assert_eq!(inventory.parameters()[0].name(), Some("named"));
+    assert_eq!(inventory.parameters()[0].ordinal(), 1);
+    assert_eq!(inventory.parameters()[1].ordinal(), 2);
+    assert_eq!(
+        inventory
+            .joins()
+            .iter()
+            .map(|join| (join.kind(), join.relation()))
+            .collect::<Vec<_>>(),
+        vec![
+            (QueryJoinKind::Inner, "one"),
+            (QueryJoinKind::Left, "two"),
+            (QueryJoinKind::Right, "three"),
+            (QueryJoinKind::Full, "four"),
+            (QueryJoinKind::Cross, "five table"),
+            (QueryJoinKind::Natural, "public.six"),
+        ]
+    );
+    assert!(
+        Query::new("invalid", "SELECT ':open")
+            .command_inventory()
+            .is_err()
+    );
+    assert!(
+        Query::new("quoted-keyword", "SELECT \"JOIN\" FROM base")
+            .command_inventory()
+            .unwrap()
+            .joins()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -543,7 +607,9 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
         .unwrap();
     let donor = author.commit().unwrap().into_database();
     let owned = OwnedPackage::from_bytes(donor.as_bytes().to_vec()).unwrap();
-    let payload = b"<?xml version=\"1.0\"?><report:document xmlns:report=\"urn:example:report\" xmlns:form=\"urn:oasis:names:tc:opendocument:xmlns:form:1.0\"><form:button/></report:document>";
+    let payload = b"<?xml version=\"1.0\"?><report:document xmlns:report=\"urn:example:report\" xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><draw:image xlink:href=\"../../Shared/dependency.xml\"/></report:document>";
+    let shared_dependency = b"<?xml version=\"1.0\"?><root xmlns:form=\"urn:oasis:names:tc:opendocument:xmlns:form:1.0\" xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><form:button/><draw:image xlink:href=\"../Pictures/shared.png\"/></root>";
+    let shared_picture = b"inert-shared-picture";
     let donor = Database::from_bytes(
         rebuild_package(
             &owned,
@@ -559,6 +625,16 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
                     bytes: payload.to_vec(),
                     media_type: "text/xml".to_string(),
                 },
+                Addition {
+                    path: "Shared/dependency.xml".to_string(),
+                    bytes: shared_dependency.to_vec(),
+                    media_type: "text/xml".to_string(),
+                },
+                Addition {
+                    path: "Pictures/shared.png".to_string(),
+                    bytes: shared_picture.to_vec(),
+                    media_type: "image/png".to_string(),
+                },
             ],
             vec![
                 (
@@ -569,6 +645,8 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
                     "reports/source-two/".to_string(),
                     "application/vnd.sun.xml.report".to_string(),
                 ),
+                ("Shared/".to_string(), String::new()),
+                ("Pictures/".to_string(), String::new()),
             ],
             Vec::<String>::new(),
             Vec::<String>::new(),
@@ -579,7 +657,7 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
 
     let destination = source();
     assert!(
-        !donor
+        donor
             .component_active_content(ComponentKind::Report, "payload-report")
             .unwrap()
             .is_empty()
@@ -592,6 +670,18 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
                 ComponentKind::Report,
                 "payload-report",
                 "reports/refused",
+            )
+            .is_err()
+    );
+    let mut unsafe_relocation = destination.edit();
+    assert!(
+        unsafe_relocation
+            .transfer_component_from_to_with(
+                &donor,
+                ComponentKind::Report,
+                "payload-report",
+                "nested/reports/imported",
+                ActiveContentDisposition::CopyInert,
             )
             .is_err()
     );
@@ -618,6 +708,14 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
     assert_eq!(
         package.get_file("reports/imported/content.xml").unwrap(),
         payload
+    );
+    assert_eq!(
+        package.get_file("Shared/dependency.xml").unwrap(),
+        shared_dependency
+    );
+    assert_eq!(
+        package.get_file("Pictures/shared.png").unwrap(),
+        shared_picture
     );
     assert!(!package.has_file("reports/source/content.xml").unwrap());
     assert_eq!(
@@ -651,6 +749,10 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
             .unwrap(),
         payload
     );
+    assert_eq!(
+        durable_package.get_file("Pictures/shared.png").unwrap(),
+        shared_picture
+    );
 
     let mut second = destination.edit();
     second
@@ -679,6 +781,10 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
             .get_file("reports/imported-two/content.xml")
             .unwrap(),
         payload
+    );
+    assert_eq!(
+        package.get_file("Pictures/shared.png").unwrap(),
+        shared_picture
     );
 }
 
@@ -883,18 +989,29 @@ fn durable_history_and_join_span_the_inert_database_root() {
 fn dependency_closed_transfer_spans_schema_resources_and_components() {
     let donor = source();
     let mut edit = donor.edit();
-    edit.add_table(Table::new("parent", TableKind::Definition).with_column(Column::new("id")))
-        .unwrap();
+    edit.add_table(
+        Table::new("parent", TableKind::Definition)
+            .with_column(Column::new("id").with_default_value("0"))
+            .with_key(
+                Key::new("parent-primary", KeyKind::Primary).with_column(KeyColumn::new("id")),
+            ),
+    )
+    .unwrap();
     edit.add_table(
         Table::new("child", TableKind::Definition)
             .with_column(Column::new("parent_id"))
             .with_key(
                 Key::new("child-parent", KeyKind::Foreign)
                     .with_referenced_table("parent")
+                    .with_update_rule(Some(litchi_odb::ReferentialAction::Cascade))
+                    .with_delete_rule(Some(litchi_odb::ReferentialAction::Restrict))
                     .with_column(KeyColumn::new("parent_id").with_related_column("id")),
             )
             .with_index(
-                Index::new("child-parent-index").with_column(IndexColumn::new("parent_id")),
+                Index::new("child-parent-index")
+                    .with_unique(Some(true))
+                    .with_clustered(Some(false))
+                    .with_column(IndexColumn::new("parent_id").with_ascending(Some(false))),
             ),
     )
     .unwrap();
@@ -968,6 +1085,48 @@ fn dependency_closed_transfer_spans_schema_resources_and_components() {
     assert_eq!(child.columns().len(), 1);
     assert_eq!(child.keys().len(), 1);
     assert_eq!(child.indices().len(), 1);
+    assert_eq!(child.foreign_keys().count(), 1);
+    assert_eq!(
+        child.key("child-parent").unwrap().delete_rule(),
+        Some(litchi_odb::ReferentialAction::Restrict)
+    );
+    assert_eq!(
+        child.key("child-parent").unwrap().update_rule(),
+        Some(litchi_odb::ReferentialAction::Cascade)
+    );
+    assert_eq!(
+        child.index("child-parent-index").unwrap().unique(),
+        Some(true)
+    );
+    assert_eq!(
+        child.index("child-parent-index").unwrap().clustered(),
+        Some(false)
+    );
+    assert_eq!(
+        child.index("child-parent-index").unwrap().columns()[0].ascending(),
+        Some(false)
+    );
+    assert_eq!(catalog.outgoing_relations("child").count(), 1);
+    assert_eq!(catalog.incoming_relations("parent").count(), 1);
+    assert_eq!(
+        catalog
+            .table("parent")
+            .unwrap()
+            .unwrap()
+            .column("id")
+            .unwrap()
+            .default_value(),
+        Some("0")
+    );
+    assert_eq!(
+        catalog
+            .table("parent")
+            .unwrap()
+            .unwrap()
+            .primary_key()
+            .and_then(Key::name),
+        Some("parent-primary")
+    );
     assert!(matches!(
         catalog.connection(),
         Some(Connection::Resource(_))

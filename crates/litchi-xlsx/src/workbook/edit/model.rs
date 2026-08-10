@@ -682,6 +682,12 @@ pub enum Change {
         before: crate::page_breaks::PageBreaks,
         after: crate::page_breaks::PageBreaks,
     },
+    /// Direct worksheet page-margin state changed.
+    PageMargins {
+        sheet: Box<str>,
+        before: Option<crate::page_margins::Margins>,
+        after: Option<crate::page_margins::Margins>,
+    },
     /// Direct worksheet page-setup state changed.
     PageSetup {
         sheet: Box<str>,
@@ -712,6 +718,7 @@ impl Change {
             | Self::Row { sheet, .. }
             | Self::Column { sheet, .. }
             | Self::PageBreaks { sheet, .. }
+            | Self::PageMargins { sheet, .. }
             | Self::PageSetup { sheet, .. }
             | Self::PrintOptions { sheet, .. } => sheet,
         }
@@ -734,6 +741,7 @@ impl Change {
             | Self::Row { .. }
             | Self::Column { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -760,6 +768,7 @@ impl Change {
             | Self::Row { .. }
             | Self::Column { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -782,6 +791,7 @@ impl Change {
             | Self::Row { .. }
             | Self::Column { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -809,6 +819,7 @@ impl Change {
             | Self::Row { .. }
             | Self::Column { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -863,6 +874,7 @@ impl Change {
             | Self::Row { .. }
             | Self::Column { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -887,6 +899,7 @@ impl Change {
             | Self::Cell { .. }
             | Self::Column { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -914,6 +927,7 @@ impl Change {
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -951,6 +965,20 @@ impl Change {
     )> {
         match self {
             Self::PageBreaks { before, after, .. } => Some((before, after)),
+            _ => None,
+        }
+    }
+
+    /// Direct page-margin transition, when applicable.
+    #[must_use]
+    pub fn page_margins(
+        &self,
+    ) -> Option<(
+        Option<&crate::page_margins::Margins>,
+        Option<&crate::page_margins::Margins>,
+    )> {
+        match self {
+            Self::PageMargins { before, after, .. } => Some((before.as_ref(), after.as_ref())),
             _ => None,
         }
     }
@@ -1101,6 +1129,15 @@ impl Change {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::PageMargins {
+                sheet,
+                before,
+                after,
+            } => Self::PageMargins {
+                sheet: sheet.clone(),
+                before: *after,
+                after: *before,
+            },
             Self::PageSetup {
                 sheet,
                 before,
@@ -1214,6 +1251,11 @@ pub enum Conflict {
         sheet: Box<str>,
         position: usize,
     },
+    /// Both branches replace page margins on the same worksheet.
+    PageMargins {
+        sheet: Box<str>,
+        position: usize,
+    },
     /// Both branches replace page setup on the same worksheet.
     PageSetup {
         sheet: Box<str>,
@@ -1243,6 +1285,7 @@ impl Conflict {
             | Self::Rows { sheet, .. }
             | Self::Columns { sheet, .. }
             | Self::PageBreaks { sheet, .. }
+            | Self::PageMargins { sheet, .. }
             | Self::PageSetup { sheet, .. }
             | Self::PrintOptions { sheet, .. } => sheet,
         }
@@ -1264,6 +1307,7 @@ impl Conflict {
             | Self::Rows { position, .. }
             | Self::Columns { position, .. }
             | Self::PageBreaks { position, .. }
+            | Self::PageMargins { position, .. }
             | Self::PageSetup { position, .. }
             | Self::PrintOptions { position, .. } => *position,
         }
@@ -1320,6 +1364,12 @@ impl Conflict {
         matches!(self, Self::PageBreaks { .. })
     }
 
+    /// Whether both edits replace page margins on the same worksheet.
+    #[must_use]
+    pub const fn is_page_margins(&self) -> bool {
+        matches!(self, Self::PageMargins { .. })
+    }
+
     /// Whether both edits replace page setup on the same worksheet.
     #[must_use]
     pub const fn is_page_setup(&self) -> bool {
@@ -1357,6 +1407,7 @@ impl Conflict {
             | Self::Rows { .. }
             | Self::Columns { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -1378,6 +1429,7 @@ impl Conflict {
             | Self::Cells { .. }
             | Self::Columns { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -1400,6 +1452,7 @@ impl Conflict {
             | Self::Cells { .. }
             | Self::Rows { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => None,
         }
@@ -1414,6 +1467,7 @@ impl Conflict {
             | Self::Tab { .. }
             | Self::Web { .. }
             | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
             | Self::PageSetup { .. }
             | Self::PrintOptions { .. } => 1,
             Self::Defaults { fields, .. } => fields.bits().count_ones() as usize,

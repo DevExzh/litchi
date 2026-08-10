@@ -20,16 +20,19 @@ use litchi_core::{
     PatchError, PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation, SubEdit,
     SubEditConflict, SubEditJoinFailure, ThreeWayMergePlan,
 };
-use litchi_odf_common::package::{Addition, rebuild_package};
+use litchi_odf_common::{
+    core::{PackageWriter, Profile, XmlSourcePart, XmlSplicePublication},
+    package::{Addition, rebuild_package},
+};
 use serde_json::{Value, json};
 
 use crate::package::Package;
 
 pub use crate::advanced::{
-    BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, Drawing, DrawingFrame,
-    DrawingGeometry, DrawingGeometryKind, DrawingGroup, DrawingTextBox, EffectiveCellStyle,
-    FormControl, FormControlKind, FormEvent, NumberStyleNode, RichFormControl, RichRun, RichText,
-    StyleGraph, TextProperties, TextStyleNode,
+    BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, DataStyleNode,
+    Drawing, DrawingFrame, DrawingGeometry, DrawingGeometryKind, DrawingGroup, DrawingPoint,
+    DrawingPolygon, DrawingTextBox, EffectiveCellStyle, FormControl, FormControlKind, FormEvent,
+    NumberStyleNode, RichFormControl, RichRun, RichText, StyleGraph, TextProperties, TextStyleNode,
 };
 
 const FORMAT: &str = "litchi.ods.document";
@@ -238,6 +241,11 @@ impl Snapshot {
             reader.has_file(DOCUMENT_SIGNATURE_PATH) || reader.has_file(MACRO_SIGNATURE_PATH);
         let encrypted = reader.manifest().has_encrypted_entries();
         Ok(SecurityCapabilities {
+            encrypt: if encrypted {
+                SecurityCapability::RefusedUnsupported
+            } else {
+                SecurityCapability::Available
+            },
             sign: SecurityCapability::RefusedUnsupported,
             resign: if signed {
                 SecurityCapability::RefusedUnsupported
@@ -267,6 +275,96 @@ impl Snapshot {
     /// Returns an error for a missing/cyclic style or malformed package XML.
     pub fn effective_cell_style(&self, name: &str) -> Result<EffectiveCellStyle> {
         crate::advanced::resolve_package_cell_style(self.source.as_ref(), name)
+    }
+
+    /// Report whether terminal password encryption can publish this exact snapshot.
+    ///
+    /// The report is machine-readable and accounts for encrypted input plus the caller's stale
+    /// signature policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when package security metadata is malformed.
+    pub fn encryption_write_capability(
+        &self,
+        signatures: SignatureWritePolicy,
+    ) -> Result<EncryptionWriteCapability> {
+        let package = Package::from_bytes(self.source.as_ref().to_vec())?;
+        let reader = package.package().package()?;
+        if reader.manifest().has_encrypted_entries() {
+            return Ok(EncryptionWriteCapability::Refused(
+                EncryptionWriteRefusal::EncryptedSourceRequiresCredentialSnapshot,
+            ));
+        }
+        if (reader.has_file(DOCUMENT_SIGNATURE_PATH) || reader.has_file(MACRO_SIGNATURE_PATH))
+            && matches!(signatures, SignatureWritePolicy::Refuse)
+        {
+            return Ok(EncryptionWriteCapability::Refused(
+                EncryptionWriteRefusal::SignedSourceRequiresStripPolicy,
+            ));
+        }
+        Ok(EncryptionWriteCapability::Available)
+    }
+
+    /// Publish this exact plaintext snapshot as a bounded password-encrypted ODS archive.
+    ///
+    /// This terminal operation does not create an editable encrypted `Snapshot`. Existing
+    /// signatures are refused by default because encryption invalidates their package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty/oversized password, encrypted or signed input, package
+    /// bounds, or encrypted archive publication failure.
+    pub fn encrypt_to_bytes(&self, password: &str, profile: EncryptionProfile) -> Result<Vec<u8>> {
+        self.encrypt_to_bytes_with_signatures(password, profile, SignatureWritePolicy::Refuse)
+    }
+
+    /// Publish terminal encrypted bytes with an explicit stale-signature policy.
+    ///
+    /// `StripInvalidated` deliberately omits existing document and macro signature containers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty/oversized password, a machine-readable capability refusal,
+    /// package bounds, or encrypted archive publication failure.
+    pub fn encrypt_to_bytes_with_signatures(
+        &self,
+        password: &str,
+        profile: EncryptionProfile,
+        signatures: SignatureWritePolicy,
+    ) -> Result<Vec<u8>> {
+        if password.is_empty() || password.len() > 4_096 {
+            return invalid("ODS encryption password must contain 1 through 4096 UTF-8 bytes");
+        }
+        match self.encryption_write_capability(signatures)? {
+            EncryptionWriteCapability::Available => {},
+            EncryptionWriteCapability::Refused(
+                EncryptionWriteRefusal::EncryptedSourceRequiresCredentialSnapshot,
+            ) => {
+                return invalid(
+                    "ODS terminal encryption refuses an already-encrypted source without a credential-retaining snapshot",
+                );
+            },
+            EncryptionWriteCapability::Refused(
+                EncryptionWriteRefusal::SignedSourceRequiresStripPolicy,
+            ) => {
+                return invalid(
+                    "ODS terminal encryption requires explicit stale-signature stripping",
+                );
+            },
+        }
+        let package = Package::from_bytes(self.source.as_ref().to_vec())?;
+        let mut writer = PackageWriter::new_bounded(self.limits.package_bytes);
+        writer.set_mimetype(&package.package().mimetype()?)?;
+        writer.set_encryption(password.to_string(), profile.shared())?;
+        for path in ["content.xml", "styles.xml", "meta.xml"] {
+            if package.package().has_file(path)? {
+                let part = XmlSourcePart::load(package.package(), path)?;
+                writer.add_spliced_xml(XmlSplicePublication::new(part))?;
+            }
+        }
+        writer.copy_auxiliary_files_from(package.package())?;
+        writer.finish_to_bounded_bytes()
     }
 
     /// Begin one clone-staged unified package transaction.
@@ -381,6 +479,44 @@ pub enum EncryptionWritePolicy {
     DecryptAndReencrypt,
 }
 
+/// Bounded password-encryption profile for terminal ODS publication.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EncryptionProfile {
+    /// AES-256-CBC, SHA-256, and PBKDF2 for broad ODF compatibility.
+    #[default]
+    Compatible,
+    /// AES-256-GCM, SHA-256, and Argon2id for authenticated encryption.
+    Authenticated,
+}
+
+impl EncryptionProfile {
+    fn shared(self) -> Profile {
+        match self {
+            Self::Compatible => Profile::compatible(),
+            Self::Authenticated => Profile::authenticated(),
+        }
+    }
+}
+
+/// Machine-readable reason terminal password encryption cannot proceed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EncryptionWriteRefusal {
+    /// The source already has encrypted members and requires a credential-retaining edit owner.
+    EncryptedSourceRequiresCredentialSnapshot,
+    /// Existing signatures require explicit stale-signature stripping.
+    SignedSourceRequiresStripPolicy,
+}
+
+/// Availability of terminal password encryption for one exact snapshot and signature policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EncryptionWriteCapability {
+    Available,
+    Refused(EncryptionWriteRefusal),
+}
+
 /// Caller-selected security disposition for changed package publication.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SecurityWritePolicy {
@@ -392,6 +528,8 @@ pub struct SecurityWritePolicy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SecurityCapability {
+    /// The operation is available under the documented bounded API.
+    Available,
     /// The operation is irrelevant to the current source state.
     NotApplicable,
     /// The ODS unified root deliberately does not implement the operation.
@@ -400,9 +538,10 @@ pub enum SecurityCapability {
     RefusedCredentialsRequired,
 }
 
-/// Sign/resign/decrypt/re-encrypt capability states for one exact snapshot.
+/// Encrypt/sign/resign/decrypt/re-encrypt capability states for one exact snapshot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SecurityCapabilities {
+    pub encrypt: SecurityCapability,
     pub sign: SecurityCapability,
     pub resign: SecurityCapability,
     pub decrypt: SecurityCapability,
@@ -1104,6 +1243,22 @@ impl Edit {
             self.before.limits.package_bytes,
         )?;
         self.stage_spliced("drawing-geometry.put", &geometry.name, bytes)
+    }
+
+    /// Add a bounded positioned polygon or polyline with optional rich text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid identity, view-box coordinates, geometry, rich text, bounds,
+    /// duplicate names, or splice failure.
+    pub fn put_drawing_polygon(&mut self, sheet: &str, polygon: &DrawingPolygon) -> Result<()> {
+        let bytes = crate::advanced::put_drawing_polygon(
+            &self.candidate,
+            sheet,
+            polygon,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("drawing-polygon.put", &polygon.name, bytes)
     }
 
     /// Atomically add a package-backed chart drawing and compact chart content dependency.
@@ -2217,6 +2372,7 @@ fn known_operation(operation: &str) -> bool {
             | "drawing-frame.put"
             | "drawing-group.put"
             | "drawing-geometry.put"
+            | "drawing-polygon.put"
             | "chart-object.put"
             | "form.edit"
             | "form.bindings"

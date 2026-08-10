@@ -9,9 +9,10 @@ use litchi_odf_common::chart::authoring::{
 };
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
 use litchi_odp::content::{
-    Cell, ControlKind, FormControl, Paragraph, RichText, Run, Table, TextBox,
+    Cell, ControlKind, ElementSelector, FormControl, Paragraph, RichText, Run, Table, TextBox,
 };
 use litchi_odp::{Builder, Presentation, edit};
+use soapberry_zip::office::StreamingArchiveWriter;
 
 fn chart() -> Definition {
     let mut definition = Definition::new(ChartClass::line());
@@ -287,10 +288,21 @@ fn source_backed_story_table_and_form_models_edit_without_flattening() {
     story
         .set_xml(story.xml().replace(
             "<text:p>before story</text:p>",
-            "<text:list><text:list-item><text:p>after story</text:p></text:list-item></text:list>",
+            "<text:list><text:list-item><text:p>intermediate story</text:p></text:list-item></text:list><producer:semantic xmlns:producer=\"urn:litchi:test:producer\">before extension</producer:semantic>",
         ))
         .unwrap();
     assert_eq!(story.list_count(), 1);
+    story
+        .replace_paragraph(0, &Paragraph::plain("after story").unwrap())
+        .unwrap();
+    story
+        .edit_element(
+            &ElementSelector::new("urn:litchi:test:producer", "semantic", 0).unwrap(),
+            Some(
+                "<producer:semantic xmlns:producer=\"urn:litchi:test:producer\">after extension</producer:semantic>",
+            ),
+        )
+        .unwrap();
     transaction.replace_text_box_model("Story", &story).unwrap();
 
     let mut table = inventory
@@ -305,6 +317,9 @@ fn source_backed_story_table_and_form_models_edit_without_flattening() {
             "office:value-type=\"string\" table:number-columns-spanned=\"2\"",
         ))
         .unwrap();
+    table
+        .replace_cell_story(0, &RichText::plain("granular cell story").unwrap())
+        .unwrap();
     transaction.replace_table_model("Grid", &table).unwrap();
 
     let mut control = inventory
@@ -315,17 +330,49 @@ fn source_backed_story_table_and_form_models_edit_without_flattening() {
         .clone();
     control
         .set_xml(
-            control
-                .declaration_xml()
-                .replace("before label", "after label"),
-            control.visual_xml().to_string(),
+            control.declaration_xml().replacen(
+                "/>",
+                "><producer:declaration xmlns:producer=\"urn:litchi:test:producer\">before declaration extension</producer:declaration></form:button>",
+                1,
+            ),
+            control.visual_xml().replacen(
+                "/>",
+                "><producer:visual xmlns:producer=\"urn:litchi:test:producer\">before visual extension</producer:visual></draw:control>",
+                1,
+            ),
         )
         .unwrap();
+    control
+        .edit_declaration_element(
+            &ElementSelector::new("urn:litchi:test:producer", "declaration", 0).unwrap(),
+            Some(
+                "<producer:declaration xmlns:producer=\"urn:litchi:test:producer\">after declaration extension</producer:declaration>",
+            ),
+        )
+        .unwrap();
+    control
+        .edit_visual_element(
+            &ElementSelector::new("urn:litchi:test:producer", "visual", 0).unwrap(),
+            Some(
+                "<producer:visual xmlns:producer=\"urn:litchi:test:producer\">after visual extension</producer:visual>",
+            ),
+        )
+        .unwrap();
+    control.set_label(Some("after label")).unwrap();
+    control.set_current_value(Some("granular value")).unwrap();
     transaction
         .replace_form_control_model("Choice", &control)
         .unwrap();
 
     let commit = transaction.commit().unwrap();
+    let durable =
+        edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
+    let replayed = durable.apply(&source).unwrap();
+    assert_eq!(replayed.bytes(), commit.snapshot().bytes());
+    assert_eq!(
+        durable.inverse().apply(&replayed).unwrap().bytes(),
+        source.bytes()
+    );
     let inventory = commit.snapshot().rich_content().unwrap();
     let story = inventory
         .text_boxes()
@@ -345,9 +392,17 @@ fn source_backed_story_table_and_form_models_edit_without_flattening() {
     assert_eq!(story.list_count(), 1);
     assert_eq!(story.paragraph_count(), 1);
     assert!(story.xml().contains("after story"));
-    assert!(table.xml().contains("after cell"));
+    assert!(story.xml().contains("after extension"));
+    assert!(table.xml().contains("granular cell story"));
     assert!(table.xml().contains("table:number-columns-spanned=\"2\""));
     assert!(control.declaration_xml().contains("after label"));
+    assert!(control.declaration_xml().contains("granular value"));
+    assert!(
+        control
+            .declaration_xml()
+            .contains("after declaration extension")
+    );
+    assert!(control.visual_xml().contains("after visual extension"));
 }
 
 #[test]
@@ -381,4 +436,37 @@ fn producer_named_drawing_resources_transfer_with_their_payload() {
     assert!(content.content_xml().contains("ProducerImage"));
     assert!(content.content_xml().contains("producer closure"));
     assert!(!content.content_xml().contains("> <"));
+}
+
+#[test]
+fn producer_bom_remains_source_provenance_during_rich_content_edit() {
+    const MIME: &str = "application/vnd.oasis.opendocument.presentation";
+    const CONTENT: &[u8] = br#"<?xml version="1.0" encoding="utf-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page draw:name="Producer"><draw:rect draw:name="retained"/></draw:page></office:presentation></office:body></office:document-content>"#;
+    const MANIFEST: &[u8] = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#;
+    let mut content = b"\xef\xbb\xbf".to_vec();
+    content.extend_from_slice(CONTENT);
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
+    archive.write_deflated("content.xml", &content).unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    let source = edit::Snapshot::from_bytes(archive.finish_to_bytes().unwrap()).unwrap();
+
+    let mut transaction = source.transaction().unwrap();
+    transaction
+        .add_text_box(
+            0usize,
+            &TextBox::new("BOM-safe box", RichText::plain("retained BOM").unwrap()).unwrap(),
+        )
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let changed = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let changed_content = changed.get_file("content.xml").unwrap();
+    assert!(changed_content.starts_with(b"\xef\xbb\xbf"));
+    assert!(
+        std::str::from_utf8(&changed_content)
+            .unwrap()
+            .contains("BOM-safe box")
+    );
 }

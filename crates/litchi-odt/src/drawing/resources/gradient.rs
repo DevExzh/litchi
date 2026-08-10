@@ -124,11 +124,11 @@ impl FromStr for RgbColor {
             return invalid(format!("invalid ODF color '{value}'"));
         }
         let red = u8::from_str_radix(&value[1..3], 16)
-            .map_err(|_| make_error(format!("invalid ODF color '{value}'")))?;
+            .map_err(|_error| make_error(format!("invalid ODF color '{value}'")))?;
         let green = u8::from_str_radix(&value[3..5], 16)
-            .map_err(|_| make_error(format!("invalid ODF color '{value}'")))?;
+            .map_err(|_error| make_error(format!("invalid ODF color '{value}'")))?;
         let blue = u8::from_str_radix(&value[5..7], 16)
-            .map_err(|_| make_error(format!("invalid ODF color '{value}'")))?;
+            .map_err(|_error| make_error(format!("invalid ODF color '{value}'")))?;
         Ok(Self::new(red, green, blue))
     }
 }
@@ -216,7 +216,7 @@ impl FromStr for Coordinate {
         validate_decimal(number, value)?;
         let number = number
             .parse::<f64>()
-            .map_err(|_| make_error(format!("invalid gradient coordinate '{value}'")))?;
+            .map_err(|_error| make_error(format!("invalid gradient coordinate '{value}'")))?;
         Self::new(number, unit)
     }
 }
@@ -1171,7 +1171,7 @@ fn parse_intensity(value: &str, context: &str) -> Result<Intensity> {
 fn parse_number(value: &str, context: &str) -> Result<f64> {
     let value = value
         .parse::<f64>()
-        .map_err(|_| make_error(format!("invalid {context} value '{value}'")))?;
+        .map_err(|_error| make_error(format!("invalid {context} value '{value}'")))?;
     finite(value, context)?;
     Ok(value)
 }
@@ -1230,7 +1230,7 @@ fn validate_text(value: &str, context: &str, empty_allowed: bool) -> Result<()> 
 fn decode_name(value: &[u8], context: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| make_error(format!("invalid UTF-8 in gradient {context} name")))
+        .map_err(|_error| make_error(format!("invalid UTF-8 in gradient {context} name")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

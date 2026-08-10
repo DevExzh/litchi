@@ -3929,6 +3929,22 @@ impl<'a> RtfDocument<'a> {
         &self.shapes
     }
 
+    pub(crate) fn set_body_shape_text(
+        &mut self,
+        index: usize,
+        text: Cow<'a, str>,
+    ) -> RtfResult<()> {
+        let mut candidate = self.shapes.get(index).cloned().ok_or_else(|| {
+            RtfError::MalformedDocument("RTF shape index is outside the body store".to_string())
+        })?;
+        candidate.set_text(text);
+        candidate.validate()?;
+        *self.shapes.get_mut(index).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF shape index is outside the body store".to_string())
+        })? = candidate;
+        Ok(())
+    }
+
     /// Recursively find a body, background, grouped, or text-story shape by name.
     #[must_use]
     pub fn find_shape_by_name(&self, name: &str) -> Option<&super::super::shape::Shape<'_>> {

@@ -303,7 +303,7 @@ fn parse_face_attributes(
                 if !metric_kinds.insert(kind) {
                     return invalid(format!("duplicate svg:{} metric", kind.as_str()));
                 }
-                let value = value.parse::<i64>().map_err(|_| {
+                let value = value.parse::<i64>().map_err(|_error| {
                     Error::InvalidFormat(format!("invalid svg:{} integer", kind.as_str()))
                 })?;
                 face.metrics.push(Metric { kind, value });

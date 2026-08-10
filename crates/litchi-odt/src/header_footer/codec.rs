@@ -312,7 +312,7 @@ fn parse_background(
                     .strip_suffix('%')
                     .ok_or_else(|| bad("draw:opacity requires percent"))?
                     .parse::<u8>()
-                    .map_err(|_| bad("invalid draw:opacity"))?;
+                    .map_err(|_error| bad("invalid draw:opacity"))?;
                 if n > 100 {
                     return Err(bad("draw:opacity exceeds 100%"));
                 }

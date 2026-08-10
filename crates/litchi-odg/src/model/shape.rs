@@ -96,6 +96,10 @@ pub struct Shape {
     width: Option<String>,
     height: Option<String>,
     path_data: Option<String>,
+    transform: Option<String>,
+    points: Option<String>,
+    view_box: Option<String>,
+    line_geometry: [Option<String>; 4],
     title: Option<String>,
     description: Option<String>,
     kind: ShapeKind,
@@ -109,6 +113,10 @@ pub(crate) struct Properties {
     pub(crate) layer: Option<String>,
     pub(crate) name: Option<String>,
     pub(crate) path_data: Option<String>,
+    pub(crate) transform: Option<String>,
+    pub(crate) points: Option<String>,
+    pub(crate) view_box: Option<String>,
+    pub(crate) line_geometry: [Option<String>; 4],
     pub(crate) style_name: Option<String>,
     pub(crate) text_style_name: Option<String>,
     pub(crate) z_index: Option<u32>,
@@ -125,6 +133,10 @@ impl Shape {
                 layer: None,
                 name: None,
                 path_data: None,
+                transform: None,
+                points: None,
+                view_box: None,
+                line_geometry: [None, None, None, None],
                 style_name: None,
                 text_style_name: None,
                 z_index: None,
@@ -141,6 +153,10 @@ impl Shape {
             layer,
             name,
             path_data,
+            transform,
+            points,
+            view_box,
+            line_geometry,
             style_name,
             text_style_name,
             z_index,
@@ -158,6 +174,10 @@ impl Shape {
             width,
             height,
             path_data,
+            transform,
+            points,
+            view_box,
+            line_geometry,
             title: None,
             description: None,
             kind,
@@ -221,6 +241,39 @@ impl Shape {
     #[must_use]
     pub fn with_path_data(mut self, path_data: impl Into<String>) -> Self {
         self.path_data = Some(path_data.into());
+        self
+    }
+
+    /// Sets a lexical `draw:transform` on a detached shape.
+    #[must_use]
+    pub fn with_transform(mut self, transform: impl Into<String>) -> Self {
+        self.transform = Some(transform.into());
+        self
+    }
+
+    /// Sets a lexical polygon/polyline view box and point list.
+    #[must_use]
+    pub fn with_points(mut self, view_box: impl Into<String>, points: impl Into<String>) -> Self {
+        self.view_box = Some(view_box.into());
+        self.points = Some(points.into());
+        self
+    }
+
+    /// Sets lexical line endpoints (`svg:x1`, `y1`, `x2`, `y2`).
+    #[must_use]
+    pub fn with_line_geometry(
+        mut self,
+        x1: impl Into<String>,
+        y1: impl Into<String>,
+        x2: impl Into<String>,
+        y2: impl Into<String>,
+    ) -> Self {
+        self.line_geometry = [
+            Some(x1.into()),
+            Some(y1.into()),
+            Some(x2.into()),
+            Some(y2.into()),
+        ];
         self
     }
 
@@ -333,6 +386,30 @@ impl Shape {
     #[must_use]
     pub fn path_data(&self) -> Option<&str> {
         self.path_data.as_deref()
+    }
+
+    /// Optional lexical `draw:transform`.
+    #[must_use]
+    pub fn transform(&self) -> Option<&str> {
+        self.transform.as_deref()
+    }
+
+    /// Optional lexical `draw:points` polygon/polyline point list.
+    #[must_use]
+    pub fn points(&self) -> Option<&str> {
+        self.points.as_deref()
+    }
+
+    /// Optional lexical `svg:viewBox` paired with polygon/polyline points.
+    #[must_use]
+    pub fn view_box(&self) -> Option<&str> {
+        self.view_box.as_deref()
+    }
+
+    /// Optional lexical line endpoints in `x1`, `y1`, `x2`, `y2` order.
+    #[must_use]
+    pub fn line_geometry(&self) -> [Option<&str>; 4] {
+        self.line_geometry.each_ref().map(|value| value.as_deref())
     }
 
     /// The optional inert `draw:control` form-control reference.

@@ -27,6 +27,7 @@ pub(super) struct SheetActions {
     pub(super) columns: BTreeMap<ColumnIndex, ColumnAction>,
     pub(super) merges: Vec<MergeIntent>,
     pub(super) page_breaks: Option<crate::page_breaks::PageBreaks>,
+    pub(super) page_margins: Option<OptionalAction<crate::page_margins::Margins>>,
     pub(super) page_setup: Option<OptionalAction<crate::page_setup::Setup>>,
     pub(super) print_options: Option<OptionalAction<crate::print_options::PrintOptions>>,
 }
@@ -61,6 +62,7 @@ impl SheetActions {
             .saturating_add(self.columns.len())
             .saturating_add(self.merges.len())
             .saturating_add(usize::from(self.page_breaks.is_some()))
+            .saturating_add(usize::from(self.page_margins.is_some()))
             .saturating_add(usize::from(self.page_setup.is_some()))
             .saturating_add(usize::from(self.print_options.is_some()))
     }
@@ -75,6 +77,7 @@ impl SheetActions {
             && self.columns.is_empty()
             && self.merges.is_empty()
             && self.page_breaks.is_none()
+            && self.page_margins.is_none()
             && self.page_setup.is_none()
             && self.print_options.is_none()
     }

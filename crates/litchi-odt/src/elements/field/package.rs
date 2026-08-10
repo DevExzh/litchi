@@ -58,9 +58,11 @@ impl FieldParser {
                         }
                         let tag_name = format!(
                             "text:{}",
-                            std::str::from_utf8(source.local_name().as_ref()).map_err(|_| {
-                                Error::InvalidFormat("non-UTF-8 field element name".to_string())
-                            })?
+                            std::str::from_utf8(source.local_name().as_ref()).map_err(
+                                |_error| {
+                                    Error::InvalidFormat("non-UTF-8 field element name".to_string())
+                                }
+                            )?
                         );
                         if Field::is_field_tag(&tag_name) {
                             if next_order >= MAX_FIELDS {
@@ -95,7 +97,7 @@ impl FieldParser {
                     }
                     let tag_name = format!(
                         "text:{}",
-                        std::str::from_utf8(source.local_name().as_ref()).map_err(|_| {
+                        std::str::from_utf8(source.local_name().as_ref()).map_err(|_error| {
                             Error::InvalidFormat("non-UTF-8 field element name".to_string())
                         })?
                     );

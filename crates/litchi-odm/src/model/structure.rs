@@ -70,6 +70,7 @@ impl GeneratedIndex {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Structure {
     pub(crate) items: Vec<Kind>,
+    pub(crate) item_spans: Vec<Range<usize>>,
     pub(crate) generated_indexes: Vec<GeneratedIndex>,
 }
 

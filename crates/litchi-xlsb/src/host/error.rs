@@ -1,5 +1,21 @@
 //! Error types for XLSB file parsing
 
+#![deny(
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::checked_conversions,
+    clippy::expect_used,
+    clippy::float_cmp,
+    clippy::let_underscore_must_use,
+    clippy::map_err_ignore,
+    clippy::unnecessary_unwrap,
+    clippy::wildcard_enum_match_arm,
+    reason = "typed package errors contain no unchecked BIFF12 conversions or panic extraction"
+)]
+
 use std::collections::TryReserveError;
 use std::fmt;
 
@@ -50,6 +66,8 @@ pub enum Error {
     FileNotFound(String),
     /// Unsupported feature
     UnsupportedFeature(String),
+    /// A drawing transfer was refused before any package mutation.
+    DrawingTransfer(crate::cell_values::DrawingTransferRefusal),
     /// Encoding error
     Encoding(String),
     /// Invalid package or DrawingML structure.
@@ -140,6 +158,7 @@ impl fmt::Display for Error {
             Error::UnsupportedFeature(feature) => {
                 write!(f, "Unsupported feature: {}", feature)
             },
+            Error::DrawingTransfer(refusal) => write!(f, "Drawing transfer refused: {refusal}"),
             Error::Encoding(msg) => {
                 write!(f, "Encoding error: {}", msg)
             },
@@ -185,12 +204,30 @@ impl std::error::Error for Error {
             Error::Calc(e) => Some(e),
             Error::MergedCell(e) => Some(e),
             Error::Hyperlink(e) => Some(e),
+            Error::DrawingTransfer(refusal) => Some(refusal),
             Error::Allocation { source, .. } => Some(source),
             Error::Drawing(e) => Some(e),
             Error::Common(e) => Some(e),
             #[cfg(feature = "vba-inspection")]
             Error::Vba(e) => Some(e),
-            _ => None,
+            Error::InvalidRecordType(_)
+            | Error::UnexpectedRecord { .. }
+            | Error::InvalidLength { .. }
+            | Error::UnexpectedEndOfStream(_)
+            | Error::InvalidFormula(_)
+            | Error::InvalidCellReference(_)
+            | Error::WorksheetNotFound(_)
+            | Error::FileNotFound(_)
+            | Error::UnsupportedFeature(_)
+            | Error::Encoding(_)
+            | Error::InvalidFormat(_)
+            | Error::InvalidUri(_)
+            | Error::InvalidRelationship(_)
+            | Error::InvalidContentType { .. }
+            | Error::CapacityOverflow { .. }
+            | Error::WideStringLength { .. }
+            | Error::Unrecognized { .. }
+            | Error::PasswordProtected => None,
         }
     }
 }
@@ -324,7 +361,9 @@ impl From<litchi_spreadsheet_drawing::Error> for Error {
             litchi_spreadsheet_drawing::Error::Drawing(error) => Self::Drawing(error),
             litchi_spreadsheet_drawing::Error::Invalid(message) => Self::InvalidFormat(message),
             litchi_spreadsheet_drawing::Error::Encoding(message) => Self::Encoding(message),
-            other => Self::InvalidFormat(other.to_string()),
+            other @ (litchi_spreadsheet_drawing::Error::Mce(_)
+            | litchi_spreadsheet_drawing::Error::Xml(_)
+            | _) => Self::InvalidFormat(other.to_string()),
         }
     }
 }

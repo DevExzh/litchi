@@ -459,7 +459,7 @@ fn parse_property_attributes(
             ResolveResult::Unbound => None,
             ResolveResult::Bound(Namespace(uri)) => Some(
                 std::str::from_utf8(uri)
-                    .map_err(|_| {
+                    .map_err(|_error| {
                         Error::InvalidFormat("non-UTF-8 property namespace URI".to_string())
                     })?
                     .to_string(),
@@ -472,7 +472,7 @@ fn parse_property_attributes(
             },
         };
         let local_name = std::str::from_utf8(local.as_ref())
-            .map_err(|_| Error::InvalidFormat("non-UTF-8 property name".to_string()))?
+            .map_err(|_error| Error::InvalidFormat("non-UTF-8 property name".to_string()))?
             .to_string();
         if !expanded_names.insert((namespace_uri.clone(), local_name.clone())) {
             return Err(Error::InvalidFormat(format!(
@@ -480,7 +480,9 @@ fn parse_property_attributes(
             )));
         }
         let qualified_name = std::str::from_utf8(qualified_name)
-            .map_err(|_| Error::InvalidFormat("non-UTF-8 qualified property name".to_string()))?
+            .map_err(|_error| {
+                Error::InvalidFormat("non-UTF-8 qualified property name".to_string())
+            })?
             .to_string();
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())

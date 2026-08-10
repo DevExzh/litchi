@@ -38,8 +38,9 @@ impl FlatDocument {
                 "mimetype '{mimetype}' has no standard flat OpenDocument form"
             )));
         }
-        let xml = String::from_utf8(bytes)
-            .map_err(|_| Error::InvalidFormat("invalid UTF-8 in flat OpenDocument".to_string()))?;
+        let xml = String::from_utf8(bytes).map_err(|_error| {
+            Error::InvalidFormat("invalid UTF-8 in flat OpenDocument".to_string())
+        })?;
         validate_flat_document(&xml, family)?;
         Ok(Self {
             xml,

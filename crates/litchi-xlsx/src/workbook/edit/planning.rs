@@ -212,6 +212,9 @@ fn effects(edit: &Edit) -> (Vec<String>, Vec<String>) {
         if actions.page_breaks.is_some() {
             writes.push(format!("sheet/{position}/page-breaks"));
         }
+        if actions.page_margins.is_some() {
+            writes.push(format!("sheet/{position}/page-margins"));
+        }
         if actions.page_setup.is_some() {
             writes.push(format!("sheet/{position}/page-setup"));
         }

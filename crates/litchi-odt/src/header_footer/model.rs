@@ -67,7 +67,7 @@ impl Color {
         if value.len() != 7 || !value.starts_with('#') {
             return Err(bad("color must be #RRGGBB"));
         }
-        let rgb = u32::from_str_radix(&value[1..], 16).map_err(|_| bad("invalid color"))?;
+        let rgb = u32::from_str_radix(&value[1..], 16).map_err(|_error| bad("invalid color"))?;
         Ok(Self::Rgb((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8))
     }
 

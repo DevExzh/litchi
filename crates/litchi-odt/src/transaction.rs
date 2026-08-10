@@ -1583,7 +1583,7 @@ impl History {
     }
 
     fn record(&mut self, snapshot: Snapshot) -> Result<()> {
-        let weight = u64::try_from(self.current().as_bytes().len()).map_err(|_| {
+        let weight = u64::try_from(self.current().as_bytes().len()).map_err(|_error| {
             Error::InvalidFormat("ODT history snapshot weight exceeds u64".to_string())
         })?;
         self.inner
@@ -3692,7 +3692,7 @@ fn note_fragment_value(note: &crate::note::Note, fragment: Option<&str>) -> Resu
 
 fn ruby_annotation_from_value(value: &Value) -> Result<crate::ruby_family::Annotation> {
     crate::ruby_family::Annotation::from_xml_fragment(&object_string(value, "xml", 1)?)
-        .map_err(|_| invalid_durable_patch())
+        .map_err(|_error| invalid_durable_patch())
 }
 
 fn form_fragment_value(fragment: &str) -> Result<Value> {
@@ -3894,7 +3894,7 @@ fn chart_content_from_value(
         return Err(invalid_durable_patch());
     }
     let content = std::str::from_utf8(blob_by_hex(blobs, blob).ok_or_else(invalid_durable_patch)?)
-        .map_err(|_| invalid_durable_patch())?
+        .map_err(|_error| invalid_durable_patch())?
         .to_owned();
     crate::package::charts::validate_chart_content(&content)?;
     let storage = match object_required_string_map(value, "storage")? {
@@ -4111,7 +4111,7 @@ fn embedded_resource_from_value(
         "inline-xml" if source.len() == 3 => {
             let bytes = resource_blob_ref(source, blobs)?;
             let xml = std::str::from_utf8(bytes)
-                .map_err(|_| invalid_durable_patch())?
+                .map_err(|_error| invalid_durable_patch())?
                 .to_owned();
             let root = match object_required_string_map(source, "root")? {
                 "open-document" => litchi_odf_common::embedded::Root::OpenDocument,
@@ -4289,7 +4289,7 @@ fn parse_canonical_index(value: &str) -> Result<usize> {
     if value.is_empty() || (value.len() > 1 && value.starts_with('0')) {
         return Err(invalid_durable_patch());
     }
-    value.parse().map_err(|_| invalid_durable_patch())
+    value.parse().map_err(|_error| invalid_durable_patch())
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
@@ -4679,9 +4679,10 @@ fn numeric_reference_projection(xml: &[u8]) -> Result<Vec<u8>> {
             {
                 return Err(invalid_numeric_reference());
             }
-            let digits = std::str::from_utf8(digits).map_err(|_| invalid_numeric_reference())?;
+            let digits =
+                std::str::from_utf8(digits).map_err(|_error| invalid_numeric_reference())?;
             let scalar =
-                u32::from_str_radix(digits, radix).map_err(|_| invalid_numeric_reference())?;
+                u32::from_str_radix(digits, radix).map_err(|_error| invalid_numeric_reference())?;
             if !is_xml_scalar(scalar) {
                 return Err(invalid_numeric_reference());
             }

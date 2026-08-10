@@ -368,7 +368,7 @@ fn canonical_element_name(
     qualified_name: &[u8],
 ) -> Result<String> {
     let local_name = std::str::from_utf8(local_name)
-        .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF element name".to_string()))?;
+        .map_err(|_error| Error::InvalidFormat("non-UTF-8 ODF element name".to_string()))?;
     match namespace {
         ResolveResult::Bound(Namespace(uri)) if *uri == TEXT_NAMESPACE => {
             Ok(format!("text:{local_name}"))
@@ -378,7 +378,7 @@ fn canonical_element_name(
         },
         ResolveResult::Bound(_) | ResolveResult::Unbound => std::str::from_utf8(qualified_name)
             .map(str::to_string)
-            .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF element name".to_string())),
+            .map_err(|_error| Error::InvalidFormat("non-UTF-8 ODF element name".to_string())),
         ResolveResult::Unknown(prefix) => Err(Error::InvalidFormat(format!(
             "unknown ODF element namespace prefix '{}'",
             String::from_utf8_lossy(prefix)
@@ -399,7 +399,7 @@ fn copy_attributes(
         }
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
         let local_name = std::str::from_utf8(local_name.as_ref())
-            .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF attribute name".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("non-UTF-8 ODF attribute name".to_string()))?;
         let name = match namespace {
             ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
                 format!("text:{local_name}")
@@ -416,7 +416,9 @@ fn copy_attributes(
             ResolveResult::Bound(_) | ResolveResult::Unbound => {
                 std::str::from_utf8(attribute.key.as_ref())
                     .map(str::to_string)
-                    .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF attribute name".to_string()))?
+                    .map_err(|_error| {
+                        Error::InvalidFormat("non-UTF-8 ODF attribute name".to_string())
+                    })?
             },
             ResolveResult::Unknown(prefix) => {
                 return Err(Error::InvalidFormat(format!(
@@ -468,7 +470,7 @@ fn append_text_control(
                         .map_err(|error| {
                             Error::InvalidFormat(format!("invalid text:c value: {error}"))
                         })?;
-                    count = decoded.parse().map_err(|_| {
+                    count = decoded.parse().map_err(|_error| {
                         Error::InvalidFormat("text:c must be a non-negative integer".to_string())
                     })?;
                     count_seen = true;

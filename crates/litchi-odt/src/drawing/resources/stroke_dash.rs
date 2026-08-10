@@ -102,7 +102,7 @@ impl FromStr for Measure {
         validate_decimal(number, value)?;
         let number = number
             .parse::<f64>()
-            .map_err(|_| make_error(format!("invalid stroke-dash measure '{value}'")))?;
+            .map_err(|_error| make_error(format!("invalid stroke-dash measure '{value}'")))?;
         Self::new(number, unit)
     }
 }
@@ -388,7 +388,7 @@ fn take_count(values: &mut Attributes, local: &str) -> Result<Option<u32>> {
             }
             let value = value
                 .parse::<u32>()
-                .map_err(|_| make_error(format!("invalid draw:{local} integer '{value}'")))?;
+                .map_err(|_error| make_error(format!("invalid draw:{local} integer '{value}'")))?;
             if value > MAX_DOT_COUNT {
                 return invalid(format!("draw:{local} exceeds {MAX_DOT_COUNT}"));
             }
@@ -609,7 +609,7 @@ fn canonical_number(value: f64) -> String {
 fn decode(value: &[u8], what: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| make_error(format!("invalid UTF-8 in stroke-dash {what}")))
+        .map_err(|_error| make_error(format!("invalid UTF-8 in stroke-dash {what}")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

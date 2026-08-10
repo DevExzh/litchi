@@ -80,6 +80,7 @@ type TextSpans = Vec<Vec<Vec<Option<Range<usize>>>>>;
 type NameSpans = Vec<Vec<Option<Range<usize>>>>;
 type LayerSpans = Vec<Vec<Option<Range<usize>>>>;
 type GeometrySpans = Vec<Vec<[Option<Range<usize>>; 4]>>;
+type PointsSpans = Vec<Vec<[Option<Range<usize>>; 2]>>;
 type PathSpans = Vec<Vec<Option<Range<usize>>>>;
 type ControlSpans = Vec<Vec<Option<Range<usize>>>>;
 type PageAttributeSpans = Vec<[Option<Range<usize>>; 2]>;
@@ -111,6 +112,37 @@ pub struct SecurityCapabilities {
     supported: u8,
 }
 
+/// One password/signature lifecycle operation that callers can plan before mutation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SecurityLifecycleOperation {
+    OpenWithPassword,
+    EncryptNew,
+    RewriteEncryptedExisting,
+    ChangeExistingPassword,
+    VerifySignatures,
+    SignNew,
+    RemoveInvalidatedSignatures,
+    ResignExisting,
+}
+
+/// Final typed reason an existing-package security transition is unavailable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SecurityLifecycleRefusal {
+    ExistingPackageReencryptionUnavailable,
+    ExistingPackageResigningUnavailable,
+}
+
+/// Supported, exact-preservation-only, or finally unsupported lifecycle disposition.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SecurityLifecycleDisposition {
+    Supported,
+    ExactSourceOnly,
+    Unsupported(SecurityLifecycleRefusal),
+}
+
 impl SecurityCapabilities {
     const OPEN_WITH_PASSWORD: u8 = 1 << 0;
     const ENCRYPT_NEW: u8 = 1 << 1;
@@ -124,6 +156,62 @@ impl SecurityCapabilities {
     #[must_use]
     pub const fn source(self) -> SecurityStatus {
         self.source
+    }
+
+    /// Returns the exact support/refusal disposition for one lifecycle operation.
+    #[must_use]
+    pub const fn disposition(
+        self,
+        operation: SecurityLifecycleOperation,
+    ) -> SecurityLifecycleDisposition {
+        match operation {
+            SecurityLifecycleOperation::OpenWithPassword if self.can_open_with_password() => {
+                SecurityLifecycleDisposition::Supported
+            },
+            SecurityLifecycleOperation::EncryptNew if self.can_encrypt_new() => {
+                SecurityLifecycleDisposition::Supported
+            },
+            SecurityLifecycleOperation::RewriteEncryptedExisting if self.source.encrypted => {
+                SecurityLifecycleDisposition::ExactSourceOnly
+            },
+            SecurityLifecycleOperation::RewriteEncryptedExisting => {
+                SecurityLifecycleDisposition::Supported
+            },
+            SecurityLifecycleOperation::ChangeExistingPassword if self.can_reencrypt_existing() => {
+                SecurityLifecycleDisposition::Supported
+            },
+            SecurityLifecycleOperation::ChangeExistingPassword => {
+                SecurityLifecycleDisposition::Unsupported(
+                    SecurityLifecycleRefusal::ExistingPackageReencryptionUnavailable,
+                )
+            },
+            SecurityLifecycleOperation::VerifySignatures if self.can_verify_signatures() => {
+                SecurityLifecycleDisposition::Supported
+            },
+            SecurityLifecycleOperation::SignNew if self.can_sign_new() => {
+                SecurityLifecycleDisposition::Supported
+            },
+            SecurityLifecycleOperation::RemoveInvalidatedSignatures
+                if self.can_remove_invalidated_signatures() =>
+            {
+                SecurityLifecycleDisposition::Supported
+            },
+            SecurityLifecycleOperation::ResignExisting if self.can_resign_existing() => {
+                SecurityLifecycleDisposition::Supported
+            },
+            SecurityLifecycleOperation::ResignExisting => {
+                SecurityLifecycleDisposition::Unsupported(
+                    SecurityLifecycleRefusal::ExistingPackageResigningUnavailable,
+                )
+            },
+            SecurityLifecycleOperation::OpenWithPassword
+            | SecurityLifecycleOperation::EncryptNew
+            | SecurityLifecycleOperation::VerifySignatures
+            | SecurityLifecycleOperation::SignNew
+            | SecurityLifecycleOperation::RemoveInvalidatedSignatures => {
+                SecurityLifecycleDisposition::ExactSourceOnly
+            },
+        }
     }
 
     /// Whether password-encrypted drawings can be opened for inert inspection.
@@ -934,6 +1022,37 @@ struct ContentSplice {
 }
 
 impl Transaction {
+    fn replace_or_insert_shape_attribute(
+        &mut self,
+        page: usize,
+        shape: usize,
+        span: Option<Range<usize>>,
+        qualified_name: &str,
+        value: &str,
+    ) -> Result<()> {
+        if let Some(attribute_span) = span {
+            return self.replace_content_value(&attribute_span, value);
+        }
+        let parsed = parse_content(&self.content)?;
+        let shape_span = parsed
+            .shape_spans
+            .get(page)
+            .and_then(|values| values.get(shape))
+            .and_then(Option::as_ref)
+            .ok_or_else(|| Error::InvalidFormat("ODG shape source span is missing".into()))?;
+        let tag_end = start_tag_end(&self.content, shape_span.start)?;
+        let insertion = if self.content.as_bytes().get(tag_end.saturating_sub(2)) == Some(&b'/') {
+            tag_end.saturating_sub(2)
+        } else {
+            tag_end.saturating_sub(1)
+        };
+        let mut attribute = String::new();
+        push_attribute(&mut attribute, qualified_name, Some(value))?;
+        self.invalidate_content_splices();
+        self.content = insert_xml(&self.content, insertion, &attribute)?;
+        Ok(())
+    }
+
     fn replace_content_value(&mut self, span: &Range<usize>, replacement: &str) -> Result<()> {
         let escaped = quick_xml::escape::escape(replacement).into_owned();
         let next = replace_xml_value(&self.content, span, replacement)?;
@@ -1428,6 +1547,150 @@ impl Transaction {
             before: before.map(Option::unwrap_or_default),
             after,
         }));
+        Ok(())
+    }
+
+    /// Sets or inserts a lexical `draw:transform` on one checked shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid selectors, lexical controls, provenance, or output limits.
+    pub fn set_shape_transform(
+        &mut self,
+        page: usize,
+        shape: usize,
+        transform: impl Into<String>,
+    ) -> Result<()> {
+        let after = transform.into();
+        validate_advanced_geometry_value(&after, "ODG transform")?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .and_then(|value| value.shapes().get(shape))
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
+        if selected.transform() == Some(after.as_str()) {
+            return Ok(());
+        }
+        let span = parsed.transform_spans[page][shape].clone();
+        self.replace_or_insert_shape_attribute(page, shape, span, "draw:transform", &after)?;
+        self.changes.push(Change::Structure(
+            StructureChange::ShapeAdvancedGeometryChanged { page, shape },
+        ));
+        Ok(())
+    }
+
+    /// Sets or inserts a polygon/polyline view box and lexical point list atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the selector owns a polygon or polyline and values are bounded.
+    pub fn set_shape_points(
+        &mut self,
+        page: usize,
+        shape: usize,
+        view_box: impl Into<String>,
+        points: impl Into<String>,
+    ) -> Result<()> {
+        let target_view_box = view_box.into();
+        let target_points = points.into();
+        validate_advanced_geometry_value(&target_view_box, "ODG polygon view box")?;
+        validate_advanced_geometry_value(&target_points, "ODG polygon points")?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .and_then(|value| value.shapes().get(shape))
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
+        if !matches!(selected.kind(), ShapeKind::Polygon | ShapeKind::Polyline) {
+            return Err(Error::Unsupported(
+                "ODG point-list edit requires a polygon or polyline".into(),
+            ));
+        }
+        if selected.view_box() == Some(target_view_box.as_str())
+            && selected.points() == Some(target_points.as_str())
+        {
+            return Ok(());
+        }
+        let view_box_span = parsed.points_spans[page][shape][0].clone();
+        self.replace_or_insert_shape_attribute(
+            page,
+            shape,
+            view_box_span,
+            "svg:viewBox",
+            &target_view_box,
+        )?;
+        let reparsed = parse_content(&self.content)?;
+        let points_span = reparsed.points_spans[page][shape][1].clone();
+        self.replace_or_insert_shape_attribute(
+            page,
+            shape,
+            points_span,
+            "draw:points",
+            &target_points,
+        )?;
+        self.changes.push(Change::Structure(
+            StructureChange::ShapeAdvancedGeometryChanged { page, shape },
+        ));
+        Ok(())
+    }
+
+    /// Sets or inserts lexical line endpoints on a line, connector, or measure shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an incompatible kind, selector failure, or invalid lexical values.
+    pub fn set_shape_line_geometry(
+        &mut self,
+        page: usize,
+        shape: usize,
+        x1: impl Into<String>,
+        y1: impl Into<String>,
+        x2: impl Into<String>,
+        y2: impl Into<String>,
+    ) -> Result<()> {
+        let after = [x1.into(), y1.into(), x2.into(), y2.into()];
+        validate_geometry(&after)?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .and_then(|value| value.shapes().get(shape))
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
+        if !matches!(
+            selected.kind(),
+            ShapeKind::Line | ShapeKind::Connector | ShapeKind::Measure
+        ) {
+            return Err(Error::Unsupported(
+                "ODG line-endpoint edit requires a line, connector, or measure".into(),
+            ));
+        }
+        let before = selected.line_geometry();
+        if before
+            .iter()
+            .zip(&after)
+            .all(|(source_value, target_value)| *source_value == Some(target_value.as_str()))
+        {
+            return Ok(());
+        }
+        for (index, (qualified_name, value)) in ["svg:x1", "svg:y1", "svg:x2", "svg:y2"]
+            .into_iter()
+            .zip(&after)
+            .enumerate()
+        {
+            let current = parse_content(&self.content)?;
+            let attribute_span = current.line_geometry_spans[page][shape][index].clone();
+            self.replace_or_insert_shape_attribute(
+                page,
+                shape,
+                attribute_span,
+                qualified_name,
+                value,
+            )?;
+        }
+        self.changes.push(Change::Structure(
+            StructureChange::ShapeAdvancedGeometryChanged { page, shape },
+        ));
         Ok(())
     }
 
@@ -3178,6 +3441,10 @@ pub enum StructureChange {
         position: usize,
         kind: ShapeKind,
     },
+    ShapeAdvancedGeometryChanged {
+        page: usize,
+        shape: usize,
+    },
     FormControlInserted {
         id: String,
     },
@@ -4237,6 +4504,9 @@ struct Parsed {
     layer_spans: LayerSpans,
     layer_count: usize,
     geometry_spans: GeometrySpans,
+    line_geometry_spans: GeometrySpans,
+    points_spans: PointsSpans,
+    transform_spans: Vec<Vec<Option<Range<usize>>>>,
     path_spans: PathSpans,
     style_name_spans: Vec<Vec<Option<Range<usize>>>>,
     page_spans: Vec<Option<Range<usize>>>,
@@ -4327,6 +4597,9 @@ struct Scanner {
     name_spans: NameSpans,
     layer_spans: LayerSpans,
     geometry_spans: GeometrySpans,
+    line_geometry_spans: GeometrySpans,
+    points_spans: PointsSpans,
+    transform_spans: Vec<Vec<Option<Range<usize>>>>,
     path_spans: PathSpans,
     style_name_spans: Vec<Vec<Option<Range<usize>>>>,
     layer_count: usize,
@@ -4370,6 +4643,9 @@ impl Scanner {
             name_spans: Vec::new(),
             layer_spans: Vec::new(),
             geometry_spans: Vec::new(),
+            line_geometry_spans: Vec::new(),
+            points_spans: Vec::new(),
+            transform_spans: Vec::new(),
             path_spans: Vec::new(),
             style_name_spans: Vec::new(),
             layer_count: 0,
@@ -4560,6 +4836,9 @@ impl Scanner {
             self.name_spans.push(Vec::new());
             self.layer_spans.push(Vec::new());
             self.geometry_spans.push(Vec::new());
+            self.line_geometry_spans.push(Vec::new());
+            self.points_spans.push(Vec::new());
+            self.transform_spans.push(Vec::new());
             self.path_spans.push(Vec::new());
             self.style_name_spans.push(Vec::new());
             self.page_spans.push(None);
@@ -4603,6 +4882,12 @@ impl Scanner {
                 attribute(reader, element, SVG, b"width")?,
                 attribute(reader, element, SVG, b"height")?,
             ];
+            let line_geometry = [
+                attribute(reader, element, SVG, b"x1")?,
+                attribute(reader, element, SVG, b"y1")?,
+                attribute(reader, element, SVG, b"x2")?,
+                attribute(reader, element, SVG, b"y2")?,
+            ];
             let shape = self.pages[page].shapes().len();
             self.pages[page].push_shape(Shape::parsed(
                 ShapeProperties {
@@ -4611,6 +4896,10 @@ impl Scanner {
                     layer: attribute(reader, element, DRAW, b"layer")?,
                     name,
                     path_data: attribute(reader, element, SVG, b"d")?,
+                    transform: attribute(reader, element, DRAW, b"transform")?,
+                    points: attribute(reader, element, DRAW, b"points")?,
+                    view_box: attribute(reader, element, SVG, b"viewBox")?,
+                    line_geometry,
                     style_name: attribute(reader, element, DRAW, b"style-name")?,
                     text_style_name: attribute(reader, element, DRAW, b"text-style-name")?,
                     z_index,
@@ -4632,6 +4921,24 @@ impl Scanner {
                 attribute_source_span(reader, element, tag, tag_start, SVG, b"width")?,
                 attribute_source_span(reader, element, tag, tag_start, SVG, b"height")?,
             ]);
+            self.line_geometry_spans[page].push([
+                attribute_source_span(reader, element, tag, tag_start, SVG, b"x1")?,
+                attribute_source_span(reader, element, tag, tag_start, SVG, b"y1")?,
+                attribute_source_span(reader, element, tag, tag_start, SVG, b"x2")?,
+                attribute_source_span(reader, element, tag, tag_start, SVG, b"y2")?,
+            ]);
+            self.points_spans[page].push([
+                attribute_source_span(reader, element, tag, tag_start, SVG, b"viewBox")?,
+                attribute_source_span(reader, element, tag, tag_start, DRAW, b"points")?,
+            ]);
+            self.transform_spans[page].push(attribute_source_span(
+                reader,
+                element,
+                tag,
+                tag_start,
+                DRAW,
+                b"transform",
+            )?);
             self.path_spans[page].push(attribute_source_span(
                 reader, element, tag, tag_start, SVG, b"d",
             )?);
@@ -4876,6 +5183,9 @@ impl Scanner {
             name_spans: self.name_spans,
             layer_spans: self.layer_spans,
             geometry_spans: self.geometry_spans,
+            line_geometry_spans: self.line_geometry_spans,
+            points_spans: self.points_spans,
+            transform_spans: self.transform_spans,
             path_spans: self.path_spans,
             style_name_spans: self.style_name_spans,
             layer_count: self.layer_count,
@@ -6130,6 +6440,44 @@ fn serialize_shape(shape: &Shape) -> Result<String> {
     push_attribute(&mut xml, "svg:y", shape.y())?;
     push_attribute(&mut xml, "svg:width", shape.width())?;
     push_attribute(&mut xml, "svg:height", shape.height())?;
+    if let Some(transform) = shape.transform() {
+        validate_advanced_geometry_value(transform, "ODG transform")?;
+    }
+    push_attribute(&mut xml, "draw:transform", shape.transform())?;
+    let has_points = shape.points().is_some() || shape.view_box().is_some();
+    if has_points
+        && (!matches!(shape.kind(), ShapeKind::Polygon | ShapeKind::Polyline)
+            || shape.points().is_none()
+            || shape.view_box().is_none())
+    {
+        return invalid("ODG points require a polygon/polyline with a paired view box");
+    }
+    if let Some(points) = shape.points() {
+        validate_advanced_geometry_value(points, "ODG polygon points")?;
+    }
+    if let Some(view_box) = shape.view_box() {
+        validate_advanced_geometry_value(view_box, "ODG polygon view box")?;
+    }
+    push_attribute(&mut xml, "svg:viewBox", shape.view_box())?;
+    push_attribute(&mut xml, "draw:points", shape.points())?;
+    let line_geometry = shape.line_geometry();
+    let line_values = line_geometry.iter().flatten().count();
+    if line_values != 0
+        && (line_values != 4
+            || !matches!(
+                shape.kind(),
+                ShapeKind::Line | ShapeKind::Connector | ShapeKind::Measure
+            ))
+    {
+        return invalid("ODG line geometry requires four endpoints on a line-like shape");
+    }
+    for endpoint in line_geometry.iter().flatten().copied() {
+        validate_advanced_geometry_value(endpoint, "ODG line endpoint")?;
+    }
+    push_attribute(&mut xml, "svg:x1", line_geometry[0])?;
+    push_attribute(&mut xml, "svg:y1", line_geometry[1])?;
+    push_attribute(&mut xml, "svg:x2", line_geometry[2])?;
+    push_attribute(&mut xml, "svg:y2", line_geometry[3])?;
     if shape.path_data().is_some() && shape.kind() != ShapeKind::Path {
         return invalid("ODG svg:d is only supported on detached path shapes");
     }
@@ -6197,6 +6545,16 @@ fn validate_path_data(value: &str) -> Result<()> {
     validate_bounded_value(value, "ODG path data")?;
     if value.chars().any(char::is_control) {
         return invalid("ODG path data contains a control character");
+    }
+    Ok(())
+}
+
+fn validate_advanced_geometry_value(value: &str, owner: &str) -> Result<()> {
+    validate_bounded_value(value, owner)?;
+    if value.chars().any(char::is_control) {
+        return Err(Error::InvalidFormat(format!(
+            "{owner} contains a control character"
+        )));
     }
     Ok(())
 }
@@ -6613,6 +6971,12 @@ fn inverse_change(change: &Change) -> Change {
                 page: *page,
                 position: *position,
                 kind: *kind,
+            },
+            StructureChange::ShapeAdvancedGeometryChanged { page, shape } => {
+                StructureChange::ShapeAdvancedGeometryChanged {
+                    page: *page,
+                    shape: *shape,
+                }
             },
             StructureChange::FormControlInserted { id } => {
                 StructureChange::FormControlRemoved { id: id.clone() }

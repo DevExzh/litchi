@@ -514,7 +514,7 @@ fn parse_columns(
     let count = take(&mut values, Ns::Fo, "column-count")
         .ok_or_else(|| make_error("style:columns is missing fo:column-count"))?
         .parse::<u8>()
-        .map_err(|_| make_error("invalid fo:column-count"))?;
+        .map_err(|_error| make_error("invalid fo:column-count"))?;
     let mut result = Columns::new(count)?;
     result.column_gap = take(&mut values, Ns::Fo, "column-gap")
         .map(Length::new)
@@ -536,7 +536,7 @@ fn parse_column(
         .filter(|value| !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()))
         .ok_or_else(|| make_error("invalid style:rel-width"))?
         .parse::<u64>()
-        .map_err(|_| make_error("invalid style:rel-width"))?;
+        .map_err(|_error| make_error("invalid style:rel-width"))?;
     let mut result = Column::new(width)?;
     result.start_indent = take(&mut values, Ns::Fo, "start-indent")
         .map(Length::new)
@@ -668,7 +668,7 @@ fn parse_percent(value: &str) -> Result<u8> {
         .strip_suffix('%')
         .ok_or_else(|| make_error("invalid style:height"))?
         .parse::<u8>()
-        .map_err(|_| make_error("invalid style:height"))
+        .map_err(|_error| make_error("invalid style:height"))
         .and_then(|value| {
             if value <= 100 {
                 Ok(value)
@@ -748,7 +748,7 @@ fn escape(xml: &mut String, value: &str) {
 fn decode(value: &[u8]) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| make_error("non-UTF-8 style:columns name"))
+        .map_err(|_error| make_error("non-UTF-8 style:columns name"))
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(make_error(message))

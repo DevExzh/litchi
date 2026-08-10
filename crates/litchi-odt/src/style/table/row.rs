@@ -263,7 +263,7 @@ impl Opacity {
         }
         let parsed = number
             .parse::<f64>()
-            .map_err(|_| bad("invalid draw:opacity"))?;
+            .map_err(|_error| bad("invalid draw:opacity"))?;
         if !parsed.is_finite() || !(0.0..=100.0).contains(&parsed) {
             return Err(bad("draw:opacity is out of range"));
         }

@@ -122,6 +122,7 @@ struct ActiveSpan {
 }
 
 struct PendingList {
+    item_open: bool,
     items: Vec<PendingListItem>,
     level: usize,
     source_start: usize,
@@ -1382,6 +1383,9 @@ fn publish_block(
     }
     match block.kind {
         Element::Paragraph => {
+            if list_stack.last().is_some_and(|list| !list.item_open) {
+                return invalid("OTH paragraph occurs directly below a text:list");
+            }
             reserve(paragraphs, "OTH paragraph projection")?;
             reserve(order, "OTH block order")?;
             let index = paragraphs.len();
@@ -1543,6 +1547,7 @@ fn start_list(
             let level = stack.len().saturating_add(1);
             reserve(stack, "OTH list stack")?;
             stack.push(PendingList {
+                item_open: false,
                 items: Vec::new(),
                 level,
                 source_start,
@@ -1553,6 +1558,10 @@ fn start_list(
             let list = stack.last_mut().ok_or_else(|| {
                 Error::InvalidFormat("OTH list item occurs outside a text:list".to_string())
             })?;
+            if list.item_open {
+                return invalid("OTH list items cannot be nested without a text:list");
+            }
+            list.item_open = true;
             reserve(&mut list.items, "OTH list items")?;
             let start_value = optional_attribute(reader, start, TEXT_NAMESPACE, b"start-value")?
                 .map(|value| {
@@ -1600,8 +1609,27 @@ fn empty_list(
     sites: &mut Vec<ReplacementSite>,
 ) -> Result<()> {
     start_list(reader, start, current, source_range.start, stack)?;
-    if current == Element::List {
-        publish_list(stack, paragraphs, lists, source_range.end, sites)?;
+    match current {
+        Element::List => publish_list(stack, paragraphs, lists, source_range.end, sites)?,
+        Element::ListItem => close_list_item(stack)?,
+        Element::Body
+        | Element::Bookmark
+        | Element::BookmarkEnd
+        | Element::BookmarkStart
+        | Element::DocumentContent
+        | Element::Field
+        | Element::Form
+        | Element::FormControl
+        | Element::Heading
+        | Element::LineBreak
+        | Element::Link
+        | Element::Other
+        | Element::Paragraph
+        | Element::Resource
+        | Element::Space
+        | Element::Span
+        | Element::Tab
+        | Element::Text => {},
     }
     Ok(())
 }
@@ -1614,9 +1642,39 @@ fn end_list(
     lists: &mut Vec<crate::list::List>,
     sites: &mut Vec<ReplacementSite>,
 ) -> Result<()> {
-    if current == Element::List {
-        publish_list(stack, paragraphs, lists, source_end, sites)?;
+    match current {
+        Element::List => publish_list(stack, paragraphs, lists, source_end, sites)?,
+        Element::ListItem => close_list_item(stack)?,
+        Element::Body
+        | Element::Bookmark
+        | Element::BookmarkEnd
+        | Element::BookmarkStart
+        | Element::DocumentContent
+        | Element::Field
+        | Element::Form
+        | Element::FormControl
+        | Element::Heading
+        | Element::LineBreak
+        | Element::Link
+        | Element::Other
+        | Element::Paragraph
+        | Element::Resource
+        | Element::Space
+        | Element::Span
+        | Element::Tab
+        | Element::Text => {},
     }
+    Ok(())
+}
+
+fn close_list_item(stack: &mut [PendingList]) -> Result<()> {
+    let list = stack.last_mut().ok_or_else(|| {
+        Error::InvalidFormat("OTH list item closes outside a text:list".to_string())
+    })?;
+    if !list.item_open {
+        return invalid("OTH list item state is not open");
+    }
+    list.item_open = false;
     Ok(())
 }
 
@@ -1630,6 +1688,15 @@ fn publish_list(
     let list = stack
         .pop()
         .ok_or_else(|| Error::InvalidFormat("OTH list state is missing".to_string()))?;
+    if list.item_open {
+        return invalid("OTH text:list closes before its list item");
+    }
+    if list.items.is_empty() {
+        return invalid("OTH text:list requires at least one list item");
+    }
+    if stack.last().is_some_and(|parent| !parent.item_open) {
+        return invalid("OTH nested text:list occurs outside a list item");
+    }
     let mut items = Vec::new();
     items
         .try_reserve_exact(list.items.len())
@@ -1638,6 +1705,9 @@ fn publish_list(
             source,
         })?;
     for item in list.items {
+        if item.paragraph_positions.is_empty() && item.nested_lists.is_empty() {
+            return invalid("OTH list item requires projected paragraph or nested-list content");
+        }
         let mut values = Vec::new();
         values
             .try_reserve_exact(item.paragraph_positions.len())
@@ -1756,9 +1826,9 @@ fn push_control(
     start: &BytesStart<'_>,
     stack: &mut [PendingForm],
 ) -> Result<()> {
-    let Some(form) = stack.last_mut() else {
-        return Ok(());
-    };
+    let form = stack.last_mut().ok_or_else(|| {
+        Error::InvalidFormat("OTH form control occurs outside form:form".to_string())
+    })?;
     let qualified = start.name();
     let (_, local) = reader.resolver().resolve_element(qualified);
     reserve(&mut form.controls, "OTH form controls")?;

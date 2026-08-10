@@ -6,6 +6,7 @@ use crate::core::{MetaXmlPatch, PackageWriter, Structure, patch_meta_xml};
 use crate::elements::parser::OrderElement;
 use crate::elements::text::Paragraph;
 use litchi_core::{Result, xml::escape_xml};
+use litchi_odf_common::package::xml_splice_publication;
 use std::path::Path;
 
 impl MutableDocument {
@@ -474,7 +475,16 @@ impl MutableDocument {
 
         // Add meta.xml (patched from the source or regenerated with current metadata)
         let meta_xml = self.generate_meta_xml()?;
-        writer.add_file("meta.xml", meta_xml.as_bytes())?;
+        let meta_splice = self
+            .source_package
+            .as_ref()
+            .map(|source| xml_splice_publication(source, "meta.xml", &meta_xml))
+            .transpose();
+        if let Ok(Some(publication)) = meta_splice {
+            publication.publish(&mut writer)?;
+        } else {
+            writer.add_file("meta.xml", meta_xml.as_bytes())?;
+        }
 
         // Add authored picture payloads.
         for pending in &self.pending_images {

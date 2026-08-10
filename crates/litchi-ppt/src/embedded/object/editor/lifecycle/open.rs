@@ -4,7 +4,7 @@ use super::super::{Collection, Editor, Result, mapping, rewrite};
 use crate::package::Error;
 use litchi_cfb::OleFile;
 use litchi_ole_common::protection::is_protected_component;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
@@ -96,7 +96,7 @@ fn open_with_limit(
         current_edit_offset,
         document_persist_id,
         collection,
-        staged_storage: HashMap::default(),
+        staged_storage: BTreeMap::default(),
         removed_persist_ids: HashSet::default(),
         rewrite_object_list: false,
         changed: false,
@@ -160,10 +160,7 @@ fn validate_current_user(current_user: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn validate_object_mappings(
-    collection: &Collection,
-    mappings: &std::collections::BTreeMap<u32, u32>,
-) -> Result<()> {
+fn validate_object_mappings(collection: &Collection, mappings: &BTreeMap<u32, u32>) -> Result<()> {
     for object in &collection.objects {
         if !mappings.contains_key(&object.persist_id()) {
             return Err(Error::Corrupted(format!(

@@ -206,7 +206,7 @@ impl NumberedParagraph {
     /// The `text:level` nesting level of the paragraph.
     pub fn level(&self) -> Option<Result<u32>> {
         self.element.get_attribute("text:level").map(|value| {
-            value.parse::<u32>().map_err(|_| {
+            value.parse::<u32>().map_err(|_error| {
                 Error::InvalidFormat("text:level is not a non-negative integer".to_string())
             })
         })
@@ -220,9 +220,9 @@ impl NumberedParagraph {
     /// The `text:start-value` restarting numbering at this paragraph.
     pub fn start_value(&self) -> Option<Result<i32>> {
         self.element.get_attribute("text:start-value").map(|value| {
-            value
-                .parse::<i32>()
-                .map_err(|_| Error::InvalidFormat("text:start-value is not an integer".to_string()))
+            value.parse::<i32>().map_err(|_error| {
+                Error::InvalidFormat("text:start-value is not an integer".to_string())
+            })
         })
     }
 
@@ -601,7 +601,7 @@ impl Heading {
     pub fn level(&self) -> Option<u8> {
         self.element
             .get_int_attribute("text:outline-level")
-            .map(|n| n as u8)
+            .and_then(|value| u8::try_from(value).ok())
     }
 
     /// Set the outline level
@@ -1098,8 +1098,9 @@ fn make_text_block_element(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) ->
             continue;
         }
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
-        let local_name = std::str::from_utf8(local_name.as_ref())
-            .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string()))?;
+        let local_name = std::str::from_utf8(local_name.as_ref()).map_err(|_error| {
+            Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
+        })?;
         let name = match namespace {
             ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
                 format!("text:{local_name}")
@@ -1112,7 +1113,7 @@ fn make_text_block_element(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) ->
             },
             ResolveResult::Bound(_) | ResolveResult::Unbound => {
                 std::str::from_utf8(attribute.key.as_ref())
-                    .map_err(|_| {
+                    .map_err(|_error| {
                         Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
                     })?
                     .to_string()
@@ -1193,7 +1194,7 @@ fn text_space_count(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resul
                 .map_err(|error| {
                     Error::InvalidFormat(format!("invalid text:c attribute: {error}"))
                 })?;
-            let value = value.parse().map_err(|_| {
+            let value = value.parse().map_err(|_error| {
                 Error::InvalidFormat("text:c must be a non-negative integer".to_string())
             })?;
             count = Some(value);

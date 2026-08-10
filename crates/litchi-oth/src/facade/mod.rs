@@ -4,7 +4,7 @@ use litchi_core::{Error, HistoryLimits, Metadata, PatchError, Position, Result};
 use std::fmt;
 use std::{path::Path, sync::Arc};
 
-pub use crate::authoring::Builder;
+pub use crate::authoring::{Builder, ResourceMember};
 
 const MAX_PARAGRAPH_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DURABLE_PATCH_BYTES: usize = 512 * 1024 * 1024;
@@ -167,6 +167,18 @@ impl Template {
     /// Returns an error if the package entries cannot be enumerated.
     pub fn files(&self) -> Result<Vec<String>> {
         self.package.files()
+    }
+
+    /// Returns the stable XML validation capability contract.
+    #[must_use]
+    pub const fn validation_capabilities(&self) -> ValidationCapabilities {
+        ValidationCapabilities::oth()
+    }
+
+    /// Returns the stable security lifecycle capability contract.
+    #[must_use]
+    pub const fn security_capabilities(&self) -> SecurityCapabilities {
+        SecurityCapabilities::oth()
     }
 
     /// Inventories inert active-content surfaces and enforces an explicit policy.
@@ -352,6 +364,127 @@ pub struct SecurityReport {
     pub scripts: usize,
     /// Whether a recognized signature member exists.
     pub signed: bool,
+}
+
+/// Explicit support state for validation and security capabilities.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CapabilityState {
+    /// The capability is implemented at the documented OTH boundary.
+    Supported,
+    /// The capability is deliberately unavailable and fails closed.
+    Refused,
+}
+
+/// Stable validation contract for OTH XML.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ValidationCapabilities {
+    compact_publication: CapabilityState,
+    namespace_family_envelope: CapabilityState,
+    odf_relax_ng: CapabilityState,
+    semantic_subset: CapabilityState,
+}
+
+impl ValidationCapabilities {
+    const fn oth() -> Self {
+        Self {
+            compact_publication: CapabilityState::Supported,
+            namespace_family_envelope: CapabilityState::Supported,
+            odf_relax_ng: CapabilityState::Refused,
+            semantic_subset: CapabilityState::Supported,
+        }
+    }
+
+    /// Namespace-aware root/body/text family-envelope validation.
+    #[must_use]
+    pub const fn namespace_family_envelope(self) -> CapabilityState {
+        self.namespace_family_envelope
+    }
+
+    /// Bounded validation for the projected text/list/form/resource subset.
+    #[must_use]
+    pub const fn semantic_subset(self) -> CapabilityState {
+        self.semantic_subset
+    }
+
+    /// Full OASIS ODF Relax NG validation.
+    #[must_use]
+    pub const fn odf_relax_ng(self) -> CapabilityState {
+        self.odf_relax_ng
+    }
+
+    /// Compact authored and changed-part publication.
+    #[must_use]
+    pub const fn compact_publication(self) -> CapabilityState {
+        self.compact_publication
+    }
+}
+
+/// Stable security and protected-package lifecycle contract.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SecurityCapabilities {
+    active_execution: CapabilityState,
+    changed_signed_publication: CapabilityState,
+    external_resolution: CapabilityState,
+    inert_inventory: CapabilityState,
+    password_open: CapabilityState,
+    policy_gate: CapabilityState,
+    signature_verification: CapabilityState,
+}
+
+impl SecurityCapabilities {
+    const fn oth() -> Self {
+        Self {
+            active_execution: CapabilityState::Refused,
+            changed_signed_publication: CapabilityState::Refused,
+            external_resolution: CapabilityState::Refused,
+            inert_inventory: CapabilityState::Supported,
+            password_open: CapabilityState::Refused,
+            policy_gate: CapabilityState::Supported,
+            signature_verification: CapabilityState::Refused,
+        }
+    }
+
+    /// Inert inventory of embedded/external resources, forms, scripts, and signatures.
+    #[must_use]
+    pub const fn inert_inventory(self) -> CapabilityState {
+        self.inert_inventory
+    }
+
+    /// Explicit default-deny policy enforcement over inventoried surfaces.
+    #[must_use]
+    pub const fn policy_gate(self) -> CapabilityState {
+        self.policy_gate
+    }
+
+    /// Network or external-link resolution.
+    #[must_use]
+    pub const fn external_resolution(self) -> CapabilityState {
+        self.external_resolution
+    }
+
+    /// Script, macro, form, object, field, or action execution.
+    #[must_use]
+    pub const fn active_execution(self) -> CapabilityState {
+        self.active_execution
+    }
+
+    /// Password-encrypted package opening.
+    #[must_use]
+    pub const fn password_open(self) -> CapabilityState {
+        self.password_open
+    }
+
+    /// Cryptographic signature verification.
+    #[must_use]
+    pub const fn signature_verification(self) -> CapabilityState {
+        self.signature_verification
+    }
+
+    /// Changed publication of a signed source.
+    #[must_use]
+    pub const fn changed_signed_publication(self) -> CapabilityState {
+        self.changed_signed_publication
+    }
 }
 
 /// One source block selected for cross-template transfer.
@@ -2584,11 +2717,6 @@ fn transfer_block(
             let site = source.package.list_site(position.get()).ok_or_else(|| {
                 Error::InvalidFormat("OTH transfer list site is missing".to_string())
             })?;
-            if list.level() != 1 {
-                return Err(Error::InvalidFormat(
-                    "OTH transfer requires a top-level list selector".to_string(),
-                ));
-            }
             for paragraph in list_paragraph_positions(list) {
                 if !source.package.paragraph_inline_replaceable(paragraph.get()) {
                     return Err(Error::InvalidFormat(
@@ -2596,7 +2724,10 @@ fn transfer_block(
                     ));
                 }
             }
-            Ok((crate::ContentBlock::List(list.clone()), site.clone()))
+            Ok((
+                crate::ContentBlock::List(normalize_list_level(list, 1)),
+                site.clone(),
+            ))
         },
         TransferSelector::Resource(_) => Err(Error::InvalidFormat(
             "OTH resource transfer must use dependency planning".to_string(),
@@ -3619,9 +3750,12 @@ fn validate_one_inline_change(
         (change.before_xml.as_str(), change.before_text.as_str())
     };
     if actual_xml != expected_xml || text != Some(expected_text) {
-        return Err(Error::InvalidFormat(
-            "OTH durable rich inline semantic readback failed".to_string(),
-        ));
+        return Err(Error::InvalidFormat(format!(
+            "OTH durable rich inline semantic readback failed for {:?}: XML matches={}, text matches={}",
+            change.block,
+            actual_xml == expected_xml,
+            text == Some(expected_text)
+        )));
     }
     Ok(())
 }

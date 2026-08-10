@@ -8,10 +8,11 @@ mod model;
 mod package;
 
 pub use facade::{
-    Block, Builder, Commit, Edit, FormsChange, HeadingChange, History, InlineBlock, InlineChange,
-    JoinError, JoinFailure, ListChange, MergeConflict, MergePlan, ParagraphChange, Patch,
-    ResourceChange, ResourcePayloadChange, SecurityPolicy, SecurityReport, Template, TextBody,
-    TransferPlan, TransferPolicy, TransferSelector,
+    Block, Builder, CapabilityState, Commit, Edit, FormsChange, HeadingChange, History,
+    InlineBlock, InlineChange, JoinError, JoinFailure, ListChange, MergeConflict, MergePlan,
+    ParagraphChange, Patch, ResourceChange, ResourceMember, ResourcePayloadChange,
+    SecurityCapabilities, SecurityPolicy, SecurityReport, Template, TextBody, TransferPlan,
+    TransferPolicy, TransferSelector, ValidationCapabilities,
 };
 pub use model::block::Content as ContentBlock;
 pub use model::{

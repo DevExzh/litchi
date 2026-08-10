@@ -1350,6 +1350,16 @@ impl<W: Write> RtfWriter<W> {
         shape
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if let Some(formatting) = shape.text_formatting {
+            self.write_str("{")?;
+            self.write_formatting(&formatting)?;
+            self.write_root_shape_content(shape)?;
+            return self.write_str("}");
+        }
+        self.write_root_shape_content(shape)
+    }
+
+    fn write_root_shape_content(&mut self, shape: &Shape<'_>) -> io::Result<()> {
         if !shape.instruction_present {
             self.write_str("{\\shp")?;
             let result = shape.result.as_ref().ok_or_else(|| {

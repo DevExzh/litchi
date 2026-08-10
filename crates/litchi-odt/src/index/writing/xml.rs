@@ -1263,7 +1263,7 @@ fn scan_xml(xml: &str) -> Result<XmlScan> {
                         return invalid("content XML has multiple office:text elements");
                     }
                     let qname = std::str::from_utf8(value.name().as_ref())
-                        .map_err(|_| {
+                        .map_err(|_error| {
                             Error::InvalidFormat("non-UTF-8 office:text name".to_string())
                         })?
                         .to_string();
@@ -1462,7 +1462,7 @@ fn boolean(value: &str, context: &str) -> Result<()> {
 fn parse_positive(value: &str, context: &str) -> Result<u64> {
     let value = value
         .parse::<u64>()
-        .map_err(|_| Error::InvalidFormat(format!("{context} is not a positive integer")))?;
+        .map_err(|_error| Error::InvalidFormat(format!("{context} is not a positive integer")))?;
     if value == 0 {
         return invalid(format!("{context} must be positive"));
     }
@@ -1477,7 +1477,7 @@ fn validate_length(value: &str) -> Result<()> {
     let number = &value[..value.len() - unit.len()];
     number
         .parse::<f64>()
-        .map_err(|_| Error::InvalidFormat(format!("invalid ODF length {value:?}")))?;
+        .map_err(|_error| Error::InvalidFormat(format!("invalid ODF length {value:?}")))?;
     Ok(())
 }
 

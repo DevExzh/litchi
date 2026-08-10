@@ -137,6 +137,43 @@ impl TransferPlan {
         )
     }
 
+    /// Plans transfer of one inert root body text frame at the target body end.
+    ///
+    /// Geometry, properties, text formatting, fallbacks, and self-contained
+    /// nested drawings are retained when font/color resources match. Active
+    /// hyperlinks, nested generic fields, and unknown drawing syntax are refused.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, active or unresolved drawing
+    /// dependency, opaque syntax, or invalid candidate readback.
+    pub fn shape(source: &Snapshot, source_index: usize, target: &Snapshot) -> Result<Self, Error> {
+        require_equal_text_resources(source, target)?;
+        let shape = source
+            .shapes()
+            .get(source_index)
+            .ok_or(Error::DestinationOutOfRange("shape"))?;
+        if !shape.text_destination_present
+            || matches!(shape.shape_type, crate::ShapeType::PictureFrame)
+        {
+            return Err(Error::UnsupportedSource(
+                "shape transfer supports retained non-picture text frames",
+            ));
+        }
+        refuse_feature_opaque(source, crate::opaque::Context::Drawing, shape.position)?;
+        refuse_drawing_story_fields(std::slice::from_ref(shape), &[])?;
+        if super::shape_has_active_link(shape) {
+            return Err(Error::UnsupportedSource(
+                "shape transfer refuses active hyperlink metadata",
+            ));
+        }
+        let dependency_count = shape_dependency_count(shape);
+        let mut transferred_shape = shape.clone().into_owned();
+        transferred_shape.position = target.text().len();
+        let effect = format!("body:shape:append:{source_index}");
+        let after = canonical_candidate(target, |model| model.push_shape(transferred_shape))?;
+        root_plan(target, "shape.transfer", &effect, after, dependency_count)
+    }
+
     /// Plans copying one complete nested table tree into a target cell end.
     ///
     /// Nested table text, geometry, borders, and recursively nested tables are
@@ -773,6 +810,31 @@ fn shape_has_story_fields(shape: &crate::Shape<'_>) -> bool {
 fn shape_group_has_story_fields(group: &crate::ShapeGroup<'_>) -> bool {
     group.shapes.iter().any(shape_has_story_fields)
         || group.groups.iter().any(shape_group_has_story_fields)
+}
+
+fn shape_dependency_count(shape: &crate::Shape<'_>) -> usize {
+    let mut count = shape
+        .text_shapes
+        .len()
+        .saturating_add(shape.text_shape_groups.len());
+    for nested in &shape.text_shapes {
+        count = count.saturating_add(shape_dependency_count(nested));
+    }
+    for group in &shape.text_shape_groups {
+        count = count.saturating_add(shape_group_dependency_count(group));
+    }
+    count
+}
+
+fn shape_group_dependency_count(group: &crate::ShapeGroup<'_>) -> usize {
+    let mut count = group.shapes.len().saturating_add(group.groups.len());
+    for shape in &group.shapes {
+        count = count.saturating_add(shape_dependency_count(shape));
+    }
+    for nested in &group.groups {
+        count = count.saturating_add(shape_group_dependency_count(nested));
+    }
+    count
 }
 
 fn count_styled_rows(table: &crate::Table<'_>) -> usize {

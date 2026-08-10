@@ -8,10 +8,12 @@ use litchi_ods::{
     Builder, Cell, CellValue, Row, Sheet, Spreadsheet,
     document::{
         BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, Collision,
-        Drawing, DrawingFrame, DrawingGeometry, DrawingGeometryKind, EncryptionWritePolicy,
-        FormControl, FormControlKind, FormEvent, History, JoinFailure, NumberStyleNode, Resource,
-        RichFormControl, RichRun, RichText, SecurityCapability, SecurityWritePolicy,
-        SignatureWritePolicy, Snapshot, StyleGraph, TextProperties, TextStyleNode,
+        DataStyleNode, Drawing, DrawingFrame, DrawingGeometry, DrawingGeometryKind, DrawingPoint,
+        DrawingPolygon, EncryptionProfile, EncryptionWriteCapability, EncryptionWritePolicy,
+        EncryptionWriteRefusal, FormControl, FormControlKind, FormEvent, History, JoinFailure,
+        NumberStyleNode, Resource, RichFormControl, RichRun, RichText, SecurityCapability,
+        SecurityWritePolicy, SignatureWritePolicy, Snapshot, StyleGraph, TextProperties,
+        TextStyleNode,
     },
     model::{
         conditional_format::{Condition, Format},
@@ -41,6 +43,29 @@ fn deep_style_graph() -> StyleGraph {
             prefix: Some("$".to_string()),
             suffix: None,
         }],
+        data_styles: vec![
+            DataStyleNode::Date {
+                name: "IsoDate".to_string(),
+            },
+            DataStyleNode::Time {
+                name: "Clock".to_string(),
+                decimal_places: 3,
+            },
+            DataStyleNode::Currency {
+                name: "Euro2".to_string(),
+                symbol: "€".to_string(),
+                decimal_places: 2,
+                min_integer_digits: 1,
+            },
+            DataStyleNode::Percentage {
+                name: "Percent1".to_string(),
+                decimal_places: 1,
+                min_integer_digits: 1,
+            },
+            DataStyleNode::Boolean {
+                name: "Truth".to_string(),
+            },
+        ],
         text_styles: vec![TextStyleNode {
             name: "StrongRun".to_string(),
             parent: None,
@@ -85,6 +110,7 @@ fn automatic_style_replace_remove_and_package_resolution_are_durable() -> Result
     let security = snapshot.security_capabilities()?;
     assert_eq!(security.decrypt, SecurityCapability::NotApplicable);
     assert_eq!(security.reencrypt, SecurityCapability::NotApplicable);
+    assert_eq!(security.encrypt, SecurityCapability::Available);
     assert_eq!(security.sign, SecurityCapability::RefusedUnsupported);
     let mut create = snapshot.edit();
     create.put_style_graph(&deep_style_graph())?;
@@ -96,9 +122,32 @@ fn automatic_style_replace_remove_and_package_resolution_are_durable() -> Result
     );
     assert_eq!(effective.data_style.as_deref(), Some("Money2"));
     assert_eq!(effective.cell.background.as_deref(), Some("#fff4cc"));
-    let names = ["Money2", "StrongRun", "BaseInput", "MoneyInput"]
-        .map(str::to_string)
-        .to_vec();
+    for element in [
+        "<number:date-style",
+        "<number:time-style",
+        "<number:currency-style",
+        "<number:percentage-style",
+        "<number:boolean-style",
+    ] {
+        assert!(
+            Spreadsheet::from_bytes(created.snapshot().as_bytes().to_vec())?
+                .content_xml()
+                .contains(element)
+        );
+    }
+    let names = [
+        "Money2",
+        "IsoDate",
+        "Clock",
+        "Euro2",
+        "Percent1",
+        "Truth",
+        "StrongRun",
+        "BaseInput",
+        "MoneyInput",
+    ]
+    .map(str::to_string)
+    .to_vec();
     let mut referenced = created.snapshot().edit();
     referenced.set_cell_style("Data", 0, 0, "MoneyInput")?;
     let referenced_before = referenced.as_bytes().to_vec();
@@ -161,6 +210,42 @@ fn package_style_resolution_crosses_common_and_automatic_parts() -> Result<()> {
     assert_eq!(effective.cell.background.as_deref(), Some("#ccffee"));
     assert_eq!(effective.cell.horizontal_align.as_deref(), Some("end"));
     assert_eq!(effective.text.bold, Some(true));
+    let duplicated_styles = String::from_utf8_lossy(styles).replace(
+        "</office:styles>",
+        "<style:style style:name=\"CommonBase\" style:family=\"table-cell\"/></office:styles>",
+    );
+    let invalid_bytes = support::raw_package(&[
+        ("content.xml", content, "text/xml"),
+        ("styles.xml", duplicated_styles.as_bytes(), "text/xml"),
+    ]);
+    if let Ok(invalid) = Snapshot::from_bytes(invalid_bytes) {
+        assert!(invalid.effective_cell_style("AutoChild").is_err());
+    }
+    Ok(())
+}
+
+#[test]
+fn terminal_encryption_is_bounded_machine_readable_and_password_reopenable() -> Result<()> {
+    let source = compact_source()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    assert_eq!(
+        snapshot.encryption_write_capability(SignatureWritePolicy::Refuse)?,
+        EncryptionWriteCapability::Available
+    );
+    assert!(
+        snapshot
+            .encrypt_to_bytes("", EncryptionProfile::Compatible)
+            .is_err()
+    );
+    let encrypted =
+        snapshot.encrypt_to_bytes("ods-test-password", EncryptionProfile::Compatible)?;
+    assert!(Snapshot::from_bytes(encrypted.clone()).is_err());
+    assert!(Spreadsheet::from_bytes_with_password(encrypted.clone(), "wrong-password").is_err());
+    let reopened = Spreadsheet::from_bytes_with_password(encrypted.clone(), "ods-test-password")?;
+    let original = Spreadsheet::from_bytes(source)?;
+    assert_eq!(reopened.content_xml(), original.content_xml());
+    let archive = OwnedPackage::from_bytes_with_password(encrypted, "ods-test-password")?;
+    assert!(archive.package()?.manifest().has_encrypted_entries());
     Ok(())
 }
 
@@ -169,60 +254,80 @@ fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
     let source = compact_source()?;
     let snapshot = Snapshot::from_bytes(source.clone())?;
     let mut edit = snapshot.edit();
-    edit.set_rich_form_controls_with_resources(
-        &[
-            RichFormControl {
-                id: "choice".to_string(),
-                label: "Choice".to_string(),
-                kind: FormControlKind::Radio,
-                linked_cell: Some("Data.A1".to_string()),
-                source_range: None,
-                image_path: None,
-                events: vec![FormEvent {
-                    event_name: "dom:click".to_string(),
-                    macro_name: "application:ReviewChoice".to_string(),
-                }],
-            },
-            RichFormControl {
-                id: "date".to_string(),
-                label: "Date".to_string(),
-                kind: FormControlKind::Date,
-                linked_cell: None,
-                source_range: None,
-                image_path: None,
-                events: Vec::new(),
-            },
-            RichFormControl {
-                id: "choices".to_string(),
-                label: "Choices".to_string(),
-                kind: FormControlKind::ComboBox,
-                linked_cell: None,
-                source_range: Some("Data.A1:A1".to_string()),
-                image_path: None,
-                events: Vec::new(),
-            },
-            RichFormControl {
-                id: "preview".to_string(),
-                label: "Preview".to_string(),
-                kind: FormControlKind::Image,
-                linked_cell: None,
-                source_range: None,
-                image_path: None,
-                events: Vec::new(),
-            },
-            RichFormControl {
-                id: "time".to_string(),
-                label: "Time".to_string(),
-                kind: FormControlKind::Time,
-                linked_cell: None,
-                source_range: None,
-                image_path: None,
-                events: Vec::new(),
-            },
-        ],
-        Vec::new(),
-        Collision::Reject,
-    )?;
+    let mut controls = vec![
+        RichFormControl {
+            id: "choice".to_string(),
+            label: "Choice".to_string(),
+            kind: FormControlKind::Radio,
+            linked_cell: Some("Data.A1".to_string()),
+            source_range: None,
+            image_path: None,
+            events: vec![FormEvent {
+                event_name: "dom:click".to_string(),
+                macro_name: "application:ReviewChoice".to_string(),
+            }],
+        },
+        RichFormControl {
+            id: "date".to_string(),
+            label: "Date".to_string(),
+            kind: FormControlKind::Date,
+            linked_cell: None,
+            source_range: None,
+            image_path: None,
+            events: Vec::new(),
+        },
+        RichFormControl {
+            id: "choices".to_string(),
+            label: "Choices".to_string(),
+            kind: FormControlKind::ComboBox,
+            linked_cell: None,
+            source_range: Some("Data.A1:A1".to_string()),
+            image_path: None,
+            events: Vec::new(),
+        },
+        RichFormControl {
+            id: "preview".to_string(),
+            label: "Preview".to_string(),
+            kind: FormControlKind::Image,
+            linked_cell: None,
+            source_range: None,
+            image_path: None,
+            events: Vec::new(),
+        },
+        RichFormControl {
+            id: "time".to_string(),
+            label: "Time".to_string(),
+            kind: FormControlKind::Time,
+            linked_cell: None,
+            source_range: None,
+            image_path: None,
+            events: Vec::new(),
+        },
+    ];
+    for (id, label, kind) in [
+        ("fixed", "Fixed", FormControlKind::FixedText),
+        ("formatted", "Formatted", FormControlKind::FormattedText),
+        ("number", "Number", FormControlKind::Number),
+        ("file", "File", FormControlKind::File),
+        ("password", "Password", FormControlKind::Password),
+        ("area", "Area", FormControlKind::TextArea),
+        ("hidden", "Hidden", FormControlKind::Hidden),
+        ("range", "Range", FormControlKind::ValueRange),
+        ("frame", "Frame", FormControlKind::Frame),
+        ("image-frame", "Image Frame", FormControlKind::ImageFrame),
+        ("generic", "Generic", FormControlKind::GenericControl),
+    ] {
+        controls.push(RichFormControl {
+            id: id.to_string(),
+            label: label.to_string(),
+            kind,
+            linked_cell: None,
+            source_range: None,
+            image_path: None,
+            events: Vec::new(),
+        });
+    }
+    edit.set_rich_form_controls_with_resources(&controls, Vec::new(), Collision::Reject)?;
     edit.put_drawing_geometry(
         "Data",
         &DrawingGeometry {
@@ -254,7 +359,7 @@ fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
     edit.put_drawing_geometry(
         "Data",
         &DrawingGeometry {
-            name: "Connector".to_string(),
+            name: "Segment".to_string(),
             kind: DrawingGeometryKind::Line,
             text: None,
             x_cm: 4.0,
@@ -264,6 +369,41 @@ fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
             z_index: 5,
         },
     )?;
+    edit.put_drawing_geometry(
+        "Data",
+        &DrawingGeometry {
+            name: "Connector".to_string(),
+            kind: DrawingGeometryKind::Connector,
+            text: None,
+            x_cm: 4.0,
+            y_cm: 3.0,
+            width_cm: 2.0,
+            height_cm: 0.5,
+            z_index: 6,
+        },
+    )?;
+    for (name, closed) in [("Triangle", true), ("Route", false)] {
+        edit.put_drawing_polygon(
+            "Data",
+            &DrawingPolygon {
+                name: name.to_string(),
+                closed,
+                points: vec![
+                    DrawingPoint { x: 0, y: 100 },
+                    DrawingPoint { x: 50, y: 0 },
+                    DrawingPoint { x: 100, y: 100 },
+                ],
+                view_box_width: 100,
+                view_box_height: 100,
+                text: None,
+                x_cm: 1.0,
+                y_cm: 4.0,
+                width_cm: 2.0,
+                height_cm: 2.0,
+                z_index: 7,
+            },
+        )?;
+    }
     let commit = edit.commit()?;
     let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
     for expected in [
@@ -272,11 +412,25 @@ fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
         "<form:combobox",
         "<form:image",
         "<form:time",
+        "<form:fixed-text",
+        "<form:formatted-text",
+        "<form:number",
+        "<form:file",
+        "<form:password",
+        "<form:textarea",
+        "<form:hidden",
+        "<form:value-range",
+        "<form:frame",
+        "<form:image-frame",
+        "<form:generic-control",
         "script:event-name=\"dom:click\"",
         "script:macro-name=\"application:ReviewChoice\"",
         "<draw:rect",
         "<draw:ellipse",
         "<draw:line",
+        "<draw:connector",
+        "<draw:polygon",
+        "<draw:polyline",
         "draw:name=\"Callout\"",
         "<text:p>Review</text:p>",
     ] {
@@ -427,6 +581,15 @@ fn deep_dependency_failures_leave_the_candidate_unchanged() -> Result<()> {
     };
     assert!(edit.put_style_graph(&cyclic).is_err());
     assert_eq!(edit.as_bytes(), before);
+    let invalid_data_style = StyleGraph {
+        data_styles: vec![DataStyleNode::Time {
+            name: "TooPrecise".to_string(),
+            decimal_places: 10,
+        }],
+        ..StyleGraph::default()
+    };
+    assert!(edit.put_style_graph(&invalid_data_style).is_err());
+    assert_eq!(edit.as_bytes(), before);
     assert!(
         edit.set_bound_form_controls_with_resources(
             &[BoundFormControl {
@@ -438,6 +601,30 @@ fn deep_dependency_failures_leave_the_candidate_unchanged() -> Result<()> {
             }],
             Vec::new(),
             Collision::Reject,
+        )
+        .is_err()
+    );
+    assert_eq!(edit.as_bytes(), before);
+    assert!(
+        edit.put_drawing_polygon(
+            "Data",
+            &DrawingPolygon {
+                name: "OutOfViewBox".to_string(),
+                closed: true,
+                points: vec![
+                    DrawingPoint { x: 0, y: 0 },
+                    DrawingPoint { x: 50, y: 50 },
+                    DrawingPoint { x: 101, y: 100 },
+                ],
+                view_box_width: 100,
+                view_box_height: 100,
+                text: None,
+                x_cm: 0.0,
+                y_cm: 0.0,
+                width_cm: 1.0,
+                height_cm: 1.0,
+                z_index: 0,
+            },
         )
         .is_err()
     );
@@ -647,6 +834,17 @@ fn explicit_signature_policy_strips_stale_signatures_for_commit_and_apply() -> R
         ),
     ]);
     let signed = Snapshot::from_bytes(signed_bytes)?;
+    assert_eq!(
+        signed.encryption_write_capability(SignatureWritePolicy::Refuse)?,
+        EncryptionWriteCapability::Refused(EncryptionWriteRefusal::SignedSourceRequiresStripPolicy)
+    );
+    let encrypted = signed.encrypt_to_bytes_with_signatures(
+        "strip-signature",
+        EncryptionProfile::Compatible,
+        SignatureWritePolicy::StripInvalidated,
+    )?;
+    let encrypted_package = OwnedPackage::from_bytes_with_password(encrypted, "strip-signature")?;
+    assert!(!encrypted_package.has_file("META-INF/documentsignatures.xml")?);
     let mut refused = signed.edit();
     refused.set_cell_formula("Data", 0, 0, "of:=6*7")?;
     assert!(refused.commit().is_err());

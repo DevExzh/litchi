@@ -430,10 +430,19 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
         font_index,
     }];
     let reference = Reference::new(6, 3).unwrap();
+    let reused_reference = Reference::new(7, 3).unwrap();
     let text = "λ".repeat(5_000);
     let mut transaction = source.transaction();
     transaction
         .insert_rich_text_cell("Sheet1".into(), reference, text.clone(), runs.clone())
+        .unwrap();
+    transaction
+        .insert_rich_text_cell(
+            "Sheet1".into(),
+            reused_reference,
+            text.clone(),
+            runs.clone(),
+        )
         .unwrap();
     let commit = transaction.commit().unwrap();
     assert_eq!(
@@ -447,6 +456,28 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
             .unwrap()
             .value(),
         &Value::Text(text.clone())
+    );
+    assert_eq!(
+        commit
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reused_reference)
+            .unwrap()
+            .unwrap()
+            .value(),
+        &Value::Text(text.clone())
+    );
+    assert_eq!(
+        commit
+            .snapshot()
+            .inner
+            .shared_strings
+            .iter()
+            .filter(|candidate| candidate.as_str() == text.as_str())
+            .count(),
+        1
     );
     let index = commit
         .snapshot()
@@ -734,5 +765,70 @@ fn dependency_safe_row_insertion_reopens_and_inverts() {
             .unwrap()
             .value(),
         &Value::Number(2.0)
+    );
+}
+
+#[test]
+fn reference_free_formula_shifts_reopen_and_invert_exactly() {
+    let source = Snapshot::from_bytes(formula_package("1+1")).unwrap();
+    let mut transaction = source.transaction();
+    transaction.insert_rows("Formula".into(), 0, 2).unwrap();
+    let commit = transaction.commit().unwrap();
+    assert_eq!(
+        commit
+            .snapshot()
+            .worksheet("Formula".into())
+            .unwrap()
+            .unwrap()
+            .cell(Reference::new(2, 0).unwrap())
+            .unwrap()
+            .unwrap()
+            .value(),
+        &Value::FormulaCache(FormulaCache::Empty)
+    );
+    Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let wire = commit.patch().semantic().to_deterministic_json().unwrap();
+    let durable = SemanticPatch::from_deterministic_json(&wire).unwrap();
+    assert!(durable.plan_transfer(&source).is_executable());
+    let replay = durable.apply(&source).unwrap();
+    assert_eq!(replay.snapshot().bytes(), commit.snapshot().bytes());
+    let restored = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.snapshot())
+        .unwrap();
+    assert_eq!(restored.snapshot().bytes(), source.bytes());
+
+    let column_source = Snapshot::from_bytes(formula_package("1+1")).unwrap();
+    let mut columns = column_source.transaction();
+    columns.insert_columns("Formula".into(), 0, 2).unwrap();
+    let column_commit = columns.commit().unwrap();
+    assert_eq!(
+        column_commit
+            .snapshot()
+            .worksheet("Formula".into())
+            .unwrap()
+            .unwrap()
+            .cell(Reference::new(0, 2).unwrap())
+            .unwrap()
+            .unwrap()
+            .value(),
+        &Value::FormulaCache(FormulaCache::Empty)
+    );
+    let column_restored = column_commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(column_commit.snapshot())
+        .unwrap();
+    assert_eq!(column_restored.snapshot().bytes(), column_source.bytes());
+
+    let dependent = Snapshot::from_bytes(formula_package("A1+1")).unwrap();
+    assert!(
+        dependent
+            .transaction()
+            .insert_rows("Formula".into(), 0, 1)
+            .is_err()
     );
 }

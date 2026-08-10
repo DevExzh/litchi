@@ -37,6 +37,9 @@ pub type TransactionResult<T> = Result<T, TransactionError>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Refusal {
+    /// A composite selector is empty, duplicated, or not in canonical
+    /// ownership order, so its scope cannot be represented unambiguously.
+    AmbiguousCompositeSelector,
     /// The selected owner contains unsupported structural content.
     ComplexContent,
     /// The selected owner has no editable text element.
@@ -63,6 +66,9 @@ pub enum Refusal {
 impl std::fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
+            Self::AmbiguousCompositeSelector => {
+                "composite selector is empty, duplicated, or not canonically ordered"
+            },
             Self::ComplexContent => "selected owner contains unsupported structural content",
             Self::ComplexRun => "selected content has no editable Word text",
             Self::HyperlinkNotFound => "direct paragraph hyperlink was not found",
@@ -104,6 +110,59 @@ impl TableCellAddress {
     #[must_use]
     pub const fn new(table: Position, row: Position, cell: Position) -> Self {
         Self { table, row, cell }
+    }
+}
+
+/// One direct hyperlink address within an owner-scoped paragraph collection.
+///
+/// The paragraph position is relative to the body, deepest block content
+/// control, or deepest nested-table cell selected by the batch operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ParagraphHyperlinkAddress {
+    /// Direct paragraph position within the selected owner.
+    pub paragraph: Position,
+    /// Direct hyperlink position within the selected paragraph.
+    pub hyperlink: Position,
+}
+
+impl ParagraphHyperlinkAddress {
+    /// Construct one checked-by-use paragraph/hyperlink address.
+    #[must_use]
+    pub const fn new(paragraph: Position, hyperlink: Position) -> Self {
+        Self {
+            paragraph,
+            hyperlink,
+        }
+    }
+}
+
+/// Authored text paired with one owner-scoped direct hyperlink address.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HyperlinkTextReplacement {
+    address: ParagraphHyperlinkAddress,
+    text: String,
+}
+
+impl HyperlinkTextReplacement {
+    /// Construct one hyperlink text replacement.
+    #[must_use]
+    pub fn new(address: ParagraphHyperlinkAddress, text: impl Into<String>) -> Self {
+        Self {
+            address,
+            text: text.into(),
+        }
+    }
+
+    /// Return the selected direct paragraph/hyperlink address.
+    #[must_use]
+    pub const fn address(&self) -> ParagraphHyperlinkAddress {
+        self.address
+    }
+
+    /// Borrow the authored replacement text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
     }
 }
 
@@ -1020,6 +1079,36 @@ impl Edit {
         Ok(self)
     }
 
+    /// Atomically replace direct hyperlinks across one or more direct-body
+    /// paragraphs.
+    ///
+    /// Addresses must be non-empty, unique, and strictly increasing by
+    /// paragraph then hyperlink position. Each leaf remains inside one direct
+    /// paragraph, so this bounded composite selector cannot cross ownership or
+    /// relationship scopes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed ambiguity refusal for an empty, duplicate, or
+    /// non-canonical selector list, or a resource-limit error for an oversized
+    /// batch. Any checked leaf failure also leaves the entire edit unchanged.
+    pub fn replace_body_hyperlink_texts(
+        &mut self,
+        replacements: &[HyperlinkTextReplacement],
+    ) -> TransactionResult<&mut Self> {
+        validate_hyperlink_replacements(replacements)?;
+        let mut candidate = self.clone();
+        for replacement in replacements {
+            candidate.replace_hyperlink_text(
+                replacement.address.paragraph,
+                replacement.address.hyperlink,
+                replacement.text.as_str(),
+            )?;
+        }
+        *self = candidate;
+        Ok(self)
+    }
+
     /// Replace text and structural characters in one direct run while
     /// retaining its `w:rPr`, drawings, and opaque run children. Tabs, line
     /// breaks, carriage returns, non-breaking hyphens, and soft hyphens map to
@@ -1410,6 +1499,38 @@ impl Edit {
         )
     }
 
+    /// Atomically replace direct hyperlinks across one or more direct
+    /// paragraphs in the deepest block content control reached by `controls`.
+    ///
+    /// Addresses must be non-empty, unique, and strictly increasing by
+    /// paragraph then hyperlink position. Direct-child selection keeps every
+    /// leaf within the same path-addressed control owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed ambiguity refusal for an empty, duplicate, or
+    /// non-canonical selector list, or a resource-limit error for an oversized
+    /// batch. Any checked path or leaf failure also leaves the entire edit
+    /// unchanged.
+    pub fn replace_block_content_control_paragraph_hyperlink_texts(
+        &mut self,
+        controls: &[Position],
+        replacements: &[HyperlinkTextReplacement],
+    ) -> TransactionResult<&mut Self> {
+        validate_hyperlink_replacements(replacements)?;
+        let mut candidate = self.clone();
+        for replacement in replacements {
+            candidate.replace_block_content_control_paragraph_hyperlink_text(
+                controls,
+                replacement.address.paragraph,
+                replacement.address.hyperlink,
+                replacement.text.as_str(),
+            )?;
+        }
+        *self = candidate;
+        Ok(self)
+    }
+
     /// Replace text in a basic direct-body table cell.
     ///
     /// The supported cell contains one direct paragraph. Its existing runs,
@@ -1634,6 +1755,38 @@ impl Edit {
                 )
             },
         )
+    }
+
+    /// Atomically replace direct hyperlinks across one or more direct
+    /// paragraphs in the deepest cell reached by `path`.
+    ///
+    /// Addresses must be non-empty, unique, and strictly increasing by
+    /// paragraph then hyperlink position. Direct-child selection keeps every
+    /// leaf within the same path-addressed cell owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed ambiguity refusal for an empty, duplicate, or
+    /// non-canonical selector list, or a resource-limit error for an oversized
+    /// batch. Any checked path or leaf failure also leaves the entire edit
+    /// unchanged.
+    pub fn replace_nested_table_cell_paragraph_hyperlink_texts(
+        &mut self,
+        path: &[TableCellAddress],
+        replacements: &[HyperlinkTextReplacement],
+    ) -> TransactionResult<&mut Self> {
+        validate_hyperlink_replacements(replacements)?;
+        let mut candidate = self.clone();
+        for replacement in replacements {
+            candidate.replace_nested_table_cell_paragraph_hyperlink_text(
+                path,
+                replacement.address.paragraph,
+                replacement.address.hyperlink,
+                replacement.text.as_str(),
+            )?;
+        }
+        *self = candidate;
+        Ok(self)
     }
 
     /// Insert a compact plain-text paragraph at a projected zero-based
@@ -2515,6 +2668,32 @@ impl FragmentPrefix {
 struct CellSelection<'a> {
     xml: &'a [u8],
     start: usize,
+}
+
+fn validate_hyperlink_replacements(
+    replacements: &[HyperlinkTextReplacement],
+) -> TransactionResult<()> {
+    if replacements.len() > MAX_OPERATIONS {
+        return Err(TransactionError::Limit {
+            resource: "composite hyperlink replacements",
+            max: MAX_OPERATIONS,
+            actual: replacements.len(),
+        });
+    }
+    let ambiguous_position = replacements
+        .first()
+        .map_or(0, |replacement| replacement.address.paragraph.get());
+    if replacements.is_empty()
+        || replacements
+            .windows(2)
+            .any(|pair| pair[0].address >= pair[1].address)
+    {
+        return Err(TransactionError::Refused {
+            position: ambiguous_position,
+            reason: Refusal::AmbiguousCompositeSelector,
+        });
+    }
+    Ok(())
 }
 
 fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
@@ -5065,5 +5244,173 @@ mod tests {
             .join(right_edit.prepare(limits, "right").unwrap())
             .unwrap();
         assert_eq!(composition.commit().unwrap().patch().operations().len(), 2);
+    }
+
+    #[test]
+    fn cross_paragraph_hyperlink_batches_are_atomic_durable_and_non_crossing() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><w:body><w:p><w:hyperlink r:id=\"body0\" w:tooltip=\"body zero\"><w:r><w:rPr><w:b/></w:rPr><w:t>body zero old</w:t></w:r></w:hyperlink></w:p><w:p><w:hyperlink r:id=\"body1\" w:tooltip=\"body one\"><w:r><w:t>body one old</w:t></w:r></w:hyperlink></w:p><w:sdt><w:sdtPr><w:alias w:val=\"outer-block\"/></w:sdtPr><w:sdtContent><w:sdt><w:sdtPr><w:alias w:val=\"inner-block\"/></w:sdtPr><w:sdtContent><w:p><w:hyperlink r:id=\"block0\" w:tooltip=\"block zero\"><w:r><w:t>block zero old</w:t></w:r></w:hyperlink></w:p><w:p><w:hyperlink r:id=\"block1\" w:tooltip=\"block one\"><w:r><w:rPr><w:i/></w:rPr><w:t>block one old</w:t></w:r></w:hyperlink></w:p></w:sdtContent></w:sdt></w:sdtContent></w:sdt><w:tbl><w:tr><w:tc><w:p><w:r><w:t>outer retained</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:tcPr><w:shd w:fill=\"00FF00\"/></w:tcPr><w:p><w:hyperlink r:id=\"table0\" w:tooltip=\"table zero\"><w:r><w:t>table zero old</w:t></w:r></w:hyperlink></w:p><w:p><w:hyperlink r:id=\"table1\" w:tooltip=\"table one\"><w:r><w:rPr><w:u/></w:rPr><w:t>table one old</w:t></w:r></w:hyperlink></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let controls = [Position::new(0), Position::new(0)];
+        let table_path = [
+            TableCellAddress::new(Position::new(0), Position::new(0), Position::new(0)),
+            TableCellAddress::new(Position::new(0), Position::new(0), Position::new(0)),
+        ];
+        let replacements = |prefix: &str| {
+            [
+                HyperlinkTextReplacement::new(
+                    ParagraphHyperlinkAddress::new(Position::new(0), Position::new(0)),
+                    format!("{prefix} zero changed"),
+                ),
+                HyperlinkTextReplacement::new(
+                    ParagraphHyperlinkAddress::new(Position::new(1), Position::new(0)),
+                    format!("{prefix} one changed"),
+                ),
+            ]
+        };
+
+        let mut edit = source.edit();
+        edit.replace_body_hyperlink_texts(&replacements("body"))
+            .unwrap()
+            .replace_block_content_control_paragraph_hyperlink_texts(
+                &controls,
+                &replacements("block"),
+            )
+            .unwrap()
+            .replace_nested_table_cell_paragraph_hyperlink_texts(
+                &table_path,
+                &replacements("table"),
+            )
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.patch().operations().len(), 6);
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        for retained in [
+            "r:id=\"body0\"",
+            "w:tooltip=\"body one\"",
+            "<w:rPr><w:b/></w:rPr>",
+            "r:id=\"block0\"",
+            "w:tooltip=\"block one\"",
+            "<w:rPr><w:i/></w:rPr>",
+            "r:id=\"table0\"",
+            "w:tooltip=\"table one\"",
+            "<w:rPr><w:u/></w:rPr>",
+            "<w:shd w:fill=\"00FF00\"/>",
+            "<w:t>outer retained</w:t>",
+            "<w:t>body zero changed</w:t>",
+            "<w:t>body one changed</w:t>",
+            "<w:t>block zero changed</w:t>",
+            "<w:t>block one changed</w:t>",
+            "<w:t>table zero changed</w:t>",
+            "<w:t>table one changed</w:t>",
+        ] {
+            assert!(xml.contains(retained), "missing retained XML: {retained}");
+        }
+
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                durable_limits(),
+            )
+            .unwrap();
+        let applied = source.apply_durable(&decoded).unwrap();
+        assert_eq!(applied.xml_bytes(), commit.snapshot().xml_bytes());
+        assert_eq!(
+            applied
+                .apply_durable(&decoded.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let limits = CompositionLimits::new(8, 8, 32, 8);
+        let mut body = source.edit();
+        body.replace_body_hyperlink_texts(&replacements("body"))
+            .unwrap();
+        let mut block = source.edit();
+        block
+            .replace_block_content_control_paragraph_hyperlink_texts(
+                &controls,
+                &replacements("block"),
+            )
+            .unwrap();
+        let mut table = source.edit();
+        table
+            .replace_nested_table_cell_paragraph_hyperlink_texts(
+                &table_path,
+                &replacements("table"),
+            )
+            .unwrap();
+        let mut composition = source.compose(limits);
+        composition
+            .join(table.prepare(limits, "c-table").unwrap())
+            .unwrap()
+            .join(block.prepare(limits, "b-block").unwrap())
+            .unwrap()
+            .join(body.prepare(limits, "a-body").unwrap())
+            .unwrap();
+        assert_eq!(
+            composition.commit().unwrap().snapshot().xml_bytes(),
+            commit.snapshot().xml_bytes()
+        );
+
+        let history_budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap();
+        let mut history = source.history(HistoryLimits::new(2, history_budget));
+        history.record(commit).unwrap();
+        assert!(history.undo());
+        assert_eq!(history.current().xml_bytes(), source.xml_bytes());
+        assert!(history.redo());
+
+        let duplicate = [
+            HyperlinkTextReplacement::new(
+                ParagraphHyperlinkAddress::new(Position::new(0), Position::new(0)),
+                "first",
+            ),
+            HyperlinkTextReplacement::new(
+                ParagraphHyperlinkAddress::new(Position::new(0), Position::new(0)),
+                "duplicate",
+            ),
+        ];
+        let mut refused = source.edit();
+        assert!(matches!(
+            refused.replace_body_hyperlink_texts(&[]),
+            Err(TransactionError::Refused {
+                reason: Refusal::AmbiguousCompositeSelector,
+                ..
+            })
+        ));
+        assert!(matches!(
+            refused.replace_body_hyperlink_texts(&duplicate),
+            Err(TransactionError::Refused {
+                reason: Refusal::AmbiguousCompositeSelector,
+                ..
+            })
+        ));
+        assert_eq!(refused.projected().xml_bytes(), source.xml_bytes());
+
+        let late_failure = [
+            HyperlinkTextReplacement::new(
+                ParagraphHyperlinkAddress::new(Position::new(0), Position::new(0)),
+                "would otherwise change",
+            ),
+            HyperlinkTextReplacement::new(
+                ParagraphHyperlinkAddress::new(Position::new(1), Position::new(1)),
+                "missing",
+            ),
+        ];
+        assert!(matches!(
+            refused.replace_body_hyperlink_texts(&late_failure),
+            Err(TransactionError::Refused {
+                reason: Refusal::HyperlinkNotFound,
+                ..
+            })
+        ));
+        assert_eq!(refused.projected().xml_bytes(), source.xml_bytes());
     }
 }

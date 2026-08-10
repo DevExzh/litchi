@@ -97,7 +97,7 @@ struct Patch {
 pub(crate) fn parse(source: &[u8], kind: Kind) -> Result<Policy> {
     validate_xml_size(source)?;
     let xml = std::str::from_utf8(source)
-        .map_err(|_| Error::InvalidFormat("ODT protection XML is not UTF-8".to_string()))?;
+        .map_err(|_error| Error::InvalidFormat("ODT protection XML is not UTF-8".to_string()))?;
     policy_from_xml(xml, kind)
 }
 
@@ -127,7 +127,7 @@ pub(crate) fn rewrite(
     }
 
     let xml = std::str::from_utf8(source)
-        .map_err(|_| Error::InvalidFormat("ODT protection XML is not UTF-8".to_string()))?;
+        .map_err(|_error| Error::InvalidFormat("ODT protection XML is not UTF-8".to_string()))?;
     let sites = scan_sites(xml, kind)?;
     let mut patches = Vec::new();
     let mut insertions = Vec::new();
@@ -256,7 +256,7 @@ fn policy_from_xml(xml: &str, kind: Kind) -> Result<Policy> {
                     .bytes()
                     .filter(|byte| !byte.is_ascii_whitespace())
                     .collect::<Vec<_>>();
-                let value = BASE64.decode(normalized).map_err(|_| {
+                let value = BASE64.decode(normalized).map_err(|_error| {
                     Error::InvalidFormat(format!(
                         "configuration item '{}' has invalid base64",
                         field.name()
@@ -339,8 +339,9 @@ fn render_value(field: Field, value: Value<'_>) -> Result<Vec<u8>> {
 }
 
 fn render_item(field: Field, value: Value<'_>) -> Result<Vec<u8>> {
-    let value = String::from_utf8(render_value(field, value)?)
-        .map_err(|_| Error::InvalidFormat("rendered protection value is not UTF-8".to_string()))?;
+    let value = String::from_utf8(render_value(field, value)?).map_err(|_error| {
+        Error::InvalidFormat("rendered protection value is not UTF-8".to_string())
+    })?;
     Ok(format!(
         "<config:config-item xmlns:config=\"{}\" config:name=\"{}\" config:type=\"{}\">{}</config:config-item>",
         CONFIG_NAMESPACE_TEXT,

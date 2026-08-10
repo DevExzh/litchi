@@ -100,7 +100,7 @@ impl PageNumber {
         }
         let number: u64 = value
             .parse()
-            .map_err(|_| bad("invalid style:page-number"))?;
+            .map_err(|_error| bad("invalid style:page-number"))?;
         if number == 0 || number > MAX_PAGE_NUMBER {
             return Err(bad("style:page-number out of range"));
         }
@@ -376,7 +376,9 @@ fn break_attributes(
                 properties.number_lines = Some(parse_bool(&value, "text:number-lines")?);
             },
             (Ns::Text, b"line-number") => {
-                let number: u64 = value.parse().map_err(|_| bad("invalid text:line-number"))?;
+                let number: u64 = value
+                    .parse()
+                    .map_err(|_error| bad("invalid text:line-number"))?;
                 properties.line_number = Some(number);
             },
             // Other paragraph-properties attributes are owned by sibling modules.

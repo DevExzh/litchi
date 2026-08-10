@@ -791,7 +791,7 @@ pub(in crate::elements::field) fn parse_database_fields(xml: &str) -> Result<Vec
                 )?;
             },
             Event::GeneralRef(ref reference) if active.is_some() => {
-                let name = std::str::from_utf8(reference.as_ref()).map_err(|_| {
+                let name = std::str::from_utf8(reference.as_ref()).map_err(|_error| {
                     Error::InvalidFormat("invalid database field entity reference".to_string())
                 })?;
                 let value = resolve_database_reference(name)?;
@@ -1366,7 +1366,7 @@ fn resolved_namespace(namespace: &quick_xml::name::ResolveResult<'_>) -> Result<
 fn utf8(value: &[u8], description: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| Error::InvalidFormat(format!("invalid UTF-8 {description}")))
+        .map_err(|_error| Error::InvalidFormat(format!("invalid UTF-8 {description}")))
 }
 
 fn resolve_database_reference(name: &str) -> Result<String> {
@@ -1383,7 +1383,7 @@ fn resolve_database_reference(name: &str) -> Result<String> {
                 "undeclared entity in database field".to_string(),
             ));
         }
-        .map_err(|_| {
+        .map_err(|_error| {
             Error::InvalidFormat("invalid database field character reference".to_string())
         })?;
     char::from_u32(codepoint)

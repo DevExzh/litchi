@@ -493,7 +493,7 @@ fn handle_start(
     namespace: NamespaceKind,
     local: &str,
     attributes: Attributes,
-    part: ContentValidationPart,
+    _part: ContentValidationPart,
     depth: usize,
     parent: Option<&Frame>,
     container: &mut Option<ActiveContainer>,
@@ -574,7 +574,6 @@ fn handle_start(
             "table:{local} is outside table:content-validations"
         ));
     }
-    let _ = part;
     Ok(())
 }
 
@@ -583,7 +582,7 @@ fn handle_empty(
     namespace: NamespaceKind,
     local: &str,
     attributes: Attributes,
-    part: ContentValidationPart,
+    _part: ContentValidationPart,
     depth: usize,
     parent: Option<&Frame>,
     container: &mut Option<ActiveContainer>,
@@ -669,7 +668,6 @@ fn handle_empty(
             "table:{local} is outside table:content-validations"
         ));
     }
-    let _ = (part, active_macro);
     Ok(())
 }
 

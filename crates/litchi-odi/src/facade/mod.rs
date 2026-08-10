@@ -34,6 +34,20 @@ impl Image {
         crate::package::Snapshot::from_bytes(bytes).map(|package| Self { package })
     }
 
+    /// Opens a password-encrypted image package for inert inspection.
+    ///
+    /// The password is retained only by the shared package owner for lazy
+    /// member decryption. Protected snapshots remain rewrite-refused.
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        crate::package::Snapshot::from_bytes_with_password(bytes, password)
+            .map(|package| Self { package })
+    }
+
+    /// Opens a password-encrypted image package from a file for inert inspection.
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        Self::from_bytes_with_password(std::fs::read(path)?, password)
+    }
+
     /// Returns the `content.xml` document.
     #[must_use]
     pub fn content_xml(&self) -> &str {
@@ -115,6 +129,36 @@ impl Image {
     #[must_use]
     pub fn active_content(&self) -> &[crate::active::ActiveContent] {
         self.package.active_content()
+    }
+
+    /// Returns inert ODF form and `XForms` occurrences from content and styles.
+    #[must_use]
+    pub fn forms(&self) -> &[crate::surface::Surface] {
+        self.package.forms()
+    }
+
+    /// Returns inert producer-extension elements and attributes from content and styles.
+    #[must_use]
+    pub fn extensions(&self) -> &[crate::surface::Surface] {
+        self.package.extensions()
+    }
+
+    /// Returns exact signature-member and encrypted-manifest-entry inventory.
+    #[must_use]
+    pub fn protection(&self) -> &crate::ProtectionInventory {
+        self.package.protection()
+    }
+
+    /// Reads inert document and macro signature metadata without executing content.
+    pub fn digital_signatures(&self) -> Result<litchi_odf_common::signature::DigitalSignatures> {
+        self.package.digital_signatures()
+    }
+
+    /// Verifies document-signature math without making a certificate trust decision.
+    pub fn verify_document_signatures(
+        &self,
+    ) -> Result<Vec<litchi_odf_common::signature::SignatureVerification>> {
+        self.package.verify_document_signatures()
     }
 
     /// Classifies one style name/family dependency across content and styles.

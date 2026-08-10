@@ -703,7 +703,7 @@ fn ensure_unique(
     Ok(())
 }
 fn validate_candidate(xml: String) -> Result<String> {
-    let _ = scan(&xml)?;
+    drop(scan(&xml)?);
     let sections = Parser::parse_sections(&xml)?;
     let mut names = HashSet::new();
     for section in sections {

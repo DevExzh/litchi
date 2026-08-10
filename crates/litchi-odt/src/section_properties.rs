@@ -83,7 +83,7 @@ impl SectionBackgroundColor {
             ));
         }
         let rgb = u32::from_str_radix(&value[1..], 16)
-            .map_err(|_| invalid("invalid section background color"))?;
+            .map_err(|_error| invalid("invalid section background color"))?;
         Ok(Self::Rgb((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8))
     }
     fn lexical(self) -> String {
@@ -375,7 +375,7 @@ fn opacity(value: &str) -> Result<u8> {
         .strip_suffix('%')
         .ok_or_else(|| invalid("draw:opacity must be a percentage"))?
         .parse::<u8>()
-        .map_err(|_| invalid("invalid draw:opacity"))?;
+        .map_err(|_error| invalid("invalid draw:opacity"))?;
     if value > 100 {
         return Err(invalid("draw:opacity exceeds 100%"));
     }
@@ -565,8 +565,8 @@ pub fn parse_section_style_properties(xml: &[u8]) -> Result<SectionStyleProperti
     if xml.len() > MAX_XML {
         return Err(invalid("section-properties XML exceeds size cap"));
     }
-    let xml_text =
-        std::str::from_utf8(xml).map_err(|_| invalid("section-properties XML is not UTF-8"))?;
+    let xml_text = std::str::from_utf8(xml)
+        .map_err(|_error| invalid("section-properties XML is not UTF-8"))?;
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut version = XmlVersion::Implicit1_0;

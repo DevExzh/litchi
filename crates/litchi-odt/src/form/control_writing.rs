@@ -558,7 +558,7 @@ fn scan(xml: &str) -> Result<Scan> {
     if !stack.is_empty() {
         return invalid("unclosed form control XML elements");
     }
-    for (index, control) in controls.iter().enumerate() {
+    for control in &controls {
         forms[control.form].controls.push(control.clone());
         let form = &forms[control.form];
         if form.controls[..form.controls.len() - 1]
@@ -570,7 +570,6 @@ fn scan(xml: &str) -> Result<Scan> {
                 control.control.name
             ));
         }
-        let _ = index;
     }
     Ok(Scan { forms, controls })
 }
@@ -643,7 +642,7 @@ fn validate_form_element(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> 
         "escape-processing",
         "ignore-result",
     ] {
-        let _ = optional_bool(&attrs, FORM, name)?;
+        optional_bool(&attrs, FORM, name).map(|_| ())?;
     }
     if let Some(value) = optional(&attrs, XLINK, "type")
         && value != "simple"
@@ -773,7 +772,7 @@ fn optional_bool(attrs: &[Attr], namespace: &str, local: &str) -> Result<Option<
 fn optional_u64(attrs: &[Attr], namespace: &str, local: &str) -> Result<Option<u64>> {
     optional(attrs, namespace, local)
         .map(|value| {
-            value.parse::<u64>().map_err(|_| {
+            value.parse::<u64>().map_err(|_error| {
                 Error::InvalidFormat(format!(
                     "invalid non-negative integer '{value}' for {local}"
                 ))
@@ -865,7 +864,7 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 }
 fn qname(element: &BytesStart<'_>) -> Result<String> {
     String::from_utf8(element.name().as_ref().to_vec())
-        .map_err(|_| Error::InvalidFormat("invalid form element name".to_string()))
+        .map_err(|_error| Error::InvalidFormat("invalid form element name".to_string()))
 }
 fn apply(xml: &str, span: Range<usize>, replacement: &str) -> Result<String> {
     let mut result = String::with_capacity(xml.len() - span.len() + replacement.len());
@@ -882,7 +881,7 @@ fn expand_empty(xml: &str, start: usize, end: usize, qname: &str, content: &str)
     let replacement = format!("{}>{content}</{qname}>", &raw[..slash]);
     apply(xml, start..end, &replacement)
 }
-fn bind_fragment(xml: &str, mut fragment: String) -> String {
+fn bind_fragment(_xml: &str, mut fragment: String) -> String {
     for (prefix, namespace) in [("form", FORM), ("text", TEXT)] {
         if fragment.contains(&format!("{prefix}:"))
             && !fragment.contains(&format!("xmlns:{prefix}="))
@@ -890,7 +889,6 @@ fn bind_fragment(xml: &str, mut fragment: String) -> String {
             fragment = fragment.replacen(' ', &format!(" xmlns:{prefix}=\"{namespace}\" "), 1);
         }
     }
-    let _ = xml;
     fragment
 }
 

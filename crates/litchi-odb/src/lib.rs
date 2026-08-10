@@ -32,7 +32,10 @@ pub use litchi_odf_common::signature::{
     DigitalSignature, DigitalSignatures, SignatureValidity, SignatureVerification,
 };
 pub use model::connection::Connection;
-pub use model::query::{Query, QueryUpdateTarget};
+pub use model::query::{
+    Query, QueryCommandInventory, QueryJoin, QueryJoinKind, QueryParameter, QueryParameterKind,
+    QueryUpdateTarget,
+};
 pub use model::{
     ActiveContentEntry, ActiveContentInventory, ActiveContentKind, Catalog, Column, Component,
     ComponentKind, ComponentLinkKind, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind,

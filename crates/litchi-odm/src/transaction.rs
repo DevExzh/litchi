@@ -14,8 +14,8 @@ use std::{
 use crate::{Master, link::Selector};
 
 pub use crate::edit_ops::{
-    ActiveContentPolicy, GeneratedIndexChange, ResourceChange, ResourceSpec, SectionChange,
-    SectionSpec, SecurityPolicy, StyleChange, StyleSpec, SubdocumentSpec,
+    ActiveContentPolicy, BodyItemChange, GeneratedIndexChange, ResourceChange, ResourceSpec,
+    SectionChange, SectionSpec, SecurityPolicy, StyleChange, StyleSpec, SubdocumentSpec,
 };
 
 const MAX_PACKAGE_BYTES: usize = 256 * 1024 * 1024;
@@ -84,6 +84,7 @@ pub struct Edit<'source> {
     metadata: Option<litchi_core::Metadata>,
     sections: Vec<SectionChange>,
     generated_indexes: Vec<GeneratedIndexChange>,
+    body_items: Vec<BodyItemChange>,
     styles: Vec<StyleChange>,
     resources: BTreeMap<String, ResourceChange>,
     policy: SecurityPolicy,
@@ -104,6 +105,7 @@ impl<'source> Edit<'source> {
             metadata: None,
             sections: Vec::new(),
             generated_indexes: Vec::new(),
+            body_items: Vec::new(),
             styles: Vec::new(),
             resources: BTreeMap::new(),
             policy,
@@ -381,6 +383,11 @@ impl<'source> Edit<'source> {
             .name()
             .ok_or_else(|| invalid("ODM generated index has no text:name"))?
             .to_owned();
+        if self.body_items.iter().any(
+            |change| matches!(change, BodyItemChange::Remove { item: staged, .. } if *staged == item),
+        ) {
+            return Err(invalid("ODM generated index is already staged for removal"));
+        }
         let after = name.into();
         crate::edit_ops::validate_value(&after, "ODM generated index name", false)?;
         if before != after
@@ -405,6 +412,57 @@ impl<'source> Edit<'source> {
             before,
             after,
         });
+        Ok(self)
+    }
+
+    /// Removes one common direct master-body subtree without reserializing it.
+    ///
+    /// Paragraphs, headings, lists, tables, generated indexes, and unknown
+    /// extension children are removed by their checked source span. Sections
+    /// retain their dependency-aware [`Self::remove_section`] operation, while
+    /// declaration containers are intentionally not editable through this
+    /// generic operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale selector, an unsupported item kind, or an
+    /// overlapping generated-index change.
+    pub fn remove_body_item(&mut self, item: Position) -> Result<&mut Self> {
+        let kind = *self
+            .source
+            .structure()
+            .items()
+            .get(item.get())
+            .ok_or_else(|| invalid("ODM master-body item selector is out of bounds"))?;
+        match kind {
+            crate::structure::Kind::Section(_) => {
+                return Err(invalid(
+                    "ODM section removal requires dependency-aware remove_section",
+                ));
+            },
+            crate::structure::Kind::Declarations => {
+                return Err(invalid(
+                    "ODM declaration containers are not generic body-item edits",
+                ));
+            },
+            crate::structure::Kind::Paragraph
+            | crate::structure::Kind::Heading
+            | crate::structure::Kind::List
+            | crate::structure::Kind::Table
+            | crate::structure::Kind::GeneratedIndex(_)
+            | crate::structure::Kind::Other => {},
+        }
+        if self.generated_indexes.iter().any(
+            |change| matches!(change, GeneratedIndexChange::Rename { item: staged, .. } if *staged == item),
+        ) {
+            return Err(invalid("ODM master-body item already has a staged change"));
+        }
+        if self.body_items.iter().any(
+            |change| matches!(change, BodyItemChange::Remove { item: staged, .. } if *staged == item),
+        ) {
+            return Err(invalid("ODM master-body item already has a staged change"));
+        }
+        self.body_items.push(BodyItemChange::Remove { item, kind });
         Ok(self)
     }
 
@@ -655,6 +713,7 @@ impl<'source> Edit<'source> {
         let extended_changed = self.metadata.is_some()
             || !self.sections.is_empty()
             || !self.generated_indexes.is_empty()
+            || !self.body_items.is_empty()
             || !self.styles.is_empty()
             || !self.resources.is_empty();
         if !title_changed && link_changes.is_empty() && !extended_changed {
@@ -687,6 +746,7 @@ impl<'source> Edit<'source> {
             &staged_links,
             &self.sections,
             &self.generated_indexes,
+            &self.body_items,
             &self.styles,
         )?;
         let mut removed_resources = Vec::new();
@@ -753,9 +813,11 @@ impl<'source> Edit<'source> {
             }
         }
         verify_extended_readback(
+            self.source,
             &snapshot,
             &self.sections,
             &self.generated_indexes,
+            &self.body_items,
             &self.styles,
             &self.resources,
         )?;
@@ -779,6 +841,7 @@ impl<'source> Edit<'source> {
                 },
                 sections: self.sections,
                 generated_indexes: self.generated_indexes,
+                body_items: self.body_items,
                 styles: self.styles,
                 resources: self.resources.into_values().collect(),
             },
@@ -843,6 +906,7 @@ pub struct ChangeSet {
     metadata: Option<MetadataChange>,
     sections: Vec<SectionChange>,
     generated_indexes: Vec<GeneratedIndexChange>,
+    body_items: Vec<BodyItemChange>,
     styles: Vec<StyleChange>,
     resources: Vec<ResourceChange>,
 }
@@ -878,6 +942,12 @@ impl ChangeSet {
         &self.generated_indexes
     }
 
+    /// Returns direct master-body item effects in staging order.
+    #[must_use]
+    pub fn body_items(&self) -> &[BodyItemChange] {
+        &self.body_items
+    }
+
     /// Returns style-catalog effects in staging order.
     #[must_use]
     pub fn styles(&self) -> &[StyleChange] {
@@ -898,6 +968,7 @@ impl ChangeSet {
             && self.metadata.is_none()
             && self.sections.is_empty()
             && self.generated_indexes.is_empty()
+            && self.body_items.is_empty()
             && self.styles.is_empty()
             && self.resources.is_empty()
     }
@@ -1128,6 +1199,8 @@ pub enum Conflict {
     GeneratedIndex(Position),
     /// Both patches rename generated indexes to the same identity.
     GeneratedIndexName(String),
+    /// Both patches divergently write one direct master-body item.
+    BodyItem(Position),
     /// Both patches write one style identity.
     Style(String),
     /// Both patches write one package resource path.
@@ -1684,9 +1757,11 @@ fn simple_metadata_equal(left: &litchi_core::Metadata, right: &litchi_core::Meta
 }
 
 fn verify_extended_readback(
+    source: &Master,
     snapshot: &Master,
     sections: &[SectionChange],
     generated_indexes: &[GeneratedIndexChange],
+    body_items: &[BodyItemChange],
     styles: &[StyleChange],
     resources: &BTreeMap<String, ResourceChange>,
 ) -> Result<()> {
@@ -1738,18 +1813,43 @@ fn verify_extended_readback(
     }
     for change in generated_indexes {
         match change {
-            GeneratedIndexChange::Rename { item, after, .. } => {
-                let actual = snapshot
+            GeneratedIndexChange::Rename { after, .. } => {
+                if !snapshot
                     .structure()
                     .generated_indexes()
                     .iter()
-                    .find(|index| index.item() == *item)
-                    .and_then(crate::structure::GeneratedIndex::name)
-                    .ok_or_else(|| invalid("ODM generated index failed semantic readback"))?;
-                if actual != after {
+                    .any(|index| index.name() == Some(after))
+                {
                     return Err(invalid("ODM generated-index rename readback differs"));
                 }
             },
+        }
+    }
+    for change in body_items {
+        let BodyItemChange::Remove { kind, .. } = change;
+        let removed = body_items
+            .iter()
+            .filter(|change_candidate| {
+                matches!(change_candidate, BodyItemChange::Remove { kind: candidate_kind, .. } if candidate_kind == kind)
+            })
+            .count();
+        let before = source
+            .structure()
+            .items()
+            .iter()
+            .filter(|candidate| *candidate == kind)
+            .count();
+        let expected = before
+            .checked_sub(removed)
+            .ok_or_else(|| invalid("ODM body-item removal inventory is inconsistent"))?;
+        let actual = snapshot
+            .structure()
+            .items()
+            .iter()
+            .filter(|candidate| *candidate == kind)
+            .count();
+        if actual != expected {
+            return Err(invalid("ODM body-item removal failed semantic readback"));
         }
     }
     for change in styles {
@@ -1894,6 +1994,7 @@ fn inverse_changes(changes: &ChangeSet) -> ChangeSet {
                 },
             })
             .collect(),
+        body_items: Vec::new(),
         styles: changes
             .styles
             .iter()
@@ -1937,6 +2038,18 @@ fn find_conflicts(
             left.generated_indexes
                 .len()
                 .saturating_mul(right.generated_indexes.len()),
+        )
+        .saturating_add(left.body_items.len().saturating_mul(right.body_items.len()))
+        .saturating_add(
+            left.body_items
+                .len()
+                .saturating_mul(right.generated_indexes.len()),
+        )
+        .saturating_add(
+            right
+                .body_items
+                .len()
+                .saturating_mul(left.generated_indexes.len()),
         )
         .saturating_add(left.styles.len().saturating_mul(right.styles.len()))
         .saturating_add(left.resources.len().saturating_mul(right.resources.len()));
@@ -2008,6 +2121,39 @@ fn find_conflicts(
             } else if left_item != right_item && left_after == right_after {
                 conflicts.push(Conflict::GeneratedIndexName(left_after.clone()));
             }
+        }
+    }
+    for left_change in &left.body_items {
+        for right_change in &right.body_items {
+            let (
+                BodyItemChange::Remove {
+                    item: left_item, ..
+                },
+                BodyItemChange::Remove {
+                    item: right_item, ..
+                },
+            ) = (left_change, right_change);
+            if left_item == right_item && left_change != right_change {
+                conflicts.push(Conflict::BodyItem(*left_item));
+            }
+        }
+        let BodyItemChange::Remove {
+            item: left_item, ..
+        } = left_change;
+        if right.generated_indexes.iter().any(|change| {
+            matches!(change, GeneratedIndexChange::Rename { item, .. } if item == left_item)
+        }) {
+            conflicts.push(Conflict::BodyItem(*left_item));
+        }
+    }
+    for right_change in &right.body_items {
+        let BodyItemChange::Remove {
+            item: right_item, ..
+        } = right_change;
+        if left.generated_indexes.iter().any(|change| {
+            matches!(change, GeneratedIndexChange::Rename { item, .. } if item == right_item)
+        }) {
+            conflicts.push(Conflict::BodyItem(*right_item));
         }
     }
     for left_change in &left.styles {
@@ -2163,10 +2309,17 @@ fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
             },
         }
     }
+    for body_item in &changes.body_items {
+        if edit.body_items.contains(body_item) {
+            continue;
+        }
+        let BodyItemChange::Remove { item, .. } = body_item;
+        edit.remove_body_item(*item)?;
+    }
     // Style additions/renames must be visible before strict section staging:
     // an added section may reference a style imported by the same patch.
     // Removals remain atomic because XML mutation receives both complete
-    // intent lists and computes removed section spans before staging styles.
+    // intent lists and computes removed content spans before staging styles.
     for style in &changes.styles {
         if edit.styles.contains(style) {
             continue;

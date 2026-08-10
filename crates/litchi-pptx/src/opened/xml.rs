@@ -7,7 +7,7 @@ use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
 use quick_xml::Reader;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::model::{Slide, invalid};
@@ -495,7 +495,7 @@ pub(crate) fn remap_shape_fragment(
     shape_ids: &HashMap<u32, u32>,
     relationships: &HashMap<String, String>,
 ) -> Result<Vec<u8>> {
-    let mut reader = Reader::from_reader(source);
+    let mut reader = NsReader::from_reader(source);
     reader.config_mut().trim_text(false);
     let mut output = Vec::with_capacity(source.len());
     let mut depth = 0usize;
@@ -523,6 +523,7 @@ pub(crate) fn remap_shape_fragment(
                     &mut output,
                     &element,
                     reader.decoder(),
+                    reader.resolver(),
                     false,
                     &mut remap,
                 )?;
@@ -535,6 +536,7 @@ pub(crate) fn remap_shape_fragment(
                     &mut output,
                     &element,
                     reader.decoder(),
+                    reader.resolver(),
                     true,
                     &mut remap,
                 )?;
@@ -646,6 +648,7 @@ fn write_remapped_shape_start(
     output: &mut Vec<u8>,
     element: &BytesStart<'_>,
     decoder: Decoder,
+    resolver: &NamespaceResolver,
     empty: bool,
     remap: &mut ShapeRemap<'_>,
 ) -> Result<()> {
@@ -721,18 +724,33 @@ fn write_remapped_shape_start(
                     }
                 })?
                 .to_string()
-        } else if key.starts_with(b"r:") && matches!(&key[2..], b"id" | b"embed" | b"link") {
-            remap
-                .relationships
-                .get(decoded.as_str())
-                .cloned()
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "opened-presentation transferred relationship {decoded} was not remapped"
-                    ))
-                })?
         } else {
-            decoded
+            let (namespace, _) = resolver.resolve_attribute(quick_xml::name::QName(key.as_slice()));
+            let is_relationship_namespace = matches!(
+                &namespace,
+                ResolveResult::Bound(Namespace(value))
+                    if *value == litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE
+                        || *value == litchi_ooxml_common::relationships::STRICT_NAMESPACE
+            );
+            let is_inherited_relationship_alias = matches!(
+                &namespace,
+                ResolveResult::Unknown(prefix)
+                    if prefix.as_slice() == b"r"
+                        || remap.relationships.contains_key(decoded.as_str())
+            );
+            if is_relationship_namespace || is_inherited_relationship_alias {
+                remap
+                    .relationships
+                    .get(decoded.as_str())
+                    .cloned()
+                    .ok_or_else(|| {
+                        invalid(format!(
+                            "opened-presentation transferred relationship {decoded} was not remapped"
+                        ))
+                    })?
+            } else {
+                decoded
+            }
         };
         output.extend_from_slice(quick_xml::escape::escape(&value).as_bytes());
         output.push(b'"');

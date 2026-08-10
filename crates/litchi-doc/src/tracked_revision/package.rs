@@ -182,6 +182,253 @@ fn canonical_picture_from_block(block: &[u8]) -> Result<(crate::writer::Picture,
     Ok((picture, width, height))
 }
 
+#[deny(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::expect_used,
+    clippy::let_underscore_must_use,
+    clippy::map_err_ignore,
+    clippy::unwrap_used,
+    reason = "picture shape ownership is a checked OfficeArt boundary"
+)]
+fn picture_shape_id(block: &[u8]) -> Result<u32> {
+    const PICF_HEADER_LEN: usize = 0x44;
+
+    let (record, consumed) = litchi_odraw::Record::parse(block, PICF_HEADER_LEN)
+        .map_err(|error| corrupted(format!("picture shape container is invalid: {error}")))?;
+    if record.kind() != litchi_odraw::RecordKind::SpContainer {
+        return Err(corrupted(
+            "picture PICF is not followed by an OfficeArt shape container",
+        ));
+    }
+    let end = PICF_HEADER_LEN
+        .checked_add(consumed)
+        .ok_or_else(|| corrupted("picture shape-container extent overflow"))?;
+    if end > block.len() {
+        return Err(corrupted(
+            "picture shape container extends past its PICF block",
+        ));
+    }
+    let container = litchi_odraw::Container::try_new(record)
+        .map_err(|error| corrupted(format!("picture shape container is malformed: {error}")))?;
+    let mut shape_id = None;
+    for child in container.children() {
+        let child = child.map_err(|error| {
+            corrupted(format!("picture shape child record is malformed: {error}"))
+        })?;
+        if child.kind() != litchi_odraw::RecordKind::Sp {
+            continue;
+        }
+        if shape_id.is_some() || child.version() != 2 || child.len() != 8 {
+            return Err(corrupted(
+                "picture block does not contain one canonical shape atom",
+            ));
+        }
+        let bytes: [u8; 8] = child
+            .data()
+            .try_into()
+            .map_err(|error| corrupted(format!("picture shape atom is invalid: {error}")))?;
+        shape_id = Some(u32::from_le_bytes(bytes[..4].try_into().map_err(
+            |error| corrupted(format!("picture shape identifier is invalid: {error}")),
+        )?));
+    }
+    shape_id.ok_or_else(|| corrupted("picture block has no shape atom"))
+}
+
+#[deny(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::expect_used,
+    clippy::let_underscore_must_use,
+    clippy::map_err_ignore,
+    clippy::unwrap_used,
+    reason = "main-story OfficeArt traversal is bounded and checked"
+)]
+fn main_drawing_shapes(dgg_info: &[u8]) -> Result<Vec<litchi_odraw::shape::Shape<'_>>> {
+    let (first, first_size) = litchi_odraw::Record::parse(dgg_info, 0)
+        .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
+    if first.kind() != litchi_odraw::RecordKind::DggContainer {
+        return Err(corrupted(
+            "OfficeArtContent does not start with a DggContainer",
+        ));
+    }
+    let mut offset = first_size;
+    let mut main = None;
+    while offset < dgg_info.len() {
+        let label = *dgg_info
+            .get(offset)
+            .ok_or_else(|| corrupted("OfficeArtWordDrawing label is truncated"))?;
+        if label != 0 {
+            return Err(corrupted(
+                "picture transfer does not rewrite header drawing graphs",
+            ));
+        }
+        let record_offset = offset
+            .checked_add(1)
+            .ok_or_else(|| corrupted("OfficeArtWordDrawing offset overflow"))?;
+        let (drawing, drawing_size) = litchi_odraw::Record::parse(dgg_info, record_offset)
+            .map_err(|error| corrupted(format!("main OfficeArt drawing is invalid: {error}")))?;
+        if drawing.kind() != litchi_odraw::RecordKind::DgContainer {
+            return Err(corrupted(
+                "OfficeArtWordDrawing does not contain a DgContainer",
+            ));
+        }
+        if main.is_some() {
+            return Err(corrupted(
+                "OfficeArtContent contains more than one main-story drawing",
+            ));
+        }
+        let drawing_end = record_offset
+            .checked_add(drawing_size)
+            .ok_or_else(|| corrupted("main OfficeArt drawing extent overflow"))?;
+        let drawing_bytes = dgg_info
+            .get(record_offset..drawing_end)
+            .ok_or_else(|| corrupted("main OfficeArt drawing extends past DggInfo"))?;
+        main =
+            Some(litchi_odraw::shape::parse(drawing_bytes).map_err(|error| {
+                corrupted(format!("main OfficeArt shapes are invalid: {error}"))
+            })?);
+        offset = drawing_end;
+    }
+    main.ok_or_else(|| corrupted("floating picture has no main-story OfficeArt drawing"))
+}
+
+#[deny(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::expect_used,
+    clippy::let_underscore_must_use,
+    clippy::map_err_ignore,
+    clippy::unwrap_used,
+    reason = "selected picture identity is a checked OfficeArt/BStore boundary"
+)]
+fn validate_floating_picture_identity(
+    dgg_info: &[u8],
+    shape_id: u32,
+    anchor_index: usize,
+    picture: &crate::writer::Picture,
+) -> Result<()> {
+    let shapes = main_drawing_shapes(dgg_info)?;
+    let selected = shapes
+        .iter()
+        .find(|shape| shape.id() == shape_id)
+        .ok_or_else(|| corrupted("floating picture shape is absent from the main drawing"))?;
+    let mut matching_ids = 0usize;
+    let mut pending = shapes.iter().collect::<Vec<_>>();
+    while let Some(shape) = pending.pop() {
+        if shape.id() == shape_id {
+            matching_ids = matching_ids
+                .checked_add(1)
+                .ok_or_else(|| corrupted("matching picture-shape count overflow"))?;
+        }
+        pending.extend(shape.children());
+    }
+    if matching_ids != 1 {
+        return Err(corrupted(
+            "floating picture shape ID is duplicated or ambiguously nested",
+        ));
+    }
+    if selected.kind() != litchi_odraw::shape::Kind::Picture
+        || selected.native_kind() != litchi_odraw::shape::Native::PICTURE
+        || selected.flags()
+            != (litchi_odraw::shape::Flags::HAVE_ANCHOR | litchi_odraw::shape::Flags::HAVE_SPT)
+        || selected.anchor().is_some()
+        || !selected.children().is_empty()
+        || selected.textbox().is_some()
+    {
+        return Err(corrupted(
+            "selected floating shape is not a canonical top-level picture frame",
+        ));
+    }
+    let props = selected.props();
+    let pib = props
+        .prop(litchi_odraw::prop::Id::BlipToDisplay)
+        .filter(|prop| {
+            props.len() == 1
+                && prop.raw_opid() == 0x4104
+                && prop.is_blip()
+                && !prop.is_complex()
+                && prop.raw_value() > 0
+        })
+        .ok_or_else(|| corrupted("selected picture frame has no canonical pib property"))?;
+    let pib = u32::try_from(pib.raw_value())
+        .map_err(|error| corrupted(format!("picture pib is invalid: {error}")))?;
+
+    let records = selected
+        .meta()
+        .children()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|error| corrupted(format!("picture shape records are invalid: {error}")))?;
+    let expected_kinds = [
+        litchi_odraw::RecordKind::Sp,
+        litchi_odraw::RecordKind::Opt,
+        litchi_odraw::RecordKind::ClientAnchor,
+        litchi_odraw::RecordKind::ClientData,
+    ];
+    let [sp, opt, client_anchor, client_data] = records.as_slice() else {
+        return Err(corrupted(
+            "selected picture frame has noncanonical OfficeArt records",
+        ));
+    };
+    if records
+        .iter()
+        .zip(expected_kinds)
+        .any(|(record, expected)| record.kind() != expected)
+        || sp.version() != 2
+        || sp.instance() != litchi_odraw::shape::Native::PICTURE.raw()
+        || sp.len() != 8
+        || opt.version() != 3
+        || opt.instance() != 1
+        || opt.len() != 6
+        || client_anchor.version() != 0
+        || client_anchor.instance() != 0
+        || client_anchor.len() != 4
+        || client_data.version() != 0
+        || client_data.instance() != 0
+        || client_data.len() != 4
+    {
+        return Err(corrupted(
+            "selected picture frame has noncanonical OfficeArt records",
+        ));
+    }
+    let anchor_ordinal = u32::try_from(anchor_index)
+        .map_err(|error| corrupted(format!("SPA anchor index exceeds u32: {error}")))?;
+    if client_anchor.data() != anchor_ordinal.to_le_bytes() || client_data.data() != [0; 4] {
+        return Err(corrupted(
+            "selected picture frame does not own the expected SPA client anchor",
+        ));
+    }
+
+    let (_drawing_group, drawing_group_size) = litchi_odraw::Record::parse(dgg_info, 0)
+        .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
+    let drawing_group = dgg_info
+        .get(..drawing_group_size)
+        .ok_or_else(|| corrupted("drawing-group root extends past DggInfo"))?;
+    let store = litchi_odraw::image::store(drawing_group)
+        .map_err(|error| corrupted(format!("drawing BStore is invalid: {error}")))?
+        .ok_or_else(|| corrupted("floating picture drawing has no BStore"))?;
+    let id = litchi_odraw::image::Id::new(pib)
+        .map_err(|error| corrupted(format!("picture pib is outside the BStore range: {error}")))?;
+    let file = litchi_odraw::image::get(&store, id, None)
+        .map_err(|error| corrupted(format!("picture BStore entry is invalid: {error}")))?
+        .ok_or_else(|| corrupted("picture pib does not resolve to an embedded BStore entry"))?;
+    let native = file
+        .data()
+        .map_err(|error| corrupted(format!("picture BStore payload is invalid: {error}")))?;
+    if file.kind() != picture.kind() || native != picture.data() {
+        return Err(corrupted(
+            "picture PICF and floating BStore entry have different binary identities",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Clone)]
 pub struct RevisionEditor {
     package: ObjectEditor,
@@ -787,10 +1034,11 @@ impl RevisionEditor {
         Ok(u32::from_le_bytes(bytes))
     }
 
-    /// Extracts the canonical singleton picture graph rooted at one special
-    /// character. Multi-picture/shared-store donors are accepted only when
-    /// every main-story marker, sequential shape ID, PICF/Data block, SPA,
-    /// and the complete Dgg/BStore match the canonical writer graph.
+    /// Extracts a canonical singleton picture graph rooted at one special
+    /// character. The selected PICF/Data block is proved independently. A
+    /// floating picture additionally proves its exact SPA, top-level shape,
+    /// `pib`, and native `BStore` entry while leaving unrelated drawing nodes
+    /// outside the transferred closure.
     #[deny(
         clippy::cast_possible_truncation,
         clippy::cast_possible_wrap,
@@ -810,179 +1058,72 @@ impl RevisionEditor {
         if self.decode_text_range(cp, cp_end)? != expected_marker.to_string() {
             return Err(corrupted("selected CP is not the requested picture marker"));
         }
-        let mut markers = Vec::<(u32, bool)>::new();
-        for story in 0..7 {
-            let (origin, text) = self.story_text(story)?;
-            let mut cursor = origin;
-            for character in text.chars() {
-                if matches!(character, '\u{0001}' | '\u{0008}') {
-                    if story != 0 {
-                        return Err(corrupted(
-                            "picture transfer does not rewrite auxiliary-story drawing graphs",
-                        ));
-                    }
-                    markers.push((cursor, character == '\u{0008}'));
-                }
-                cursor = cursor
-                    .checked_add(u32::try_from(character.len_utf16()).map_err(|error| {
-                        corrupted(format!("picture marker width exceeds u32: {error}"))
-                    })?)
-                    .ok_or_else(|| corrupted("picture marker CP overflow"))?;
-            }
-        }
-        let selected_index = markers
-            .iter()
-            .position(|&(marker_cp, marker_floating)| {
-                marker_cp == cp && marker_floating == floating
-            })
-            .ok_or_else(|| corrupted("selected picture is absent from the main-story graph"))?;
-        let marker_count = u32::try_from(markers.len())
-            .map_err(|error| corrupted(format!("picture count exceeds u32: {error}")))?;
-        let (spa_offset, spa_length) = fib_pair(&self.word, 40)?;
-        let (_header_spa_offset, header_spa_length) = fib_pair(&self.word, 41)?;
-        let (dgg_offset, dgg_length) = fib_pair(&self.word, crate::shape::FIB_INDEX_DGG_INFO)?;
-        if header_spa_length != 0 {
+        if self.picture_character_is_object(cp)? {
             return Err(corrupted(
-                "picture transfer does not rewrite header drawing graphs",
+                "embedded-object previews must use embedded-object transfer",
             ));
         }
-        let spa_bytes = (spa_length != 0)
-            .then(|| slice(&self.table, spa_offset, spa_length, "PlcfSpaMom"))
-            .transpose()?
-            .unwrap_or(&[]);
-        let anchors = if spa_bytes.is_empty() {
-            Vec::new()
-        } else {
-            crate::parts::spa::parse_plcf_spa(spa_bytes)?
-        };
-        if anchors.len()
-            != markers
+        let (picture, width, height, shape_id) = self.canonical_picture_at_cp(cp)?;
+        let selected_spa = if floating {
+            let (spa_offset, spa_length) = fib_pair(&self.word, 40)?;
+            let (_header_spa_offset, header_spa_length) = fib_pair(&self.word, 41)?;
+            if header_spa_length != 0 {
+                return Err(corrupted(
+                    "picture transfer does not rewrite header drawing graphs",
+                ));
+            }
+            if spa_length == 0 {
+                return Err(corrupted("floating picture has no PlcfSpaMom"));
+            }
+            let spa_bytes = slice(&self.table, spa_offset, spa_length, "PlcfSpaMom")?;
+            let anchors = crate::parts::spa::parse_plcf_spa(spa_bytes)?;
+            let mut matches = anchors
                 .iter()
-                .filter(|(_, is_floating)| *is_floating)
-                .count()
-        {
-            return Err(corrupted(
-                "picture markers and SPA anchors are not one-to-one",
-            ));
-        }
-
-        struct Entry {
-            cp: u32,
-            picture: crate::writer::Picture,
-            width: u32,
-            height: u32,
-            spa: Option<crate::parts::spa::Spa>,
-        }
-        let mut entries = Vec::with_capacity(markers.len());
-        for (index, &(marker_cp, marker_floating)) in markers.iter().enumerate() {
-            if self.picture_character_is_object(marker_cp)? {
-                return Err(corrupted(
-                    "embedded-object previews must use embedded-object transfer",
-                ));
+                .enumerate()
+                .filter(|(_, anchor)| anchor.cp == cp);
+            let (anchor_index, anchor) = matches
+                .next()
+                .ok_or_else(|| corrupted("floating picture has no matching SPA anchor"))?;
+            if matches.next().is_some() {
+                return Err(corrupted("floating picture has ambiguous SPA ownership"));
             }
-            let ordinal = u32::try_from(index)
-                .map_err(|error| corrupted(format!("picture ordinal exceeds u32: {error}")))?;
-            let shape_id = crate::writer::images::FIRST_PICTURE_SHAPE_ID
-                .checked_add(ordinal)
-                .ok_or_else(|| corrupted("picture shape ID overflow"))?;
-            let (picture, width, height) = self.canonical_picture_at_cp(marker_cp, shape_id)?;
-            let spa = if marker_floating {
-                let anchor = anchors
-                    .iter()
-                    .find(|anchor| anchor.cp == marker_cp)
-                    .ok_or_else(|| corrupted("floating picture has no matching SPA anchor"))?;
-                if anchor.spa.shape_id != shape_id
-                    || anchor.spa.width()
-                        != i32::try_from(width).map_err(|error| {
-                            corrupted(format!("picture width exceeds i32: {error}"))
-                        })?
-                    || anchor.spa.height()
-                        != i32::try_from(height).map_err(|error| {
-                            corrupted(format!("picture height exceeds i32: {error}"))
-                        })?
-                {
-                    return Err(corrupted("floating picture SPA does not match its PICF"));
-                }
-                Some(anchor.spa)
-            } else {
-                None
-            };
-            entries.push(Entry {
-                cp: marker_cp,
-                picture,
-                width,
-                height,
-                spa,
-            });
-        }
-        let positions = entries
-            .iter()
-            .map(|entry| entry.spa.map(floating_position_from_spa))
-            .collect::<Vec<_>>();
-        let floating_shapes = entries
-            .iter()
-            .zip(&positions)
-            .filter_map(|(entry, position)| {
-                entry.spa.zip(position.as_ref()).map(|(spa, position)| {
-                    crate::writer::images::FloatingShapeInfo {
-                        anchor_cp: entry.cp,
-                        shape_id: spa.shape_id,
-                        content: crate::writer::images::FloatingShapeContent::Picture(
-                            &entry.picture,
-                        ),
-                        width_twips: entry.width,
-                        height_twips: entry.height,
-                        position,
-                        text: None,
-                    }
-                })
-            })
-            .collect::<Vec<_>>();
-        if floating_shapes.is_empty() {
-            if !spa_bytes.is_empty() || dgg_length != 0 {
-                return Err(corrupted(
-                    "inline-only donor has a drawing-group dependency",
-                ));
-            }
-        } else {
-            if dgg_length == 0
-                || crate::writer::images::build_plcf_spa(&floating_shapes, self.main_ccp)
-                    != spa_bytes
+            if anchor.spa.shape_id != shape_id
+                || anchor.spa.width()
+                    != i32::try_from(width)
+                        .map_err(|error| corrupted(format!("picture width exceeds i32: {error}")))?
+                || anchor.spa.height()
+                    != i32::try_from(height).map_err(|error| {
+                        corrupted(format!("picture height exceeds i32: {error}"))
+                    })?
             {
-                return Err(corrupted("multi-picture PlcfSpa is not canonical"));
+                return Err(corrupted("floating picture SPA does not match its PICF"));
+            }
+            let (dgg_offset, dgg_length) = fib_pair(&self.word, crate::shape::FIB_INDEX_DGG_INFO)?;
+            if dgg_length == 0 {
+                return Err(corrupted("floating picture has no DggInfo"));
             }
             let dgg_info = slice(&self.table, dgg_offset, dgg_length, "DggInfo")?;
-            let canonical_dgg =
-                crate::writer::images::build_dgg_info(&floating_shapes, &[], marker_count)
-                    .map_err(|error| {
-                        corrupted(format!("drawing graph cannot be encoded: {error}"))
-                    })?;
-            if canonical_dgg != dgg_info {
-                return Err(corrupted(
-                    "drawing graph has groups, textboxes, reordered/shared BLIPs, or producer extensions",
-                ));
-            }
-        }
-
-        let selected = entries
-            .get(selected_index)
-            .ok_or_else(|| corrupted("selected picture ordinal is absent"))?;
+            validate_floating_picture_identity(dgg_info, shape_id, anchor_index, &picture)?;
+            Some(anchor.spa)
+        } else {
+            None
+        };
         let mut picture_block = Vec::new();
         crate::writer::images::write_picture_block(
-            &selected.picture,
+            &picture,
             crate::writer::images::FIRST_PICTURE_SHAPE_ID,
             &mut picture_block,
         )
         .map_err(|error| corrupted(format!("selected picture cannot be re-homed: {error}")))?;
-        let (spa, dgg_info) = if let Some(mut spa) = selected.spa {
+        let (spa, dgg_info) = if let Some(mut spa) = selected_spa {
             spa.shape_id = crate::writer::images::FIRST_PICTURE_SHAPE_ID;
             let position = floating_position_from_spa(spa);
             let shape = crate::writer::images::FloatingShapeInfo {
                 anchor_cp: cp,
                 shape_id: spa.shape_id,
-                content: crate::writer::images::FloatingShapeContent::Picture(&selected.picture),
-                width_twips: selected.width,
-                height_twips: selected.height,
+                content: crate::writer::images::FloatingShapeContent::Picture(&picture),
+                width_twips: width,
+                height_twips: height,
                 position: &position,
                 text: None,
             };
@@ -1017,11 +1158,7 @@ impl RevisionEditor {
         clippy::unwrap_used,
         reason = "PICF/Data canonicalization is a checked legacy-codec boundary"
     )]
-    fn canonical_picture_at_cp(
-        &self,
-        cp: u32,
-        shape_id: u32,
-    ) -> Result<(crate::writer::Picture, u32, u32)> {
+    fn canonical_picture_at_cp(&self, cp: u32) -> Result<(crate::writer::Picture, u32, u32, u32)> {
         let picture_offset = self.picture_location_at_cp(cp)?;
         let block_start = usize::try_from(picture_offset)
             .map_err(|error| corrupted(format!("picture offset exceeds usize: {error}")))?;
@@ -1058,6 +1195,7 @@ impl RevisionEditor {
             .data
             .get(block_start..block_end)
             .ok_or_else(|| corrupted("picture block extends past the Data stream"))?;
+        let shape_id = picture_shape_id(picture_block)?;
         let image = crate::image::Image::new(picture_offset)
             .data(&self.data, &self.word)
             .map_err(|error| corrupted(format!("picture BLIP is invalid: {error}")))?;
@@ -1103,7 +1241,7 @@ impl RevisionEditor {
                 "picture block is not the canonical OfficeArt graph for its shape ID",
             ));
         }
-        Ok((picture, width, height))
+        Ok((picture, width, height, shape_id))
     }
 
     #[deny(

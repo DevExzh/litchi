@@ -394,6 +394,19 @@ pub enum GeneratedIndexChange {
     },
 }
 
+/// One staged or committed direct master-body item effect.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum BodyItemChange {
+    /// Removes an exactly addressed direct body subtree.
+    Remove {
+        /// The source [`crate::structure::Structure::items`] position.
+        item: Position,
+        /// The checked source item kind.
+        kind: crate::structure::Kind,
+    },
+}
+
 /// One staged or committed style-catalog effect.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -428,6 +441,7 @@ pub(crate) fn mutate_xml(
     links: &[(Position, String)],
     sections: &[SectionChange],
     generated_indexes: &[GeneratedIndexChange],
+    body_items: &[BodyItemChange],
     styles: &[StyleChange],
 ) -> Result<MutatedParts> {
     let mut content_edits = Vec::new();
@@ -450,12 +464,15 @@ pub(crate) fn mutate_xml(
     for intent in generated_indexes {
         stage_generated_index(source, intent, &mut content_edits)?;
     }
-    let removed_section_spans = removed_section_spans(source, sections)?;
+    for intent in body_items {
+        stage_body_item(source, intent, &mut content_edits)?;
+    }
+    let removed_content_spans = removed_content_spans(source, sections, body_items)?;
     for intent in styles {
         stage_style(
             source,
             intent,
-            &removed_section_spans,
+            &removed_content_spans,
             &mut content_edits,
             &mut styles_edits,
         )?;
@@ -526,6 +543,33 @@ pub(crate) fn mutate_xml(
         content,
         styles: styles_xml,
     })
+}
+
+fn stage_body_item(
+    source: &Master,
+    intent: &BodyItemChange,
+    edits: &mut Vec<(Range<usize>, String)>,
+) -> Result<()> {
+    match intent {
+        BodyItemChange::Remove { item, kind } => {
+            let actual = source
+                .structure()
+                .items()
+                .get(item.get())
+                .ok_or_else(|| invalid("ODM master-body item selector is stale"))?;
+            if actual != kind {
+                return Err(invalid("ODM master-body item kind is stale"));
+            }
+            let span = source
+                .structure()
+                .item_spans
+                .get(item.get())
+                .cloned()
+                .ok_or_else(|| invalid("ODM master-body item source span is stale"))?;
+            edits.push((span, String::new()));
+            Ok(())
+        },
+    }
 }
 
 fn stage_generated_index(
@@ -637,7 +681,7 @@ fn stage_section(
 fn stage_style(
     source: &Master,
     intent: &StyleChange,
-    removed_section_spans: &[Range<usize>],
+    removed_content_spans: &[Range<usize>],
     content_edits: &mut Vec<(Range<usize>, String)>,
     styles_edits: &mut Vec<(Range<usize>, String)>,
 ) -> Result<()> {
@@ -660,7 +704,7 @@ fn stage_style(
         Origin::Styles => &mut *styles_edits,
     };
     if remove {
-        if style_is_referenced(source, name, removed_section_spans)? {
+        if style_is_referenced(source, name, removed_content_spans)? {
             return Err(invalid(
                 "ODM style removal is blocked by an incoming reference",
             ));
@@ -671,7 +715,7 @@ fn stage_style(
         content_edits.extend(
             attribute_references(source.content_xml(), name, after)?
                 .into_iter()
-                .filter(|(span, _)| !span_is_removed(span, removed_section_spans)),
+                .filter(|(span, _)| !span_is_removed(span, removed_content_spans)),
         );
         if let Some(xml) = source.styles_xml() {
             styles_edits.extend(attribute_references(xml, name, after)?);
@@ -683,11 +727,11 @@ fn stage_style(
 fn style_is_referenced(
     source: &Master,
     name: &str,
-    removed_section_spans: &[Range<usize>],
+    removed_content_spans: &[Range<usize>],
 ) -> Result<bool> {
     if attribute_references(source.content_xml(), name, name)?
         .iter()
-        .any(|(span, _)| !span_is_removed(span, removed_section_spans))
+        .any(|(span, _)| !span_is_removed(span, removed_content_spans))
     {
         return Ok(true);
     }
@@ -698,17 +742,22 @@ fn style_is_referenced(
         .map(Option::unwrap_or_default)
 }
 
-fn removed_section_spans(source: &Master, sections: &[SectionChange]) -> Result<Vec<Range<usize>>> {
+fn removed_content_spans(
+    source: &Master,
+    sections: &[SectionChange],
+    body_items: &[BodyItemChange],
+) -> Result<Vec<Range<usize>>> {
     let mut spans = Vec::new();
     spans
         .try_reserve(
             sections
                 .iter()
                 .filter(|change| matches!(change, SectionChange::Remove { .. }))
-                .count(),
+                .count()
+                .saturating_add(body_items.len()),
         )
         .map_err(|allocation_error| Error::Allocation {
-            resource: "ODM removed section spans",
+            resource: "ODM removed content spans",
             source: allocation_error,
         })?;
     for change in sections {
@@ -720,6 +769,17 @@ fn removed_section_spans(source: &Master, sections: &[SectionChange]) -> Result<
             .get(*position)
             .ok_or_else(|| invalid("ODM removed section selector is stale"))?;
         spans.push(node.source_span.clone());
+    }
+    for change in body_items {
+        let BodyItemChange::Remove { item, .. } = change;
+        spans.push(
+            source
+                .structure()
+                .item_spans
+                .get(item.get())
+                .cloned()
+                .ok_or_else(|| invalid("ODM removed body-item span is stale"))?,
+        );
     }
     Ok(spans)
 }

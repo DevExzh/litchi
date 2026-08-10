@@ -8,7 +8,9 @@ use litchi_odf_common::{
 use litchi_odg::{
     Builder, DocumentSigner, Drawing, EncryptionProfile, FormControl,
     PackageActiveContentWritePolicy, PackageDurablePatch, PackageMergePlan,
-    PackageSecurityWritePolicy, SignatureAlgorithm, SignatureValidity,
+    PackageSecurityLifecycleDisposition, PackageSecurityLifecycleOperation,
+    PackageSecurityLifecycleRefusal, PackageSecurityWritePolicy, SignatureAlgorithm,
+    SignatureValidity,
     page::Page,
     shape::{Shape, ShapeKind},
     style::Style,
@@ -526,6 +528,14 @@ fn fresh_password_and_signing_lifecycle_is_explicit_and_verifiable() {
     let drawing = Drawing::from_bytes_with_password(bytes, "drawing-password").unwrap();
     assert!(drawing.security().is_encrypted());
     assert!(drawing.security().is_signed());
+    let exact = drawing.edit().commit().unwrap();
+    assert!(!exact.changed());
+    assert_eq!(exact.snapshot().as_bytes(), drawing.as_bytes());
+    let mut changed_encrypted = drawing.edit();
+    changed_encrypted
+        .add_page(Page::new("Refused change"))
+        .unwrap();
+    assert!(changed_encrypted.commit().is_err());
     let capabilities = drawing.security_capabilities();
     assert_eq!(capabilities.source(), drawing.security());
     assert!(capabilities.can_open_with_password());
@@ -535,6 +545,22 @@ fn fresh_password_and_signing_lifecycle_is_explicit_and_verifiable() {
     assert!(capabilities.can_sign_new());
     assert!(!capabilities.can_resign_existing());
     assert!(capabilities.can_remove_invalidated_signatures());
+    assert_eq!(
+        capabilities.disposition(PackageSecurityLifecycleOperation::RewriteEncryptedExisting),
+        PackageSecurityLifecycleDisposition::ExactSourceOnly
+    );
+    assert_eq!(
+        capabilities.disposition(PackageSecurityLifecycleOperation::ChangeExistingPassword),
+        PackageSecurityLifecycleDisposition::Unsupported(
+            PackageSecurityLifecycleRefusal::ExistingPackageReencryptionUnavailable
+        )
+    );
+    assert_eq!(
+        capabilities.disposition(PackageSecurityLifecycleOperation::ResignExisting),
+        PackageSecurityLifecycleDisposition::Unsupported(
+            PackageSecurityLifecycleRefusal::ExistingPackageResigningUnavailable
+        )
+    );
     assert_eq!(
         drawing
             .digital_signatures()
@@ -677,6 +703,79 @@ fn path_data_is_typed_losslessly_editable_and_durable() {
             .as_bytes(),
         source.as_bytes()
     );
+}
+
+#[test]
+fn transforms_points_and_line_endpoints_insert_reopen_and_invert() {
+    let content = CONTENT.replace(
+        "</draw:page>",
+        r#"<draw:polyline draw:name="Route"/><draw:line draw:name="Axis"/></draw:page>"#,
+    );
+    let source = Drawing::from_bytes(package(&content)).unwrap();
+    let mut refused = source.edit();
+    assert!(
+        refused
+            .set_shape_points(0, 0, "0 0 1 1", "0,0 1,1")
+            .is_err()
+    );
+    assert_eq!(
+        refused.commit().unwrap().snapshot().as_bytes(),
+        source.as_bytes()
+    );
+    let mut edit = source.edit();
+    edit.set_shape_transform(0, 0, "rotate (15) translate (1cm 2cm)")
+        .unwrap();
+    edit.set_shape_points(0, 2, "0 0 1000 1000", "0,0 500,1000 1000,0")
+        .unwrap();
+    edit.set_shape_line_geometry(0, 3, "1cm", "2cm", "8cm", "9cm")
+        .unwrap();
+    edit.add_shape(
+        0,
+        Shape::new(ShapeKind::Polygon)
+            .with_name("Authored polygon")
+            .with_points("0 0 10 10", "0,0 5,10 10,0")
+            .with_transform("translate (2cm 3cm)"),
+    )
+    .unwrap();
+    edit.add_shape(
+        0,
+        Shape::new(ShapeKind::Connector)
+            .with_name("Authored connector")
+            .with_line_geometry("0cm", "0cm", "4cm", "5cm"),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let shapes = commit.snapshot().pages()[0].shapes();
+    assert_eq!(
+        shapes[0].transform(),
+        Some("rotate (15) translate (1cm 2cm)")
+    );
+    assert_eq!(shapes[2].view_box(), Some("0 0 1000 1000"));
+    assert_eq!(shapes[2].points(), Some("0,0 500,1000 1000,0"));
+    assert_eq!(
+        shapes[3].line_geometry(),
+        [Some("1cm"), Some("2cm"), Some("8cm"), Some("9cm")]
+    );
+    assert_eq!(shapes[4].points(), Some("0,0 5,10 10,0"));
+    assert_eq!(shapes[4].transform(), Some("translate (2cm 3cm)"));
+    assert_eq!(
+        shapes[5].line_geometry(),
+        [Some("0cm"), Some("0cm"), Some("4cm"), Some("5cm")]
+    );
+    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    assert_eq!(reopened.as_bytes(), commit.snapshot().as_bytes());
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
+    );
+    assert!(!commit.snapshot().active_content().is_present());
 }
 
 #[test]

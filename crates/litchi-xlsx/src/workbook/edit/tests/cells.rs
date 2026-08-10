@@ -990,7 +990,7 @@ fn cell_transfer_clones_selected_picture_graph_and_is_reversible() {
 }
 
 #[test]
-fn cell_transfer_clones_classic_chart_leaf_through_merge_and_durable_inverse() {
+fn cell_transfer_clones_classic_chart_graph_through_merge_and_durable_inverse() {
     let baseline = two_sheet_workbook(WorksheetKind::Worksheet);
     let mut package = baseline.inner.package.clone();
     package
@@ -1006,7 +1006,7 @@ fn cell_transfer_clones_classic_chart_leaf_through_merge_and_durable_inverse() {
             br#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><xdr:twoCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><a:graphic><a:graphicData><c:chart r:id="rIdChart"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>"#.to_vec(),
         )))
         .expect("drawing part");
-    let chart_xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea/></c:chart></c:chartSpace>"#.to_vec();
+    let chart_xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart><c:plotArea/></c:chart><c:externalData r:id="rIdWorkbook"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>"#.to_vec();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/charts/chart1.xml").expect("chart URI"),
@@ -1014,6 +1014,24 @@ fn cell_transfer_clones_classic_chart_leaf_through_merge_and_durable_inverse() {
             chart_xml.clone(),
         )))
         .expect("chart part");
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/embeddings/embedded1.xlsx").expect("embedded workbook URI"),
+            litchi_opc::constants::content_type::OFC_PACKAGE.to_owned(),
+            b"embedded-workbook-bytes".to_vec(),
+        )))
+        .expect("embedded workbook part");
+    package
+        .get_part_mut(&PackURI::new("/xl/charts/chart1.xml").expect("chart URI"))
+        .expect("chart part")
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::PACKAGE.to_owned(),
+            "../embeddings/embedded1.xlsx".to_owned(),
+            "rIdWorkbook".to_owned(),
+            TargetMode::Internal,
+        )
+        .expect("embedded workbook relationship");
     package
         .get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").expect("drawing URI"))
         .expect("drawing part")
@@ -1090,6 +1108,33 @@ fn cell_transfer_clones_classic_chart_leaf_through_merge_and_durable_inverse() {
             .expect("cloned chart")
             .blob(),
         chart_xml.as_slice()
+    );
+    let target_chart = committed
+        .workbook()
+        .inner
+        .package
+        .get_part(&target_chart_uri)
+        .expect("cloned chart");
+    let target_embedding_uri =
+        PackURI::new("/xl/embeddings/embedded1_copy1.xlsx").expect("cloned embedding URI");
+    assert_eq!(
+        target_chart
+            .rels()
+            .get("rIdWorkbook")
+            .expect("cloned embedded workbook relationship")
+            .target_partname()
+            .expect("embedded workbook target"),
+        target_embedding_uri
+    );
+    assert_eq!(
+        committed
+            .workbook()
+            .inner
+            .package
+            .get_part(&target_embedding_uri)
+            .expect("cloned embedded workbook")
+            .blob(),
+        b"embedded-workbook-bytes"
     );
     assert!(matches!(
         committed

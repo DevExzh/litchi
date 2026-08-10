@@ -25,11 +25,33 @@ impl Spreadsheet {
         Self::from_package(package)
     }
 
+    /// Open a password-encrypted ODS path and fully decode the public semantic owners.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for file I/O, an incorrect password, malformed encryption metadata,
+    /// invalid XML, or typed owner readback failure.
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        let package = crate::package::Package::open_with_password(path, password)?;
+        Self::from_package(package)
+    }
+
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = crate::package::Package::from_bytes(bytes)?;
+        Self::from_package(package)
+    }
+
+    /// Open password-encrypted ODS bytes and fully decode the public semantic owners.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an incorrect password, malformed encryption metadata, invalid XML,
+    /// or typed owner readback failure.
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        let package = crate::package::Package::from_bytes_with_password(bytes, password)?;
         Self::from_package(package)
     }
 

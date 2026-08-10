@@ -1,0 +1,10 @@
+/tmp/litchi-odc-odfdom.mMiZBQ/odfdom-created.odc:  Info: ODF version of root document: 1.2
+internal:/schema/odf1.2/OpenDocument-v1.2-os-manifest-schema.rng:  Info: parsed.
+/tmp/litchi-odc-odfdom.mMiZBQ/odfdom-created.odc/META-INF/manifest.xml:  Info: no errors, no warnings
+/tmp/litchi-odc-odfdom.mMiZBQ/odfdom-created.odc/mimetype:  Info: no errors, no warnings
+/tmp/litchi-odc-odfdom.mMiZBQ/odfdom-created.odc:  Info: Media Type: application/vnd.oasis.opendocument.chart
+internal:/schema/odf1.2/OpenDocument-v1.2-os-schema.rng:  Info: parsed.
+/tmp/litchi-odc-odfdom.mMiZBQ/odfdom-created.odc/meta.xml:  Info: no errors, no warnings
+/tmp/litchi-odc-odfdom.mMiZBQ/odfdom-created.odc/content.xml:  Info: no errors, no warnings
+internal:/schema/odf1.2/OpenDocument-v1.2-os-dsig-schema.rng:  Info: parsed.
+/tmp/litchi-odc-odfdom.mMiZBQ/odfdom-created.odc:  Info: no errors, no warnings

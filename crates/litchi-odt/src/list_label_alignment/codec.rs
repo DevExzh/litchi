@@ -175,7 +175,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     let number = take(&mut attributes, Namespace::Text, b"level")
                         .ok_or_else(|| bad("list level missing text:level"))?
                         .parse::<u16>()
-                        .map_err(|_| bad("invalid text:level"))?;
+                        .map_err(|_error| bad("invalid text:level"))?;
                     if !(1..=MAX_LEVEL).contains(&number) || !seen.insert(number) {
                         return Err(bad("invalid or duplicate list level"));
                     }

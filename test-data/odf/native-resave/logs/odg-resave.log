@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=draw8
+input=test-data/odf/native-resave/litchi-changed/rhbz1870501-litchi.odg
+output=test-data/odf/native-resave/libreoffice-resaved/rhbz1870501-litchi.odg
+status=success
+output_sha256=4cf5a94733a11a9a7075284994a191cb87c41173899ee0ebbba592c57232d99c

@@ -264,12 +264,52 @@ pub struct NumberStyleNode {
     pub suffix: Option<String>,
 }
 
+/// Common ODF data-style families supported by automatic style graphs.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DataStyleNode {
+    Date {
+        name: String,
+    },
+    Time {
+        name: String,
+        decimal_places: u8,
+    },
+    Currency {
+        name: String,
+        symbol: String,
+        decimal_places: u8,
+        min_integer_digits: u8,
+    },
+    Percentage {
+        name: String,
+        decimal_places: u8,
+        min_integer_digits: u8,
+    },
+    Boolean {
+        name: String,
+    },
+}
+
+impl DataStyleNode {
+    fn name(&self) -> &str {
+        match self {
+            Self::Date { name }
+            | Self::Time { name, .. }
+            | Self::Currency { name, .. }
+            | Self::Percentage { name, .. }
+            | Self::Boolean { name } => name,
+        }
+    }
+}
+
 /// A dependency-checked automatic style graph.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StyleGraph {
     pub cell_styles: Vec<CellStyleNode>,
     pub text_styles: Vec<TextStyleNode>,
     pub number_styles: Vec<NumberStyleNode>,
+    pub data_styles: Vec<DataStyleNode>,
 }
 
 /// Fully inherited table-cell style properties resolved from one closed graph.
@@ -340,6 +380,17 @@ pub enum FormControlKind {
     Image,
     Date,
     Time,
+    FixedText,
+    FormattedText,
+    Number,
+    File,
+    Password,
+    TextArea,
+    Hidden,
+    ValueRange,
+    Frame,
+    ImageFrame,
+    GenericControl,
 }
 
 /// One inert form event binding. Macro targets are retained but never executed.
@@ -400,6 +451,30 @@ pub enum DrawingGeometryKind {
     Rectangle,
     Ellipse,
     Line,
+    Connector,
+}
+
+/// One integer point in a bounded drawing view box.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DrawingPoint {
+    pub x: u32,
+    pub y: u32,
+}
+
+/// A positioned polygon or polyline using checked view-box coordinates.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawingPolygon {
+    pub name: String,
+    pub closed: bool,
+    pub points: Vec<DrawingPoint>,
+    pub view_box_width: u32,
+    pub view_box_height: u32,
+    pub text: Option<RichText>,
+    pub x_cm: f64,
+    pub y_cm: f64,
+    pub width_cm: f64,
+    pub height_cm: f64,
+    pub z_index: u32,
 }
 
 /// One finite positioned geometry with optional rich text.
@@ -690,6 +765,11 @@ pub(crate) fn put_style_graph(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum StyleNodeKind {
     Number,
+    Date,
+    Time,
+    Currency,
+    Percentage,
+    Boolean,
     Text,
     Cell,
 }
@@ -700,6 +780,7 @@ fn style_graph_nodes(graph: &StyleGraph) -> Result<Vec<(String, StyleNodeKind, S
         graph
             .number_styles
             .len()
+            .saturating_add(graph.data_styles.len())
             .saturating_add(graph.text_styles.len())
             .saturating_add(graph.cell_styles.len()),
     );
@@ -708,6 +789,13 @@ fn style_graph_nodes(graph: &StyleGraph) -> Result<Vec<(String, StyleNodeKind, S
             style.name.clone(),
             StyleNodeKind::Number,
             number_style_markup(style)?,
+        ));
+    }
+    for style in &graph.data_styles {
+        nodes.push((
+            style.name().to_string(),
+            data_style_kind(style),
+            data_style_markup(style)?,
         ));
     }
     for style in &graph.text_styles {
@@ -732,7 +820,8 @@ fn style_graph_markup(graph: &StyleGraph) -> Result<String> {
         .cell_styles
         .len()
         .saturating_add(graph.text_styles.len())
-        .saturating_add(graph.number_styles.len());
+        .saturating_add(graph.number_styles.len())
+        .saturating_add(graph.data_styles.len());
     if total > 4_096 {
         return invalid("ODS automatic style graph exceeds the node limit");
     }
@@ -751,9 +840,23 @@ fn style_graph_markup(graph: &StyleGraph) -> Result<String> {
         .iter()
         .map(|style| style.name.as_str())
         .collect::<std::collections::BTreeSet<_>>();
+    let data_names = graph
+        .data_styles
+        .iter()
+        .map(DataStyleNode::name)
+        .collect::<std::collections::BTreeSet<_>>();
+    let all_names = cell_names
+        .iter()
+        .chain(text_names.iter())
+        .chain(number_names.iter())
+        .chain(data_names.iter())
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
     if cell_names.len() != graph.cell_styles.len()
         || text_names.len() != graph.text_styles.len()
         || number_names.len() != graph.number_styles.len()
+        || data_names.len() != graph.data_styles.len()
+        || all_names.len() != total
     {
         return invalid("ODS automatic style graph contains duplicate names");
     }
@@ -778,7 +881,7 @@ fn style_graph_markup(graph: &StyleGraph) -> Result<String> {
             || style
                 .data_style
                 .as_deref()
-                .is_some_and(|name| !number_names.contains(name))
+                .is_some_and(|name| !number_names.contains(name) && !data_names.contains(name))
         {
             return invalid("ODS cell style dependency is unresolved");
         }
@@ -807,9 +910,39 @@ fn style_graph_markup(graph: &StyleGraph) -> Result<String> {
             return invalid("ODS number style digits or text are invalid");
         }
     }
+    for style in &graph.data_styles {
+        validate_token(style.name(), "data style name")?;
+        match style {
+            DataStyleNode::Date { .. } | DataStyleNode::Boolean { .. } => {},
+            DataStyleNode::Time { decimal_places, .. } if *decimal_places <= 9 => {},
+            DataStyleNode::Currency {
+                symbol,
+                decimal_places,
+                min_integer_digits,
+                ..
+            } if !symbol.is_empty()
+                && symbol.len() <= 32
+                && !symbol.chars().any(char::is_control)
+                && *decimal_places <= 20
+                && (1..=20).contains(min_integer_digits) => {},
+            DataStyleNode::Percentage {
+                decimal_places,
+                min_integer_digits,
+                ..
+            } if *decimal_places <= 20 && (1..=20).contains(min_integer_digits) => {},
+            DataStyleNode::Time { .. }
+            | DataStyleNode::Currency { .. }
+            | DataStyleNode::Percentage { .. } => {
+                return invalid("ODS data style parameters are invalid");
+            },
+        }
+    }
     let mut output = String::new();
     for style in &graph.number_styles {
         output.push_str(&number_style_markup(style)?);
+    }
+    for style in &graph.data_styles {
+        output.push_str(&data_style_markup(style)?);
     }
     for style in &graph.text_styles {
         output.push_str(&text_style_markup(style)?);
@@ -846,6 +979,47 @@ fn number_style_markup(style: &NumberStyleNode) -> Result<String> {
     }
     output.push_str("</number:number-style>");
     Ok(output)
+}
+
+fn data_style_kind(style: &DataStyleNode) -> StyleNodeKind {
+    match style {
+        DataStyleNode::Date { .. } => StyleNodeKind::Date,
+        DataStyleNode::Time { .. } => StyleNodeKind::Time,
+        DataStyleNode::Currency { .. } => StyleNodeKind::Currency,
+        DataStyleNode::Percentage { .. } => StyleNodeKind::Percentage,
+        DataStyleNode::Boolean { .. } => StyleNodeKind::Boolean,
+    }
+}
+
+fn data_style_markup(style: &DataStyleNode) -> Result<String> {
+    let name = escape_xml(style.name());
+    Ok(match style {
+        DataStyleNode::Date { .. } => format!(
+            "<number:date-style xmlns:number=\"{NUMBER}\" xmlns:style=\"{STYLE}\" style:name=\"{name}\"><number:year number:style=\"long\"/><number:text>-</number:text><number:month number:style=\"long\"/><number:text>-</number:text><number:day number:style=\"long\"/></number:date-style>"
+        ),
+        DataStyleNode::Time { decimal_places, .. } => format!(
+            "<number:time-style xmlns:number=\"{NUMBER}\" xmlns:style=\"{STYLE}\" style:name=\"{name}\"><number:hours number:style=\"long\"/><number:text>:</number:text><number:minutes number:style=\"long\"/><number:text>:</number:text><number:seconds number:style=\"long\" number:decimal-places=\"{decimal_places}\"/></number:time-style>"
+        ),
+        DataStyleNode::Currency {
+            symbol,
+            decimal_places,
+            min_integer_digits,
+            ..
+        } => format!(
+            "<number:currency-style xmlns:number=\"{NUMBER}\" xmlns:style=\"{STYLE}\" style:name=\"{name}\"><number:currency-symbol>{}</number:currency-symbol><number:number number:decimal-places=\"{decimal_places}\" number:min-integer-digits=\"{min_integer_digits}\"/></number:currency-style>",
+            escape_xml(symbol)
+        ),
+        DataStyleNode::Percentage {
+            decimal_places,
+            min_integer_digits,
+            ..
+        } => format!(
+            "<number:percentage-style xmlns:number=\"{NUMBER}\" xmlns:style=\"{STYLE}\" style:name=\"{name}\"><number:number number:decimal-places=\"{decimal_places}\" number:min-integer-digits=\"{min_integer_digits}\"/><number:text>%</number:text></number:percentage-style>"
+        ),
+        DataStyleNode::Boolean { .. } => format!(
+            "<number:boolean-style xmlns:number=\"{NUMBER}\" xmlns:style=\"{STYLE}\" style:name=\"{name}\"><number:boolean/></number:boolean-style>"
+        ),
+    })
 }
 
 fn text_style_markup(style: &TextStyleNode) -> Result<String> {
@@ -1236,8 +1410,16 @@ fn direct_named_styles(
 }
 
 fn automatic_style_kind(xml: &str, span: &Span) -> Result<Option<StyleNodeKind>> {
-    if span.namespace.as_deref() == Some(NUMBER) && span.local == "number-style" {
-        return Ok(Some(StyleNodeKind::Number));
+    if span.namespace.as_deref() == Some(NUMBER) {
+        return Ok(match span.local.as_str() {
+            "number-style" => Some(StyleNodeKind::Number),
+            "date-style" => Some(StyleNodeKind::Date),
+            "time-style" => Some(StyleNodeKind::Time),
+            "currency-style" => Some(StyleNodeKind::Currency),
+            "percentage-style" => Some(StyleNodeKind::Percentage),
+            "boolean-style" => Some(StyleNodeKind::Boolean),
+            _ => None,
+        });
     }
     if span.namespace.as_deref() != Some(STYLE) || span.local != "style" {
         return Ok(None);
@@ -1486,16 +1668,25 @@ pub(crate) fn put_drawing(
         return invalid("ODS sheet has more than one shapes container");
     }
     if let Some(shapes) = shapes.first().copied()
-        && ["frame", "g", "rect", "ellipse", "line"]
-            .into_iter()
-            .flat_map(|local| descendants(&spans, shapes, DRAW, local))
-            .any(|index| {
-                attribute(&xml, &spans[index], b"draw:name")
-                    .ok()
-                    .flatten()
-                    .as_deref()
-                    == Some(&drawing.name)
-            })
+        && [
+            "frame",
+            "g",
+            "rect",
+            "ellipse",
+            "line",
+            "connector",
+            "polygon",
+            "polyline",
+        ]
+        .into_iter()
+        .flat_map(|local| descendants(&spans, shapes, DRAW, local))
+        .any(|index| {
+            attribute(&xml, &spans[index], b"draw:name")
+                .ok()
+                .flatten()
+                .as_deref()
+                == Some(&drawing.name)
+        })
     {
         return invalid("ODS drawing name already exists");
     }
@@ -1666,8 +1857,81 @@ pub(crate) fn put_drawing_geometry(
                 geometry.x_cm, geometry.y_cm
             )
         },
+        DrawingGeometryKind::Connector => {
+            let x2 = geometry.x_cm + geometry.width_cm;
+            let y2 = geometry.y_cm + geometry.height_cm;
+            if !x2.is_finite() || !y2.is_finite() {
+                return invalid("ODS drawing connector endpoint is invalid");
+            }
+            format!(
+                "<draw:connector {common} draw:type=\"standard\" svg:x1=\"{}cm\" svg:y1=\"{}cm\" svg:x2=\"{x2}cm\" svg:y2=\"{y2}cm\">{text}</draw:connector>",
+                geometry.x_cm, geometry.y_cm
+            )
+        },
     };
     insert_shape_child(source, sheet, &geometry.name, markup, max_output)
+}
+
+pub(crate) fn put_drawing_polygon(
+    source: &[u8],
+    sheet: &str,
+    polygon: &DrawingPolygon,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    validate_token(&polygon.name, "drawing polygon name")?;
+    let minimum = if polygon.closed { 3 } else { 2 };
+    if polygon.points.len() < minimum
+        || polygon.points.len() > 4_096
+        || polygon.view_box_width == 0
+        || polygon.view_box_height == 0
+        || polygon
+            .points
+            .iter()
+            .any(|point| point.x > polygon.view_box_width || point.y > polygon.view_box_height)
+        || [
+            polygon.x_cm,
+            polygon.y_cm,
+            polygon.width_cm,
+            polygon.height_cm,
+        ]
+        .into_iter()
+        .any(|value| !value.is_finite())
+        || polygon.width_cm <= 0.0
+        || polygon.height_cm <= 0.0
+    {
+        return invalid("ODS drawing polygon geometry is invalid");
+    }
+    let mut points = String::new();
+    for (index, point) in polygon.points.iter().enumerate() {
+        if index != 0 {
+            points.push(' ');
+        }
+        write!(points, "{},{}", point.x, point.y)
+            .map_err(|_error| invalid_error("ODS drawing polygon formatting failed"))?;
+    }
+    let text = polygon
+        .text
+        .as_ref()
+        .map(RichText::markup)
+        .transpose()?
+        .unwrap_or_default();
+    let element = if polygon.closed {
+        "polygon"
+    } else {
+        "polyline"
+    };
+    let markup = format!(
+        "<draw:{element} xmlns:draw=\"{DRAW}\" xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:xlink=\"{XLINK}\" draw:name=\"{}\" draw:z-index=\"{}\" svg:x=\"{}cm\" svg:y=\"{}cm\" svg:width=\"{}cm\" svg:height=\"{}cm\" svg:viewBox=\"0 0 {} {}\" draw:points=\"{points}\">{text}</draw:{element}>",
+        escape_xml(&polygon.name),
+        polygon.z_index,
+        polygon.x_cm,
+        polygon.y_cm,
+        polygon.width_cm,
+        polygon.height_cm,
+        polygon.view_box_width,
+        polygon.view_box_height
+    );
+    insert_shape_child(source, sheet, &polygon.name, markup, max_output)
 }
 
 fn insert_shape_child(
@@ -1684,16 +1948,25 @@ fn insert_shape_child(
         return invalid("ODS sheet has more than one shapes container");
     }
     if let Some(shapes) = shapes.first().copied()
-        && ["frame", "g", "rect", "ellipse", "line"]
-            .into_iter()
-            .flat_map(|local| descendants(&spans, shapes, DRAW, local))
-            .any(|index| {
-                attribute(&xml, &spans[index], b"draw:name")
-                    .ok()
-                    .flatten()
-                    .as_deref()
-                    == Some(name)
-            })
+        && [
+            "frame",
+            "g",
+            "rect",
+            "ellipse",
+            "line",
+            "connector",
+            "polygon",
+            "polyline",
+        ]
+        .into_iter()
+        .flat_map(|local| descendants(&spans, shapes, DRAW, local))
+        .any(|index| {
+            attribute(&xml, &spans[index], b"draw:name")
+                .ok()
+                .flatten()
+                .as_deref()
+                == Some(name)
+        })
     {
         return invalid("ODS drawing name already exists");
     }
@@ -1901,6 +2174,17 @@ pub(crate) fn set_rich_forms(
                 FormControlKind::Image => "image",
                 FormControlKind::Date => "date",
                 FormControlKind::Time => "time",
+                FormControlKind::FixedText => "fixed-text",
+                FormControlKind::FormattedText => "formatted-text",
+                FormControlKind::Number => "number",
+                FormControlKind::File => "file",
+                FormControlKind::Password => "password",
+                FormControlKind::TextArea => "textarea",
+                FormControlKind::Hidden => "hidden",
+                FormControlKind::ValueRange => "value-range",
+                FormControlKind::Frame => "frame",
+                FormControlKind::ImageFrame => "image-frame",
+                FormControlKind::GenericControl => "generic-control",
             };
             write!(
                 markup,

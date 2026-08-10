@@ -44,7 +44,7 @@ impl Length {
         }
         let value = value
             .parse::<u32>()
-            .map_err(|_| bad("style:length must be 'word' or a positive integer"))?;
+            .map_err(|_error| bad("style:length must be 'word' or a positive integer"))?;
         let result = Self::Characters(value);
         result.validate()?;
         Ok(result)
@@ -361,7 +361,7 @@ fn cap_attrs(
             b"lines" => {
                 let lines = value
                     .parse::<u32>()
-                    .map_err(|_| bad("style:lines must be a positive integer"))?;
+                    .map_err(|_error| bad("style:lines must be a positive integer"))?;
                 cap.lines = Some(lines);
             },
             b"distance" => cap.distance = Some(Distance::new(value)?),

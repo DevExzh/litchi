@@ -353,6 +353,17 @@ pub(crate) fn render_formula(tokens: &[u8], context: Option<&FormulaContext>) ->
         .and_then(|formula| render_text(format_args!("={formula}")).ok())
 }
 
+/// Certifies a bounded Formula token stream as independent of workbook or
+/// worksheet coordinates. Unknown tokens, names, and every 2-D/3-D reference
+/// form fail closed.
+pub(crate) fn formula_is_reference_free(tokens: &[u8]) -> bool {
+    if tokens.len() > MAX_FORMULA_TOKEN_BYTES {
+        return false;
+    }
+    let mut decoder = FormulaDecoder::new(tokens, None, None);
+    decoder.decode().is_ok() && !decoder.coordinate_dependency
+}
+
 /// Render a shared formula template at a particular formula-cell origin.
 pub(crate) fn render_shared_formula(
     tokens: &[u8],
@@ -389,6 +400,7 @@ struct FormulaDecoder<'a> {
     name_x_operands: Vec<usize>,
     context: Option<&'a FormulaContext>,
     shared_origin: Option<(u16, u16)>,
+    coordinate_dependency: bool,
 }
 
 impl<'a> FormulaDecoder<'a> {
@@ -405,6 +417,7 @@ impl<'a> FormulaDecoder<'a> {
             name_x_operands: Vec::new(),
             context,
             shared_origin,
+            coordinate_dependency: false,
         }
     }
 
@@ -567,6 +580,7 @@ impl<'a> FormulaDecoder<'a> {
                 self.function(metadata.name, args)
             },
             0x23 => {
+                self.coordinate_dependency = true;
                 let index = self.u32()?;
                 let name = self
                     .context
@@ -575,12 +589,14 @@ impl<'a> FormulaDecoder<'a> {
                 self.push_text(name.to_owned())
             },
             0x24 => {
+                self.coordinate_dependency = true;
                 let row = self.u16()?;
                 let col = self.u16()?;
                 let (row, col) = resolve_shared_reference(row, col, self.shared_origin)?;
                 self.push_text(cell_reference(row, col)?)
             },
             0x25 => {
+                self.coordinate_dependency = true;
                 let first_row = self.u16()?;
                 let last_row = self.u16()?;
                 let first_col = self.u16()?;
@@ -598,6 +614,7 @@ impl<'a> FormulaDecoder<'a> {
             0x26 | 0x27 => self.skip(6),
             0x29 => self.skip(2),
             0x2c => {
+                self.coordinate_dependency = true;
                 let row = self.u16()?;
                 let col = self.u16()?;
                 let origin = self.shared_origin.ok_or(())?;
@@ -605,6 +622,7 @@ impl<'a> FormulaDecoder<'a> {
                 self.push_text(cell_reference(row, col)?)
             },
             0x2d => {
+                self.coordinate_dependency = true;
                 let first_row = self.u16()?;
                 let last_row = self.u16()?;
                 let first_col = self.u16()?;
@@ -619,6 +637,7 @@ impl<'a> FormulaDecoder<'a> {
                 self.push_rendered(format_args!("{first}:{last}"))
             },
             0x39 => {
+                self.coordinate_dependency = true;
                 let extern_sheet = self.u16()?;
                 let name_index = self.u16()?;
                 if self.u16()? != 0 {
@@ -633,6 +652,7 @@ impl<'a> FormulaDecoder<'a> {
                 self.push_text(name)
             },
             0x3a => {
+                self.coordinate_dependency = true;
                 let extern_sheet = self.u16()?;
                 let row = self.u16()?;
                 let col = self.u16()?;
@@ -645,6 +665,7 @@ impl<'a> FormulaDecoder<'a> {
                 self.push_rendered(format_args!("{prefix}{reference}"))
             },
             0x3b => {
+                self.coordinate_dependency = true;
                 let extern_sheet = self.u16()?;
                 let first_row = self.u16()?;
                 let last_row = self.u16()?;
@@ -663,6 +684,7 @@ impl<'a> FormulaDecoder<'a> {
                 self.push_rendered(format_args!("{prefix}{first}:{last}"))
             },
             0x3c => {
+                self.coordinate_dependency = true;
                 let extern_sheet = self.u16()?;
                 self.skip(4)?;
                 let prefix = self
@@ -672,6 +694,7 @@ impl<'a> FormulaDecoder<'a> {
                 self.push_rendered(format_args!("{prefix}#REF!"))
             },
             0x3d => {
+                self.coordinate_dependency = true;
                 let extern_sheet = self.u16()?;
                 self.skip(8)?;
                 let prefix = self
@@ -900,9 +923,18 @@ pub(crate) fn fixed_function_arity(index: u16) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::{
-        FormulaContext, MAX_FORMULA_STACK_ENTRIES, MAX_FORMULA_TOKEN_BYTES, ptg_exp_anchor,
-        render_formula, render_shared_formula,
+        FormulaContext, MAX_FORMULA_STACK_ENTRIES, MAX_FORMULA_TOKEN_BYTES,
+        formula_is_reference_free, ptg_exp_anchor, render_formula, render_shared_formula,
     };
+
+    #[test]
+    fn reference_free_certification_rejects_coordinate_tokens() {
+        assert!(formula_is_reference_free(&[0x1e, 1, 0]));
+        assert!(formula_is_reference_free(&[0x1e, 1, 0, 0x1e, 2, 0, 0x03,]));
+        assert!(!formula_is_reference_free(&[0x24, 0, 0, 0, 0]));
+        assert!(!formula_is_reference_free(&[0x25, 0, 0, 1, 0, 0, 0, 1, 0]));
+        assert!(!formula_is_reference_free(&[0xff]));
+    }
 
     #[test]
     fn renders_constants_operators_and_references() {

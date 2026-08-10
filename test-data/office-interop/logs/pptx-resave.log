@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=Impress MS PowerPoint 2007 XML
+input=test-data/office-interop/litchi-changed/shapes-litchi.pptx
+output=test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx
+status=success
+output_sha256=fcc8acffad88f5091316f67403c099a4c9eaa372e17927edfee29c35fb132034

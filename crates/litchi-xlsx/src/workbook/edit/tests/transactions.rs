@@ -3,6 +3,109 @@
 use super::super::*;
 
 use crate::cell::{Number, Value};
+use crate::{History, HistoryLimits, Margins, PageMargin};
+
+#[test]
+fn page_margins_merge_replay_inverse_and_record_history() {
+    let source = Workbook::new().expect("source workbook");
+    let source_bytes = source.to_plain_bytes().expect("source bytes");
+    let margins = Margins::new(
+        PageMargin::from_inches(0.7).unwrap(),
+        PageMargin::from_inches(0.8).unwrap(),
+        PageMargin::from_inches(1.0).unwrap(),
+        PageMargin::from_inches(1.1).unwrap(),
+        PageMargin::from_inches(0.3).unwrap(),
+        PageMargin::from_inches(0.4).unwrap(),
+    );
+
+    let mut margin_edit = source.edit().expect("margin edit");
+    margin_edit
+        .put_page_margins("Sheet1", margins)
+        .expect("put margins")
+        .expect("sheet selector");
+    let mut cell_edit = source.edit().expect("cell edit");
+    cell_edit
+        .sheet("Sheet1")
+        .expect("lookup")
+        .expect("sheet")
+        .set("H8", "disjoint")
+        .expect("cell edit");
+    let merged = margin_edit
+        .plan_three_way(cell_edit, MergeLimits::new(2, 64, 128, 64))
+        .expect("plan merge");
+    assert!(merged.conflicts().is_empty());
+    let commit = merged
+        .finish()
+        .expect("finish merge")
+        .commit()
+        .expect("commit margins");
+    assert!(commit.patch().changes().iter().any(|change| {
+        matches!(change.page_margins(), Some((None, Some(after))) if *after == margins)
+    }));
+    assert_eq!(
+        commit
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet")
+            .page_margins()
+            .expect("read margins"),
+        Some(margins)
+    );
+
+    let durable = commit.patch().durable().expect("durable margins patch");
+    let json = durable
+        .to_deterministic_json()
+        .expect("deterministic margins patch");
+    let durable = DurablePatch::from_deterministic_json(&json).expect("parse margins patch");
+    let replayed = durable.apply(&source).expect("replay margins patch");
+    assert_eq!(
+        replayed.to_plain_bytes().expect("replayed bytes"),
+        commit.workbook().to_plain_bytes().expect("committed bytes")
+    );
+    assert_eq!(
+        durable
+            .inverse()
+            .apply(&replayed)
+            .expect("inverse margins patch")
+            .to_plain_bytes()
+            .expect("restored bytes"),
+        source_bytes
+    );
+
+    let mut stale_edit = source.edit().expect("stale edit");
+    stale_edit
+        .sheet("Sheet1")
+        .expect("lookup")
+        .expect("sheet")
+        .set("A1", "stale")
+        .expect("stale cell");
+    let stale = stale_edit.commit().expect("stale commit").into_workbook();
+    assert!(matches!(
+        durable.apply(&stale),
+        Err(Error::PatchConflict { .. })
+    ));
+
+    let mut history = History::new(source, HistoryLimits::new(2, 256 * 1024 * 1024));
+    assert!(
+        commit
+            .record(&mut history)
+            .expect("record margins")
+            .is_empty()
+    );
+    assert!(history.undo());
+    assert!(history.redo());
+    assert_eq!(
+        history
+            .current()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet")
+            .page_margins()
+            .expect("history margins"),
+        Some(margins)
+    );
+}
 
 #[test]
 fn independently_prepared_disjoint_edits_join_after_threaded_work() {

@@ -178,6 +178,12 @@ impl Document {
         self.inner.model.pictures()
     }
 
+    /// Borrow root body shapes in source order.
+    #[must_use]
+    pub fn shapes(&self) -> &[crate::Shape<'_>] {
+        self.inner.model.shapes()
+    }
+
     /// Borrow fields in source order.
     #[must_use]
     pub fn fields(&self) -> &[crate::field::Field<'_>] {

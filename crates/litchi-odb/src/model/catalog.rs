@@ -178,6 +178,26 @@ impl<'source> Catalog<'source> {
         self.owned.relations()
     }
 
+    /// Iterates foreign-key relations owned by `table`.
+    pub fn outgoing_relations<'catalog>(
+        &'catalog self,
+        table: &'catalog str,
+    ) -> impl Iterator<Item = &'catalog Relation> + 'catalog {
+        self.relations()
+            .iter()
+            .filter(move |relation| relation.table() == table)
+    }
+
+    /// Iterates foreign-key relations targeting `table`.
+    pub fn incoming_relations<'catalog>(
+        &'catalog self,
+        table: &'catalog str,
+    ) -> impl Iterator<Item = &'catalog Relation> + 'catalog {
+        self.relations()
+            .iter()
+            .filter(move |relation| relation.referenced_table() == table)
+    }
+
     /// Returns the inert connection declaration, if the data source has one.
     #[must_use]
     pub const fn connection(&self) -> Option<&Connection> {
@@ -869,6 +889,7 @@ fn add_column(
             nullable,
             empty_allowed,
             autoincrement,
+            default_value: optional_db_attr(reader, element, b"default-value", limits)?,
         },
     );
     match (table, query) {

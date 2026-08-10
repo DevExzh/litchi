@@ -926,12 +926,12 @@ fn namespace(value: &ResolveResult<'_>) -> NamespaceKind {
 }
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("form XML position overflow".to_string()))
+        .map_err(|_error| Error::InvalidFormat("form XML position overflow".to_string()))
 }
 fn qname(value: &[u8]) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| Error::InvalidFormat("invalid form qualified name".to_string()))
+        .map_err(|_error| Error::InvalidFormat("invalid form qualified name".to_string()))
 }
 fn validate_name(label: &str, value: &str) -> Result<()> {
     if value.is_empty() {

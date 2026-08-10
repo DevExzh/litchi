@@ -80,7 +80,7 @@ pub(crate) fn scan(xml: &str, wanted_paragraph: Option<usize>) -> Result<Scan> {
     let mut output = Scan::default();
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_error| {
             Error::InvalidFormat("content.xml byte offset exceeds platform limits".to_string())
         })?;
         let (namespace, event) = reader
@@ -137,7 +137,7 @@ pub(crate) fn scan(xml: &str, wanted_paragraph: Option<usize>) -> Result<Scan> {
             },
             Event::Empty(ref element) => {
                 let local = element.local_name();
-                let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+                let event_end = usize::try_from(reader.buffer_position()).map_err(|_error| {
                     Error::InvalidFormat(
                         "content.xml byte offset exceeds platform limits".to_string(),
                     )
@@ -148,7 +148,7 @@ pub(crate) fn scan(xml: &str, wanted_paragraph: Option<usize>) -> Result<Scan> {
                     }
                     if wanted_paragraph == Some(paragraph_count) {
                         let qualified_name = std::str::from_utf8(element.name().as_ref())
-                            .map_err(|_| {
+                            .map_err(|_error| {
                                 Error::InvalidFormat(
                                     "ODF paragraph name is not valid UTF-8".to_string(),
                                 )
@@ -200,7 +200,7 @@ pub(crate) fn scan(xml: &str, wanted_paragraph: Option<usize>) -> Result<Scan> {
                     let (start, _, _) = active_fields.pop().ok_or_else(|| {
                         Error::InvalidFormat("missing completed dynamic text field".to_string())
                     })?;
-                    let end = usize::try_from(reader.buffer_position()).map_err(|_| {
+                    let end = usize::try_from(reader.buffer_position()).map_err(|_error| {
                         Error::InvalidFormat(
                             "content.xml byte offset exceeds platform limits".to_string(),
                         )
@@ -214,7 +214,7 @@ pub(crate) fn scan(xml: &str, wanted_paragraph: Option<usize>) -> Result<Scan> {
                     let (start, _) = active_database_fields.pop().ok_or_else(|| {
                         Error::InvalidFormat("missing completed database text field".to_string())
                     })?;
-                    let end = usize::try_from(reader.buffer_position()).map_err(|_| {
+                    let end = usize::try_from(reader.buffer_position()).map_err(|_error| {
                         Error::InvalidFormat(
                             "content.xml byte offset exceeds platform limits".to_string(),
                         )

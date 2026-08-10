@@ -36,6 +36,7 @@ impl Revision {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChangeKind {
     SlidesReordered,
+    SlideVisibilityChanged,
     SlideInserted,
     SlideRemoved,
     MastersReordered,
@@ -50,6 +51,12 @@ pub enum ChangeKind {
 pub enum Change {
     /// Reorder slide groups while retaining each group's text and opaque atoms.
     SlidesReordered { before: Vec<u32>, after: Vec<u32> },
+    /// Change the hidden flag of one slide while retaining every other flag.
+    SlideVisibilityChanged {
+        position: usize,
+        before: bool,
+        after: bool,
+    },
     /// Insert one complete slide-list group at a semantic position.
     SlideInserted { position: usize, group: Vec<Record> },
     /// Remove one complete slide-list group at a semantic position.
@@ -85,6 +92,7 @@ impl Change {
     pub const fn kind(&self) -> ChangeKind {
         match self {
             Self::SlidesReordered { .. } => ChangeKind::SlidesReordered,
+            Self::SlideVisibilityChanged { .. } => ChangeKind::SlideVisibilityChanged,
             Self::SlideInserted { .. } => ChangeKind::SlideInserted,
             Self::SlideRemoved { .. } => ChangeKind::SlideRemoved,
             Self::MastersReordered { .. } => ChangeKind::MastersReordered,
@@ -100,6 +108,15 @@ impl Change {
             Self::SlidesReordered { before, after } => Self::SlidesReordered {
                 before: after.clone(),
                 after: before.clone(),
+            },
+            Self::SlideVisibilityChanged {
+                position,
+                before,
+                after,
+            } => Self::SlideVisibilityChanged {
+                position: *position,
+                before: *after,
+                after: *before,
             },
             Self::SlideInserted { position, group } => Self::SlideRemoved {
                 position: *position,
@@ -387,6 +404,60 @@ impl Transaction {
             .position(|slide| slide.slide_id() == slide_id)
             .ok_or_else(|| Error::InvalidFormat(format!("slide ID {slide_id} was not found")))?;
         self.move_slide(index, destination)
+    }
+
+    /// Changes whether one slide is omitted from the presentation sequence.
+    ///
+    /// This edits only bit 2 of the fixed-width `SlidePersistAtom.flags`
+    /// field. Every other flag and every following slide-list record remains
+    /// exact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the position is absent or the resulting document
+    /// violates the structural invariants.
+    pub fn set_slide_hidden(&mut self, position: usize, hidden: bool) -> Result<()> {
+        const HIDDEN_FLAG: u32 = 1 << 2;
+
+        let slide = self
+            .slides()?
+            .get(position)
+            .copied()
+            .ok_or_else(|| Error::InvalidFormat("slide position is out of range".into()))?;
+        let before = slide.flags() & HIDDEN_FLAG != 0;
+        if before == hidden {
+            return Ok(());
+        }
+        let list_index = validation::list_index(&self.candidate, 0)?
+            .ok_or_else(|| Error::InvalidFormat("the presentation slide list is absent".into()))?;
+        let mut candidate = self.candidate.clone();
+        let atom = candidate.children[list_index]
+            .children
+            .get_mut(slide.child_index())
+            .ok_or_else(|| Error::Corrupted("slide reference index is inconsistent".into()))?;
+        if atom.record_type != RecordType::SlidePersistAtom || atom.data.len() != 20 {
+            return Err(Error::Corrupted(
+                "slide reference is not a fixed-width SlidePersistAtom".into(),
+            ));
+        }
+        let mut flags = u32::from_le_bytes(
+            atom.data[4..8]
+                .try_into()
+                .map_err(|_error| Error::Corrupted("slide flags are truncated".into()))?,
+        );
+        if hidden {
+            flags |= HIDDEN_FLAG;
+        } else {
+            flags &= !HIDDEN_FLAG;
+        }
+        atom.data[4..8].copy_from_slice(&flags.to_le_bytes());
+        self.publish_candidate(candidate)?;
+        self.changes.push(Change::SlideVisibilityChanged {
+            position,
+            before,
+            after: hidden,
+        });
+        Ok(())
     }
 
     /// Returns one complete slide-list group without changing the candidate.

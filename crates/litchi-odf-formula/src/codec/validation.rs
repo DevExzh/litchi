@@ -71,7 +71,7 @@ pub(crate) fn validate_element(element: &Element) -> Result<()> {
         "reln" => validate_relation(element),
         "ci" | "cn" | "csymbol" => validate_content_token(element),
         "interval" => validate_interval(element),
-        "piece" => validate_exact_content_expressions(element, 2),
+        "piece" => validate_piece(element),
         "condition" => validate_condition(element),
         "degree"
         | "domainofapplication"
@@ -476,17 +476,26 @@ fn validate_declare(element: &Element) -> Result<()> {
 fn validate_condition(element: &Element) -> Result<()> {
     validate_no_character_data(element)?;
     let children: Vec<_> = element.children().collect();
-    if children.len() == 1
-        && children[0].namespace_uri() == Some(MATHML_NAMESPACE)
-        && matches!(
-            children[0].local_name(),
-            "apply" | "reln" | "set" | "true" | "false"
-        )
-    {
+    if children.len() == 1 && is_predicate_expression(children[0]) {
         Ok(())
     } else {
         Err(invalid(
             "MathML condition requires one predicate expression",
+        ))
+    }
+}
+
+fn validate_piece(element: &Element) -> Result<()> {
+    validate_no_character_data(element)?;
+    let children: Vec<_> = element.children().collect();
+    if children.len() == 2
+        && is_content_expression(children[0])
+        && is_predicate_expression(children[1])
+    {
+        Ok(())
+    } else {
+        Err(invalid(
+            "MathML piece requires one value followed by one predicate",
         ))
     }
 }
@@ -1239,6 +1248,14 @@ fn is_math_variant(value: &str) -> bool {
 
 fn is_positive_integer(value: &str) -> bool {
     value.parse::<usize>().is_ok_and(|number| number > 0)
+}
+
+fn is_predicate_expression(element: &Element) -> bool {
+    element.namespace_uri() == Some(MATHML_NAMESPACE)
+        && matches!(
+            element.local_name(),
+            "apply" | "reln" | "set" | "true" | "false"
+        )
 }
 
 fn is_script(element: &Element) -> bool {

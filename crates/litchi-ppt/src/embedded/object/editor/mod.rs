@@ -17,7 +17,7 @@ mod tests;
 use super::{Collection, ExternalObject};
 use crate::embedded::storage::Storage;
 use crate::package::Error;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -36,7 +36,7 @@ pub struct Editor {
     pub(super) current_edit_offset: u32,
     pub(super) document_persist_id: u32,
     pub(super) collection: Collection,
-    pub(super) staged_storage: HashMap<u32, Vec<u8>>,
+    pub(super) staged_storage: BTreeMap<u32, Vec<u8>>,
     pub(super) removed_persist_ids: HashSet<u32>,
     pub(super) rewrite_object_list: bool,
     pub(super) changed: bool,

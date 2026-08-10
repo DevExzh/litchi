@@ -11,11 +11,15 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 const MIB: usize = 1024 * 1024;
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const MAX_STYLE_CLOSURE: usize = 1_024;
 
 /// Whether a security-sensitive semantic capability is available.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -812,92 +816,264 @@ fn complete_style_dependency(
     frame_key: &OperationKey,
     plan: &mut SemanticPlan,
 ) {
-    let source_style_part = target.and_then(Image::styles_xml);
-    let part_inventory = source_style_part
-        .map(|xml| scan_style_document(xml, name, family))
-        .transpose();
-    let content_inventory = target
-        .map(|image| scan_style_document(image.content_xml(), name, family))
-        .transpose();
-    let (Ok(part_inventory), Ok(content_inventory)) = (part_inventory, content_inventory) else {
-        push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(name.to_owned())));
-        return;
-    };
-    let transferable = part_inventory
-        .as_ref()
-        .and_then(|document| document.definition.as_ref());
-    let desired_definition = transferable.or_else(|| {
-        content_inventory
-            .as_ref()
-            .and_then(|document| document.definition.as_ref())
-    });
-
-    let destination_content_inventory = scan_style_document(current.content_xml(), name, family);
-    let Ok(destination_content_inventory) = destination_content_inventory else {
-        push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(name.to_owned())));
-        return;
-    };
-    if let Some(actual) = destination_content_inventory.definition.as_ref() {
-        if desired_definition.is_none_or(|desired| definitions_match(actual, desired)) {
-            return;
-        }
-        push_style_collision(plan, frame_key, actual, desired_definition);
-        return;
-    }
-
-    let destination_style_xml = planned_styles_xml(current, plan).map(str::to_owned);
-    let destination_style_inventory = destination_style_xml
-        .as_deref()
-        .map(|xml| scan_style_document(xml, name, family))
-        .transpose();
-    let Ok(destination_style_inventory) = destination_style_inventory else {
-        push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(name.to_owned())));
-        return;
-    };
-    if let Some(actual) = destination_style_inventory
-        .as_ref()
-        .and_then(|document| document.definition.as_ref())
-    {
-        if desired_definition.is_none_or(|desired| definitions_match(actual, desired)) {
-            return;
-        }
-        push_style_collision(plan, frame_key, actual, desired_definition);
-        return;
-    }
-
-    let Some(source_inventory) = part_inventory.as_ref() else {
-        push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(name.to_owned())));
-        return;
-    };
-    let Some(definition) = transferable else {
-        push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(name.to_owned())));
-        return;
-    };
-    if definition.container != StyleContainer::Named {
-        push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(name.to_owned())));
-        return;
-    }
-
-    if let Some(base) = destination_style_xml.as_deref() {
-        let Some(destination_inventory) = destination_style_inventory.as_ref() else {
-            push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(name.to_owned())));
-            return;
-        };
-        match merge_named_style(base, destination_inventory, source_inventory, definition) {
-            Ok(merged) => set_planned_styles(current, plan, merged),
-            Err(_) => plan.conflicts.push(Conflict {
+    let Some(target) = target else {
+        match inspect_style_dependency(current.content_xml(), current.styles_xml(), name, family) {
+            Ok(
+                StyleDependencyState::Named
+                | StyleDependencyState::Automatic
+                | StyleDependencyState::EquivalentDuplicate,
+            ) => {},
+            Ok(StyleDependencyState::Collision) => plan.conflicts.push(Conflict {
                 key: Some(frame_key.clone()),
                 kind: ConflictKind::DependencyCollision,
                 expected: None,
-                actual: Some(SemanticValue::Xml(Some(base.to_owned()))),
-                desired: Some(SemanticValue::Xml(Some(definition.xml.to_owned()))),
+                actual: Some(SemanticValue::Text(Some(name.to_owned()))),
+                desired: Some(SemanticValue::Text(Some(name.to_owned()))),
             }),
+            Ok(StyleDependencyState::Absent) | Err(_) => {
+                push_missing_dependency(
+                    plan,
+                    frame_key,
+                    SemanticValue::Text(Some(name.to_owned())),
+                );
+            },
         }
-    } else if let Some(styles_xml) = source_style_part {
-        set_planned_styles(current, plan, styles_xml.to_owned());
-    } else {
+        return;
+    };
+    let Ok(closure) = collect_style_closure(target, name, family) else {
         push_missing_dependency(plan, frame_key, SemanticValue::Text(Some(name.to_owned())));
+        return;
+    };
+    for desired in &closure {
+        match merge_style_dependency(current, plan, desired) {
+            Ok(()) => {},
+            Err(actual) => {
+                plan.conflicts.push(Conflict {
+                    key: Some(frame_key.clone()),
+                    kind: ConflictKind::DependencyCollision,
+                    expected: None,
+                    actual: Some(actual),
+                    desired: Some(SemanticValue::Xml(Some(desired.xml.clone()))),
+                });
+                return;
+            },
+        }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct StyleKey {
+    name: String,
+    family: String,
+}
+
+struct TransferStyleDefinition {
+    key: StyleKey,
+    container: StyleContainer,
+    xml: String,
+    namespaces: BTreeMap<String, String>,
+    declaration: Option<String>,
+}
+
+fn collect_style_closure(
+    source: &Image,
+    name: &str,
+    family: &str,
+) -> Result<Vec<TransferStyleDefinition>> {
+    let mut pending = vec![StyleKey {
+        name: name.to_owned(),
+        family: family.to_owned(),
+    }];
+    let mut seen = BTreeSet::new();
+    let mut closure = Vec::new();
+    while let Some(key) = pending.pop() {
+        if !seen.insert(key.clone()) {
+            continue;
+        }
+        if seen.len() > MAX_STYLE_CLOSURE {
+            return Err(invalid(
+                "ODI transitive style closure exceeds the item limit",
+            ));
+        }
+        let definition = source_style_definition(source, &key)?;
+        let mut dependencies = style_dependencies(&definition)?;
+        dependencies.reverse();
+        pending.extend(dependencies);
+        closure.push(definition);
+    }
+    Ok(closure)
+}
+
+fn source_style_definition(source: &Image, key: &StyleKey) -> Result<TransferStyleDefinition> {
+    let content = scan_style_document(source.content_xml(), &key.name, &key.family)?;
+    let styles = source
+        .styles_xml()
+        .map(|xml| scan_style_document(xml, &key.name, &key.family))
+        .transpose()?;
+    let content_definition = content.definition.as_ref();
+    let styles_definition = styles
+        .as_ref()
+        .and_then(|document| document.definition.as_ref());
+    let (definition, namespaces, document_xml) = match (content_definition, styles_definition) {
+        (None, None) => return Err(invalid("ODI transitive style dependency is missing")),
+        (Some(definition), None) => (definition, &content.namespaces, source.content_xml()),
+        (None, Some(definition)) => (
+            definition,
+            &styles
+                .as_ref()
+                .ok_or_else(|| invalid("ODI style inventory disappeared"))?
+                .namespaces,
+            source
+                .styles_xml()
+                .ok_or_else(|| invalid("ODI styles part disappeared"))?,
+        ),
+        (Some(left), Some(right)) if definitions_match(left, right) => (
+            right,
+            &styles
+                .as_ref()
+                .ok_or_else(|| invalid("ODI style inventory disappeared"))?
+                .namespaces,
+            source
+                .styles_xml()
+                .ok_or_else(|| invalid("ODI styles part disappeared"))?,
+        ),
+        (Some(_), Some(_)) => {
+            return Err(invalid(
+                "ODI transitive style dependency collides across parts",
+            ));
+        },
+    };
+    Ok(TransferStyleDefinition {
+        key: key.clone(),
+        container: definition.container,
+        xml: definition.xml.to_owned(),
+        namespaces: namespaces.clone(),
+        declaration: leading_xml_declaration(document_xml).map(str::to_owned),
+    })
+}
+
+fn leading_xml_declaration(xml: &str) -> Option<&str> {
+    xml.strip_prefix("<?xml")
+        .and_then(|suffix| suffix.find("?>").map(|end| &xml[..end.saturating_add(7)]))
+}
+
+fn style_dependencies(definition: &TransferStyleDefinition) -> Result<Vec<StyleKey>> {
+    let mut reader = NsReader::from_reader(definition.xml.as_bytes());
+    loop {
+        let (_, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid ODI style dependency fragment: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let values = inherited_style_reference_attributes(
+                    &reader,
+                    &element,
+                    &definition.namespaces,
+                )?;
+                let mut dependencies = Vec::new();
+                for (kind, name) in values {
+                    let family = if kind == b"linked-style-name" {
+                        match definition.key.family.as_str() {
+                            "paragraph" => "text",
+                            "text" => "paragraph",
+                            value => value,
+                        }
+                    } else {
+                        &definition.key.family
+                    };
+                    dependencies.push(StyleKey {
+                        name,
+                        family: family.to_owned(),
+                    });
+                }
+                return Ok(dependencies);
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODI style XML")),
+            Event::Eof => return Err(invalid("ODI style dependency fragment is empty")),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn inherited_style_reference_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    namespaces: &BTreeMap<String, String>,
+) -> Result<Vec<(&'static [u8], String)>> {
+    let mut values = Vec::new();
+    for raw in element.attributes() {
+        let attribute =
+            raw.map_err(|error| invalid(format!("invalid ODI style attribute: {error}")))?;
+        let key = std::str::from_utf8(attribute.key.as_ref())
+            .map_err(|error| invalid(format!("ODI style attribute name is not UTF-8: {error}")))?;
+        let Some((prefix, local)) = key.split_once(':') else {
+            continue;
+        };
+        if namespaces.get(prefix).map(String::as_bytes) != Some(STYLE_NAMESPACE) {
+            continue;
+        }
+        let kind = match local.as_bytes() {
+            b"parent-style-name" => b"parent-style-name".as_slice(),
+            b"next-style-name" => b"next-style-name".as_slice(),
+            b"linked-style-name" => b"linked-style-name".as_slice(),
+            _ => continue,
+        };
+        if values.iter().any(|(present, _)| *present == kind) {
+            return Err(invalid("duplicate ODI transitive style reference"));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| invalid(format!("invalid ODI style reference value: {error}")))?
+            .into_owned();
+        values.push((kind, value));
+    }
+    Ok(values)
+}
+
+fn merge_style_dependency(
+    current: &Image,
+    plan: &mut SemanticPlan,
+    desired: &TransferStyleDefinition,
+) -> std::result::Result<(), SemanticValue> {
+    let content = scan_style_document(
+        current.content_xml(),
+        &desired.key.name,
+        &desired.key.family,
+    )
+    .map_err(|error| SemanticValue::Text(Some(error.to_string())))?;
+    if let Some(actual) = content.definition.as_ref() {
+        return if definition_matches_transfer(actual, desired) {
+            Ok(())
+        } else {
+            Err(SemanticValue::Xml(Some(actual.xml.to_owned())))
+        };
+    }
+    let office_version = content.office_version.as_deref().unwrap_or("1.4");
+    let base = planned_styles_xml(current, plan).map(str::to_owned);
+    if let Some(base) = base.as_deref() {
+        let inventory = scan_style_document(base, &desired.key.name, &desired.key.family)
+            .map_err(|error| SemanticValue::Text(Some(error.to_string())))?;
+        if let Some(actual) = inventory.definition.as_ref() {
+            return if definition_matches_transfer(actual, desired) {
+                Ok(())
+            } else {
+                Err(SemanticValue::Xml(Some(actual.xml.to_owned())))
+            };
+        }
+        let merged = merge_style(base, &inventory, desired)
+            .map_err(|error| SemanticValue::Text(Some(error.to_string())))?;
+        set_planned_styles(current, plan, merged);
+    } else {
+        let created = new_style_document(desired, office_version);
+        set_planned_styles(current, plan, created);
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -934,6 +1110,7 @@ pub(crate) fn inspect_style_dependency(
     }
 }
 
+#[derive(Clone, Copy)]
 struct StyleDefinition<'a> {
     container: StyleContainer,
     xml: &'a str,
@@ -942,6 +1119,9 @@ struct StyleDefinition<'a> {
 struct StyleDocument<'a> {
     definition: Option<StyleDefinition<'a>>,
     named_close: Option<usize>,
+    automatic_close: Option<usize>,
+    root_close: Option<usize>,
+    office_version: Option<String>,
     namespaces: BTreeMap<String, String>,
 }
 
@@ -952,6 +1132,9 @@ fn scan_style_document<'a>(xml: &'a str, name: &str, family: &str) -> Result<Sty
     let mut active = None::<(usize, usize, StyleContainer)>;
     let mut definition = None;
     let mut named_close = None;
+    let mut automatic_close = None;
+    let mut root_close = None;
+    let mut office_version = None;
     let mut namespaces = BTreeMap::new();
     let mut buffer = Vec::new();
     loop {
@@ -977,6 +1160,8 @@ fn scan_style_document<'a>(xml: &'a str, name: &str, family: &str) -> Result<Sty
                     .ok_or_else(|| invalid("ODI style dependency depth overflow"))?;
                 if depth == 1 {
                     namespaces = namespace_declarations(&reader, &element)?;
+                    office_version =
+                        namespaced_attribute(&reader, &element, OFFICE_NAMESPACE, b"version")?;
                 }
                 if is_office {
                     let kind = match element.local_name().as_ref() {
@@ -1042,10 +1227,14 @@ fn scan_style_document<'a>(xml: &'a str, name: &str, family: &str) -> Result<Sty
                 if let Some((owner, kind)) = container
                     && owner == depth
                 {
-                    if kind == StyleContainer::Named {
-                        named_close = Some(start);
+                    match kind {
+                        StyleContainer::Named => named_close = Some(start),
+                        StyleContainer::Automatic => automatic_close = Some(start),
                     }
                     container = None;
+                }
+                if depth == 1 {
+                    root_close = Some(start);
                 }
                 depth = depth
                     .checked_sub(1)
@@ -1059,6 +1248,9 @@ fn scan_style_document<'a>(xml: &'a str, name: &str, family: &str) -> Result<Sty
                 return Ok(StyleDocument {
                     definition,
                     named_close,
+                    automatic_close,
+                    root_close,
+                    office_version,
                     namespaces,
                 });
             },
@@ -1097,6 +1289,32 @@ fn style_key(
         }
     }
     Ok((name, family))
+}
+
+fn namespaced_attribute(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    namespace: &[u8],
+    local: &[u8],
+) -> Result<Option<String>> {
+    let mut result = None;
+    for raw in element.attributes() {
+        let attribute =
+            raw.map_err(|error| invalid(format!("invalid ODI style attribute: {error}")))?;
+        let (resolved, name) = reader.resolver().resolve_attribute(attribute.key);
+        if bound_to(&resolved, namespace) && name.as_ref() == local {
+            if result.is_some() {
+                return Err(invalid("duplicate expanded ODI style attribute"));
+            }
+            result = Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                    .map_err(|error| invalid(format!("invalid ODI style value: {error}")))?
+                    .into_owned(),
+            );
+        }
+    }
+    Ok(result)
 }
 
 fn namespace_declarations(
@@ -1142,6 +1360,13 @@ fn definitions_match(left: &StyleDefinition<'_>, right: &StyleDefinition<'_>) ->
     left.container == right.container && left.xml == right.xml
 }
 
+fn definition_matches_transfer(
+    actual: &StyleDefinition<'_>,
+    desired: &TransferStyleDefinition,
+) -> bool {
+    actual.container == desired.container && actual.xml == desired.xml
+}
+
 fn planned_styles_xml<'a>(current: &'a Image, plan: &'a SemanticPlan) -> Option<&'a str> {
     plan.operations
         .iter()
@@ -1157,20 +1382,16 @@ fn planned_styles_xml<'a>(current: &'a Image, plan: &'a SemanticPlan) -> Option<
         .unwrap_or_else(|| current.styles_xml())
 }
 
-fn merge_named_style(
+fn merge_style(
     base: &str,
     destination_inventory: &StyleDocument<'_>,
-    source_inventory: &StyleDocument<'_>,
-    definition: &StyleDefinition<'_>,
+    definition: &TransferStyleDefinition,
 ) -> Result<String> {
-    let close = destination_inventory
-        .named_close
-        .ok_or_else(|| invalid("ODI destination has no office:styles merge site"))?;
-    for prefix in used_prefixes(definition.xml)? {
+    for prefix in used_prefixes(&definition.xml)? {
         if prefix == "xml" {
             continue;
         }
-        let source_binding = source_inventory.namespaces.get(&prefix);
+        let source_binding = definition.namespaces.get(&prefix);
         let destination_binding = destination_inventory.namespaces.get(&prefix);
         let compatible = if prefix.is_empty() {
             source_binding == destination_binding
@@ -1183,17 +1404,149 @@ fn merge_named_style(
             ));
         }
     }
-    let mut merged = String::with_capacity(base.len().saturating_add(definition.xml.len()));
+    let close = match definition.container {
+        StyleContainer::Named => destination_inventory.named_close,
+        StyleContainer::Automatic => destination_inventory.automatic_close,
+    };
+    let insertion = if close.is_some() {
+        definition.xml.clone()
+    } else {
+        let root_close = destination_inventory
+            .root_close
+            .ok_or_else(|| invalid("ODI destination has no style-document close site"))?;
+        let office_prefix = office_prefix(&destination_inventory.namespaces)?;
+        let local = match definition.container {
+            StyleContainer::Named => "styles",
+            StyleContainer::Automatic => "automatic-styles",
+        };
+        return insert_style_container(base, root_close, office_prefix, local, &definition.xml);
+    };
+    let close = close.ok_or_else(|| invalid("ODI style merge site disappeared"))?;
+    let mut merged = String::with_capacity(base.len().saturating_add(insertion.len()));
     merged.push_str(
         base.get(..close)
             .ok_or_else(|| invalid("ODI style insertion range is invalid"))?,
     );
-    merged.push_str(definition.xml);
+    merged.push_str(&insertion);
     merged.push_str(
         base.get(close..)
             .ok_or_else(|| invalid("ODI style insertion range is invalid"))?,
     );
     Ok(merged)
+}
+
+fn insert_style_container(
+    base: &str,
+    root_close: usize,
+    office_prefix: &str,
+    local: &str,
+    definition: &str,
+) -> Result<String> {
+    let mut merged = String::with_capacity(
+        base.len()
+            .saturating_add(definition.len())
+            .saturating_add(64),
+    );
+    merged.push_str(
+        base.get(..root_close)
+            .ok_or_else(|| invalid("ODI style insertion range is invalid"))?,
+    );
+    merged.push('<');
+    merged.push_str(office_prefix);
+    merged.push(':');
+    merged.push_str(local);
+    merged.push('>');
+    merged.push_str(definition);
+    merged.push_str("</");
+    merged.push_str(office_prefix);
+    merged.push(':');
+    merged.push_str(local);
+    merged.push('>');
+    merged.push_str(
+        base.get(root_close..)
+            .ok_or_else(|| invalid("ODI style insertion range is invalid"))?,
+    );
+    Ok(merged)
+}
+
+fn new_style_document(definition: &TransferStyleDefinition, office_version: &str) -> String {
+    let mut namespaces = definition.namespaces.clone();
+    let office_prefix = ensure_office_prefix(&mut namespaces);
+    let mut xml = definition.declaration.clone().unwrap_or_default();
+    xml.push('<');
+    xml.push_str(&office_prefix);
+    xml.push_str(":document-styles");
+    for (prefix, namespace) in &namespaces {
+        xml.push_str(" xmlns");
+        if !prefix.is_empty() {
+            xml.push(':');
+            xml.push_str(prefix);
+        }
+        xml.push_str("=\"");
+        push_escaped_attribute(&mut xml, namespace);
+        xml.push('"');
+    }
+    xml.push(' ');
+    xml.push_str(&office_prefix);
+    xml.push_str(":version=\"");
+    push_escaped_attribute(&mut xml, office_version);
+    xml.push_str("\">");
+    let local = match definition.container {
+        StyleContainer::Named => "styles",
+        StyleContainer::Automatic => "automatic-styles",
+    };
+    xml.push('<');
+    xml.push_str(&office_prefix);
+    xml.push(':');
+    xml.push_str(local);
+    xml.push('>');
+    xml.push_str(&definition.xml);
+    xml.push_str("</");
+    xml.push_str(&office_prefix);
+    xml.push(':');
+    xml.push_str(local);
+    xml.push_str("></");
+    xml.push_str(&office_prefix);
+    xml.push_str(":document-styles>");
+    xml
+}
+
+fn ensure_office_prefix(namespaces: &mut BTreeMap<String, String>) -> String {
+    let office = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    if let Some((prefix, _)) = namespaces
+        .iter()
+        .find(|(prefix, value)| !prefix.is_empty() && value.as_str() == office)
+    {
+        return prefix.clone();
+    }
+    let mut prefix = "office".to_owned();
+    let mut suffix = 0usize;
+    while namespaces.contains_key(&prefix) {
+        suffix = suffix.saturating_add(1);
+        prefix = format!("odi-office-{suffix}");
+    }
+    namespaces.insert(prefix.clone(), office.to_owned());
+    prefix
+}
+
+fn office_prefix(namespaces: &BTreeMap<String, String>) -> Result<&str> {
+    let office = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    namespaces
+        .iter()
+        .find(|(prefix, value)| !prefix.is_empty() && value.as_str() == office)
+        .map(|(prefix, _)| prefix.as_str())
+        .ok_or_else(|| invalid("ODI destination has no prefixed office namespace binding"))
+}
+
+fn push_escaped_attribute(target: &mut String, value: &str) {
+    for character in value.chars() {
+        match character {
+            '&' => target.push_str("&amp;"),
+            '<' => target.push_str("&lt;"),
+            '"' => target.push_str("&quot;"),
+            _ => target.push(character),
+        }
+    }
 }
 
 fn used_prefixes(xml: &str) -> Result<Vec<String>> {
@@ -1258,21 +1611,6 @@ fn set_planned_styles(current: &Image, plan: &mut SemanticPlan, merged: String) 
             after: SemanticValue::Xml(Some(merged)),
         });
     }
-}
-
-fn push_style_collision(
-    plan: &mut SemanticPlan,
-    key: &OperationKey,
-    actual: &StyleDefinition<'_>,
-    desired: Option<&StyleDefinition<'_>>,
-) {
-    plan.conflicts.push(Conflict {
-        key: Some(key.clone()),
-        kind: ConflictKind::DependencyCollision,
-        expected: None,
-        actual: Some(SemanticValue::Xml(Some(actual.xml.to_owned()))),
-        desired: desired.map(|value| SemanticValue::Xml(Some(value.xml.to_owned()))),
-    });
 }
 
 fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {

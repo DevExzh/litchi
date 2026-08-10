@@ -421,7 +421,7 @@ fn validate_mark(mark: &TextIndexMark) -> Result<()> {
             .parse::<u64>()
             .ok()
             .as_ref()
-            .is_none_or(|value| *value <= 0)
+            .is_none_or(|value| *value == 0)
     {
         return invalid("index mark outline level must be positive");
     }
@@ -562,7 +562,9 @@ fn scan_xml(xml: &str) -> Result<Scan> {
                 let local = local_name.as_ref();
                 if text_element && matches!(local, b"p" | b"h") {
                     let qname = std::str::from_utf8(element.name().as_ref())
-                        .map_err(|_| Error::InvalidFormat("non-UTF-8 paragraph name".to_string()))?
+                        .map_err(|_error| {
+                            Error::InvalidFormat("non-UTF-8 paragraph name".to_string())
+                        })?
                         .to_string();
                     paragraphs.push(ParagraphLocation {
                         site: ParagraphSite::Empty { start, end, qname },

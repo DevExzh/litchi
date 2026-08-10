@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=writer8
+input=test-data/odf/native-resave/litchi-changed/writer-header-footer-litchi.odt
+output=test-data/odf/native-resave/libreoffice-resaved/writer-header-footer-litchi.odt
+status=success
+output_sha256=22e95ca413c468c8ec4de96f23f934ff6a4ee860b5089c512dafb2a0d7f74c32

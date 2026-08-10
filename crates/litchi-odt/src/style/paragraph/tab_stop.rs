@@ -859,7 +859,7 @@ fn escape(xml: &mut String, value: &str) {
 fn decode(value: &[u8], what: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| error(format!("invalid UTF-8 in {what}")))
+        .map_err(|_error| error(format!("invalid UTF-8 in {what}")))
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(error(message))

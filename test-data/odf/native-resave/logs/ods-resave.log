@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=calc8
+input=test-data/odf/native-resave/litchi-changed/calc-two-sheets-litchi.ods
+output=test-data/odf/native-resave/libreoffice-resaved/calc-two-sheets-litchi.ods
+status=success
+output_sha256=5d60813f36fab58a802da50fd7979b7ea503e38c8721598de093f61f60eb111b

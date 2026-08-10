@@ -158,13 +158,27 @@ pub(super) fn plan(
         }
         let source_leaf_uri = relationship.target_partname()?;
         let source_leaf = workbook.inner.package.get_part(&source_leaf_uri)?;
-        validate_leaf_dependency(relationship.reltype(), source_leaf)?;
         let target_leaf_uri = allocate_uri(&source_leaf_uri, &mut reserved)?;
-        let target_leaf = BlobPart::new_shared(
+        let mut target_leaf = BlobPart::new_shared(
             target_leaf_uri.clone(),
             source_leaf.content_type().to_owned(),
             source_leaf.blob_arc(),
         );
+        let descendants = prepare_dependency(
+            workbook,
+            relationship.reltype(),
+            source_leaf,
+            &target_leaf_uri,
+            &mut target_leaf,
+            &mut reserved,
+        )?;
+        if internal
+            .len()
+            .checked_add(1usize.saturating_add(descendants.len()))
+            .is_none_or(|count| count > MAX_REFERENCES)
+        {
+            return Err(invalid("drawing dependency graph part limit exceeded"));
+        }
         let cloned_relationship = Relationship::new_with_mode(
             relationship.r_id().to_owned(),
             relationship.reltype().to_owned(),
@@ -178,6 +192,7 @@ pub(super) fn plan(
             relationship: cloned_relationship,
             part: Box::new(target_leaf),
         });
+        internal.extend(descendants);
     }
     let worksheet_relationship = Relationship::new_with_mode(
         target_relationship_id.clone(),
@@ -207,36 +222,45 @@ pub(super) fn plan(
     }))
 }
 
-fn validate_leaf_dependency(relationship_type: &str, part: &dyn Part) -> Result<()> {
-    if !part.rels().is_empty() {
-        return Err(unsupported(
-            "copying drawing dependencies with outbound relationships",
-        ));
-    }
-    if part.blob().len() > MAX_LEAF_BYTES {
+fn prepare_dependency(
+    workbook: &Workbook,
+    relationship_type: &str,
+    source: &dyn Part,
+    target_uri: &PackURI,
+    target: &mut BlobPart,
+    reserved: &mut BTreeSet<String>,
+) -> Result<Vec<GraphChange>> {
+    if source.blob().len() > MAX_LEAF_BYTES {
         return Err(invalid("drawing dependency exceeds the size limit"));
     }
     match relationship_type {
-        rt::IMAGE | rt::STRICT_IMAGE => validate_image_leaf(part),
+        rt::IMAGE | rt::STRICT_IMAGE => {
+            if !source.rels().is_empty() {
+                return Err(unsupported(
+                    "copying image parts with outbound relationships",
+                ));
+            }
+            validate_image_leaf(source)?;
+            Ok(Vec::new())
+        },
         rt::CHART | rt::STRICT_CHART => {
-            if part.content_type() != ct::DML_CHART {
+            if source.content_type() != ct::DML_CHART {
                 return Err(invalid(format!(
                     "drawing chart part has content type '{}', expected '{}'",
-                    part.content_type(),
+                    source.content_type(),
                     ct::DML_CHART
                 )));
             }
-            if !part.partname().as_str().starts_with("/xl/charts/")
-                || !part.partname().as_str().ends_with(".xml")
+            if !source.partname().as_str().starts_with("/xl/charts/")
+                || !source.partname().as_str().ends_with(".xml")
             {
                 return Err(invalid(
                     "drawing chart target is outside /xl/charts or lacks .xml suffix",
                 ));
             }
-            ensure_no_relationship_attributes(part.blob())?;
             let anchor = crate::chart::Anchor::new(0, 0, 1, 1);
-            let _ = crate::chart::read(part.blob(), anchor)?;
-            Ok(())
+            let chart = crate::chart::read(source.blob(), anchor)?;
+            clone_chart_relationships(workbook, source, target_uri, target, reserved, &chart)
         },
         _ => Err(unsupported(
             "copying drawing dependencies other than images and classic charts",
@@ -244,32 +268,179 @@ fn validate_leaf_dependency(relationship_type: &str, part: &dyn Part) -> Result<
     }
 }
 
-fn ensure_no_relationship_attributes(xml: &[u8]) -> Result<()> {
-    let mut reader = NsReader::from_reader(xml);
-    reader.config_mut().check_end_names = true;
-    loop {
-        let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let resolver = reader.resolver().clone();
-        match event {
-            Event::Start(element) | Event::Empty(element) => {
-                for attribute in element.attributes().with_checks(true) {
-                    let attribute = attribute.map_err(xml_error)?;
-                    if relationship_namespace(&resolver.resolve_attribute(attribute.key).0) {
-                        return Err(unsupported(
-                            "copying classic charts with relationship attributes",
-                        ));
-                    }
-                }
-            },
-            Event::DocType(_) | Event::PI(_) => {
-                return Err(invalid(
-                    "drawing chart transfer rejects DTD and processing instructions",
-                ));
-            },
-            Event::Eof => return Ok(()),
-            _ => {},
+fn clone_chart_relationships(
+    workbook: &Workbook,
+    source: &dyn Part,
+    target_uri: &PackURI,
+    target: &mut BlobPart,
+    reserved: &mut BTreeSet<String>,
+    chart: &crate::chart::Chart,
+) -> Result<Vec<GraphChange>> {
+    let mut fragment_ids =
+        litchi_spreadsheet_drawing::chart::relationship::fragment_ids(&chart.chart)?;
+    let external_data_id = chart
+        .chart
+        .external_data
+        .as_ref()
+        .and_then(|value| value.relationship_id.as_deref());
+    let user_shapes_id = chart
+        .chart
+        .user_shapes
+        .as_ref()
+        .and_then(|value| value.relationship_id.as_deref());
+    for id in [external_data_id, user_shapes_id].into_iter().flatten() {
+        if !fragment_ids.insert(id.to_owned()) {
+            return Err(invalid("chart relationship roles use the same ID"));
         }
     }
+    let actual = source
+        .rels()
+        .iter()
+        .map(|relationship| relationship.r_id().to_owned())
+        .collect::<HashSet<_>>();
+    if actual != fragment_ids {
+        return Err(invalid(
+            "chart XML relationship references do not close over package relationships",
+        ));
+    }
+    if actual.len() > MAX_REFERENCES {
+        return Err(invalid("chart relationship limit exceeded"));
+    }
+    let mut relationships = source.rels().iter().collect::<Vec<_>>();
+    relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
+    let mut graph = Vec::new();
+    graph
+        .try_reserve_exact(relationships.len())
+        .map_err(|source| allocation("chart dependency graph", source))?;
+    for relationship in relationships {
+        validate_chart_relationship_role(relationship, external_data_id, user_shapes_id)?;
+        if relationship.is_external() {
+            target.rels_mut().try_add_relationship(
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.r_id().to_owned(),
+                TargetMode::External,
+            )?;
+            continue;
+        }
+        let source_child_uri = relationship.target_partname()?;
+        let source_child = workbook.inner.package.get_part(&source_child_uri)?;
+        validate_chart_child(relationship, source_child, user_shapes_id)?;
+        let target_child_uri = allocate_uri(&source_child_uri, reserved)?;
+        let target_child = BlobPart::new_shared(
+            target_child_uri.clone(),
+            source_child.content_type().to_owned(),
+            source_child.blob_arc(),
+        );
+        let cloned_relationship = Relationship::new_with_mode(
+            relationship.r_id().to_owned(),
+            relationship.reltype().to_owned(),
+            target_child_uri.relative_ref(target_uri.base_uri()),
+            target_uri.base_uri().to_owned(),
+            TargetMode::Internal,
+        );
+        graph.push(GraphChange {
+            action: GraphAction::Add,
+            source: target_uri.clone(),
+            relationship: cloned_relationship,
+            part: Box::new(target_child),
+        });
+    }
+    Ok(graph)
+}
+
+fn validate_chart_relationship_role(
+    relationship: &Relationship,
+    external_data_id: Option<&str>,
+    user_shapes_id: Option<&str>,
+) -> Result<()> {
+    if external_data_id == Some(relationship.r_id()) {
+        if !litchi_spreadsheet_drawing::chart::relationship::is_external_data_type(
+            relationship.reltype(),
+        ) {
+            return Err(invalid("chart external-data relationship has invalid type"));
+        }
+        return Ok(());
+    }
+    if user_shapes_id == Some(relationship.r_id()) {
+        if relationship.is_external()
+            || !litchi_spreadsheet_drawing::chart::relationship::is_user_shapes_type(
+                relationship.reltype(),
+            )
+        {
+            return Err(invalid(
+                "chart user-shapes relationship has invalid type or mode",
+            ));
+        }
+        return Ok(());
+    }
+    if relationship.is_external()
+        && matches!(
+            relationship.reltype(),
+            rt::HYPERLINK | rt::STRICT_HYPERLINK | rt::IMAGE | rt::STRICT_IMAGE
+        )
+    {
+        return Ok(());
+    }
+    if !relationship.is_external() && matches!(relationship.reltype(), rt::IMAGE | rt::STRICT_IMAGE)
+    {
+        return Ok(());
+    }
+    Err(unsupported(
+        "copying unsupported classic-chart relationships",
+    ))
+}
+
+fn validate_chart_child(
+    relationship: &Relationship,
+    child: &dyn Part,
+    user_shapes_id: Option<&str>,
+) -> Result<()> {
+    if !child.rels().is_empty() {
+        return Err(unsupported(
+            "copying classic-chart dependencies with outbound relationships",
+        ));
+    }
+    if child.blob().len() > MAX_LEAF_BYTES {
+        return Err(invalid("chart dependency exceeds the size limit"));
+    }
+    if user_shapes_id == Some(relationship.r_id()) {
+        if child.content_type() != ct::DML_CHARTSHAPES
+            || !child.partname().as_str().starts_with("/xl/drawings/")
+            || !child.partname().as_str().ends_with(".xml")
+        {
+            return Err(invalid(
+                "chart user-shapes target has invalid path or content type",
+            ));
+        }
+        if !litchi_spreadsheet_drawing::chart::relationship::user_shapes_ids(child.blob())?
+            .is_empty()
+        {
+            return Err(unsupported(
+                "copying chart user-shapes with referenced dependencies",
+            ));
+        }
+        return Ok(());
+    }
+    if matches!(relationship.reltype(), rt::IMAGE | rt::STRICT_IMAGE) {
+        return validate_image_leaf(child);
+    }
+    let expected = litchi_spreadsheet_drawing::chart::relationship::external_data_content_type(
+        relationship.reltype(),
+    )
+    .ok_or_else(|| unsupported("copying unsupported embedded chart data"))?;
+    if !child.partname().as_str().starts_with("/xl/embeddings/") {
+        return Err(invalid(
+            "embedded chart data target is outside /xl/embeddings",
+        ));
+    }
+    if child.content_type() != expected {
+        return Err(invalid(format!(
+            "embedded chart data has content type '{}', expected '{expected}'",
+            child.content_type()
+        )));
+    }
+    Ok(())
 }
 
 fn validate_image_leaf(part: &dyn Part) -> Result<()> {

@@ -5,8 +5,8 @@
 
 use litchi_core::{HistoryLimits, Metadata, Position};
 use litchi_oth::{
-    Block, Builder, History, JoinFailure, Patch, SecurityPolicy, Template, TransferPolicy,
-    TransferSelector, field,
+    Block, Builder, CapabilityState, History, JoinFailure, Patch, ResourceMember, SecurityPolicy,
+    Template, TransferPolicy, TransferSelector, field,
     form::{Control, Form},
     heading::Heading,
     inline::{Content as Inline, Field as InlineField, Span},
@@ -179,6 +179,166 @@ fn builder_authors_compact_optional_xml_parts_and_reopens_before_publication() {
 }
 
 #[test]
+fn fresh_builder_authors_common_semantics_and_resource_closure() {
+    let metadata = Metadata {
+        title: Some("Fresh OTH".to_string()),
+        page_count: Some(2),
+        ..Metadata::default()
+    };
+    let body_style = Style::new("Body", "paragraph").unwrap();
+    let strong_style = Style::new("Strong", "text")
+        .unwrap()
+        .with_text_properties(TextProperties::new().with_weight(Weight::Bold));
+    let form =
+        Form::new("search").with_control(Control::new("text").with_id("query").with_name("q"));
+    let nested = List::new([Item::new(Paragraph::new("outer"))
+        .with_nested_list(List::new([Item::new(Paragraph::new("inner"))]))]);
+
+    let builder = Builder::new()
+        .metadata(metadata)
+        .style(body_style)
+        .style(strong_style)
+        .form(form)
+        .list(nested);
+    let builder = builder
+        .rich_heading(
+            1,
+            [
+                Inline::text("Fresh "),
+                Inline::Link(Link::new("https://example.test/heading", "heading")),
+            ],
+        )
+        .unwrap();
+    let builder = builder
+        .styled_rich_paragraph(
+            "Body",
+            [
+                Inline::bookmark("point"),
+                Inline::text("Rich "),
+                Inline::Span(Span::new("Strong", "span")),
+                Inline::text(" "),
+                Inline::Field(
+                    InlineField::new(field::Kind::PageCount, "2")
+                        .with_name("pages")
+                        .fixed(),
+                ),
+            ],
+        )
+        .unwrap();
+    let builder = builder
+        .resource_with_payload(
+            resource::Resource::new(resource::Kind::Image, "Pictures/fresh.bin").unwrap(),
+            "image/png",
+            b"fresh-image".to_vec(),
+        )
+        .unwrap();
+    let builder = builder
+        .object_with_members(
+            resource::Resource::new(resource::Kind::Object, "./Object 1").unwrap(),
+            [
+                ResourceMember::new("content.xml", "text/xml", b"<object/>".to_vec()).unwrap(),
+                ResourceMember::new("settings.xml", "text/xml", b"<settings/>".to_vec()).unwrap(),
+            ],
+        )
+        .unwrap();
+    let bytes = builder
+        .external_resource(
+            resource::Resource::new(resource::Kind::Image, "https://example.test/image.png")
+                .unwrap(),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let template = Template::from_bytes(bytes.clone()).unwrap();
+    assert!(!template.content_xml().contains(">\n<"));
+    assert!(!template.meta_xml().unwrap().contains(">\n<"));
+    assert!(!template.styles_xml().unwrap().contains(">\n<"));
+    assert_eq!(
+        template.metadata().unwrap().title.as_deref(),
+        Some("Fresh OTH")
+    );
+    assert_eq!(template.metadata().unwrap().page_count, Some(2));
+    assert_eq!(template.styles().len(), 2);
+    let body = template.text_body().unwrap();
+    assert_eq!(body.forms()[0].controls()[0].name(), Some("q"));
+    assert_eq!(body.resources().len(), 3);
+    assert_eq!(body.headings()[0].text(), "Fresh heading");
+    assert_eq!(body.headings()[0].links().len(), 1);
+    assert_eq!(body.paragraphs()[2].text(), "Rich span 2");
+    assert_eq!(
+        body.paragraphs()[2].formatting_runs()[0].style_name(),
+        "Strong"
+    );
+    let rich_paragraph = &body.paragraphs()[2];
+    let display_range = rich_paragraph.fields()[0].display_range().clone();
+    assert_eq!(&rich_paragraph.text()[display_range], "2");
+    assert_eq!(body.bookmarks().len(), 1);
+    assert_eq!(body.lists()[1].items()[0].nested_lists().len(), 1);
+    let files = template.files().unwrap();
+    for expected in [
+        "Pictures/fresh.bin",
+        "Object 1/content.xml",
+        "Object 1/settings.xml",
+    ] {
+        assert!(files.iter().any(|path| path == expected));
+    }
+    template
+        .check_security(SecurityPolicy {
+            allow_embedded_objects: true,
+            allow_external_resources: true,
+            allow_forms: true,
+            ..SecurityPolicy::default()
+        })
+        .unwrap();
+    let reopened = Template::from_bytes(template.as_bytes().to_vec()).unwrap();
+    assert_eq!(reopened.as_bytes(), bytes.as_slice());
+    assert_eq!(reopened.text_body().unwrap().resources(), body.resources());
+
+    assert!(
+        Builder::new()
+            .content_xml(COMPACT_CONTENT)
+            .form(Form::new("conflict"))
+            .build()
+            .is_err()
+    );
+    assert!(
+        Builder::new()
+            .meta_xml("<office:document-meta/>")
+            .metadata(Metadata::default())
+            .build()
+            .is_err()
+    );
+    assert!(
+        Builder::new()
+            .styles_xml("<office:document-styles/>")
+            .style(Style::new("Conflict", "text").unwrap())
+            .build()
+            .is_err()
+    );
+    assert!(ResourceMember::new("../escape", "text/xml", Vec::new()).is_err());
+    assert!(
+        Builder::new()
+            .object_with_members(
+                resource::Resource::new(resource::Kind::Object, "Object 2").unwrap(),
+                [],
+            )
+            .is_err()
+    );
+    assert!(
+        Builder::new()
+            .resource_with_payload(
+                resource::Resource::new(resource::Kind::Image, "content.xml").unwrap(),
+                "text/xml",
+                b"<collision/>".to_vec(),
+            )
+            .unwrap()
+            .build()
+            .is_err()
+    );
+}
+
+#[test]
 fn semantic_whitespace_is_preserved_exactly() {
     let template = Template::from_bytes(
         Builder::new()
@@ -236,6 +396,29 @@ fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
         1,
     );
     assert!(Template::from_bytes(raw_negative_package(&dtd)).is_err());
+}
+
+#[test]
+fn odf_grammar_derived_list_and_form_negatives_are_test_only_raw() {
+    const PREFIX: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0">"#,
+        r#"<office:body><office:text>"#,
+    );
+    const SUFFIX: &str = "</office:text></office:body></office:document-content>";
+    // Representative constraints derived from ODF list/form grammar. These
+    // deliberately bypass Builder; OTH does not claim full Relax NG support.
+    for invalid_body in [
+        "<text:list/>",
+        "<text:list><text:p>direct</text:p></text:list>",
+        "<text:list><text:list-item/></text:list>",
+        "<office:forms><form:text/></office:forms>",
+    ] {
+        let xml = format!("{PREFIX}{invalid_body}{SUFFIX}");
+        assert!(Template::from_bytes(raw_negative_package(&xml)).is_err());
+    }
 }
 
 #[test]
@@ -854,6 +1037,27 @@ fn metadata_and_styles_are_durable_and_reversible() {
 
 #[test]
 fn security_policy_is_explicit_and_default_deny() {
+    let baseline = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let validation = baseline.validation_capabilities();
+    assert_eq!(
+        validation.namespace_family_envelope(),
+        CapabilityState::Supported
+    );
+    assert_eq!(validation.semantic_subset(), CapabilityState::Supported);
+    assert_eq!(validation.compact_publication(), CapabilityState::Supported);
+    assert_eq!(validation.odf_relax_ng(), CapabilityState::Refused);
+    let security = baseline.security_capabilities();
+    assert_eq!(security.inert_inventory(), CapabilityState::Supported);
+    assert_eq!(security.policy_gate(), CapabilityState::Supported);
+    assert_eq!(security.external_resolution(), CapabilityState::Refused);
+    assert_eq!(security.active_execution(), CapabilityState::Refused);
+    assert_eq!(security.password_open(), CapabilityState::Refused);
+    assert_eq!(security.signature_verification(), CapabilityState::Refused);
+    assert_eq!(
+        security.changed_signed_publication(),
+        CapabilityState::Refused
+    );
+
     const ACTIVE: &str = concat!(
         r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
         r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
@@ -879,6 +1083,36 @@ fn security_policy_is_explicit_and_default_deny() {
     assert_eq!(report.embedded_objects, 1);
     assert_eq!(report.external_resources, 1);
     assert_eq!(report.forms, 1);
+
+    let protected_bytes = resource_package(
+        COMPACT_CONTENT,
+        &[
+            ("Scripts/main.js", b"inert script", "application/javascript"),
+            (
+                "META-INF/documentsignatures.xml",
+                b"<signatures/>",
+                "text/xml",
+            ),
+        ],
+    );
+    let protected = Template::from_bytes(protected_bytes.clone()).unwrap();
+    assert_eq!(protected.as_bytes(), protected_bytes.as_slice());
+    assert!(protected.check_security(SecurityPolicy::default()).is_err());
+    let protected_report = protected
+        .check_security(SecurityPolicy {
+            allow_scripts: true,
+            allow_signatures: true,
+            ..SecurityPolicy::default()
+        })
+        .unwrap();
+    assert_eq!(protected_report.scripts, 1);
+    assert!(protected_report.signed);
+    let mut changed = protected.edit();
+    changed
+        .set_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    assert!(changed.commit().is_err());
+    assert_eq!(protected.as_bytes(), protected_bytes.as_slice());
 }
 
 #[test]
@@ -1158,6 +1392,54 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
     assert_eq!(
         rich_durable.apply(&destination).unwrap().as_bytes(),
         rich.template().as_bytes()
+    );
+
+    let inner_list = destination
+        .plan_transfer_from(&source, TransferSelector::List(Position::new(0)), policy)
+        .unwrap()
+        .publish()
+        .unwrap();
+    let inner_list_body = inner_list.template().text_body().unwrap();
+    assert_eq!(inner_list_body.lists().len(), 1);
+    assert_eq!(inner_list_body.lists()[0].level(), 1);
+    assert_eq!(
+        inner_list_body.lists()[0].items()[0].paragraphs()[0].text(),
+        "inner"
+    );
+    assert!(inner_list.template().content_xml().contains(
+        "<text:list><text:list-item><text:p>inner</text:p></text:list-item></text:list>"
+    ));
+    let inner_list_durable = Patch::from_bytes(&inner_list.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        inner_list_durable.apply(&destination).unwrap().as_bytes(),
+        inner_list.template().as_bytes()
+    );
+    assert_eq!(
+        inner_list_durable
+            .inverse()
+            .apply(inner_list.template())
+            .unwrap()
+            .as_bytes(),
+        destination.as_bytes()
+    );
+
+    let inner_paragraph = destination
+        .plan_transfer_from(
+            &source,
+            TransferSelector::Paragraph(Position::new(2)),
+            policy,
+        )
+        .unwrap()
+        .publish()
+        .unwrap();
+    let inner_paragraph_body = inner_paragraph.template().text_body().unwrap();
+    assert_eq!(inner_paragraph_body.lists().len(), 0);
+    assert_eq!(inner_paragraph_body.paragraphs()[0].text(), "inner");
+    assert!(
+        inner_paragraph
+            .template()
+            .content_xml()
+            .contains("<text:p>inner</text:p>")
     );
 
     let nested = destination

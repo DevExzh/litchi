@@ -53,7 +53,7 @@ impl FromStr for ViewBox {
             }
             component
                 .parse::<i64>()
-                .map_err(|_| make_error(format!("invalid svg:viewBox integer '{component}'")))
+                .map_err(|_error| make_error(format!("invalid svg:viewBox integer '{component}'")))
         };
         let result = Self::new(next()?, next()?, next()?, next()?);
         if values.next().is_some() {
@@ -504,7 +504,7 @@ fn escape_xml(output: &mut String, value: &str) {
 fn decode(value: &[u8], what: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_owned)
-        .map_err(|_| make_error(format!("invalid UTF-8 in marker {what}")))
+        .map_err(|_error| make_error(format!("invalid UTF-8 in marker {what}")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

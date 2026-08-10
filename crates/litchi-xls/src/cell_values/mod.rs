@@ -982,7 +982,8 @@ impl Transaction {
     /// A standalone `RK` and `LabelSst` can be converted into each other
     /// because both have the same ten-byte payload; the SST reference count is
     /// updated atomically. Missing simple text is interned into a bounded SST
-    /// tail resource when the workbook has no `ExtSST` offset cache.
+    /// tail resource when an absent or canonical adjacent `ExtSST` can be
+    /// updated without changing its bucket size.
     ///
     /// # Errors
     ///
@@ -1096,12 +1097,12 @@ impl Transaction {
         self.insert_cell_with_style(selector, reference, value, style)
     }
 
-    /// Inserts one absent text cell backed by a newly authored rich SST entry.
+    /// Inserts one text cell backed by an exact rich SST identity.
     ///
     /// Formatting runs use UTF-16 character positions and must be strictly
     /// increasing, inside the text, and reference a font used by an effective
-    /// XF. The text itself must not already occur in the SST so its rich
-    /// resource identity remains unambiguous in the plain cell-value view.
+    /// XF. An absent text authors a new rich SST entry. Existing text is reused
+    /// only when it occurs once and its formatting identity matches exactly.
     ///
     /// # Errors
     ///
@@ -1116,9 +1117,20 @@ impl Transaction {
     ) -> Result<()> {
         validate_rich_text(self, &text, &formatting_runs)?;
         if self.has_shared_string(&text) {
-            return Err(Error::UnsafeEdit(
-                "rich SST authoring requires text absent from the effective SST".into(),
-            ));
+            let occurrences = self
+                .effective_shared_strings()
+                .iter()
+                .filter(|candidate| candidate.as_str() == text.as_str())
+                .count();
+            if occurrences != 1 || !self.has_rich_shared_string(&text, &formatting_runs) {
+                return Err(Error::UnsafeEdit(
+                    "rich SST reuse requires one exact formatting identity".into(),
+                ));
+            }
+            let mut staged = self.clone();
+            staged.insert_cell(selector, reference, Value::Text(text))?;
+            *self = staged;
+            return Ok(());
         }
         let mut staged = self.clone();
         staged.stage_resource(ResourceChange::RichSharedString {
@@ -1510,6 +1522,13 @@ impl Transaction {
                         "shared-string resource outcome is already present".into(),
                     ));
                 }
+                if *insert {
+                    structural::certify_sst_insertion(
+                        &self.source,
+                        &self.resource_changes,
+                        &change,
+                    )?;
+                }
             },
             ResourceChange::RichSharedString {
                 text,
@@ -1529,6 +1548,11 @@ impl Transaction {
                         ));
                     }
                     validate_rich_text(self, text, formatting_runs)?;
+                    structural::certify_sst_insertion(
+                        &self.source,
+                        &self.resource_changes,
+                        &change,
+                    )?;
                 }
             },
             ResourceChange::ExtendedFormat {
@@ -1725,7 +1749,15 @@ impl Transaction {
             ));
         }
         let sheet = self.require_sheet(selector, "row operation")?;
-        structural::certify_shift(&self.source, sheet)?;
+        structural::certify_shift(
+            &self.source,
+            sheet,
+            structural::AxisShift::Rows {
+                start,
+                count,
+                insert,
+            },
+        )?;
         self.stage_structural(StructuralChange::Rows {
             sheet,
             start,
@@ -1752,7 +1784,15 @@ impl Transaction {
             ));
         }
         let sheet = self.require_sheet(selector, "column operation")?;
-        structural::certify_shift(&self.source, sheet)?;
+        structural::certify_shift(
+            &self.source,
+            sheet,
+            structural::AxisShift::Columns {
+                start,
+                count,
+                insert,
+            },
+        )?;
         self.stage_structural(StructuralChange::Columns {
             sheet,
             start,

@@ -234,20 +234,23 @@ impl Element {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(ref e)) => {
-                    let tag_name = String::from_utf8(e.name().as_ref().to_vec()).map_err(|_| {
-                        Error::InvalidFormat("Invalid UTF-8 in tag name".to_string())
-                    })?;
+                    let tag_name =
+                        String::from_utf8(e.name().as_ref().to_vec()).map_err(|_error| {
+                            Error::InvalidFormat("Invalid UTF-8 in tag name".to_string())
+                        })?;
 
                     let mut namespace_context = NamespaceContext::default();
 
                     // First pass: collect namespace declarations
                     for attr_result in e.attributes() {
-                        let attr = attr_result
-                            .map_err(|_| Error::InvalidFormat("Invalid attribute".to_string()))?;
-                        let key = String::from_utf8(attr.key.as_ref().to_vec()).map_err(|_| {
-                            Error::InvalidFormat("Invalid UTF-8 in attribute key".to_string())
+                        let attr = attr_result.map_err(|_error| {
+                            Error::InvalidFormat("Invalid attribute".to_string())
                         })?;
-                        let value = String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                        let key =
+                            String::from_utf8(attr.key.as_ref().to_vec()).map_err(|_error| {
+                                Error::InvalidFormat("Invalid UTF-8 in attribute key".to_string())
+                            })?;
+                        let value = String::from_utf8(attr.value.to_vec()).map_err(|_error| {
                             Error::InvalidFormat("Invalid UTF-8 in attribute value".to_string())
                         })?;
 
@@ -261,12 +264,14 @@ impl Element {
 
                     // Second pass: set regular attributes
                     for attr_result in e.attributes() {
-                        let attr = attr_result
-                            .map_err(|_| Error::InvalidFormat("Invalid attribute".to_string()))?;
-                        let key = String::from_utf8(attr.key.as_ref().to_vec()).map_err(|_| {
-                            Error::InvalidFormat("Invalid UTF-8 in attribute key".to_string())
+                        let attr = attr_result.map_err(|_error| {
+                            Error::InvalidFormat("Invalid attribute".to_string())
                         })?;
-                        let value = String::from_utf8(attr.value.to_vec()).map_err(|_| {
+                        let key =
+                            String::from_utf8(attr.key.as_ref().to_vec()).map_err(|_error| {
+                                Error::InvalidFormat("Invalid UTF-8 in attribute key".to_string())
+                            })?;
+                        let value = String::from_utf8(attr.value.to_vec()).map_err(|_error| {
                             Error::InvalidFormat("Invalid UTF-8 in attribute value".to_string())
                         })?;
 
@@ -280,7 +285,7 @@ impl Element {
                 },
                 Ok(Event::Text(ref t)) => {
                     if let Some(current) = stack.last_mut() {
-                        let text = String::from_utf8(t.to_vec()).map_err(|_| {
+                        let text = String::from_utf8(t.to_vec()).map_err(|_error| {
                             Error::InvalidFormat("Invalid UTF-8 in text content".to_string())
                         })?;
                         current.text_content.push_str(&text);
@@ -288,7 +293,7 @@ impl Element {
                 },
                 Ok(Event::End(ref e)) => {
                     let _tag_name = String::from_utf8(e.name().as_ref().to_vec()) // Tag name for debugging - kept for future use
-                        .map_err(|_| {
+                        .map_err(|_error| {
                             Error::InvalidFormat("Invalid UTF-8 in tag name".to_string())
                         })?;
 
@@ -314,7 +319,7 @@ impl Element {
     /// Serialize element to XML string
     pub fn to_xml_string(&self) -> String {
         let mut xml = String::with_capacity(self.estimated_xml_len());
-        self.write_xml(&mut xml, 0);
+        self.write_xml(&mut xml);
         xml
     }
 
@@ -349,9 +354,7 @@ impl Element {
         len
     }
 
-    fn write_xml(&self, output: &mut String, indent: usize) {
-        let _ = indent;
-
+    fn write_xml(&self, output: &mut String) {
         // Opening tag
         output.push('<');
         output.push_str(&self.tag_name);
@@ -401,7 +404,7 @@ impl Element {
 
             // Child elements
             for child in &self.children {
-                child.write_xml(output, indent + 1);
+                child.write_xml(output);
             }
 
             // Closing tag

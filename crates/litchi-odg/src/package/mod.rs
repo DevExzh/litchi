@@ -7,7 +7,8 @@ pub use snapshot::{
     ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
     DurablePatch, GeometryChange, JoinedEdits, LayerChange, Lineage, MergePlan, NameChange,
     PageNameChange, PageStyleChange, Patch, PathChange, PreparedEdit, ResourceChange,
-    SecurityCapabilities, SecurityStatus, SecurityWritePolicy, ShapeTransfer, Snapshot,
+    SecurityCapabilities, SecurityLifecycleDisposition, SecurityLifecycleOperation,
+    SecurityLifecycleRefusal, SecurityStatus, SecurityWritePolicy, ShapeTransfer, Snapshot,
     SnapshotHistory as History, StructureChange, StyleChange, TextChange, Transaction,
     TransferControl, TransferResource, TransferStyle, TransferStyleResource,
 };

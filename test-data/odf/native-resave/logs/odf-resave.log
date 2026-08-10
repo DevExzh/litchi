@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=math8
+input=test-data/odf/native-resave/litchi-changed/font-styles-litchi.odf
+output=test-data/odf/native-resave/libreoffice-resaved/font-styles-litchi.odf
+status=success
+output_sha256=4c1ca45f31b5ac919fe82b9b09962d0d57bcffc0c801f7eae3e57882f8c5ea7c

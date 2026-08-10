@@ -275,7 +275,7 @@ fn scan_locations(xml: &str) -> Result<Scan> {
             Event::Empty(ref element) if text_element && element.local_name().as_ref() == b"p" => {
                 let start = event_start(xml, event_end)?;
                 let qname = std::str::from_utf8(element.name().as_ref())
-                    .map_err(|_| {
+                    .map_err(|_error| {
                         Error::InvalidFormat(
                             "note insertion paragraph name is not UTF-8".to_string(),
                         )

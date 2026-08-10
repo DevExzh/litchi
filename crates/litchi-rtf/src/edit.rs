@@ -5,8 +5,8 @@
 //! exact-body closure deliberately excludes body-anchored opaque syntax,
 //! tables, positioned content, and mixed formatting whose dependent ranges
 //! cannot be updated losslessly yet. Canonical retained-story edits cover
-//! checked table cells, headers/footers, comments, and notes while refusing
-//! unknown destinations and dependent positioned content.
+//! checked table cells, headers/footers, comments, notes, and root shape text
+//! frames while refusing unknown destinations and dependent positioned content.
 
 use crate::{Alignment, Document, HeaderFooterType, RtfError, RtfWriter, TableCellPath};
 use bumpalo::Bump;
@@ -375,6 +375,11 @@ enum Operation {
         before: String,
         after: String,
     },
+    ShapeText {
+        index: usize,
+        before: String,
+        after: String,
+    },
     RootTransfer {
         vocabulary: &'static str,
         effect: String,
@@ -390,7 +395,8 @@ impl Operation {
             | Self::TableCellText { after, .. }
             | Self::HeaderFooterText { after, .. }
             | Self::AnnotationText { after, .. }
-            | Self::NoteText { after, .. } => after.len(),
+            | Self::NoteText { after, .. }
+            | Self::ShapeText { after, .. } => after.len(),
             Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
             Self::RootTransfer { after, .. } => after.len(),
             Self::Alignment { .. } | Self::Bold { .. } => 0,
@@ -414,6 +420,7 @@ impl Operation {
             Self::HeaderFooterText { target, .. } => vec![header_footer_effect(*target)],
             Self::AnnotationText { index, .. } => vec![annotation_effect(*index)],
             Self::NoteText { index, .. } => vec![note_effect(*index)],
+            Self::ShapeText { index, .. } => vec![shape_effect(*index)],
             Self::RootTransfer { effect, .. } => vec![effect.clone()],
         }
     }
@@ -428,6 +435,7 @@ impl Operation {
             | Self::HeaderFooterText { .. }
             | Self::AnnotationText { .. }
             | Self::NoteText { .. }
+            | Self::ShapeText { .. }
             | Self::RootTransfer { .. } => None,
         }
     }
@@ -443,6 +451,7 @@ impl Operation {
                 | Self::HeaderFooterText { .. }
                 | Self::AnnotationText { .. }
                 | Self::NoteText { .. }
+                | Self::ShapeText { .. }
                 | Self::RootTransfer { .. }
         )
     }
@@ -922,6 +931,60 @@ impl Edit {
         Ok(self)
     }
 
+    /// Stages replacement of one retained root shape text frame.
+    ///
+    /// Geometry, scalar properties, formatting, name, and body position are
+    /// preserved. Shapes without an existing text destination and shapes with
+    /// hyperlinks, legacy fallbacks, or nested positioned story content are
+    /// refused.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid index, active/dependent drawing content,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_shape_text(
+        &mut self,
+        index: usize,
+        input: impl Into<String>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = input.into();
+        let shape = shape(&self.source, index)?;
+        if !shape.text_destination_present {
+            return Err(Error::UnsupportedSource(
+                "shape text editing requires an existing text destination",
+            ));
+        }
+        if shape.result.is_some()
+            || !shape.text_shapes.is_empty()
+            || !shape.text_shape_groups.is_empty()
+            || !shape.text_drawing_order.is_empty()
+            || !shape.text_story_events.is_empty()
+        {
+            return Err(Error::UnsupportedSource(
+                "shape text has dependent positioned or fallback content",
+            ));
+        }
+        if shape_has_active_link(shape) {
+            return Err(Error::UnsupportedSource(
+                "shape text editing refuses active hyperlink metadata",
+            ));
+        }
+        let mut candidate = shape.clone();
+        candidate.set_text(Cow::Owned(after.clone()));
+        candidate.validate()?;
+        let before = shape.text.to_string();
+        let effect = shape_effect(index);
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::ShapeText {
+            index,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
     fn ensure_body_compatible(&self) -> Result<(), Error> {
         if self.operations.iter().any(Operation::is_destination) {
             return Err(Error::BodyDestinationConflict);
@@ -1043,7 +1106,8 @@ impl Edit {
                 Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
-                | Operation::NoteText { .. } => {
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. } => {
                     return Err(Error::BodyDestinationConflict);
                 },
                 Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
@@ -1179,6 +1243,9 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             Operation::NoteText { index, after, .. } => {
                 model.set_note_content(*index, Cow::Owned(after.clone()))?;
             },
+            Operation::ShapeText { index, after, .. } => {
+                model.set_body_shape_text(*index, Cow::Owned(after.clone()))?;
+            },
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::Bold { .. }
@@ -1237,6 +1304,13 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
                 if note(&snapshot, *index)?.content != after.as_str() {
                     return Err(Error::UnsupportedSource(
                         "note text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::ShapeText { index, after, .. } => {
+                if shape(&snapshot, *index)?.text != after.as_str() {
+                    return Err(Error::UnsupportedSource(
+                        "shape text did not survive RTF validation",
                     ));
                 }
             },
@@ -1354,6 +1428,30 @@ fn note(source: &Snapshot, index: usize) -> Result<&crate::Note<'_>, Error> {
         .ok_or(Error::DestinationOutOfRange("note"))
 }
 
+fn shape(source: &Snapshot, index: usize) -> Result<&crate::Shape<'_>, Error> {
+    source
+        .shapes()
+        .get(index)
+        .ok_or(Error::DestinationOutOfRange("shape"))
+}
+
+fn shape_has_active_link(shape: &crate::Shape<'_>) -> bool {
+    shape
+        .properties
+        .iter()
+        .any(|property| property.hyperlink.is_some())
+        || shape.text_shapes.iter().any(shape_has_active_link)
+        || shape
+            .text_shape_groups
+            .iter()
+            .any(shape_group_has_active_link)
+}
+
+fn shape_group_has_active_link(group: &crate::ShapeGroup<'_>) -> bool {
+    group.shapes.iter().any(shape_has_active_link)
+        || group.groups.iter().any(shape_group_has_active_link)
+}
+
 fn model_header_footer_paragraph_mut<'a>(
     model: &'a mut crate::document::RtfDocument<'static>,
     target: HeaderFooterParagraph,
@@ -1403,6 +1501,10 @@ fn annotation_effect(index: usize) -> String {
 
 fn note_effect(index: usize) -> String {
     format!("body:note:{index}:text")
+}
+
+fn shape_effect(index: usize) -> String {
+    format!("body:shape:{index}:text")
 }
 
 const fn header_footer_kind_name(kind: HeaderFooterType) -> &'static str {
@@ -1495,6 +1597,7 @@ fn project_text(
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
             | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -1589,6 +1692,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
             | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -1634,6 +1738,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
                 | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -1698,6 +1803,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
             | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -2110,6 +2216,11 @@ enum Change {
         before: String,
         after: String,
     },
+    ShapeText {
+        index: usize,
+        before: String,
+        after: String,
+    },
     RootTransfer {
         vocabulary: &'static str,
         effect: String,
@@ -2197,6 +2308,15 @@ impl Change {
                 before,
                 after,
             } => Self::NoteText {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ShapeText {
+                index,
+                before,
+                after,
+            } => Self::ShapeText {
                 index: *index,
                 before: after.clone(),
                 after: before.clone(),
@@ -2311,6 +2431,15 @@ fn semantic_changes(
                 before: before.clone(),
                 after: after.clone(),
             }),
+            Operation::ShapeText {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::ShapeText {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
             Operation::RootTransfer {
                 vocabulary,
                 effect,
@@ -2329,6 +2458,7 @@ fn semantic_changes(
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
             | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect()
@@ -2564,6 +2694,20 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Change::ShapeText {
+            index,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "shape-text.replace",
+                shape_effect(*index),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
         Change::RootTransfer {
             vocabulary,
             effect,
@@ -2774,6 +2918,23 @@ pub(crate) fn apply_durable<Mode>(
                 })?;
                 edit.set_note_text(index, replacement)?;
             },
+            "shape-text.replace" => {
+                let index = parse_shape_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing shape text precondition".to_string())
+                    })?;
+                if shape(source, index)?.text != expected {
+                    return Err(Error::StalePrecondition("shape text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("shape text value must be a string".to_string())
+                })?;
+                edit.set_shape_text(index, replacement)?;
+            },
             vocabulary if is_root_transfer_vocabulary(vocabulary) => {
                 let expected_feature = operation
                     .preconditions
@@ -2813,6 +2974,7 @@ fn is_root_transfer_vocabulary(vocabulary: &str) -> bool {
             | "list.transfer"
             | "style.transfer"
             | "object.transfer"
+            | "shape.transfer"
     )
 }
 
@@ -2823,6 +2985,7 @@ fn root_transfer_vocabulary(vocabulary: &str) -> Result<&'static str, Error> {
         "list.transfer" => Ok("list.transfer"),
         "style.transfer" => Ok("style.transfer"),
         "object.transfer" => Ok("object.transfer"),
+        "shape.transfer" => Ok("shape.transfer"),
         _ => Err(Error::DurablePatch(
             "unsupported ordinary-root vocabulary".to_string(),
         )),
@@ -2976,6 +3139,10 @@ fn parse_annotation_target(target: &str) -> Result<usize, Error> {
 
 fn parse_note_target(target: &str) -> Result<usize, Error> {
     parse_indexed_story_target(target, "note")
+}
+
+fn parse_shape_target(target: &str) -> Result<usize, Error> {
+    parse_indexed_story_target(target, "shape")
 }
 
 fn parse_indexed_story_target(target: &str, owner: &'static str) -> Result<usize, Error> {

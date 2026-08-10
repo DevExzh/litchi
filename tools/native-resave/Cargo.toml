@@ -1,0 +1,32 @@
+[package]
+name = "litchi-native-resave-evidence"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "../../crates/litchi-core" }
+litchi-docx = { path = "../../crates/litchi-docx", optional = true }
+litchi-odf-formula = { path = "../../crates/litchi-odf-formula", optional = true }
+litchi-odg = { path = "../../crates/litchi-odg", optional = true }
+litchi-odp = { path = "../../crates/litchi-odp", optional = true }
+litchi-ods = { path = "../../crates/litchi-ods", optional = true }
+litchi-odt = { path = "../../crates/litchi-odt", optional = true }
+litchi-pptx = { path = "../../crates/litchi-pptx", optional = true }
+litchi-ppt = { path = "../../crates/litchi-ppt", optional = true }
+litchi-rtf = { path = "../../crates/litchi-rtf", optional = true }
+litchi-xlsx = { path = "../../crates/litchi-xlsx", optional = true }
+
+[features]
+docx = ["dep:litchi-docx"]
+odf = ["dep:litchi-odf-formula"]
+odg = ["dep:litchi-odg"]
+odp = ["dep:litchi-odp"]
+ods = ["dep:litchi-ods"]
+odt = ["dep:litchi-odt"]
+pptx = ["dep:litchi-pptx"]
+ppt = ["dep:litchi-ppt"]
+rtf = ["dep:litchi-rtf"]
+xlsx = ["dep:litchi-xlsx"]
+
+[workspace]

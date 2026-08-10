@@ -171,7 +171,7 @@ pub(crate) fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
                     for active in &mut builders {
                         active.builder.empty(&element, reader.decoder())?;
                     }
-                    let _ = structural_kind(
+                    let _kind = structural_kind(
                         &reader,
                         &element,
                         ns,
@@ -618,7 +618,7 @@ fn optional_usize(
         .map(|value| {
             value
                 .parse::<usize>()
-                .map_err(|_| invalid_error("invalid repeated table count"))
+                .map_err(|_error| invalid_error("invalid repeated table count"))
         })
         .transpose()
 }
@@ -644,11 +644,11 @@ fn namespace(value: &ResolveResult<'_>) -> Ns {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid_error("annotation XML position overflow"))
+        .map_err(|_error| invalid_error("annotation XML position overflow"))
 }
 
 fn qname(value: &[u8]) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| invalid_error("invalid annotation qualified name"))
+        .map_err(|_error| invalid_error("invalid annotation qualified name"))
 }

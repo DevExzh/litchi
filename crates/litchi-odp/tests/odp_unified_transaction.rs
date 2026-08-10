@@ -68,6 +68,25 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
         source.security_policy().unwrap(),
         edit::SecurityPolicy::Editable
     );
+    assert_eq!(
+        source
+            .crypto_capability(edit::CryptoOperation::ClearSignatures)
+            .unwrap(),
+        edit::CryptoCapability::AvailableNoOp
+    );
+    assert_eq!(
+        source
+            .crypto_capability(edit::CryptoOperation::DecryptForEditing)
+            .unwrap(),
+        edit::CryptoCapability::AvailableNoOp
+    );
+    assert_eq!(
+        source
+            .crypto_capability(edit::CryptoOperation::AddSignature)
+            .unwrap()
+            .refusal(),
+        Some(edit::CryptoRefusal::SignatureAuthoringUnavailable)
+    );
     let source_bytes = source.bytes().to_vec();
 
     let mut transaction = source.transaction().unwrap();
@@ -407,6 +426,22 @@ fn signed_packages_are_refused_before_a_transaction_can_stage_changes() {
         )
         .unwrap();
     let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        source.security_policy().unwrap(),
+        edit::SecurityPolicy::SignedReadOnly
+    );
+    assert_eq!(
+        source
+            .crypto_capability(edit::CryptoOperation::VerifySignatures)
+            .unwrap(),
+        edit::CryptoCapability::Refused(edit::CryptoRefusal::SignatureVerificationUnavailable)
+    );
+    assert_eq!(
+        source
+            .crypto_capability(edit::CryptoOperation::ClearSignatures)
+            .unwrap(),
+        edit::CryptoCapability::Refused(edit::CryptoRefusal::SignatureRemovalUnavailable)
+    );
 
     let Err(error) = source.transaction() else {
         panic!("signed package unexpectedly admitted an editing transaction");
@@ -430,6 +465,18 @@ fn encrypted_package_entries_are_refused_before_staging() {
     assert_eq!(
         source.security_policy().unwrap(),
         edit::SecurityPolicy::EncryptedReadOnly
+    );
+    assert_eq!(
+        source
+            .crypto_capability(edit::CryptoOperation::DecryptForEditing)
+            .unwrap(),
+        edit::CryptoCapability::Refused(edit::CryptoRefusal::UsePasswordOpening)
+    );
+    assert_eq!(
+        source
+            .crypto_capability(edit::CryptoOperation::Encrypt)
+            .unwrap(),
+        edit::CryptoCapability::Refused(edit::CryptoRefusal::EncryptionAuthoringUnavailable)
     );
 
     let Err(error) = source.transaction() else {

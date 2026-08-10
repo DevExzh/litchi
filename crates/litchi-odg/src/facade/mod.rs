@@ -8,9 +8,10 @@ pub use crate::package::{
     ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
     DurablePatch, GeometryChange, History, HistoryLimits, JoinedEdits, LayerChange, Lineage,
     MergePlan, NameChange, PageNameChange, PageStyleChange, Patch, PathChange, PreparedEdit,
-    ResourceChange, SecurityCapabilities, SecurityStatus, SecurityWritePolicy, ShapeTransfer,
-    Snapshot, StructureChange, StyleChange, TextChange, Transaction, TransferControl,
-    TransferResource, TransferStyle, TransferStyleResource,
+    ResourceChange, SecurityCapabilities, SecurityLifecycleDisposition, SecurityLifecycleOperation,
+    SecurityLifecycleRefusal, SecurityStatus, SecurityWritePolicy, ShapeTransfer, Snapshot,
+    StructureChange, StyleChange, TextChange, Transaction, TransferControl, TransferResource,
+    TransferStyle, TransferStyleResource,
 };
 
 /// Immutable source-owning drawing facade.

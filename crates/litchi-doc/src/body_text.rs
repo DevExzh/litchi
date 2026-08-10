@@ -196,8 +196,8 @@ pub enum DrawingDependency {
     InlinePictureOrObjectPreview,
     /// `0x0008`: floating shape/picture with `PlcfSpa` and drawing-group edges.
     FloatingOfficeArt,
-    /// A picture graph uses noncanonical/reordered sharing, grouping,
-    /// textboxes, producer extensions, PICF transforms, or a delayed BLIP.
+    /// The selected picture has ambiguous/nested ownership, noncanonical
+    /// records, PICF transforms, producer extensions, or a delayed BLIP.
     UnsupportedPictureGraph,
     /// The receiver already owns picture/shape identifiers or a BLIP store.
     PictureGraphCollision,
@@ -890,9 +890,22 @@ impl Snapshot {
     ///
     /// The bounded closure owns the marker CHPX, exact PICF/Data block, and,
     /// for floating pictures, a re-homed singleton `PlcfSpaMom` and `DggInfo`.
-    /// Multi-picture donors are accepted after their complete shared graph is
-    /// proved canonical. Groups, textboxes, producer extensions, delay-loaded
+    /// The selected PICF/Data block is proved independently. Floating pictures
+    /// additionally prove one exact SPA/top-level-shape/`pib`/`BStore` identity,
+    /// so unrelated bounded shapes, groups, textboxes, and shared slots may
+    /// remain in the donor. Selected nested/extended graphs, delay-loaded
     /// images, auxiliary stories, and occupied receivers are refused.
+    #[deny(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::expect_used,
+        clippy::let_underscore_must_use,
+        clippy::map_err_ignore,
+        clippy::unwrap_used,
+        reason = "picture transfer planning is a checked binary-resource boundary"
+    )]
     pub fn plan_picture_transfer_from(
         &self,
         donor: &Self,
@@ -4481,7 +4494,7 @@ mod tests {
     }
 
     #[test]
-    fn picture_transfer_refuses_receiver_collision_and_rehomes_multi_picture_graphs() {
+    fn picture_transfer_rehomes_shared_pictures_beside_shapes_and_textboxes() {
         let singleton = Snapshot::parse(&picture_doc(false)).expect("singleton donor");
         let receiver_with_picture =
             Snapshot::parse(&picture_doc(false)).expect("occupied receiver");
@@ -4503,6 +4516,21 @@ mod tests {
         .expect("PNG fixture");
         let mut writer = Writer::new();
         writer
+            .insert_floating_shape(
+                crate::writer::Shape::new(crate::writer::Kind::Rectangle, 640, 320)
+                    .expect("neighbor shape"),
+                FloatingPosition::new(20, 40),
+            )
+            .expect("neighbor shape run");
+        writer
+            .insert_floating_text_box(
+                crate::writer::Shape::new(crate::writer::Kind::Rectangle, 680, 360)
+                    .expect("neighbor textbox"),
+                FloatingPosition::new(60, 80),
+                "unrelated textbox content",
+            )
+            .expect("neighbor textbox run");
+        writer
             .insert_picture(Picture::new(bytes.clone()).expect("first picture"))
             .expect("first picture run");
         writer
@@ -4523,9 +4551,9 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer
             .write_to(&mut output)
-            .expect("multi-picture donor DOC");
-        let shared = Snapshot::parse(&output.into_inner()).expect("shared-store donor");
-        for (position, floating) in [(Position::new(2), false), (Position::new(3), true)] {
+            .expect("mixed drawing donor DOC");
+        let shared = Snapshot::parse(&output.into_inner()).expect("mixed shared-store donor");
+        for (position, floating) in [(Position::new(4), false), (Position::new(5), true)] {
             let empty = Snapshot::parse(&doc(&["placeholder"])).expect("empty receiver");
             let plan = empty
                 .plan_picture_transfer_from(
@@ -4549,6 +4577,20 @@ mod tests {
                     .expect("re-homed picture durable replay"),
                 commit.snapshot()
             );
+        }
+
+        for position in [Position::new(0), Position::new(1)] {
+            let empty = Snapshot::parse(&doc(&["placeholder"])).expect("empty receiver");
+            assert!(matches!(
+                empty.plan_picture_transfer_from(
+                    &shared,
+                    TextTarget::body_paragraph(position),
+                    TextTarget::body_paragraph(Position::new(0)),
+                ),
+                Err(Error::Refused(Refusal::DrawingDependency {
+                    dependency: DrawingDependency::UnsupportedPictureGraph
+                }))
+            ));
         }
     }
 }

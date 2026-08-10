@@ -602,14 +602,14 @@ fn parse_start(xml: &str) -> Result<(String, Vec<(String, String)>)> {
     match reader.read_event().map_err(xml_error)? {
         Event::Start(value) | Event::Empty(value) => {
             let name = std::str::from_utf8(value.name().as_ref())
-                .map_err(|_| make_error("invalid chart QName"))?
+                .map_err(|_error| make_error("invalid chart QName"))?
                 .to_string();
             let mut attrs = Vec::new();
             for attr in value.attributes().with_checks(true) {
                 let attr = attr.map_err(xml_error)?;
                 attrs.push((
                     std::str::from_utf8(attr.key.as_ref())
-                        .map_err(|_| make_error("invalid chart attribute QName"))?
+                        .map_err(|_error| make_error("invalid chart attribute QName"))?
                         .to_string(),
                     attr.decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
                         .map_err(xml_error)?
@@ -663,7 +663,8 @@ fn splice(xml: &str, start: usize, end: usize, value: &str) -> Result<String> {
     Ok(format!("{}{}{}", &xml[..start], value, &xml[end..]))
 }
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|_| make_error("chart XML position overflow"))
+    usize::try_from(reader.buffer_position())
+        .map_err(|_error| make_error("chart XML position overflow"))
 }
 fn bounds(kind: &str, index: usize, len: usize) -> Error {
     make_error(format!(

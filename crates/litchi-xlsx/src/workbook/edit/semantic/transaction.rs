@@ -342,6 +342,84 @@ impl Edit {
         Ok(Some(self))
     }
 
+    /// Create or replace one worksheet's complete page-margin set.
+    pub fn put_page_margins<'a>(
+        &mut self,
+        sheet: impl Into<Selector<'a>>,
+        value: crate::page_margins::Margins,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page margins")?;
+        let Some(sheet) = Snapshot::new(&self.base).worksheet(sheet)? else {
+            return Ok(None);
+        };
+        self.sheets
+            .entry(sheet.position())
+            .or_default()
+            .page_margins = Some(OptionalAction::Put(value));
+        Ok(Some(self))
+    }
+
+    /// Remove one worksheet's direct page margins.
+    pub fn remove_page_margins<'a>(
+        &mut self,
+        sheet: impl Into<Selector<'a>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page margins")?;
+        let Some(sheet) = Snapshot::new(&self.base).worksheet(sheet)? else {
+            return Ok(None);
+        };
+        self.sheets
+            .entry(sheet.position())
+            .or_default()
+            .page_margins = Some(OptionalAction::Remove);
+        Ok(Some(self))
+    }
+
+    /// Copy exact typed page margins between two worksheets.
+    pub fn copy_page_margins<'source, 'target>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        target: impl Into<Selector<'target>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page-margin copy")?;
+        let Some((source, target)) = Snapshot::new(&self.base).worksheet_pair(source, target)?
+        else {
+            return Ok(None);
+        };
+        let value = self.pending_page_margins(&source)?;
+        self.sheets
+            .entry(target.position())
+            .or_default()
+            .page_margins = Some(OptionalAction::from_option(value));
+        Ok(Some(self))
+    }
+
+    /// Move exact typed page margins between two worksheets atomically.
+    pub fn move_page_margins<'source, 'target>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        target: impl Into<Selector<'target>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page-margin move")?;
+        let Some((source, target)) = Snapshot::new(&self.base).worksheet_pair(source, target)?
+        else {
+            return Ok(None);
+        };
+        if source.position() == target.position() {
+            return Ok(Some(self));
+        }
+        let value = self.pending_page_margins(&source)?;
+        self.sheets
+            .entry(target.position())
+            .or_default()
+            .page_margins = Some(OptionalAction::from_option(value));
+        self.sheets
+            .entry(source.position())
+            .or_default()
+            .page_margins = Some(OptionalAction::Remove);
+        Ok(Some(self))
+    }
+
     /// Create or replace one worksheet's complete relationship-free page setup.
     pub fn put_page_setup<'a>(
         &mut self,
@@ -700,6 +778,7 @@ impl Edit {
                 .saturating_add(added.actions.columns.len())
                 .saturating_add(added.actions.merges.len())
                 .saturating_add(usize::from(added.actions.page_breaks.is_some()))
+                .saturating_add(usize::from(added.actions.page_margins.is_some()))
                 .saturating_add(usize::from(added.actions.page_setup.is_some()))
                 .saturating_add(usize::from(added.actions.print_options.is_some()))
         })
@@ -842,6 +921,9 @@ impl Edit {
                     if accepted.page_breaks.is_none() {
                         accepted.page_breaks = actions.page_breaks;
                     }
+                    if accepted.page_margins.is_none() {
+                        accepted.page_margins = actions.page_margins;
+                    }
                     if accepted.page_setup.is_none() {
                         accepted.page_setup = actions.page_setup;
                     }
@@ -884,17 +966,12 @@ impl Edit {
             added,
             removed: _,
         } = self;
-        if requested_defined_names.is_some()
-            && (requested_order
-                .as_ref()
-                .is_some_and(OrderPlan::is_effective)
-                || !added.is_empty()
-                || sheets.values().any(|actions| actions.rename.is_some()))
-        {
-            return Err(Error::Unsupported {
-                feature: "combining defined-name replacement with structural sheet edits",
-            });
-        }
+        ensure_defined_name_edit_is_composable(
+            requested_defined_names.as_deref(),
+            requested_order.as_ref(),
+            &sheets,
+            &added,
+        )?;
         validate_web_edit(&base, requested_panes.as_ref(), &sheets, &added)?;
         let mut changes = Vec::new();
         let mut package_changes = Vec::new();
@@ -902,19 +979,7 @@ impl Edit {
         let mut needs_recalculation = false;
         let mut drawing_graph = Vec::new();
 
-        let mut effective_renames = Vec::<(usize, Name)>::new();
-        for (position, actions) in &mut sheets {
-            let Some(name) = actions.rename.take() else {
-                continue;
-            };
-            let data =
-                base.inner.sheets.get(*position).ok_or_else(|| {
-                    invalid(format!("renamed sheet position {position} disappeared"))
-                })?;
-            if name.as_str() != data.name {
-                effective_renames.push((*position, name));
-            }
-        }
+        let effective_renames = take_effective_renames(&base, &mut sheets)?;
         if let Some((position, _)) = effective_renames.first() {
             let data = base
                 .inner
@@ -927,22 +992,6 @@ impl Edit {
             .iter()
             .map(|(position, name)| (*position, name))
             .collect::<HashMap<_, _>>();
-        let final_len = base
-            .inner
-            .sheets
-            .len()
-            .checked_add(added.len())
-            .ok_or_else(|| invalid("final worksheet count overflow"))?;
-        if final_len > raw::catalog_edit::MAX_SHEETS {
-            let first = added
-                .first()
-                .ok_or_else(|| invalid("worksheet limit exceeded without a creation"))?;
-            return Err(Error::TabEditBlocked {
-                sheet: first.name.as_str().to_owned(),
-                position: base.inner.sheets.len(),
-                reason: TabEditBlock::SheetLimit,
-            });
-        }
         let effective_order = requested_order.filter(OrderPlan::is_effective);
         if let Some(order) = &effective_order {
             package::validate_order_plan(order, base.inner.sheets.len())?;
@@ -955,37 +1004,7 @@ impl Edit {
                 .ok_or_else(|| invalid("first created worksheet has no final position"))?;
             package::ensure_reorder_supported(&base, first.name.as_str(), position)?;
         }
-        let mut final_names = HashMap::<&str, usize>::new();
-        final_names
-            .try_reserve(final_len)
-            .map_err(|source| allocation("final sheet-name index", source))?;
-        for (position, target) in final_order.targets.iter().copied().enumerate() {
-            let (name, key) = match target {
-                Target::Base(identity) => {
-                    let data = base.inner.sheets.get(identity).ok_or_else(|| {
-                        invalid("existing worksheet disappeared from final names")
-                    })?;
-                    rename_by_position
-                        .get(&identity)
-                        .map_or((data.name.as_str(), data.name_key.as_ref()), |name| {
-                            (name.as_str(), name.identity_key())
-                        })
-                },
-                Target::Added(index) => {
-                    let created = added
-                        .get(index)
-                        .ok_or_else(|| invalid("created worksheet disappeared from final names"))?;
-                    (created.name.as_str(), created.name.identity_key())
-                },
-            };
-            if let Some(first) = final_names.insert(key, position) {
-                return Err(Error::SheetNameConflict {
-                    name: name.to_owned(),
-                    first,
-                    second: position,
-                });
-            }
-        }
+        validate_final_sheet_names(&base, &final_order, &added, &rename_by_position)?;
         for (position, after) in &effective_renames {
             let before = base
                 .inner
@@ -1228,6 +1247,7 @@ impl Edit {
                 columns,
                 merges,
                 page_breaks,
+                page_margins,
                 page_setup,
                 print_options,
             } = requested;
@@ -1238,6 +1258,7 @@ impl Edit {
                 && columns.is_empty()
                 && merges.is_empty()
                 && page_breaks.is_none()
+                && page_margins.is_none()
                 && page_setup.is_none()
                 && print_options.is_none()
                 && drawing.is_none()
@@ -1267,6 +1288,23 @@ impl Edit {
                             after: after.clone(),
                         });
                         Some(after)
+                    }
+                },
+                None => None,
+            };
+            let effective_page_margins = match page_margins {
+                Some(action) => {
+                    let before = sheet.page_margins()?;
+                    let after = action.as_option().copied();
+                    if before == after {
+                        None
+                    } else {
+                        changes.push(Change::PageMargins {
+                            sheet: data.name.clone().into_boxed_str(),
+                            before,
+                            after,
+                        });
+                        Some(action)
                     }
                 },
                 None => None,
@@ -1413,6 +1451,7 @@ impl Edit {
                 && effective_columns.is_empty()
                 && merge_projection.plan.is_empty()
                 && effective_page_breaks.is_none()
+                && effective_page_margins.is_none()
                 && effective_page_setup.is_none()
                 && effective_print_options.is_none()
                 && drawing.is_none()
@@ -1463,6 +1502,13 @@ impl Edit {
             if let Some(page_breaks) = &effective_page_breaks {
                 let input = after.as_deref().unwrap_or(&before);
                 after = Some(crate::page_breaks::replace(input, page_breaks)?);
+            }
+            if let Some(page_margins) = &effective_page_margins {
+                let input = after.as_deref().unwrap_or(&before);
+                after = Some(crate::page_margins::replace_page_margins(
+                    input,
+                    page_margins.as_option(),
+                )?);
             }
             if let Some(page_setup) = &effective_page_setup {
                 let input = after.as_deref().unwrap_or(&before);
@@ -1583,6 +1629,18 @@ impl Edit {
                         if &actual != expected {
                             return Err(invalid(format!(
                                 "worksheet page-break verification failed at {sheet}"
+                            )));
+                        }
+                    },
+                    Change::PageMargins {
+                        sheet,
+                        after: expected,
+                        ..
+                    } => {
+                        let actual = crate::page_margins::parse_page_margins(&after)?;
+                        if &actual != expected {
+                            return Err(invalid(format!(
+                                "worksheet page-margin verification failed at {sheet}"
                             )));
                         }
                     },
@@ -2445,6 +2503,20 @@ impl Edit {
         sheet.page_setup()
     }
 
+    fn pending_page_margins(
+        &self,
+        sheet: &Worksheet,
+    ) -> Result<Option<crate::page_margins::Margins>> {
+        if let Some(value) = self
+            .sheets
+            .get(&sheet.position())
+            .and_then(|actions| actions.page_margins.as_ref())
+        {
+            return Ok(value.as_option().copied());
+        }
+        sheet.page_margins()
+    }
+
     fn pending_print_options(
         &self,
         sheet: &Worksheet,
@@ -2653,6 +2725,12 @@ impl Edit {
                     position: *position,
                 });
             }
+            if left.page_margins.is_some() && right.page_margins.is_some() {
+                conflicts.push(Conflict::PageMargins {
+                    sheet: sheet.into(),
+                    position: *position,
+                });
+            }
             if left.page_setup.is_some() && right.page_setup.is_some() {
                 conflicts.push(Conflict::PageSetup {
                     sheet: sheet.into(),
@@ -2778,6 +2856,102 @@ impl Edit {
             reason,
         }
     }
+}
+
+fn take_effective_renames(
+    base: &Workbook,
+    sheets: &mut BTreeMap<usize, SheetActions>,
+) -> Result<Vec<(usize, Name)>> {
+    let mut effective = Vec::new();
+    for (position, actions) in sheets {
+        let Some(name) = actions.rename.take() else {
+            continue;
+        };
+        let data = base
+            .inner
+            .sheets
+            .get(*position)
+            .ok_or_else(|| invalid(format!("renamed sheet position {position} disappeared")))?;
+        if name.as_str() != data.name {
+            effective.push((*position, name));
+        }
+    }
+    Ok(effective)
+}
+
+fn validate_final_sheet_names<'a>(
+    base: &'a Workbook,
+    final_order: &FinalOrder,
+    added: &'a [Added],
+    rename_by_position: &HashMap<usize, &'a Name>,
+) -> Result<()> {
+    let final_len = base
+        .inner
+        .sheets
+        .len()
+        .checked_add(added.len())
+        .ok_or_else(|| invalid("final worksheet count overflow"))?;
+    if final_len > raw::catalog_edit::MAX_SHEETS {
+        let first = added
+            .first()
+            .ok_or_else(|| invalid("worksheet limit exceeded without a creation"))?;
+        return Err(Error::TabEditBlocked {
+            sheet: first.name.as_str().to_owned(),
+            position: base.inner.sheets.len(),
+            reason: TabEditBlock::SheetLimit,
+        });
+    }
+    let mut final_names = HashMap::<&str, usize>::new();
+    final_names
+        .try_reserve(final_len)
+        .map_err(|source| allocation("final sheet-name index", source))?;
+    for (position, target) in final_order.targets.iter().copied().enumerate() {
+        let (name, key) = match target {
+            Target::Base(identity) => {
+                let data =
+                    base.inner.sheets.get(identity).ok_or_else(|| {
+                        invalid("existing worksheet disappeared from final names")
+                    })?;
+                rename_by_position
+                    .get(&identity)
+                    .map_or((data.name.as_str(), data.name_key.as_ref()), |name| {
+                        (name.as_str(), name.identity_key())
+                    })
+            },
+            Target::Added(index) => {
+                let created = added
+                    .get(index)
+                    .ok_or_else(|| invalid("created worksheet disappeared from final names"))?;
+                (created.name.as_str(), created.name.identity_key())
+            },
+        };
+        if let Some(first) = final_names.insert(key, position) {
+            return Err(Error::SheetNameConflict {
+                name: name.to_owned(),
+                first,
+                second: position,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn ensure_defined_name_edit_is_composable(
+    requested_defined_names: Option<&[raw::DefinedName]>,
+    requested_order: Option<&OrderPlan>,
+    sheets: &BTreeMap<usize, SheetActions>,
+    added: &[Added],
+) -> Result<()> {
+    if requested_defined_names.is_some()
+        && (requested_order.is_some_and(OrderPlan::is_effective)
+            || !added.is_empty()
+            || sheets.values().any(|actions| actions.rename.is_some()))
+    {
+        return Err(Error::Unsupported {
+            feature: "combining defined-name replacement with structural sheet edits",
+        });
+    }
+    Ok(())
 }
 
 fn validate_web_edit(

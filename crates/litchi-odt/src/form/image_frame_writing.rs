@@ -814,7 +814,7 @@ fn bind_fragment(mut value: String) -> String {
 }
 fn qname(element: &BytesStart<'_>) -> Result<String> {
     String::from_utf8(element.name().as_ref().to_vec())
-        .map_err(|_| Error::InvalidFormat("invalid image-frame form element name".to_string()))
+        .map_err(|_error| Error::InvalidFormat("invalid image-frame form element name".to_string()))
 }
 fn apply(xml: &str, span: Range<usize>, replacement: &str) -> Result<String> {
     let mut out = String::with_capacity(xml.len() - span.len() + replacement.len());

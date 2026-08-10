@@ -1,8 +1,9 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_odi::{
-    Builder, ConflictKind, FlatImage, FrameProperty, History, Image, OperationKey, SecurityPolicy,
-    SemanticValue,
+    Builder, ConflictKind, FlatImage, FrameProperty, History, Image, OperationKey,
+    ProtectionDisposition, SecurityPolicy, SemanticValue, StyleDependencyState, SurfaceDisposition,
+    SurfaceKind,
     frame::Frame,
     map::{Area, ImageMap},
     source::Source,
@@ -17,6 +18,10 @@ const FLAT: &str = concat!(
 const META: &str = r#"<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><dc:title>Before</dc:title><meta:user-defined meta:name="opaque">keep</meta:user-defined></office:meta></office:document-meta>"#;
 
 const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:styles><style:style style:name="gr2" style:family="graphic"/></office:styles></office:document-styles>"#;
+
+const TRANSITIVE_CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="auto-child" style:family="graphic" style:parent-style-name="named-parent"/></office:automatic-styles><office:body><office:image><draw:frame draw:style-name="gr1"><draw:image draw:mime-type="image/png"><office:binary-data>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+X9p9WQAAAABJRU5ErkJggg==</office:binary-data></draw:image></draw:frame></office:image></office:body></office:document-content>"#;
+
+const TRANSITIVE_STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:styles><style:style style:name="named-parent" style:family="graphic"/></office:styles></office:document-styles>"#;
 
 const NORMATIVE_SYNTHETIC: &[u8] = include_bytes!("fixtures/odf-1.4-normative-synthetic.fodi");
 const ODFDOM_ORIGINAL: &[u8] = include_bytes!("fixtures/odfdom-0.13.0-original.odi");
@@ -172,6 +177,95 @@ fn checked_in_odfdom_producer_round_trip_is_genuine_odi_evidence() {
     ));
     assert_eq!(original.as_bytes(), ODFDOM_ORIGINAL);
     assert_eq!(changed.as_bytes(), ODFDOM_CHANGED);
+}
+
+#[test]
+fn public_form_and_extension_inventory_is_inert_and_exact() {
+    let xml = FLAT
+        .replacen(
+            " office:mimetype=",
+            r#" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:vendor="urn:vendor:test" office:mimetype="#,
+            1,
+        )
+        .replacen(
+            "<office:body>",
+            r#"<office:forms><form:form form:name="Search"><form:text form:id="query"/></form:form></office:forms><vendor:item vendor:flag="1"/><office:body>"#,
+            1,
+        );
+    let image = FlatImage::from_bytes(xml.clone().into_bytes()).unwrap();
+    assert_eq!(image.forms().len(), 3);
+    assert_eq!(image.forms()[1].name(), Some("Search"));
+    assert_eq!(image.forms()[2].control_id(), Some("query"));
+    assert_eq!(image.extensions().len(), 2);
+    assert_eq!(image.extensions()[0].kind(), SurfaceKind::ExtensionElement);
+    assert_eq!(
+        image.extensions()[1].preservation_disposition(),
+        SurfaceDisposition::PreserveExact
+    );
+    assert_eq!(image.as_bytes(), xml.as_bytes());
+}
+
+#[test]
+fn automatic_style_transfer_carries_transitive_exact_parent_closure() {
+    let prepared = Image::from_bytes(
+        Builder::new()
+            .content_xml(TRANSITIVE_CONTENT)
+            .styles_xml(TRANSITIVE_STYLES)
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    let mut edit = prepared.edit();
+    edit.set_style_name(0, Some("auto-child".into())).unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let destination = package();
+    let plan = patch.plan_package(&destination);
+    assert!(plan.is_conflict_free(), "{:?}", plan.conflicts());
+    let transferred = plan
+        .commit_package(&destination, &SecurityPolicy::default())
+        .unwrap();
+    assert_eq!(
+        transferred
+            .image()
+            .style_dependency_state("auto-child", "graphic")
+            .unwrap(),
+        StyleDependencyState::Automatic
+    );
+    assert_eq!(
+        transferred
+            .image()
+            .style_dependency_state("named-parent", "graphic")
+            .unwrap(),
+        StyleDependencyState::Named
+    );
+    let styles = transferred.image().styles_xml().unwrap();
+    assert!(styles.contains(r#"style:name="auto-child""#));
+    assert!(styles.contains(r#"style:name="named-parent""#));
+}
+
+#[test]
+fn protection_inventory_exposes_exact_signed_rewrite_disposition() {
+    let signed = Image::from_bytes(
+        Builder::new()
+            .resource(
+                "META-INF/vendor-signatures-v2.xml",
+                "text/xml",
+                br"<signature/>".to_vec(),
+            )
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        signed.protection().signature_members(),
+        &["META-INF/vendor-signatures-v2.xml".to_owned()]
+    );
+    assert_eq!(
+        signed.protection().disposition(),
+        ProtectionDisposition::RefuseSignedRewrite
+    );
+    assert!(!signed.protection().is_encrypted());
 }
 
 #[test]

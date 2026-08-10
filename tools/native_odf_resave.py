@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Isolated LibreOffice headless resave stage for Litchi-changed ODF files.
+"""Isolated LibreOffice headless resave stage for Litchi-changed Office files.
 
 This tool never creates the Litchi mutation and never labels an embedded or
 synthetic package as native evidence.  A format-owner test supplies a changed
@@ -25,9 +25,43 @@ class Filter:
     extension: str
     filter_name: str
     document_service: str
+    registry_file: str | None = None
 
 
 FILTERS = {
+    ".docx": Filter(
+        "docx",
+        "MS Word 2007 XML",
+        "com.sun.star.text.TextDocument",
+        "MS_Word_2007_XML",
+    ),
+    ".xlsx": Filter(
+        "xlsx",
+        "Calc MS Excel 2007 XML",
+        "com.sun.star.sheet.SpreadsheetDocument",
+        "calc_MS_Excel_2007_XML",
+    ),
+    ".pptx": Filter(
+        "pptx",
+        "Impress MS PowerPoint 2007 XML",
+        "com.sun.star.presentation.PresentationDocument",
+        "impress_MS_PowerPoint_2007_XML",
+    ),
+    ".doc": Filter(
+        "doc", "MS Word 97", "com.sun.star.text.TextDocument", "MS_Word_97"
+    ),
+    ".xls": Filter(
+        "xls", "MS Excel 97", "com.sun.star.sheet.SpreadsheetDocument", "MS_Excel_97"
+    ),
+    ".ppt": Filter(
+        "ppt",
+        "MS PowerPoint 97",
+        "com.sun.star.presentation.PresentationDocument",
+        "MS_PowerPoint_97",
+    ),
+    ".rtf": Filter(
+        "rtf", "Rich Text Format", "com.sun.star.text.TextDocument", "Rich_Text_Format"
+    ),
     ".odt": Filter("odt", "writer8", "com.sun.star.text.TextDocument"),
     ".ods": Filter("ods", "calc8", "com.sun.star.sheet.SpreadsheetDocument"),
     ".odp": Filter(
@@ -43,6 +77,10 @@ FILTERS = {
 }
 
 UNSUPPORTED = {
+    ".xlsb": (
+        "LibreOffice's Calc MS Excel 2007 Binary registry filter is IMPORT-only; "
+        "same-format XLSB export is unavailable"
+    ),
     ".odi": "LibreOffice has no ODI type or import/export filter in its filter registry",
     ".odb": (
         "the StarOffice XML (Base) registry filter is IMPORT-only; a same-package "
@@ -87,7 +125,7 @@ def resave(source: Path, output_directory: Path, executable: str) -> Path:
     if suffix in UNSUPPORTED:
         raise ValueError(f"{suffix}: {UNSUPPORTED[suffix]}")
     if suffix not in FILTERS:
-        raise ValueError(f"unsupported ODF extension: {suffix or '<none>'}")
+        raise ValueError(f"unsupported Office extension: {suffix or '<none>'}")
     output_directory = output_directory.resolve(strict=True)
     output = output_directory / source.name
     if output == source:

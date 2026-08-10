@@ -1163,7 +1163,7 @@ fn parse_bool(value: &str, local: &str) -> Result<bool> {
 fn optional_u64(attrs: &[Attr], namespace: &str, local: &str) -> Result<Option<u64>> {
     optional(attrs, namespace, local)
         .map(|value| {
-            value.parse::<u64>().map_err(|_| {
+            value.parse::<u64>().map_err(|_error| {
                 Error::InvalidFormat(format!(
                     "invalid non-negative integer '{value}' for {local}"
                 ))
@@ -1296,7 +1296,7 @@ fn bind_fragment(mut value: String) -> String {
 
 fn qname(element: &BytesStart<'_>) -> Result<String> {
     String::from_utf8(element.name().as_ref().to_vec())
-        .map_err(|_| Error::InvalidFormat("invalid visual form element name".to_string()))
+        .map_err(|_error| Error::InvalidFormat("invalid visual form element name".to_string()))
 }
 
 fn apply(xml: &str, span: Range<usize>, replacement: &str) -> Result<String> {
