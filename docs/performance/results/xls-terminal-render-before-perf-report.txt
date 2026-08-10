@@ -1,0 +1,689 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 41K of event 'cycles:P'
+# Event count (approx.): 203360489610
+#
+# Children      Self  Command          Shared Object                       Symbol
+# ........  ........  ...............  ..................................  ...........................................................................................................................................................................................................................................................................................................................
+#
+    99.84%     0.00%  litchi-perf-bas  [unknown]                           [k] 0xffffffffffffffff
+            |
+            ---0xffffffffffffffff
+               |
+               |--50.19%--litchi_perf_baseline::run_case_with_config
+               |          |
+               |          |--43.15%--litchi_perf_baseline::verify_semantic_xls
+               |          |          |
+               |          |          |--40.22%--litchi_xls::cell_values::Worksheet::cell
+               |          |          |
+               |          |           --1.99%--litchi_xls::cell_values::Snapshot::from_bytes
+               |          |                     |
+               |          |                      --1.90%--litchi_xls::cell_values::Snapshot::from_package_editor
+               |          |                                |
+               |          |                                |--1.06%--litchi_xls::cell_values::parse_worksheet
+               |          |                                |          |
+               |          |                                |           --1.04%--litchi_xls::cell_values::push_entry
+               |          |                                |
+               |          |                                 --0.67%--core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+               |          |                                           |
+               |          |                                            --0.66%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+               |          |                                                      |
+               |          |                                                       --0.61%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+               |          |
+               |          |--2.81%--litchi_xls::cell_values::Patch::apply
+               |          |          |
+               |          |           --2.55%--litchi_xls::cell_values::Snapshot::from_package_editor
+               |          |                     |
+               |          |                     |--1.48%--litchi_xls::cell_values::parse_worksheet
+               |          |                     |          |
+               |          |                     |           --1.43%--litchi_xls::cell_values::push_entry
+               |          |                     |
+               |          |                      --0.82%--core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+               |          |                                |
+               |          |                                 --0.80%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+               |          |                                           |
+               |          |                                            --0.74%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+               |          |
+               |          |--1.86%--litchi_xls::cell_values::Transaction::commit
+               |          |          |
+               |          |           --1.26%--litchi_xls::cell_values::Snapshot::from_package_editor
+               |          |                     |
+               |          |                      --0.69%--litchi_xls::cell_values::parse_worksheet
+               |          |                                |
+               |          |                                 --0.65%--litchi_xls::cell_values::push_entry
+               |          |
+               |           --1.67%--litchi_xls::cell_values::Snapshot::from_bytes
+               |                     |
+               |                      --1.52%--litchi_xls::cell_values::Snapshot::from_package_editor
+               |                                |
+               |                                 --0.84%--litchi_xls::cell_values::parse_worksheet
+               |                                           |
+               |                                            --0.81%--litchi_xls::cell_values::push_entry
+               |
+               |--48.61%--litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+               |          |
+               |          |--21.46%--litchi_xls::workbook::codec::semantic::worksheet::add_cell
+               |          |          |
+               |          |          |--16.17%--alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+               |          |          |          |
+               |          |          |          |--7.88%--__memcpy_avx512_unaligned (inlined)
+               |          |          |          |
+               |          |          |          |--2.21%--__GI___libc_malloc (inlined)
+               |          |          |          |          |
+               |          |          |          |           --2.11%--_int_malloc
+               |          |          |          |                     |
+               |          |          |          |                      --0.60%--0xffffffff9d800bc7
+               |          |          |          |                                |
+               |          |          |          |                                 --0.60%--0xffffffff9d64e923
+               |          |          |          |
+               |          |          |           --1.38%--__memcpy_avx512_unaligned_erms (inlined)
+               |          |          |
+               |          |          |--1.26%--__memcpy_avx512_unaligned_erms (inlined)
+               |          |          |
+               |          |           --1.13%--__memcpy_avx512_unaligned (inlined)
+               |          |
+               |          |--4.92%--litchi_xls::cell::Cell::from_record_with_formula_context
+               |          |          |
+               |          |           --1.71%--litchi_xls::number_format::model::Formatting::is_date_time_format
+               |          |                     |
+               |          |                      --0.84%--core::hash::BuildHasher::hash_one
+               |          |
+               |          |--4.42%--__memcpy_avx512_unaligned (inlined)
+               |          |
+               |          |--4.16%--litchi_xls::row_block_index::codec::RowBlockIndexCollector::feed_record
+               |          |
+               |          |--1.49%--litchi_xls::scenario::ScenarioCollector::feed_record
+               |          |          |
+               |          |           --1.04%--litchi_xls::scenario::ScenarioCollector::finish_pending
+               |          |
+               |          |--1.22%--litchi_xls::consolidation::ConsolidationCollector::feed_record
+               |          |
+               |          |--0.79%--litchi_xls::layout::Collector::feed_record
+               |          |
+               |          |--0.55%--litchi_xls::pivot_table::package::PivotTableCollector::feed_record
+               |          |
+               |           --0.53%--__memcpy_avx512_unaligned_erms (inlined)
+               |
+                --0.83%--litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::new
+                          |
+                           --0.80%--litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::parse_workbook
+
+    50.19%     0.01%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_perf_baseline::run_case_with_config
+            |
+             --50.18%--litchi_perf_baseline::run_case_with_config
+                       |
+                       |--43.15%--litchi_perf_baseline::verify_semantic_xls
+                       |          |
+                       |          |--40.22%--litchi_xls::cell_values::Worksheet::cell
+                       |          |
+                       |           --1.99%--litchi_xls::cell_values::Snapshot::from_bytes
+                       |                     |
+                       |                      --1.90%--litchi_xls::cell_values::Snapshot::from_package_editor
+                       |                                |
+                       |                                |--1.06%--litchi_xls::cell_values::parse_worksheet
+                       |                                |          |
+                       |                                |           --1.04%--litchi_xls::cell_values::push_entry
+                       |                                |
+                       |                                 --0.67%--core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+                       |                                           |
+                       |                                            --0.66%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+                       |                                                      |
+                       |                                                       --0.61%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+                       |
+                       |--2.81%--litchi_xls::cell_values::Patch::apply
+                       |          |
+                       |           --2.55%--litchi_xls::cell_values::Snapshot::from_package_editor
+                       |                     |
+                       |                     |--1.48%--litchi_xls::cell_values::parse_worksheet
+                       |                     |          |
+                       |                     |           --1.43%--litchi_xls::cell_values::push_entry
+                       |                     |
+                       |                      --0.82%--core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+                       |                                |
+                       |                                 --0.80%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+                       |                                           |
+                       |                                            --0.74%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+                       |
+                       |--1.86%--litchi_xls::cell_values::Transaction::commit
+                       |          |
+                       |           --1.26%--litchi_xls::cell_values::Snapshot::from_package_editor
+                       |                     |
+                       |                      --0.69%--litchi_xls::cell_values::parse_worksheet
+                       |                                |
+                       |                                 --0.65%--litchi_xls::cell_values::push_entry
+                       |
+                        --1.67%--litchi_xls::cell_values::Snapshot::from_bytes
+                                  |
+                                   --1.52%--litchi_xls::cell_values::Snapshot::from_package_editor
+                                             |
+                                              --0.84%--litchi_xls::cell_values::parse_worksheet
+                                                        |
+                                                         --0.81%--litchi_xls::cell_values::push_entry
+
+    48.61%     5.49%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+            |
+            |--43.13%--litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+            |          |
+            |          |--21.46%--litchi_xls::workbook::codec::semantic::worksheet::add_cell
+            |          |          |
+            |          |          |--16.17%--alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+            |          |          |          |
+            |          |          |          |--7.88%--__memcpy_avx512_unaligned (inlined)
+            |          |          |          |
+            |          |          |          |--2.21%--__GI___libc_malloc (inlined)
+            |          |          |          |          |
+            |          |          |          |           --2.11%--_int_malloc
+            |          |          |          |                     |
+            |          |          |          |                      --0.60%--0xffffffff9d800bc7
+            |          |          |          |                                |
+            |          |          |          |                                 --0.60%--0xffffffff9d64e923
+            |          |          |          |
+            |          |          |           --1.38%--__memcpy_avx512_unaligned_erms (inlined)
+            |          |          |
+            |          |          |--1.26%--__memcpy_avx512_unaligned_erms (inlined)
+            |          |          |
+            |          |           --1.13%--__memcpy_avx512_unaligned (inlined)
+            |          |
+            |          |--4.92%--litchi_xls::cell::Cell::from_record_with_formula_context
+            |          |          |
+            |          |           --1.71%--litchi_xls::number_format::model::Formatting::is_date_time_format
+            |          |                     |
+            |          |                      --0.84%--core::hash::BuildHasher::hash_one
+            |          |
+            |          |--4.42%--__memcpy_avx512_unaligned (inlined)
+            |          |
+            |          |--4.16%--litchi_xls::row_block_index::codec::RowBlockIndexCollector::feed_record
+            |          |
+            |          |--1.49%--litchi_xls::scenario::ScenarioCollector::feed_record
+            |          |          |
+            |          |           --1.04%--litchi_xls::scenario::ScenarioCollector::finish_pending
+            |          |
+            |          |--1.22%--litchi_xls::consolidation::ConsolidationCollector::feed_record
+            |          |
+            |          |--0.79%--litchi_xls::layout::Collector::feed_record
+            |          |
+            |          |--0.55%--litchi_xls::pivot_table::package::PivotTableCollector::feed_record
+            |          |
+            |           --0.53%--__memcpy_avx512_unaligned_erms (inlined)
+            |
+             --5.49%--0xffffffffffffffff
+                       litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+
+    43.15%     0.69%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_perf_baseline::verify_semantic_xls
+            |
+            |--42.46%--litchi_perf_baseline::verify_semantic_xls
+            |          |
+            |          |--40.22%--litchi_xls::cell_values::Worksheet::cell
+            |          |
+            |           --1.99%--litchi_xls::cell_values::Snapshot::from_bytes
+            |                     |
+            |                      --1.91%--litchi_xls::cell_values::Snapshot::from_package_editor
+            |                                |
+            |                                |--1.06%--litchi_xls::cell_values::parse_worksheet
+            |                                |          |
+            |                                |           --1.04%--litchi_xls::cell_values::push_entry
+            |                                |
+            |                                 --0.67%--core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+            |                                           |
+            |                                            --0.66%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+            |                                                      |
+            |                                                       --0.61%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+            |
+             --0.69%--0xffffffffffffffff
+                       litchi_perf_baseline::run_case_with_config
+                       litchi_perf_baseline::verify_semantic_xls
+
+    40.22%    40.15%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::cell_values::Worksheet::cell
+            |
+             --40.15%--0xffffffffffffffff
+                       litchi_perf_baseline::run_case_with_config
+                       litchi_perf_baseline::verify_semantic_xls
+                       litchi_xls::cell_values::Worksheet::cell
+
+    21.46%     2.90%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::workbook::codec::semantic::worksheet::add_cell
+            |
+            |--18.56%--litchi_xls::workbook::codec::semantic::worksheet::add_cell
+            |          |
+            |          |--16.17%--alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+            |          |          |
+            |          |          |--7.88%--__memcpy_avx512_unaligned (inlined)
+            |          |          |
+            |          |          |--2.21%--__GI___libc_malloc (inlined)
+            |          |          |          |
+            |          |          |           --2.11%--_int_malloc
+            |          |          |                     |
+            |          |          |                      --0.60%--0xffffffff9d800bc7
+            |          |          |                                |
+            |          |          |                                 --0.60%--0xffffffff9d64e923
+            |          |          |
+            |          |           --1.38%--__memcpy_avx512_unaligned_erms (inlined)
+            |          |
+            |          |--1.26%--__memcpy_avx512_unaligned_erms (inlined)
+            |          |
+            |           --1.13%--__memcpy_avx512_unaligned (inlined)
+            |
+             --2.90%--0xffffffffffffffff
+                       litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+                       litchi_xls::workbook::codec::semantic::worksheet::add_cell
+
+    16.17%     4.63%  litchi-perf-bas  litchi-perf-baseline-before         [.] alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+            |
+            |--11.53%--alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+            |          |
+            |          |--7.88%--__memcpy_avx512_unaligned (inlined)
+            |          |
+            |          |--2.21%--__GI___libc_malloc (inlined)
+            |          |          |
+            |          |           --2.11%--_int_malloc
+            |          |                     |
+            |          |                      --0.60%--0xffffffff9d800bc7
+            |          |                                |
+            |          |                                 --0.60%--0xffffffff9d64e923
+            |          |
+            |           --1.38%--__memcpy_avx512_unaligned_erms (inlined)
+            |
+             --4.63%--0xffffffffffffffff
+                       litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+                       litchi_xls::workbook::codec::semantic::worksheet::add_cell
+                       alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+
+    13.44%     0.00%  litchi-perf-bas  libc.so.6                           [.] __memcpy_avx512_unaligned (inlined)
+            |
+            ---__memcpy_avx512_unaligned (inlined)
+
+    13.42%    13.42%  litchi-perf-bas  libc.so.6                           [.] __memmove_avx512_unaligned
+            |
+            ---0xffffffffffffffff
+               |
+                --13.40%--litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+                          |
+                          |--8.99%--litchi_xls::workbook::codec::semantic::worksheet::add_cell
+                          |          |
+                          |          |--7.86%--alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+                          |          |          __memcpy_avx512_unaligned (inlined)
+                          |          |
+                          |           --1.13%--__memcpy_avx512_unaligned (inlined)
+                          |
+                           --4.41%--__memcpy_avx512_unaligned (inlined)
+
+     7.40%     0.02%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::cell_values::Snapshot::from_package_editor
+            |
+             --7.37%--litchi_xls::cell_values::Snapshot::from_package_editor
+                       |
+                       |--4.07%--litchi_xls::cell_values::parse_worksheet
+                       |          |
+                       |           --3.94%--litchi_xls::cell_values::push_entry
+                       |
+                        --2.39%--core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+                                  |
+                                   --2.36%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+                                             |
+                                              --2.19%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+                                                        |
+                                                        |--1.48%--_ZN5alloc11collections5btree3map25IntoIter$LT$K$C$V$C$A$GT$10dying_next17had09952b60f684cbE.llvm.15658881268753989661
+                                                        |          |
+                                                        |           --0.78%--__GI___libc_free (inlined)
+                                                        |
+                                                         --0.68%--_ZN4core3ptr43drop_in_place$LT$litchi_xls..cell..Cell$GT$17h6d55c46b3833a0fbE.llvm.15658881268753989661
+                                                                   |
+                                                                    --0.50%--core::ptr::drop_in_place<litchi_core::sheet::types::CellValue>
+
+     4.92%     3.20%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::cell::Cell::from_record_with_formula_context
+            |
+            |--3.20%--0xffffffffffffffff
+            |          litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+            |          litchi_xls::cell::Cell::from_record_with_formula_context
+            |
+             --1.71%--litchi_xls::cell::Cell::from_record_with_formula_context
+                       litchi_xls::number_format::model::Formatting::is_date_time_format
+                       |
+                        --0.84%--core::hash::BuildHasher::hash_one
+
+     4.26%     0.00%  litchi-perf-bas  libc.so.6                           [.] __memcpy_avx512_unaligned_erms (inlined)
+            |
+            ---__memcpy_avx512_unaligned_erms (inlined)
+
+     4.16%     3.29%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::row_block_index::codec::RowBlockIndexCollector::feed_record
+            |
+            |--3.29%--0xffffffffffffffff
+            |          litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+            |          litchi_xls::row_block_index::codec::RowBlockIndexCollector::feed_record
+            |
+             --0.87%--litchi_xls::row_block_index::codec::RowBlockIndexCollector::feed_record
+
+     4.14%     4.14%  litchi-perf-bas  libc.so.6                           [.] __memmove_avx512_unaligned_erms
+            |
+            ---0xffffffffffffffff
+               |
+               |--3.17%--litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+               |          |
+               |          |--2.64%--litchi_xls::workbook::codec::semantic::worksheet::add_cell
+               |          |          |
+               |          |          |--1.37%--alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+               |          |          |          __memcpy_avx512_unaligned_erms (inlined)
+               |          |          |
+               |          |           --1.26%--__memcpy_avx512_unaligned_erms (inlined)
+               |          |
+               |           --0.53%--__memcpy_avx512_unaligned_erms (inlined)
+               |
+                --0.87%--litchi_perf_baseline::run_case_with_config
+
+     4.07%     0.07%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::cell_values::parse_worksheet
+            |
+             --3.99%--litchi_xls::cell_values::parse_worksheet
+                       |
+                        --3.94%--litchi_xls::cell_values::push_entry
+
+     3.94%     3.35%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::cell_values::push_entry
+            |
+            |--3.35%--0xffffffffffffffff
+            |          litchi_perf_baseline::run_case_with_config
+            |          |
+            |          |--1.32%--litchi_xls::cell_values::Patch::apply
+            |          |          litchi_xls::cell_values::Snapshot::from_package_editor
+            |          |          litchi_xls::cell_values::parse_worksheet
+            |          |          litchi_xls::cell_values::push_entry
+            |          |
+            |          |--0.72%--litchi_xls::cell_values::Snapshot::from_bytes
+            |          |          litchi_xls::cell_values::Snapshot::from_package_editor
+            |          |          litchi_xls::cell_values::parse_worksheet
+            |          |          litchi_xls::cell_values::push_entry
+            |          |
+            |          |--0.72%--litchi_perf_baseline::verify_semantic_xls
+            |          |          litchi_xls::cell_values::Snapshot::from_bytes
+            |          |          litchi_xls::cell_values::Snapshot::from_package_editor
+            |          |          litchi_xls::cell_values::parse_worksheet
+            |          |          litchi_xls::cell_values::push_entry
+            |          |
+            |           --0.60%--litchi_xls::cell_values::Transaction::commit
+            |                     litchi_xls::cell_values::Snapshot::from_package_editor
+            |                     litchi_xls::cell_values::parse_worksheet
+            |                     litchi_xls::cell_values::push_entry
+            |
+             --0.59%--litchi_xls::cell_values::push_entry
+
+     3.67%     0.00%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::cell_values::Snapshot::from_bytes
+            |
+            ---litchi_xls::cell_values::Snapshot::from_bytes
+               |
+                --3.44%--litchi_xls::cell_values::Snapshot::from_package_editor
+                          |
+                          |--1.90%--litchi_xls::cell_values::parse_worksheet
+                          |          |
+                          |           --1.85%--litchi_xls::cell_values::push_entry
+                          |
+                           --1.17%--core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+                                     |
+                                      --1.16%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+                                                |
+                                                 --1.07%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+                                                           |
+                                                            --0.74%--_ZN5alloc11collections5btree3map25IntoIter$LT$K$C$V$C$A$GT$10dying_next17had09952b60f684cbE.llvm.15658881268753989661
+
+     2.82%     0.00%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::cell_values::Patch::apply
+            |
+             --2.82%--litchi_xls::cell_values::Patch::apply
+                       |
+                        --2.56%--litchi_xls::cell_values::Snapshot::from_package_editor
+                                  |
+                                  |--1.48%--litchi_xls::cell_values::parse_worksheet
+                                  |          |
+                                  |           --1.43%--litchi_xls::cell_values::push_entry
+                                  |
+                                   --0.82%--core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+                                             |
+                                              --0.80%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+                                                        |
+                                                         --0.74%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+
+     2.69%     0.00%  litchi-perf-bas  libc.so.6                           [.] __GI___libc_malloc (inlined)
+            |
+            ---__GI___libc_malloc (inlined)
+               |
+                --2.42%--_int_malloc
+                          |
+                           --0.60%--0xffffffff9d800bc7
+                                     |
+                                      --0.60%--0xffffffff9d64e923
+
+     2.62%     1.34%  litchi-perf-bas  libc.so.6                           [.] _int_malloc
+            |
+            |--1.34%--0xffffffffffffffff
+            |          |
+            |           --1.09%--litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+            |                     |
+            |                      --0.96%--litchi_xls::workbook::codec::semantic::worksheet::add_cell
+            |                                alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+            |                                __GI___libc_malloc (inlined)
+            |                                _int_malloc
+            |
+             --1.27%--_int_malloc
+                       |
+                        --0.60%--0xffffffff9d800bc7
+                                  |
+                                   --0.60%--0xffffffff9d64e923
+
+     2.39%     0.01%  litchi-perf-bas  litchi-perf-baseline-before         [.] core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+            |
+             --2.38%--core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<&[u8]>>>
+                       |
+                        --2.36%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+                                  |
+                                   --2.19%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+                                             |
+                                             |--1.48%--_ZN5alloc11collections5btree3map25IntoIter$LT$K$C$V$C$A$GT$10dying_next17had09952b60f684cbE.llvm.15658881268753989661
+                                             |          |
+                                             |           --0.78%--__GI___libc_free (inlined)
+                                             |
+                                              --0.68%--_ZN4core3ptr43drop_in_place$LT$litchi_xls..cell..Cell$GT$17h6d55c46b3833a0fbE.llvm.15658881268753989661
+                                                        |
+                                                         --0.50%--core::ptr::drop_in_place<litchi_core::sheet::types::CellValue>
+
+     2.36%     0.04%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+            |
+             --2.32%--_ZN4core3ptr53drop_in_place$LT$litchi_xls..worksheet..Worksheet$GT$17hac037fdf4fd5a21bE.llvm.7904252628967543690
+                       |
+                        --2.19%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+                                  |
+                                  |--1.48%--_ZN5alloc11collections5btree3map25IntoIter$LT$K$C$V$C$A$GT$10dying_next17had09952b60f684cbE.llvm.15658881268753989661
+                                  |          |
+                                  |           --0.78%--__GI___libc_free (inlined)
+                                  |
+                                   --0.68%--_ZN4core3ptr43drop_in_place$LT$litchi_xls..cell..Cell$GT$17h6d55c46b3833a0fbE.llvm.15658881268753989661
+                                             |
+                                              --0.50%--core::ptr::drop_in_place<litchi_core::sheet::types::CellValue>
+
+     2.19%     0.03%  litchi-perf-bas  litchi-perf-baseline-before         [.] <alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+            |
+             --2.16%--<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+                       |
+                       |--1.48%--_ZN5alloc11collections5btree3map25IntoIter$LT$K$C$V$C$A$GT$10dying_next17had09952b60f684cbE.llvm.15658881268753989661
+                       |          |
+                       |           --0.78%--__GI___libc_free (inlined)
+                       |
+                        --0.68%--_ZN4core3ptr43drop_in_place$LT$litchi_xls..cell..Cell$GT$17h6d55c46b3833a0fbE.llvm.15658881268753989661
+                                  |
+                                   --0.50%--core::ptr::drop_in_place<litchi_core::sheet::types::CellValue>
+
+     1.88%     0.00%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::cell_values::Transaction::commit
+            |
+             --1.88%--litchi_xls::cell_values::Transaction::commit
+                       |
+                        --1.27%--litchi_xls::cell_values::Snapshot::from_package_editor
+                                  |
+                                   --0.69%--litchi_xls::cell_values::parse_worksheet
+                                             |
+                                              --0.65%--litchi_xls::cell_values::push_entry
+
+     1.71%     0.87%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::number_format::model::Formatting::is_date_time_format
+            |
+            |--0.87%--0xffffffffffffffff
+            |          litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+            |          litchi_xls::cell::Cell::from_record_with_formula_context
+            |          litchi_xls::number_format::model::Formatting::is_date_time_format
+            |
+             --0.84%--litchi_xls::number_format::model::Formatting::is_date_time_format
+                       |
+                        --0.84%--core::hash::BuildHasher::hash_one
+
+     1.49%     0.46%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::scenario::ScenarioCollector::feed_record
+            |
+             --1.04%--litchi_xls::scenario::ScenarioCollector::feed_record
+                       litchi_xls::scenario::ScenarioCollector::finish_pending
+
+     1.48%     0.70%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN5alloc11collections5btree3map25IntoIter$LT$K$C$V$C$A$GT$10dying_next17had09952b60f684cbE.llvm.15658881268753989661
+            |
+            |--0.78%--_ZN5alloc11collections5btree3map25IntoIter$LT$K$C$V$C$A$GT$10dying_next17had09952b60f684cbE.llvm.15658881268753989661
+            |          __GI___libc_free (inlined)
+            |
+             --0.70%--0xffffffffffffffff
+                       litchi_perf_baseline::run_case_with_config
+
+     1.24%     0.00%  litchi-perf-bas  libc.so.6                           [.] __GI___libc_free (inlined)
+            |
+            ---__GI___libc_free (inlined)
+
+     1.22%     1.22%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::consolidation::ConsolidationCollector::feed_record
+            |
+            ---0xffffffffffffffff
+               litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+               litchi_xls::consolidation::ConsolidationCollector::feed_record
+
+     1.04%     1.04%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::scenario::ScenarioCollector::finish_pending
+            |
+            ---0xffffffffffffffff
+               litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+               litchi_xls::scenario::ScenarioCollector::feed_record
+               litchi_xls::scenario::ScenarioCollector::finish_pending
+
+     1.01%     0.00%  litchi-perf-bas  [unknown]                           [.] 0xffffffff9d800bc7
+            |
+            ---0xffffffff9d800bc7
+               |
+                --1.01%--0xffffffff9d64e923
+                          |
+                           --0.73%--0xffffffff9c4d7f29
+                                     |
+                                      --0.72%--0xffffffff9c83021a
+                                                |
+                                                 --0.70%--0xffffffff9c82ff44
+                                                           |
+                                                            --0.69%--0xffffffff9c82f8db
+
+     1.01%     0.00%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::new
+            |
+             --1.01%--litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::new
+                       |
+                        --0.80%--litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::parse_workbook
+
+     1.01%     0.00%  litchi-perf-bas  [unknown]                           [.] 0xffffffff9d64e923
+            |
+            ---0xffffffff9d64e923
+               |
+                --0.73%--0xffffffff9c4d7f29
+                          |
+                           --0.72%--0xffffffff9c83021a
+                                     |
+                                      --0.70%--0xffffffff9c82ff44
+                                                |
+                                                 --0.69%--0xffffffff9c82f8db
+
+     0.84%     0.68%  litchi-perf-bas  litchi-perf-baseline-before         [.] core::hash::BuildHasher::hash_one
+            |
+             --0.68%--0xffffffffffffffff
+                       |
+                        --0.68%--litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+                                  litchi_xls::cell::Cell::from_record_with_formula_context
+                                  litchi_xls::number_format::model::Formatting::is_date_time_format
+                                  core::hash::BuildHasher::hash_one
+
+     0.81%     0.08%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::parse_workbook
+            |
+             --0.74%--litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::parse_workbook
+
+     0.79%     0.42%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::layout::Collector::feed_record
+     0.73%     0.00%  litchi-perf-bas  [unknown]                           [.] 0xffffffff9c4d7f29
+            |
+            ---0xffffffff9c4d7f29
+               |
+                --0.72%--0xffffffff9c83021a
+                          |
+                           --0.70%--0xffffffff9c82ff44
+                                     |
+                                      --0.69%--0xffffffff9c82f8db
+
+     0.72%     0.00%  litchi-perf-bas  [unknown]                           [.] 0xffffffff9c83021a
+            |
+            ---0xffffffff9c83021a
+               |
+                --0.70%--0xffffffff9c82ff44
+                          |
+                           --0.69%--0xffffffff9c82f8db
+
+     0.72%     0.03%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hf2b38aafe62f4899E.llvm.5671631837376157380
+            |
+             --0.69%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hf2b38aafe62f4899E.llvm.5671631837376157380
+                       |
+                        --0.59%--__GI___libc_realloc (inlined)
+                                  |
+                                   --0.58%--_int_realloc
+
+     0.70%     0.00%  litchi-perf-bas  [unknown]                           [.] 0xffffffff9c82ff44
+            |
+            ---0xffffffff9c82ff44
+               |
+                --0.69%--0xffffffff9c82f8db
+
+     0.69%     0.00%  litchi-perf-bas  [unknown]                           [.] 0xffffffff9c82f8db
+            |
+            ---0xffffffff9c82f8db
+
+     0.68%     0.00%  litchi-perf-bas  libc.so.6                           [.] __GI___libc_realloc (inlined)
+            |
+            ---__GI___libc_realloc (inlined)
+               |
+                --0.66%--_int_realloc
+
+     0.68%     0.17%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN4core3ptr43drop_in_place$LT$litchi_xls..cell..Cell$GT$17h6d55c46b3833a0fbE.llvm.15658881268753989661
+            |
+             --0.50%--_ZN4core3ptr43drop_in_place$LT$litchi_xls..cell..Cell$GT$17h6d55c46b3833a0fbE.llvm.15658881268753989661
+                       core::ptr::drop_in_place<litchi_core::sheet::types::CellValue>
+
+     0.66%     0.03%  litchi-perf-bas  libc.so.6                           [.] _int_realloc
+            |
+             --0.63%--_int_realloc
+
+     0.64%     0.64%  litchi-perf-bas  libc.so.6                           [.] unlink_chunk.isra.0
+            |
+             --0.64%--0xffffffffffffffff
+
+     0.64%     0.00%  litchi-perf-bas  libc.so.6                           [.] unlink_chunk (inlined)
+            |
+            ---unlink_chunk (inlined)
+
+     0.57%     0.01%  litchi-perf-bas  litchi-perf-baseline-before         [.] alloc::sync::Arc<T,A>::drop_slow
+            |
+             --0.56%--alloc::sync::Arc<T,A>::drop_slow
+                       |
+                        --0.51%--<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop
+
+     0.55%     0.55%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_xls::pivot_table::package::PivotTableCollector::feed_record
+            |
+            ---0xffffffffffffffff
+               litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility
+               litchi_xls::pivot_table::package::PivotTableCollector::feed_record
+
+     0.54%     0.00%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ole_common::object::editor::Editor::open
+            |
+             --0.54%--litchi_ole_common::object::editor::Editor::open
+
+     0.51%     0.39%  litchi-perf-bas  litchi-perf-baseline-before         [.] <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop
+     0.50%     0.50%  litchi-perf-bas  litchi-perf-baseline-before         [.] core::ptr::drop_in_place<litchi_core::sheet::types::CellValue>
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

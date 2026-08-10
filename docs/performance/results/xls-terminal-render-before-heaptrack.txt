@@ -1,0 +1,644 @@
+reading file "target/perf/xls-validated-render/heap-before.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/xls-validated-render/frozen/litchi-perf-baseline-before --warmup 5 --samples 100 --case xls_semantic_one_edit_save --writer-shape large --json target/perf/xls-validated-render/heap-before.json
+finished reading file, now analyzing data:
+
+PEAK MEMORY CONSUMERS
+3.13M peak memory consumed over 106160 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hf2b38aafe62f4899E.llvm.5671631837376157380
+  in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+589.82K consumed over 3780 calls from:
+    litchi_xls::cell_values::push_entry::h7aed86113af4145f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::parse_worksheet::h4daab3563e4b40cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Transaction::commit::h8b04ac74006c9915
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+589.82K consumed over 3780 calls from:
+    litchi_xls::cell_values::push_entry::h7aed86113af4145f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::parse_worksheet::h4daab3563e4b40cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+589.82K consumed over 3780 calls from:
+    litchi_xls::cell_values::push_entry::h7aed86113af4145f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::parse_worksheet::h4daab3563e4b40cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Patch::apply::h6a932f3374236373
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+589.82K consumed over 3780 calls from:
+    litchi_xls::cell_values::push_entry::h7aed86113af4145f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::parse_worksheet::h4daab3563e4b40cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+589.82K consumed over 3780 calls from:
+    litchi_xls::cell_values::push_entry::h7aed86113af4145f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::parse_worksheet::h4daab3563e4b40cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Patch::apply::h6a932f3374236373
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+  and 180.63K from 335 other places
+
+2.43M peak memory consumed over 716720 calls from
+alloc::collections::btree::map::BTreeMap$LT$K$C$V$C$A$GT$::insert::ha954e8b6ed769b98
+  in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+2.07M consumed over 122220 calls from:
+    litchi_xls::workbook::codec::semantic::worksheet::add_cell::hedc63d71fa144992
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::codec::semantic::worksheet::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_worksheet_records_with_compatibility::h9842c41e1f535152
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_workbook::h786bc4c9381a1954
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::new::h196411a1a26412b2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+336.96K consumed over 18900 calls from:
+    litchi_xls::workbook::codec::semantic::worksheet::add_cell::hedc63d71fa144992
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::codec::semantic::worksheet::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_worksheet_records_with_compatibility::h9842c41e1f535152
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_workbook::h786bc4c9381a1954
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::new::h196411a1a26412b2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+22.46K consumed over 1260 calls from:
+    litchi_xls::workbook::codec::semantic::worksheet::add_cell::hedc63d71fa144992
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::codec::semantic::worksheet::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_worksheet_records_with_compatibility::h9842c41e1f535152
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_workbook::h786bc4c9381a1954
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::new::h196411a1a26412b2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+7.10K consumed over 420 calls from:
+    litchi_xls::workbook::codec::semantic::worksheet::add_cell::hedc63d71fa144992
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::codec::semantic::worksheet::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_worksheet_records_with_compatibility::h9842c41e1f535152
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_workbook::h786bc4c9381a1954
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::new::h196411a1a26412b2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+  and 0B from 23 other places
+
+655.42K peak memory consumed over 527 calls from
+_$LT$alloc..sync..Arc$LT$$u5b$T$u5d$$C$A$GT$$u20$as$u20$core..convert..From$LT$alloc..vec..Vec$LT$T$C$A$GT$$GT$$GT$::from::h78ea13373cd53a59
+  in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+163.86K consumed over 105 calls from:
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+163.86K consumed over 105 calls from:
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Transaction::commit::h8b04ac74006c9915
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+163.86K consumed over 105 calls from:
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Patch::apply::h6a932f3374236373
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+163.86K consumed over 105 calls from:
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Patch::apply::h6a932f3374236373
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+  and 0B from 2 other places
+
+644.22K peak memory consumed over 1054 calls from
+litchi_ole_common::object::codec::capture_container::hbee1afd14dbe9b17
+  in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+161.06K consumed over 105 calls from:
+    litchi_ole_common::object::codec::Package::capture::h5395956762606514
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+161.06K consumed over 105 calls from:
+    litchi_ole_common::object::codec::Package::capture::h5395956762606514
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Patch::apply::h6a932f3374236373
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+161.06K consumed over 105 calls from:
+    litchi_ole_common::object::codec::Package::capture::h5395956762606514
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Patch::apply::h6a932f3374236373
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+161.06K consumed over 105 calls from:
+    litchi_ole_common::object::codec::Package::capture::h5395956762606514
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+  and 0B from 9 other places
+
+484.14K peak memory consumed over 17 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h74ba8c770cd99f88E.llvm.18091557416437933181
+  in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+323.10K consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hbd2db2504bf758e4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_cfb::writer::core::write_sector_aligned::h751a766b44f14924
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_cfb::writer::core::OleWriter::write_to::h16f155394f736139
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::writer::core::package::_$LT$impl$u20$litchi_xls..writer..core..model..Writer$GT$::write_to::h811aba45134e180a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::write_fresh_xls::hfc934cbfb94e9721
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::build_writer_corpus::h5a1413bd56e83c45
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+161.04K consumed over 1 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::ha4e90f48c0992244
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h22970f61fd2c9c13
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::build_writer_corpus::h5a1413bd56e83c45
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+  and 0B from 12 other places
+
+328.48K peak memory consumed over 107 calls from
+alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h9e1fe1decc0da795
+  in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+163.84K consumed over 1 calls from:
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+163.84K consumed over 105 calls from:
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+800B consumed over 1 calls from:
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+
+163.84K peak memory consumed over 105 calls from
+litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+  in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+163.84K consumed over 105 calls from:
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+
+161.06K peak memory consumed over 318 calls from
+litchi_xls::cell_values::Transaction::commit::h8b04ac74006c9915
+  in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+161.06K consumed over 105 calls from:
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+  and 0B from 1 other places
+
+73.73K peak memory consumed over 1 calls from
+0x76e034eb738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+22.66K peak memory consumed over 44268 calls from
+alloc::collections::btree::map::BTreeMap$LT$K$C$V$C$A$GT$::insert::h6aa62a1b70f36d8f
+  in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+17.41K consumed over 7140 calls from:
+    litchi_xls::layout::Collector::feed_record::h5f8c0a683560057b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::codec::semantic::worksheet::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_worksheet_records_with_compatibility::h9842c41e1f535152
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_workbook::h786bc4c9381a1954
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::new::h196411a1a26412b2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+2.82K consumed over 840 calls from:
+    litchi_xls::layout::Collector::feed_record::h5f8c0a683560057b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::codec::semantic::worksheet::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_worksheet_records_with_compatibility::h9842c41e1f535152
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_workbook::h786bc4c9381a1954
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::new::h196411a1a26412b2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+1.41K consumed over 420 calls from:
+    litchi_xls::layout::Collector::feed_record::h5f8c0a683560057b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::codec::semantic::worksheet::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_worksheet_records_with_compatibility::h9842c41e1f535152
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_workbook::h786bc4c9381a1954
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::new::h196411a1a26412b2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+1.02K consumed over 420 calls from:
+    litchi_xls::layout::Collector::feed_record::h5f8c0a683560057b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::codec::semantic::worksheet::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_worksheet_records_with_compatibility::h9842c41e1f535152
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::parse_workbook::h786bc4c9381a1954
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::workbook::package::_$LT$impl$u20$litchi_xls..workbook..model..Workbook$LT$R$GT$$GT$::new::h196411a1a26412b2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_package_editor::h47725f4335962eb2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_xls::cell_values::Snapshot::from_bytes::he08767effb20ea07
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_xls::h3855f7553ec7af65
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/xls-validated-render/frozen/litchi-perf-baseline-before
+  and 0B from 23 other places
+
+
+total runtime: 2.01s.
+calls to allocation functions: 1121669 (558044/s)
+temporary memory allocations: 98189 (48850/s)
+peak heap memory consumption: 8.12M
+peak RSS (including heaptrack overhead): 19.95M
+total memory leaked: 544B

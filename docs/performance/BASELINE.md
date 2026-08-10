@@ -379,6 +379,12 @@ remains an incomplete program and CRUD matrix.
   text p50 improves 52.65%; the dense locator requests 3,216 bytes, while peak
   heap and RSS remain flat. See
   [`0027`](changes/0027-ods-adaptive-cell-locator.md).
+- An XLS-only handoff of the first validated terminal CFB rendering was
+  measured and fully reverted. Tiny changed-save p50 improved 7.55%, but large
+  changed-save p50 improved only 0.39% and four repeated large exact-no-op
+  cycles regressed 22.00% p50 / 16.69% mean. Peak heap stayed flat and
+  allocation calls fell 0.33%; the regression remains the rejection gate. See
+  [`0028`](changes/0028-xls-terminal-render-handoff-rejected.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
