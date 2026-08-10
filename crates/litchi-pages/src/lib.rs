@@ -33,6 +33,8 @@
 pub mod audio;
 mod document;
 pub mod document_options;
+/// Combined document and footnote formatter settings.
+pub mod document_settings;
 pub mod footnote;
 pub mod header_footer;
 pub mod image;

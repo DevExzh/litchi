@@ -1375,3 +1375,90 @@ library-owned atomic durable filesystem replacement. The example's synced
 temporary/no-clobber workflow does not close that library contract. Exact
 source-byte exposure and the flattened `PageLayout*` public names also remain
 API-boundary debt.
+
+## 2026-08-10 amendment: combined Pages document-settings vertical
+
+Deletion gate 3 now also passes for the combined Pages document-options and
+footnote-settings family. `litchi-pages::document_settings::Settings` is an
+archive-free composite of `document_options::Options` and
+`footnote::Settings`; its focused module owns canonical short `Edit`, `Commit`,
+`Patch`, `Diagnostics`, `Error`, and `LimitKind` names. The only package entry
+points are `document_settings`, `edit_document_settings`, and
+`apply_document_settings`; their focused method/type signatures expose no
+native identifier, component, source-byte, archive/IWA, core/proto/Prost,
+Buffa, or generated type.
+
+The private seam resolves the unique document root and its nonzero local
+`TP.DocumentArchive.settings` field-7 reference to the unique type-10012
+`TP.SettingsArchive`. That edge must occur exactly once in aggregate metadata;
+optional field evidence must be unique and match path `[7]`. Strict raw
+preflight is cross-checked against forced Buffa lazy views for fields
+1/2/3/9/10/30-34: body, headers, footers, hyphenation, ligatures, footnote
+kind/format/numbering/gap, and facing pages. Five generated files measure
+174,682 bytes under the 176 KiB cap, with deterministic aggregate SHA-256
+`7618a60db84b87e28eea67a8acd85ce8eb19513cf4cee7654c1c4e78f405f824`;
+there is no repeated view or production encoder.
+
+A semantic no-op is byte-exact, shares the source, reports zero touched
+components and deleted previews, and performs no reassembly or reopen. A
+changed edit patches the settings owner, invalidates the exact rooted
+document/view-state cache chain, and atomically removes root `preview.jpg`,
+`preview-micro.jpg`, and `preview-web.jpg`. Depending on component placement it
+rewrites one or two components, with preview deletions diagnosed separately.
+The retained-limit reopen verifies settings, invalidation, preview absence,
+stable statistics, and preserved semantics. Changed patch application reopens
+the stored target, conflicts fail, and inverse application restores the exact
+source.
+
+Canonical unknown scalars are retained. Bounded canonical groups can be read
+and survive exact no-ops, while changed group-bearing splices are deliberately
+refused. Noncanonical and wrong-wire encodings, duplicates, invalid scalar or
+reference encodings, contradictory selected-owner metadata, merge/diff state,
+and malformed object framing fail closed. Legacy nested `Index.zip` sources
+remain readable and exact on no-op, but a changed transaction returns
+`UnsupportedSource`. That explicit policy supersedes the deleted host path's
+changed normalization behavior.
+
+The deletion removed `PagesEditor::document_options`,
+`set_document_options`, `footnote_settings`, and `set_footnote_settings`;
+`document_options.rs`, its nested `document_options/wire.rs`, and
+`footnote_settings.rs`; and two host examples plus duplicate tests. A single
+focused example now demonstrates immutable chaining, no-clobber sibling-temp
+publication, and optional exact inverse output. The boundary retirement/public
+leak ratchet passes 70/70 tests; the live repository checker retains only 14
+unrelated pre-existing diagnostics (12 for six `soapberry-zip` dev edges and
+two for `xml-minifier`). This retires the combined vertical, not the remaining
+Pages editor, a manifest edge, or the IWA monolith. Inventory remains 64
+workspace packages, 235 internal dependency declarations, and 14 ordered
+migration debts.
+
+The deterministic gate is green: 108/108 Pages tests/doctests, 14/14 focused
+transactions, 4/4 codec tests, 6/6 facade tests, package check and docs, and
+no-dependencies warnings-denied Clippy. The fuzz target compiles and passes
+no-op and changed smoke runs; sanitizer execution remains blocked by the
+stable-only toolchain rejecting the required flags with no nightly installed.
+
+The native gate used Apple Pages 14.4 (7043.0.93) and a fresh app-authored,
+footnote-bearing seed, SHA-256
+`9da01e2805459e05450551827140069eefe8049aeeacc7625d3c62d7e00ffeab`.
+The Rust candidate, SHA-256
+`3d052e7f1ec86e57ea0553e46f628de1d9fa5bdda615ded9410fca29c93f0995`,
+reported two touched components and three deleted previews; inverse restored
+the exact seed. Pages opened without warnings and confirmed body/header/footer
+and facing pages enabled, hyphenation and ligatures disabled, Roman footnotes
+restarting each page at an 18-point gap, and the three body markers plus note
+unchanged. Native Save As, close, and reopen preserved those values,
+regenerated all previews, and produced SHA-256
+`803167e2479c459f9a33c8ecfc4d713f596fdc5d5d337090ab3c90e467a0cba6`.
+Focused same-settings readback was byte-exact with zero touched components or
+deletions, as was its inverse.
+
+Exit work still includes shared aggregate transaction peak-memory/total-work
+accounting, the infallible retained `ArchiveInfo` clone, a complete
+fallible-allocation proof, group-aware changed splicing, exact streaming and
+partial-output accounting plus a robust Pages `Package::write_to`, and a
+library-owned atomic durable filesystem replace. Patches still need versioned
+deterministic serialization, semantic operations and read/write sets,
+composition, merge, and history. Exact source bytes remain ordinary `Package`
+surface, and opaque cache objects plus remaining Pages settings/render state
+remain exit work.

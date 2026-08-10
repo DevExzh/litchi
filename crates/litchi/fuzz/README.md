@@ -30,6 +30,13 @@ reads and validation, exact no-op and changed commits, exact-source patch
 conflicts, inversion, content-redacted failures, and exact restoration without
 writing a package to disk.
 
+`pages_document_settings` is the focused combined Document and Footnotes
+formatter target. It offers arbitrary bytes to checked Pages package ingress
+and reuses a fixed prefix for bounded option and footnote commands against the
+native `basic.pages` seed. It covers strict reads, exact no-ops, combined
+changes, exact-source conflicts, inversion, typed limits, content-redacted
+failures, and exact restoration without writing a package to disk.
+
 `parse_iwork` uses tighter limits than the public defaults: 2 MiB of source
 bytes, 512 package entries, 8 MiB per expanded entry and decoded IWA item,
 32 MiB aggregate expanded bytes, 4,096 values of each semantic collection,
@@ -56,6 +63,11 @@ entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
 expanded bytes. Layout commands consume only a small fixed prefix; keep
 `-max_len` at 512 bytes to retain malformed-ingress mutation while ensuring
 every input also reaches the fixed native seed.
+
+`pages_document_settings` reuses the same finite Pages physical profile.
+Settings commands consume only a fixed prefix, so keep `-max_len` at 512 bytes
+to combine malformed-ingress mutations with deterministic native transaction
+coverage.
 
 All targets currently share this package's single `litchi` dependency with
 the `iwork` feature. Cargo unifies dependency features for the package, so the
@@ -114,6 +126,13 @@ Run the focused Pages target without a checked-in duplicate corpus:
 
 ```sh
 cargo +nightly fuzz run pages_page_layout -- \
+  -max_len=512 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Pages document-settings target:
+
+```sh
+cargo +nightly fuzz run pages_document_settings -- \
   -max_len=512 -timeout=10 -rss_limit_mb=2048
 ```
 

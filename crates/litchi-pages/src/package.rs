@@ -4,6 +4,7 @@
 //! and generated protobuf messages. It publishes [`Package`] snapshots whose
 //! semantic content is represented by the archive-free [`crate::Document`].
 
+pub(crate) mod document_settings;
 mod page_layout;
 mod section_name;
 mod section_pagination;

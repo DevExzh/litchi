@@ -4,6 +4,9 @@ use std::io;
 use std::path::PathBuf;
 
 use litchi::Document;
+use litchi::pages::document_settings::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Settings,
+};
 use litchi::pages::{
     Package, PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError,
     PageLayoutLimitKind, PageLayoutPatch, SectionSelector, SectionTextCommit,
@@ -223,5 +226,54 @@ fn page_layout_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::err
         .apply_page_layout(&changed.patch().inverse())?;
     assert_eq!(restored.package().source_bytes(), source_bytes);
     assert_eq!(restored.package().page_layout()?, before);
+    Ok(())
+}
+
+#[test]
+fn document_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::error::Error>> {
+    assert_send_sync::<Settings>();
+    assert_send_sync::<Edit<'static>>();
+    assert_send_sync::<Patch>();
+    assert_send_sync::<Commit>();
+    assert_send_sync::<Diagnostics>();
+    assert_send_sync::<Error>();
+    assert_send_sync::<LimitKind>();
+
+    let package = Package::open(fixture_path())?;
+    let source_bytes = package.source_bytes();
+    let source_pointer = source_bytes.as_ptr();
+    let before = package.document_settings()?;
+
+    let noop = package.edit_document_settings()?.set(before).commit()?;
+    assert_eq!(noop.patch().before(), before);
+    assert_eq!(noop.patch().after(), before);
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.diagnostics().touched_components(), 0);
+    assert!(!noop.diagnostics().full_reparse_performed());
+    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+
+    let mut options = before.options();
+    options.set_automatic_hyphenation(Some(!options.uses_automatic_hyphenation()));
+    let mut after = before;
+    after.set_options(options);
+    assert_ne!(after, before);
+
+    let changed = package.edit_document_settings()?.set(after).commit()?;
+    assert_eq!(changed.patch().before(), before);
+    assert_eq!(changed.patch().after(), after);
+    assert_eq!(changed.package().document_settings()?, after);
+    assert!(changed.diagnostics().changed());
+    assert!(changed.diagnostics().touched_components() >= 1);
+    assert!(changed.diagnostics().full_reparse_performed());
+    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.source_bytes(), source_bytes);
+    assert_ne!(changed.package().source_bytes(), source_bytes);
+
+    let restored = changed
+        .package()
+        .apply_document_settings(&changed.patch().inverse())?;
+    assert_eq!(restored.package().source_bytes(), source_bytes);
+    assert_eq!(restored.package().document_settings()?, before);
     Ok(())
 }

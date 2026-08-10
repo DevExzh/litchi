@@ -10,11 +10,6 @@ use litchi_iwa_common::comment::{
 use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
-use litchi_pages::document_options::Options as DocumentOptions;
-use litchi_pages::footnote::{
-    Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
-    Numbering as FootnoteNumbering, Settings as FootnoteSettings,
-};
 use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 use prost::Message;
 
@@ -4659,9 +4654,7 @@ mod audio;
 mod body_shapes;
 mod charts;
 mod date_time_fields;
-mod document_options;
 mod drawable_order;
-mod footnote_settings;
 mod footnotes;
 mod images;
 mod movies;
