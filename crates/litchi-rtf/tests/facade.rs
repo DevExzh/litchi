@@ -10,6 +10,27 @@
 use litchi_rtf::write::Writer;
 use litchi_rtf::{Document, read};
 use litchi_rtf::{text, text::Inline};
+use std::io::{self, Write};
+
+struct FailAfter {
+    accepted: usize,
+    limit: usize,
+}
+
+impl Write for FailAfter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.accepted >= self.limit {
+            return Err(io::Error::other("injected RTF sink failure"));
+        }
+        let accepted = bytes.len().min(self.limit - self.accepted);
+        self.accepted += accepted;
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 fn assert_snapshot_traits<T: Clone + Send + Sync>() {}
 fn assert_borrowed_view_traits<T: Copy + Send + Sync>() {}
@@ -144,6 +165,24 @@ fn snapshot_to_bytes_matches_streaming_facade() {
     let direct = document.to_bytes().unwrap();
     let reparsed = Document::from_bytes(&direct).unwrap();
     assert_eq!(reparsed.text(), "concise");
+}
+
+#[test]
+fn streaming_facade_propagates_partial_sink_failure_without_mutating_snapshot() {
+    let source = br"{\rtf1\ansi immutable sequential output}";
+    let document = Document::from_bytes(source).unwrap();
+    let before = document.text().to_owned();
+    let mut sink = FailAfter {
+        accepted: 0,
+        limit: source.len() / 2,
+    };
+
+    let error = document.write_to(&mut sink).unwrap_err();
+
+    assert_eq!(error.kind(), io::ErrorKind::Other);
+    assert_eq!(sink.accepted, source.len() / 2);
+    assert_eq!(document.text(), before);
+    assert_eq!(document.to_bytes().unwrap(), source);
 }
 
 #[test]

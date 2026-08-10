@@ -113,6 +113,48 @@ fn test_simple_document() {
 }
 
 #[test]
+fn plain_ascii_text_is_written_as_one_chunk() {
+    #[derive(Default)]
+    struct CountingSink {
+        bytes: Vec<u8>,
+        writes: usize,
+    }
+
+    impl io::Write for CountingSink {
+        fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+            self.writes += 1;
+            self.bytes.extend_from_slice(buffer);
+            Ok(buffer.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut sink = CountingSink::default();
+    RtfWriter::new(&mut sink)
+        .write_text("A long ordinary ASCII fragment 0123456789")
+        .unwrap();
+
+    assert_eq!(sink.writes, 1);
+    assert_eq!(sink.bytes, b"A long ordinary ASCII fragment 0123456789");
+}
+
+#[test]
+fn chunked_text_writer_preserves_all_escape_spellings() {
+    let mut output = Vec::new();
+    RtfWriter::new(&mut output)
+        .write_text("plain\\{}\n\t\r—é")
+        .unwrap();
+
+    assert_eq!(
+        String::from_utf8(output).unwrap(),
+        "plain\\\\\\{\\}\\par \\tab \\'0d\\emdash \\u233?"
+    );
+}
+
+#[test]
 fn checked_charsets_write_their_exact_header_controls() {
     assert!(Charset::ansi(1200).is_err());
     assert!(Charset::ansi(65000).is_err());

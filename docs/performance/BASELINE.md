@@ -220,11 +220,11 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **81
+The stage-1 records above are retained unchanged. The current harness has **88
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, 16 opt-in
-DOCX/PPTX semantic cases, and 21 opt-in ODT/ODS/ODP semantic cases. It remains
-an incomplete program and CRUD matrix.
+DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, and 21 opt-in
+ODT/ODS/ODP semantic cases. It remains an incomplete program and CRUD matrix.
 
 - The XLSX row-start index is accepted for the narrow-range case: ABBA p50
   geometric mean **-80.499%**, mean geometric mean **-79.962%**; full scan
@@ -283,6 +283,13 @@ an incomplete program and CRUD matrix.
   19.97x**) and whole-process allocation calls fall **94.11%**, with flat peak
   heap and RSS. See
   [`0012`](changes/0012-docx-coalesced-paragraph-edits.md).
+- Deterministic native RTF corpora now cover public open, lazy paragraph
+  listing/selection, first full text, exact stream/no-op save and one paragraph
+  edit/save. Retained text length removes the temporary fragment vector,
+  ordinary ASCII emits in chunks, and text-only edits skip unused property
+  scans. Large full-text p50 falls **27.08%** and large one-edit/save p50 falls
+  **25.79%**; open moves +3.41%, peak heap is flat and RSS +0.32% (flat). See
+  [`0013`](changes/0013-rtf-semantic-baseline-and-text-paths.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

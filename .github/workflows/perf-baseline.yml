@@ -18,6 +18,7 @@ on:
       - 'crates/litchi-odt/**'
       - 'crates/litchi-ppt/**'
       - 'crates/litchi-pptx/**'
+      - 'crates/litchi-rtf/**'
       - 'crates/litchi-xls/**'
       - 'crates/litchi-xlsx/**'
       - 'crates/soapberry-zip/**'
@@ -41,6 +42,7 @@ on:
       - 'crates/litchi-odt/**'
       - 'crates/litchi-ppt/**'
       - 'crates/litchi-pptx/**'
+      - 'crates/litchi-rtf/**'
       - 'crates/litchi-xls/**'
       - 'crates/litchi-xlsx/**'
       - 'crates/soapberry-zip/**'
@@ -148,6 +150,27 @@ jobs:
               assert item["corpus"]["archive_sha256"]
           PY
 
+      - name: Run RTF semantic smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case rtf_semantic_open,rtf_semantic_list_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
+            --semantic-shape tiny \
+            --json target/perf/rtf-semantic-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/rtf-semantic-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 7
+          assert len({item["case"] for item in report["results"]}) == 7
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 1
+              assert item["corpus"]["archive_sha256"]
+          PY
+
   full:
     name: release container matrix
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -227,6 +250,26 @@ jobs:
               assert item["corpus"]["archive_sha256"]
           PY
 
+      - name: Run release RTF semantic matrix
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case rtf_semantic_open,rtf_semantic_list_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
+            --semantic-shape tiny,large \
+            --json target/perf/rtf-semantic-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/rtf-semantic-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 14
+          assert len({item["case"] for item in report["results"]}) == 7
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 15
+              assert item["corpus"]["archive_sha256"]
+          PY
+
       - name: Upload performance baseline JSON
         uses: actions/upload-artifact@v4
         with:
@@ -235,5 +278,6 @@ jobs:
             target/perf/container-baseline.json
             target/perf/semantic-baseline.json
             target/perf/odf-semantic-baseline.json
+            target/perf/rtf-semantic-baseline.json
           if-no-files-found: error
           retention-days: 14

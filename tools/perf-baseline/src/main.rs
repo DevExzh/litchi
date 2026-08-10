@@ -53,6 +53,7 @@ const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const SEMANTIC_ODS_CORPUS_GENERATOR: &str = "litchi-ods-semantic-v1";
 const SEMANTIC_ODP_CORPUS_GENERATOR: &str = "litchi-odp-semantic-v1";
+const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v1";
 static NEXT_INSTRUMENTED_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -139,6 +140,10 @@ impl SemanticShape {
             Self::Medium => 200,
             Self::Large => 10_000,
         }
+    }
+
+    const fn rtf_paragraphs(self) -> usize {
+        self.docx_paragraphs()
     }
 
     const fn pptx_slides(self) -> usize {
@@ -292,6 +297,13 @@ enum Case {
     XlsxRangeSourceNarrowColumnRangeScan,
     OpcOpenSessionScaling,
     CfbBulkReadScaling,
+    RtfSemanticOpen,
+    RtfSemanticListParagraphs,
+    RtfSemanticOneParagraph,
+    RtfSemanticFullText,
+    RtfSemanticStreamSave,
+    RtfSemanticNoopEditSave,
+    RtfSemanticOneEditSave,
     DocxSemanticOpen,
     DocxSemanticListParagraphs,
     DocxSemanticOneParagraph,
@@ -419,6 +431,13 @@ impl Case {
             },
             Self::OpcOpenSessionScaling => "opc_open_session_scaling",
             Self::CfbBulkReadScaling => "cfb_bulk_read_scaling",
+            Self::RtfSemanticOpen => "rtf_semantic_open",
+            Self::RtfSemanticListParagraphs => "rtf_semantic_list_paragraphs",
+            Self::RtfSemanticOneParagraph => "rtf_semantic_one_paragraph",
+            Self::RtfSemanticFullText => "rtf_semantic_full_text",
+            Self::RtfSemanticStreamSave => "rtf_semantic_stream_save",
+            Self::RtfSemanticNoopEditSave => "rtf_semantic_noop_edit_save",
+            Self::RtfSemanticOneEditSave => "rtf_semantic_one_edit_save",
             Self::DocxSemanticOpen => "docx_semantic_open",
             Self::DocxSemanticListParagraphs => "docx_semantic_list_paragraphs",
             Self::DocxSemanticOneParagraph => "docx_semantic_one_paragraph",
@@ -536,6 +555,19 @@ impl Case {
                 | Self::DocxSemanticNoopEditSave
                 | Self::DocxSemanticOneEditSave
                 | Self::DocxSemanticOnePercentEditSave
+        )
+    }
+
+    const fn uses_semantic_rtf(self) -> bool {
+        matches!(
+            self,
+            Self::RtfSemanticOpen
+                | Self::RtfSemanticListParagraphs
+                | Self::RtfSemanticOneParagraph
+                | Self::RtfSemanticFullText
+                | Self::RtfSemanticStreamSave
+                | Self::RtfSemanticNoopEditSave
+                | Self::RtfSemanticOneEditSave
         )
     }
 
@@ -1415,6 +1447,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             for case in options.cases.iter().filter(|case| {
                 !case.is_fresh_writer()
                     && !case.uses_xlsx()
+                    && !case.uses_semantic_rtf()
                     && !case.uses_semantic_docx()
                     && !case.uses_semantic_pptx()
                     && !case.uses_semantic_odt()
@@ -1488,6 +1521,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                 case.uses_semantic_docx()
                     && (*shape == SemanticShape::Tiny || !case.is_semantic_create_small())
             }) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_semantic_rtf()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_semantic_rtf_corpus(*shape)?;
+            for case in options.cases.iter().filter(|case| case.uses_semantic_rtf()) {
                 results.push(run_case_with_config(
                     *case,
                     &corpus,
@@ -1824,6 +1872,13 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "opc_open_session_scaling" => Some(Case::OpcOpenSessionScaling),
         "cfb_bulk_read_scaling" => Some(Case::CfbBulkReadScaling),
+        "rtf_semantic_open" => Some(Case::RtfSemanticOpen),
+        "rtf_semantic_list_paragraphs" => Some(Case::RtfSemanticListParagraphs),
+        "rtf_semantic_one_paragraph" => Some(Case::RtfSemanticOneParagraph),
+        "rtf_semantic_full_text" => Some(Case::RtfSemanticFullText),
+        "rtf_semantic_stream_save" => Some(Case::RtfSemanticStreamSave),
+        "rtf_semantic_noop_edit_save" => Some(Case::RtfSemanticNoopEditSave),
+        "rtf_semantic_one_edit_save" => Some(Case::RtfSemanticOneEditSave),
         "docx_semantic_open" => Some(Case::DocxSemanticOpen),
         "docx_semantic_list_paragraphs" => Some(Case::DocxSemanticListParagraphs),
         "docx_semantic_one_paragraph" => Some(Case::DocxSemanticOneParagraph),
@@ -1937,7 +1992,11 @@ fn print_usage() {
                                        xlsx_range_source_open,xlsx_range_source_list_sheets,\n\
                                        xlsx_range_source_first_cell,\n\
                                        xlsx_range_source_narrow_column_range_scan,\n\
-                                       opc_open_session_scaling,cfb_bulk_read_scaling\n\
+                                       opc_open_session_scaling,cfb_bulk_read_scaling,\n\
+                                       rtf_semantic_open,rtf_semantic_list_paragraphs,\n\
+                                       rtf_semantic_one_paragraph,rtf_semantic_full_text,\n\
+                                       rtf_semantic_stream_save,rtf_semantic_noop_edit_save,\n\
+                                       rtf_semantic_one_edit_save,\n\
                                        docx_semantic_open,docx_semantic_list_paragraphs,\n\
                                        docx_semantic_one_paragraph,docx_semantic_full_text,\n\
                                        docx_semantic_create_small,docx_semantic_noop_edit_save,\n\
@@ -2290,6 +2349,68 @@ fn semantic_update_indices(count: usize) -> Result<Vec<usize>, Box<dyn Error>> {
         .ok_or("semantic update count overflows usize")?
         / 100;
     Ok((0..updates).map(|index| index * count / updates).collect())
+}
+
+fn semantic_rtf_text(index: usize, updated: bool) -> String {
+    let state = if updated { "updated" } else { "source" };
+    format!("litchi-perf-baseline-rtf-semantic-v1-{state}-{index:05}")
+}
+
+fn semantic_rtf_expected_text(shape: SemanticShape, updated: Option<usize>) -> String {
+    (0..shape.rtf_paragraphs())
+        .map(|index| semantic_rtf_text(index, updated == Some(index)))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn semantic_rtf_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut source = String::from(r"{\rtf1\ansi\deff0{\fonttbl{\f0\fswiss Arial;}}\f0\fs20 ");
+    for index in 0..shape.rtf_paragraphs() {
+        if index != 0 {
+            source.push_str(r"\par ");
+        }
+        source.push_str(&semantic_rtf_text(index, false));
+    }
+    source.push('}');
+
+    let document = litchi_rtf::Document::parse(&source)?;
+    let bytes = document.to_bytes()?;
+    if bytes != source.as_bytes() {
+        return Err("semantic RTF generator lost exact source identity".into());
+    }
+    Ok(bytes)
+}
+
+fn build_semantic_rtf_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let archive = semantic_rtf_bytes(shape)?;
+    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    verify_semantic_rtf(&document, shape, None)?;
+    let target_payload = semantic_rtf_text(0, false).into_bytes();
+    let content_bytes = semantic_rtf_expected_text(shape, None).len();
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("rtf-semantic-{}", shape.name()),
+            generator: SEMANTIC_RTF_CORPUS_GENERATOR,
+            package_format: "RTF",
+            shape: shape.name(),
+            payload_kind: "deterministic-semantic-text",
+            compression: "none",
+            entry_count: shape.rtf_paragraphs(),
+            archive_member_count: 1,
+            entry_bytes: semantic_rtf_text(0, false).len(),
+            uncompressed_payload_bytes: content_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "paragraph:0".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            xlsx: None,
+        },
+        archive,
+        target_name: "paragraph:0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
 }
 
 fn semantic_docx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -2988,6 +3109,15 @@ fn run_case_with_config(
                 range_simulation,
             )
         },
+        Case::RtfSemanticOpen
+        | Case::RtfSemanticListParagraphs
+        | Case::RtfSemanticOneParagraph
+        | Case::RtfSemanticFullText
+        | Case::RtfSemanticStreamSave
+        | Case::RtfSemanticNoopEditSave
+        | Case::RtfSemanticOneEditSave => {
+            run_semantic_rtf(case, corpus, warmup_iterations, samples)
+        },
         Case::DocxSemanticOpen
         | Case::DocxSemanticListParagraphs
         | Case::DocxSemanticOneParagraph
@@ -3249,6 +3379,32 @@ fn xlsx_output_ceiling(bytes: usize) -> Result<u64, Box<dyn Error>> {
         .ok_or_else(|| "XLSX sequential output ceiling overflows u64".into())
 }
 
+fn verify_semantic_rtf(
+    document: &litchi_rtf::Document,
+    shape: SemanticShape,
+    updated: Option<usize>,
+) -> Result<(), Box<dyn Error>> {
+    if document.paragraph_count() != shape.rtf_paragraphs() {
+        return Err("semantic RTF paragraph count differs from specification".into());
+    }
+    let mut count = 0usize;
+    for (index, paragraph) in document.body().paragraphs().enumerate() {
+        if paragraph.to_text() != semantic_rtf_text(index, updated == Some(index)) {
+            return Err("semantic RTF paragraph text differs from specification".into());
+        }
+        count = count
+            .checked_add(1)
+            .ok_or("semantic RTF paragraph count overflows usize")?;
+    }
+    if count != shape.rtf_paragraphs() {
+        return Err("semantic RTF paragraph traversal differs from specification".into());
+    }
+    if document.text() != semantic_rtf_expected_text(shape, updated) {
+        return Err("semantic RTF full text differs from specification".into());
+    }
+    Ok(())
+}
+
 fn verify_semantic_docx(
     package: &litchi_docx::Package,
     shape: SemanticShape,
@@ -3472,6 +3628,133 @@ fn verify_semantic_odp(
         return Err("semantic ODP full text differs from slide scan".into());
     }
     Ok(())
+}
+
+fn run_semantic_rtf(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let selected = shape.rtf_paragraphs() / 2;
+    let expected_changed = if case == Case::RtfSemanticOneEditSave {
+        let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let mut edit = document.edit();
+        edit.replace_paragraph_text(selected, semantic_rtf_text(selected, true))?;
+        edit.commit()?.snapshot().to_bytes()?
+    } else {
+        corpus.archive.clone()
+    };
+    let sink_ceiling = u64::try_from(expected_changed.len())?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sinks = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        match case {
+            Case::RtfSemanticOpen => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let document = litchi_rtf::Document::from_bytes(&owned)?;
+                let duration = started.elapsed();
+                verify_semantic_rtf(&document, shape, None)?;
+                std::hint::black_box(document);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::RtfSemanticListParagraphs => {
+                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let started = Instant::now();
+                let count = document.body().paragraphs().count();
+                let duration = started.elapsed();
+                if count != shape.rtf_paragraphs() {
+                    return Err("semantic RTF paragraph list differs from specification".into());
+                }
+                verify_semantic_rtf(&document, shape, None)?;
+                std::hint::black_box(count);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::RtfSemanticOneParagraph => {
+                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let started = Instant::now();
+                let paragraph = document
+                    .body()
+                    .paragraphs()
+                    .nth(selected)
+                    .ok_or("semantic RTF selected paragraph is missing")?
+                    .to_text();
+                let duration = started.elapsed();
+                if paragraph != semantic_rtf_text(selected, false) {
+                    return Err("semantic RTF selected paragraph differs from specification".into());
+                }
+                verify_semantic_rtf(&document, shape, None)?;
+                std::hint::black_box(paragraph);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::RtfSemanticFullText => {
+                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let started = Instant::now();
+                let text = document.text();
+                let duration = started.elapsed();
+                if text != semantic_rtf_expected_text(shape, None) {
+                    return Err("semantic RTF full text differs from specification".into());
+                }
+                verify_semantic_rtf(&document, shape, None)?;
+                std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::RtfSemanticStreamSave
+            | Case::RtfSemanticNoopEditSave
+            | Case::RtfSemanticOneEditSave => {
+                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let mut sink = CountingSink::bounded(sink_ceiling, sink_ceiling);
+                sink.reserve_budget()?;
+                let started = Instant::now();
+                let (published, expected_update) = match case {
+                    Case::RtfSemanticStreamSave => (document.clone(), None),
+                    Case::RtfSemanticNoopEditSave => {
+                        let commit = document.edit().commit()?;
+                        if commit.diagnostics().changed()
+                            || commit.diagnostics().operation_count() != 0
+                            || !commit.snapshot().same_snapshot(&document)
+                        {
+                            return Err("semantic RTF no-op commit changed its source".into());
+                        }
+                        (commit.into_snapshot(), None)
+                    },
+                    Case::RtfSemanticOneEditSave => {
+                        let mut edit = document.edit();
+                        edit.replace_paragraph_text(selected, semantic_rtf_text(selected, true))?;
+                        let commit = edit.commit()?;
+                        if !commit.diagnostics().changed()
+                            || commit.diagnostics().operation_count() != 1
+                        {
+                            return Err(
+                                "semantic RTF changed commit has unexpected diagnostics".into()
+                            );
+                        }
+                        (commit.into_snapshot(), Some(selected))
+                    },
+                    _ => return Err("non-save RTF case reached save branch".into()),
+                };
+                published.write_to(&mut sink)?;
+                let duration = started.elapsed();
+                let summary = sink.summary();
+                if sink.bytes != expected_changed {
+                    return Err("semantic RTF save differs from deterministic output".into());
+                }
+                let reopened = litchi_rtf::Document::from_bytes(&sink.bytes)?;
+                verify_semantic_rtf(&reopened, shape, expected_update)?;
+                if iteration >= warmup_iterations {
+                    sinks.push(summary);
+                }
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            _ => return Err("non-RTF semantic case passed to RTF runner".into()),
+        }
+    }
+    let sink = (!sinks.is_empty())
+        .then(|| deterministic_sink_summary(&sinks, "semantic RTF stream/save"))
+        .transpose()?;
+    Ok(result(case, corpus, elapsed, sink))
 }
 
 fn run_semantic_docx(
@@ -5936,9 +6219,9 @@ mod tests {
         RequestSizeBuckets, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
         XlsxShape, build_cfb_corpus, build_opc_corpus, build_semantic_docx_corpus,
         build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
-        build_semantic_pptx_corpus, build_writer_corpus, build_xlsx_corpus, payload_bytes,
-        resolve_execution_workers, run_case, run_case_with_config, run_scaling_case,
-        simulated_request_delay, statistics,
+        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_writer_corpus,
+        build_xlsx_corpus, payload_bytes, resolve_execution_workers, run_case,
+        run_case_with_config, run_scaling_case, simulated_request_delay, statistics,
     };
 
     #[test]
@@ -6015,6 +6298,31 @@ mod tests {
 
         assert_eq!(result.case, "docx_semantic_one_percent_edit_save");
         assert!(result.sink.is_some());
+    }
+
+    #[test]
+    fn semantic_rtf_tiny_corpus_is_deterministic_and_exercises_native_crud() {
+        let rtf = build_semantic_rtf_corpus(SemanticShape::Tiny).unwrap();
+        let rtf_again = build_semantic_rtf_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(rtf.archive, rtf_again.archive);
+        assert_eq!(rtf.manifest.entry_count, 24);
+        assert_eq!(
+            rtf.manifest.archive_sha256,
+            "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328"
+        );
+
+        for case in [
+            Case::RtfSemanticOpen,
+            Case::RtfSemanticListParagraphs,
+            Case::RtfSemanticOneParagraph,
+            Case::RtfSemanticFullText,
+            Case::RtfSemanticStreamSave,
+            Case::RtfSemanticNoopEditSave,
+            Case::RtfSemanticOneEditSave,
+        ] {
+            let result = run_case(case, &rtf, 0, 1).unwrap();
+            assert_eq!(result.sink.is_some(), case.name().contains("save"));
+        }
     }
 
     #[test]

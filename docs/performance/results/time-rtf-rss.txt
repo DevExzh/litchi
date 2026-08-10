@@ -1,0 +1,13 @@
+GNU Time peak-RSS guard for 100 large rtf_semantic_one_edit_save samples.
+Each process used 10 warmups, was pinned to CPU 2, and wrote JSON under /tmp.
+Order: before A, after A, after B, before B.
+
+before A: elapsed 3.03s; maximum resident set size 54376 KiB
+after A:  elapsed 2.65s; maximum resident set size 54552 KiB
+after B:  elapsed 2.64s; maximum resident set size 54552 KiB
+before B: elapsed 2.96s; maximum resident set size 54120 KiB
+
+Observed RSS range:
+before: 54120-54376 KiB
+after:  54552 KiB
+maximum delta versus the larger before observation: +0.32%

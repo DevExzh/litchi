@@ -361,4 +361,17 @@ mod tests {
         assert!(document.inner.text.get().is_none());
         assert!(document.inner.paragraph_count.get().is_none());
     }
+
+    #[test]
+    fn valid_paragraph_edit_does_not_count_the_remaining_story() {
+        let document = Document::parse(r"{\rtf1 one\par two\par three}").unwrap();
+        assert!(document.inner.paragraph_count.get().is_none());
+
+        document
+            .edit()
+            .replace_paragraph_text(1, "changed")
+            .unwrap();
+
+        assert!(document.inner.paragraph_count.get().is_none());
+    }
 }

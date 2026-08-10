@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0011`](changes/0011-odf-semantic-baseline-and-ods-snapshot.md)
+Evidence through: [`change 0013`](changes/0013-rtf-semantic-baseline-and-text-paths.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -188,17 +188,23 @@ end-to-end baselines; the previous spare-capacity DOC move remains rejected.
 
 ## RTF path
 
-RTF currently has no performance-harness cases. Native `Document::from_bytes`
-and borrowed body access exist, the first complete text result is cached, and
-the native writer accepts a forward-only sink. The unified root path still
-passes through owned UTF-8 strings and raw materializers, so it must not be
-used as evidence for the native path.
+Seven native public cases now cover owned open, lazy paragraph listing, one
+paragraph, first complete text, exact stream save, exact empty-edit save, and
+one checked paragraph edit/save over 24/200/10,000-paragraph corpora. The
+unified root path remains intentionally outside this evidence.
 
-The smallest source-audited allocation candidate is raw
-`RtfDocument::text()`: it collects text slices into a temporary `Vec<&str>`
-and then joins them. A direct pre-sized `String` plus `push_str` can remove that
-temporary allocation shape, but only after matched public open/list/full-text/
-stream-save/no-op/one-edit baselines exist.
+`RtfDocument` now retains the total block-text byte length during its existing
+owned-detach pass, so first full-text materialization performs one exact
+allocation and one block pass instead of allocating and joining a temporary
+fragment vector. The large full-text p50 improves 27.08%. Canonical text
+emission now writes contiguous ASCII spans rather than formatting one character
+per sink call, and text-only commits skip unused paragraph-property vectors and
+scans. Together with early successful paragraph selection, large one-edit/save
+p50 improves 25.79%. Full-text caching, forward-only sink errors, exact no-op
+identity, opaque refusal, validation, and complete reopen/readback remain.
+
+Formatting/media, compressed/legacy-code-page, malformed/security,
+real-producer, cold-source, broad edit and conversion matrices remain missing.
 
 ## Source and detector path
 
@@ -233,7 +239,7 @@ pattern elsewhere.
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
 | 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable; implemented without changing readback. | Broader ODF source-backed read and unchanged-member publication profiles. |
 | 14 | Confirmed for DOCX direct-body batches: repeated full XML rebuild/parse work was removable while retaining ordinary durable operations and complete readback. | Real-producer/extension/security corpora and broader structural/bulk edit semantics. |
-| 15 | Confirmed structurally for RTF text aggregation, but unmeasured: a temporary slice vector precedes final string construction. | Native RTF public semantic baseline before any implementation change. |
+| 15 | Measured and implemented for RTF full-text and text-only edit/save paths: temporary fragment/property vectors and per-character ASCII writes were removable. | Extend the accepted native matrix to formatting/media, compressed/code-page, malformed/security, real-producer and broad edit scenarios. |
 
 ## Ranked work queue
 
@@ -252,7 +258,7 @@ The order below is provisional until baseline measurements are recorded.
 | 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Implemented for canonical direct-body DOCX batches and PPTX selected-scene reuse; complete source validation and candidate readback remain. See changes 0010 and 0012. |
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
 | 11 | Extend ODF beyond the accepted ODS snapshot reuse: source-backed selectors and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Public semantic baselines now exist; exact no-op and full readback must remain. |
-| 12 | Add native RTF public semantic cases, then measure direct full-text aggregation. | RTF open/list/full-text/stream-save/no-op/one-edit. | Low-medium | No harness evidence exists yet; preserve cached text and native forward-only output contracts. |
+| 12 | Add native RTF public semantic cases and remove measured full-text/edit work. | RTF open/list/full-text/stream-save/no-op/one-edit. | Low-medium | Implemented; cached text and native forward-only output contracts remain. See change 0013. |
 | 13 | Add legacy DOC/XLS/PPT semantic open/edit/save baselines before further CFB ownership experiments. | OLE2 document CRUD rather than substrate-only insertion. | Medium | Positional CFB exists; the previous DOC move regression requires end-to-end guardrails. |
 | 14 | Measure ODT snapshot handoff from existing shared transaction bytes. | ODT no-op and changed edit/save. | Low-medium | Preserve source lineage, limits, complete readback and exact no-op bytes. |
 | 15 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
@@ -273,4 +279,5 @@ changes. Remaining gaps are:
   counters and no claim is generalized from the one measured save workload.
 - Contention evidence beyond the committed explicit-context scaling curves.
 - Format-semantic preservation evidence beyond the generated
-  DOCX/PPTX/ODT/ODS/ODP slices and native targeted-OPC raw passthrough corpus.
+  DOCX/PPTX/RTF/ODT/ODS/ODP slices and native targeted-OPC raw passthrough
+  corpus.

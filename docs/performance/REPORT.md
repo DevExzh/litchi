@@ -2,7 +2,7 @@
 
 Date: 2026-08-10
 Branch: `feat/office-format-completeness`
-Production base for the latest semantic tranche: `2250cb302b15dba98041bf0c5672007ec306c25b`
+Production base for the latest semantic tranche: `1793c089f1822103eacbc358e53264c098c65c56`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,10 +13,10 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **81 selectable cases**: 36 default cases and 198 default
+harness contains **88 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, 16
-opt-in DOCX/PPTX semantic cases and 21 opt-in ODT/ODS/ODP semantic cases. It is
-still not broad program or CRUD coverage.
+opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, and 21 opt-in
+ODT/ODS/ODP semantic cases. It is still not broad program or CRUD coverage.
 
 | Change | Current evidence | Scope / limitation |
 |---|---|---|
@@ -28,6 +28,7 @@ still not broad program or CRUD coverage.
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
 | ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP corpora; ODT/ODP are coverage-only; changed ODS publication still rewrites the package |
+| RTF semantic baseline and text paths | Medium/large full-text p50 **-38.39% / -27.08%**; one-edit/save **-33.40% / -25.79%** | Generated native RTF text corpus; open guard +0.96% / +3.41%; formatting/media/security matrices remain missing |
 
 Raw evidence: [`XLSX before A`](results/abba-xlsx-range-before-a.json),
 [`after A`](results/abba-xlsx-range-after-a.json),
@@ -68,6 +69,15 @@ That record also links the dedicated four-leg large-corpus scalar one-edit
 guardrail (p50 -1.28%, mean +0.79% with overlapping intervals), which is
 treated as neutral.
 
+The RTF raw evidence is
+[`text before A`](results/abba-rtf-text-before-a.json),
+[`text after A`](results/abba-rtf-text-after-a.json),
+[`text after B`](results/abba-rtf-text-after-b.json), and
+[`text before B`](results/abba-rtf-text-before-b.json). The independent open
+guard, complete seven-case matrix, allocation/RSS evidence, and rejected first
+candidate are in
+[`change 0013`](changes/0013-rtf-semantic-baseline-and-text-paths.md).
+
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
 charged to hierarchical `Budget`. Raw ZIP preservation is now integrated for
 owned same-topology OPC mutations; broader source-backed editing is pending.
@@ -78,7 +88,8 @@ See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0009`](changes/0009-range-source-and-scaling.md), and
 [`0010`](changes/0010-docx-pptx-semantic-queries-and-edits.md), and
 [`0011`](changes/0011-odf-semantic-baseline-and-ods-snapshot.md), and
-[`0012`](changes/0012-docx-coalesced-paragraph-edits.md).
+[`0012`](changes/0012-docx-coalesced-paragraph-edits.md), and
+[`0013`](changes/0013-rtf-semantic-baseline-and-text-paths.md).
 
 Consolidated changed-crate tests passed, along with focused changed-crate
 warning-denied Clippy and formatter checks. An umbrella all-feature `litchi`
@@ -105,6 +116,8 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | PPTX 1% edit/save, 10,000 text boxes | 399.320 ms | 361.915 ms | -9.37% p50 / -9.37% mean | Allocation calls -11.67%; peak heap flat; profiler RSS +1.28% |
 | ODS no-op edit/save, 32,768 cells | 76.894 ms | 67.838 ms | -11.78% p50 / -12.08% mean | Peak heap flat; profiler RSS -0.13% |
 | ODS one-cell edit/save, 32,768 cells | 384.150 ms | 376.237 ms | -2.06% p50 / -2.19% mean | Changed package rewrite/readback still dominates |
+| RTF full text, 10,000 paragraphs | 33.095 us | 24.134 us | -27.08% p50 / -25.37% mean | One fragment-vector allocation removed per first materialization |
+| RTF one paragraph edit/save, 10,000 paragraphs | 12.408 ms | 9.208 ms | -25.79% p50 / -25.53% mean | Allocation calls -707 over 100 samples; peak heap flat; RSS +0.32% (flat) |
 
 The underlying records are:
 
@@ -117,6 +130,7 @@ The underlying records are:
 - [`0010-docx-pptx-semantic-queries-and-edits.md`](changes/0010-docx-pptx-semantic-queries-and-edits.md)
 - [`0011-odf-semantic-baseline-and-ods-snapshot.md`](changes/0011-odf-semantic-baseline-and-ods-snapshot.md)
 - [`0012-docx-coalesced-paragraph-edits.md`](changes/0012-docx-coalesced-paragraph-edits.md)
+- [`0013-rtf-semantic-baseline-and-text-paths.md`](changes/0013-rtf-semantic-baseline-and-text-paths.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -159,6 +173,12 @@ rather than hidden in an aggregate.
 - ODS unified snapshot construction reuses its one validated package for full
   facade readback instead of cloning package bytes and parsing the package a
   second time.
+- RTF first full-text materialization retains only a byte count during parse,
+  then allocates the final string once and copies blocks in one pass instead of
+  allocating and joining a temporary fragment vector.
+- RTF canonical text emission writes ordinary ASCII spans in chunks instead of
+  one formatted write per character. Text-only commits skip paragraph-property
+  vectors/scans, and a successful paragraph selector stops at its target.
 
 No unsafe code, ambient I/O, dependency edge, public archive type, or global
 synchronization primitive was introduced. Exact-source authorization is
@@ -168,9 +188,10 @@ ZIP layouts use the fully validated rewrite path before any sink output.
 
 ## Evidence and verification
 
-The standalone harness provides 81 selectable cases and a 198-record default
+The standalone harness provides 88 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
-public DOC/XLS/PPT writer corpora, and DOCX/PPTX/ODT/ODS/ODP semantic corpora.
+public DOC/XLS/PPT writer corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP semantic
+corpora.
 It records
 p50/p95/p99, raw samples, mean, sample deviation, Student's-t 95% mean interval,
 corpus/output hashes, environment, bounded sequential-write behavior,
@@ -216,10 +237,10 @@ threshold tuning/contention work beyond the committed explicit scaling curves,
 and broad format-semantic CRUD coverage beyond the new generated
 DOCX/PPTX slice (bulk action distinctions, dependency-copy, merge/split,
 patching, repair, security, malformed and real-producer corpora, plus broader
-ODF coverage). RTF still lacks public semantic benchmark coverage; ODT shared
-snapshot bytes and legacy DOC/XLS/PPT semantic edit/save baselines are the next
-source-audited non-iWork candidates. iWork work is deliberately deferred while
-the `iwa-*` crates are changing independently.
+ODF and RTF coverage). ODT shared snapshot bytes and legacy DOC/XLS/PPT
+semantic edit/save baselines are the next source-audited non-iWork candidates.
+iWork work is deliberately deferred while the `iwa-*` crates are changing
+independently.
 The scenario-by-scenario gap map and next case queue are in
 [`CRUD_COVERAGE.md`](CRUD_COVERAGE.md).
 The ranked source-level queue and path maps are maintained in

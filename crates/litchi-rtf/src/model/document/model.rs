@@ -132,6 +132,8 @@ pub struct RtfDocument<'a> {
     color_table: ColorTable,
     /// Style blocks
     blocks: Vec<StyleBlock<'a>>,
+    /// Total UTF-8 bytes across `blocks`, retained without flattening their text.
+    text_len: usize,
     /// Unsupported syntax retained as bounded inert source fragments.
     opaque_nodes: Vec<crate::opaque::Node>,
     /// Original transport for byte-exact writes of immutable snapshots containing opaque syntax.
@@ -425,13 +427,18 @@ impl<'a> RtfDocument<'a> {
 
         // Convert parsed document to owned document
         // We need to convert Cow::Borrowed to Cow::Owned to detach from input lifetime
+        let mut text_len = 0usize;
         let owned_blocks: Vec<StyleBlock<'static>> = parsed
             .blocks
             .into_iter()
-            .map(|block| StyleBlock {
-                text: Cow::Owned(block.text.into_owned()),
-                formatting: block.formatting,
-                paragraph: block.paragraph,
+            .map(|block| {
+                let text = block.text.into_owned();
+                text_len = text_len.saturating_add(text.len());
+                StyleBlock {
+                    text: Cow::Owned(text),
+                    formatting: block.formatting,
+                    paragraph: block.paragraph,
+                }
             })
             .collect();
 
@@ -521,6 +528,7 @@ impl<'a> RtfDocument<'a> {
             file_table: parsed.file_table.map(crate::FileTable::into_owned),
             color_table: parsed.color_table,
             blocks: owned_blocks,
+            text_len,
             opaque_nodes: parsed.opaque_nodes,
             preserved_source: None,
             tables: owned_tables,
@@ -746,11 +754,11 @@ impl<'a> RtfDocument<'a> {
     /// This concatenates all text blocks with their natural separators.
     #[must_use]
     pub fn text(&self) -> String {
-        self.blocks
-            .iter()
-            .map(|block| block.text.as_ref())
-            .collect::<Vec<&str>>()
-            .join("")
+        let mut text = String::with_capacity(self.text_len);
+        for block in &self.blocks {
+            text.push_str(block.text.as_ref());
+        }
+        text
     }
 
     /// Get the number of paragraphs in the document.

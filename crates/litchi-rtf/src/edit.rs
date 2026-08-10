@@ -1078,10 +1078,23 @@ impl Edit {
         }
 
         let (replacement, projected_spans) = project_text(&self.source, &self.operations)?;
-        let mut alignments = source_alignments(&self.source);
-        let base_bold = base_bold_for_edit(&self.source, &self.operations)?;
+        let property_operation = self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Alignment { .. } | Operation::Bold { .. }
+            )
+        });
+        let mut alignments = if property_operation {
+            source_alignments(&self.source)
+        } else {
+            Vec::new()
+        };
+        let base_bold = if property_operation {
+            base_bold_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
         let mut projected_bold_ranges = Vec::new();
-        let mut property_operation = false;
         for operation in &self.operations {
             match operation {
                 Operation::Alignment {
@@ -1095,12 +1108,10 @@ impl Edit {
                             count,
                         })?;
                     *slot = *after;
-                    property_operation = true;
                 },
                 Operation::Bold { span, after, .. } => {
                     projected_bold_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                    property_operation = true;
                 },
                 Operation::Text { .. } | Operation::InsertParagraph { .. } => {},
                 Operation::TableCellText { .. }
@@ -1113,7 +1124,11 @@ impl Edit {
                 Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
             }
         }
-        let original_alignments = source_alignments(&self.source);
+        let original_alignments = if property_operation {
+            source_alignments(&self.source)
+        } else {
+            Vec::new()
+        };
         let has_bold_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::Bold { before, after, .. } if before != after)
         });
@@ -1553,7 +1568,6 @@ fn spans_conflict(left: TextSpan, right: TextSpan) -> bool {
 
 fn paragraph_range(source: &Snapshot, position: usize) -> Result<Range<usize>, Error> {
     let mut start = 0usize;
-    let mut selected = None;
     for (paragraph_position, paragraph) in source.body().paragraphs().enumerate() {
         let end = start
             .checked_add(paragraph.len())
@@ -1562,8 +1576,7 @@ fn paragraph_range(source: &Snapshot, position: usize) -> Result<Range<usize>, E
                 limit: source.limits().max_source_bytes(),
             })?;
         if paragraph_position == position {
-            selected = Some(start..end);
-            break;
+            return Ok(start..end);
         }
         start = end.checked_add(1).ok_or(Error::InputTooLarge {
             observed: usize::MAX,
@@ -1571,7 +1584,7 @@ fn paragraph_range(source: &Snapshot, position: usize) -> Result<Range<usize>, E
         })?;
     }
     let count = source.paragraph_count();
-    selected.ok_or(Error::ParagraphOutOfRange { position, count })
+    Err(Error::ParagraphOutOfRange { position, count })
 }
 
 fn project_text(

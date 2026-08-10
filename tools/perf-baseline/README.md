@@ -1,8 +1,8 @@
-# OPC, CFB, legacy-writer, OOXML, and ODF performance baseline
+# OPC, CFB, legacy-writer, OOXML, RTF, and ODF performance baseline
 
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
-public-API XLSX snapshot/edit/save flows, and opt-in DOCX/PPTX/ODT/ODS/ODP
+public-API XLSX snapshot/edit/save flows, and opt-in DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic flows. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog and worksheet reads over positional I/O. It does not
 depend on untracked office files, network state, or randomness. ODP builder
@@ -14,16 +14,17 @@ packaged output.
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
 
-The DOCX/PPTX/ODF semantic matrices are deliberately opt-in. They measure only
-current public APIs and therefore do not change the default 36 cases / 198
+The DOCX/PPTX/RTF/ODF semantic matrices are deliberately opt-in. They measure
+only current public APIs and therefore do not change the default 36 cases / 198
 records.
 
 ## Run
 
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
-range cases, two execution-scaling cases, 16 DOCX/PPTX semantic cases and 21
-ODF semantic cases are opt-in, for 81 selectable cases in total:
+range cases, two execution-scaling cases, 16 DOCX/PPTX semantic cases, seven
+RTF semantic cases, and 21 ODF semantic cases are opt-in, for 88 selectable
+cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -88,6 +89,15 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
   --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
   --json target/perf/semantic-odf-smoke.json
+```
+
+Run the complete tiny semantic RTF smoke matrix (seven records):
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 0 --samples 1 --semantic-shape tiny \
+  --case rtf_semantic_open,rtf_semantic_list_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
+  --json target/perf/semantic-rtf-smoke.json
 ```
 
 Exercise deterministic high-latency, range-bounded positional I/O without a
@@ -195,6 +205,29 @@ PPTX uses `Package::from_bytes`/`from_vec`, presentation slide/text views,
 opened-presentation transactions, and `to_bytes`. PPTX currently has no public
 writer-sink API, so PPTX save records intentionally leave `sink` as `null`
 rather than claiming unobservable write behavior.
+
+## Opt-in RTF semantic corpus matrix
+
+The RTF cases use deterministic direct ASCII RTF source with the same
+paragraph counts as DOCX. They exercise only the ordinary native
+`litchi_rtf::Document` facade: owned-byte open, lazy paragraph enumeration,
+one middle paragraph, first complete-text materialization, exact source
+streaming, exact empty-edit publication, and one checked paragraph edit/save.
+Every save uses the native forward-only `Write` contract and every output is
+reopened and fully verified.
+
+| Shape | Paragraphs | Source bytes | Text bytes |
+|---|---:|---:|---:|
+| `tiny` | 24 | 1,347 | 1,199 |
+| `medium` | 200 | 10,851 | 9,999 |
+| `large` | 10,000 | 540,051 | 499,999 |
+
+The exact stream-save and no-op cases preserve the generated input byte for
+byte and emit it as one sequential write. The one-edit case stages the middle
+paragraph through `replace_paragraph_text`, commits with source and semantic
+readback checks, streams the changed snapshot, and verifies every paragraph
+after reopen. Corpus creation, expected-output construction, and input cloning
+remain outside the timed interval.
 
 ## Opt-in ODF semantic corpus matrix
 
@@ -374,6 +407,19 @@ remain distinguishable.
   time opened-presentation transaction capture, no-op/one/~1% text-box edits,
   commit, publication, and `to_bytes`, then reopen and verify all slides,
   shapes, and text. The public API has no save-to-sink method.
+- `rtf_semantic_open`: parse deterministic owned transport bytes through
+  public `Document::from_bytes`.
+- `rtf_semantic_list_paragraphs`, `rtf_semantic_one_paragraph`, and
+  `rtf_semantic_full_text`: enumerate lazy body paragraph views, resolve and
+  flatten one middle paragraph, or materialize the snapshot's cached complete
+  text for the first time.
+- `rtf_semantic_stream_save`: stream the immutable snapshot through public
+  `Document::write_to` and require byte-exact source output.
+- `rtf_semantic_noop_edit_save`: commit an empty edit, require shared snapshot
+  identity and exact bytes, then stream through the same forward-only sink.
+- `rtf_semantic_one_edit_save`: replace the middle paragraph through the
+  checked native transaction, stream the changed snapshot, reopen it, and
+  verify its complete semantic projection and sink counters.
 
 For both CFB stream-insertion cases, payload generation/cloning and writer
 construction happen before timing, while writer and source destruction happen

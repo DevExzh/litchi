@@ -22,6 +22,14 @@ fn test_simple_document() {
 }
 
 #[test]
+fn text_concatenates_fragmented_blocks_without_changing_separators() {
+    let doc = RtfDocument::parse(r"{\rtf1\ansi A{\b B}{\i C}\par D}").unwrap();
+
+    assert!(doc.blocks().len() >= 4);
+    assert_eq!(doc.text(), "ABC\nD");
+}
+
+#[test]
 fn root_drawing_mutations_preflight_corrupt_indices_and_events() {
     let mut document = RtfDocument::parse(r"{\rtf1 body}").unwrap();
     let mut first = crate::Shape::new(crate::ShapeType::Rectangle);

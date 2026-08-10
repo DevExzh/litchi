@@ -28,56 +28,77 @@ impl<W: Write> RtfWriter<W> {
     /// # Errors
     /// Returns an error when writing to the underlying output fails.
     pub fn write_text(&mut self, text: &str) -> io::Result<()> {
-        for ch in text.chars() {
-            match ch {
-                '\\' => self.write_str("\\\\")?,
-                '{' => self.write_str("\\{")?,
-                '}' => self.write_str("\\}")?,
+        let mut plain_start = 0usize;
+        for (offset, ch) in text.char_indices() {
+            let escape = match ch {
+                '\\' => Some("\\\\"),
+                '{' => Some("\\{"),
+                '}' => Some("\\}"),
                 // The trailing space delimits the control word. Without it the
                 // following character is absorbed into the word itself (`\partwo`)
                 // or misread as its numeric parameter (`\par2`), silently
                 // destroying the text that follows the break. RTF always consumes
                 // a single delimiting space, so it never reappears as content.
-                '\n' => self.write_str("\\par ")?,
-                '\t' => self.write_str("\\tab ")?,
+                '\n' => Some("\\par "),
+                '\t' => Some("\\tab "),
                 // RTF special characters with dedicated control words keep their
                 // source spelling instead of a generic \u escape. The trailing
                 // space delimits the control word exactly like \par and \tab.
-                '\u{2014}' => self.write_str("\\emdash ")?,
-                '\u{2013}' => self.write_str("\\endash ")?,
-                '\u{2003}' => self.write_str("\\emspace ")?,
-                '\u{2002}' => self.write_str("\\enspace ")?,
-                '\u{2005}' => self.write_str("\\qmspace ")?,
-                '\u{2022}' => self.write_str("\\bullet ")?,
-                '\u{2018}' => self.write_str("\\lquote ")?,
-                '\u{2019}' => self.write_str("\\rquote ")?,
-                '\u{201C}' => self.write_str("\\ldblquote ")?,
-                '\u{201D}' => self.write_str("\\rdblquote ")?,
-                '\u{200E}' => self.write_str("\\ltrmark ")?,
-                '\u{200F}' => self.write_str("\\rtlmark ")?,
-                '\u{200D}' => self.write_str("\\zwj ")?,
-                '\u{200C}' => self.write_str("\\zwnj ")?,
-                '\u{200B}' => self.write_str("\\zwbo ")?,
-                '\u{FEFF}' => self.write_str("\\zwnbo ")?,
+                '\u{2014}' => Some("\\emdash "),
+                '\u{2013}' => Some("\\endash "),
+                '\u{2003}' => Some("\\emspace "),
+                '\u{2002}' => Some("\\enspace "),
+                '\u{2005}' => Some("\\qmspace "),
+                '\u{2022}' => Some("\\bullet "),
+                '\u{2018}' => Some("\\lquote "),
+                '\u{2019}' => Some("\\rquote "),
+                '\u{201C}' => Some("\\ldblquote "),
+                '\u{201D}' => Some("\\rdblquote "),
+                '\u{200E}' => Some("\\ltrmark "),
+                '\u{200F}' => Some("\\rtlmark "),
+                '\u{200D}' => Some("\\zwj "),
+                '\u{200C}' => Some("\\zwnj "),
+                '\u{200B}' => Some("\\zwbo "),
+                '\u{FEFF}' => Some("\\zwnbo "),
                 // Readers discard raw carriage returns and other bare control
                 // bytes as line-ending noise, so emit them as hex escapes to keep
                 // them part of the document text.
                 c if (c as u32) < ASCII_CONTROL_LIMIT => {
+                    self.write_text_span(text, plain_start, offset)?;
                     write!(self.writer, "\\'{:02x}", c as u32)?;
+                    plain_start = offset + ch.len_utf8();
+                    continue;
                 },
-                c if c.is_ascii() => {
-                    write!(self.writer, "{c}")?;
-                },
+                c if c.is_ascii() => continue,
                 c => {
+                    self.write_text_span(text, plain_start, offset)?;
                     // Write Unicode character
                     let code = c as i32;
                     self.write_control_word("u", Some(code))?;
                     // Fallback character
                     self.write_str("?")?;
+                    plain_start = offset + ch.len_utf8();
+                    continue;
                 },
+            };
+            self.write_text_span(text, plain_start, offset)?;
+            if let Some(escape) = escape {
+                self.write_str(escape)?;
             }
+            plain_start = offset + ch.len_utf8();
         }
-        Ok(())
+        self.write_text_span(text, plain_start, text.len())
+    }
+
+    #[inline]
+    fn write_text_span(&mut self, text: &str, start: usize, end: usize) -> io::Result<()> {
+        let span = text.get(start..end).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF text span is not on UTF-8 boundaries",
+            )
+        })?;
+        self.write_str(span)
     }
 
     /// Write a string

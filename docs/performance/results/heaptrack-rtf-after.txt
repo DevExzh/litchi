@@ -1,0 +1,14 @@
+Profile: /tmp/rtf-after.heaptrack.zst
+Binary: /tmp/litchi-perf-baseline-rtf-after
+Binary SHA-256: 793d01bc572a56ad88e5ba80bbe754621c557f6780d8529d1159d9c20d1d5f2f
+Command: --warmup 0 --samples 100 --case rtf_semantic_one_edit_save --semantic-shape large
+
+total runtime: 2.987000s
+calls to allocation functions: 6118279
+temporary memory allocations: 1020406
+peak heap memory consumption: 56.98M
+peak RSS (including heaptrack overhead): 65.78M
+total memory leaked: 544B
+
+Generated with heaptrack and summarized with:
+heaptrack_print -p 0 -a 0 -T 0
