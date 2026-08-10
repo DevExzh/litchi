@@ -143,6 +143,36 @@ pub struct HyperlinkTextReplacement {
     text: String,
 }
 
+/// Authored text paired with one direct-body paragraph position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParagraphTextReplacement {
+    position: Position,
+    text: String,
+}
+
+impl ParagraphTextReplacement {
+    /// Construct one direct-body paragraph text replacement.
+    #[must_use]
+    pub fn new(position: Position, text: impl Into<String>) -> Self {
+        Self {
+            position,
+            text: text.into(),
+        }
+    }
+
+    /// Return the selected direct-body paragraph position.
+    #[must_use]
+    pub const fn position(&self) -> Position {
+        self.position
+    }
+
+    /// Borrow the authored replacement text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+}
+
 impl HyperlinkTextReplacement {
     /// Construct one hyperlink text replacement.
     #[must_use]
@@ -993,6 +1023,104 @@ impl Edit {
         });
         self.replacement_text_bytes = replacement_text_bytes;
         self.projected = candidate;
+        Ok(self)
+    }
+
+    /// Atomically replace complete text across direct-body paragraphs.
+    ///
+    /// Positions must be non-empty, unique, and strictly increasing. Every
+    /// paragraph retains its run boundaries, formatting, drawings, and unknown
+    /// run XML under the same refusal rules as [`Self::replace_paragraph_text`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed ambiguity refusal for an empty, duplicate, or
+    /// non-canonical selector list, or a checked leaf/resource failure without
+    /// changing the edit.
+    pub fn replace_body_paragraph_texts(
+        &mut self,
+        replacements: &[ParagraphTextReplacement],
+    ) -> TransactionResult<&mut Self> {
+        validate_paragraph_replacements(replacements)?;
+        let mut candidate = self.clone();
+        let first_operation = candidate.operations.len();
+        let mut ranges = Vec::new();
+        ranges
+            .try_reserve_exact(replacements.len())
+            .map_err(|allocation_error| crate::Error::Allocation {
+                resource: "document paragraph replacement plan",
+                source: allocation_error,
+            })?;
+        for replacement in replacements {
+            candidate.reserve_operation()?;
+            validate_authored_text(replacement.text.as_str()).map_err(|reason| {
+                TransactionError::Refused {
+                    position: replacement.position.get(),
+                    reason,
+                }
+            })?;
+            let replacement_text_bytes = candidate.checked_text_total(replacement.text.len())?;
+            let range = candidate.range(replacement.position)?;
+            let paragraph_start = checked_start(range, "paragraph")?;
+            let paragraph_end = checked_end(range, "paragraph")?;
+            let paragraph = checked_slice(
+                candidate.projected.xml_bytes(),
+                paragraph_start,
+                paragraph_end,
+                "paragraph",
+            )?;
+            let owner =
+                scan_text_owner(paragraph, b"p").map_err(|reason| TransactionError::Refused {
+                    position: replacement.position.get(),
+                    reason,
+                })?;
+            if owner.text == replacement.text {
+                continue;
+            }
+            ranges.push((
+                paragraph_start,
+                paragraph_end,
+                rewrite_text_owner(paragraph, &owner, replacement.text.as_str())?,
+            ));
+            candidate.operations.push(Operation::ReplaceParagraphText {
+                position: replacement.position,
+                before: owner.text,
+                after: replacement.text.clone(),
+            });
+            candidate.replacement_text_bytes = replacement_text_bytes;
+        }
+        if ranges.is_empty() {
+            *self = candidate;
+            return Ok(self);
+        }
+        let projected =
+            Snapshot::from_xml(replace_ranges(candidate.projected.xml_bytes(), &ranges)?)?;
+        for operation in &candidate.operations[first_operation..] {
+            let Operation::ReplaceParagraphText {
+                position, after, ..
+            } = operation
+            else {
+                return Err(crate::Error::InvalidFormat(
+                    "paragraph replacement plan contains a different operation".into(),
+                )
+                .into());
+            };
+            let readback = projected
+                .paragraph(*position)
+                .ok_or(TransactionError::OutOfBounds {
+                    position: position.get(),
+                    len: projected.paragraph_count(),
+                })?
+                .text()?;
+            if readback != *after {
+                return Err(crate::Error::InvalidFormat(
+                    "document paragraph batch failed semantic readback".into(),
+                )
+                .into());
+            }
+        }
+        candidate.projected = projected;
+        *self = candidate;
         Ok(self)
     }
 
@@ -2687,6 +2815,32 @@ fn validate_hyperlink_replacements(
         || replacements
             .windows(2)
             .any(|pair| pair[0].address >= pair[1].address)
+    {
+        return Err(TransactionError::Refused {
+            position: ambiguous_position,
+            reason: Refusal::AmbiguousCompositeSelector,
+        });
+    }
+    Ok(())
+}
+
+fn validate_paragraph_replacements(
+    replacements: &[ParagraphTextReplacement],
+) -> TransactionResult<()> {
+    if replacements.len() > MAX_OPERATIONS {
+        return Err(TransactionError::Limit {
+            resource: "composite paragraph replacements",
+            max: MAX_OPERATIONS,
+            actual: replacements.len(),
+        });
+    }
+    let ambiguous_position = replacements
+        .first()
+        .map_or(0, |replacement| replacement.position.get());
+    if replacements.is_empty()
+        || replacements
+            .windows(2)
+            .any(|pair| pair[0].position >= pair[1].position)
     {
         return Err(TransactionError::Refused {
             position: ambiguous_position,
@@ -4399,10 +4553,46 @@ fn replace_ranges(
     source: &[u8],
     replacements: &[(usize, usize, Vec<u8>)],
 ) -> TransactionResult<Vec<u8>> {
-    let mut output = source.to_vec();
-    for (start, end, replacement) in replacements.iter().rev() {
-        output = replace_range(&output, *start, *end, replacement)?;
+    let mut capacity = source.len();
+    let mut previous_end = 0usize;
+    for (start, end, replacement) in replacements {
+        if *start < previous_end || start > end || *end > source.len() {
+            return Err(crate::Error::InvalidFormat(
+                "document rewrite ranges are invalid or overlap".into(),
+            )
+            .into());
+        }
+        capacity = capacity
+            .checked_sub(end - start)
+            .and_then(|size| size.checked_add(replacement.len()))
+            .ok_or(TransactionError::Limit {
+                resource: "projected XML bytes",
+                max: MAX_DOCUMENT_XML_BYTES,
+                actual: usize::MAX,
+            })?;
+        previous_end = *end;
     }
+    if capacity > MAX_DOCUMENT_XML_BYTES {
+        return Err(TransactionError::Limit {
+            resource: "projected XML bytes",
+            max: MAX_DOCUMENT_XML_BYTES,
+            actual: capacity,
+        });
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|allocation_error| crate::Error::Allocation {
+            resource: "document transaction XML",
+            source: allocation_error,
+        })?;
+    let mut cursor = 0usize;
+    for (start, end, replacement) in replacements {
+        output.extend_from_slice(&source[cursor..*start]);
+        output.extend_from_slice(replacement);
+        cursor = *end;
+    }
+    output.extend_from_slice(&source[cursor..]);
     Ok(output)
 }
 
@@ -4594,6 +4784,130 @@ mod tests {
         let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
         assert_eq!(restored.xml_bytes(), source.xml_bytes());
         assert!(matches!(commit.patch().apply(&restored), Ok(_)));
+    }
+
+    #[test]
+    fn paragraph_text_batch_is_canonical_atomic_and_reversible() {
+        let source = Snapshot::from_xml(document(
+            "<w:p w:rsidR=\"1\"><w:r><w:rPr><w:b/></w:rPr><w:t>first</w:t></w:r></w:p><w:p><w:r><w:t>retained</w:t></w:r></w:p><w:p><w:r><w:rPr><w:i/></w:rPr><w:t>third</w:t></w:r></w:p>",
+        ))
+        .unwrap();
+        let replacements = [
+            ParagraphTextReplacement::new(Position::new(0), "first changed"),
+            ParagraphTextReplacement::new(Position::new(2), "third changed"),
+        ];
+        let mut edit = source.edit();
+        edit.replace_body_paragraph_texts(&replacements).unwrap();
+        let commit = edit.commit().unwrap();
+
+        let mut scalar = source.edit();
+        for replacement in &replacements {
+            scalar
+                .replace_paragraph_text(replacement.position(), replacement.text())
+                .unwrap();
+        }
+        let scalar = scalar.commit().unwrap();
+        assert_eq!(commit.snapshot().xml_bytes(), scalar.snapshot().xml_bytes());
+
+        assert_eq!(commit.diagnostics().operations(), 2);
+        assert_eq!(
+            commit
+                .snapshot()
+                .paragraph(Position::new(0))
+                .unwrap()
+                .text()
+                .unwrap(),
+            "first changed"
+        );
+        assert_eq!(
+            commit
+                .snapshot()
+                .paragraph(Position::new(1))
+                .unwrap()
+                .text()
+                .unwrap(),
+            "retained"
+        );
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        assert!(xml.contains("<w:rPr><w:b/></w:rPr>"));
+        assert!(xml.contains("<w:rPr><w:i/></w:rPr>"));
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                durable_limits(),
+            )
+            .unwrap();
+        let applied = source.apply_durable(&decoded).unwrap();
+        assert_eq!(applied.xml_bytes(), commit.snapshot().xml_bytes());
+        assert_eq!(
+            applied
+                .apply_durable(&decoded.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let noops = [
+            ParagraphTextReplacement::new(Position::new(0), "first"),
+            ParagraphTextReplacement::new(Position::new(2), "third"),
+        ];
+        let mut noop = source.edit();
+        noop.replace_body_paragraph_texts(&noops).unwrap();
+        let noop = noop.commit().unwrap();
+        assert!(!noop.diagnostics().changed());
+        assert_eq!(noop.diagnostics().operations(), 0);
+        assert_eq!(
+            noop.snapshot().xml_bytes().as_ptr(),
+            source.xml_bytes().as_ptr()
+        );
+
+        let duplicate = [
+            ParagraphTextReplacement::new(Position::new(0), "one"),
+            ParagraphTextReplacement::new(Position::new(0), "duplicate"),
+        ];
+        let out_of_order = [
+            ParagraphTextReplacement::new(Position::new(2), "third first"),
+            ParagraphTextReplacement::new(Position::new(0), "first second"),
+        ];
+        let late_failure = [
+            ParagraphTextReplacement::new(Position::new(0), "would change"),
+            ParagraphTextReplacement::new(Position::new(2), "line\nbreak"),
+        ];
+        let mut refused = source.edit();
+        assert!(matches!(
+            refused.replace_body_paragraph_texts(&duplicate),
+            Err(TransactionError::Refused {
+                reason: Refusal::AmbiguousCompositeSelector,
+                ..
+            })
+        ));
+        assert!(matches!(
+            refused.replace_body_paragraph_texts(&[]),
+            Err(TransactionError::Refused {
+                reason: Refusal::AmbiguousCompositeSelector,
+                ..
+            })
+        ));
+        assert!(matches!(
+            refused.replace_body_paragraph_texts(&out_of_order),
+            Err(TransactionError::Refused {
+                reason: Refusal::AmbiguousCompositeSelector,
+                ..
+            })
+        ));
+        assert!(refused.replace_body_paragraph_texts(&late_failure).is_err());
+        assert_eq!(refused.projected().xml_bytes(), source.xml_bytes());
     }
 
     #[test]

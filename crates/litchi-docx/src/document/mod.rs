@@ -17,7 +17,8 @@ pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use transaction::{
     Commit, Composition, CompositionLimits, Diagnostics, Edit, History, HistoryLimits,
     HyperlinkTextReplacement, JoinError, MergeChoice, Operation, ParagraphHyperlinkAddress,
-    ParagraphTransfer, Patch, PreparedEdit, Refusal, RevisionKind, Snapshot, SubEditConflict,
-    SubEditJoinFailure, TableCellAddress, ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan,
-    TransactionError, TransactionResult, TransferGraph, TransferRefusal,
+    ParagraphTextReplacement, ParagraphTransfer, Patch, PreparedEdit, Refusal, RevisionKind,
+    Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress, ThreeWayError,
+    ThreeWayMergeFailure, ThreeWayPlan, TransactionError, TransactionResult, TransferGraph,
+    TransferRefusal,
 };

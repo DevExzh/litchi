@@ -106,9 +106,12 @@ DOCX format views are borrowed after eager OPC materialization. Repeated
 Single-index paragraph lookup now scans the complete bounded XML but constructs
 only the selected shared range; the 10,000-paragraph cell improves 4.72% p50
 and removes ten collection-growth allocations per call. Table lookup still
-builds the complete collection. Changed document transactions reconstruct,
-compact, and reparse the complete main document XML for each paragraph
-replacement, so the 1% path remains a higher-impact coalescing candidate.
+builds the complete collection. Canonical direct-body paragraph batches now
+plan every replacement against one snapshot, emit the disjoint ranges in one
+forward pass, parse one candidate, and read back every selected paragraph. The
+10,000-paragraph / 100-edit save improves 94.99% p50 (19.97x) and allocation
+calls fall 94.11%. Scalar edits, unordered/nested selections, structural edits,
+and complete transaction-capture costs are unchanged.
 
 PPTX ordinary reads defer slide payload parsing, but repeatedly parse the
 presentation slide-reference list. Exact-name slide lookup resolves and parses
@@ -179,6 +182,24 @@ Confirmed source facts:
 - `HashMap`/`HashSet` iteration in fresh CFB directory construction requires a
   separate determinism audit; it is not treated as a performance result.
 
+The substrate harness still does not measure semantic legacy DOC/XLS/PPT
+open/edit/save. Any additional owned-stream experiment must start with those
+end-to-end baselines; the previous spare-capacity DOC move remains rejected.
+
+## RTF path
+
+RTF currently has no performance-harness cases. Native `Document::from_bytes`
+and borrowed body access exist, the first complete text result is cached, and
+the native writer accepts a forward-only sink. The unified root path still
+passes through owned UTF-8 strings and raw materializers, so it must not be
+used as evidence for the native path.
+
+The smallest source-audited allocation candidate is raw
+`RtfDocument::text()`: it collects text slices into a temporary `Vec<&str>`
+and then joins them. A direct pre-sized `String` plus `push_str` can remove that
+temporary allocation shape, but only after matched public open/list/full-text/
+stream-save/no-op/one-edit baselines exist.
+
 ## Source and detector path
 
 `litchi-core::ReadAt` provides immutable positional reads and source versions.
@@ -211,6 +232,8 @@ pattern elsewhere.
 | 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers, and child lookup descends the validated tree by cached exact keys. | Add deep-directory, MiniFAT-heavy, concurrent-read, and real DOC/XLS/PPT scenarios beyond the measured synthetic wide-root and writer corpora. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
 | 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable; implemented without changing readback. | Broader ODF source-backed read and unchanged-member publication profiles. |
+| 14 | Confirmed for DOCX direct-body batches: repeated full XML rebuild/parse work was removable while retaining ordinary durable operations and complete readback. | Real-producer/extension/security corpora and broader structural/bulk edit semantics. |
+| 15 | Confirmed structurally for RTF text aggregation, but unmeasured: a temporary slice vector precedes final string construction. | Native RTF public semantic baseline before any implementation change. |
 
 ## Ranked work queue
 
@@ -226,10 +249,13 @@ The order below is provisional until baseline measurements are recorded.
 | 6 | Move already-owned XLS/PPT writer buffers into `OleWriter`. | Legacy fresh creation and some rebuilds. | Low | Implemented for XLS/PPT; DOC rejected by measurement. See `changes/0003-legacy-owned-stream-handoff.md`. |
 | 7 | Use validated cached CFB sibling-tree descent and reusable sector buffers. | Legacy stream-heavy open/rebuild workflows. | Medium | Implemented; see `changes/0002-cfb-lookup-and-sector-buffers.md`. |
 | 8 | Extend the accepted XLSX row-start index to broader selector and edit matrices. | Sparse range queries after sheet load. | Low-medium | Narrow ranges are accepted; preservation/readback gates and broad CRUD coverage remain unchanged. |
-| 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Direct DOCX selection and PPTX selected-scene reuse are accepted; complete source validation and candidate readback remain mandatory. |
+| 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Implemented for canonical direct-body DOCX batches and PPTX selected-scene reuse; complete source validation and candidate readback remain. See changes 0010 and 0012. |
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
 | 11 | Extend ODF beyond the accepted ODS snapshot reuse: source-backed selectors and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Public semantic baselines now exist; exact no-op and full readback must remain. |
-| 12 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
+| 12 | Add native RTF public semantic cases, then measure direct full-text aggregation. | RTF open/list/full-text/stream-save/no-op/one-edit. | Low-medium | No harness evidence exists yet; preserve cached text and native forward-only output contracts. |
+| 13 | Add legacy DOC/XLS/PPT semantic open/edit/save baselines before further CFB ownership experiments. | OLE2 document CRUD rather than substrate-only insertion. | Medium | Positional CFB exists; the previous DOC move regression requires end-to-end guardrails. |
+| 14 | Measure ODT snapshot handoff from existing shared transaction bytes. | ODT no-op and changed edit/save. | Low-medium | Preserve source lineage, limits, complete readback and exact no-op bytes. |
+| 15 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
 
 ## Evidence still missing
 

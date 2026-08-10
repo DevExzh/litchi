@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "2250cb302b15dba98041bf0c5672007ec306c25b",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1"
+  },
+  "configuration": {
+    "samples_per_case": 15,
+    "warmup_iterations_per_case": 3,
+    "cases": [
+      "docx_semantic_one_percent_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "semantic_shapes": [
+      "medium",
+      "large"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ]
+  },
+  "results": [
+    {
+      "case": "docx_semantic_one_percent_edit_save",
+      "corpus": {
+        "name": "docx-semantic-medium",
+        "generator": "litchi-docx-semantic-v1",
+        "package_format": "DOCX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 200,
+        "archive_member_count": 12,
+        "entry_bytes": 50,
+        "uncompressed_payload_bytes": 10000,
+        "archive_bytes": 9048,
+        "archive_sha256": "4a89310d88c022d43e0ced5244e9a54a249d987b7c40ea390a87ca64b98a5038",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          617300,
+          623598,
+          635535,
+          647010,
+          650956,
+          652217,
+          657565,
+          657795,
+          659518,
+          665796,
+          679976,
+          698891,
+          716947,
+          722795,
+          727731
+        ],
+        "min": 617300,
+        "p50": 657795,
+        "p95": 727731,
+        "p99": 727731,
+        "max": 727731,
+        "mean": 667575.3333333334,
+        "standard_deviation": 34771.79138872414,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 648317.4419711486,
+          "upper": 686833.2246955181
+        }
+      },
+      "sink": {
+        "accepted_bytes": 9059,
+        "write_calls": 25,
+        "largest_write": 1652
+      }
+    },
+    {
+      "case": "docx_semantic_one_percent_edit_save",
+      "corpus": {
+        "name": "docx-semantic-large",
+        "generator": "litchi-docx-semantic-v1",
+        "package_format": "DOCX/OPC/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 10000,
+        "archive_member_count": 12,
+        "entry_bytes": 50,
+        "uncompressed_payload_bytes": 500000,
+        "archive_bytes": 37245,
+        "archive_sha256": "34327ba32c4e4d9e3c24fbf7af0cacd76fd79b71ad903d4df81efa6b1d023330",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          480720936,
+          495813898,
+          499277707,
+          499822278,
+          500878160,
+          501279774,
+          501759686,
+          502699609,
+          504160050,
+          504194397,
+          504751434,
+          504757213,
+          506696853,
+          508677970,
+          509927481
+        ],
+        "min": 480720936,
+        "p50": 502699609,
+        "p95": 509927481,
+        "p99": 509927481,
+        "max": 509927481,
+        "mean": 501694496.40000004,
+        "standard_deviation": 6857210.571316743,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 497896722.084787,
+          "upper": 505492270.71521306
+        }
+      },
+      "sink": {
+        "accepted_bytes": 37361,
+        "write_calls": 25,
+        "largest_write": 29340
+      }
+    }
+  ]
+}

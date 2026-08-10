@@ -3567,11 +3567,24 @@ fn run_semantic_docx(
                     litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
                 let started = Instant::now();
                 let mut edit = package.edit_document()?;
-                for index in &selected {
-                    edit.replace_paragraph_text(
-                        Position::new(*index),
-                        semantic_docx_text(*index, true),
-                    )?;
+                if selected.len() > 1 {
+                    let replacements = selected
+                        .iter()
+                        .map(|index| {
+                            litchi_docx::document::ParagraphTextReplacement::new(
+                                Position::new(*index),
+                                semantic_docx_text(*index, true),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    edit.replace_body_paragraph_texts(&replacements)?;
+                } else {
+                    for index in &selected {
+                        edit.replace_paragraph_text(
+                            Position::new(*index),
+                            semantic_docx_text(*index, true),
+                        )?;
+                    }
                 }
                 let mut sink = CountingSeekSink::default();
                 let commit = package.publish_document_edit(edit)?;
@@ -5991,6 +6004,17 @@ mod tests {
         assert_eq!(pptx.manifest.entry_count, 12);
         let pptx_result = run_case(Case::PptxSemanticOnePercentEditSave, &pptx, 0, 1).unwrap();
         assert!(pptx_result.sink.is_none());
+    }
+
+    #[test]
+    fn semantic_docx_medium_one_percent_edit_exercises_batch_publication() {
+        let docx = build_semantic_docx_corpus(SemanticShape::Medium).unwrap();
+        assert_eq!(docx.manifest.entry_count, 200);
+
+        let result = run_case(Case::DocxSemanticOnePercentEditSave, &docx, 0, 1).unwrap();
+
+        assert_eq!(result.case, "docx_semantic_one_percent_edit_save");
+        assert!(result.sink.is_some());
     }
 
     #[test]

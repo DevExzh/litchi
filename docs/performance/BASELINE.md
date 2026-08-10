@@ -277,6 +277,12 @@ an incomplete program and CRUD matrix.
   for one-cell edit-save. Full-process allocated bytes fall 1.46% in the
   medium no-op profile; peak heap is flat. See
   [`0011`](changes/0011-odf-semantic-baseline-and-ods-snapshot.md).
+- The DOCX one-percent transaction now coalesces canonical direct-body
+  paragraph replacements into one bounded XML emission and candidate parse.
+  Pooled large-corpus p50 falls from 487.542 to 24.418 ms (**-94.99%,
+  19.97x**) and whole-process allocation calls fall **94.11%**, with flat peak
+  heap and RSS. See
+  [`0012`](changes/0012-docx-coalesced-paragraph-edits.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

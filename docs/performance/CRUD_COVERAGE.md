@@ -19,13 +19,13 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; signed/extension corpora remain missing |
 | One semantic edit and save | Covered for generated XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen |
-| About 1% semantic update and save | Covered for XLSX/DOCX/PPTX generated corpora | Deterministic evenly spaced cell, paragraph and shape changes |
+| About 1% semantic update and save | Covered for XLSX/DOCX/PPTX generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch and reopens the package |
 | Bulk update matching objects | Missing | No semantic end-to-end case |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
 | Sanitization and irreversible redaction | Missing | No complete matrix |
 | Copy object with dependency closure | Missing | No measured format case |
 | Merge and split | Missing | No measured format case |
-| Patch encode/apply/invert/merge | Partial | XLSX in-memory commit only; no durable lifecycle timing |
+| Patch encode/apply/invert/merge | Partial | DOCX coalesced replacement correctness covers deterministic durable encode/decode/apply/inverse, but no durable lifecycle timing; broader formats/merge remain missing |
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests; no format-semantic extension corpus |
@@ -41,21 +41,25 @@ semantic conversion remain.
 
 ## Highest-return next cases
 
-1. Coalesce DOCX same-structure paragraph replacements so a 1% transaction
-   does not rebuild and reparse the complete XML once per paragraph.
-2. Separate logical authoring/append time from final serialization and reopen
+1. Add native RTF open/list/full-text/stream-save/no-op/one-edit cases before
+   measuring direct full-text aggregation without its temporary slice vector.
+2. Measure ODT transaction snapshot handoff from existing shared immutable
+   bytes instead of cloning the complete package.
+3. Add semantic DOC/XLS/PPT open/edit/save baselines before any further CFB
+   owned-stream experiment; retain the rejected DOC move as a guardrail.
+4. Separate logical authoring/append time from final serialization and reopen
    for DOCX, PPTX and XLSX.
-3. XLSX bulk update plus distinct clear/remove/hide behavior.
-4. Unknown OOXML extension and media preservation during a known semantic edit.
-5. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
+5. XLSX bulk update plus distinct clear/remove/hide behavior.
+6. Unknown OOXML extension and media preservation during a known semantic edit.
+7. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
    including stale-base and conflict cases.
-6. PPTX dependency-closure transfer and slide split/removal with charts, media,
+8. PPTX dependency-closure transfer and slide split/removal with charts, media,
    themes and collision names.
-7. Validate/security matrix for valid, malformed-within-limits, encrypted,
+9. Validate/security matrix for valid, malformed-within-limits, encrypted,
    macro-enabled, protected and external-link fixtures.
-8. Smart detection versus prepared-source reuse. OOXML smart results retain an
+10. Smart detection versus prepared-source reuse. OOXML smart results retain an
    adoptable parsed OPC package; ODF detection/handoff remains unmeasured.
-9. Broaden ODF beyond generated text/grid/deck cases: 1% and bulk edits,
+11. Broaden ODF beyond generated text/grid/deck cases: 1% and bulk edits,
    unknown extensions, real producers, media, security and source-backed I/O.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
 

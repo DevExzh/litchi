@@ -181,6 +181,12 @@ always truthful.
 
 The DOCX cases use `Package::from_reader`, `document().paragraph(index)`,
 paragraph enumeration/text extraction, document transactions, and `to_stream`.
+The one-percent case uses the canonical
+`Edit::replace_body_paragraph_texts` transaction whenever the selection has
+more than one paragraph, so validation, XML emission, candidate parsing, and
+complete selected-paragraph readback are coalesced without changing the
+ordinary durable patch operations. The one-edit case remains on
+`replace_paragraph_text` as a scalar guardrail.
 The seekable stream is instrumented with the existing `sink` schema field.
 DOCX also accepts a forward-only `Write` sink; production correctness tests
 cover that contract while the frozen before/after benchmark keeps the same
@@ -353,7 +359,9 @@ remain distinguishable.
 - `docx_semantic_noop_edit_save`, `docx_semantic_one_edit_save`, and
   `docx_semantic_one_percent_edit_save`: time document transaction capture,
   no-op/one/~1% paragraph replacement, publication, and seekable-stream save;
-  reopen and verify every paragraph, full text, and recorded sink behavior.
+  reopen and verify every paragraph, full text, operation count, and recorded
+  sink behavior. Multi-paragraph selection uses the canonical batch transaction
+  while the one-edit case stays scalar.
 - `pptx_semantic_open`: open a complete in-memory PPTX through public
   `Package::from_bytes`.
 - `pptx_semantic_list_slides` / `pptx_semantic_one_slide` /
