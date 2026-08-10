@@ -234,6 +234,11 @@ const CP850_HIGH: [char; 128] = [
 ];
 
 fn append_transport_bytes(buffer: &mut impl Extend<u8>, text: &str) -> RtfResult<()> {
+    if text.is_ascii() {
+        buffer.extend(text.bytes());
+        return Ok(());
+    }
+
     for character in text.chars() {
         let byte = u8::try_from(character as u32).map_err(|_err| {
             RtfError::InvalidUnicode(
@@ -2150,3 +2155,52 @@ mod stories;
 mod styles;
 mod tables;
 mod unicode;
+
+#[cfg(test)]
+mod tests {
+    use super::{RtfError, append_transport_bytes};
+
+    #[derive(Default)]
+    struct CountingBuffer {
+        bytes: Vec<u8>,
+        extend_calls: usize,
+    }
+
+    impl Extend<u8> for CountingBuffer {
+        fn extend<T: IntoIterator<Item = u8>>(&mut self, iter: T) {
+            self.extend_calls += 1;
+            self.bytes.extend(iter);
+        }
+    }
+
+    #[test]
+    fn ascii_transport_is_extended_in_one_batch() {
+        let mut buffer = CountingBuffer::default();
+
+        append_transport_bytes(&mut buffer, "ASCII transport").expect("ASCII transport bytes");
+
+        assert_eq!(buffer.bytes, b"ASCII transport");
+        assert_eq!(buffer.extend_calls, 1);
+    }
+
+    #[test]
+    fn byte_valued_non_ascii_transport_keeps_the_fallback() {
+        let mut buffer = CountingBuffer::default();
+
+        append_transport_bytes(&mut buffer, "\u{e9}").expect("byte-valued transport character");
+
+        assert_eq!(buffer.bytes, [0xe9]);
+        assert_eq!(buffer.extend_calls, 1);
+    }
+
+    #[test]
+    fn invalid_unicode_keeps_the_valid_prefix_and_error() {
+        let mut buffer = Vec::new();
+
+        let error = append_transport_bytes(&mut buffer, "ok\u{100}")
+            .expect_err("non-byte Unicode must be rejected");
+
+        assert_eq!(buffer, b"ok");
+        assert!(matches!(error, RtfError::InvalidUnicode(_)));
+    }
+}

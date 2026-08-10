@@ -44,9 +44,10 @@ semantic conversion remain.
 1. Attribute remaining final owner/public-reader work after the accepted native
    XLS editor reuse and DOC batched stream publication; preserve exact-source
    patch/inverse and the rejected DOC move as independent guardrails.
-2. Extend native RTF coverage beyond the accepted ordinary parser-state
-   specialization to formatting/media, compressed and legacy-code-page input,
-   malformed/security cases, real producers and broad edits.
+2. Extend native RTF coverage beyond the accepted ordinary parser-state and
+   ASCII transport batching changes to formatting/media, compressed and
+   legacy-code-page input, malformed/security cases, real producers and broad
+   edits.
 3. Separate logical authoring/append time from final serialization and reopen
    for DOCX, PPTX and XLSX.
 4. XLSX bulk update plus distinct clear/remove/hide behavior.
@@ -75,8 +76,10 @@ The former native DOC/XLS/PPT baseline item is complete in change 0015. Changes
 removing final validation. Change 0018 accepts same-topology ODS row-local
 publication and exact untouched opaque-row preservation. Change 0019 accepts
 ordinary RTF parser-state work elimination and records a rejected, reverted
-ODS package-adoption candidate. None claims broad
-native-format or ODF CRUD, real-producer, security, or preservation coverage.
+ODS package-adoption candidate. Change 0020 accepts RTF ASCII transport
+batching and records a rejected, reverted ODT final-document adoption whose
+common read guard regressed. None claims broad native-format or ODF CRUD,
+real-producer, security, or preservation coverage.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

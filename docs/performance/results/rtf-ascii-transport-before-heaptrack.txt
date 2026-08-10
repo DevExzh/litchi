@@ -1,0 +1,2200 @@
+reading file "/tmp/rtf-ascii-before.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-before-rtf-ascii-transport --warmup 2 --samples 20 --semantic-shape large --case rtf_semantic_one_edit_save --json /tmp/rtf-ascii-heaptrack-before.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+700000 calls to allocation functions with 1.50M peak consumption from
+_$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::hc0e4496a74325f8f
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+220000 calls with 500.00K peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+220000 calls with 500.00K peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+220000 calls with 500.00K peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+10000 calls with 0B peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+10000 calls with 0B peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 20000 from 2 other places
+
+480026 calls to allocation functions with 760.10K peak consumption from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+220000 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+220000 calls with 760.00K peak consumption from:
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h8419d299e9568371
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::semantic_rtf_expected_text::h49a0319a8a8afbff
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+10000 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+10000 calls with 0B peak consumption from:
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h8419d299e9568371
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::semantic_rtf_expected_text::h49a0319a8a8afbff
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+10000 calls with 0B peak consumption from:
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h8419d299e9568371
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::semantic_rtf_expected_text::h49a0319a8a8afbff
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 10026 from 7 other places
+
+235008 calls to allocation functions with 51.85M peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.15143379835271959641
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+220000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h7fbfc6e1afa4957c
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str.llvm.1067736630308126291
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _$LT$litchi_rtf..api..story..Paragraph$u20$as$u20$core..fmt..Display$GT$::fmt::h6c79a68ba6de5d17
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::story::Paragraph::to_text::h90107af3df479bfb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+10000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h7fbfc6e1afa4957c
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str.llvm.1067736630308126291
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _$LT$litchi_rtf..api..story..Paragraph$u20$as$u20$core..fmt..Display$GT$::fmt::h6c79a68ba6de5d17
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::story::Paragraph::to_text::h90107af3df479bfb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+286 calls with 0B peak consumption from:
+    litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans::hf88b2c9964751e8f
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+286 calls with 0B peak consumption from:
+    litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans::hf88b2c9964751e8f
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+286 calls with 0B peak consumption from:
+    litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans::hf88b2c9964751e8f
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::ordinary_body_source_span::heb4353e268c3a10d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 4150 from 120 other places
+
+700 calls to allocation functions with 0B peak consumption from
+bumpalo::Bump$LT$_$GT$::alloc_layout_slow::h61bba29137c9142c
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+220 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+220 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+220 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+10 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+10 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 20 from 2 other places
+
+70 calls to allocation functions with 0B peak consumption from
+litchi_rtf::codec::parser::codec::DeferredText::decode::h27a595a361365ed2
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 2 from 2 other places
+
+70 calls to allocation functions with 15B peak consumption from
+litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 5B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 5B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 5B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 2 from 2 other places
+
+70 calls to allocation functions with 0B peak consumption from
+litchi_rtf::codec::parser::codec::DeferredText::push_transport::hee20c226f530c637
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 2 from 2 other places
+
+70 calls to allocation functions with 0B peak consumption from
+litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::new_with_source::h98ec7b708080e217
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 2 from 2 other places
+
+70 calls to allocation functions with 0B peak consumption from
+hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h98566c5297b08a63
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 2 from 2 other places
+
+69 calls to allocation functions with 1.50M peak consumption from
+litchi_rtf::model::document::model::RtfDocument::text::h8a68196ff901e6ae
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 500.00K peak consumption from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::replace_paragraph_text::h8f6c5d0529bffbc7
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 500.00K peak consumption from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 calls with 500.00K peak consumption from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 calls with 0B peak consumption from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::replace_paragraph_text::h8f6c5d0529bffbc7
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 1 from 1 other places
+
+
+PEAK MEMORY CONSUMERS
+51.85M peak memory consumed over 235008 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.15143379835271959641
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+16.12M consumed over 264 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h2ec2af8e1aee53a0
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+16.12M consumed over 264 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h2ec2af8e1aee53a0
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+16.12M consumed over 264 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h2ec2af8e1aee53a0
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+540.05K consumed over 22 calls from:
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+540.05K consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h7fbfc6e1afa4957c
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::to_bytes::hff43d86100b9bc72
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 2.41M from 120 other places
+
+1.50M peak memory consumed over 700000 calls from
+_$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::hc0e4496a74325f8f
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+500.00K consumed over 220000 calls from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+500.00K consumed over 220000 calls from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+500.00K consumed over 220000 calls from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 0B from 2 other places
+
+1.50M peak memory consumed over 69 calls from
+litchi_rtf::model::document::model::RtfDocument::text::h8a68196ff901e6ae
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+500.00K consumed over 22 calls from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+500.00K consumed over 22 calls from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+500.00K consumed over 22 calls from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.310656537280148346
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::replace_paragraph_text::h8f6c5d0529bffbc7
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 0B from 1 other places
+
+760.10K peak memory consumed over 480026 calls from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+760.00K consumed over 220000 calls from:
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h8419d299e9568371
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::semantic_rtf_expected_text::h49a0319a8a8afbff
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+76B consumed over 1 calls from:
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+26B consumed over 1 calls from:
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 0B from 7 other places
+
+540.05K peak memory consumed over 37 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h74ba8c770cd99f88E.llvm.10128653455353264005
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+540.05K consumed over 22 calls from:
+    litchi_perf_baseline::CountingSink::reserve_budget::h25fcc771d8df78cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+
+500.00K peak memory consumed over 24 calls from
+alloc::str::join_generic_copy::h7c50224ad2d98e0a
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+500.00K consumed over 22 calls from:
+    litchi_perf_baseline::semantic_rtf_expected_text::h49a0319a8a8afbff
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+
+240.00K peak memory consumed over 24 calls from
+_$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h8419d299e9568371
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+240.00K consumed over 22 calls from:
+    litchi_perf_baseline::semantic_rtf_expected_text::h49a0319a8a8afbff
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+
+73.73K peak memory consumed over 1 calls from
+0x7e6c8f2b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+12.10K peak memory consumed over 69 calls from
+litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+4.03K consumed over 22 calls from:
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+4.03K consumed over 22 calls from:
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+4.03K consumed over 22 calls from:
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 0B from 1 other places
+
+640B peak memory consumed over 25 calls from
+alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h9e1fe1decc0da795
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+480B consumed over 1 calls from:
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+160B consumed over 1 calls from:
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+
+
+MOST TEMPORARY ALLOCATIONS
+239988 temporary allocations of 480026 allocations in total (49.99%) from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+220000 temporary allocations of 220000 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+10000 temporary allocations of 10000 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_rtf::hc9779281f6f62d46
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+9988 temporary allocations of 9999 allocations in total (99.89%) from:
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 0B from 7 other places
+
+93 temporary allocations of 235008 allocations in total (0.04%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.15143379835271959641
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+22 temporary allocations of 286 allocations in total (7.69%) from:
+    litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans::hf88b2c9964751e8f
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::ordinary_body_source_span::heb4353e268c3a10d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h9cffb4f1823407ac
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h9cffb4f1823407ac
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h9cffb4f1823407ac
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 temporary allocations of 13 allocations in total (7.69%) from:
+    litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans::hf88b2c9964751e8f
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::ordinary_body_source_span::heb4353e268c3a10d
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::run_case_with_config::h12b294b75b363f27
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 4B from 120 other places
+
+4 temporary allocations of 15 allocations in total (26.67%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjrHSEGnQ3l9_3std
+  in /tmp/litchi-perf-before-rtf-ascii-transport
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECsjrHSEGnQ3l9_3std
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RINvNvNtCsjrHSEGnQ3l9_3std2io19default_read_to_end16small_probe_readRNtNtNtNtB6_3sys2fd4unix8FileDescEB6_
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::command_output::hddb1f56e0e68f787
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECsjrHSEGnQ3l9_3std
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RINvNvNtCsjrHSEGnQ3l9_3std2io19default_read_to_end16small_probe_readRNtNtNtNtB6_3sys2fd4unix8FileDescEB6_
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::git_output::h0c8e1fffec11bbd7
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECsjrHSEGnQ3l9_3std
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RINvNvNtCsjrHSEGnQ3l9_3std2io19default_read_to_end16small_probe_readRNtNtNtNtB6_3sys2fd4unix8FileDescEB6_
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::git_output::h0c8e1fffec11bbd7
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 temporary allocations of 2 allocations in total (50.00%) from:
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::git_output::h0c8e1fffec11bbd7
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+  and 0B from 9 other places
+
+3 temporary allocations of 3 allocations in total (100.00%) from
+__posix_spawn_file_actions_realloc
+  at ./posix/spawn_faction_init.c:32
+  in /lib/x86_64-linux-gnu/libc.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::command_output::hddb1f56e0e68f787
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::git_output::h0c8e1fffec11bbd7
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::git_output::h0c8e1fffec11bbd7
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.16255425803740649942
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+
+1 temporary allocations of 1 allocations in total (100.00%) from
+__GI___getdelim
+  at ./libio/iogetdelim.c:107
+  in /lib/x86_64-linux-gnu/libc.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __pthread_getattr_np
+      at ./nptl/pthread_getattr_np.c:122
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+    main
+      in /tmp/litchi-perf-before-rtf-ascii-transport
+
+1 temporary allocations of 1 allocations in total (100.00%) from
+0x7e6c8f2b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+
+total runtime: 0.68s.
+calls to allocation functions: 1416591 (2071039/s)
+temporary memory allocations: 240090 (351008/s)
+peak heap memory consumption: 56.98M
+peak RSS (including heaptrack overhead): 65.77M
+total memory leaked: 544B

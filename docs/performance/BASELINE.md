@@ -326,6 +326,14 @@ remains an incomplete program and CRUD matrix.
   See [`0019`](changes/0019-rtf-parser-state-specialization.md). An ODS
   target-package adoption candidate measured only -0.44% p50 with +0.30% p95
   and was fully reverted.
+- RTF transport-byte accumulation now extends each all-ASCII source token in
+  one batch instead of invoking the generic `SmallVec::extend` path once per
+  character. Large open p50 improves 26.67% and large one-edit/save improves
+  6.26%; instructions fall 18.40%, while allocation count, peak heap and RSS
+  remain flat. The checked byte-valued non-ASCII and invalid-Unicode paths are
+  unchanged. See [`0020`](changes/0020-rtf-ascii-transport-batching.md). An
+  ODT final-document adoption candidate was reverted because its medium
+  one-paragraph read guard regressed 6.33% mean and 17.64% p95.
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
