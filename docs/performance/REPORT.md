@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest tranche: `f9cd26da793a8342393e6c6d2862c5c56bc3734d`
+Production base for the latest tranche: `16014fda8e542e39649ddabc650bca07a70743e3`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,10 +13,10 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **109 selectable cases**: 36 default cases and 198 default
+harness contains **110 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, 16
-opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, 21 opt-in
+opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, 22 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
@@ -40,6 +40,7 @@ is still not broad program or CRUD coverage.
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
 | Bounded XLSX validated-store handoff | Medium one-cell commit + first read p50 **-23.23%**, mean **-23.15%**; allocation calls **-21.01%** | At most 4,096 cells / 1 MiB XML with exact byte and lineage identity; peak heap +4.29%; unrestricted dense-wide candidate rejected at +8.99% peak heap |
 | ODS row-local publication | Large/medium one-cell edit-save p50 **-9.54% / -7.22%**; allocation calls **-5.85%**, peak heap **-27.18%** | Same-topology modeled rows only; structural edits fall back and touched opaque rows refuse |
+| ODS adaptive cell locator | Large public cell sweep p50 **-81.74%**, mean **-80.72%**; full cell text p50 **-52.65%** | Builds lazily at 64 calls, requests 3,216 bytes on the dense corpus and is capped at 4 MiB; peak heap/RSS flat |
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
 | OPC shared changed-Part payload | Few-large compressible targeted save **-20.73%** p50 / **-18.49%** mean; cache misses **-31.12%** | Removes one 4.19 MiB handoff copy; peak heap -3.42%, uninstrumented RSS +0.22% (flat); the remaining local-span copy is removed by the follow-up below |
@@ -139,6 +140,12 @@ The ODS row-local publication evidence is
 guardrail, allocation, RSS and hardware-counter evidence is summarized in
 [`change 0018`](changes/0018-ods-row-local-publication.md).
 
+The adaptive ODS cell-locator ABBA evidence starts at
+[`before A`](results/abba-ods-cell-locator-before-a.json) and
+[`after A`](results/abba-ods-cell-locator-after-a.json); the complete profile,
+guard, memory and counter record is
+[`change 0027`](changes/0027-ods-adaptive-cell-locator.md).
+
 The RTF parser-state follow-up evidence is
 [`before A`](results/abba-rtf-state-clone-one-edit-before-a.json),
 [`after A`](results/abba-rtf-state-clone-one-edit-after-a.json),
@@ -236,6 +243,8 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODS no-op edit/save, 32,768 cells | 76.894 ms | 67.838 ms | -11.78% p50 / -12.08% mean | Peak heap flat; profiler RSS -0.13% |
 | ODS one-cell edit/save, 32,768 cells | 384.150 ms | 376.237 ms | -2.06% p50 / -2.19% mean | Changed package rewrite/readback still dominates |
 | ODS row-local one-cell edit/save, 32,768 cells | 359.011 ms | 324.774 ms | **-9.54% p50 / -9.32% mean** | Allocation calls -5.85%; peak heap -27.18%; uninstrumented RSS improved |
+| ODS public cell sweep, 32,768 cells | 2.049 ms | 0.374 ms | **-81.74% p50 / -80.72% mean** | Lazy 3,216-byte dense index; peak heap/RSS flat; allocation calls +0.0004% process-wide |
+| ODS full cell text, 32,768 cells | 3.047 ms | 1.443 ms | **-52.65% p50 / -52.30% mean** | Existing string clones/join remain; lookup work only is indexed |
 | RTF full text, 10,000 paragraphs | 33.095 us | 24.134 us | -27.08% p50 / -25.37% mean | One fragment-vector allocation removed per first materialization |
 | RTF one paragraph edit/save, 10,000 paragraphs | 12.408 ms | 9.208 ms | -25.79% p50 / -25.53% mean | Allocation calls -707 over 100 samples; peak heap flat; RSS +0.32% (flat) |
 | RTF parser-state follow-up, one paragraph edit/save, 10,000 paragraphs | 8.630 ms | 7.634 ms | **-11.54% p50 / -11.71% mean** | `State::clone` profile frame removed; allocation calls, peak heap and RSS flat |
@@ -274,6 +283,7 @@ The underlying records are:
 - [`0024-ppt-slide-order-open-reuse.md`](changes/0024-ppt-slide-order-open-reuse.md)
 - [`0025-xlsx-validated-store-handoff.md`](changes/0025-xlsx-validated-store-handoff.md)
 - [`0026-ppt-text-edit-resolver-reuse.md`](changes/0026-ppt-text-edit-resolver-reuse.md)
+- [`0027-ods-adaptive-cell-locator.md`](changes/0027-ods-adaptive-cell-locator.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -374,6 +384,10 @@ remain linked from change 0023.
   selected persisted record instead of opening and capturing the CFB a second
   time. Commit still opens a fresh editor and performs exact source comparison,
   publication, complete snapshot reopen and semantic readback.
+- Repeated public ODS cell queries lazily build one private, sheet-aligned
+  locator after 64 successful lookups. Direct runs retain compact row
+  descriptors; repeated runs add cumulative endpoints under a 4 MiB cap and
+  any build failure permanently falls back to linear lookup.
 
 No unsafe code, ambient I/O, dependency edge, public archive type, or global
 synchronization primitive was introduced. Exact-source authorization is
@@ -383,7 +397,7 @@ ZIP layouts use the fully validated rewrite path before any sink output.
 
 ## Evidence and verification
 
-The standalone harness provides 109 selectable cases and a 198-record default
+The standalone harness provides 110 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora.
@@ -445,6 +459,12 @@ task clock 3.60%, allocation calls 3.53% and temporary allocations 6.05%.
 Peak heap and uninstrumented RSS remain flat. Its +315.43% minor-fault trigger
 has zero major faults and is disclosed rather than presented as a
 memory-locality improvement.
+The ODS cell-locator follow-up reduces the large public sweep's p50 81.74% and
+the full-text aggregate's p50 52.65%. Matched sweep-process task clock falls
+10.28%, cycles 9.74%, instructions 6.72% and cache misses 7.90%; peak heap,
+Heaptrack RSS and uninstrumented RSS remain flat. The 318 added allocation
+calls across 105 snapshots (+0.0004%) and the retained 3,216-byte dense index
+are disclosed.
 Lock-wait evidence remains missing.
 
 ## Remaining highest-impact work
@@ -469,8 +489,8 @@ editor-reuse, DOC batched-publication, PPT root-open reuse and direct PPT
 text-edit resolver reuse follow-ups.
 Remaining native work requires new attribution inside the retained final
 owner/public-reader validation layers. ODT full-text block ownership is
-accepted, but broader ODF
-source-backed reads, repeated ODT/ODP semantic scans, package-parse reuse,
+accepted, and repeated ODS facade cell lookup now has a bounded lazy index, but
+broader ODF source-backed reads, repeated ODT/ODP semantic scans, package-parse reuse,
 unchanged ZIP-member publication and structural-edit profiles remain open.
 XLSX changed-sheet validation can now seed a bounded first-read cache, but bulk
 action planning, large-sheet retention, source-backed editable publication,

@@ -220,11 +220,11 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **109
+The stage-1 records above are retained unchanged. The current harness has **110
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, 16 opt-in
-DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, and 21 opt-in
+DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, and 22 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 remains an incomplete program and CRUD matrix.
 
@@ -374,6 +374,11 @@ remains an incomplete program and CRUD matrix.
   fall 3.53%, peak heap/RSS remain flat, and the minor-fault increase is
   disclosed. See
   [`0026`](changes/0026-ppt-text-edit-resolver-reuse.md).
+- Repeated public ODS cell lookup now builds a private bounded locator only on
+  the 64th successful query. Large cell-sweep p50 improves 81.74% and full-cell
+  text p50 improves 52.65%; the dense locator requests 3,216 bytes, while peak
+  heap and RSS remain flat. See
+  [`0027`](changes/0027-ods-adaptive-cell-locator.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
@@ -381,8 +386,10 @@ See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 bounded by `SourceCacheLimits`, but are not yet charged to the hierarchical
 `Budget`.
 
-Consolidated changed-crate tests and focused changed-crate formatter,
-warning-denied Clippy and rustdoc gates passed. The ODT tranche compiled the
-ODF fuzz target offline; the PPT tranche has no dedicated fuzz target in the
-current tree. A workspace all-target/all-feature gate was not rerun because
-iWork was explicitly excluded while its crates are changing independently.
+Consolidated changed-crate tests, formatter checks and focused warning-denied
+Clippy gates passed. The current ODS all-target Clippy and rustdoc gates retain
+the unrelated pre-existing findings recorded in change 0027. The ODT tranche
+compiled the ODF fuzz target offline; the PPT tranche has no dedicated fuzz
+target in the current tree. A workspace all-target/all-feature gate was not
+rerun because iWork was explicitly excluded while its crates are changing
+independently.

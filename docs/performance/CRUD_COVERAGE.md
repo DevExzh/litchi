@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 109 selectable
+This is a coverage map, not a completion claim. It compares the 110 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -12,7 +12,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; DOCX section listing remains missing |
 | Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX/ODT paragraph, one PPT shape and one PPTX/ODP slide; broader properties/images remain missing |
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX/ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part; semantic image selection remains missing |
-| Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration |
+| Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, including the isolated ODS public-cell sweep; DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration |
 | Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; ODT consuming block ownership is measured in change 0023; real-producer/media-heavy corpora remain missing |
 | Semantic conversion to sequential sink | Missing | Package serialization exists; semantic export/conversion does not |
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
@@ -111,6 +111,11 @@ Change 0026 adds a distinct direct PPT text-edit attribution case and removes
 one repeated editor open from target resolution. The fresh commit editor,
 exact source comparison, patch/inverse and complete readback remain; this does
 not complete PPT anchors, broad edits, real-producer or security coverage.
+
+Change 0027 adds an aggregation-free public ODS cell-sweep attribution case and
+a bounded lazy facade locator for repeated queries. It does not add structural,
+bulk, source-backed, real-producer, media, security or unchanged-ZIP-member
+coverage; those remain under item 10.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

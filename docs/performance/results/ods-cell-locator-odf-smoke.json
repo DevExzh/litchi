@@ -1,0 +1,966 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "16014fda8e542e39649ddabc650bca07a70743e3",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 12,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1"
+  },
+  "configuration": {
+    "samples_per_case": 1,
+    "warmup_iterations_per_case": 0,
+    "cases": [
+      "odt_semantic_open",
+      "odt_semantic_list_paragraphs",
+      "odt_semantic_one_paragraph",
+      "odt_semantic_full_text",
+      "odt_semantic_create_small",
+      "odt_semantic_noop_edit_save",
+      "odt_semantic_one_edit_save",
+      "ods_semantic_open",
+      "ods_semantic_list_sheets",
+      "ods_semantic_one_cell",
+      "ods_semantic_cell_sweep",
+      "ods_semantic_full_cell_text",
+      "ods_semantic_create_small",
+      "ods_semantic_noop_edit_save",
+      "ods_semantic_one_edit_save",
+      "odp_semantic_open",
+      "odp_semantic_list_slides",
+      "odp_semantic_one_slide",
+      "odp_semantic_full_text",
+      "odp_semantic_create_small",
+      "odp_semantic_noop_edit_save",
+      "odp_semantic_one_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "semantic_shapes": [
+      "tiny"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1,
+      2,
+      4,
+      8,
+      12
+    ]
+  },
+  "results": [
+    {
+      "case": "odt_semantic_open",
+      "corpus": {
+        "name": "odt-semantic-tiny",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 24,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1176,
+        "archive_bytes": 2148,
+        "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          30299
+        ],
+        "min": 30299,
+        "p50": 30299,
+        "p95": 30299,
+        "p99": 30299,
+        "max": 30299,
+        "mean": 30299.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 30299.0,
+          "upper": 30299.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odt_semantic_list_paragraphs",
+      "corpus": {
+        "name": "odt-semantic-tiny",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 24,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1176,
+        "archive_bytes": 2148,
+        "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          11495
+        ],
+        "min": 11495,
+        "p50": 11495,
+        "p95": 11495,
+        "p99": 11495,
+        "max": 11495,
+        "mean": 11495.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 11495.0,
+          "upper": 11495.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odt_semantic_one_paragraph",
+      "corpus": {
+        "name": "odt-semantic-tiny",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 24,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1176,
+        "archive_bytes": 2148,
+        "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          11395
+        ],
+        "min": 11395,
+        "p50": 11395,
+        "p95": 11395,
+        "p99": 11395,
+        "max": 11395,
+        "mean": 11395.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 11395.0,
+          "upper": 11395.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odt_semantic_full_text",
+      "corpus": {
+        "name": "odt-semantic-tiny",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 24,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1176,
+        "archive_bytes": 2148,
+        "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          12877
+        ],
+        "min": 12877,
+        "p50": 12877,
+        "p95": 12877,
+        "p99": 12877,
+        "max": 12877,
+        "mean": 12877.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 12877.0,
+          "upper": 12877.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odt_semantic_create_small",
+      "corpus": {
+        "name": "odt-semantic-tiny",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 24,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1176,
+        "archive_bytes": 2148,
+        "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          135775
+        ],
+        "min": 135775,
+        "p50": 135775,
+        "p95": 135775,
+        "p99": 135775,
+        "max": 135775,
+        "mean": 135775.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 135775.0,
+          "upper": 135775.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odt_semantic_noop_edit_save",
+      "corpus": {
+        "name": "odt-semantic-tiny",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 24,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1176,
+        "archive_bytes": 2148,
+        "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          781
+        ],
+        "min": 781,
+        "p50": 781,
+        "p95": 781,
+        "p99": 781,
+        "max": 781,
+        "mean": 781.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 781.0,
+          "upper": 781.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odt_semantic_one_edit_save",
+      "corpus": {
+        "name": "odt-semantic-tiny",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 24,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1176,
+        "archive_bytes": 2148,
+        "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          501214
+        ],
+        "min": 501214,
+        "p50": 501214,
+        "p95": 501214,
+        "p99": 501214,
+        "max": 501214,
+        "mean": 501214.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 501214.0,
+          "upper": 501214.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "ods_semantic_open",
+      "corpus": {
+        "name": "ods-semantic-tiny",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 3456,
+        "archive_bytes": 1083,
+        "archive_sha256": "3e7111e5d618980cdcb338af1a0657c1722c3ffae36f35651b3aea03b2034aa2",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          148942
+        ],
+        "min": 148942,
+        "p50": 148942,
+        "p95": 148942,
+        "p99": 148942,
+        "max": 148942,
+        "mean": 148942.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 148942.0,
+          "upper": 148942.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "ods_semantic_list_sheets",
+      "corpus": {
+        "name": "ods-semantic-tiny",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 3456,
+        "archive_bytes": 1083,
+        "archive_sha256": "3e7111e5d618980cdcb338af1a0657c1722c3ffae36f35651b3aea03b2034aa2",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          21
+        ],
+        "min": 21,
+        "p50": 21,
+        "p95": 21,
+        "p99": 21,
+        "max": 21,
+        "mean": 21.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 21.0,
+          "upper": 21.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "ods_semantic_one_cell",
+      "corpus": {
+        "name": "ods-semantic-tiny",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 3456,
+        "archive_bytes": 1083,
+        "archive_sha256": "3e7111e5d618980cdcb338af1a0657c1722c3ffae36f35651b3aea03b2034aa2",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          100
+        ],
+        "min": 100,
+        "p50": 100,
+        "p95": 100,
+        "p99": 100,
+        "max": 100,
+        "mean": 100.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 100.0,
+          "upper": 100.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "ods_semantic_cell_sweep",
+      "corpus": {
+        "name": "ods-semantic-tiny",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 3456,
+        "archive_bytes": 1083,
+        "archive_sha256": "3e7111e5d618980cdcb338af1a0657c1722c3ffae36f35651b3aea03b2034aa2",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          1913
+        ],
+        "min": 1913,
+        "p50": 1913,
+        "p95": 1913,
+        "p99": 1913,
+        "max": 1913,
+        "mean": 1913.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 1913.0,
+          "upper": 1913.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "ods_semantic_full_cell_text",
+      "corpus": {
+        "name": "ods-semantic-tiny",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 3456,
+        "archive_bytes": 1083,
+        "archive_sha256": "3e7111e5d618980cdcb338af1a0657c1722c3ffae36f35651b3aea03b2034aa2",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          4206
+        ],
+        "min": 4206,
+        "p50": 4206,
+        "p95": 4206,
+        "p99": 4206,
+        "max": 4206,
+        "mean": 4206.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 4206.0,
+          "upper": 4206.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "ods_semantic_create_small",
+      "corpus": {
+        "name": "ods-semantic-tiny",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 3456,
+        "archive_bytes": 1083,
+        "archive_sha256": "3e7111e5d618980cdcb338af1a0657c1722c3ffae36f35651b3aea03b2034aa2",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          283454
+        ],
+        "min": 283454,
+        "p50": 283454,
+        "p95": 283454,
+        "p99": 283454,
+        "max": 283454,
+        "mean": 283454.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 283454.0,
+          "upper": 283454.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "ods_semantic_noop_edit_save",
+      "corpus": {
+        "name": "ods-semantic-tiny",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 3456,
+        "archive_bytes": 1083,
+        "archive_sha256": "3e7111e5d618980cdcb338af1a0657c1722c3ffae36f35651b3aea03b2034aa2",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          239368
+        ],
+        "min": 239368,
+        "p50": 239368,
+        "p95": 239368,
+        "p99": 239368,
+        "max": 239368,
+        "mean": 239368.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 239368.0,
+          "upper": 239368.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "ods_semantic_one_edit_save",
+      "corpus": {
+        "name": "ods-semantic-tiny",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 3456,
+        "archive_bytes": 1083,
+        "archive_sha256": "3e7111e5d618980cdcb338af1a0657c1722c3ffae36f35651b3aea03b2034aa2",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          1296350
+        ],
+        "min": 1296350,
+        "p50": 1296350,
+        "p95": 1296350,
+        "p99": 1296350,
+        "max": 1296350,
+        "mean": 1296350.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 1296350.0,
+          "upper": 1296350.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odp_semantic_open",
+      "corpus": {
+        "name": "odp-semantic-tiny",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 261,
+        "archive_bytes": 2229,
+        "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          47692
+        ],
+        "min": 47692,
+        "p50": 47692,
+        "p95": 47692,
+        "p99": 47692,
+        "max": 47692,
+        "mean": 47692.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 47692.0,
+          "upper": 47692.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odp_semantic_list_slides",
+      "corpus": {
+        "name": "odp-semantic-tiny",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 261,
+        "archive_bytes": 2229,
+        "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          45979
+        ],
+        "min": 45979,
+        "p50": 45979,
+        "p95": 45979,
+        "p99": 45979,
+        "max": 45979,
+        "mean": 45979.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 45979.0,
+          "upper": 45979.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odp_semantic_one_slide",
+      "corpus": {
+        "name": "odp-semantic-tiny",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 261,
+        "archive_bytes": 2229,
+        "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          38070
+        ],
+        "min": 38070,
+        "p50": 38070,
+        "p95": 38070,
+        "p99": 38070,
+        "max": 38070,
+        "mean": 38070.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 38070.0,
+          "upper": 38070.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odp_semantic_full_text",
+      "corpus": {
+        "name": "odp-semantic-tiny",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 261,
+        "archive_bytes": 2229,
+        "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          37729
+        ],
+        "min": 37729,
+        "p50": 37729,
+        "p95": 37729,
+        "p99": 37729,
+        "max": 37729,
+        "mean": 37729.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 37729.0,
+          "upper": 37729.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odp_semantic_create_small",
+      "corpus": {
+        "name": "odp-semantic-tiny",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 261,
+        "archive_bytes": 2229,
+        "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          177599
+        ],
+        "min": 177599,
+        "p50": 177599,
+        "p95": 177599,
+        "p99": 177599,
+        "max": 177599,
+        "mean": 177599.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 177599.0,
+          "upper": 177599.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odp_semantic_noop_edit_save",
+      "corpus": {
+        "name": "odp-semantic-tiny",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 261,
+        "archive_bytes": 2229,
+        "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          195112
+        ],
+        "min": 195112,
+        "p50": 195112,
+        "p95": 195112,
+        "p99": 195112,
+        "max": 195112,
+        "mean": 195112.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 195112.0,
+          "upper": 195112.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "odp_semantic_one_edit_save",
+      "corpus": {
+        "name": "odp-semantic-tiny",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 261,
+        "archive_bytes": 2229,
+        "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          578525
+        ],
+        "min": 578525,
+        "p50": 578525,
+        "p95": 578525,
+        "p99": 578525,
+        "max": 578525,
+        "mean": 578525.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 578525.0,
+          "upper": 578525.0
+        }
+      },
+      "sink": null
+    }
+  ]
+}
