@@ -9,10 +9,6 @@ use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings, M
 use litchi_iwa_common::shape::fill::{Opacity, StopMidpoint, StopPosition};
 use litchi_keynote::slide::media::MovieKind;
 use litchi_keynote::soundtrack::{Mode as SoundtrackMode, Settings as SoundtrackSettings};
-use litchi_keynote::transition::{
-    Acceleration, AnimationParameters, CustomParameters, Direction, Effect, MosaicType, Settings,
-    TextDelivery, TimingCurveSlot,
-};
 use litchi_keynote::{Package as FocusedKeynotePackage, SlideSelector};
 use std::time::Duration;
 
@@ -3138,35 +3134,6 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
 }
 
 #[test]
-fn transition_update_is_transactional() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut transition = editor.slides().unwrap()[0].transition.clone().unwrap();
-    transition.set_duration(Some(2.5)).unwrap();
-    transition.set_delay(Some(1.0)).unwrap();
-    transition.set_is_automatic(Some(true));
-    let before = editor.to_bytes().unwrap();
-    let mut invalid_transition = transition.clone();
-    assert!(
-        invalid_transition
-            .set_duration(Some(f64::INFINITY))
-            .is_err()
-    );
-    assert_eq!(invalid_transition, transition);
-    assert_eq!(editor.to_bytes().unwrap(), before);
-    editor.set_slide_transition(0, transition.clone()).unwrap();
-    assert_eq!(
-        editor.slides().unwrap()[0].transition.as_ref(),
-        Some(&transition)
-    );
-
-    let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        reparsed.slides().unwrap()[0].transition.as_ref(),
-        Some(&transition)
-    );
-}
-
-#[test]
 fn soundtrack_settings_are_typed_transactional_and_wire_exact() {
     let mut editor = KeynoteEditor::from_package(test_package_with_soundtrack()).unwrap();
     let original = SoundtrackSettings::new(Some(1.0), Some(SoundtrackMode::PlayOnce)).unwrap();
@@ -3735,292 +3702,9 @@ fn slide_text_placeholder_visibility_rejects_missing_or_inconsistent_state() {
 }
 
 #[test]
-fn transition_lifecycle_is_typed_transactional_and_wire_exact() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let original: Settings = editor.slide_transition(0).unwrap().unwrap();
-    assert_eq!(original.effect(), Some(&Effect::None));
-    assert!(!original.has_effect());
-
-    let mut dissolve = original.clone();
-    dissolve.set_effect(Some(Effect::Dissolve)).unwrap();
-    dissolve.set_duration(Some(1.5)).unwrap();
-    dissolve.set_direction(Some(Direction::from_native(2)));
-    let mut animation_parameters = dissolve.animation_parameters().clone();
-    animation_parameters.set_detail(Some(0.75)).unwrap();
-    dissolve
-        .set_animation_parameters(animation_parameters)
-        .unwrap();
-    let mut custom_parameters = *dissolve.custom_parameters();
-    custom_parameters.set_bounce(Some(true));
-    dissolve.set_custom_parameters(custom_parameters).unwrap();
-    editor.set_slide_transition(0, dissolve.clone()).unwrap();
-    assert_eq!(editor.slide_transition(0).unwrap(), Some(dissolve));
-    assert!(editor.slide_transition(0).unwrap().unwrap().has_effect());
-
-    assert!(editor.clear_slide_transition(0).unwrap());
-    assert_eq!(editor.slide_transition(0).unwrap(), Some(original));
-    let cleared = editor.to_bytes().unwrap();
-    assert!(!editor.clear_slide_transition(0).unwrap());
-    assert!(editor.slide_transition(99).is_err());
-    assert!(editor.clear_slide_transition(99).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), cleared);
-
-    assert!(Effect::unknown("none").is_err());
-    assert_eq!(editor.to_bytes().unwrap(), cleared);
-}
-
-#[test]
-fn transition_lifecycle_synchronizes_the_separate_slide_node_component() {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(3).unwrap();
-            let message = object.messages[0].clone();
-            let mut data = patch_varint_field(&message.data, 7, true, Some(0))?;
-            append_unknown_varint(&mut data, 97, 9_700);
-            object.replace_message(
-                0,
-                RawMessage {
-                    type_: message.type_,
-                    data,
-                },
-            )?;
-            object.archive_info.message_infos[0]
-                .field_infos
-                .push(FieldInfo {
-                    path: FieldPath { path: vec![7] },
-                    ..Default::default()
-                });
-            Ok(())
-        })
-        .unwrap();
-
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
-    let baseline = editor.to_bytes().unwrap();
-    let original = editor.slide_transition(0).unwrap().unwrap();
-    assert!(!original.has_effect());
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    assert_ne!(
-        graph.archive_name(3).unwrap(),
-        graph.archive_name(4).unwrap()
-    );
-    let original_node_wire = graph
-        .message_data_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
-        .unwrap();
-    let original_unknown = crate::wire::parse_wire_fields(original_node_wire)
-        .unwrap()
-        .into_iter()
-        .find(|field| field.number() == 97)
-        .map(|field| original_node_wire[field.start()..field.end()].to_vec())
-        .unwrap();
-    let original_header_metadata = editor
-        .package()
-        .archive("Index/Document.iwa")
-        .unwrap()
-        .object(3)
-        .unwrap()
-        .archive_info
-        .message_infos[0]
-        .field_infos
-        .clone();
-
-    let mut dissolve = original.clone();
-    dissolve.set_effect(Some(Effect::Dissolve)).unwrap();
-    editor.set_slide_transition(0, dissolve.clone()).unwrap();
-    assert_eq!(editor.slide_transition(0).unwrap(), Some(dissolve.clone()));
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    let node: kn::SlideNodeArchive = graph
-        .decode_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
-        .unwrap();
-    assert!(node.has_transition);
-    let node_wire = graph
-        .message_data_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
-        .unwrap();
-    let unknown = crate::wire::parse_wire_fields(node_wire)
-        .unwrap()
-        .into_iter()
-        .find(|field| field.number() == 97)
-        .map(|field| node_wire[field.start()..field.end()].to_vec())
-        .unwrap();
-    assert_eq!(unknown, original_unknown);
-    assert_eq!(
-        editor
-            .package()
-            .archive("Index/Document.iwa")
-            .unwrap()
-            .object(3)
-            .unwrap()
-            .archive_info
-            .message_infos[0]
-            .field_infos,
-        original_header_metadata
-    );
-
-    let changed = editor.to_bytes().unwrap();
-    editor.set_slide_transition(0, dissolve).unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), changed);
-
-    let reopened = KeynoteEditor::from_bytes(&changed).unwrap();
-    assert_eq!(
-        reopened.slide_transition(0).unwrap().unwrap().has_effect(),
-        true
-    );
-    let reopened_graph = ObjectGraph::read(reopened.package()).unwrap();
-    let reopened_node: kn::SlideNodeArchive = reopened_graph
-        .decode_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
-        .unwrap();
-    assert!(reopened_node.has_transition);
-
-    assert!(editor.clear_slide_transition(0).unwrap());
-    assert!(!editor.slide_transition(0).unwrap().unwrap().has_effect());
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    let node: kn::SlideNodeArchive = graph
-        .decode_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
-        .unwrap();
-    assert!(!node.has_transition);
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-    assert!(!editor.clear_slide_transition(0).unwrap());
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    let mut malformed = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut invalid = malformed.slide_transition(0).unwrap().unwrap();
-    invalid.set_effect(Some(Effect::Dissolve)).unwrap();
-    let mut corrupted = malformed.into_package();
-    corrupted
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(3).unwrap();
-            let message = object.messages[0].clone();
-            let mut data = message.data;
-            append_unknown_varint(&mut data, 7, 0);
-            object.replace_message(
-                0,
-                RawMessage {
-                    type_: TEST_SLIDE_NODE_MESSAGE_TYPE,
-                    data,
-                },
-            )?;
-            Ok(())
-        })
-        .unwrap();
-    malformed = KeynoteEditor::from_package(corrupted).unwrap();
-    let malformed_before = malformed.to_bytes().unwrap();
-    assert!(malformed.set_slide_transition(0, invalid).is_err());
-    assert_eq!(malformed.to_bytes().unwrap(), malformed_before);
-    assert!(!malformed.slide_transition(0).unwrap().unwrap().has_effect());
-}
-
-#[test]
-fn transition_custom_parameter_crud_is_lossless_and_transactional() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut settings = editor.slides().unwrap()[0].transition.clone().unwrap();
-    settings
-        .set_effect(Some(
-            Effect::unknown("com.example.future-transition").unwrap(),
-        ))
-        .unwrap();
-    settings.set_direction(Some(Direction::from_native(42)));
-    let mut custom_parameters = CustomParameters::new();
-    custom_parameters.set_twist(Some(-0.375)).unwrap();
-    custom_parameters.set_mosaic_size(Some(0));
-    custom_parameters.set_mosaic_type(Some(MosaicType::from_native(7)));
-    custom_parameters.set_bounce(Some(false));
-    custom_parameters.set_magic_move_fade_unmatched_objects(Some(true));
-    custom_parameters.set_acceleration(Some(Acceleration::Custom));
-    custom_parameters.set_text_delivery(Some(TextDelivery::ByCharacter));
-    custom_parameters.set_motion_blur(Some(false));
-    custom_parameters.set_travel_distance(Some(275.5)).unwrap();
-    settings.set_custom_parameters(custom_parameters).unwrap();
-    editor.set_slide_transition(0, settings.clone()).unwrap();
-    assert_eq!(
-        editor.slides().unwrap()[0].transition.as_ref(),
-        Some(&settings)
-    );
-
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    let native: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
-    let native = native.transition.attributes;
-    assert_eq!(native.custom_twist, Some(-0.375));
-    assert_eq!(native.custom_mosaic_size, Some(0));
-    assert_eq!(native.custom_mosaic_type, Some(7));
-    assert_eq!(native.custom_bounce, Some(false));
-    assert_eq!(native.custom_magic_move_fade_unmatched_objects, Some(true));
-    assert_eq!(native.custom_timing_curve, Some(5));
-    assert_eq!(native.custom_text_delivery_type, Some(3));
-    assert_eq!(native.custom_motion_blur, Some(false));
-    assert_eq!(native.custom_travel_distance, Some(275.5));
-    drop(graph);
-
-    let before_noop = editor.to_bytes().unwrap();
-    editor.set_slide_transition(0, settings.clone()).unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), before_noop);
-
-    let mut custom_parameters = *settings.custom_parameters();
-    custom_parameters.set_acceleration(Some(Acceleration::from_native(19)));
-    custom_parameters.set_text_delivery(Some(TextDelivery::from_native(-1)));
-    settings.set_custom_parameters(custom_parameters).unwrap();
-    editor.set_slide_transition(0, settings.clone()).unwrap();
-    let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        reparsed.slides().unwrap()[0].transition.as_ref(),
-        Some(&settings)
-    );
-
-    let before_invalid = editor.to_bytes().unwrap();
-    let mut invalid_custom_parameters = *settings.custom_parameters();
-    assert!(invalid_custom_parameters.set_twist(Some(f32::NAN)).is_err());
-    assert_eq!(invalid_custom_parameters, *settings.custom_parameters());
-    assert!(
-        invalid_custom_parameters
-            .set_travel_distance(Some(f32::INFINITY))
-            .is_err()
-    );
-    assert_eq!(invalid_custom_parameters, *settings.custom_parameters());
-    assert!(Effect::unknown("apple:dissolve").is_err());
-    let mut invalid = settings.clone();
-    assert!(
-        invalid
-            .set_animation_type(Some("invalid\0transition"))
-            .is_err()
-    );
-    assert_eq!(invalid, settings);
-    assert_eq!(editor.to_bytes().unwrap(), before_invalid);
-
-    settings
-        .set_custom_parameters(CustomParameters::default())
-        .unwrap();
-    editor.set_slide_transition(0, settings.clone()).unwrap();
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    let native: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
-    let native = native.transition.attributes;
-    assert_eq!(native.custom_twist, None);
-    assert_eq!(native.custom_mosaic_size, None);
-    assert_eq!(native.custom_mosaic_type, None);
-    assert_eq!(native.custom_bounce, None);
-    assert_eq!(native.custom_magic_move_fade_unmatched_objects, None);
-    assert_eq!(native.custom_timing_curve, None);
-    assert_eq!(native.custom_text_delivery_type, None);
-    assert_eq!(native.custom_motion_blur, None);
-    assert_eq!(native.custom_travel_distance, None);
-}
-
-#[test]
-fn transition_custom_parameters_reject_malformed_wire_transactionally() {
+fn transition_custom_parameters_reader_rejects_malformed_wire() {
     for mutation in 0..10 {
-        let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-        let mut settings = editor.slides().unwrap()[0].transition.clone().unwrap();
-        let mut custom_parameters = CustomParameters::new();
-        custom_parameters.set_twist(Some(0.25)).unwrap();
-        custom_parameters.set_mosaic_size(Some(16));
-        custom_parameters.set_mosaic_type(Some(MosaicType::from_native(2)));
-        custom_parameters.set_bounce(Some(true));
-        custom_parameters.set_magic_move_fade_unmatched_objects(Some(false));
-        custom_parameters.set_acceleration(Some(Acceleration::EaseInOut));
-        custom_parameters.set_text_delivery(Some(TextDelivery::ByWord));
-        custom_parameters.set_motion_blur(Some(true));
-        custom_parameters.set_travel_distance(Some(80.0)).unwrap();
-        settings.set_custom_parameters(custom_parameters).unwrap();
-        editor.set_slide_transition(0, settings.clone()).unwrap();
-        let mut package = editor.into_package();
+        let mut package = test_package();
         package
             .update_archive("Index/Slide-4.iwa", |archive| {
                 let slide = archive.object_mut(4).unwrap();
@@ -4029,15 +3713,42 @@ fn transition_custom_parameters_reject_malformed_wire_transactionally() {
                     transform_length_delimited_field(transition, 2, |attributes| {
                         let mut attributes = attributes.to_vec();
                         match mutation {
-                            0 => append_unknown_fixed32(&mut attributes, 9, 0.5_f32.to_bits()),
-                            1 => append_unknown_varint(&mut attributes, 10, 24),
-                            2 => append_unknown_varint(&mut attributes, 11, 3),
-                            3 => append_unknown_varint(&mut attributes, 12, 0),
-                            4 => append_unknown_varint(&mut attributes, 13, 1),
-                            5 => append_unknown_varint(&mut attributes, 15, 3),
-                            6 => append_unknown_varint(&mut attributes, 16, 4),
-                            7 => append_unknown_varint(&mut attributes, 17, 0),
-                            8 => append_unknown_fixed32(&mut attributes, 18, 120.0_f32.to_bits()),
+                            0 => {
+                                append_unknown_fixed32(&mut attributes, 9, 0.25_f32.to_bits());
+                                append_unknown_fixed32(&mut attributes, 9, 0.5_f32.to_bits());
+                            },
+                            1 => {
+                                append_unknown_varint(&mut attributes, 10, 16);
+                                append_unknown_varint(&mut attributes, 10, 24);
+                            },
+                            2 => {
+                                append_unknown_varint(&mut attributes, 11, 2);
+                                append_unknown_varint(&mut attributes, 11, 3);
+                            },
+                            3 => {
+                                append_unknown_varint(&mut attributes, 12, 1);
+                                append_unknown_varint(&mut attributes, 12, 0);
+                            },
+                            4 => {
+                                append_unknown_varint(&mut attributes, 13, 0);
+                                append_unknown_varint(&mut attributes, 13, 1);
+                            },
+                            5 => {
+                                append_unknown_varint(&mut attributes, 15, 2);
+                                append_unknown_varint(&mut attributes, 15, 3);
+                            },
+                            6 => {
+                                append_unknown_varint(&mut attributes, 16, 2);
+                                append_unknown_varint(&mut attributes, 16, 4);
+                            },
+                            7 => {
+                                append_unknown_varint(&mut attributes, 17, 1);
+                                append_unknown_varint(&mut attributes, 17, 0);
+                            },
+                            8 => {
+                                append_unknown_fixed32(&mut attributes, 18, 80.0_f32.to_bits());
+                                append_unknown_fixed32(&mut attributes, 18, 120.0_f32.to_bits());
+                            },
                             9 => append_unknown_varint(&mut attributes, 9, 1),
                             _ => unreachable!(),
                         }
@@ -4054,151 +3765,17 @@ fn transition_custom_parameters_reject_malformed_wire_transactionally() {
                 Ok(())
             })
             .unwrap();
-        if let Ok(mut malformed) = KeynoteEditor::from_package(package) {
-            assert!(malformed.slides().is_err(), "mutation {mutation}");
-            let before = malformed.to_bytes().unwrap();
-            assert!(
-                malformed.set_slide_transition(0, settings).is_err(),
-                "mutation {mutation}"
-            );
-            assert_eq!(malformed.to_bytes().unwrap(), before);
-        }
+        let rejected = match KeynoteEditor::from_package(package) {
+            Ok(malformed) => malformed.slides().is_err(),
+            Err(_) => true,
+        };
+        assert!(rejected, "mutation {mutation}");
     }
 }
 
 #[test]
-fn transition_animation_parameter_crud_preserves_raw_payloads_transactionally() {
-    let mut color_payload = tsp::Color {
-        model: tsp::color::ColorModel::Rgb as i32,
-        r: Some(0.125),
-        g: Some(0.5),
-        b: Some(0.875),
-        a: Some(0.75),
-        rgbspace: Some(tsp::color::RgbColorSpace::P3 as i32),
-        ..Default::default()
-    }
-    .encode_to_vec();
-    append_unknown_varint(&mut color_payload, 99, 9_900);
-    let mut curve_payload =
-        native_motion_path(&KeynoteMotionPath::straight(1.0, 1.0)).encode_to_vec();
-    append_unknown_varint(&mut curve_payload, 98, 9_800);
-
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut settings = editor.slides().unwrap()[0].transition.clone().unwrap();
-    let mut animation_parameters = AnimationParameters::new();
-    animation_parameters
-        .set_color_payload(Some(&color_payload))
-        .unwrap();
-    for slot in TimingCurveSlot::ALL {
-        animation_parameters
-            .set_timing_curve_payload(slot, Some(&curve_payload))
-            .unwrap();
-    }
-    animation_parameters.set_random_number_seed(Some(0));
-    animation_parameters.set_detail(Some(0.0)).unwrap();
-    for (slot, name) in TimingCurveSlot::ALL
-        .into_iter()
-        .zip(["", "Ease In", "Custom Bézier"])
-    {
-        animation_parameters
-            .set_timing_curve_theme_name(slot, Some(name))
-            .unwrap();
-    }
-    animation_parameters.set_writing_direction_is_rtl(Some(false));
-    settings
-        .set_animation_parameters(animation_parameters)
-        .unwrap();
-    editor.set_slide_transition(0, settings.clone()).unwrap();
-    assert_eq!(
-        editor.slides().unwrap()[0].transition.as_ref(),
-        Some(&settings)
-    );
-
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    let native: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
-    let animation = native.transition.attributes.animation_attributes.unwrap();
-    assert!(animation.color.is_some());
-    assert!(animation.custom_effect_timing_curve_1.is_some());
-    assert!(animation.custom_effect_timing_curve_2.is_some());
-    assert!(animation.custom_effect_timing_curve_3.is_some());
-    assert_eq!(animation.random_number_seed, Some(0));
-    assert_eq!(animation.custom_detail, Some(0.0));
-    assert_eq!(
-        animation.custom_effect_timing_curve_theme_name_1.as_deref(),
-        Some("")
-    );
-    assert_eq!(animation.writing_direction_is_rtl, Some(false));
-    drop(graph);
-
-    let before_noop = editor.to_bytes().unwrap();
-    editor.set_slide_transition(0, settings.clone()).unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), before_noop);
-
-    let before_invalid = editor.to_bytes().unwrap();
-    let mut invalid_animation_parameters = settings.animation_parameters().clone();
-    assert!(
-        invalid_animation_parameters
-            .set_detail(Some(f64::NAN))
-            .is_err()
-    );
-    assert_eq!(
-        invalid_animation_parameters,
-        *settings.animation_parameters()
-    );
-    let mut invalid = settings.clone();
-    let mut invalid_animation_parameters = settings.animation_parameters().clone();
-    invalid_animation_parameters
-        .set_color_payload(Some(&[0xff]))
-        .unwrap();
-    invalid
-        .set_animation_parameters(invalid_animation_parameters)
-        .unwrap();
-    assert!(editor.set_slide_transition(0, invalid).is_err());
-    let mut invalid = settings.clone();
-    let mut invalid_animation_parameters = settings.animation_parameters().clone();
-    invalid_animation_parameters
-        .set_timing_curve_payload(TimingCurveSlot::Second, Some(&[0xff]))
-        .unwrap();
-    invalid
-        .set_animation_parameters(invalid_animation_parameters)
-        .unwrap();
-    assert!(editor.set_slide_transition(0, invalid).is_err());
-    let mut invalid_animation_parameters = settings.animation_parameters().clone();
-    assert!(
-        invalid_animation_parameters
-            .set_timing_curve_theme_name(TimingCurveSlot::Third, Some("bad\0name"))
-            .is_err()
-    );
-    assert_eq!(
-        invalid_animation_parameters,
-        *settings.animation_parameters()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), before_invalid);
-
-    settings
-        .set_animation_parameters(AnimationParameters::default())
-        .unwrap();
-    editor.set_slide_transition(0, settings).unwrap();
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    let native: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
-    let animation = native.transition.attributes.animation_attributes.unwrap();
-    assert_eq!(animation.color, None);
-    assert_eq!(animation.custom_effect_timing_curve_1, None);
-    assert_eq!(animation.custom_effect_timing_curve_2, None);
-    assert_eq!(animation.custom_effect_timing_curve_3, None);
-    assert_eq!(animation.random_number_seed, None);
-    assert_eq!(animation.custom_detail, None);
-    assert_eq!(animation.custom_effect_timing_curve_theme_name_1, None);
-    assert_eq!(animation.custom_effect_timing_curve_theme_name_2, None);
-    assert_eq!(animation.custom_effect_timing_curve_theme_name_3, None);
-    assert_eq!(animation.writing_direction_is_rtl, None);
-}
-
-#[test]
-fn transition_animation_parameters_reject_malformed_wire() {
+fn transition_animation_parameters_reader_rejects_malformed_wire() {
     for mutation in 0..10 {
-        let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-        let mut settings = editor.slides().unwrap()[0].transition.clone().unwrap();
         let color_payload = tsp::Color {
             model: tsp::color::ColorModel::White as i32,
             w: Some(0.5),
@@ -4207,24 +3784,7 @@ fn transition_animation_parameters_reject_malformed_wire() {
         .encode_to_vec();
         let curve_payload =
             native_motion_path(&KeynoteMotionPath::straight(1.0, 1.0)).encode_to_vec();
-        let mut animation_parameters = AnimationParameters::new();
-        animation_parameters
-            .set_color_payload(Some(&color_payload))
-            .unwrap();
-        animation_parameters
-            .set_timing_curve_payload(TimingCurveSlot::First, Some(&curve_payload))
-            .unwrap();
-        animation_parameters.set_random_number_seed(Some(17));
-        animation_parameters.set_detail(Some(0.25)).unwrap();
-        animation_parameters
-            .set_timing_curve_theme_name(TimingCurveSlot::First, Some("Curve"))
-            .unwrap();
-        animation_parameters.set_writing_direction_is_rtl(Some(true));
-        settings
-            .set_animation_parameters(animation_parameters)
-            .unwrap();
-        editor.set_slide_transition(0, settings.clone()).unwrap();
-        let mut package = editor.into_package();
+        let mut package = test_package();
         package
             .update_archive("Index/Slide-4.iwa", |archive| {
                 let slide = archive.object_mut(4).unwrap();
@@ -4240,6 +3800,11 @@ fn transition_animation_parameters_reject_malformed_wire() {
                                         7,
                                         &color_payload,
                                     )?;
+                                    animation = append_repeated_length_delimited_field(
+                                        &animation,
+                                        7,
+                                        &color_payload,
+                                    )?;
                                 },
                                 1 => {
                                     animation = append_repeated_length_delimited_field(
@@ -4247,15 +3812,32 @@ fn transition_animation_parameters_reject_malformed_wire() {
                                         8,
                                         &curve_payload,
                                     )?;
+                                    animation = append_repeated_length_delimited_field(
+                                        &animation,
+                                        8,
+                                        &curve_payload,
+                                    )?;
                                 },
-                                2 => append_unknown_varint(&mut animation, 11, 18),
-                                3 => append_unknown_fixed64(&mut animation, 12, 0.5_f64.to_bits()),
+                                2 => {
+                                    append_unknown_varint(&mut animation, 11, 17);
+                                    append_unknown_varint(&mut animation, 11, 18);
+                                },
+                                3 => {
+                                    append_unknown_fixed64(&mut animation, 12, 0.25_f64.to_bits());
+                                    append_unknown_fixed64(&mut animation, 12, 0.5_f64.to_bits());
+                                },
                                 4 => {
+                                    animation = append_repeated_length_delimited_field(
+                                        &animation, 13, b"Curve",
+                                    )?;
                                     animation = append_repeated_length_delimited_field(
                                         &animation, 13, b"Other",
                                     )?;
                                 },
-                                5 => append_unknown_varint(&mut animation, 16, 0),
+                                5 => {
+                                    append_unknown_varint(&mut animation, 16, 1);
+                                    append_unknown_varint(&mut animation, 16, 0);
+                                },
                                 6 => append_unknown_varint(&mut animation, 7, 1),
                                 7 => append_unknown_varint(&mut animation, 12, 1),
                                 8 => append_unknown_fixed64(&mut animation, 11, 17_f64.to_bits()),
@@ -4276,20 +3858,16 @@ fn transition_animation_parameters_reject_malformed_wire() {
                 Ok(())
             })
             .unwrap();
-        if let Ok(mut malformed) = KeynoteEditor::from_package(package) {
-            assert!(malformed.slides().is_err(), "mutation {mutation}");
-            let before = malformed.to_bytes().unwrap();
-            assert!(
-                malformed.set_slide_transition(0, settings).is_err(),
-                "mutation {mutation}"
-            );
-            assert_eq!(malformed.to_bytes().unwrap(), before);
-        }
+        let rejected = match KeynoteEditor::from_package(package) {
+            Ok(malformed) => malformed.slides().is_err(),
+            Err(_) => true,
+        };
+        assert!(rejected, "mutation {mutation}");
     }
 }
 
 #[test]
-fn transition_and_slide_name_updates_preserve_unknown_wire_and_restore_exact_components() {
+fn slide_name_updates_preserve_unknown_wire_and_restore_exact_component() {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -4302,44 +3880,6 @@ fn transition_and_slide_name_updates_preserve_unknown_wire_and_restore_exact_com
             Ok(())
         })
         .unwrap();
-    package
-        .update_archive("Index/Slide-4.iwa", |archive| {
-            let object = archive.object_mut(4).unwrap();
-            let message = object.messages[0].clone();
-            let mut data =
-                crate::wire::transform_length_delimited_field(&message.data, 4, |transition| {
-                    let mut transition = crate::wire::transform_length_delimited_field(
-                        transition,
-                        2,
-                        |attributes| {
-                            let mut attributes = crate::wire::transform_length_delimited_field(
-                                attributes,
-                                8,
-                                |animation| {
-                                    let mut animation = animation.to_vec();
-                                    append_unknown_varint(&mut animation, 96, 960);
-                                    Ok(animation)
-                                },
-                            )?;
-                            append_unknown_varint(&mut attributes, 97, 970);
-                            Ok(attributes)
-                        },
-                    )?;
-                    append_unknown_varint(&mut transition, 98, 980);
-                    Ok(transition)
-                })?;
-            append_unknown_varint(&mut data, 99, 990);
-            Ok(object
-                .replace_message(
-                    0,
-                    RawMessage {
-                        type_: message.type_,
-                        data,
-                    },
-                )
-                .map(|_| ())?)
-        })
-        .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
     let document_before = editor
         .package()
@@ -4347,27 +3887,6 @@ fn transition_and_slide_name_updates_preserve_unknown_wire_and_restore_exact_com
         .unwrap()
         .to_bytes()
         .unwrap();
-    let slide_before = editor
-        .package()
-        .archive("Index/Slide-4.iwa")
-        .unwrap()
-        .to_bytes()
-        .unwrap();
-    let original_transition = editor.slides().unwrap()[0].transition.clone().unwrap();
-
-    let mut changed_transition = original_transition.clone();
-    changed_transition
-        .set_animation_type(Some("Transition"))
-        .unwrap();
-    changed_transition
-        .set_effect(Some(Effect::unknown("dissolve").unwrap()))
-        .unwrap();
-    changed_transition.set_duration(Some(2.5)).unwrap();
-    changed_transition.set_direction(Some(Direction::from_native(2)));
-    changed_transition.set_delay(Some(1.0)).unwrap();
-    changed_transition.set_is_automatic(Some(true));
-    editor.set_slide_transition(0, changed_transition).unwrap();
-    editor.set_slide_transition(0, original_transition).unwrap();
     editor.set_slide_name(0, Some("Temporary")).unwrap();
     editor.set_slide_name(0, None).unwrap();
 
@@ -4379,15 +3898,6 @@ fn transition_and_slide_name_updates_preserve_unknown_wire_and_restore_exact_com
             .to_bytes()
             .unwrap(),
         document_before
-    );
-    assert_eq!(
-        editor
-            .package()
-            .archive("Index/Slide-4.iwa")
-            .unwrap()
-            .to_bytes()
-            .unwrap(),
-        slide_before
     );
 }
 

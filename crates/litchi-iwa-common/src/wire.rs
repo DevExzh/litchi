@@ -549,6 +549,175 @@ impl WireField {
     }
 }
 
+/// Typed replacement for one leaf in a batched nested-field rewrite.
+///
+/// `None` clears a present leaf, or validates that an absent leaf remains
+/// absent. `Some` replaces a present leaf or appends an absent leaf. Keeping
+/// the wire type outside the option means clearing still verifies the exact
+/// schema-selected wire type before removing bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NestedFieldReplacement<'a> {
+    /// Optional protobuf varint.
+    Varint(Option<u64>),
+    /// Optional little-endian protobuf fixed32.
+    Fixed32(Option<u32>),
+    /// Optional little-endian protobuf fixed64.
+    Fixed64(Option<u64>),
+    /// Optional protobuf length-delimited payload.
+    LengthDelimited(Option<&'a [u8]>),
+}
+
+impl NestedFieldReplacement<'_> {
+    const fn wire_type(self) -> u8 {
+        match self {
+            Self::Varint(_) => 0,
+            Self::Fixed64(_) => 1,
+            Self::LengthDelimited(_) => 2,
+            Self::Fixed32(_) => 5,
+        }
+    }
+
+    #[allow(
+        clippy::match_same_arms,
+        reason = "The variants carry three different Option scalar types plus one borrowed slice"
+    )]
+    const fn is_some(self) -> bool {
+        match self {
+            Self::Varint(value) => value.is_some(),
+            Self::Fixed32(value) => value.is_some(),
+            Self::Fixed64(value) => value.is_some(),
+            Self::LengthDelimited(value) => value.is_some(),
+        }
+    }
+}
+
+/// One schema-selected leaf edit for [`patch_nested_fields_batched_with_limits`].
+///
+/// `path` is a nonempty sequence of canonical protobuf field numbers. Every
+/// non-leaf component must identify exactly one canonical length-delimited
+/// field. The leaf must occur exactly once when `expected_present` is true and
+/// not at all when it is false. Paths may share ancestors, but duplicate paths
+/// and leaf/ancestor path collisions are rejected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NestedFieldEdit<'a> {
+    path: &'a [u32],
+    expected_present: bool,
+    replacement: NestedFieldReplacement<'a>,
+}
+
+impl<'a> NestedFieldEdit<'a> {
+    /// Construct one batched nested-field edit.
+    #[must_use]
+    pub const fn new(
+        path: &'a [u32],
+        expected_present: bool,
+        replacement: NestedFieldReplacement<'a>,
+    ) -> Self {
+        Self {
+            path,
+            expected_present,
+            replacement,
+        }
+    }
+
+    /// Canonical field-number path from the root message to the leaf.
+    #[must_use]
+    pub const fn path(self) -> &'a [u32] {
+        self.path
+    }
+
+    /// Whether the selected leaf must occur exactly once.
+    #[must_use]
+    pub const fn expected_present(self) -> bool {
+        self.expected_present
+    }
+
+    /// Typed optional replacement for the selected leaf.
+    #[must_use]
+    pub const fn replacement(self) -> NestedFieldReplacement<'a> {
+        self.replacement
+    }
+}
+
+#[derive(Debug)]
+struct BatchTrieNode {
+    children: Vec<(u32, usize)>,
+    edit: Option<usize>,
+}
+
+impl BatchTrieNode {
+    const fn new() -> Self {
+        Self {
+            children: Vec::new(),
+            edit: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BatchFieldAction {
+    Copy,
+    Leaf(usize),
+    Nested(usize),
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BatchPlannedField {
+    start: usize,
+    key_end: usize,
+    end: usize,
+    action: BatchFieldAction,
+}
+
+#[derive(Debug)]
+struct BatchMessagePlan {
+    fields: Vec<BatchPlannedField>,
+    appended: Vec<usize>,
+    output_len: usize,
+    changed: bool,
+}
+
+#[derive(Debug)]
+struct BatchPlanContext {
+    limits: WireLimits,
+    source_fields: usize,
+    removed_fields: usize,
+    appended_fields: usize,
+    plans: Vec<BatchMessagePlan>,
+}
+
+impl BatchPlanContext {
+    const fn new(limits: WireLimits) -> Self {
+        Self {
+            limits,
+            source_fields: 0,
+            removed_fields: 0,
+            appended_fields: 0,
+            plans: Vec::new(),
+        }
+    }
+
+    fn charge_field(&mut self) -> Result<()> {
+        self.source_fields = self
+            .source_fields
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
+        ensure_field_count(self.source_fields, self.limits)
+    }
+
+    fn push_plan(&mut self, plan: BatchMessagePlan) -> Result<usize> {
+        let index = self.plans.len();
+        self.plans
+            .try_reserve(1)
+            .map_err(|_allocation| Error::Allocation {
+                resource: "batched wire message plans",
+                amount: index + 1,
+            })?;
+        self.plans.push(plan);
+        Ok(index)
+    }
+}
+
 fn checked_wire_range<'a>(
     data: &'a [u8],
     start: usize,
@@ -1045,6 +1214,656 @@ pub fn patch_nested_fixed64_field(
     patch_nested_field(data, path, &|nested_data, field_number| {
         patch_fixed64_field(nested_data, field_number, expected_leaf, replacement)
     })
+}
+
+/// Rewrite many nested singular leaves with one bounded parse/sizing pass and
+/// one final emission.
+///
+/// The edits are compiled into a field-number trie, so shared ancestors are
+/// decoded and rebuilt once even when many leaves change below them. Selected
+/// ancestors and leaves must have canonical keys; selected length-delimited
+/// framing and selected varint values must also be canonical. All unselected
+/// records remain opaque and retain their exact bytes and order, including
+/// unknown fields, duplicate unknowns, noncanonical unknown varints, and
+/// matched protobuf groups. New leaves are appended to their containing
+/// message in edit-slice order.
+///
+/// The shared input, field, output, and nesting budgets cover the whole
+/// selected tree. Rewrite work is exactly the root source length plus final
+/// emitted length: every retained or replaced source byte is scanned at most
+/// once by the planning pass and every output byte is emitted once. The final
+/// output uses one exact, fallible allocation; planning storage is also grown
+/// fallibly.
+pub fn patch_nested_fields_batched_with_limits(
+    data: &[u8],
+    edits: &[NestedFieldEdit<'_>],
+    limits: WireLimits,
+) -> Result<Vec<u8>> {
+    if data.len() > limits.max_input_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: data.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+
+    let trie = build_batch_edit_trie(edits, limits)?;
+    let mut context = BatchPlanContext::new(limits);
+    let root_plan = plan_batch_message(data, 0, data.len(), 0, 0, &trie, edits, &mut context)?;
+    let root = context
+        .plans
+        .get(root_plan)
+        .ok_or_else(|| Error::InvalidFormat("protobuf batch root plan is missing".to_owned()))?;
+    let output_fields = context
+        .source_fields
+        .checked_sub(context.removed_fields)
+        .and_then(|count| count.checked_add(context.appended_fields))
+        .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
+    ensure_field_count(output_fields, limits)?;
+    let output_size = root.output_len;
+    let work = data
+        .len()
+        .checked_add(output_size)
+        .ok_or_else(|| Error::InvalidFormat("protobuf rewrite-work overflow".to_owned()))?;
+    ensure_rewrite_work(work, limits)?;
+
+    let mut output = output_with_capacity(output_size, limits)?;
+    emit_batch_message(root_plan, data, edits, &context.plans, &mut output)?;
+    debug_assert_eq!(output.len(), output_size);
+    Ok(output)
+}
+
+/// Rewrite many nested singular leaves under the default finite resource
+/// profile. See [`patch_nested_fields_batched_with_limits`] for invariants and
+/// byte-preservation guarantees.
+pub fn patch_nested_fields_batched(data: &[u8], edits: &[NestedFieldEdit<'_>]) -> Result<Vec<u8>> {
+    patch_nested_fields_batched_with_limits(data, edits, WireLimits::default())
+}
+
+fn build_batch_edit_trie(
+    edits: &[NestedFieldEdit<'_>],
+    limits: WireLimits,
+) -> Result<Vec<BatchTrieNode>> {
+    ensure_field_count(edits.len(), limits)?;
+    let mut trie = Vec::new();
+    trie.try_reserve(1)
+        .map_err(|_allocation| Error::Allocation {
+            resource: "batched wire edit trie",
+            amount: 1,
+        })?;
+    trie.push(BatchTrieNode::new());
+
+    for (edit_index, edit) in edits.iter().enumerate() {
+        if edit.path.is_empty() {
+            return Err(Error::InvalidFormat(
+                "protobuf field path cannot be empty".to_owned(),
+            ));
+        }
+        ensure_nesting(edit.path.len() - 1, limits)?;
+        let mut node_index = 0usize;
+        for &field_number in edit.path {
+            validate_field_number(field_number)?;
+            if trie[node_index].edit.is_some() {
+                return Err(Error::InvalidFormat(
+                    "protobuf batch edit path crosses an edited leaf".to_owned(),
+                ));
+            }
+            let existing = trie[node_index]
+                .children
+                .binary_search_by_key(&field_number, |&(number, _)| number)
+                .ok()
+                .map(|position| trie[node_index].children[position].1);
+            node_index = if let Some(child) = existing {
+                child
+            } else {
+                let child = trie.len();
+                // The root is not a field-path component, so the next node's
+                // index is also the resulting number of selected components.
+                ensure_field_count(child, limits)?;
+                trie.try_reserve(1)
+                    .map_err(|_allocation| Error::Allocation {
+                        resource: "batched wire edit trie",
+                        amount: child + 1,
+                    })?;
+                trie.push(BatchTrieNode::new());
+                let position = trie[node_index]
+                    .children
+                    .binary_search_by_key(&field_number, |&(number, _)| number)
+                    .unwrap_or_else(|position| position);
+                trie[node_index]
+                    .children
+                    .try_reserve(1)
+                    .map_err(|_allocation| Error::Allocation {
+                        resource: "batched wire trie children",
+                        amount: trie[node_index].children.len() + 1,
+                    })?;
+                trie[node_index]
+                    .children
+                    .insert(position, (field_number, child));
+                child
+            };
+        }
+        if trie[node_index].edit.is_some() {
+            return Err(Error::InvalidFormat(
+                "protobuf batch edit path occurs more than once".to_owned(),
+            ));
+        }
+        if !trie[node_index].children.is_empty() {
+            return Err(Error::InvalidFormat(
+                "protobuf batch edited leaf is also an ancestor".to_owned(),
+            ));
+        }
+        trie[node_index].edit = Some(edit_index);
+    }
+    Ok(trie)
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The recursive planner carries one explicit source range, trie node, depth, and shared bounded state"
+)]
+fn plan_batch_message(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    trie_node: usize,
+    depth: usize,
+    trie: &[BatchTrieNode],
+    edits: &[NestedFieldEdit<'_>],
+    context: &mut BatchPlanContext,
+) -> Result<usize> {
+    ensure_nesting(depth, context.limits)?;
+    let node = trie
+        .get(trie_node)
+        .ok_or_else(|| Error::InvalidFormat("protobuf batch trie node is missing".to_owned()))?;
+    let mut seen = Vec::new();
+    seen.try_reserve_exact(node.children.len())
+        .map_err(|_allocation| Error::Allocation {
+            resource: "batched wire occurrence counters",
+            amount: node.children.len(),
+        })?;
+    seen.resize(node.children.len(), 0usize);
+    let mut fields = Vec::new();
+    let mut output_len = 0usize;
+    let mut changed = false;
+    let mut offset = start;
+
+    while offset < end {
+        let field = parse_batch_field(data, offset, end, depth, context)?;
+        offset = field.end;
+        let selected = node
+            .children
+            .binary_search_by_key(&field.number, |&(number, _)| number)
+            .ok();
+        let (action, field_output_len, field_changed) = if let Some(position) = selected {
+            seen[position] = seen[position]
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormat("protobuf occurrence overflow".to_owned()))?;
+            if seen[position] > 1 {
+                return Err(Error::InvalidFormat(format!(
+                    "singular protobuf field {} occurs more than once",
+                    field.number
+                )));
+            }
+            let child_index = node.children[position].1;
+            let child = &trie[child_index];
+            if let Some(edit_index) = child.edit {
+                plan_batch_leaf(data, field, edit_index, edits, context)?
+            } else {
+                if field.wire_type != 2 {
+                    return Err(Error::InvalidFormat(format!(
+                        "protobuf field {} is not length-delimited",
+                        field.number
+                    )));
+                }
+                field.validate_canonical_framing(data)?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf nesting depth overflow".to_owned())
+                })?;
+                ensure_nesting(child_depth, context.limits)?;
+                let nested_plan = plan_batch_message(
+                    data,
+                    field.payload_start,
+                    field.end,
+                    child_index,
+                    child_depth,
+                    trie,
+                    edits,
+                    context,
+                )?;
+                let nested = context.plans.get(nested_plan).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf nested batch plan is missing".to_owned())
+                })?;
+                if nested.changed {
+                    let payload_length =
+                        u64::try_from(nested.output_len).map_err(|_conversion| {
+                            Error::InvalidFormat("protobuf replacement exceeds u64".to_owned())
+                        })?;
+                    let length = field
+                        .key_end
+                        .checked_sub(field.start)
+                        .and_then(|key| key.checked_add(crate::varint::encoded_len(payload_length)))
+                        .and_then(|framing| framing.checked_add(nested.output_len))
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("protobuf output size overflow".to_owned())
+                        })?;
+                    (BatchFieldAction::Nested(nested_plan), length, true)
+                } else {
+                    (BatchFieldAction::Copy, field.end - field.start, false)
+                }
+            }
+        } else {
+            (BatchFieldAction::Copy, field.end - field.start, false)
+        };
+        output_len = output_len
+            .checked_add(field_output_len)
+            .ok_or_else(|| Error::InvalidFormat("protobuf output size overflow".to_owned()))?;
+        changed |= field_changed;
+        fields
+            .try_reserve(1)
+            .map_err(|_allocation| Error::Allocation {
+                resource: "batched wire field plans",
+                amount: fields.len() + 1,
+            })?;
+        fields.push(BatchPlannedField {
+            start: field.start,
+            key_end: field.key_end,
+            end: field.end,
+            action,
+        });
+    }
+
+    let mut appended = Vec::new();
+    for (position, &(field_number, child_index)) in node.children.iter().enumerate() {
+        let child = &trie[child_index];
+        if seen[position] != 0 {
+            continue;
+        }
+        let Some(edit_index) = child.edit else {
+            return Err(Error::InvalidFormat(format!(
+                "singular protobuf ancestor field {field_number} changed during mutation"
+            )));
+        };
+        let edit = edits[edit_index];
+        if edit.expected_present {
+            return Err(Error::InvalidFormat(format!(
+                "singular protobuf field {field_number} changed during mutation"
+            )));
+        }
+        if !edit.replacement.is_some() {
+            continue;
+        }
+        let appended_len = encoded_batch_replacement_len(field_number, edit.replacement, true)?;
+        output_len = output_len
+            .checked_add(appended_len)
+            .ok_or_else(|| Error::InvalidFormat("protobuf output size overflow".to_owned()))?;
+        context.appended_fields = context
+            .appended_fields
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
+        appended
+            .try_reserve(1)
+            .map_err(|_allocation| Error::Allocation {
+                resource: "batched appended wire edits",
+                amount: appended.len() + 1,
+            })?;
+        appended.push(edit_index);
+        changed = true;
+    }
+    appended.sort_unstable();
+
+    context.push_plan(BatchMessagePlan {
+        fields,
+        appended,
+        output_len,
+        changed,
+    })
+}
+
+fn plan_batch_leaf(
+    data: &[u8],
+    field: WireField,
+    edit_index: usize,
+    edits: &[NestedFieldEdit<'_>],
+    context: &mut BatchPlanContext,
+) -> Result<(BatchFieldAction, usize, bool)> {
+    let edit = edits[edit_index];
+    if !edit.expected_present {
+        return Err(Error::InvalidFormat(format!(
+            "singular protobuf field {} changed during mutation",
+            field.number
+        )));
+    }
+    let expected_wire_type = edit.replacement.wire_type();
+    if field.wire_type != expected_wire_type {
+        return Err(Error::InvalidFormat(format!(
+            "protobuf field {} has wire type {}, expected {expected_wire_type}",
+            field.number, field.wire_type
+        )));
+    }
+    validate_batch_selected_leaf(data, field)?;
+    if !edit.replacement.is_some() {
+        context.removed_fields = context
+            .removed_fields
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
+        return Ok((BatchFieldAction::Leaf(edit_index), 0, true));
+    }
+    if batch_replacement_matches(data, field, edit.replacement)? {
+        return Ok((BatchFieldAction::Copy, field.end - field.start, false));
+    }
+    let length = encoded_batch_replacement_len(field.number, edit.replacement, false)?
+        .checked_add(field.key_end - field.start)
+        .ok_or_else(|| Error::InvalidFormat("protobuf output size overflow".to_owned()))?;
+    Ok((BatchFieldAction::Leaf(edit_index), length, true))
+}
+
+fn validate_batch_selected_leaf(data: &[u8], field: WireField) -> Result<()> {
+    field.validate_canonical_key(data)?;
+    if field.wire_type == 2 {
+        field.validate_canonical_length(data)?;
+    } else if field.wire_type == 0 {
+        let payload = field.payload(data)?;
+        let (value, width) = crate::varint::decode_varint_from_bytes(payload).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "invalid protobuf varint value for field {}: {error}",
+                field.number
+            ))
+        })?;
+        if width != payload.len() || width != crate::varint::encoded_len(value) {
+            return Err(Error::InvalidFormat(format!(
+                "protobuf field {} has a noncanonical varint value",
+                field.number
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn batch_replacement_matches(
+    data: &[u8],
+    field: WireField,
+    replacement: NestedFieldReplacement<'_>,
+) -> Result<bool> {
+    let payload = field.payload(data)?;
+    Ok(match replacement {
+        NestedFieldReplacement::Varint(Some(value)) => {
+            let (existing, width) =
+                crate::varint::decode_varint_from_bytes(payload).map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "invalid protobuf varint value for field {}: {error}",
+                        field.number
+                    ))
+                })?;
+            width == payload.len() && existing == value
+        },
+        NestedFieldReplacement::Fixed32(Some(value)) => payload == value.to_le_bytes(),
+        NestedFieldReplacement::Fixed64(Some(value)) => payload == value.to_le_bytes(),
+        NestedFieldReplacement::LengthDelimited(Some(value)) => payload == value,
+        NestedFieldReplacement::Varint(None)
+        | NestedFieldReplacement::Fixed32(None)
+        | NestedFieldReplacement::Fixed64(None)
+        | NestedFieldReplacement::LengthDelimited(None) => false,
+    })
+}
+
+fn encoded_batch_replacement_len(
+    field_number: u32,
+    replacement: NestedFieldReplacement<'_>,
+    include_key: bool,
+) -> Result<usize> {
+    let payload_len = match replacement {
+        NestedFieldReplacement::Varint(Some(value)) => crate::varint::encoded_len(value),
+        NestedFieldReplacement::Fixed32(Some(_)) => 4,
+        NestedFieldReplacement::Fixed64(Some(_)) => 8,
+        NestedFieldReplacement::LengthDelimited(Some(payload)) => {
+            let length = u64::try_from(payload.len()).map_err(|_conversion| {
+                Error::InvalidFormat("protobuf replacement exceeds u64".to_owned())
+            })?;
+            crate::varint::encoded_len(length)
+                .checked_add(payload.len())
+                .ok_or_else(|| Error::InvalidFormat("protobuf output size overflow".to_owned()))?
+        },
+        NestedFieldReplacement::Varint(None)
+        | NestedFieldReplacement::Fixed32(None)
+        | NestedFieldReplacement::Fixed64(None)
+        | NestedFieldReplacement::LengthDelimited(None) => 0,
+    };
+    if !include_key {
+        return Ok(payload_len);
+    }
+    let key = (u64::from(field_number) << 3) | u64::from(replacement.wire_type());
+    crate::varint::encoded_len(key)
+        .checked_add(payload_len)
+        .ok_or_else(|| Error::InvalidFormat("protobuf output size overflow".to_owned()))
+}
+
+fn parse_batch_field(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    depth: usize,
+    context: &mut BatchPlanContext,
+) -> Result<WireField> {
+    let (number, wire_type, key_end) = parse_batch_key(data, start, end)?;
+    context.charge_field()?;
+    if wire_type == 4 {
+        return Err(Error::InvalidFormat(format!(
+            "unexpected protobuf end-group field {number}"
+        )));
+    }
+    let mut payload_start = key_end;
+    let field_end = if wire_type == 3 {
+        let group_depth = depth
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("protobuf nesting depth overflow".to_owned()))?;
+        ensure_nesting(group_depth, context.limits)?;
+        skip_batch_group(data, key_end, end, number, group_depth, context)?
+    } else {
+        let (payload, parsed_end) = parse_batch_payload(data, key_end, end, wire_type)?;
+        payload_start = payload;
+        parsed_end
+    };
+    Ok(WireField {
+        number,
+        wire_type,
+        start,
+        key_end,
+        payload_start,
+        end: field_end,
+    })
+}
+
+fn parse_batch_key(data: &[u8], start: usize, end: usize) -> Result<(u32, u8, usize)> {
+    let source = data.get(start..end).ok_or_else(|| {
+        Error::InvalidFormat("protobuf field range is outside the supplied data".to_owned())
+    })?;
+    let (key, key_length) = crate::varint::decode_varint_from_bytes(source)
+        .map_err(|error| Error::InvalidFormat(format!("invalid protobuf key: {error}")))?;
+    let key_end = start
+        .checked_add(key_length)
+        .ok_or_else(|| Error::InvalidFormat("protobuf key offset overflow".to_owned()))?;
+    let number = u32::try_from(key >> 3).map_err(|error| {
+        Error::InvalidFormat(format!("protobuf field number does not fit u32: {error}"))
+    })?;
+    validate_field_number(number)?;
+    let wire_type = u8::try_from(key & 7).map_err(|error| {
+        Error::InvalidFormat(format!("protobuf wire type does not fit u8: {error}"))
+    })?;
+    if wire_type > 5 {
+        return Err(Error::InvalidFormat(format!(
+            "invalid protobuf wire type {wire_type}"
+        )));
+    }
+    Ok((number, wire_type, key_end))
+}
+
+fn parse_batch_payload(
+    data: &[u8],
+    key_end: usize,
+    message_end: usize,
+    wire_type: u8,
+) -> Result<(usize, usize)> {
+    let mut payload_start = key_end;
+    let end = match wire_type {
+        0 => {
+            let source = data.get(key_end..message_end).ok_or_else(|| {
+                Error::InvalidFormat("protobuf varint range is outside the message".to_owned())
+            })?;
+            let (_, width) = crate::varint::decode_varint_from_bytes(source).map_err(|error| {
+                Error::InvalidFormat(format!("invalid protobuf varint value: {error}"))
+            })?;
+            key_end
+                .checked_add(width)
+                .ok_or_else(|| Error::InvalidFormat("protobuf varint offset overflow".to_owned()))?
+        },
+        1 => key_end
+            .checked_add(8)
+            .ok_or_else(|| Error::InvalidFormat("protobuf fixed64 offset overflow".to_owned()))?,
+        2 => {
+            let source = data.get(key_end..message_end).ok_or_else(|| {
+                Error::InvalidFormat("protobuf length range is outside the message".to_owned())
+            })?;
+            let (encoded_length, width) =
+                crate::varint::decode_varint_from_bytes(source).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid protobuf length: {error}"))
+                })?;
+            payload_start = key_end.checked_add(width).ok_or_else(|| {
+                Error::InvalidFormat("protobuf length-prefix overflow".to_owned())
+            })?;
+            let length = usize::try_from(encoded_length).map_err(|error| {
+                Error::InvalidFormat(format!("protobuf field length exceeds usize: {error}"))
+            })?;
+            payload_start
+                .checked_add(length)
+                .ok_or_else(|| Error::InvalidFormat("protobuf field range overflow".to_owned()))?
+        },
+        5 => key_end
+            .checked_add(4)
+            .ok_or_else(|| Error::InvalidFormat("protobuf fixed32 offset overflow".to_owned()))?,
+        3 | 4 => {
+            return Err(Error::InvalidFormat(
+                "protobuf group was parsed as a scalar payload".to_owned(),
+            ));
+        },
+        _ => {
+            return Err(Error::InvalidFormat(format!(
+                "invalid protobuf wire type {wire_type}"
+            )));
+        },
+    };
+    if end > message_end {
+        return Err(Error::InvalidFormat("truncated protobuf field".to_owned()));
+    }
+    Ok((payload_start, end))
+}
+
+fn skip_batch_group(
+    data: &[u8],
+    mut offset: usize,
+    message_end: usize,
+    group_number: u32,
+    depth: usize,
+    context: &mut BatchPlanContext,
+) -> Result<usize> {
+    while offset < message_end {
+        let (number, wire_type, key_end) = parse_batch_key(data, offset, message_end)?;
+        context.charge_field()?;
+        if wire_type == 4 {
+            if number != group_number {
+                return Err(Error::InvalidFormat(format!(
+                    "protobuf end-group field {number} does not match start-group field {group_number}"
+                )));
+            }
+            return Ok(key_end);
+        }
+        offset = if wire_type == 3 {
+            let nested_depth = depth.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("protobuf nesting depth overflow".to_owned())
+            })?;
+            ensure_nesting(nested_depth, context.limits)?;
+            skip_batch_group(data, key_end, message_end, number, nested_depth, context)?
+        } else {
+            parse_batch_payload(data, key_end, message_end, wire_type)?.1
+        };
+    }
+    Err(Error::InvalidFormat(format!(
+        "protobuf start-group field {group_number} is not terminated"
+    )))
+}
+
+fn emit_batch_message(
+    plan_index: usize,
+    data: &[u8],
+    edits: &[NestedFieldEdit<'_>],
+    plans: &[BatchMessagePlan],
+    output: &mut Vec<u8>,
+) -> Result<()> {
+    let plan = plans.get(plan_index).ok_or_else(|| {
+        Error::InvalidFormat("protobuf batch emission plan is missing".to_owned())
+    })?;
+    for field in &plan.fields {
+        match field.action {
+            BatchFieldAction::Copy => output.extend_from_slice(&data[field.start..field.end]),
+            BatchFieldAction::Leaf(edit_index) => {
+                let edit = edits[edit_index];
+                if edit.replacement.is_some() {
+                    output.extend_from_slice(&data[field.start..field.key_end]);
+                    emit_batch_replacement_payload(edit.replacement, output)?;
+                }
+            },
+            BatchFieldAction::Nested(nested_plan) => {
+                output.extend_from_slice(&data[field.start..field.key_end]);
+                let nested = plans.get(nested_plan).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf nested emission plan is missing".to_owned())
+                })?;
+                let length = u64::try_from(nested.output_len).map_err(|_conversion| {
+                    Error::InvalidFormat("protobuf replacement exceeds u64".to_owned())
+                })?;
+                crate::varint::encode_varint_into(output, length);
+                emit_batch_message(nested_plan, data, edits, plans, output)?;
+            },
+        }
+    }
+    for &edit_index in &plan.appended {
+        let edit = edits[edit_index];
+        let field_number = *edit.path.last().ok_or_else(|| {
+            Error::InvalidFormat("protobuf field path cannot be empty".to_owned())
+        })?;
+        let key = (u64::from(field_number) << 3) | u64::from(edit.replacement.wire_type());
+        crate::varint::encode_varint_into(output, key);
+        emit_batch_replacement_payload(edit.replacement, output)?;
+    }
+    Ok(())
+}
+
+fn emit_batch_replacement_payload(
+    replacement: NestedFieldReplacement<'_>,
+    output: &mut Vec<u8>,
+) -> Result<()> {
+    match replacement {
+        NestedFieldReplacement::Varint(Some(value)) => {
+            crate::varint::encode_varint_into(output, value);
+        },
+        NestedFieldReplacement::Fixed32(Some(value)) => {
+            output.extend_from_slice(&value.to_le_bytes());
+        },
+        NestedFieldReplacement::Fixed64(Some(value)) => {
+            output.extend_from_slice(&value.to_le_bytes());
+        },
+        NestedFieldReplacement::LengthDelimited(Some(payload)) => {
+            let length = u64::try_from(payload.len()).map_err(|_conversion| {
+                Error::InvalidFormat("protobuf replacement exceeds u64".to_owned())
+            })?;
+            crate::varint::encode_varint_into(output, length);
+            output.extend_from_slice(payload);
+        },
+        NestedFieldReplacement::Varint(None)
+        | NestedFieldReplacement::Fixed32(None)
+        | NestedFieldReplacement::Fixed64(None)
+        | NestedFieldReplacement::LengthDelimited(None) => {},
+    }
+    Ok(())
 }
 
 pub fn patch_length_delimited_field(
@@ -2315,6 +3134,12 @@ mod tests {
         field
     }
 
+    fn length_delimited_field(number: u32, payload: &[u8]) -> Vec<u8> {
+        let mut field = Vec::new();
+        append_length_delimited_field(&mut field, number, payload).unwrap();
+        field
+    }
+
     #[test]
     fn generic_callback_boundary_preserves_caller_errors() {
         let mut repeated = Vec::new();
@@ -2396,6 +3221,361 @@ mod tests {
             patch_nested_fixed32_field(&outer, &[4, 1], false, Some(42.0_f32.to_bits())).unwrap();
         let restored = patch_nested_fixed32_field(&changed, &[4, 1], true, None).unwrap();
         assert_eq!(restored, baseline);
+    }
+
+    #[test]
+    fn batched_nested_edits_match_sequential_typed_patches() {
+        let mut leaf = varint_field(1, 7);
+        append_scalar_field(&mut leaf, 2, 5, &10_u32.to_le_bytes()).unwrap();
+        append_scalar_field(&mut leaf, 3, 1, &20_u64.to_le_bytes()).unwrap();
+        append_length_delimited_field(&mut leaf, 4, b"old").unwrap();
+        leaf.extend(varint_field(99, 9001));
+        let child = length_delimited_field(2, &leaf);
+        let mut source = varint_field(90, 1);
+        source.extend(length_delimited_field(4, &child));
+        source.extend(varint_field(91, 2));
+
+        let edits = [
+            NestedFieldEdit::new(&[4, 2, 1], true, NestedFieldReplacement::Varint(Some(8))),
+            NestedFieldEdit::new(&[4, 2, 2], true, NestedFieldReplacement::Fixed32(None)),
+            NestedFieldEdit::new(&[4, 2, 3], true, NestedFieldReplacement::Fixed64(Some(21))),
+            NestedFieldEdit::new(
+                &[4, 2, 4],
+                true,
+                NestedFieldReplacement::LengthDelimited(Some(b"new value")),
+            ),
+            NestedFieldEdit::new(&[4, 2, 5], false, NestedFieldReplacement::Varint(Some(55))),
+        ];
+        let batch = patch_nested_fields_batched(&source, &edits).unwrap();
+
+        let mut sequential = patch_nested_varint_field(&source, &[4, 2, 1], true, Some(8)).unwrap();
+        sequential = patch_nested_fixed32_field(&sequential, &[4, 2, 2], true, None).unwrap();
+        sequential = patch_nested_fixed64_field(&sequential, &[4, 2, 3], true, Some(21)).unwrap();
+        sequential =
+            patch_nested_length_delimited_field(&sequential, &[4, 2, 4], true, Some(b"new value"))
+                .unwrap();
+        sequential = patch_nested_varint_field(&sequential, &[4, 2, 5], false, Some(55)).unwrap();
+        assert_eq!(batch, sequential);
+    }
+
+    #[test]
+    fn batched_nested_clears_and_appends_every_leaf_wire_type_exactly() {
+        let mut source = varint_field(99, 9001);
+        source.extend(varint_field(1, 7));
+        append_scalar_field(&mut source, 2, 5, &10_u32.to_le_bytes()).unwrap();
+        append_scalar_field(&mut source, 3, 1, &20_u64.to_le_bytes()).unwrap();
+        append_length_delimited_field(&mut source, 4, b"opaque").unwrap();
+        let cleared = patch_nested_fields_batched(
+            &source,
+            &[
+                NestedFieldEdit::new(&[1], true, NestedFieldReplacement::Varint(None)),
+                NestedFieldEdit::new(&[2], true, NestedFieldReplacement::Fixed32(None)),
+                NestedFieldEdit::new(&[3], true, NestedFieldReplacement::Fixed64(None)),
+                NestedFieldEdit::new(&[4], true, NestedFieldReplacement::LengthDelimited(None)),
+            ],
+        )
+        .unwrap();
+        assert_eq!(cleared, varint_field(99, 9001));
+
+        let restored = patch_nested_fields_batched(
+            &cleared,
+            &[
+                NestedFieldEdit::new(&[1], false, NestedFieldReplacement::Varint(Some(7))),
+                NestedFieldEdit::new(&[2], false, NestedFieldReplacement::Fixed32(Some(10))),
+                NestedFieldEdit::new(&[3], false, NestedFieldReplacement::Fixed64(Some(20))),
+                NestedFieldEdit::new(
+                    &[4],
+                    false,
+                    NestedFieldReplacement::LengthDelimited(Some(b"opaque")),
+                ),
+            ],
+        )
+        .unwrap();
+        assert_eq!(restored, source);
+    }
+
+    #[test]
+    fn batched_nested_noop_is_exact_and_appends_in_edit_order() {
+        let mut inner = vec![0xa0, 0x81, 0x00, 0x81, 0x00];
+        inner.extend(varint_field(1, 7));
+        inner.extend([0xa5, 0x01, 1, 2, 3, 4]);
+        inner.extend([0x92, 0x00, 0x81, 0x00, b'z']);
+        let source = length_delimited_field(4, &inner);
+        assert_eq!(patch_nested_fields_batched(&source, &[]).unwrap(), source);
+        let noops = [
+            NestedFieldEdit::new(&[4, 1], true, NestedFieldReplacement::Varint(Some(7))),
+            NestedFieldEdit::new(&[4, 3], false, NestedFieldReplacement::Fixed32(None)),
+        ];
+        assert_eq!(
+            patch_nested_fields_batched(&source, &noops).unwrap(),
+            source
+        );
+
+        let appends = [
+            NestedFieldEdit::new(&[4, 7], false, NestedFieldReplacement::Varint(Some(1))),
+            NestedFieldEdit::new(&[4, 5], false, NestedFieldReplacement::Fixed32(Some(2))),
+        ];
+        let changed = patch_nested_fields_batched(&source, &appends).unwrap();
+        let mut expected_inner = inner;
+        expected_inner.extend(varint_field(7, 1));
+        append_scalar_field(&mut expected_inner, 5, 5, &2_u32.to_le_bytes()).unwrap();
+        assert_eq!(changed, length_delimited_field(4, &expected_inner));
+    }
+
+    #[test]
+    fn batched_nested_preserves_all_unknown_wire_types_and_groups() {
+        let mut group = vec![0x53];
+        group.extend([0x88, 0x00, 0x81, 0x00]);
+        group.push(0x5b);
+        group.extend([0x15, 1, 2, 3, 4]);
+        group.extend([0x5c, 0x54]);
+
+        let mut source = vec![0x91, 0x01, 1, 2, 3, 4, 5, 6, 7, 8];
+        source.extend(&group);
+        source.extend(varint_field(1, 7));
+        source.extend([0x9d, 0x01, 9, 8, 7, 6]);
+        source.extend([0xa2, 0x01, 0x81, 0x00, b'x']);
+        let edit = [NestedFieldEdit::new(
+            &[1],
+            true,
+            NestedFieldReplacement::Varint(Some(8)),
+        )];
+        let changed = patch_nested_fields_batched(&source, &edit).unwrap();
+
+        let mut expected = vec![0x91, 0x01, 1, 2, 3, 4, 5, 6, 7, 8];
+        expected.extend(&group);
+        expected.extend(varint_field(1, 8));
+        expected.extend([0x9d, 0x01, 9, 8, 7, 6]);
+        expected.extend([0xa2, 0x01, 0x81, 0x00, b'x']);
+        assert_eq!(changed, expected);
+    }
+
+    #[test]
+    fn batched_nested_rejects_malformed_groups_and_bounds_group_depth() {
+        let edit = [NestedFieldEdit::new(
+            &[1],
+            true,
+            NestedFieldReplacement::Varint(Some(2)),
+        )];
+        for malformed in [
+            vec![0x53, 0x08, 0x01],
+            vec![0x53, 0x08, 0x01, 0x5c],
+            vec![0x54, 0x08, 0x01],
+        ] {
+            assert!(patch_nested_fields_batched(&malformed, &edit).is_err());
+        }
+
+        let nested_groups = [0x53, 0x5b, 0x5c, 0x54, 0x08, 0x01];
+        let shallow = WireLimits::default().with_nesting(1).unwrap();
+        assert!(matches!(
+            patch_nested_fields_batched_with_limits(&nested_groups, &edit, shallow),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Nesting,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+        let exact = WireLimits::default().with_nesting(2).unwrap();
+        assert!(patch_nested_fields_batched_with_limits(&nested_groups, &edit, exact).is_ok());
+    }
+
+    #[test]
+    fn batched_nested_recalculates_each_ancestor_varint_width() {
+        for (old_payload, new_payload, old_inner, new_inner) in
+            [(125, 126, 127, 128), (16_380, 16_381, 16_383, 16_384)]
+        {
+            let old = vec![b'a'; old_payload];
+            let new = vec![b'b'; new_payload];
+            let inner = length_delimited_field(1, &old);
+            assert_eq!(inner.len(), old_inner);
+            let source = length_delimited_field(4, &inner);
+            let edit = [NestedFieldEdit::new(
+                &[4, 1],
+                true,
+                NestedFieldReplacement::LengthDelimited(Some(&new)),
+            )];
+            let changed = patch_nested_fields_batched(&source, &edit).unwrap();
+            let expected_inner = length_delimited_field(1, &new);
+            assert_eq!(expected_inner.len(), new_inner);
+            assert_eq!(changed, length_delimited_field(4, &expected_inner));
+        }
+    }
+
+    #[test]
+    fn batched_nested_enforces_presence_type_and_path_uniqueness() {
+        let source = varint_field(1, 7);
+        let duplicate_source = [source.as_slice(), source.as_slice()].concat();
+        let replace = NestedFieldEdit::new(&[1], true, NestedFieldReplacement::Varint(Some(8)));
+        assert!(patch_nested_fields_batched(&duplicate_source, &[replace]).is_err());
+        assert!(
+            patch_nested_fields_batched(
+                &source,
+                &[NestedFieldEdit::new(
+                    &[1],
+                    false,
+                    NestedFieldReplacement::Varint(Some(8)),
+                )],
+            )
+            .is_err()
+        );
+        assert!(
+            patch_nested_fields_batched(
+                &source,
+                &[NestedFieldEdit::new(
+                    &[1],
+                    true,
+                    NestedFieldReplacement::Fixed32(Some(8)),
+                )],
+            )
+            .is_err()
+        );
+        assert!(patch_nested_fields_batched(&source, &[replace, replace]).is_err());
+        assert!(
+            patch_nested_fields_batched(
+                &source,
+                &[
+                    replace,
+                    NestedFieldEdit::new(&[1, 2], true, NestedFieldReplacement::Varint(Some(3)),),
+                ],
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn batched_nested_rejects_noncanonical_selected_framing_only() {
+        let varint_edit = [NestedFieldEdit::new(
+            &[1],
+            true,
+            NestedFieldReplacement::Varint(Some(2)),
+        )];
+        assert!(patch_nested_fields_batched(&[0x88, 0x00, 0x01], &varint_edit).is_err());
+        assert!(patch_nested_fields_batched(&[0x08, 0x81, 0x00], &varint_edit).is_err());
+
+        let length_edit = [NestedFieldEdit::new(
+            &[1],
+            true,
+            NestedFieldReplacement::LengthDelimited(Some(b"y")),
+        )];
+        assert!(patch_nested_fields_batched(&[0x0a, 0x81, 0x00, b'x'], &length_edit).is_err());
+
+        let nested_edit = [NestedFieldEdit::new(
+            &[2, 1],
+            true,
+            NestedFieldReplacement::Varint(Some(2)),
+        )];
+        assert!(
+            patch_nested_fields_batched(&[0x92, 0x00, 0x02, 0x08, 0x01], &nested_edit).is_err()
+        );
+        assert!(
+            patch_nested_fields_batched(&[0x12, 0x82, 0x00, 0x08, 0x01], &nested_edit).is_err()
+        );
+    }
+
+    #[test]
+    fn batched_nested_limit_boundaries_are_exact() {
+        let source = varint_field(1, 1);
+        let replace = [NestedFieldEdit::new(
+            &[1],
+            true,
+            NestedFieldReplacement::Varint(Some(300)),
+        )];
+        let expected = varint_field(1, 300);
+        let work = source.len() + expected.len();
+        let exact = WireLimits::default()
+            .with_input_bytes(source.len())
+            .unwrap()
+            .with_output_bytes(expected.len())
+            .unwrap()
+            .with_fields(1)
+            .unwrap()
+            .with_rewrite_work(work)
+            .unwrap();
+        assert_eq!(
+            patch_nested_fields_batched_with_limits(&source, &replace, exact).unwrap(),
+            expected
+        );
+
+        let input_short = WireLimits::default()
+            .with_input_bytes(source.len() - 1)
+            .unwrap();
+        assert!(matches!(
+            patch_nested_fields_batched_with_limits(&source, &replace, input_short),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                ..
+            })
+        ));
+        let output_short = WireLimits::default()
+            .with_output_bytes(expected.len() - 1)
+            .unwrap();
+        assert!(matches!(
+            patch_nested_fields_batched_with_limits(&source, &replace, output_short),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::OutputBytes,
+                ..
+            })
+        ));
+        let work_short = WireLimits::default().with_rewrite_work(work - 1).unwrap();
+        assert!(matches!(
+            patch_nested_fields_batched_with_limits(&source, &replace, work_short),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                observed,
+                limit,
+            }) if observed == work && limit == work - 1
+        ));
+
+        let append = [NestedFieldEdit::new(
+            &[2],
+            false,
+            NestedFieldReplacement::Varint(Some(3)),
+        )];
+        let one_field = WireLimits::default().with_fields(1).unwrap();
+        assert!(matches!(
+            patch_nested_fields_batched_with_limits(&source, &append, one_field),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+
+        let validators = [
+            NestedFieldEdit::new(&[2], false, NestedFieldReplacement::Varint(None)),
+            NestedFieldEdit::new(&[3], false, NestedFieldReplacement::Fixed32(None)),
+        ];
+        assert!(matches!(
+            patch_nested_fields_batched_with_limits(&[], &validators, one_field),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn batched_nested_depth_limit_applies_to_selected_paths() {
+        let leaf = varint_field(1, 1);
+        let middle = length_delimited_field(2, &leaf);
+        let source = length_delimited_field(3, &middle);
+        let edit = [NestedFieldEdit::new(
+            &[3, 2, 1],
+            true,
+            NestedFieldReplacement::Varint(Some(2)),
+        )];
+        let too_shallow = WireLimits::default().with_nesting(1).unwrap();
+        assert!(matches!(
+            patch_nested_fields_batched_with_limits(&source, &edit, too_shallow),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Nesting,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+        let exact = WireLimits::default().with_nesting(2).unwrap();
+        assert!(patch_nested_fields_batched_with_limits(&source, &edit, exact).is_ok());
     }
 
     #[test]

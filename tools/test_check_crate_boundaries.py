@@ -64,6 +64,28 @@ def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
     )
 
 
+def add_keynote_slide_transition_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[0]
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic_source = (
+        semantic.read_text(encoding="utf-8") if semantic.is_file() else ""
+    )
+    semantic.write_text(
+        semantic_source
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+        ),
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES[0]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_source = (
+        lib_export.read_text(encoding="utf-8") if lib_export.is_file() else ""
+    )
+    lib_export.write_text(lib_source + "pub mod transition;\n", encoding="utf-8")
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -1342,6 +1364,818 @@ class BoundaryPolicyTests(unittest.TestCase):
                     ]
                 ),
             )
+
+    def test_keynote_slide_transition_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHODS,
+            ("slide_transition", "set_slide_transition", "clear_slide_transition"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_SOURCES,
+            (Path("crates/litchi-iwa/src/keynote/editor/transition_lifecycle.rs"),),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_MODULES,
+            ("transition_lifecycle",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_EXAMPLES,
+            (
+                Path("crates/litchi-iwa/examples/clear_keynote_transition.rs"),
+                Path("crates/litchi-iwa/examples/edit_keynote_transition.rs"),
+                Path("crates/litchi-iwa/examples/set_keynote_transition_effect.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES,
+            (
+                Path("crates/litchi-keynote/src/transition.rs"),
+                Path("crates/litchi-keynote/src/package/slide_transition.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES,
+            (
+                Path("crates/litchi-keynote/src/lib.rs"),
+                Path("crates/litchi-keynote/src/package.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES,
+            ("Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_SEMANTIC_TYPES,
+            (
+                "Acceleration",
+                "AccelerationKind",
+                "AnimationParameters",
+                "CustomParameters",
+                "Direction",
+                "Effect",
+                "MosaicType",
+                "Settings",
+                "SettingsBuilder",
+                "TextDelivery",
+                "TextDeliveryKind",
+                "TimingCurveSlot",
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIAS_PREFIXES,
+            ("SlideTransition", "Transition"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES,
+            frozenset(
+                prefix + suffix
+                for prefix in ("SlideTransition", "Transition")
+                for suffix in (
+                    "Edit",
+                    "Patch",
+                    "Commit",
+                    "Diagnostics",
+                    "Error",
+                    "LimitKind",
+                )
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_ROOT_ALIASES,
+            frozenset(
+                boundaries.KEYNOTE_SLIDE_TRANSITION_SEMANTIC_TYPES
+                + boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_PHYSICAL_TYPES,
+            frozenset(
+                {
+                    "Archive",
+                    "EntryEdit",
+                    "IWorkPackage",
+                    "PhysicalSource",
+                    "RawMessage",
+                    "SnappyStream",
+                    "SourceCatalog",
+                    "TransitionSettingsSnapshot",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_WIRE_TYPES,
+            frozenset(
+                {
+                    "WireDescent",
+                    "WireError",
+                    "WireLimits",
+                    "WireResourceLimit",
+                    "WireView",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_SEMANTIC_IDENTIFIER_NAMES,
+            frozenset(
+                {"MAX_IDENTIFIER_BYTES", "from_identifier", "identifier", "identifiers"}
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_SEMANTIC_OPAQUE_PAYLOAD_MEMBERS,
+            frozenset(
+                {
+                    "color_payload",
+                    "set_color_payload",
+                    "set_timing_curve_payload",
+                    "timing_curve_payload",
+                    "timing_curve_payloads",
+                }
+            ),
+        )
+
+    def test_retired_iwa_keynote_slide_transition_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retained = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor/transition.rs"
+            retained.parent.mkdir(parents=True)
+            retained.write_text(
+                "pub(in crate::keynote) async unsafe fn set_slide_transition() {}\n",
+                encoding="utf-8",
+            )
+            nested = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/transition.rs"
+            nested.parent.mkdir(parents=True)
+            nested.write_text(
+                "fn r#slide_transition() {}\n"
+                "pub(super) const fn clear_slide_transition() {}\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.write_text(
+                "pub(crate) mod r#transition_lifecycle;\n",
+                encoding="utf-8",
+            )
+            for retired in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_SOURCES:
+                path = root / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// retired owner returned\n", encoding="utf-8")
+            for retired in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_EXAMPLES:
+                path = root / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// retired example returned\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_transition_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote slide-transition method "
+                        "set_slide_transition: "
+                        "crates/litchi-iwa/src/keynote/editor/transition.rs:1",
+                        "retired litchi-iwa Keynote slide-transition method "
+                        "slide_transition: "
+                        "crates/litchi-iwa/src/keynote/legacy/transition.rs:1",
+                        "retired litchi-iwa Keynote slide-transition method "
+                        "clear_slide_transition: "
+                        "crates/litchi-iwa/src/keynote/legacy/transition.rs:2",
+                        "retired litchi-iwa Keynote slide-transition module "
+                        "transition_lifecycle: "
+                        "crates/litchi-iwa/src/keynote/editor.rs:1",
+                        *[
+                            "retired litchi-iwa Keynote slide-transition source "
+                            f"returned: {path}"
+                            for path in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_SOURCES
+                        ],
+                        *[
+                            "retired litchi-iwa Keynote slide-transition example "
+                            f"returned: {path}"
+                            for path in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_EXAMPLES
+                        ],
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_keynote_slide_transition_module_variants(self) -> None:
+        for declaration in (
+            "mod transition_lifecycle;",
+            "pub(crate) mod transition_lifecycle;",
+            "pub(super) mod r#transition_lifecycle {}",
+            "pub(in crate::keynote)\nmod\nr#transition_lifecycle\n{}",
+            "pub mod transition_lifecycle { pub struct Legacy; }",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+                    editor.parent.mkdir(parents=True)
+                    editor.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_iwa_keynote_slide_transition_source_topology(
+                            root
+                        ),
+                        [
+                            "retired litchi-iwa Keynote slide-transition module "
+                            "transition_lifecycle: "
+                            "crates/litchi-iwa/src/keynote/editor.rs:1"
+                        ],
+                    )
+
+    def test_retired_iwa_keynote_slide_transition_readme_calls_and_examples(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "\n".join(
+                    [
+                        "let value = keynote",
+                        "    .",
+                        "    r#slide_transition",
+                        "    (",
+                        "editor.r#set_slide_transition(",
+                        "reopened.r#clear_slide_transition(",
+                        "crate::keynote::KeynoteEditor",
+                        "    ::",
+                        "    slide_transition(",
+                        "r#KeynoteEditor::r#set_slide_transition(",
+                        "other.clear_slide_transition(",
+                        "Run `clear_keynote_transition`.",
+                        "Run edit_keynote_transition.rs.",
+                        "Run set_keynote_transition_effect.",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_transition_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote slide-transition README call "
+                        "slide_transition: crates/litchi-iwa/README.md:3",
+                        "retired litchi-iwa Keynote slide-transition README call "
+                        "set_slide_transition: crates/litchi-iwa/README.md:5",
+                        "retired litchi-iwa Keynote slide-transition README call "
+                        "clear_slide_transition: crates/litchi-iwa/README.md:6",
+                        "retired litchi-iwa Keynote slide-transition README call "
+                        "slide_transition: crates/litchi-iwa/README.md:9",
+                        "retired litchi-iwa Keynote slide-transition README call "
+                        "set_slide_transition: crates/litchi-iwa/README.md:10",
+                        "retired litchi-iwa Keynote slide-transition README call "
+                        "clear_slide_transition: crates/litchi-iwa/README.md:11",
+                        "retired litchi-iwa Keynote slide-transition README example "
+                        "reference clear_keynote_transition: "
+                        "crates/litchi-iwa/README.md:12",
+                        "retired litchi-iwa Keynote slide-transition README example "
+                        "reference edit_keynote_transition: "
+                        "crates/litchi-iwa/README.md:13",
+                        "retired litchi-iwa Keynote slide-transition README example "
+                        "reference set_keynote_transition_effect: "
+                        "crates/litchi-iwa/README.md:14",
+                    ]
+                ),
+            )
+
+    def test_iwa_keynote_slide_transition_policy_ignores_safe_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/transition_old.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "\n".join(
+                    [
+                        "// pub fn slide_transition() {}",
+                        'const NOTE: &str = "fn set_slide_transition() {}";',
+                        "/* fn clear_slide_transition() {}",
+                        "   /* fn slide_transition() {} */",
+                        "   fn set_slide_transition() {} */",
+                        'const RAW_NOTE: &str = r###"fn clear_slide_transition() {}"###;',
+                        "pub fn slide_transition_snapshot() {}",
+                        "pub fn set_slide_transitions() {}",
+                        "pub fn clear_slide_transition_cache() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.write_text(
+                "\n".join(
+                    [
+                        "// mod transition_lifecycle;",
+                        'const NOTE: &str = "mod transition_lifecycle;";',
+                        "/* pub mod r#transition_lifecycle {} */",
+                        "mod transition_lifecycle_old;",
+                        "pub use litchi_keynote::transition::{Effect, Acceleration};",
+                        "pub use crate::transition::Effect;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.write_text(
+                "\n".join(
+                    [
+                        "The slide_transition method is retired.",
+                        "Use `slide_transition` rather than `.slide_transition`.",
+                        "slide_transition(",
+                        "set_slide_transition(",
+                        "keynote.slide_transition_snapshot(",
+                        "editor.set_slide_transitions(",
+                        "package.slide_transition(",
+                        "package.edit_slide_transition(",
+                        "edit.clear(",
+                        "create_keynote_transition.rs",
+                        "clear_keynote_transitions.rs",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            declarations = "\n".join(
+                f"pub fn {name}() {{}}"
+                for name in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHODS
+            ) + "\n"
+            for relative in (
+                Path("crates/litchi-keynote/src/package/slide_transition.rs"),
+                Path("crates/litchi-iwa/src/pages/editor/transition.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(declarations, encoding="utf-8")
+            non_rust = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "transition.txt"
+            non_rust.write_text(declarations, encoding="utf-8")
+            retained_example = root / "crates/litchi-iwa/examples/create_keynote_transition.rs"
+            retained_example.parent.mkdir(parents=True, exist_ok=True)
+            retained_example.write_text("// retained creation example\n", encoding="utf-8")
+            for relative in (Path("README.md"), Path("crates/litchi-keynote/README.md")):
+                other = root / relative
+                other.parent.mkdir(parents=True, exist_ok=True)
+                other.write_text(
+                    "keynote.slide_transition(\nclear_keynote_transition\n",
+                    encoding="utf-8",
+                )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_transition_source_topology(root),
+                [],
+            )
+
+    def test_focused_keynote_slide_transition_public_api_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn transition(r#source_bytes: &[u8], r#object_id: u64) "
+                "-> (DocumentArchive, IWorkPackage, SourceCatalog) {}\n"
+                "pub type Effect = buffa::DocumentArchiveView;\n"
+                "impl prost::Message for transition::Settings {}\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub type Edit = Archive;",
+                        "pub type Patch = EntryEdit;",
+                        "pub type Commit = IWorkPackage;",
+                        "pub type Diagnostics = PhysicalSource;",
+                        "pub type Error = RawMessage;",
+                        "pub type LimitKind = SnappyStream;",
+                        "pub type TransitionPhysical = SourceCatalog;",
+                        "pub type TransitionSnapshot = TransitionSettingsSnapshot;",
+                        "pub type TransitionDescent = wire::WireDescent;",
+                        "pub type TransitionWireError = wire::WireError;",
+                        "pub type TransitionWireLimits = WireLimits;",
+                        "pub type TransitionWireResource = WireResourceLimit;",
+                        "pub type TransitionWireView = WireView;",
+                        "pub type TransitionNative = NativeObject;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub fn edit_slide_transition("
+                "value: litchi_iwa_protos::GeneratedTransition) "
+                "-> transition::Patch {}\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub fn apply_slide_transition(value: prost_types::MessageInfo) "
+                "-> transition::Commit {}\n",
+                encoding="utf-8",
+            )
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            violations = (
+                boundaries.audit_keynote_slide_transition_facade_source_topology(root)
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-keynote slide-transition public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type DocumentArchive",
+                "archive/IWA type IWorkPackage",
+                "archive/IWA type SourceCatalog",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type Archive",
+                "archive/IWA type EntryEdit",
+                "archive/IWA type PhysicalSource",
+                "archive/IWA type RawMessage",
+                "archive/IWA type SnappyStream",
+                "archive/IWA type TransitionSettingsSnapshot",
+                "wire type wire",
+                "wire type WireDescent",
+                "wire type WireError",
+                "wire type WireLimits",
+                "wire type WireResourceLimit",
+                "wire type WireView",
+                "native object NativeObject",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedTransition",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+            )
+            self.assertEqual(len(violations), 30)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused slide-transition leak: {fragment}",
+                    )
+
+    def test_focused_keynote_slide_transition_requires_each_canonical_type(
+        self,
+    ) -> None:
+        for missing in boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    semantic = (
+                        root
+                        / boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[0]
+                    )
+                    semantic.parent.mkdir(parents=True)
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    lib_export = (
+                        root / boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES[0]
+                    )
+                    lib_export.write_text("pub mod transition;\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_slide_transition_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote slide-transition public API is "
+                            f"missing canonical transition type {missing}: "
+                            "crates/litchi-keynote/src/transition.rs"
+                        ],
+                    )
+
+    def test_focused_keynote_slide_transition_root_module_visibility(self) -> None:
+        rejected = (
+            "",
+            "mod transition;\n",
+            "pub(crate) mod transition;\n",
+            "pub(super) mod r#transition {}\n",
+            "pub(in crate) mod transition;\n",
+            "// pub mod transition;\n",
+            'const NOTE: &str = "pub mod transition;";\n',
+            'const RAW_NOTE: &str = r#"pub mod r#transition {}"#;\n',
+        )
+        accepted = (
+            "pub mod transition;\n",
+            "pub mod r#transition;\n",
+            "pub mod transition {}\n",
+            "pub\nmod\nr#transition\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-keynote slide-transition public API is "
+                        "missing canonical root transition module: "
+                        "crates/litchi-keynote/src/lib.rs"
+                    ],
+                )
+                for declaration in rejected
+            ],
+            *[(declaration, []) for declaration in accepted],
+        ):
+            with self.subTest(declaration=declaration, expected=expected):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    semantic = (
+                        root
+                        / boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[0]
+                    )
+                    semantic.parent.mkdir(parents=True)
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+                        ),
+                        encoding="utf-8",
+                    )
+                    lib_export = (
+                        root / boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES[0]
+                    )
+                    lib_export.write_text(declaration, encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_slide_transition_facade_source_topology(
+                            root
+                        ),
+                        expected,
+                    )
+
+    def test_focused_keynote_slide_transition_api_allows_nested_semantic_surface(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "// pub type SlideTransitionEdit = DocumentArchive;",
+                        'const NOTE: &str = "pub struct TransitionPatch;";',
+                        "/* pub type SlideTransitionCommit = buffa::ArchiveView; */",
+                        *[
+                            f"pub struct {name};"
+                            for name in boundaries.KEYNOTE_SLIDE_TRANSITION_SEMANTIC_TYPES
+                        ],
+                        "pub const MAX_IDENTIFIER_BYTES: usize = 64;",
+                        "pub fn from_identifier(identifier: &str, identifiers: &[String]) "
+                        "-> Effect { todo!() }",
+                        "pub fn color_payload(&self) -> &[u8] { todo!() }",
+                        "pub fn set_color_payload(&mut self, payload: &[u8]) {}",
+                        "pub fn timing_curve_payload(&self) -> &[u8] { todo!() }",
+                        "pub fn timing_curve_payloads(&self) -> &[u8] { todo!() }",
+                        "pub fn set_timing_curve_payload(&mut self, payload: &[u8]) {}",
+                        "pub struct TransitionSnapshot;",
+                        "pub struct SlideTransitions;",
+                        "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                        "-> SourceBytes { todo!() }",
+                        "pub(crate) fn restricted(archive: DocumentArchive) {}",
+                        "impl SlideTransitionEdit {}",
+                        "impl prost::Message for Unrelated {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            private_aliases = [
+                (
+                    "struct" if index % 2 == 0 else "pub(crate) struct"
+                )
+                + f" {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES)
+                )
+            ]
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        *[
+                            f"pub struct {name};"
+                            for name in boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+                        ],
+                        *private_aliases,
+                        "impl TransitionPatch {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES
+            )
+            private_roots = "\n".join(
+                ("use" if index % 2 == 0 else "pub(crate) use")
+                + f" crate::transition::{name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SLIDE_TRANSITION_ROOT_ALIASES)
+                )
+            )
+            safe_exports = (
+                "pub mod transition;\n"
+                "// pub use crate::transition::{Effect, Edit};\n"
+                'const NOTE: &str = "pub use crate::transition::*;";\n'
+                "pub fn edit_slide_transition(settings: transition::Settings, "
+                "edit: transition::Edit) -> Result<transition::Commit, "
+                "transition::Error> { todo!() }\n"
+                + private_roots
+                + "\npub(crate) use crate::transition::*;\n"
+                "pub use crate::animation::{Acceleration, AccelerationKind, "
+                "AnimationParameters, CustomParameters, Direction, Effect, MosaicType, "
+                "Settings, SettingsBuilder, TextDelivery, TextDeliveryKind, "
+                "TimingCurveSlot, Edit, Patch, Commit, Diagnostics, Error, LimitKind};\n"
+                "pub use crate::animation::*;\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+            )
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            package_export.write_text(
+                safe_exports.replace("pub mod transition;\n", "")
+                + "// pub mod slide_transition;\n"
+                + 'const MODULE_NOTE: &str = "pub mod slide_transition;";\n'
+                + 'const RAW_NOTE: &str = r#"pub mod r#slide_transition {}"#;\n'
+                + "/* pub mod r#slide_transition {} */\n"
+                + "mod slide_transition;\n"
+                + "pub(crate) mod r#slide_transition;\n"
+                + "pub(super) mod slide_transition {}\n"
+                + "pub(in crate) mod slide_transition;\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.KEYNOTE_SOURCE_ROOT / "slide.rs"
+            nonfocused.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(
+                        boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES
+                    )
+                )
+                + "\npub fn transition(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/transition.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(
+                        boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES
+                    )
+                )
+                + "\npub use crate::transition::{Effect, Settings, Edit, Patch};\n"
+                "pub fn transition(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_slide_transition_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_keynote_slide_transition_rejects_all_flat_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES
+                + boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            for index, name in enumerate(
+                sorted(boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES)
+            ):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                if source_index == 0:
+                    declaration = f"pub struct {name};"
+                elif source_index == 1:
+                    declaration = f"pub type {name} = Edit;"
+                else:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-keynote slide-transition public API retains "
+                    f"flat alias {name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_slide_transition_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_keynote_slide_transition_exports_reject_all_root_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            aliases = sorted(boundaries.KEYNOTE_SLIDE_TRANSITION_ROOT_ALIASES)
+            midpoint = len(aliases) // 2
+            lib_aliases = aliases[:midpoint]
+            package_aliases = aliases[midpoint:]
+            lib_export.write_text(
+                "pub use crate::transition::{" + ", ".join(lib_aliases) + "};\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::slide_transition::{"
+                + ", ".join(package_aliases)
+                + "};\n"
+                "pub use crate::transition::*;\n",
+                encoding="utf-8",
+            )
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_slide_transition_facade_source_topology(root),
+                sorted(
+                    [
+                        *[
+                            "focused litchi-keynote slide-transition public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-keynote/src/lib.rs:1"
+                            for name in lib_aliases
+                        ],
+                        *[
+                            "focused litchi-keynote slide-transition public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-keynote/src/package.rs:1"
+                            for name in package_aliases
+                        ],
+                        "focused litchi-keynote slide-transition public API retains "
+                        "root aliases via transition glob: "
+                        "crates/litchi-keynote/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_keynote_slide_transition_rejects_duplicate_package_module(
+        self,
+    ) -> None:
+        for declaration in (
+            "pub mod slide_transition;",
+            "pub mod r#slide_transition;",
+            "pub mod slide_transition {}",
+            "pub\nmod\nr#slide_transition\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    package_export = (
+                        root / boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES[1]
+                    )
+                    package_export.parent.mkdir(parents=True)
+                    package_export.write_text(declaration + "\n", encoding="utf-8")
+                    add_keynote_slide_transition_canonical_scaffold(root)
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_slide_transition_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote slide-transition public API exposes "
+                            "duplicate package::slide_transition module: "
+                            "crates/litchi-keynote/src/package.rs:1"
+                        ],
+                    )
 
     def test_retired_iwa_numbers_table_lock_method_inventory_is_exact(self) -> None:
         self.assertEqual(

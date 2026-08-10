@@ -25,6 +25,8 @@ const MIN_SIGN_EXTENDED_INT32: u64 = 0xffff_ffff_8000_0000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DecodeOptions {
     max_message_bytes: usize,
+    max_fields: usize,
+    max_work_bytes: usize,
     recursion_limit: u32,
 }
 
@@ -34,8 +36,18 @@ impl DecodeOptions {
     pub const fn new(max_message_bytes: usize, recursion_limit: u32) -> Self {
         Self {
             max_message_bytes,
+            max_fields: max_message_bytes,
+            max_work_bytes: max_message_bytes.saturating_mul(8),
             recursion_limit,
         }
+    }
+
+    /// Override the exact field and strict-plus-projection work ceilings.
+    #[must_use]
+    pub const fn with_resource_limits(mut self, max_fields: usize, max_work_bytes: usize) -> Self {
+        self.max_fields = max_fields;
+        self.max_work_bytes = max_work_bytes;
+        self
     }
 
     fn buffa(self) -> BuffaDecodeOptions {
@@ -141,7 +153,18 @@ enum DecodeErrorKind {
     MissingRequired(&'static str),
     DuplicateSingular(&'static str),
     NonCanonical(&'static str),
+    Resource(WireResourceLimit),
+    Field { observed: usize, maximum: usize },
+    Work { observed: usize, maximum: usize },
     Projection,
+}
+
+/// Content-free byte or nesting resource failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum WireResourceLimit {
+    Bytes { observed: usize, maximum: usize },
+    Nesting { observed: u32, maximum: u32 },
 }
 
 impl DecodeError {
@@ -173,6 +196,42 @@ impl DecodeError {
         }
     }
 
+    const fn resource(limit: WireResourceLimit) -> Self {
+        Self {
+            kind: DecodeErrorKind::Resource(limit),
+        }
+    }
+
+    /// Exact byte/nesting limit observation, when applicable.
+    #[must_use]
+    pub const fn wire_resource_limit(&self) -> Option<WireResourceLimit> {
+        if let DecodeErrorKind::Resource(x) = self.kind {
+            Some(x)
+        } else {
+            None
+        }
+    }
+
+    /// Exact observed and allowed field count, when applicable.
+    #[must_use]
+    pub const fn field_limit_values(&self) -> Option<(usize, usize)> {
+        if let DecodeErrorKind::Field { observed, maximum } = self.kind {
+            Some((observed, maximum))
+        } else {
+            None
+        }
+    }
+
+    /// Exact observed and allowed work bytes, when applicable.
+    #[must_use]
+    pub const fn work_limit_values(&self) -> Option<(usize, usize)> {
+        if let DecodeErrorKind::Work { observed, maximum } = self.kind {
+            Some((observed, maximum))
+        } else {
+            None
+        }
+    }
+
     /// Singular known field repeated in the source, when applicable.
     #[must_use]
     pub const fn duplicate_singular_field(&self) -> Option<&'static str> {
@@ -181,6 +240,9 @@ impl DecodeError {
             DecodeErrorKind::Wire(_)
             | DecodeErrorKind::MissingRequired(_)
             | DecodeErrorKind::NonCanonical(_)
+            | DecodeErrorKind::Resource(_)
+            | DecodeErrorKind::Field { .. }
+            | DecodeErrorKind::Work { .. }
             | DecodeErrorKind::Projection => None,
         }
     }
@@ -193,6 +255,9 @@ impl DecodeError {
             DecodeErrorKind::Wire(_)
             | DecodeErrorKind::DuplicateSingular(_)
             | DecodeErrorKind::NonCanonical(_)
+            | DecodeErrorKind::Resource(_)
+            | DecodeErrorKind::Field { .. }
+            | DecodeErrorKind::Work { .. }
             | DecodeErrorKind::Projection => None,
         }
     }
@@ -205,6 +270,9 @@ impl DecodeError {
             DecodeErrorKind::Wire(_)
             | DecodeErrorKind::MissingRequired(_)
             | DecodeErrorKind::DuplicateSingular(_)
+            | DecodeErrorKind::Resource(_)
+            | DecodeErrorKind::Field { .. }
+            | DecodeErrorKind::Work { .. }
             | DecodeErrorKind::Projection => None,
         }
     }
@@ -223,6 +291,19 @@ impl fmt::Display for DecodeError {
             DecodeErrorKind::NonCanonical(reason) => {
                 write!(formatter, "non-canonical protobuf representation: {reason}")
             },
+            DecodeErrorKind::Resource(WireResourceLimit::Bytes { .. }) => {
+                formatter.write_str("Keynote slide-transition byte limit exceeded")
+            },
+            DecodeErrorKind::Resource(WireResourceLimit::Nesting { .. }) => {
+                formatter.write_str("Keynote slide-transition nesting limit exceeded")
+            },
+            DecodeErrorKind::Field { observed, maximum } => {
+                write!(formatter, "visited {observed} fields; maximum is {maximum}")
+            },
+            DecodeErrorKind::Work { observed, maximum } => write!(
+                formatter,
+                "requires {observed} work bytes; maximum is {maximum}"
+            ),
             DecodeErrorKind::Projection => formatter.write_str(
                 "Keynote slide-transition strict preflight disagrees with Buffa projection",
             ),
@@ -232,10 +313,20 @@ impl fmt::Display for DecodeError {
 
 impl std::error::Error for DecodeError {}
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    clippy::shadow_same,
+    reason = "Buffa may add wire failures; preserve them without narrowing the error API."
+)]
 impl From<buffa::DecodeError> for DecodeError {
     fn from(error: buffa::DecodeError) -> Self {
-        Self {
-            kind: DecodeErrorKind::Wire(error),
+        match error {
+            buffa::DecodeError::MessageTooLarge | buffa::DecodeError::RecursionLimitExceeded => {
+                Self::projection()
+            },
+            error => Self {
+                kind: DecodeErrorKind::Wire(error),
+            },
         }
     }
 }
@@ -249,7 +340,8 @@ pub fn decode_slide_transition<'source>(
     options: DecodeOptions,
 ) -> Result<SlideTransitionSnapshot<'source>, DecodeError> {
     validate_decode_input(source, options)?;
-    let strict = preflight_slide_transition(source, options)?;
+    let mut budget = Budget::new(options);
+    let strict = preflight_slide_transition(source, options, &mut budget)?;
     let view: projection::KeynoteSlideTransitionArchiveLazyView<'source> =
         options.buffa().decode_lazy_view(source)?;
     let projected = force_slide_transition_projection(&view)?;
@@ -265,7 +357,8 @@ pub fn decode_slide_node_has_transition(
     options: DecodeOptions,
 ) -> Result<bool, DecodeError> {
     validate_decode_input(source, options)?;
-    let strict = preflight_slide_node_transition(source, options)?;
+    let mut budget = Budget::new(options);
+    let strict = preflight_slide_node_transition(source, options, &mut budget)?;
     let view: projection::KeynoteSlideNodeTransitionArchiveLazyView<'_> =
         options.buffa().decode_lazy_view(source)?;
     if !view.has_has_transition() || view.has_transition != strict {
@@ -274,25 +367,87 @@ pub fn decode_slide_node_has_transition(
     Ok(strict)
 }
 
+struct Budget {
+    fields: usize,
+    work: usize,
+    max_fields: usize,
+    max_work: usize,
+}
+impl Budget {
+    const fn new(options: DecodeOptions) -> Self {
+        Self {
+            fields: 0,
+            work: 0,
+            max_fields: options.max_fields,
+            max_work: options.max_work_bytes,
+        }
+    }
+    fn charge(&mut self, source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
+        let work = source
+            .len()
+            .checked_mul(2)
+            .and_then(|cost| self.work.checked_add(cost))
+            .ok_or_else(DecodeError::projection)?;
+        if work > self.max_work {
+            return Err(DecodeError {
+                kind: DecodeErrorKind::Work {
+                    observed: work,
+                    maximum: self.max_work,
+                },
+            });
+        }
+        self.work = work;
+        for field in StrictFields::new(source, options.recursion_limit) {
+            let _ = field?;
+            let observed = self
+                .fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+            if observed > self.max_fields {
+                return Err(DecodeError {
+                    kind: DecodeErrorKind::Field {
+                        observed,
+                        maximum: self.max_fields,
+                    },
+                });
+            }
+            self.fields = observed;
+        }
+        Ok(())
+    }
+}
+
 fn validate_decode_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
     const MAX_RECURSION_LIMIT: u32 = 64;
     let max_buffa_message_bytes = usize::try_from(buffa::MAX_MESSAGE_BYTES)
-        .map_err(|_conversion| buffa::DecodeError::MessageTooLarge)?;
-    if options.max_message_bytes > max_buffa_message_bytes
-        || source.len() > options.max_message_bytes
-    {
-        return Err(buffa::DecodeError::MessageTooLarge.into());
+        .map_err(|_conversion| DecodeError::projection())?;
+    if options.max_message_bytes > max_buffa_message_bytes {
+        return Err(DecodeError::resource(WireResourceLimit::Bytes {
+            observed: options.max_message_bytes,
+            maximum: max_buffa_message_bytes,
+        }));
+    }
+    if source.len() > options.max_message_bytes {
+        return Err(DecodeError::resource(WireResourceLimit::Bytes {
+            observed: source.len(),
+            maximum: options.max_message_bytes,
+        }));
     }
     if options.recursion_limit == 0 || options.recursion_limit > MAX_RECURSION_LIMIT {
-        return Err(DecodeError::recursion_limit());
+        return Err(DecodeError::resource(WireResourceLimit::Nesting {
+            observed: options.recursion_limit,
+            maximum: MAX_RECURSION_LIMIT,
+        }));
     }
     Ok(())
 }
 
-fn preflight_slide_transition(
-    source: &[u8],
+fn preflight_slide_transition<'source>(
+    source: &'source [u8],
     options: DecodeOptions,
-) -> Result<SlideTransitionSnapshot<'_>, DecodeError> {
+    budget: &mut Budget,
+) -> Result<SlideTransitionSnapshot<'source>, DecodeError> {
+    budget.charge(source, options)?;
     let mut transition = None;
     for field_result in StrictFields::new(source, options.recursion_limit) {
         let field = field_result?;
@@ -305,6 +460,7 @@ fn preflight_slide_transition(
             transition = Some(preflight_transition(
                 field.length_delimited()?,
                 options.descend()?,
+                budget,
             )?);
         }
     }
@@ -314,10 +470,12 @@ fn preflight_slide_transition(
     })
 }
 
-fn preflight_transition(
-    source: &[u8],
+fn preflight_transition<'source>(
+    source: &'source [u8],
     options: DecodeOptions,
-) -> Result<TransitionSettingsSnapshot<'_>, DecodeError> {
+    budget: &mut Budget,
+) -> Result<TransitionSettingsSnapshot<'source>, DecodeError> {
+    budget.charge(source, options)?;
     let mut attributes = None;
     for field_result in StrictFields::new(source, options.recursion_limit) {
         let field = field_result?;
@@ -330,16 +488,19 @@ fn preflight_transition(
             attributes = Some(preflight_transition_attributes(
                 field.length_delimited()?,
                 options.descend()?,
+                budget,
             )?);
         }
     }
     attributes.ok_or_else(|| DecodeError::missing_required("KN.TransitionArchive.attributes"))
 }
 
-fn preflight_transition_attributes(
-    source: &[u8],
+fn preflight_transition_attributes<'source>(
+    source: &'source [u8],
     options: DecodeOptions,
-) -> Result<TransitionSettingsSnapshot<'_>, DecodeError> {
+    budget: &mut Budget,
+) -> Result<TransitionSettingsSnapshot<'source>, DecodeError> {
+    budget.charge(source, options)?;
     let mut seen = 0u32;
     let mut animation = None;
     let mut custom_twist = None;
@@ -365,6 +526,7 @@ fn preflight_transition_attributes(
                 animation = Some(preflight_animation(
                     field.length_delimited()?,
                     options.descend()?,
+                    budget,
                 )?);
             },
             9 => {
@@ -461,10 +623,12 @@ fn preflight_transition_attributes(
     })
 }
 
-fn preflight_animation(
-    source: &[u8],
+fn preflight_animation<'source>(
+    source: &'source [u8],
     options: DecodeOptions,
-) -> Result<AnimationSnapshot<'_>, DecodeError> {
+    budget: &mut Budget,
+) -> Result<AnimationSnapshot<'source>, DecodeError> {
+    budget.charge(source, options)?;
     let mut seen = 0u32;
     let mut result = AnimationSnapshot {
         animation_type: None,
@@ -536,7 +700,9 @@ fn preflight_animation(
 fn preflight_slide_node_transition(
     source: &[u8],
     options: DecodeOptions,
+    budget: &mut Budget,
 ) -> Result<bool, DecodeError> {
+    budget.charge(source, options)?;
     let mut has_transition = None;
     for field_result in StrictFields::new(source, options.recursion_limit) {
         let field = field_result?;
@@ -994,7 +1160,8 @@ mod tests {
     )]
 
     use super::{
-        DecodeError, DecodeOptions, decode_slide_node_has_transition, decode_slide_transition,
+        Budget, DecodeError, DecodeOptions, WireResourceLimit, decode_slide_node_has_transition,
+        decode_slide_transition, preflight_slide_transition,
     };
 
     fn options(source: &[u8]) -> DecodeOptions {
@@ -1393,6 +1560,51 @@ mod tests {
     #[test]
     fn finite_limits_are_enforced_before_projection() {
         let source = slide(&[]);
+        let unlimited =
+            DecodeOptions::new(source.len(), 8).with_resource_limits(usize::MAX, usize::MAX);
+        let mut budget = Budget::new(unlimited);
+        let _ = preflight_slide_transition(&source, unlimited, &mut budget).expect("preflight");
+        let baseline =
+            DecodeOptions::new(source.len(), 8).with_resource_limits(budget.fields, budget.work);
+        assert!(decode_slide_transition(&source, baseline).is_ok());
+        assert_eq!(
+            error(decode_slide_transition(
+                &source,
+                DecodeOptions::new(source.len() - 1, 8)
+                    .with_resource_limits(budget.fields, budget.work)
+            ))
+            .wire_resource_limit(),
+            Some(WireResourceLimit::Bytes {
+                observed: source.len(),
+                maximum: source.len() - 1
+            })
+        );
+        assert_eq!(
+            error(decode_slide_transition(
+                &source,
+                DecodeOptions::new(source.len(), 8).with_resource_limits(0, budget.work)
+            ))
+            .field_limit_values(),
+            Some((1, 0))
+        );
+        assert_eq!(
+            error(decode_slide_transition(
+                &source,
+                DecodeOptions::new(source.len(), 8)
+                    .with_resource_limits(budget.fields, budget.work - 1)
+            ))
+            .work_limit_values(),
+            Some((budget.work, budget.work - 1))
+        );
+        assert_eq!(
+            error(decode_slide_transition(
+                &source,
+                DecodeOptions::new(source.len(), 8)
+                    .with_resource_limits(budget.fields - 1, budget.work)
+            ))
+            .field_limit_values(),
+            Some((budget.fields, budget.fields - 1))
+        );
         assert!(
             !error(decode_slide_transition(
                 &source,

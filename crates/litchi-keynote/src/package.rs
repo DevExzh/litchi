@@ -12,7 +12,7 @@ mod slide_notes;
 mod slide_order;
 mod slide_preview;
 mod slide_text;
-mod slide_transition;
+pub(crate) mod slide_transition;
 
 use std::fmt;
 use std::fs::File;
@@ -43,7 +43,7 @@ use prost::Message;
 use thiserror::Error;
 
 use crate::show::{Mode, Settings, Show, Size};
-use crate::{AnimationType, Build, Document, Effect, Seconds, Slide, Transition};
+use crate::{AnimationType, Build, Document, Seconds, Slide, Transition, transition::Effect};
 
 pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
 pub use limits::{
@@ -61,10 +61,6 @@ pub use slide_order::{
 pub use slide_text::{
     SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
     SlideTextPatch, SlideTextRole,
-};
-pub use slide_transition::{
-    SlideTransitionCommit, SlideTransitionDiagnostics, SlideTransitionEdit, SlideTransitionError,
-    SlideTransitionLimitKind, SlideTransitionPatch,
 };
 
 /// Checked physical resource limits for Keynote package ingress.
@@ -1245,19 +1241,26 @@ impl Package {
     }
 
     fn object(&self, identifier: u64) -> Option<&ArchiveObject> {
+        self.object_with_component(identifier)
+            .map(|(_component_name, object)| object)
+    }
+
+    fn object_with_component(&self, identifier: u64) -> Option<(&str, &ArchiveObject)> {
         let locator = self
             .state
             .object_index
             .binary_search_by_key(&identifier, |locator| locator.identifier)
             .ok()
             .map(|index| self.state.object_index[index])?;
-        self.state
+        let component = self
+            .state
             .source
             .components()
-            .get_index(locator.component)?
-            .archive()
-            .objects
-            .get(locator.object)
+            .get_index(locator.component)?;
+        Some((
+            component.name(),
+            component.archive().objects.get(locator.object)?,
+        ))
     }
 
     fn wire_limits(&self) -> litchi_iwa_common::Result<WireLimits> {

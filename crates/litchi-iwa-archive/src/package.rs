@@ -6,6 +6,7 @@
 //! with the facade and the neutral component catalog respectively.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::io::{self, Write};
 use std::ops::Range;
 use std::sync::Arc;
@@ -298,6 +299,134 @@ impl<'a> EntryEdit<'a> {
     #[must_use]
     pub const fn data(self) -> &'a [u8] {
         self.data
+    }
+}
+
+/// A process-local pair of exact immutable package artifacts.
+///
+/// Focused semantic patches can retain this pair instead of independently
+/// reimplementing source-byte authorization and source/target ownership. The
+/// complete source and target allocations are retained behind private,
+/// immutable handles for the lifetime of the pair. Cloning and inversion are
+/// `O(1)` [`Arc`] operations; constructing the pair reads each distinct
+/// artifact allocation once to cache compact diagnostic fingerprints.
+///
+/// Fingerprints are diagnostics only. They never authorize patch application:
+/// [`Self::authorizes_source`] requires either allocation identity or one exact
+/// byte comparison. This type is process-local in-memory state, not a compact
+/// or durable patch serialization format.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ExactArtifacts {
+    source: Arc<[u8]>,
+    target: Arc<[u8]>,
+    source_fingerprint: u64,
+    target_fingerprint: u64,
+}
+
+impl fmt::Debug for ExactArtifacts {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ExactArtifacts")
+            .field("source_fingerprint", &self.source_fingerprint)
+            .field("target_fingerprint", &self.target_fingerprint)
+            .finish_non_exhaustive()
+    }
+}
+
+impl ExactArtifacts {
+    /// Retain one exact source/target artifact pair.
+    ///
+    /// The supplied allocations are owned immutably and are never exposed as
+    /// mutable or borrowed raw slices. Callers remain responsible for
+    /// constructing the target through their bounded, semantically verified
+    /// focused transaction.
+    ///
+    /// # Costs
+    ///
+    /// Reads each distinct complete artifact once to cache diagnostics.
+    #[must_use]
+    pub fn new(source: Arc<[u8]>, target: Arc<[u8]>) -> Self {
+        let source_fingerprint = diagnostic_fingerprint(&source);
+        let target_fingerprint = if Arc::ptr_eq(&source, &target) {
+            source_fingerprint
+        } else {
+            diagnostic_fingerprint(&target)
+        };
+        Self {
+            source,
+            target,
+            source_fingerprint,
+            target_fingerprint,
+        }
+    }
+
+    /// Return the source artifact's compact diagnostic fingerprint.
+    ///
+    /// This value is not collision-resistant and never authorizes source
+    /// identity. Use [`Self::authorizes_source`] for exact authorization.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> u64 {
+        self.source_fingerprint
+    }
+
+    /// Return the target artifact's compact diagnostic fingerprint.
+    ///
+    /// This value is not collision-resistant and is not an artifact identity.
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> u64 {
+        self.target_fingerprint
+    }
+
+    /// Return whether `candidate` is the exact retained source artifact.
+    ///
+    /// Allocation identity is an `O(1)` fast path. A different allocation is
+    /// authorized only by one complete byte equality comparison. Cached
+    /// fingerprints do not participate in this decision.
+    #[must_use]
+    pub fn authorizes_source(&self, candidate: &Arc<[u8]>) -> bool {
+        Arc::ptr_eq(candidate, &self.source) || candidate.as_ref() == self.source.as_ref()
+    }
+
+    /// Return whether source and target are byte-for-byte identical.
+    ///
+    /// Allocation identity is an `O(1)` fast path; otherwise this reads the
+    /// artifacts for exact equality. Fingerprint equality is insufficient.
+    #[must_use]
+    pub fn is_byte_noop(&self) -> bool {
+        Arc::ptr_eq(&self.source, &self.target) || self.source.as_ref() == self.target.as_ref()
+    }
+
+    /// Return the exact target-to-source inverse pair.
+    ///
+    /// This only clones and swaps shared handles and cached diagnostics.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            source: Arc::clone(&self.target),
+            target: Arc::clone(&self.source),
+            source_fingerprint: self.target_fingerprint,
+            target_fingerprint: self.source_fingerprint,
+        }
+    }
+
+    /// Clone the retained exact source allocation for an internal consumer.
+    ///
+    /// This is an `O(1)` shared-handle operation. The returned slice remains
+    /// immutable.
+    #[must_use]
+    pub fn source(&self) -> Arc<[u8]> {
+        Arc::clone(&self.source)
+    }
+
+    /// Clone the retained exact target allocation for an internal consumer.
+    ///
+    /// This is an `O(1)` shared-handle operation. The returned slice remains
+    /// immutable; focused consumers must still reopen and semantically verify
+    /// a changed target before publication. Cloning the privately retained
+    /// target does not rehash its bytes.
+    #[must_use]
+    pub fn target(&self) -> Arc<[u8]> {
+        Arc::clone(&self.target)
     }
 }
 
@@ -1669,6 +1798,12 @@ fn raw_u32(bytes: &[u8], start: usize) -> Option<u32> {
         .map(|value| u32::from_le_bytes([value[0], value[1], value[2], value[3]]))
 }
 
+fn diagnostic_fingerprint(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325_u64, |value, byte| {
+        (value ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}
+
 fn collect_flat(archive: &ZipArchive<'_>, source: &Arc<[u8]>) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
@@ -2037,6 +2172,60 @@ mod tests {
         push_u16(&mut bytes, checked_u16(archive_comment.len()));
         bytes.extend_from_slice(archive_comment);
         bytes
+    }
+
+    #[test]
+    fn exact_artifacts_authorize_pointer_or_exact_bytes_but_not_fingerprints() {
+        let source: Arc<[u8]> = b"exact package source".to_vec().into();
+        let target: Arc<[u8]> = b"exact package target".to_vec().into();
+        let mut artifacts = ExactArtifacts::new(Arc::clone(&source), target);
+
+        assert!(artifacts.authorizes_source(&source));
+        let equal_copy: Arc<[u8]> = source.as_ref().to_vec().into();
+        assert!(!Arc::ptr_eq(&source, &equal_copy));
+        assert!(artifacts.authorizes_source(&equal_copy));
+
+        let tampered: Arc<[u8]> = b"tampered package source".to_vec().into();
+        artifacts.source_fingerprint = diagnostic_fingerprint(&tampered);
+        assert!(!artifacts.authorizes_source(&tampered));
+    }
+
+    #[test]
+    fn exact_artifacts_clone_inverse_and_handoffs_share_allocations() {
+        let source: Arc<[u8]> = b"source bytes".to_vec().into();
+        let mut target: Arc<[u8]> = b"target bytes".to_vec().into();
+        let artifacts = ExactArtifacts::new(Arc::clone(&source), Arc::clone(&target));
+
+        assert!(Arc::get_mut(&mut target).is_none());
+        let cloned = artifacts.clone();
+        assert!(Arc::ptr_eq(&cloned.source(), &source));
+        assert!(Arc::ptr_eq(&cloned.target(), &target));
+        assert_eq!(cloned.source_fingerprint(), artifacts.source_fingerprint());
+        assert_eq!(cloned.target_fingerprint(), artifacts.target_fingerprint());
+
+        let inverse = artifacts.inverse();
+        assert!(Arc::ptr_eq(&inverse.source(), &target));
+        assert!(Arc::ptr_eq(&inverse.target(), &source));
+        assert_eq!(inverse.source_fingerprint(), artifacts.target_fingerprint());
+        assert_eq!(inverse.target_fingerprint(), artifacts.source_fingerprint());
+    }
+
+    #[test]
+    fn exact_artifacts_byte_noop_requires_exact_equality() {
+        let shared: Arc<[u8]> = b"same bytes".to_vec().into();
+        let shared_pair = ExactArtifacts::new(Arc::clone(&shared), Arc::clone(&shared));
+        assert!(shared_pair.is_byte_noop());
+
+        let equal_copy: Arc<[u8]> = shared.as_ref().to_vec().into();
+        let equal_pair = ExactArtifacts::new(Arc::clone(&shared), equal_copy);
+        assert!(equal_pair.is_byte_noop());
+
+        let changed: Arc<[u8]> = b"same bytez".to_vec().into();
+        let changed_pair = ExactArtifacts::new(shared, changed);
+        assert!(!changed_pair.is_byte_noop());
+        let debug = format!("{changed_pair:?}");
+        assert!(!debug.contains("same bytes"));
+        assert!(!debug.contains("same bytez"));
     }
 
     #[test]

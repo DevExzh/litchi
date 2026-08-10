@@ -33,6 +33,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_slide_transition"
+path = "fuzz_targets/keynote_slide_transition.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_lock"
 path = "fuzz_targets/numbers_table_lock.rs"
 test = false
