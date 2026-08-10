@@ -266,9 +266,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_pages_section_projection_budget(&buffa_pages_section_out_directory)?;
 
-    // Pages root/body traversal needs only two root references and one
-    // streamed section-boundary entry. The enclosing section table stays out
-    // of generated code, and strict preflight owns every ingress limit.
+    // Pages root/body traversal needs only two root references, scalar page
+    // layout, and one streamed section-boundary entry. The enclosing section
+    // table stays out of generated code, and strict preflight owns every
+    // ingress limit.
     let buffa_pages_body_out_directory =
         PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-body");
     buffa_build::Config::new()
@@ -570,14 +571,25 @@ fn enforce_pages_body_projection_provenance(
     projection_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
     const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
-    const TP_FIELDS: [&str; 3] = [
+    const TP_FIELDS: [&str; 14] = [
         "required .TSA.DocumentArchive super = 15;",
         "optional .TSP.Reference body_storage = 4;",
         "optional .TSP.Reference section = 5;",
+        "optional float page_width = 30;",
+        "optional float page_height = 31;",
+        "optional float left_margin = 32;",
+        "optional float right_margin = 33;",
+        "optional float top_margin = 34;",
+        "optional float bottom_margin = 35;",
+        "optional float header_margin = 36;",
+        "optional float footer_margin = 37;",
+        "optional float page_scale = 38;",
+        "optional bool lays_out_body_vertically = 39;",
+        "optional uint32 orientation = 42 [default = 0];",
     ];
     const TSWP_BOUNDARY: &str = "message ObjectAttribute {\n    required uint32 character_index = 1;\n    optional .TSP.Reference object = 2;\n  }";
     const PROJECTION_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
-    const PROJECTION_DOCUMENT: &str = "message PagesDocumentBodyArchive {\n  optional .LitchiIwaProjection.Reference body_storage = 4;\n  optional .LitchiIwaProjection.Reference initial_section = 5;\n}";
+    const PROJECTION_DOCUMENT: &str = "message PagesDocumentBodyArchive {\n  optional .LitchiIwaProjection.Reference body_storage = 4;\n  optional .LitchiIwaProjection.Reference initial_section = 5;\n  optional float page_width = 30;\n  optional float page_height = 31;\n  optional float left_margin = 32;\n  optional float right_margin = 33;\n  optional float top_margin = 34;\n  optional float bottom_margin = 35;\n  optional float header_margin = 36;\n  optional float footer_margin = 37;\n  optional float page_scale = 38;\n  optional bool lays_out_body_vertically = 39;\n  optional uint32 orientation = 42 [default = 0];\n}";
     const PROJECTION_BOUNDARY: &str = "message PagesSectionBoundaryEntry {\n  required uint32 character_index = 1;\n  optional .LitchiIwaProjection.Reference section = 2;\n}";
     const ROUTER_DECLARATIONS: [&str; 9] = [
         "const DOCUMENT_BODY_STORAGE_FIELD: u32 = 4;",
@@ -618,7 +630,7 @@ fn enforce_pages_body_projection_provenance(
         || production_codec.contains(".encode(")
     {
         return Err(
-            "derived Pages body projection/router drifted from canonical TP/TSWP/TSP fields, exceeded its 3 KiB source budget, introduced generated repeated storage, or added production encoding"
+            "derived Pages body/layout projection/router drifted from canonical TP/TSWP/TSP fields, exceeded its 3 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
     }
@@ -1242,14 +1254,15 @@ fn enforce_pages_section_projection_budget(directory: &Path) -> Result<(), Box<d
 
 fn enforce_pages_body_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: usize = 5;
-    // Buffa 0.9.1 emits 93,867 bytes for the three singular message shells.
-    // Leave only a small generator/formatter allowance so another schema
-    // closure cannot enter this focused projection unnoticed.
-    const MAX_GENERATED_BYTES: u64 = 96 * 1024;
+    // Buffa 0.9.1 emits 122,114 bytes for the body references, streamed
+    // section-boundary entry, and scalar page layout. Leave only a small
+    // generator/formatter allowance so another schema closure cannot enter
+    // this focused projection unnoticed.
+    const MAX_GENERATED_BYTES: u64 = 124 * 1024;
 
     let mut files = 0usize;
     let mut bytes = 0u64;
-    let mut generated_repeated_views = 0usize;
+    let mut generated_repeated_view_mentions = 0usize;
     for entry_result in fs::read_dir(directory)? {
         let entry = entry_result?;
         if !entry.file_type()?.is_file() {
@@ -1261,18 +1274,21 @@ fn enforce_pages_body_projection_budget(directory: &Path) -> Result<(), Box<dyn 
         bytes = bytes
             .checked_add(entry.metadata()?.len())
             .ok_or("generated byte count overflow")?;
-        generated_repeated_views = generated_repeated_views
+        generated_repeated_view_mentions = generated_repeated_view_mentions
             .checked_add(
                 fs::read_to_string(entry.path())?
-                    .matches("LazyRepeatedView")
+                    .matches("RepeatedView")
                     .count(),
             )
-            .ok_or("generated repeated-view count overflow")?;
+            .ok_or("generated repeated-view mention count overflow")?;
     }
 
-    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || generated_repeated_view_mentions != 0
+    {
         return Err(format!(
-            "Pages body projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+            "Pages body/layout projection generated {files} files/{bytes} bytes/{generated_repeated_view_mentions} RepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

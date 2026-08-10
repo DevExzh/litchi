@@ -52,6 +52,10 @@ pub use litchi_iwa_text::{TextPosition, TextSpan};
 pub use package::__semantic_document_from_prepared_source;
 pub use package::{Limits, Package, PackageError, PackageResult, Stats};
 pub use package::{
+    PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
+    PageLayoutPatch,
+};
+pub use package::{
     SectionNameCommit, SectionNameDiagnostics, SectionNameEdit, SectionNameError,
     SectionNameLimitKind, SectionNamePatch,
 };

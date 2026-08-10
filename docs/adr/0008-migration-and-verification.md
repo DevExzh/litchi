@@ -8173,3 +8173,159 @@ host table/cell mutations do not enforce that state by default; read-model
 convergence and protection enforcement remain host-migration debt. The private
 Numbers locator also remains specialized instead of converging on the neutral
 IWA index owner.
+
+## 2026-08-10 amendment: Pages page-layout cutover and verification contract
+
+Pages page geometry now follows the focused immutable package flow. The public
+semantic value remains the presence-preserving `page_layout::Layout`, while
+`Package::{page_layout, edit_page_layout, apply_page_layout}` and the
+format-owned edit, commit, reversible patch, diagnostics, error, and limit
+types own the artifact transaction. Native object IDs, component names,
+message types, generated messages, and layout/cache wire fields remain private.
+
+The exact read call graph is `Package::page_layout` to the unique object 1 and
+unique type-10000 `TP.DocumentArchive` payload, then a bounded canonical raw
+preflight of required opaque field 15 plus layout fields 30 through 39 and 42,
+then forced access to every projected scalar on the private Buffa lazy view,
+and finally equality with the archive-free `Layout`. Raw preflight rejects
+duplicates, wrong wire types, noncanonical keys or varints, invalid Booleans,
+and invalid semantic geometry before the generated view can authorize the
+result. The existing document-body projection, rather than a second competing
+schema, owns the layout scalars. Its five generated files measure 122,114
+bytes under a 124 KiB cap, contain no repeated view or production encoding
+path, and deliberately leave the required `TP.DocumentArchive.super` payload
+opaque. Buffa is a checked borrowed read seam, never the preservation or
+encoding representation.
+
+A changed commit raw-splices the eleven presence-preserving scalar fields in
+the selected document payload. Cache ownership is proved through the rooted
+raw call graph, not by claiming every package-wide view-state candidate. The
+adapter rejects deprecated `TP.DocumentArchive` fields 11 and 12, parses its
+required `super` field 15, follows `TSA.DocumentArchive.view_state` field 5 to
+a unique referenced type-210 shared view-state object, follows that payload's
+field 1 to a unique referenced type-10147 `TP.ViewStateRootArchive`, and then
+strictly decodes the root's optional layout-state field 1 and UI-state field 2.
+Every followed reference must be nonzero and local. The document-to-bridge
+edge must occur exactly once in aggregate metadata and, when field metadata is
+present, exactly once at path `[15, 5]`; the bridge-to-root edge has the same
+contract at path `[1]`.
+If layout state exists, the transaction removes only field 1 and its exactly
+once-declared aggregate reference metadata plus the optional unique field
+declaration at path `[1]`. It does not delete or decode the referenced
+layout-state object, rewrite the type-210 bridge, or claim detached/unrooted
+type-10147 objects; those remain opaque and exact. It also preserves field 2,
+unknown view-state content, and unrelated reference metadata. Missing,
+duplicate, or contradictory objects on the rooted chain, a shared layout/UI
+identifier, selected merge/diff metadata, and noncanonical object-length
+prefixes fail closed instead of being normalized.
+
+Document and rooted view-state edits publish in one candidate. If both objects
+share an IWA component, diagnostics report one touched component; if a separate
+component carries the layout-state edge, diagnostics report two. The same
+bounded deletion-aware archive operation removes root `preview.jpg`,
+`preview-micro.jpg`, and `preview-web.jpg`, with deletions counted separately
+from IWA components. This is the explicit preservation exception required to
+prevent Pages from retaining layout-derived view and rendered preview state;
+all other retained ZIP records and unselected IWA content remain exact.
+Publication completes only after reopening the whole candidate under the
+retained limits and verifying the new layout, absent layout-state edge, absent
+root previews, stable package statistics, and unchanged section names, types,
+headings, paragraphs, text storages, and page counts.
+Bounded canonical unknown protobuf groups remain readable and exact no-ops
+retain them, but changed page-layout publication currently refuses a
+group-bearing document payload because the scalar splicer does not yet own a
+group-aware rewrite rule.
+
+An equal-layout commit is a byte-exact no-op: it retains optional-field
+presence, view-state and preview bytes, shares the source allocation, reports
+zero touched components and deleted previews, and performs neither reassembly
+nor candidate reopen. A no-op patch additionally requires exact artifact
+identity. A changed patch is bound to complete source and target artifacts;
+application checks exact source bytes, semantic layout, layout-state identity,
+and preview count, then reopens and verifies the stored target rather than
+reassembling it. Its inverse swaps those artifacts and restores the original
+document, cache edge, previews, and bytes exactly. Legacy nested `Index.zip`
+packages remain readable and support exact no-ops, but changed publication is
+rejected as `UnsupportedSource`.
+
+Migration is intentionally breaking rather than aliased:
+
+- `PagesEditor::page_layout()` becomes `Package::page_layout()`.
+- `PagesEditor::set_page_layout(layout)` becomes
+  `let mut edit = package.edit_page_layout()?; edit.set_layout(layout)?; let
+  commit = edit.commit()?;`.
+- The next immutable edit must begin from `commit.package()` or
+  `commit.into_package()`; the package that began the edit is never mutated.
+- Changed-output comparisons must allow the declared layout-state-edge and
+  root-preview removal. Exact no-ops remain byte-identical.
+
+The host methods, private `editor::page_layout` module/source, their duplicate
+host tests, and `litchi-iwa/examples/edit_pages_layout.rs` are removed. The
+focused `litchi-pages` example validates width, height, and orientation, writes
+through a synced sibling temporary file with no clobber, and can emit an exact
+inverse. Boundary checks forbid the retired host method declarations and
+module/source from returning and reject physical IWA/protobuf vocabulary in
+the focused public facade.
+No workspace membership, internal dependency declaration, or ordered debt
+changes: the checked inventory remains 64 packages, 235 internal declarations,
+and 14 ordered migration debts.
+
+The final deterministic gate passed all 92 `litchi-pages` tests and doctests,
+including the focused 10/10 transaction suite, and the private page-layout
+codec passed 6/6. Coverage includes one- and two-component invalidation,
+rooted metadata proof at every hop, detached-cache preservation, preview
+deletion, raw unknown/header locality, bounded canonical unknown groups,
+malformed scalar and reference framing, deprecated cache paths, selected
+merge/diff refusal, exact no-op and inverse behavior, stale/tampered patch
+conflicts, legacy changed refusal, typed limits, failure atomicity, concurrent
+reads, and public `Send + Sync` assertions. The package check and focused
+no-dependency library Clippy with warnings denied pass. Full all-target Clippy
+remains blocked upstream by 88 existing `litchi-core` SIMD lint errors. All 63
+boundary-policy unit tests pass and the live Pages retirement/facade audits are
+clean.
+
+The `pages_page_layout` fuzz binary compiles. Its bounded harness sends
+arbitrary bytes through checked ingress and interprets the same input as layout
+commands over the checked-in native fixture, covering reads, no-op/change/clear,
+apply, conflicts, inversion, exact restoration, limits, and redacted failures.
+Thirty-two generated smoke inputs and a fixed changed-layout corpus completed.
+The attempted sanitizer-backed 1,000-run `cargo fuzz` campaign did not start:
+the active stable toolchain rejects `-Zsanitizer=address` and no nightly
+toolchain is installed. This is compile and non-sanitized smoke evidence, not a
+sustained sanitizer campaign.
+
+The checked-in `basic.pages` transaction changed the native fixture to 792 by
+612 point landscape, reported `changed=true`, touched two IWA components,
+deleted all three root previews, retained the semantic body text, and left no
+root preview entry in the Rust candidate. The source and current Rust-candidate
+SHA-256 values are
+`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`
+and `79e00545ef6e2e30e366e3160b7d9126bf06cffac5fbbd5551e3d3789cc298e4`.
+Applying the inverse restored the exact source hash. Reapplying the same layout
+to the Rust candidate reported unchanged, zero touched components, zero
+deleted previews, and preserved the candidate hash exactly.
+
+Apple Pages 14.4 (7043.0.93) opened the current Rust candidate without warning,
+repair, recovery, or conversion. The Document inspector showed Any Printer,
+US Letter, Landscape selected, 11.00 by 8.50 inches, and Document Body checked.
+The accessibility text contained exactly `Litchi native Pages fixture`,
+`Buffa lazy-view migration verification`, and `2026-08-07`. Native Save As,
+close, and exact-file reopen were warning-free and reconfirmed the same layout,
+document kind, and body. The native-resaved SHA-256 is
+`8228e7518bb080bd8e5ec134d0abc7484c8825ad3cde3d16cabf76c5dbd8ef82`,
+and native Save As regenerated root `preview.jpg`, `preview-micro.jpg`, and
+`preview-web.jpg`. A focused equal-layout transaction over that native artifact
+reported unchanged, zero touched components, and zero deleted previews and
+produced a byte-identical output with the same hash.
+
+This cutover does not claim ownership of the detached opaque layout-state
+object, other document settings, durable patch serialization, semantic patch
+composition or merge, library-owned atomic durable filesystem replacement,
+or a whole-Pages Buffa conversion. The example's publication workflow is
+evidence, not the missing library contract. Aggregate transaction peak memory
+and total work are not yet bounded across retained before/after artifacts,
+component recompression, hashing, ZIP reassembly, and full candidate reopen;
+nor is every transitive allocation proven fallible. In particular, the shared
+archive encoder still deep-clones retained `ArchiveInfo` metadata through an
+infallible path. Exact source bytes remain an ordinary `Package` API, and the
+flattened `PageLayout*` names remain focused-module naming debt.

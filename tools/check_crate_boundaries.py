@@ -175,6 +175,36 @@ NUMBERS_TABLE_LOCK_ALLOWED_COMMON_REEXPORT = (
     "lock",
     "State",
 )
+IWA_PAGES_SOURCE_ROOT = Path("crates/litchi-iwa/src/pages")
+IWA_PAGES_EDITOR_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor.rs"
+RETIRED_IWA_PAGES_PAGE_LAYOUT_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor" / "page_layout.rs"
+RETIRED_IWA_PAGES_PAGE_LAYOUT_METHODS = ("page_layout", "set_page_layout")
+RETIRED_IWA_PAGES_PAGE_LAYOUT_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_PAGE_LAYOUT_METHODS
+)
+PAGES_SOURCE_ROOT = Path("crates/litchi-pages/src")
+PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE = (
+    PAGES_SOURCE_ROOT / "package" / "page_layout.rs"
+)
+PAGES_PAGE_LAYOUT_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+)
+PAGES_PAGE_LAYOUT_PUBLIC_MARKERS = frozenset(
+    {
+        "PageLayoutCommit",
+        "PageLayoutDiagnostics",
+        "PageLayoutEdit",
+        "PageLayoutError",
+        "PageLayoutLimitKind",
+        "PageLayoutPatch",
+    }
+)
+IWA_PAGES_PAGE_LAYOUT_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?page_layout\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
 CAMEL_CASE_WORD = re.compile(r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|[0-9]+")
 FACADE_DEFAULT_FEATURE = "default"
 FACADE_ALL_FEATURE = "all"
@@ -1215,19 +1245,22 @@ def _rust_named_struct_body(source: str, name: str) -> tuple[str, int] | None:
     return code[opening + 1 : cursor - 1], opening + 1
 
 
-def _numbers_table_lock_public_leak(identifier: str) -> str | None:
-    """Classify physical vocabulary forbidden in the focused lock facade."""
+def _iwork_public_leak(identifier: str) -> str | None:
+    """Classify physical vocabulary forbidden in focused iWork facades."""
 
     if identifier.startswith("litchi_iwa"):
         return "archive/IWA type"
-    if identifier in {"prost", "prost_types"}:
+    if identifier in {"buffa", "prost", "prost_types"}:
         return "protobuf type"
     if identifier == "IWorkPackage":
         return "archive/IWA type"
     words: list[str] = []
     for part in identifier.split("_"):
         words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
-    if any(word in {"id", "ids", "identifier", "identifiers"} for word in words):
+    if any(
+        word in {"guid", "guids", "id", "ids", "identifier", "identifiers", "uuid", "uuids"}
+        for word in words
+    ):
         return "raw identifier"
     if identifier[:1].islower() and any(
         word in {"object", "objects"} for word in words
@@ -1239,7 +1272,7 @@ def _numbers_table_lock_public_leak(identifier: str) -> str | None:
         "Message"
     ):
         return "protobuf type"
-    if identifier.endswith("Archive") or (
+    if identifier.endswith(("Archive", "ArchiveView", "MessageInfo")) or (
         "raw" in words and identifier[:1].isupper()
     ):
         return "archive/IWA type"
@@ -1256,6 +1289,19 @@ def _is_numbers_table_lock_public_declaration(
     }
     return bool(identifiers & NUMBERS_TABLE_LOCK_PUBLIC_MARKERS) or any(
         "table_lock" in identifier.lower() for identifier in identifiers
+    )
+
+
+def _is_pages_page_layout_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(identifiers & PAGES_PAGE_LAYOUT_PUBLIC_MARKERS) or any(
+        "page_layout" in identifier.lower() for identifier in identifiers
     )
 
 
@@ -1383,10 +1429,10 @@ def audit_numbers_table_lock_facade_source_topology(root: Path = ROOT) -> list[s
                     identifier in NUMBERS_TABLE_LOCK_PUBLIC_MARKERS
                     or "lock" in identifier.lower()
                     or identifier.startswith("litchi_iwa")
-                    or identifier in {"prost", "prost_types"}
+                    or identifier in {"buffa", "prost", "prost_types"}
                 ):
                     continue
-                reason = _numbers_table_lock_public_leak(identifier)
+                reason = _iwork_public_leak(identifier)
                 if reason is None:
                     continue
                 identifier_line = line_number + declaration.count(
@@ -1394,6 +1440,87 @@ def audit_numbers_table_lock_facade_source_topology(root: Path = ROOT) -> list[s
                 )
                 violations.append(
                     "focused litchi-numbers table-lock public API exposes "
+                    f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_pages_page_layout_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the retired Pages page-layout API and module out of the host."""
+
+    violations: list[str] = []
+    retired_source = root / RETIRED_IWA_PAGES_PAGE_LAYOUT_SOURCE
+    if retired_source.exists():
+        violations.append(
+            "retired litchi-iwa Pages page-layout source returned: "
+            + str(RETIRED_IWA_PAGES_PAGE_LAYOUT_SOURCE)
+        )
+
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_PAGES_PAGE_LAYOUT_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Pages page-layout method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    editor_path = root / IWA_PAGES_EDITOR_SOURCE
+    if editor_path.is_file():
+        source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+        for match in IWA_PAGES_PAGE_LAYOUT_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Pages page-layout module declaration: "
+                f"{IWA_PAGES_EDITOR_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Reject physical identifiers and implementation types from the layout facade."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    implementation_source = root / PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE
+    dedicated_sources = {implementation_source} if implementation_source.is_file() else set()
+    export_sources = {
+        root / path for path in PAGES_PAGE_LAYOUT_EXPORT_SOURCES if (root / path).is_file()
+    }
+    violations: list[str] = []
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for declaration, line_number, complete_source_scope in declarations:
+            if not _is_pages_page_layout_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                reason = _iwork_public_leak(identifier)
+                if reason is None:
+                    continue
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                violations.append(
+                    "focused litchi-pages page-layout public API exposes "
                     f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
                 )
 
@@ -1666,6 +1793,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
+        + audit_iwa_pages_page_layout_source_topology()
+        + audit_pages_page_layout_facade_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

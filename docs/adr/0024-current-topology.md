@@ -835,3 +835,86 @@ focused-module short-name rule.
 The archive-free `Table` snapshot does not yet carry lock state, remaining host
 table/cell mutations do not enforce that state by default, and the private
 Numbers locator has not converged on the neutral IWA index owner.
+
+## 2026-08-10 current-status amendment: Pages page-layout owner
+
+`litchi-pages::Package` now owns reading and immutable exact-source mutation of
+the document-wide, presence-preserving `page_layout::Layout`. The focused API
+is `page_layout`, `edit_page_layout`, and `apply_page_layout`, plus
+format-owned edit, commit, reversible patch, diagnostics, error, and limit
+types. No physical identifier, component, generated message, or wire-field
+vocabulary crosses the public boundary.
+
+The private locator requires one object 1 and one type-10000
+`TP.DocumentArchive`. A bounded canonical raw pass reads required opaque
+`super` field 15 and scalar fields 30 through 39 and 42; every projected layout
+scalar is then forced on the existing document-body Buffa lazy view and the
+complete result is cross-checked. The projection remains read-only, repeated-
+view-free, and preservation-free, with five generated files measuring 122,114
+bytes under 124 KiB. Raw records remain authoritative for unknown fields and
+rewrites.
+
+A changed transaction patches the selected document and follows a raw rooted
+cache graph: required `TP.DocumentArchive.super` field 15 to
+`TSA.DocumentArchive.view_state` field 5, its unique type-210 object to field 1,
+and that reference to the unique type-10147 view-state root. Deprecated
+document fields 11 and 12 are rejected. Both followed local edges require one
+aggregate metadata occurrence and optional unique field metadata at `[15, 5]`
+and `[1]`, respectively. The transaction removes the rooted
+layout-state field 1 and its uniquely proven aggregate and optional path-`[1]`
+reference metadata, while preserving UI-state field 2, unrelated metadata,
+unknown fields, the now-detached opaque layout-state object, the intermediate
+bridge, and detached/unrooted view-state candidates. Missing, ambiguous, or
+contradictory rooted objects or metadata, a layout/UI alias, selected
+merge/diff state, and noncanonical object lengths fail closed. The document and
+rooted view-state root can share one component or occupy two; diagnostics
+report that exact one-or-two component count.
+
+The same atomic reassembly deletes root `preview.jpg`, `preview-micro.jpg`, and
+`preview-web.jpg`, reported separately from components. The complete candidate
+is reopened under retained limits and checked for requested layout, absent
+cache edge and previews, stable statistics, and unchanged section semantics.
+Canonical unknown protobuf groups remain readable and exact on no-op paths,
+but changed layout splicing currently fails closed on a group-bearing document
+payload.
+Exact semantic no-ops preserve cache and preview bytes, share the source,
+report zero components, and skip reassembly and reopen. Changed patch
+application reopens its exact stored target; inverse application restores the
+whole source artifact. Legacy nested packages retain reads and exact no-ops but
+refuse changed publication.
+
+The migration host no longer has `PagesEditor::page_layout`,
+`set_page_layout`, the private page-layout module/source, or the old host
+example. A focused example demonstrates validated immutable chaining,
+no-clobber temporary publication, and optional exact inverse output. Boundary
+ratchets protect both the retirement and the archive-free facade. Remaining
+host Pages editors and other settings/cache owners are unchanged, so no
+manifest edge or ordered migration debt is retired.
+The current inventory remains 64 workspace packages, 235 internal dependency
+declarations, and 14 ordered debts.
+
+Verification is current: all 92 Pages tests/doctests pass, including 10/10
+focused transactions, as do 6/6 private codec tests, the Pages package check,
+focused warnings-denied Clippy, and all 63 boundary-policy tests. The fuzz
+target compiles and completed 32 generated smoke inputs plus a fixed changed
+corpus; sanitizer execution remains pending because the installed stable
+toolchain cannot run cargo-fuzz's sanitizer flags and nightly is unavailable.
+On the checked-in native Pages fixture, the 792 by 612 point landscape
+candidate touched two components, deleted three previews, retained semantic
+text, and inverted exactly. Source and candidate SHA-256 values are
+`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`
+and `79e00545ef6e2e30e366e3160b7d9126bf06cffac5fbbd5551e3d3789cc298e4`.
+Apple Pages 14.4 (7043.0.93) opened the candidate without warning, showed US Letter
+landscape with Document Body and all three fixture lines intact, then completed
+native Save As, close, and reopen. Save As regenerated all three previews and
+produced SHA-256
+`8228e7518bb080bd8e5ec134d0abc7484c8825ad3cde3d16cabf76c5dbd8ef82`;
+a focused equal-layout transaction reproduced that artifact exactly with zero
+components and preview deletions.
+
+Open topology debt includes the unowned opaque layout-state object, other
+render/settings caches, whole-Pages Buffa coverage, aggregate transaction
+peak-memory and total-work accounting, a complete fallible-allocation proof,
+durable patch serialization, and a library-owned atomic durable filesystem
+save. Exact bytes remain ordinary `Package` surface, and flattened
+`PageLayout*` transaction names remain focused-module naming debt.

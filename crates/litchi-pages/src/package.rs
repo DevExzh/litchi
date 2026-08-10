@@ -4,6 +4,7 @@
 //! and generated protobuf messages. It publishes [`Package`] snapshots whose
 //! semantic content is represented by the archive-free [`crate::Document`].
 
+mod page_layout;
 mod section_name;
 mod section_pagination;
 mod section_text;
@@ -38,6 +39,10 @@ use crate::{
     MAX_SECTIONS, Root, Section, SectionType,
 };
 
+pub use page_layout::{
+    PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
+    PageLayoutPatch,
+};
 pub use section_name::{
     SectionNameCommit, SectionNameDiagnostics, SectionNameEdit, SectionNameError,
     SectionNameLimitKind, SectionNamePatch,

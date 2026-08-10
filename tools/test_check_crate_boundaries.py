@@ -1025,6 +1025,261 @@ class BoundaryPolicyTests(unittest.TestCase):
                 boundaries.audit_iwa_numbers_table_lock_source_topology(root), []
             )
 
+    def test_retired_iwa_pages_page_layout_method_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_PAGE_LAYOUT_METHODS,
+            ("page_layout", "set_page_layout"),
+        )
+
+    def test_retired_iwa_pages_page_layout_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            nested = root / boundaries.IWA_PAGES_SOURCE_ROOT / "legacy/layout.rs"
+            nested.parent.mkdir(parents=True)
+            nested.write_text(
+                "\n".join(
+                    [
+                        "fn r#page_layout() {}",
+                        "pub(crate) async unsafe fn set_page_layout() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_PAGES_EDITOR_SOURCE
+            editor.write_text("pub(crate) mod page_layout;\n", encoding="utf-8")
+            retired = root / boundaries.RETIRED_IWA_PAGES_PAGE_LAYOUT_SOURCE
+            retired.parent.mkdir(parents=True, exist_ok=True)
+            retired.write_text("// retired owner returned\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_page_layout_source_topology(root),
+                [
+                    "retired litchi-iwa Pages page-layout method page_layout: "
+                    "crates/litchi-iwa/src/pages/legacy/layout.rs:1",
+                    "retired litchi-iwa Pages page-layout method set_page_layout: "
+                    "crates/litchi-iwa/src/pages/legacy/layout.rs:2",
+                    "retired litchi-iwa Pages page-layout module declaration: "
+                    "crates/litchi-iwa/src/pages/editor.rs:1",
+                    "retired litchi-iwa Pages page-layout source returned: "
+                    "crates/litchi-iwa/src/pages/editor/page_layout.rs",
+                ],
+            )
+
+    def test_retired_iwa_pages_page_layout_module_declaration_variants(
+        self,
+    ) -> None:
+        for declaration in (
+            "mod page_layout;",
+            "pub(crate) mod page_layout;",
+            "pub mod r#page_layout;",
+            "mod\npage_layout\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    editor = root / boundaries.IWA_PAGES_EDITOR_SOURCE
+                    editor.parent.mkdir(parents=True)
+                    editor.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_iwa_pages_page_layout_source_topology(root),
+                        [
+                            "retired litchi-iwa Pages page-layout module declaration: "
+                            "crates/litchi-iwa/src/pages/editor.rs:1"
+                        ],
+                    )
+
+    def test_iwa_pages_page_layout_policy_ignores_non_code_near_names_and_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "legacy/page_layout_old.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "\n".join(
+                    [
+                        "// pub fn page_layout() {}",
+                        'const NOTE: &str = "fn set_page_layout() {}";',
+                        "/* fn page_layout() {}",
+                        "   /* fn set_page_layout() {} */",
+                        "   fn page_layout() {} */",
+                        'const RAW_NOTE: &str = r###"fn set_page_layout() {}"###;',
+                        "pub fn page_layout_snapshot() {}",
+                        "pub fn reset_page_layout() {}",
+                        "pub fn set_page_layouts() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_PAGES_EDITOR_SOURCE
+            editor.write_text(
+                "\n".join(
+                    [
+                        "// mod page_layout;",
+                        'const NOTE: &str = "mod page_layout;";',
+                        "/* mod page_layout; */",
+                        "mod page_layout_legacy;",
+                        "use crate::page_layout;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            declarations = "pub fn page_layout() {}\npub fn set_page_layout() {}\n"
+            for relative in (
+                Path("crates/litchi-pages/src/package/page_layout.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/page_layout.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(declarations, encoding="utf-8")
+            non_rust = root / boundaries.IWA_PAGES_SOURCE_ROOT / "page_layout.txt"
+            non_rust.write_text(declarations, encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_page_layout_source_topology(root), []
+            )
+
+    def test_focused_pages_page_layout_public_api_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            implementation = root / boundaries.PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE
+            implementation.parent.mkdir(parents=True)
+            implementation.write_text(
+                "\n".join(
+                    [
+                        "pub async unsafe fn r#page_layout(",
+                        "    r#object_id: u64,",
+                        ") {}",
+                        "pub type PageLayoutPatch = DocumentArchive;",
+                        "pub type PageLayoutCommit = IWorkPackage;",
+                        "pub type PageLayoutDiagnostics = buffa::DocumentArchiveView;",
+                        "impl prost::Message for PageLayoutEdit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_PAGE_LAYOUT_EXPORT_SOURCES
+            )
+            package_export.parent.mkdir(parents=True, exist_ok=True)
+            package_export.write_text(
+                "pub type PageLayoutDiagnostics = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+            lib_export.write_text(
+                "pub use litchi_iwa_protos::PageLayoutArchive as PageLayoutPatch;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_page_layout_facade_source_topology(root)
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertEqual(
+                violations,
+                sorted(
+                    [
+                        "focused litchi-pages page-layout public API exposes "
+                        "raw identifier object_id: "
+                        "crates/litchi-pages/src/package/page_layout.rs:2",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type DocumentArchive: "
+                        "crates/litchi-pages/src/package/page_layout.rs:4",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type IWorkPackage: "
+                        "crates/litchi-pages/src/package/page_layout.rs:5",
+                        "focused litchi-pages page-layout public API exposes "
+                        "protobuf type buffa: "
+                        "crates/litchi-pages/src/package/page_layout.rs:6",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type DocumentArchiveView: "
+                        "crates/litchi-pages/src/package/page_layout.rs:6",
+                        "focused litchi-pages page-layout public API exposes "
+                        "protobuf type prost: "
+                        "crates/litchi-pages/src/package/page_layout.rs:7",
+                        "focused litchi-pages page-layout public API exposes "
+                        "protobuf type Message: "
+                        "crates/litchi-pages/src/package/page_layout.rs:7",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type litchi_iwa_core: "
+                        "crates/litchi-pages/src/package.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "native object RawObject: "
+                        "crates/litchi-pages/src/package.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type litchi_iwa_protos: "
+                        "crates/litchi-pages/src/lib.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type PageLayoutArchive: "
+                        "crates/litchi-pages/src/lib.rs:1",
+                    ]
+                ),
+            )
+
+    def test_focused_pages_page_layout_public_api_ignores_safe_and_private_code(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            implementation = root / boundaries.PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE
+            implementation.parent.mkdir(parents=True)
+            implementation.write_text(
+                "\n".join(
+                    [
+                        "// pub fn page_layout(object_id: ObjectId) {}",
+                        'const NOTE: &str = "pub type PageLayoutPatch = DocumentArchive";',
+                        "/* pub type PageLayoutCommit = IWorkPackage;",
+                        "   /* impl buffa::Message for PageLayoutEdit {} */",
+                        "*/",
+                        'const RAW_NOTE: &str = r###"',
+                        "pub fn page_layout(object_id: ObjectId) {}",
+                        '"###;',
+                        "pub struct PageLayoutEdit;",
+                        "pub fn page_layout(layout: Layout) "
+                        "-> Result<PageLayoutCommit, PageLayoutError> {}",
+                        "impl PageLayoutEdit {}",
+                        "impl prost::Message for Unrelated {}",
+                        "fn private_page_layout(object_id: u64) {}",
+                        "pub(crate) fn restricted_page_layout(archive: DocumentArchive) {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_PAGE_LAYOUT_EXPORT_SOURCES
+            )
+            package_export.parent.mkdir(parents=True, exist_ok=True)
+            safe_exports = (
+                "pub use crate::page_layout::Layout;\n"
+                "pub use package::page_layout::{PageLayoutCommit, PageLayoutError};\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+                "pub type PageLayoutsCommit = litchi_iwa_core::RawObject;\n"
+            )
+            package_export.write_text(safe_exports, encoding="utf-8")
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            low_level = root / boundaries.PAGES_SOURCE_ROOT / "page_layout.rs"
+            low_level.write_text(
+                "pub fn page_layout(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            unrelated_owner = root / "crates/litchi-keynote/src/package/page_layout.rs"
+            unrelated_owner.parent.mkdir(parents=True)
+            unrelated_owner.write_text(
+                "pub type PageLayoutPatch = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_page_layout_facade_source_topology(root), []
+            )
+
     def test_legacy_xlsb_sheet_view_names_and_methods_are_forbidden(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
