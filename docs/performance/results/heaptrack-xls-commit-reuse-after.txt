@@ -1,0 +1,14 @@
+Profile: /tmp/xls-duplicate-after.heaptrack.zst
+Binary: /tmp/litchi-perf-after-xls-reuse
+Binary SHA-256: edb3a8100249e7e17ec761e149b5bd77e8ba6061d6168b4e34ebaa041db45b05
+Command: --warmup 2 --samples 20 --case xls_semantic_one_edit_save --writer-shape large
+
+total runtime: 0.594000s
+calls to allocation functions: 241283
+temporary memory allocations: 22575
+peak heap memory consumption: 8.12M
+peak RSS (including heaptrack overhead): 20.28M
+total memory leaked: 544B
+
+Generated with heaptrack and summarized with:
+heaptrack_print -p 0 -a 0 -T 0

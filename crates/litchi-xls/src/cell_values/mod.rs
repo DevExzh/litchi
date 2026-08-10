@@ -349,6 +349,10 @@ impl Snapshot {
     /// validation error before a snapshot is published.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = PackageEditor::open(bytes, Targets::default(), Limits::default())?;
+        Self::from_package_editor(package)
+    }
+
+    fn from_package_editor(package: PackageEditor) -> Result<Self> {
         let workbook_path = [vec!["Workbook".to_string()], vec!["Book".to_string()]]
             .into_iter()
             .find(|path| package.stream(path).is_some())
@@ -2014,15 +2018,16 @@ impl Transaction {
         }
 
         let workbook: Arc<[u8]> = Arc::from(workbook_bytes);
-        parse_workbook_stream(&workbook)?;
         let mut package = PackageEditor::open(
             self.source.inner.bytes.to_vec(),
             Targets::default(),
             Limits::default(),
         )?;
         package.put_stream_shared(&self.source.inner.workbook_path, workbook)?;
-        let candidate = package.finish()?;
-        let snapshot = Snapshot::from_bytes(candidate)?;
+        // The committed package editor has already rendered, reopened, and
+        // recaptured the candidate CFB. Reuse it so snapshot construction
+        // performs the owner parse and complete Workbook validation once.
+        let snapshot = Snapshot::from_package_editor(package)?;
         verify_readback(&snapshot, &self.changes)?;
         verify_structural_readback(&snapshot, &self.source, &self.structural_changes)?;
         verify_resource_readback(&snapshot, &self.resource_changes)?;
