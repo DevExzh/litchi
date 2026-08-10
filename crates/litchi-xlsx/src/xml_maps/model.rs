@@ -226,7 +226,7 @@ impl XmlMapInfo {
         let mut schemas = Vec::new();
         schemas
             .try_reserve_exact(self.schemas.len())
-            .map_err(|_| invalid("custom XML maps schema descriptor allocation failed"))?;
+            .map_err(|_source| invalid("custom XML maps schema descriptor allocation failed"))?;
         for schema in &self.schemas {
             schemas.push(XmlSchemaRef {
                 id: &schema.id,
@@ -237,7 +237,7 @@ impl XmlMapInfo {
         }
         let mut maps = Vec::new();
         maps.try_reserve_exact(self.maps.len())
-            .map_err(|_| invalid("custom XML maps map descriptor allocation failed"))?;
+            .map_err(|_source| invalid("custom XML maps map descriptor allocation failed"))?;
         for map in &self.maps {
             maps.push(XmlMapRef {
                 id: map.id,

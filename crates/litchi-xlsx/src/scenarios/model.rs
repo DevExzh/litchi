@@ -139,7 +139,7 @@ impl UnknownElement {
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(xml.len())
-            .map_err(|_| invalid("unknown scenario element allocation failed"))?;
+            .map_err(|_source| invalid("unknown scenario element allocation failed"))?;
         owned.extend_from_slice(&xml);
         Ok(Self {
             xml: owned.into_boxed_slice(),
@@ -202,7 +202,7 @@ impl OpaqueFields {
         }
         self.attributes
             .try_reserve(1)
-            .map_err(|_| invalid("unknown scenario attribute allocation failed"))?;
+            .map_err(|_source| invalid("unknown scenario attribute allocation failed"))?;
         self.attributes.push(value);
         self.retained_bytes = retained;
         Ok(())
@@ -222,10 +222,10 @@ impl OpaqueFields {
         }
         self.elements
             .try_reserve(1)
-            .map_err(|_| invalid("unknown scenario element allocation failed"))?;
+            .map_err(|_source| invalid("unknown scenario element allocation failed"))?;
         self.order
             .try_reserve(1)
-            .map_err(|_| invalid("unknown scenario child-order allocation failed"))?;
+            .map_err(|_source| invalid("unknown scenario child-order allocation failed"))?;
         let index = self.elements.len();
         self.elements.push(value);
         self.order.push(ChildOrder::Unknown(index));
@@ -236,7 +236,7 @@ impl OpaqueFields {
     pub(crate) fn push_known(&mut self, index: usize) -> Result<()> {
         self.order
             .try_reserve(1)
-            .map_err(|_| invalid("unknown scenario child-order allocation failed"))?;
+            .map_err(|_source| invalid("unknown scenario child-order allocation failed"))?;
         self.order.push(ChildOrder::Known(index));
         Ok(())
     }
@@ -404,7 +404,7 @@ impl Scenario {
             opaque
                 .order
                 .try_reserve(self.input_cells.len())
-                .map_err(|_| invalid("scenario child-order allocation failed"))?;
+                .map_err(|_source| invalid("scenario child-order allocation failed"))?;
             for index in 0..self.input_cells.len() {
                 opaque.order.push(ChildOrder::Known(index));
             }
@@ -609,7 +609,7 @@ pub(crate) fn validate_cell_reference(value: &str, name: &str) -> Result<()> {
     }
     let row = value[row_start..]
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid {name} row in '{value}'")))?;
+        .map_err(|_source| invalid(format!("invalid {name} row in '{value}'")))?;
     if row == 0 || row > MAX_ROW {
         return Err(invalid(format!("{name} row is out of range in '{value}'")));
     }

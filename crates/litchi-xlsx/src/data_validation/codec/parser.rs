@@ -130,7 +130,15 @@ fn parse_collection(fragment: &Captured) -> Result<Collection> {
                         .checked_sub(1)
                         .ok_or_else(|| invalid("invalid dataValidation nesting"))?;
                 },
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_)
+                | Event::Eof => {},
             }
             if *capture_depth == 0 {
                 let Some((_, writer)) = capture.take() else {

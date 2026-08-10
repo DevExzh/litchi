@@ -23,9 +23,9 @@ pub use authoring::{
     ActiveContentDisposition, Change, ChangeAction, ChangeKind, Commit, CompositionLimits,
     DependencyDisposition, DurablePatch, Edit, EditPolicy, EncryptionCapability, EncryptionPolicy,
     History, HistoryLimits, JoinError, JoinedEdits, Lineage, MergeChoice, MergePlan,
-    MergePlanError, Patch, PreparedEdit, ProtectionCapabilities, ProtectionOperation,
-    ProtectionStatus, ProtectionSupport, ProtectionTransition, QueryChange, SealedPatch,
-    SignatureCapability, SignaturePolicy,
+    MergePlanError, Patch, PreparedEdit, ProtectionCapabilities, ProtectionDecision,
+    ProtectionOperation, ProtectionRefusal, ProtectionStatus, ProtectionSupport,
+    ProtectionTransition, QueryChange, SealedPatch, SignatureCapability, SignaturePolicy,
 };
 pub use facade::{Builder, Database};
 pub use litchi_odf_common::signature::{
@@ -33,12 +33,14 @@ pub use litchi_odf_common::signature::{
 };
 pub use model::connection::Connection;
 pub use model::query::{
-    Query, QueryCommandInventory, QueryJoin, QueryJoinKind, QueryParameter, QueryParameterKind,
-    QueryUpdateTarget,
+    Query, QueryCommandInventory, QueryCommandSemantics, QueryDependencyReason,
+    QueryDependencySupport, QueryJoin, QueryJoinKind, QueryParameter, QueryParameterKind,
+    QueryRelation, QueryRelationRole, QueryStatementKind, QueryUpdateTarget,
 };
 pub use model::{
     ActiveContentEntry, ActiveContentInventory, ActiveContentKind, Catalog, Column, Component,
-    ComponentKind, ComponentLinkKind, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind,
-    Limits, OwnedCatalog, ProducerExtension, ReferentialAction, Relation, Table, TableKind,
-    connection, query,
+    ComponentDependency, ComponentDependencyInventory, ComponentDependencyKind, ComponentKind,
+    ComponentLinkKind, ComponentTransferRefusal, ComponentTransferSupport, DataType, Index,
+    IndexColumn, Key, KeyColumn, KeyKind, Limits, OwnedCatalog, ProducerExtension,
+    ReferentialAction, Relation, RelationResolution, Table, TableKind, connection, query,
 };

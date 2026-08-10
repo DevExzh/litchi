@@ -82,7 +82,7 @@ fn read_u32(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(
         bytes[offset..offset + 4]
             .try_into()
-            .expect("fixed-size field"),
+            .unwrap_or_else(|error| crate::error::panic_error_invariant("fixed-size field", error)),
     )
 }
 
@@ -97,16 +97,20 @@ pub fn parse_key(bytes: &[u8], max_key_data_size: usize) -> Result<CryptKey<'_>,
             "header or trailer magic GUID is wrong",
         ));
     }
+    let header_size =
+        u32::try_from(HEADER_SIZE).map_err(|_source| CryptKeyError::IntegerOverflow)?;
+    let trailer_size =
+        u32::try_from(TRAILER_SIZE).map_err(|_source| CryptKeyError::IntegerOverflow)?;
     if read_u32(bytes, 16) != 4
-        || read_u32(bytes, 20) != HEADER_SIZE as u32
-        || read_u32(bytes, 28) != TRAILER_SIZE as u32
+        || read_u32(bytes, 20) != header_size
+        || read_u32(bytes, 28) != trailer_size
     {
         return Err(CryptKeyError::Invalid(
             "version, header size, or trailer size is wrong",
         ));
     }
     let key_data_size =
-        usize::try_from(read_u32(bytes, 24)).map_err(|_| CryptKeyError::IntegerOverflow)?;
+        usize::try_from(read_u32(bytes, 24)).map_err(|_source| CryptKeyError::IntegerOverflow)?;
     if key_data_size > max_key_data_size {
         return Err(CryptKeyError::LimitExceeded);
     }

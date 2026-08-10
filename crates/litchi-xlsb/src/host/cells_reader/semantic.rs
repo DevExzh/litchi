@@ -63,7 +63,10 @@ pub(super) fn error_text(error_code: u8) -> &'static str {
 }
 
 pub(super) fn cell_value_from_number(value: f64) -> CellValue {
-    if value == value.round() && value >= i64::MIN as f64 && value <= i64::MAX as f64 {
+    if value.to_bits() == value.round().to_bits()
+        && value >= i64::MIN as f64
+        && value <= i64::MAX as f64
+    {
         CellValue::Int(value as i64)
     } else {
         CellValue::Float(value)

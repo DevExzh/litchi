@@ -93,8 +93,10 @@ impl<'a> Transaction<'a> {
         let part_uri = self.next_part_uri.clone();
         self.next_part_uri = next_part_uri_after(&part_uri, self.target)?;
         let index = self.draft.len();
+        let wire_index =
+            u32::try_from(index).map_err(|_source| invalid("external-link index exceeds u32"))?;
         self.draft.push(super::package::Entry {
-            index: index as u32,
+            index: wire_index,
             relationship_id,
             part_uri,
             link,
@@ -110,7 +112,8 @@ impl<'a> Transaction<'a> {
         }
         let removed = self.draft.remove(index);
         for (index, entry) in self.draft.iter_mut().enumerate() {
-            entry.index = index as u32;
+            entry.index = u32::try_from(index)
+                .map_err(|_source| invalid("external-link index exceeds u32"))?;
         }
         validation::entries(&self.draft, self.before.conformance())?;
         Ok(Some(removed))

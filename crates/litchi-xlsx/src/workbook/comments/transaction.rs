@@ -80,21 +80,24 @@ impl<'a> Transaction<'a> {
 
         let mut comments = self.draft.clone().unwrap_or_default();
         let previous = comments.comments.get(&cell_ref).cloned();
-        let author_id = previous
+        let previous_author_id = previous
             .as_ref()
             .filter(|comment| comment.author == author)
-            .map(|comment| comment.author_id)
-            .or_else(|| {
-                comments
-                    .authors
-                    .iter()
-                    .position(|candidate| candidate == &author)
-                    .map(|index| index as u32)
-            })
-            .unwrap_or_else(|| {
-                comments.authors.push(author.clone());
-                (comments.authors.len() - 1) as u32
-            });
+            .map(|comment| comment.author_id);
+        let author_id = if let Some(author_id) = previous_author_id {
+            author_id
+        } else if let Some(index) = comments
+            .authors
+            .iter()
+            .position(|candidate| candidate == &author)
+        {
+            u32::try_from(index)
+                .map_err(|_source| invalid("classic-comments author index exceeds u32"))?
+        } else {
+            comments.authors.push(author.clone());
+            u32::try_from(comments.authors.len() - 1)
+                .map_err(|_source| invalid("classic-comments author index exceeds u32"))?
+        };
         let replacement = Comment {
             cell_ref: cell_ref.clone(),
             author,
@@ -178,7 +181,9 @@ impl<'a> Transaction<'a> {
         }
         let index = found
             .ok_or_else(|| invalid(format!("classic comments author '{current}' is absent")))?;
-        self.set_author(index as u32, replacement)
+        let index = u32::try_from(index)
+            .map_err(|_source| invalid("classic-comments author index exceeds u32"))?;
+        self.set_author(index, replacement)
     }
 
     /// Remove the note at a checked cell address.

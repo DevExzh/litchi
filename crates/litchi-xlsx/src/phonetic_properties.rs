@@ -202,7 +202,7 @@ pub fn parse_phonetic_properties(xml: &[u8]) -> Result<Option<PhoneticProperties
                 declaration_seen = true;
             },
             Event::Eof => break,
-            _ => {},
+            Event::CData(_) | Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
     if !root_seen || !root_closed || !parser.stack.is_empty() {
@@ -275,7 +275,9 @@ impl Parser {
             Context::Worksheet if local == b"worksheet" => Ok(()),
             Context::PhoneticProperties if local == b"phoneticPr" => Ok(()),
             Context::Outside => Ok(()),
-            _ => Err(invalid("mismatched worksheet phoneticPr end element")),
+            Context::Worksheet | Context::PhoneticProperties => {
+                Err(invalid("mismatched worksheet phoneticPr end element"))
+            },
         }
     }
 
@@ -343,7 +345,7 @@ fn parse_attributes(
 fn parse_font_id(value: &str) -> Result<u32> {
     value
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid worksheet phoneticPr fontId '{value}'")))
+        .map_err(|_source| invalid(format!("invalid worksheet phoneticPr fontId '{value}'")))
 }
 
 fn set_once<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {

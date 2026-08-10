@@ -30,10 +30,22 @@ fn capture(xml: &[u8]) -> Result<Option<Vec<u8>>> {
             match event {
                 Event::Start(_) => *depth += 1,
                 Event::End(_) => *depth -= 1,
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_)
+                | Event::Eof => {},
             }
             if *depth == 0 {
-                let (_, writer) = capture.take().unwrap();
+                let (_, writer) = capture.take().unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                });
                 let value = writer.into_inner();
                 if value.len() > MAX_FRAGMENT_BYTES {
                     return Err(invalid("autoFilter is too large"));
@@ -65,7 +77,14 @@ fn capture(xml: &[u8]) -> Result<Option<Vec<u8>>> {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if capture.is_some() {

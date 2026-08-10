@@ -160,7 +160,16 @@ pub fn parse_styles(content: &str) -> Result<Styles> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     styles.differential_formats = differential_formats;
@@ -193,7 +202,16 @@ fn parse_number_formats(
                 return Ok(());
             },
             Event::Eof => return Err(unterminated("numFmts")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -217,7 +235,16 @@ fn parse_fonts(
                 return Ok(());
             },
             Event::Eof => return Err(unterminated("fonts")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -319,7 +346,16 @@ fn parse_font(reader: &mut XmlReader<'_>) -> Result<Font> {
                 return Ok(font);
             },
             Event::Eof => return Err(unterminated("font")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -343,7 +379,16 @@ fn parse_fills(
                 return Ok(());
             },
             Event::Eof => return Err(unterminated("fills")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -394,7 +439,16 @@ fn parse_fill(reader: &mut XmlReader<'_>) -> Result<Fill> {
                 return Ok(fill.unwrap_or(Fill::None));
             },
             Event::Eof => return Err(unterminated("fill")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -454,7 +508,16 @@ fn parse_pattern_fill(
                 };
             },
             Event::Eof => return Err(unterminated("patternFill")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -492,7 +555,16 @@ fn parse_gradient_fill(
                 });
             },
             Event::Eof => return Err(unterminated("gradientFill")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -527,7 +599,16 @@ fn parse_gradient_stop(
                 ));
             },
             Event::Eof => return Err(unterminated("gradient stop")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -566,7 +647,16 @@ fn parse_borders(
                 return Ok(());
             },
             Event::Eof => return Err(unterminated("borders")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -599,7 +689,16 @@ fn parse_border(
                 return Ok(border);
             },
             Event::Eof => return Err(unterminated("border")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -662,8 +761,8 @@ fn parse_border_side_event(
     empty: bool,
 ) -> Result<Option<Side>> {
     let style = optional_string(element, b"style", decoder)?.unwrap_or_else(|| "none".into());
-    let line =
-        Line::from_xml(&style).map_err(|_| invalid(format!("invalid border style '{style}'")))?;
+    let line = Line::from_xml(&style)
+        .map_err(|_source| invalid(format!("invalid border style '{style}'")))?;
     if empty {
         return Ok(line.map(Side::new));
     }
@@ -689,7 +788,16 @@ fn parse_border_side_event(
                 }));
             },
             Event::Eof => return Err(unterminated("border side")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -727,7 +835,16 @@ fn parse_cell_xfs(
                 return Ok(());
             },
             Event::Eof => return Err(unterminated("cell XFs")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -763,7 +880,16 @@ fn parse_xf(
                 return Ok(style);
             },
             Event::Eof => return Err(unterminated("xf")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -780,7 +906,17 @@ fn finish_alignment(reader: &mut XmlReader<'_>) -> Result<()> {
             Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
             Event::Comment(_) => {},
             Event::Eof => return Err(unterminated("alignment")),
-            _ => return Err(invalid("cell alignment must not contain content")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return Err(invalid("cell alignment must not contain content"));
+            },
         }
     }
 }
@@ -830,19 +966,16 @@ fn parse_alignment(element: &BytesStart<'_>, decoder: Decoder) -> Result<Alignme
         match local.as_ref() {
             b"horizontal" => {
                 mark_property(&mut seen, 1, "horizontal alignment")?;
-                alignment.horizontal = Some(
-                    value
-                        .parse::<Horizontal>()
-                        .map_err(|_| invalid(format!("invalid horizontal alignment '{value}'")))?,
-                );
+                alignment.horizontal = Some(value.parse::<Horizontal>().map_err(|_source| {
+                    invalid(format!("invalid horizontal alignment '{value}'"))
+                })?);
             },
             b"vertical" => {
                 mark_property(&mut seen, 2, "vertical alignment")?;
-                alignment.vertical = Some(
-                    value
-                        .parse::<Vertical>()
-                        .map_err(|_| invalid(format!("invalid vertical alignment '{value}'")))?,
-                );
+                alignment.vertical =
+                    Some(value.parse::<Vertical>().map_err(|_source| {
+                        invalid(format!("invalid vertical alignment '{value}'"))
+                    })?);
             },
             b"textRotation" => {
                 mark_property(&mut seen, 4, "text rotation")?;
@@ -980,13 +1113,13 @@ fn parse_border_color(element: &BytesStart<'_>, decoder: Decoder) -> Result<Opti
     let tint = optional_f64(element, b"tint", decoder, "border color tint")?
         .map(Tint::new)
         .transpose()
-        .map_err(|_| invalid("border color tint must be finite and between -1 and 1"))?;
+        .map_err(|_source| invalid("border color tint must be finite and between -1 and 1"))?;
 
     let color = if let Some(value) = rgb {
         Color::from_rgb(
             value
                 .parse::<Rgb>()
-                .map_err(|_| invalid(format!("invalid RGB color '{value}'")))?,
+                .map_err(|_source| invalid(format!("invalid RGB color '{value}'")))?,
         )
     } else if let Some(index) = theme {
         Color::theme(index)
@@ -1099,14 +1232,14 @@ fn parse_u32_value(value: &str, description: &str) -> Result<u32> {
     value
         .trim()
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+        .map_err(|_source| invalid(format!("invalid {description} value '{value}'")))
 }
 
 fn parse_i32_value(value: &str, description: &str) -> Result<i32> {
     value
         .trim()
         .parse::<i32>()
-        .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+        .map_err(|_source| invalid(format!("invalid {description} value '{value}'")))
 }
 
 fn required_f64(
@@ -1130,7 +1263,7 @@ fn optional_f64(
             value
                 .trim()
                 .parse::<f64>()
-                .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+                .map_err(|_source| invalid(format!("invalid {description} value '{value}'")))
         })
         .transpose()
 }
@@ -1166,7 +1299,7 @@ fn validate_count(
 fn check_count(expected: Option<u32>, actual: usize, description: &str) -> Result<()> {
     if let Some(expected) = expected {
         let actual = u32::try_from(actual)
-            .map_err(|_| invalid(format!("{description} count exceeds u32")))?;
+            .map_err(|_source| invalid(format!("{description} count exceeds u32")))?;
         if expected != actual {
             return Err(invalid(format!(
                 "{description} count declares {expected}, parsed {actual}"

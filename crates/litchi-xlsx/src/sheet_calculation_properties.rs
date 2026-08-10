@@ -210,7 +210,7 @@ pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) => {},
         }
         buffer.clear();
     }

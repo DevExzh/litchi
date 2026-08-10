@@ -1095,7 +1095,7 @@ pub fn parse_external_link(xml: &[u8]) -> Result<Link> {
                 return Err(invalid("external-link XML has an unterminated root"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
     match parser
@@ -1282,7 +1282,7 @@ impl XmlTree {
         }
         Ok(Self {
             nodes,
-            root: root.expect("checked above"),
+            root: root.unwrap_or_else(|| crate::error::panic_missing_invariant("checked above")),
         })
     }
 
@@ -2077,7 +2077,9 @@ fn validate_cell_reference(value: &str) -> Result<()> {
     if split == 0 || split == value.len() || column > MAX_CELL_COLUMN {
         return Err(malformed());
     }
-    let row = value[split..].parse::<u32>().map_err(|_| malformed())?;
+    let row = value[split..]
+        .parse::<u32>()
+        .map_err(|_source| malformed())?;
     if row == 0 || row > MAX_CELL_ROW {
         return Err(malformed());
     }
@@ -2112,7 +2114,7 @@ fn optional_u32(
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
         })
         .transpose()
 }

@@ -134,10 +134,10 @@ impl DocumentRmdThreading {
         let (personal_styles, _) = parse_sttb(data, &mut offset, 0, "SttbStyle")?;
         // The attribute/value STTBs are ignored per MS-DOC 2.9.230 but are
         // still part of the structure and must be well-formed.
-        let _ = parse_sttb(data, &mut offset, ATTRIB_EXTRA_SIZE, "SttbAuthorAttrib")?;
-        let _ = parse_sttb(data, &mut offset, 0, "SttbAuthorValue")?;
-        let _ = parse_sttb(data, &mut offset, ATTRIB_EXTRA_SIZE, "SttbMessageAttrib")?;
-        let _ = parse_sttb(data, &mut offset, 0, "SttbMessageValue")?;
+        parse_sttb(data, &mut offset, ATTRIB_EXTRA_SIZE, "SttbAuthorAttrib")?;
+        parse_sttb(data, &mut offset, 0, "SttbAuthorValue")?;
+        parse_sttb(data, &mut offset, ATTRIB_EXTRA_SIZE, "SttbMessageAttrib")?;
+        parse_sttb(data, &mut offset, 0, "SttbMessageValue")?;
         if offset != data.len() {
             return Err(corrupted("RmdThreading contains trailing bytes"));
         }

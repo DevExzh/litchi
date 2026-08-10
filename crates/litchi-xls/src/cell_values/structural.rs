@@ -782,7 +782,8 @@ fn certify_workbook_shift(workbook: &[u8]) -> Result<()> {
         )));
     }
     for record in records.iter().filter(|record| record.kind == FORMULA) {
-        certify_formula_shift(workbook, record)?;
+        let payload = record_payload(workbook, record, "Formula")?;
+        certify_formula_owner(payload)?;
     }
     for record in records.iter().filter(|record| record.kind == HLINK) {
         let payload_start = record
@@ -1018,6 +1019,7 @@ fn patch_coordinate_dependencies(
                     Error::InvalidData("coordinate record payload is truncated".into())
                 })?;
             match record.kind {
+                FORMULA => patch_formula_record(payload, shift)?,
                 MERGED_CELLS => patch_merged_cells(payload, shift)?,
                 HLINK => patch_hyperlink(payload, shift)?,
                 HLINK_TOOLTIP => patch_hyperlink_tooltip(payload, shift)?,
@@ -2335,7 +2337,7 @@ fn certify_coordinate_shift(
             .get(payload_start..record.end)
             .ok_or_else(|| Error::InvalidData("dependency record payload is truncated".into()))?;
         match record.kind {
-            FORMULA => certify_formula_shift(worksheet, record)?,
+            FORMULA => certify_mutation(payload, shift, patch_formula_record)?,
             SELECTION => certify_mutation(payload, shift, patch_selection_shift)?,
             MERGED_CELLS => certify_mutation(payload, shift, patch_merged_cells)?,
             HLINK => certify_mutation(payload, shift, patch_hyperlink)?,
@@ -2371,35 +2373,180 @@ fn certify_mutation(
     patch(&mut candidate, shift)
 }
 
-fn certify_formula_shift(workbook: &[u8], record: &RawRecord) -> Result<()> {
-    if record.end.saturating_sub(record.start) < 26 {
+fn record_payload<'a>(bytes: &'a [u8], record: &RawRecord, label: &str) -> Result<&'a [u8]> {
+    let start = record
+        .start
+        .checked_add(4)
+        .ok_or_else(|| Error::InvalidData(format!("{label} payload offset overflow")))?;
+    bytes
+        .get(start..record.end)
+        .ok_or_else(|| Error::InvalidData(format!("{label} payload is truncated")))
+}
+
+fn formula_tokens(payload: &[u8]) -> Result<&[u8]> {
+    if payload.len() < 22 {
         return Err(Error::InvalidData("Formula record is truncated".into()));
     }
-    let count_offset = record
-        .start
-        .checked_add(24)
-        .ok_or_else(|| Error::InvalidData("Formula token count offset overflow".into()))?;
-    let count = usize::from(binary::read_u16_le_at(workbook, count_offset)?);
-    let token_start = record
-        .start
-        .checked_add(26)
-        .ok_or_else(|| Error::InvalidData("Formula token offset overflow".into()))?;
-    let token_end = token_start
+    let count = usize::from(binary::read_u16_le_at(payload, 20)?);
+    let token_end = 22_usize
         .checked_add(count)
         .ok_or_else(|| Error::InvalidData("Formula token range overflow".into()))?;
-    if token_end != record.end {
+    if token_end != payload.len() {
         return Err(Error::InvalidData(
             "Formula token count does not match its record".into(),
         ));
     }
-    let tokens = workbook
-        .get(token_start..token_end)
-        .ok_or_else(|| Error::InvalidData("Formula tokens are outside Workbook".into()))?;
-    if !crate::formula::formula_is_reference_free(tokens) {
+    payload
+        .get(22..token_end)
+        .ok_or_else(|| Error::InvalidData("Formula tokens are truncated".into()))
+}
+
+fn certify_formula_owner(payload: &[u8]) -> Result<()> {
+    if crate::formula::formula_2d_reference_spans(formula_tokens(payload)?).is_none() {
         return Err(Error::UnsafeEdit(
-            "row/column movement requires a reference-free ordinary Formula".into(),
+            "row/column movement supports only ordinary same-sheet Ref/Area Formula tokens".into(),
         ));
     }
+    Ok(())
+}
+
+fn patch_formula_record(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    let token_length = formula_tokens(payload)?.len();
+    let tokens = payload
+        .get_mut(22..22 + token_length)
+        .ok_or_else(|| Error::InvalidData("Formula tokens are truncated".into()))?;
+    patch_formula_tokens(tokens, shift)
+}
+
+fn patch_formula_tokens(tokens: &mut [u8], shift: AxisShift) -> Result<()> {
+    let references = crate::formula::formula_2d_reference_spans(tokens).ok_or_else(|| {
+        Error::UnsafeEdit(
+            "row/column movement supports only ordinary same-sheet Ref/Area Formula tokens".into(),
+        )
+    })?;
+    for reference in references {
+        match (reference, shift) {
+            (
+                crate::formula::FormulaReferenceSpan::Cell { row, .. },
+                AxisShift::Rows {
+                    start,
+                    count,
+                    insert,
+                },
+            ) => patch_formula_row(tokens, row, start, count, insert)?,
+            (
+                crate::formula::FormulaReferenceSpan::Cell { column, .. },
+                AxisShift::Columns {
+                    start,
+                    count,
+                    insert,
+                },
+            ) => patch_formula_column(tokens, column, start, count, insert)?,
+            (
+                crate::formula::FormulaReferenceSpan::Area {
+                    first_row,
+                    last_row,
+                    ..
+                },
+                AxisShift::Rows {
+                    start,
+                    count,
+                    insert,
+                },
+            ) => patch_formula_row_range(tokens, first_row, last_row, start, count, insert)?,
+            (
+                crate::formula::FormulaReferenceSpan::Area {
+                    first_column,
+                    last_column,
+                    ..
+                },
+                AxisShift::Columns {
+                    start,
+                    count,
+                    insert,
+                },
+            ) => {
+                patch_formula_column_range(
+                    tokens,
+                    first_column,
+                    last_column,
+                    start,
+                    count,
+                    insert,
+                )?;
+            },
+        }
+    }
+    Ok(())
+}
+
+fn patch_formula_row(
+    tokens: &mut [u8],
+    offset: usize,
+    start: u16,
+    count: u16,
+    insert: bool,
+) -> Result<()> {
+    let row = binary::read_u16_le_at(tokens, offset)?;
+    let row = shift_axis_point(row, start, count, insert, 65_536)?;
+    write_formula_u16(tokens, offset, row)
+}
+
+fn patch_formula_row_range(
+    tokens: &mut [u8],
+    first_offset: usize,
+    last_offset: usize,
+    start: u16,
+    count: u16,
+    insert: bool,
+) -> Result<()> {
+    let first = binary::read_u16_le_at(tokens, first_offset)?;
+    let last = binary::read_u16_le_at(tokens, last_offset)?;
+    let (first, last) = shift_axis_range(first, last, start, count, insert, 65_536)?;
+    write_formula_u16(tokens, first_offset, first)?;
+    write_formula_u16(tokens, last_offset, last)
+}
+
+fn patch_formula_column(
+    tokens: &mut [u8],
+    offset: usize,
+    start: u8,
+    count: u8,
+    insert: bool,
+) -> Result<()> {
+    let flags = binary::read_u16_le_at(tokens, offset)?;
+    let column = flags & 0x00ff;
+    let column = shift_axis_point(column, u16::from(start), u16::from(count), insert, 256)?;
+    write_formula_u16(tokens, offset, (flags & 0xff00) | column)
+}
+
+fn patch_formula_column_range(
+    tokens: &mut [u8],
+    first_offset: usize,
+    last_offset: usize,
+    start: u8,
+    count: u8,
+    insert: bool,
+) -> Result<()> {
+    let first_flags = binary::read_u16_le_at(tokens, first_offset)?;
+    let last_flags = binary::read_u16_le_at(tokens, last_offset)?;
+    let (first, last) = shift_axis_range(
+        first_flags & 0x00ff,
+        last_flags & 0x00ff,
+        u16::from(start),
+        u16::from(count),
+        insert,
+        256,
+    )?;
+    write_formula_u16(tokens, first_offset, (first_flags & 0xff00) | first)?;
+    write_formula_u16(tokens, last_offset, (last_flags & 0xff00) | last)
+}
+
+fn write_formula_u16(bytes: &mut [u8], offset: usize, value: u16) -> Result<()> {
+    bytes
+        .get_mut(offset..offset + 2)
+        .ok_or_else(|| Error::InvalidData("Formula reference field is truncated".into()))?
+        .copy_from_slice(&value.to_le_bytes());
     Ok(())
 }
 

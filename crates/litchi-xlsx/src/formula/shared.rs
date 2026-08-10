@@ -446,7 +446,9 @@ fn shifted(axis: Axis, delta: i64, maximum: u32) -> Option<u32> {
         return Some(axis.value);
     }
     let value = i64::from(axis.value).checked_add(delta)?;
-    (value >= 1 && value <= i64::from(maximum)).then_some(value as u32)
+    (value >= 1 && value <= i64::from(maximum))
+        .then(|| u32::try_from(value).ok())
+        .flatten()
 }
 
 fn render_reference(reference: Reference, row_delta: i64, column_delta: i64, output: &mut String) {

@@ -1,6 +1,7 @@
 //! Concise family entry points.
 
 use litchi_core::{Error, HistoryLimits, Metadata, PatchError, Position, Result};
+use litchi_odf_common::compact_xml;
 use std::fmt;
 use std::{path::Path, sync::Arc};
 
@@ -585,6 +586,12 @@ pub enum InlineBlock {
     Paragraph(Position),
 }
 
+#[derive(Clone, Copy)]
+enum InlinePlacement {
+    Append,
+    Prepend,
+}
+
 /// One reversible rich inline-content replacement.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InlineChange {
@@ -956,6 +963,81 @@ impl Edit<'_> {
         self.stage_inline(InlineBlock::Heading(heading), content)
     }
 
+    /// Prepends typed rich content without rewriting existing paragraph markup.
+    ///
+    /// This exact-boundary splice preserves projected and unknown producer
+    /// inline elements already present in the paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, overlapping staged work, or
+    /// content that cannot be compactly authored and fully reopened.
+    pub fn prepend_paragraph_inline(
+        &mut self,
+        paragraph: Position,
+        content: &[crate::inline::Content],
+    ) -> Result<()> {
+        self.stage_inline_boundary(
+            InlineBlock::Paragraph(paragraph),
+            content,
+            InlinePlacement::Prepend,
+        )
+    }
+
+    /// Appends typed rich content without rewriting existing paragraph markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, overlapping staged work, or
+    /// content that cannot be compactly authored and fully reopened.
+    pub fn append_paragraph_inline(
+        &mut self,
+        paragraph: Position,
+        content: &[crate::inline::Content],
+    ) -> Result<()> {
+        self.stage_inline_boundary(
+            InlineBlock::Paragraph(paragraph),
+            content,
+            InlinePlacement::Append,
+        )
+    }
+
+    /// Prepends typed rich content without rewriting existing heading markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, overlapping staged work, or
+    /// content that cannot be compactly authored and fully reopened.
+    pub fn prepend_heading_inline(
+        &mut self,
+        heading: Position,
+        content: &[crate::inline::Content],
+    ) -> Result<()> {
+        self.stage_inline_boundary(
+            InlineBlock::Heading(heading),
+            content,
+            InlinePlacement::Prepend,
+        )
+    }
+
+    /// Appends typed rich content without rewriting existing heading markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, overlapping staged work, or
+    /// content that cannot be compactly authored and fully reopened.
+    pub fn append_heading_inline(
+        &mut self,
+        heading: Position,
+        content: &[crate::inline::Content],
+    ) -> Result<()> {
+        self.stage_inline_boundary(
+            InlineBlock::Heading(heading),
+            content,
+            InlinePlacement::Append,
+        )
+    }
+
     fn stage_inline(
         &mut self,
         block: InlineBlock,
@@ -1086,6 +1168,191 @@ impl Edit<'_> {
             self.inline_changes.push(staged);
         }
         Ok(())
+    }
+
+    fn stage_inline_boundary(
+        &mut self,
+        block: InlineBlock,
+        content: &[crate::inline::Content],
+        placement: InlinePlacement,
+    ) -> Result<()> {
+        let (site, source_text) = self.inline_boundary_source(block)?;
+        let source_xml = self
+            .source
+            .content_xml()
+            .get(site.range.clone())
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH inline boundary source span is invalid".to_string())
+            })?;
+        let existing = self
+            .inline_changes
+            .iter()
+            .find(|change| change.block == block)
+            .cloned();
+        let (before_xml, before_text, current_xml, current_text) = match existing {
+            Some(change) => (
+                change.before_xml,
+                change.before_text,
+                change.after_xml,
+                change.after_text,
+            ),
+            None => (
+                source_xml.to_owned(),
+                source_text.to_owned(),
+                if site.prefix.is_empty() && site.suffix.is_empty() {
+                    source_xml.to_owned()
+                } else {
+                    String::new()
+                },
+                source_text.to_owned(),
+            ),
+        };
+        let (addition_xml, addition_text) = crate::authoring::render_inline(content)?;
+        if addition_xml.is_empty() {
+            return Ok(());
+        }
+        let target_xml_bytes = current_xml
+            .len()
+            .checked_add(addition_xml.len())
+            .ok_or_else(|| Error::InvalidFormat("OTH inline boundary size overflow".to_string()))?;
+        let target_text_bytes = current_text
+            .len()
+            .checked_add(addition_text.len())
+            .ok_or_else(|| Error::InvalidFormat("OTH inline boundary size overflow".to_string()))?;
+        if target_xml_bytes > compact_xml::DEFAULT_MAX_BYTES
+            || target_text_bytes > MAX_PARAGRAPH_BYTES
+        {
+            return Err(Error::InvalidFormat(
+                "OTH inline boundary edit exceeds the limit".to_string(),
+            ));
+        }
+        let mut after_xml = String::new();
+        after_xml
+            .try_reserve_exact(target_xml_bytes)
+            .map_err(|source| Error::Allocation {
+                resource: "OTH inline boundary XML",
+                source,
+            })?;
+        let mut after_text = String::new();
+        after_text
+            .try_reserve_exact(target_text_bytes)
+            .map_err(|source| Error::Allocation {
+                resource: "OTH inline boundary text",
+                source,
+            })?;
+        match placement {
+            InlinePlacement::Prepend => {
+                after_xml.push_str(&addition_xml);
+                after_xml.push_str(&current_xml);
+                after_text.push_str(&addition_text);
+                after_text.push_str(&current_text);
+            },
+            InlinePlacement::Append => {
+                after_xml.push_str(&current_xml);
+                after_xml.push_str(&addition_xml);
+                after_text.push_str(&current_text);
+                after_text.push_str(&addition_text);
+            },
+        }
+        let staged = InlineChange {
+            after_text,
+            after_xml,
+            before_text,
+            before_xml,
+            block,
+        };
+        if let Some(change) = self
+            .inline_changes
+            .iter_mut()
+            .find(|change| change.block == block)
+        {
+            *change = staged;
+        } else {
+            self.inline_changes
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "OTH staged inline boundary changes",
+                    source,
+                })?;
+            self.inline_changes.push(staged);
+        }
+        Ok(())
+    }
+
+    fn inline_boundary_source(
+        &self,
+        block: InlineBlock,
+    ) -> Result<(&crate::codec::ReplacementSite, &str)> {
+        match block {
+            InlineBlock::Paragraph(position) => {
+                if self
+                    .changes
+                    .iter()
+                    .any(|change| change.paragraph == position)
+                    || self.list_changes.iter().any(|change| {
+                        change
+                            .before
+                            .as_ref()
+                            .is_some_and(|list| list_contains_paragraph(list, position))
+                    })
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH paragraph boundary edit overlaps staged work".to_string(),
+                    ));
+                }
+                let value = self
+                    .source
+                    .package
+                    .paragraphs()
+                    .get(position.get())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "OTH paragraph boundary selector is out of bounds".to_string(),
+                        )
+                    })?;
+                let site = self
+                    .source
+                    .package
+                    .paragraph_content_site(position.get())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "OTH paragraph boundary content site is missing".to_string(),
+                        )
+                    })?;
+                Ok((site, value.text()))
+            },
+            InlineBlock::Heading(position) => {
+                if self
+                    .heading_changes
+                    .iter()
+                    .any(|change| change.heading == position)
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH heading boundary edit overlaps staged work".to_string(),
+                    ));
+                }
+                let value = self
+                    .source
+                    .package
+                    .headings()
+                    .get(position.get())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "OTH heading boundary selector is out of bounds".to_string(),
+                        )
+                    })?;
+                let site = self
+                    .source
+                    .package
+                    .heading_content_site(position.get())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "OTH heading boundary content site is missing".to_string(),
+                        )
+                    })?;
+                Ok((site, value.text()))
+            },
+        }
     }
 
     /// Replaces one isolated list with a detached typed list.

@@ -644,7 +644,12 @@ fn drawing_layout(xml: &[u8]) -> Result<DrawingLayout> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if depth != 0 || open_anchor.is_some() {
@@ -723,7 +728,9 @@ fn parse_anchor(xml: &[u8], span: &AnchorSpan) -> Result<Anchor> {
                     .map_err(xml_error)?
                     .trim()
                     .parse::<u32>()
-                    .map_err(|_| invalid("drawing anchor coordinate is not an unsigned integer"))?;
+                    .map_err(|_source| {
+                        invalid("drawing anchor coordinate is not an unsigned integer")
+                    })?;
                 if marker == Marker::From {
                     match coordinate {
                         Coordinate::Column => from_column = Some(value),
@@ -742,7 +749,11 @@ fn parse_anchor(xml: &[u8], span: &AnchorSpan) -> Result<Anchor> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::End(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     let mut relationship_ids = relationship_ids.into_iter().collect::<Vec<_>>();
@@ -791,7 +802,7 @@ fn translate_anchor(
                     .map_err(xml_error)?
                     .trim()
                     .parse::<i64>()
-                    .map_err(|_| invalid("drawing anchor coordinate is not an integer"))?;
+                    .map_err(|_source| invalid("drawing anchor coordinate is not an integer"))?;
                 let translated = value
                     .checked_add(match coordinate {
                         Some(Coordinate::Column) => column_delta,
@@ -821,7 +832,16 @@ fn translate_anchor(
                 _ => {},
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         writer.write_event(event).map_err(xml_error)?;
     }
@@ -879,7 +899,11 @@ fn worksheet_layout(xml: &[u8]) -> Result<WorksheetLayout> {
                     root_relationship_namespace = Some(match namespace {
                         ResolveResult::Bound(Namespace(value)) if value == SML => REL,
                         ResolveResult::Bound(Namespace(value)) if value == STRICT_SML => STRICT_REL,
-                        _ => return Err(invalid("drawing transfer requires a worksheet root")),
+                        ResolveResult::Unbound
+                        | ResolveResult::Bound(_)
+                        | ResolveResult::Unknown(_) => {
+                            return Err(invalid("drawing transfer requires a worksheet root"));
+                        },
                     });
                 } else if depth == 1 {
                     inspect_worksheet_child(
@@ -917,7 +941,12 @@ fn worksheet_layout(xml: &[u8]) -> Result<WorksheetLayout> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Ok(WorksheetLayout {
@@ -1024,7 +1053,7 @@ fn allocate_uri(original: &PackURI, reserved: &mut BTreeSet<String>) -> Result<P
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("XML position does not fit usize"))
+        .map_err(|_source| invalid("XML position does not fit usize"))
 }
 
 fn xdr(namespace: &ResolveResult<'_>) -> bool {

@@ -6,8 +6,10 @@ publish = false
 
 [dependencies]
 litchi-core = { path = "../../crates/litchi-core" }
+litchi-doc = { path = "../../crates/litchi-doc", optional = true }
 litchi-docx = { path = "../../crates/litchi-docx", optional = true }
 litchi-odf-formula = { path = "../../crates/litchi-odf-formula", optional = true }
+litchi-odb = { path = "../../crates/litchi-odb", optional = true }
 litchi-odg = { path = "../../crates/litchi-odg", optional = true }
 litchi-odp = { path = "../../crates/litchi-odp", optional = true }
 litchi-ods = { path = "../../crates/litchi-ods", optional = true }
@@ -15,11 +17,14 @@ litchi-odt = { path = "../../crates/litchi-odt", optional = true }
 litchi-pptx = { path = "../../crates/litchi-pptx", optional = true }
 litchi-ppt = { path = "../../crates/litchi-ppt", optional = true }
 litchi-rtf = { path = "../../crates/litchi-rtf", optional = true }
+litchi-xls = { path = "../../crates/litchi-xls", optional = true }
 litchi-xlsx = { path = "../../crates/litchi-xlsx", optional = true }
 
 [features]
+doc = ["dep:litchi-doc"]
 docx = ["dep:litchi-docx"]
 odf = ["dep:litchi-odf-formula"]
+odb = ["dep:litchi-odb"]
 odg = ["dep:litchi-odg"]
 odp = ["dep:litchi-odp"]
 ods = ["dep:litchi-ods"]
@@ -27,6 +32,7 @@ odt = ["dep:litchi-odt"]
 pptx = ["dep:litchi-pptx"]
 ppt = ["dep:litchi-ppt"]
 rtf = ["dep:litchi-rtf"]
+xls = ["dep:litchi-xls"]
 xlsx = ["dep:litchi-xlsx"]
 
 [workspace]

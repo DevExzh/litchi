@@ -108,7 +108,14 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
                     active.depth == 0
                 },
                 Event::Eof => return Err(invalid("unterminated unknown scenario element")),
-                _ => false,
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => false,
             };
             active
                 .writer
@@ -290,7 +297,7 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -1011,14 +1018,14 @@ impl BoundedXml {
         }
         self.bytes
             .try_reserve_exact(value.len())
-            .map_err(|_| invalid("serialized scenarios XML output allocation failed"))?;
+            .map_err(|_source| invalid("serialized scenarios XML output allocation failed"))?;
         self.bytes.extend_from_slice(value);
         Ok(())
     }
 
     fn finish(self) -> Result<String> {
         String::from_utf8(self.bytes)
-            .map_err(|_| invalid("serialized scenarios XML is not valid UTF-8"))
+            .map_err(|_source| invalid("serialized scenarios XML is not valid UTF-8"))
     }
 }
 
@@ -1062,7 +1069,7 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
 fn parse_u32(value: &str, name: &str) -> Result<u32> {
     value
         .parse::<u32>()
-        .map_err(|_| invalid(format!("{name} must be unsignedInt")))
+        .map_err(|_source| invalid(format!("{name} must be unsignedInt")))
 }
 
 fn parse_sqref(value: &str) -> Result<Vec<RangeReference>> {

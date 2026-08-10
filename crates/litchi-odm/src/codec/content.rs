@@ -215,8 +215,16 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
                     .ok_or_else(|| invalid("ODM XML depth underflow"))?;
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM content")),
-            Event::GeneralRef(_) => {
+            Event::GeneralRef(reference)
+                if !matches!(
+                    reference.as_ref(),
+                    b"amp" | b"apos" | b"gt" | b"lt" | b"quot"
+                ) =>
+            {
                 return Err(invalid("named XML entities are not allowed in ODM content"));
+            },
+            Event::GeneralRef(_) if section_source_depth.is_some() => {
+                return Err(invalid("ODM text:section-source cannot contain text"));
             },
             Event::Text(text) if section_source_depth.is_some() && !text.as_ref().is_empty() => {
                 return Err(invalid("ODM text:section-source cannot contain text"));
@@ -229,7 +237,8 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
             | Event::CData(_)
             | Event::Comment(_)
             | Event::Decl(_)
-            | Event::PI(_) => {},
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if depth != 0 || !root_seen || !body_seen || !master_seen {
@@ -427,7 +436,10 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
             Event::CData(text) => {
                 validate_common_body_text(common_owner, depth, text.as_ref())?;
             },
-            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::GeneralRef(_) => {},
+            Event::GeneralRef(_) => {
+                validate_common_body_text(common_owner, depth, b"entity")?;
+            },
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
         }
     }
     Ok(structure)

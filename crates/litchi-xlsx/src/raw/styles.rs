@@ -110,7 +110,13 @@ pub(crate) fn parse(content: &[u8]) -> Result<Catalog> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -173,7 +179,7 @@ fn count(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<u32>> {
     };
     let value = value
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid cellXfs count '{value}'")))?;
+        .map_err(|_source| invalid(format!("invalid cellXfs count '{value}'")))?;
     if value > MAX_CELL_FORMATS {
         return Err(invalid(format!("cellXfs count exceeds {MAX_CELL_FORMATS}")));
     }

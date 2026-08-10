@@ -21,10 +21,10 @@
 /// Days between December 30, 1899 (Excel epoch) and January 1, 1970 (Unix epoch)
 /// Excel serial 1 = December 31, 1899 (but displayed as January 1, 1900 due to the bug)
 /// Excel serial 2 = January 1, 1900
-const EXCEL_1900_TO_UNIX_EPOCH_DAYS: i64 = 25569;
+const EXCEL_1900_TO_UNIX_EPOCH_DAYS: f64 = 25569.0;
 
 /// Days between January 1, 1904 and January 1, 1970 (Unix epoch)
-const EXCEL_1904_TO_UNIX_EPOCH_DAYS: i64 = 24107;
+const EXCEL_1904_TO_UNIX_EPOCH_DAYS: f64 = 24107.0;
 
 /// Seconds per day
 const SECONDS_PER_DAY: f64 = 86400.0;
@@ -59,7 +59,7 @@ pub fn excel_serial_to_unix(serial: f64, is_1904: bool) -> f64 {
     };
 
     // Convert serial to days since Unix epoch
-    let days_since_unix = serial - epoch_days as f64;
+    let days_since_unix = serial - epoch_days;
 
     // Convert to seconds
     days_since_unix * SECONDS_PER_DAY
@@ -98,7 +98,7 @@ pub fn unix_to_excel_serial(unix_timestamp: f64, is_1904: bool) -> f64 {
     let days_since_unix = unix_timestamp / SECONDS_PER_DAY;
 
     // Convert to Excel serial
-    days_since_unix + epoch_days as f64
+    days_since_unix + epoch_days
 }
 
 /// Check if an Excel serial number represents a valid date

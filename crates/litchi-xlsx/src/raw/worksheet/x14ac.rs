@@ -123,7 +123,13 @@ fn capture_inner(content: &[u8], capture_rows: bool, marker_only: bool) -> Resul
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Ok(values)
@@ -230,7 +236,14 @@ fn rewrite_descent_attributes(content: &[u8]) -> Result<Vec<u8>> {
                 .write_event(Event::Empty(rewrite_element(&element, &resolver)?))
                 .map_err(|error| invalid(format!("could not rewrite worksheet XML: {error}")))?,
             Event::Eof => break,
-            other => writer
+            other @ (Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)) => writer
                 .write_event(other)
                 .map_err(|error| invalid(format!("could not rewrite worksheet XML: {error}")))?,
         }
@@ -292,7 +305,7 @@ pub(crate) fn descent(
             .map_err(|error| invalid(error.to_string()))?;
         let parsed = lexical
             .parse::<f64>()
-            .map_err(|_| invalid(format!("invalid x14ac:dyDescent value '{lexical}'")))?;
+            .map_err(|_source| invalid(format!("invalid x14ac:dyDescent value '{lexical}'")))?;
         let parsed = Descent::new(parsed)?;
         if result.replace(parsed).is_some() {
             return Err(invalid("duplicate x14ac:dyDescent attribute"));

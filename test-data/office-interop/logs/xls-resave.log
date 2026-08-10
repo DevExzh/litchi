@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=MS Excel 97
+input=test-data/office-interop/litchi-changed/tdf78897-litchi.xls
+output=test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls
+status=success
+output_sha256=eab8ae4797e6499e5c45c01b0ad55502c021103385c6fd14271e91b81e9ec537

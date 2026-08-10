@@ -110,5 +110,5 @@ pub(crate) fn is_mce_name(
 
 pub(crate) fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("worksheet XML position does not fit usize"))
+        .map_err(|_source| invalid("worksheet XML position does not fit usize"))
 }

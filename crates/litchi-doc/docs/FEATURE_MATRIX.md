@@ -74,12 +74,16 @@ disjoint composition, three-way planning, inert text and managed-resource
 transfer, and bounded undo/redo history. Canonical native inline/floating
 pictures can be re-homed after proving the selected PICF/Data and, when
 floating, its SPA/top-level-shape/`pib`/BStore binary identity; unrelated
-bounded main-story shapes, groups, textboxes, and shared BStore resources remain
+bounded main/header-story shapes, groups, textboxes, and shared BStore resources remain
 outside the copied closure. Selected nested/group-owned or extended drawing
 graphs and producer-defined object controls receive specific typed refusals
 rather than partial copying. Selection uses the
 format-neutral `litchi_core::Position`, with collection resolution returning a
-typed not-found refusal.
+typed not-found refusal. Closure evidence includes full reopen plus durable
+replay/inversion into a checked-in genuine DOC receiver and typed fail-closed
+coverage of a genuine Word 97 floating-picture donor whose producer graph is
+outside the canonical slice. The suite does not claim a native Word or
+LibreOffice changed-save result.
 
 ## Core Word binary document model
 
@@ -112,7 +116,7 @@ typed not-found refusal.
 | Feature family | Status | Read | Write | Notes |
 |----------------|--------|------|-------|-------|
 | CP, PLC, STTB, SPRM/PRL, and property storage primitives | ✅ | ✅ | ✅ | [MS-DOC] 2.2 defines character positions, piece and property storage, string tables, and single-property modifiers used by the typed model |
-| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds bounded story/paragraph, simple table-cell and cached-field-result text, direct bold/italic/underline, safe revision-mark disposition, embedded-display metadata, managed embedded-resource add/remove/transfer, and canonical inline/floating native-picture transfer to one immutable root transaction. The picture slice validates the selected PICF/Data and, for floating pictures, the exact SPA, canonical top-level picture frame, `pib`, and native BStore bytes before re-homing one singleton graph. Unrelated bounded main-story shapes, groups, textboxes, reordered slots, and shared BStore resources may coexist; selected nested/group-owned shapes, noncanonical picture frames, transforms/extensions, delay-loaded BLIPs, auxiliary/header drawing graphs, and receiver graph collisions are typed refusals. Modeled CLX/CHPX/PLCF/FIB plus field/preview/Data/ObjectPool closure, full reopen validation, exact in-memory reversal, blob-backed durable replay/inversion, disjoint three-way planning, and bounded history are covered. |
+| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds bounded story/paragraph, simple table-cell and cached-field-result text, direct bold/italic/underline, safe revision-mark disposition, embedded-display metadata, managed embedded-resource add/remove/transfer, and canonical inline/floating native-picture transfer to one immutable root transaction. The picture slice validates the selected PICF/Data and, for floating pictures, the exact SPA, canonical top-level picture frame, `pib`, and native BStore bytes before re-homing one singleton graph. Unrelated bounded main/header-story shapes, groups, textboxes, reordered slots, and shared BStore resources may coexist; selected nested/group-owned shapes, noncanonical picture frames, transforms/extensions, delay-loaded BLIPs, selection outside the main story, and receiver graph collisions are typed refusals. Modeled CLX/CHPX/PLCF/FIB plus field/preview/Data/ObjectPool closure, full reopen validation, exact in-memory reversal, blob-backed durable replay/inversion, disjoint three-way planning, and bounded history are covered. |
 | Main, footnote, endnote, header, comment, textbox, and header-textbox parts | ✅ | ✅ | ✅ | [MS-DOC] 2.3 story ranges and the corresponding PLCs are exposed through typed document, note, comment, header/footer, picture, shape, and textbox APIs |
 | Bookmark PLCs and names | ✅ | ✅ | ✅ | Range and point bookmarks are typed and editable, including repair/validation behavior for malformed ranges |
 | Field PLCs and non-Plcfld text-only fields | ✅ | ✅ | ✅ | Native field delimiters, instruction/result text, marker positions, nesting, and the five text-only field families are reconstructed and authored with balanced graphs |

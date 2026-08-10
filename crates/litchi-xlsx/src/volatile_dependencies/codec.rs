@@ -159,7 +159,9 @@ impl BoundedXml {
         }
         self.bytes
             .try_reserve_exact(value.len())
-            .map_err(|_| invalid("serialized volatile-dependencies output allocation failed"))?;
+            .map_err(|_source| {
+                invalid("serialized volatile-dependencies output allocation failed")
+            })?;
         self.bytes.extend_from_slice(value);
         Ok(())
     }
@@ -192,7 +194,13 @@ fn parse_processed(xml: &[u8]) -> Result<VolatileDependencies> {
                 Event::DocType(_) | Event::PI(_) => {
                     return Err(invalid("DTD and processing instructions are rejected"));
                 },
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::GeneralRef(_)
+                | Event::Eof => {},
             }
             if *depth == 0 {
                 writer
@@ -202,7 +210,17 @@ fn parse_processed(xml: &[u8]) -> Result<VolatileDependencies> {
                 writer.write_event(event.clone()).map_err(xml_error)?;
             }
             if *depth == 0 {
-                extension = Some(capture.take().unwrap().1.into_inner());
+                extension = Some(
+                    capture
+                        .take()
+                        .unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        })
+                        .1
+                        .into_inner(),
+                );
             }
             continue;
         }
@@ -406,7 +424,13 @@ fn start(
             add_reference(types, t, m, p, &e, decoder)?;
             stack.push(Context::Reference);
         },
-        _ => return Err(invalid("unexpected volatile-dependencies element")),
+        Context::Root
+        | Context::Type(_)
+        | Context::Main(..)
+        | Context::Topic(..)
+        | Context::Value(..)
+        | Context::Subtopic(..)
+        | Context::Reference => return Err(invalid("unexpected volatile-dependencies element")),
     }
     Ok(())
 }
@@ -472,7 +496,7 @@ fn add_reference(
     }
     let s = required_attr(e, decoder, b"s")?
         .parse::<u32>()
-        .map_err(|_| invalid("invalid volatile sheet id"))?;
+        .map_err(|_source| invalid("invalid volatile sheet id"))?;
     only_attrs(e, &[b"r", b"s"])?;
     let topic = &mut types[t].mains[m].topics[p];
     if topic.value.is_none() {
@@ -487,11 +511,26 @@ fn add_reference(
 
 fn push_text(types: &mut [TypeBuilder], ctx: Option<Context>, text: &str) -> Result<()> {
     match ctx {
-        Some(Context::Value(t, m, p)) => {
-            append(types[t].mains[m].topics[p].value.as_mut().unwrap(), text)
-        },
+        Some(Context::Value(t, m, p)) => append(
+            types[t].mains[m].topics[p]
+                .value
+                .as_mut()
+                .unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                }),
+            text,
+        ),
         Some(Context::Subtopic(t, m, p)) => append(
-            types[t].mains[m].topics[p].subtopics.last_mut().unwrap(),
+            types[t].mains[m].topics[p]
+                .subtopics
+                .last_mut()
+                .unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                }),
             text,
         ),
         _ if text.trim().is_empty() => Ok(()),
@@ -518,7 +557,7 @@ fn parse_value(kind: Option<u8>, raw: String) -> Result<VolatileValue> {
         Some(b'n') => {
             let v = raw
                 .parse::<f64>()
-                .map_err(|_| invalid("invalid volatile number"))?;
+                .map_err(|_source| invalid("invalid volatile number"))?;
             if !v.is_finite() {
                 return Err(invalid("non-finite volatile number"));
             }
@@ -555,7 +594,7 @@ fn validate_document(d: &VolatileDependencies) -> Result<()> {
                     VolatileValue::Number(v) if !v.is_finite() => {
                         return Err(invalid("non-finite volatile number"));
                     },
-                    _ => {},
+                    VolatileValue::Boolean(_) | VolatileValue::Number(_) => {},
                 }
                 if topic.references.is_empty() {
                     return Err(invalid("tp requires a tr child"));
@@ -593,7 +632,7 @@ fn name(ns: &ResolveResult<'_>, e: &BytesStart<'_>, local: &[u8]) -> bool {
             let bytes: &[u8] = v;
             bytes == NS || bytes == STRICT_NS
         },
-        _ => false,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => false,
     };
     namespace_matches && e.local_name().as_ref() == local
 }

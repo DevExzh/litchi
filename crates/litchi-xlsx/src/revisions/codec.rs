@@ -59,7 +59,7 @@ pub fn parse_revision_users(xml: &[u8]) -> Result<RevisionUsers> {
             name: required_attr(node, &RevisionAttributeNamespace::Unqualified, "name")?.into(),
             id: required_attr(node, &RevisionAttributeNamespace::Unqualified, "id")?
                 .parse()
-                .map_err(|_| invalid("invalid revision user id"))?,
+                .map_err(|_source| invalid("invalid revision user id"))?,
             date_time: required_attr(node, &RevisionAttributeNamespace::Unqualified, "dateTime")?
                 .into(),
             extension_elements: node.children.iter().map(to_public).collect::<Result<_>>()?,
@@ -92,7 +92,10 @@ pub fn parse_revision_headers(xml: &[u8]) -> Result<RevisionHeaders> {
         preserve_history: opt_u32(&root, "preserveHistory")?,
         revision_id: opt_u32(&root, "revisionId")?,
         version: opt(&root, "version")
-            .map(|v| v.parse().map_err(|_| invalid("invalid headers version")))
+            .map(|v| {
+                v.parse()
+                    .map_err(|_source| invalid("invalid headers version"))
+            })
             .transpose()?,
     };
     only_attrs(
@@ -172,7 +175,7 @@ pub fn parse_revision_headers(xml: &[u8]) -> Result<RevisionHeaders> {
             date_time: req(node, "dateTime")?.into(),
             max_sheet_id: req(node, "maxSheetId")?
                 .parse()
-                .map_err(|_| invalid("invalid maxSheetId"))?,
+                .map_err(|_source| invalid("invalid maxSheetId"))?,
             user_name: req(node, "userName")?.into(),
             relationship_id: required_attr(node, &RevisionAttributeNamespace::Relationships, "id")?
                 .into(),
@@ -479,7 +482,9 @@ fn make_node(
             ResolveResult::Bound(Namespace(v)) if v == b"http://www.w3.org/XML/1998/namespace" => {
                 RevisionAttributeNamespace::Xml
             },
-            _ => return Err(invalid("revision attribute has unsupported namespace")),
+            ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+                return Err(invalid("revision attribute has unsupported namespace"));
+            },
         };
         let local = std::str::from_utf8(local.as_ref())
             .map_err(xml_error)?
@@ -706,11 +711,14 @@ fn opt<'a>(n: &'a Node, name: &str) -> Option<&'a str> {
 fn required_u32_attr(n: &Node, name: &str) -> Result<u32> {
     req(n, name)?
         .parse()
-        .map_err(|_| invalid(format!("invalid {name}")))
+        .map_err(|_source| invalid(format!("invalid {name}")))
 }
 fn opt_u32(n: &Node, name: &str) -> Result<Option<u32>> {
     opt(n, name)
-        .map(|v| v.parse().map_err(|_| invalid(format!("invalid {name}"))))
+        .map(|v| {
+            v.parse()
+                .map_err(|_source| invalid(format!("invalid {name}")))
+        })
         .transpose()
 }
 fn opt_bool(n: &Node, name: &str) -> Result<Option<bool>> {
@@ -733,7 +741,7 @@ fn take_u32(
             .remove(i)
             .value
             .parse()
-            .map_err(|_| invalid(format!("invalid {name}")))?;
+            .map_err(|_source| invalid(format!("invalid {name}")))?;
         Ok(Some(v))
     } else {
         Ok(None)
@@ -743,6 +751,8 @@ fn take_u32(
 fn ns_text(v: &ResolveResult<'_>) -> Result<String> {
     match v {
         ResolveResult::Bound(Namespace(v)) => Ok(std::str::from_utf8(v).map_err(xml_error)?.into()),
-        _ => Err(invalid("unbound revision element namespace")),
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => {
+            Err(invalid("unbound revision element namespace"))
+        },
     }
 }

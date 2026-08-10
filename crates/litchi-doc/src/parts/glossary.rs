@@ -319,7 +319,7 @@ impl AttachedGlossary {
                 None
             };
         let images = collect_images(&text_extractor, chp_bin_table.as_ref(), data_stream);
-        let _ = table_slice(&fib, table_stream, crate::shape::FIB_INDEX_DGG_INFO)?;
+        table_slice(&fib, table_stream, crate::shape::FIB_INDEX_DGG_INFO)?;
         let shapes = crate::shape::extract_dgg_shapes(&fib, table_stream)
             .map_err(|error| corrupted(format!("invalid attached glossary drawing: {error}")))?;
         let shape_anchors =

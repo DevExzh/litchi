@@ -26,7 +26,6 @@
     clippy::cast_precision_loss,
     clippy::cast_sign_loss,
     clippy::expect_used,
-    clippy::let_underscore_must_use,
     clippy::map_err_ignore,
     clippy::unwrap_used,
     clippy::wildcard_enum_match_arm,

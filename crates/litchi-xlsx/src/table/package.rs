@@ -233,7 +233,8 @@ impl BoundedXml {
 
     fn attribute_display(&mut self, name: &str, value: impl std::fmt::Display) -> Result<()> {
         let mut text = String::new();
-        write!(&mut text, "{value}").map_err(|_| invalid("failed to format table XML value"))?;
+        write!(&mut text, "{value}")
+            .map_err(|_source| invalid("failed to format table XML value"))?;
         self.attribute(name, &text)
     }
 

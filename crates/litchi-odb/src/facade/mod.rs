@@ -170,6 +170,81 @@ impl Database {
         Ok(crate::ActiveContentInventory::new(entries))
     }
 
+    /// Inventories the exact bounded package closure of one linked component.
+    ///
+    /// Payload files/directories are distinguished from shared members reached
+    /// through package-local XML `xlink:href` chains. External IRIs remain
+    /// inert and produce an empty inventory. No component, database command,
+    /// embedded database, macro, or connection is opened or executed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an absent/ambiguous component, malformed or unsafe
+    /// package link, missing dependency, encrypted unreadable member, or
+    /// dependency budget violation.
+    pub fn component_dependencies(
+        &self,
+        kind: crate::ComponentKind,
+        name: &str,
+    ) -> Result<crate::ComponentDependencyInventory> {
+        let catalog = self.catalog()?;
+        let mut matches = catalog
+            .components()
+            .iter()
+            .filter(|component| component.kind() == kind && component.name() == Some(name));
+        let component = matches.next().ok_or_else(|| {
+            Error::InvalidFormat("ODB component dependency selector does not exist".to_string())
+        })?;
+        if matches.next().is_some() {
+            return Err(Error::InvalidFormat(
+                "ODB component dependency selector is ambiguous".to_string(),
+            ));
+        }
+        if component.link_kind() != crate::ComponentLinkKind::LocalPackage {
+            return Ok(crate::ComponentDependencyInventory::new(
+                Vec::new(),
+                0,
+                crate::ComponentTransferSupport::Supported,
+            ));
+        }
+        let prefix = format!("{}/", component.href().unwrap_or("").trim_end_matches('/'));
+        let (files, directories) = self.package.component_payload(&prefix, &prefix)?;
+        let active_content_count = crate::package::Snapshot::payload_active_content_count(&files)?;
+        let transfer_support = crate::package::Snapshot::payload_transfer_support(&files);
+        let capacity = files.len().checked_add(directories.len()).ok_or_else(|| {
+            Error::InvalidFormat("ODB component dependency count overflow".to_string())
+        })?;
+        let mut entries = Vec::new();
+        entries
+            .try_reserve(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "ODB component dependency inventory",
+                source,
+            })?;
+        entries.extend(files.into_iter().map(|file| {
+            let kind = if file.path.starts_with(&prefix) {
+                crate::ComponentDependencyKind::PayloadFile
+            } else {
+                crate::ComponentDependencyKind::LinkedFile
+            };
+            let byte_len = file.bytes.len();
+            crate::ComponentDependency::new(kind, file.path, file.media_type, Some(byte_len))
+        }));
+        entries.extend(directories.into_iter().map(|(path, media_type)| {
+            let kind = if path.starts_with(&prefix) {
+                crate::ComponentDependencyKind::PayloadDirectory
+            } else {
+                crate::ComponentDependencyKind::LinkedDirectory
+            };
+            crate::ComponentDependency::new(kind, path, media_type, None)
+        }));
+        Ok(crate::ComponentDependencyInventory::new(
+            entries,
+            active_content_count,
+            transfer_support,
+        ))
+    }
+
     /// Inventories signatures and manifest-declared encryption without
     /// validating, decrypting, or executing protected content.
     ///
@@ -199,6 +274,16 @@ impl Database {
         self.protection_capabilities().support(operation)
     }
 
+    /// Returns the exact typed support/refusal decision for one protected
+    /// package operation.
+    #[must_use]
+    pub const fn protection_decision(
+        &self,
+        operation: crate::ProtectionOperation,
+    ) -> crate::ProtectionDecision {
+        self.protection_capabilities().decision(operation)
+    }
+
     /// Enforces the root protection boundary before a workflow gathers
     /// credentials or signing material.
     ///
@@ -210,20 +295,12 @@ impl Database {
         &self,
         operation: crate::ProtectionOperation,
     ) -> Result<()> {
-        if self.protection_support(operation) == crate::ProtectionSupport::Supported {
-            return Ok(());
+        match self.protection_decision(operation) {
+            crate::ProtectionDecision::Supported => Ok(()),
+            crate::ProtectionDecision::Refused(reason) => Err(Error::Unsupported(format!(
+                "ODB protected-package operation is refused: {reason:?}"
+            ))),
         }
-        let name = match operation {
-            crate::ProtectionOperation::ReSign => "re-signing",
-            crate::ProtectionOperation::ReEncrypt => "re-encryption",
-            crate::ProtectionOperation::VerifySignatures => "signature verification",
-            crate::ProtectionOperation::RemoveInvalidatedSignatures => {
-                "invalidated-signature removal"
-            },
-        };
-        Err(Error::Unsupported(format!(
-            "ODB protected-package operation '{name}' is not supported"
-        )))
     }
 
     /// Reads inert document and macro signature metadata without verifying it

@@ -175,7 +175,13 @@ impl WorkbookInfo {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -255,7 +261,7 @@ impl WorkbookInfo {
             let active_tab = optional_u32(element, b"activeTab", decoder, "workbook activeTab")?
                 .map(|value| {
                     usize::try_from(value)
-                        .map_err(|_| invalid("workbook activeTab does not fit usize"))
+                        .map_err(|_source| invalid("workbook activeTab does not fit usize"))
                 })
                 .transpose()?;
             if !self.seen_workbook_view {
@@ -629,7 +635,7 @@ fn optional_u32(
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+                .map_err(|_source| invalid(format!("invalid {description} value '{value}'")))
         })
         .transpose()
 }

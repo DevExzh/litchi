@@ -215,7 +215,15 @@ pub(super) fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                         .checked_sub(1)
                         .ok_or_else(|| invalid("invalid dataValidations nesting"))?;
                 },
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_)
+                | Event::Eof => {},
             }
             if *capture_depth == 0 {
                 let Some((_, source, prefix, writer)) = capture.take() else {
@@ -372,7 +380,7 @@ pub(super) fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
             Event::GeneralRef(reference) => {
                 decode_xml_reference(&reference)?;
             },
-            _ => {},
+            Event::Empty(_) | Event::CData(_) | Event::Comment(_) | Event::Eof => {},
         }
     }
     if !root_seen || !root_closed || depth != 0 {
@@ -588,7 +596,7 @@ pub(super) fn optional_u32(
     optional_attr(element, name, decoder)?
         .map(|v| {
             v.parse()
-                .map_err(|_| invalid(format!("invalid unsigned integer '{v}'")))
+                .map_err(|_source| invalid(format!("invalid unsigned integer '{v}'")))
         })
         .transpose()
 }

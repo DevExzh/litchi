@@ -72,7 +72,7 @@ pub(super) fn validate_descriptor(value: &Descriptor) -> Result<()> {
                 ));
             }
         },
-        _ => {
+        Persistence::Stream | Persistence::StreamInit | Persistence::Storage => {
             if !value.properties.is_empty()
                 || value.relationship_id.as_deref().is_none_or(str::is_empty)
             {

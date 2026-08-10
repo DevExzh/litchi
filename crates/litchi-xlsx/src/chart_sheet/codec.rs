@@ -202,7 +202,7 @@ fn parse_web_publish_items(node: &Node, conformance: Conformance) -> Result<WebP
         items.push(WebPublishItem {
             id: required(child, "", "id")?
                 .parse()
-                .map_err(|_| invalid("invalid web publish item id"))?,
+                .map_err(|_source| invalid("invalid web publish item id"))?,
             div_id: required(child, "", "divId")?.to_owned(),
             source_type: WebSourceType::parse(required(child, "", "sourceType")?)?,
             source_ref: optional(child, "", "sourceRef").map(str::to_owned),
@@ -293,7 +293,10 @@ fn parse_color(node: &Node) -> Result<Color> {
         rgb: optional(node, "", "rgb").map(str::to_owned),
         theme: u32_optional(node, "theme")?,
         tint: optional(node, "", "tint")
-            .map(|v| v.parse().map_err(|_| invalid("invalid tab color tint")))
+            .map(|v| {
+                v.parse()
+                    .map_err(|_source| invalid("invalid tab color tint"))
+            })
             .transpose()?,
     })
 }
@@ -327,7 +330,7 @@ fn parse_views(node: &Node) -> Result<Vec<View>> {
             zoom_scale: u32_optional(child, "zoomScale")?,
             workbook_view_id: required(child, "", "workbookViewId")?
                 .parse()
-                .map_err(|_| invalid("invalid workbookViewId"))?,
+                .map_err(|_source| invalid("invalid workbookViewId"))?,
             zoom_to_fit: bool_optional(child, "zoomToFit")?,
         });
     }
@@ -396,7 +399,7 @@ fn parse_margins(node: &Node) -> Result<Margins> {
     let number = |name| {
         required(node, "", name)?
             .parse()
-            .map_err(|_| invalid(format!("invalid {name} page margin")))
+            .map_err(|_source| invalid(format!("invalid {name} page margin")))
     };
     Ok(Margins {
         left: number("left")?,
@@ -1302,7 +1305,10 @@ fn bool_optional(node: &Node, name: &str) -> Result<Option<bool>> {
 }
 fn u32_optional(node: &Node, name: &str) -> Result<Option<u32>> {
     optional(node, "", name)
-        .map(|v| v.parse().map_err(|_| invalid(format!("invalid {name}"))))
+        .map(|v| {
+            v.parse()
+                .map_err(|_source| invalid(format!("invalid {name}")))
+        })
         .transpose()
 }
 fn parse_bool(value: &str, name: &str) -> Result<bool> {

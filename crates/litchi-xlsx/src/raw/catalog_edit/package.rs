@@ -473,9 +473,9 @@ pub(crate) fn remove(content: &[u8], plan: Remove<'_>) -> Result<Vec<u8>> {
                 old_first
             } else {
                 let old = usize::try_from(old_first)
-                    .map_err(|_| block(context, TabEditBlock::ViewIndex))?;
+                    .map_err(|_source| block(context, TabEditBlock::ViewIndex))?;
                 u32::try_from(map_removed_position(&old_to_new, old, context)?)
-                    .map_err(|_| block(context, TabEditBlock::ViewIndex))?
+                    .map_err(|_source| block(context, TabEditBlock::ViewIndex))?
             };
             let active_changed = view
                 .active
@@ -722,14 +722,14 @@ fn view_replacements(
         let desired_first = if old_first == FIRST_SHEET_SENTINEL {
             old_first
         } else {
-            let old =
-                usize::try_from(old_first).map_err(|_| block(context, TabEditBlock::ViewIndex))?;
+            let old = usize::try_from(old_first)
+                .map_err(|_source| block(context, TabEditBlock::ViewIndex))?;
             let mapped = order
                 .old_to_new
                 .get(old)
                 .copied()
                 .ok_or_else(|| block(context, TabEditBlock::ViewIndex))?;
-            u32::try_from(mapped).map_err(|_| block(context, TabEditBlock::ViewIndex))?
+            u32::try_from(mapped).map_err(|_source| block(context, TabEditBlock::ViewIndex))?
         };
 
         let active_changed = view

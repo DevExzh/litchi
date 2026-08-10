@@ -55,7 +55,13 @@ pub fn validate_data(
                             }
                         }
                     },
-                    _ => {},
+                    ValueType::Number
+                    | ValueType::Integer
+                    | ValueType::Boolean
+                    | ValueType::Error
+                    | ValueType::Text
+                    | ValueType::SupportingBag
+                    | ValueType::Unknown(_) => {},
                 }
             }
         } else {
@@ -411,7 +417,12 @@ fn mapping_index(owner: &Bags, expected: &BagType) -> Result<Vec<usize>> {
         .iter()
         .map(|value| match value {
             PropertyValue::Bag(index) => Ok(*index as usize),
-            _ => Err(invalid(
+            PropertyValue::Integer(_)
+            | PropertyValue::Text(_)
+            | PropertyValue::Boolean(_)
+            | PropertyValue::Decimal(_)
+            | PropertyValue::Relationship(_)
+            | PropertyValue::Unknown(_) => Err(invalid(
                 "feature complement mapping contains a non-bag value",
             )),
         })
@@ -430,7 +441,7 @@ fn index_value(value: &str, name: &str) -> Result<usize> {
     value
         .trim()
         .parse::<usize>()
-        .map_err(|_| invalid(format!("{name} must be a non-negative integer")))
+        .map_err(|_source| invalid(format!("{name} must be a non-negative integer")))
 }
 
 fn integer(value: &str) -> Result<()> {

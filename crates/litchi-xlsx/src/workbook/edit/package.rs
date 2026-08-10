@@ -360,7 +360,8 @@ fn verify_removed_defined_names(
         let scope = name
             .local_sheet_id
             .map(|scope| {
-                usize::try_from(scope).map_err(|_| invalid("defined-name scope does not fit usize"))
+                usize::try_from(scope)
+                    .map_err(|_source| invalid("defined-name scope does not fit usize"))
             })
             .transpose()?;
         if scope.is_some_and(|scope| removed.contains(&scope)) {
@@ -372,7 +373,7 @@ fn verify_removed_defined_names(
                     .filter(|position| !removed.contains(position))
                     .count(),
             )
-            .map_err(|_| invalid("remapped defined-name scope does not fit u32"))
+            .map_err(|_source| invalid("remapped defined-name scope does not fit u32"))
         });
         expected.push((name, mapped.transpose()?));
     }
@@ -654,21 +655,21 @@ pub(super) fn verify_defined_name_scopes(
         return Err(invalid("defined-name scope map omits a sheet identity"));
     }
     for (before, after) in source.defined_names.iter().zip(&catalog.defined_names) {
-        let expected_scope = match before.local_sheet_id {
-            None => None,
-            Some(scope) => {
-                let scope = usize::try_from(scope)
-                    .map_err(|_| invalid("defined-name scope does not fit usize"))?;
-                let mapped = old_to_new
-                    .get(scope)
-                    .copied()
-                    .ok_or_else(|| invalid("defined-name scope cannot be remapped"))?;
-                Some(
-                    u32::try_from(mapped)
-                        .map_err(|_| invalid("remapped defined-name scope does not fit u32"))?,
-                )
-            },
-        };
+        let expected_scope =
+            match before.local_sheet_id {
+                None => None,
+                Some(scope) => {
+                    let scope = usize::try_from(scope)
+                        .map_err(|_source| invalid("defined-name scope does not fit usize"))?;
+                    let mapped = old_to_new
+                        .get(scope)
+                        .copied()
+                        .ok_or_else(|| invalid("defined-name scope cannot be remapped"))?;
+                    Some(u32::try_from(mapped).map_err(|_source| {
+                        invalid("remapped defined-name scope does not fit u32")
+                    })?)
+                },
+            };
         if after.local_sheet_id != expected_scope || !same_defined_name_except_scope(before, after)
         {
             return Err(invalid(format!(

@@ -47,6 +47,15 @@ fn formula_package(formula: &str) -> Vec<u8> {
     output.into_inner()
 }
 
+fn positioned_formula_package(formula: &str, row: u32, column: u16) -> Vec<u8> {
+    let mut writer = crate::Writer::new();
+    let sheet = writer.add_worksheet("Formula").unwrap();
+    writer.write_formula(sheet, row, column, formula).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
 fn signed_package() -> Vec<u8> {
     let mut ole = OleFile::open(Cursor::new(package())).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
@@ -823,12 +832,92 @@ fn reference_free_formula_shifts_reopen_and_invert_exactly() {
         .apply(column_commit.snapshot())
         .unwrap();
     assert_eq!(column_restored.snapshot().bytes(), column_source.bytes());
+}
 
-    let dependent = Snapshot::from_bytes(formula_package("A1+1")).unwrap();
+#[test]
+fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
+    let source = Snapshot::from_bytes(positioned_formula_package("A1+$B$2+C1:C3", 4, 4)).unwrap();
+    let mut transaction = source.transaction();
+    transaction.insert_rows("Formula".into(), 1, 2).unwrap();
+    let commit = transaction.commit().unwrap();
+
+    let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    assert_eq!(
+        reopened
+            .xls_worksheet(0)
+            .unwrap()
+            .get_cell(6, 4)
+            .unwrap()
+            .formula(),
+        Some("=((A1+$B$4)+(C1:C5))")
+    );
+
+    let wire = commit.patch().semantic().to_deterministic_json().unwrap();
+    let durable = SemanticPatch::from_deterministic_json(&wire).unwrap();
+    let transfer = durable.plan_transfer(&source);
+    assert!(transfer.is_executable());
+    let replay = transfer.execute(&source).unwrap();
+    assert_eq!(replay.snapshot().bytes(), commit.snapshot().bytes());
+    let restored = durable.inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(restored.snapshot().bytes(), source.bytes());
+
+    let mut history = source.history(HistoryLimits::new(2, u64::MAX));
+    commit.clone().record_in(&mut history).unwrap();
+    assert!(history.undo());
+    assert_eq!(history.current().bytes(), source.bytes());
+    assert!(history.redo());
+    assert_eq!(history.current().bytes(), commit.snapshot().bytes());
+
+    let mut rename = source.transaction();
+    rename.rename_sheet("Formula".into(), "Shifted").unwrap();
+    let rename = rename.commit().unwrap().patch().semantic().clone();
+    let plan = SemanticPatch::plan_three_way(&source, &durable, &rename).unwrap();
+    let merged = plan.merged().unwrap();
+    let merged_commit = merged.apply(&source).unwrap();
+    let merged_reopen = Workbook::new(Cursor::new(merged_commit.snapshot().bytes())).unwrap();
+    assert_eq!(merged_reopen.sheets()[0].name(), "Shifted");
+    assert_eq!(
+        merged_reopen
+            .xls_worksheet(0)
+            .unwrap()
+            .get_cell(6, 4)
+            .unwrap()
+            .formula(),
+        Some("=((A1+$B$4)+(C1:C5))")
+    );
+
+    let column_source =
+        Snapshot::from_bytes(positioned_formula_package("A1+$B$2+C1:C3", 4, 4)).unwrap();
+    let mut columns = column_source.transaction();
+    columns.insert_columns("Formula".into(), 1, 2).unwrap();
+    let column_commit = columns.commit().unwrap();
+    let column_reopen = Workbook::new(Cursor::new(column_commit.snapshot().bytes())).unwrap();
+    assert_eq!(
+        column_reopen
+            .xls_worksheet(0)
+            .unwrap()
+            .get_cell(4, 6)
+            .unwrap()
+            .formula(),
+        Some("=((A1+$D$2)+(E1:E3))")
+    );
+    assert_eq!(
+        column_commit
+            .patch()
+            .semantic()
+            .inverse()
+            .apply(column_commit.snapshot())
+            .unwrap()
+            .snapshot()
+            .bytes(),
+        column_source.bytes()
+    );
+
+    let dependent = Snapshot::from_bytes(positioned_formula_package("A2", 4, 4)).unwrap();
     assert!(
         dependent
             .transaction()
-            .insert_rows("Formula".into(), 0, 1)
+            .delete_rows("Formula".into(), 1, 1)
             .is_err()
     );
 }

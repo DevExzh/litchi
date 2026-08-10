@@ -558,11 +558,20 @@ fn parse_sort_state(node: &XmlNode) -> Result<SortState> {
                 return Err(invalid("icon sort requires iconSet"));
             },
             SortBy::Icon
-                if icon_id.is_some_and(|value| value >= icon_set.unwrap().cardinality()) =>
+                if icon_id.is_some_and(|value| {
+                    value
+                        >= icon_set
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .cardinality()
+                }) =>
             {
                 return Err(invalid("sort iconId exceeds icon-set cardinality"));
             },
-            _ => {},
+            SortBy::Value | SortBy::CellColor | SortBy::FontColor | SortBy::Icon => {},
         }
         conditions.push(SortCondition {
             reference,
@@ -673,7 +682,7 @@ impl ParsedAttributes {
             .map(|value| {
                 value
                     .parse::<u32>()
-                    .map_err(|_| invalid(format!("invalid unsigned integer '{value}'")))
+                    .map_err(|_source| invalid(format!("invalid unsigned integer '{value}'")))
             })
             .transpose()
     }
@@ -688,7 +697,7 @@ impl ParsedAttributes {
             .map(|value| {
                 value
                     .parse::<u8>()
-                    .map_err(|_| invalid(format!("invalid byte '{value}'")))
+                    .map_err(|_source| invalid(format!("invalid byte '{value}'")))
             })
             .transpose()
     }

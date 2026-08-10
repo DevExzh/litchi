@@ -246,7 +246,9 @@ impl TryFrom<u32> for Scale {
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         if value == 0 || (10..=400).contains(&value) {
-            Ok(Self(value as u16))
+            u16::try_from(value)
+                .map(Self)
+                .map_err(|_source| RangeError::new(RangeKind::Scale, i64::from(value)))
         } else {
             Err(RangeError::new(RangeKind::Scale, i64::from(value)))
         }
@@ -315,7 +317,9 @@ impl TryFrom<u32> for Fit {
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         if value <= u32::from(Self::MAX) {
-            Ok(Self(value as u16))
+            u16::try_from(value)
+                .map(Self)
+                .map_err(|_source| RangeError::new(RangeKind::Fit, i64::from(value)))
         } else {
             Err(RangeError::new(RangeKind::Fit, i64::from(value)))
         }
@@ -603,6 +607,12 @@ impl Display for Measure {
     }
 }
 
+// The caller validates the i16 range before retaining these low bytes.
+const fn checked_i32_to_i16(value: i32) -> i16 {
+    let bytes = value.to_le_bytes();
+    i16::from_le_bytes([bytes[0], bytes[1]])
+}
+
 /// Signed first printed page number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
@@ -616,7 +626,7 @@ impl FirstPage {
     /// Construct a first-page number in Office's interoperable range.
     pub const fn new(value: i32) -> Result<Self, RangeError> {
         if (value >= Self::MIN as i32 && value < 0) || (value >= 1 && value <= Self::MAX as i32) {
-            Ok(Self(value as i16))
+            Ok(Self(checked_i32_to_i16(value)))
         } else {
             Err(RangeError::new(RangeKind::FirstPage, value as i64))
         }
@@ -625,9 +635,9 @@ impl FirstPage {
     /// Decode `SpreadsheetML`'s unsigned two's-complement representation.
     pub const fn from_wire(value: u32) -> Result<Self, RangeError> {
         if value <= Self::MAX as u32 {
-            Self::new(value as i32)
+            Self::new(value.cast_signed())
         } else {
-            let signed = value as i32;
+            let signed = value.cast_signed();
             if signed >= Self::MIN as i32 && signed < 0 {
                 Self::new(signed)
             } else {
@@ -645,7 +655,9 @@ impl FirstPage {
     /// Return the `SpreadsheetML` `unsignedInt` representation.
     #[must_use]
     pub const fn wire(self) -> u32 {
-        (self.0 as i32) as u32
+        let bytes = self.0.to_le_bytes();
+        let sign = if self.0 < 0 { 0xFF } else { 0x00 };
+        i32::from_le_bytes([bytes[0], bytes[1], sign, sign]).cast_unsigned()
     }
 }
 
@@ -691,7 +703,9 @@ impl TryFrom<u32> for Copies {
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         if value >= 1 && value <= u32::from(Self::MAX) {
-            Ok(Self(value as u16))
+            u16::try_from(value)
+                .map(Self)
+                .map_err(|_source| RangeError::new(RangeKind::Copies, i64::from(value)))
         } else {
             Err(RangeError::new(RangeKind::Copies, i64::from(value)))
         }

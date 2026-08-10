@@ -18,6 +18,18 @@ use crate::workbook::JoinError;
 /// Result of an XLSX operation.
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[cold]
+#[track_caller]
+pub(crate) fn panic_missing_invariant(message: &str) -> ! {
+    panic!("XLSX internal invariant failed: {message}")
+}
+
+#[cold]
+#[track_caller]
+pub(crate) fn panic_error_invariant(message: &str, error: impl std::fmt::Display) -> ! {
+    panic!("XLSX internal invariant failed: {message}: {error}")
+}
+
 /// Failure to open, inspect, or edit an XLSX document.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -210,7 +222,9 @@ impl From<litchi_spreadsheet_drawing::Error> for Error {
             litchi_spreadsheet_drawing::Error::Drawing(error) => Self::Drawing(error),
             litchi_spreadsheet_drawing::Error::Invalid(message)
             | litchi_spreadsheet_drawing::Error::Encoding(message) => Self::Invalid(message),
-            other => Self::Invalid(other.to_string()),
+            other @ (litchi_spreadsheet_drawing::Error::Mce(_)
+            | litchi_spreadsheet_drawing::Error::Xml(_)
+            | _) => Self::Invalid(other.to_string()),
         }
     }
 }

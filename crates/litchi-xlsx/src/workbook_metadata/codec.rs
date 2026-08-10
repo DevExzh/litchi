@@ -740,7 +740,11 @@ fn write_extensions(out: &mut String, values: &[OpaqueMetadataExtension]) {
         out.push_str("<ext");
         qattr(out, "uri", &value.uri);
         out.push('>');
-        out.push_str(std::str::from_utf8(&value.payload_xml).expect("validated UTF-8"));
+        out.push_str(
+            std::str::from_utf8(&value.payload_xml).unwrap_or_else(|error| {
+                crate::error::panic_error_invariant("validated UTF-8", error)
+            }),
+        );
         out.push_str("</ext>");
     }
     out.push_str("</extLst>");
@@ -842,7 +846,7 @@ fn required(node: &Node, name: &str) -> Result<String> {
 fn required_u32(node: &Node, name: &str) -> Result<u32> {
     required(node, name)?
         .parse()
-        .map_err(|_| invalid(format!("invalid unsigned integer {name}")))
+        .map_err(|_source| invalid(format!("invalid unsigned integer {name}")))
 }
 fn boolean(node: &Node, name: &str) -> Result<Option<bool>> {
     attribute(node, name)

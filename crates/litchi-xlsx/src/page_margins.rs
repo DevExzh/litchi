@@ -386,7 +386,7 @@ fn parse_margins(element: &BytesStart<'_>, decoder: Decoder) -> Result<Margins> 
 }
 
 fn parse_margin(raw: &str, name: &[u8]) -> Result<PageMargin> {
-    let value = raw.parse::<f64>().map_err(|_| {
+    let value = raw.parse::<f64>().map_err(|_source| {
         invalid(format!(
             "invalid {} page margin",
             String::from_utf8_lossy(name)

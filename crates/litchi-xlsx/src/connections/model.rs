@@ -307,7 +307,7 @@ impl Connections {
         validate_connections(self.connections.iter().chain(std::iter::once(&connection)))?;
         self.connections
             .try_reserve(1)
-            .map_err(|_| invalid("connection collection allocation failed"))?;
+            .map_err(|_source| invalid("connection collection allocation failed"))?;
         self.connections.push(connection);
         Ok(())
     }
@@ -366,7 +366,7 @@ impl Connections {
         let mut index_by_id = HashMap::new();
         index_by_id
             .try_reserve(self.connections.len())
-            .map_err(|_| invalid("connection reorder allocation failed"))?;
+            .map_err(|_source| invalid("connection reorder allocation failed"))?;
         for (index, connection) in self.connections.iter().enumerate() {
             if index_by_id.insert(connection.id, index).is_some() {
                 return Err(invalid("connection reorder is not a permutation"));
@@ -375,11 +375,11 @@ impl Connections {
 
         let mut seen = HashSet::new();
         seen.try_reserve(ordered_ids.len())
-            .map_err(|_| invalid("connection reorder allocation failed"))?;
+            .map_err(|_source| invalid("connection reorder allocation failed"))?;
         let mut ranks = Vec::new();
         ranks
             .try_reserve_exact(ordered_ids.len())
-            .map_err(|_| invalid("connection reorder allocation failed"))?;
+            .map_err(|_source| invalid("connection reorder allocation failed"))?;
         ranks.resize(ordered_ids.len(), usize::MAX);
         for (rank, id) in ordered_ids.iter().enumerate() {
             let Some(&index) = index_by_id.get(id) else {
@@ -416,10 +416,10 @@ where
     let mut ids = HashSet::new();
     let mut names = HashSet::new();
     ids.try_reserve(reserve)
-        .map_err(|_| invalid("connection validation allocation failed"))?;
+        .map_err(|_source| invalid("connection validation allocation failed"))?;
     names
         .try_reserve(reserve)
-        .map_err(|_| invalid("connection validation allocation failed"))?;
+        .map_err(|_source| invalid("connection validation allocation failed"))?;
     let mut count = 0usize;
     let mut ext = 0usize;
     for c in connections {
@@ -430,7 +430,7 @@ where
             return Err(invalid("invalid connection count"));
         }
         ids.try_reserve(1)
-            .map_err(|_| invalid("connection validation allocation failed"))?;
+            .map_err(|_source| invalid("connection validation allocation failed"))?;
         if !ids.insert(c.id) {
             return Err(invalid("duplicate connection id"));
         }
@@ -438,7 +438,7 @@ where
             bounded(n)?;
             names
                 .try_reserve(1)
-                .map_err(|_| invalid("connection validation allocation failed"))?;
+                .map_err(|_source| invalid("connection validation allocation failed"))?;
             if !names.insert(n) {
                 return Err(invalid("duplicate connection name"));
             }

@@ -102,7 +102,9 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
     let (partitions_xml, partition_encoding) = decode_xml(partition_bytes, false)?;
     let partition_count = parse_partitions(&parse_xml(&partitions_xml)?)?;
     files[first].kind = FileKind::Partitions;
-    let last = *order.last().unwrap();
+    let last = *order.last().unwrap_or_else(|| {
+        crate::error::panic_missing_invariant("required value was checked before extraction")
+    });
     files[last].kind = FileKind::BackupLog;
     let (backup_xml, backup_encoding) = decode_xml(payload_slice(bytes, &files[last])?, false)?;
     let backup_log = parse_backup_log(&parse_xml(&backup_xml)?, backup_encoding)?;
@@ -438,25 +440,25 @@ pub(super) fn u64_value(node: &Node) -> Result<u64> {
     leaf_text(node)?
         .trim()
         .parse()
-        .map_err(|_| invalid(format!("{} is not an unsigned 64-bit integer", node.name)))
+        .map_err(|_source| invalid(format!("{} is not an unsigned 64-bit integer", node.name)))
 }
 pub(super) fn u32_value(node: &Node) -> Result<u32> {
     leaf_text(node)?
         .trim()
         .parse()
-        .map_err(|_| invalid(format!("{} is not an unsigned 32-bit integer", node.name)))
+        .map_err(|_source| invalid(format!("{} is not an unsigned 32-bit integer", node.name)))
 }
 pub(super) fn i64_value(node: &Node) -> Result<i64> {
     leaf_text(node)?
         .trim()
         .parse()
-        .map_err(|_| invalid(format!("{} is not a signed 64-bit integer", node.name)))
+        .map_err(|_source| invalid(format!("{} is not a signed 64-bit integer", node.name)))
 }
 pub(super) fn i32_value(node: &Node) -> Result<i32> {
     leaf_text(node)?
         .trim()
         .parse()
-        .map_err(|_| invalid(format!("{} is not a signed 32-bit integer", node.name)))
+        .map_err(|_source| invalid(format!("{} is not a signed 32-bit integer", node.name)))
 }
 
 fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, XmlEncoding)> {
@@ -501,7 +503,7 @@ pub(super) fn valid_upper_guid(value: &str) -> bool {
     })
 }
 pub(super) fn checked_usize(value: u64, name: &str) -> Result<usize> {
-    usize::try_from(value).map_err(|_| limit(name))
+    usize::try_from(value).map_err(|_source| limit(name))
 }
 pub(super) fn crc32(bytes: &[u8]) -> u32 {
     let mut crc = 0xFFFF_FFFFu32;

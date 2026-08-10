@@ -202,7 +202,9 @@ impl Subtotal {
             Self::Max => PivotValueFunction::Max,
             Self::Min => PivotValueFunction::Min,
             Self::Sum => PivotValueFunction::Sum,
-            _ => PivotValueFunction::Custom,
+            Self::Product | Self::StdDev | Self::StdDevP | Self::Var | Self::VarP => {
+                PivotValueFunction::Custom
+            },
         }
     }
 }

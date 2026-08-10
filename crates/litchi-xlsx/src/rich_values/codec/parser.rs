@@ -508,7 +508,7 @@ fn parse_u32(value: &str, name: &str) -> Result<u32> {
     value
         .trim()
         .parse()
-        .map_err(|_| invalid(format!("{name} must be an unsigned integer")))
+        .map_err(|_source| invalid(format!("{name} must be an unsigned integer")))
 }
 
 fn push_limit<T>(values: &mut [T], limit_value: usize, name: &str) -> Result<()> {

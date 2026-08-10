@@ -484,12 +484,14 @@ pub struct Collection {
 }
 impl Collection {
     pub fn new(source: Source, validations: Vec<Validation>) -> Result<Self> {
+        let declared_count = u32::try_from(validations.len())
+            .map_err(|_source| invalid("data-validation count exceeds u32"))?;
         let value = Self {
             source,
             disable_prompts: false,
             x_window: None,
             y_window: None,
-            declared_count: Some(validations.len() as u32),
+            declared_count: Some(declared_count),
             validations,
         };
         validate_collection(&value)?;
@@ -508,12 +510,14 @@ impl Collection {
         Ok(())
     }
     pub fn set_validations(&mut self, validations: Vec<Validation>) -> Result<()> {
+        let declared_count = u32::try_from(validations.len())
+            .map_err(|_source| invalid("data-validation count exceeds u32"))?;
         let candidate = Self {
             source: self.source,
             disable_prompts: self.disable_prompts,
             x_window: self.x_window,
             y_window: self.y_window,
-            declared_count: Some(validations.len() as u32),
+            declared_count: Some(declared_count),
             validations,
         };
         validate_collection(&candidate)?;

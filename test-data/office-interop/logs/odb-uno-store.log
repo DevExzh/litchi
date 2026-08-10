@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=live UNO XStorable.store()
+input=test-data/office-interop/litchi-changed/tdf132924-litchi.odb
+output=test-data/office-interop/libreoffice-resaved/tdf132924-litchi.odb
+status=success
+output_sha256=fbe56e2711dc1876f4b8a0b841e4a530f26e0304095f5a9d000b92fb15d0b607

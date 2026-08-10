@@ -129,7 +129,7 @@ fn parse_shared_string_index(value: &str) -> Result<usize> {
     value
         .trim()
         .parse::<usize>()
-        .map_err(|_| invalid(format!("invalid shared-string index '{value}'")))
+        .map_err(|_source| invalid(format!("invalid shared-string index '{value}'")))
 }
 
 pub(super) fn resolve_shared_formulas(cells: &mut [RawCell]) -> Result<()> {

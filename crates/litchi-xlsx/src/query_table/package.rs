@@ -200,7 +200,9 @@ pub fn reorder_worksheet_query_tables(
             existing
                 .iter()
                 .find(|item| &item.relationship_id == id)
-                .expect("permutation was validated")
+                .unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant("permutation was validated")
+                })
                 .clone(),
         );
     }
@@ -235,7 +237,7 @@ pub fn reorder_worksheet_query_tables(
 
 fn validate_query_table_connection(package: &OpcPackage, connection_id: u32) -> Result<()> {
     let connections = crate::connections::load_from_package(package)
-        .map_err(|_| invalid("connections graph is invalid"))?
+        .map_err(|_source| invalid("connections graph is invalid"))?
         .ok_or_else(|| invalid("query table requires a connections part"))?;
     if connections
         .connections

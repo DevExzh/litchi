@@ -93,7 +93,12 @@ fn parse_part(xml: &str, origin: Origin, definitions: &mut Vec<Definition>) -> R
                     .ok_or_else(|| invalid("ODM style XML depth underflow"))?;
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM style XML")),
-            Event::GeneralRef(_) => {
+            Event::GeneralRef(reference)
+                if !matches!(
+                    reference.as_ref(),
+                    b"amp" | b"apos" | b"gt" | b"lt" | b"quot"
+                ) =>
+            {
                 return Err(invalid(
                     "named XML entities are not allowed in ODM style XML",
                 ));
@@ -103,7 +108,8 @@ fn parse_part(xml: &str, origin: Origin, definitions: &mut Vec<Definition>) -> R
             | Event::CData(_)
             | Event::Comment(_)
             | Event::Decl(_)
-            | Event::PI(_) => {},
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if depth != 0 {

@@ -6,7 +6,7 @@ use super::{
     query::{Query, QueryUpdateTarget},
     table::{
         Column, ColumnSchema, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind,
-        ReferentialAction, Relation, Table, TableKind,
+        ReferentialAction, Relation, RelationResolution, Table, TableKind,
     },
 };
 use litchi_core::{Error, Result};
@@ -196,6 +196,39 @@ impl<'source> Catalog<'source> {
         self.relations()
             .iter()
             .filter(move |relation| relation.referenced_table() == table)
+    }
+
+    /// Resolves one relation against this inert local catalog.
+    #[must_use]
+    pub fn relation_resolution(&self, relation: &Relation) -> RelationResolution {
+        let Some(owner) = self
+            .tables()
+            .iter()
+            .find(|table| table.name() == relation.table())
+        else {
+            return RelationResolution::MissingOwnerTable;
+        };
+        let Some(target) = self
+            .tables()
+            .iter()
+            .find(|table| table.name() == relation.referenced_table())
+        else {
+            return RelationResolution::MissingReferencedTable;
+        };
+        for mapping in relation.columns() {
+            let Some(local) = mapping.name() else {
+                return RelationResolution::IncompleteLocalColumn;
+            };
+            if owner.column(local).is_none() {
+                return RelationResolution::MissingLocalColumn;
+            }
+            if let Some(related) = mapping.related_column()
+                && target.column(related).is_none()
+            {
+                return RelationResolution::MissingReferencedColumn;
+            }
+        }
+        RelationResolution::Resolved
     }
 
     /// Returns the inert connection declaration, if the data source has one.

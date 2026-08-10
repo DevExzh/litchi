@@ -14,8 +14,9 @@ use std::{
 use crate::{Master, link::Selector};
 
 pub use crate::edit_ops::{
-    ActiveContentPolicy, BodyItemChange, GeneratedIndexChange, ResourceChange, ResourceSpec,
-    SectionChange, SectionSpec, SecurityPolicy, StyleChange, StyleSpec, SubdocumentSpec,
+    ActiveContentPolicy, BodyItemChange, BodyItemProvenance, BodyItemSpec, GeneratedIndexChange,
+    ResourceChange, ResourceSpec, SectionChange, SectionSpec, SecurityPolicy, StyleChange,
+    StyleSpec, SubdocumentSpec,
 };
 
 const MAX_PACKAGE_BYTES: usize = 256 * 1024 * 1024;
@@ -398,6 +399,8 @@ impl<'source> Edit<'source> {
                         .is_some_and(|candidate| candidate == after.as_str())
             }) || self.generated_indexes.iter().any(|change| {
                 matches!(change, GeneratedIndexChange::Rename { after: staged, .. } if staged == &after)
+            }) || self.body_items.iter().any(|change| {
+                matches!(change, BodyItemChange::Add(spec) if spec.generated_index_name() == Some(after.as_str()))
             }))
         {
             return Err(invalid("ODM generated-index destination name already exists"));
@@ -464,6 +467,42 @@ impl<'source> Edit<'source> {
         }
         self.body_items.push(BodyItemChange::Remove { item, kind });
         Ok(self)
+    }
+
+    /// Appends one typed common item to the direct master body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a duplicate generated-index identity.
+    pub fn add_body_item(&mut self, item: BodyItemSpec) -> Result<&mut Self> {
+        if let Some(name) = item.generated_index_name()
+            && generated_index_name_exists(
+                self.source,
+                &self.generated_indexes,
+                &self.body_items,
+                name,
+            )
+        {
+            return Err(invalid(
+                "ODM generated-index destination name already exists",
+            ));
+        }
+        self.body_items.push(BodyItemChange::Add(item));
+        Ok(self)
+    }
+
+    /// Copies one dependency-free common body item from an immutable source.
+    ///
+    /// The exact standalone fragment and SHA-256/item provenance are retained.
+    /// Style- or resource-dependent fragments are refused because this narrow
+    /// operation does not infer an incomplete dependency closure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unsupported selector, dependency, or identity
+    /// collision.
+    pub fn transfer_body_item(&mut self, source: &Master, item: Position) -> Result<&mut Self> {
+        self.add_body_item(BodyItemSpec::imported(source, item)?)
     }
 
     /// Removes one section subtree when no modeled local reference targets it.
@@ -1201,6 +1240,8 @@ pub enum Conflict {
     GeneratedIndexName(String),
     /// Both patches divergently write one direct master-body item.
     BodyItem(Position),
+    /// Both patches create a generated index with the same identity.
+    BodyItemName(String),
     /// Both patches write one style identity.
     Style(String),
     /// Both patches write one package resource path.
@@ -1442,6 +1483,25 @@ fn section_name_exists(source: &Master, staged: &[SectionChange], name: &str) ->
             SectionChange::Add(section) => section.name() == name,
             SectionChange::Rename { after, .. } => after == name,
             SectionChange::Remove { .. } => false,
+        })
+}
+
+fn generated_index_name_exists(
+    source: &Master,
+    generated_indexes: &[GeneratedIndexChange],
+    body_items: &[BodyItemChange],
+    name: &str,
+) -> bool {
+    source
+        .structure()
+        .generated_indexes()
+        .iter()
+        .any(|index| index.name() == Some(name))
+        || generated_indexes.iter().any(|change| {
+            matches!(change, GeneratedIndexChange::Rename { after, .. } if after == name)
+        })
+        || body_items.iter().any(|change| {
+            matches!(change, BodyItemChange::Add(spec) if spec.generated_index_name() == Some(name))
         })
 }
 
@@ -1826,30 +1886,53 @@ fn verify_extended_readback(
         }
     }
     for change in body_items {
-        let BodyItemChange::Remove { kind, .. } = change;
+        let kind = match change {
+            BodyItemChange::Add(spec) => spec.kind(),
+            BodyItemChange::Remove { kind, .. } => *kind,
+        };
+        let added = body_items
+            .iter()
+            .filter(
+                |candidate| matches!(candidate, BodyItemChange::Add(spec) if spec.kind() == kind),
+            )
+            .count();
         let removed = body_items
             .iter()
-            .filter(|change_candidate| {
-                matches!(change_candidate, BodyItemChange::Remove { kind: candidate_kind, .. } if candidate_kind == kind)
+            .filter(|candidate| {
+                matches!(candidate, BodyItemChange::Remove { kind: candidate_kind, .. } if *candidate_kind == kind)
             })
             .count();
         let before = source
             .structure()
             .items()
             .iter()
-            .filter(|candidate| *candidate == kind)
+            .filter(|candidate| **candidate == kind)
             .count();
         let expected = before
+            .checked_add(added)
+            .ok_or_else(|| invalid("ODM body-item addition inventory overflowed"))?
             .checked_sub(removed)
-            .ok_or_else(|| invalid("ODM body-item removal inventory is inconsistent"))?;
+            .ok_or_else(|| invalid("ODM body-item inventory is inconsistent"))?;
         let actual = snapshot
             .structure()
             .items()
             .iter()
-            .filter(|candidate| *candidate == kind)
+            .filter(|candidate| **candidate == kind)
             .count();
         if actual != expected {
-            return Err(invalid("ODM body-item removal failed semantic readback"));
+            return Err(invalid("ODM body-item change failed semantic readback"));
+        }
+        if let BodyItemChange::Add(spec) = change
+            && let Some(name) = spec.generated_index_name()
+            && !snapshot
+                .structure()
+                .generated_indexes()
+                .iter()
+                .any(|index| index.name() == Some(name))
+        {
+            return Err(invalid(
+                "ODM added generated index failed semantic readback",
+            ));
         }
     }
     for change in styles {
@@ -2125,35 +2208,68 @@ fn find_conflicts(
     }
     for left_change in &left.body_items {
         for right_change in &right.body_items {
-            let (
-                BodyItemChange::Remove {
-                    item: left_item, ..
+            match (left_change, right_change) {
+                (
+                    BodyItemChange::Remove {
+                        item: left_item, ..
+                    },
+                    BodyItemChange::Remove {
+                        item: right_item, ..
+                    },
+                ) if left_item == right_item && left_change != right_change => {
+                    conflicts.push(Conflict::BodyItem(*left_item));
                 },
-                BodyItemChange::Remove {
-                    item: right_item, ..
+                (BodyItemChange::Add(left_spec), BodyItemChange::Add(right_spec))
+                    if left_spec != right_spec
+                        && left_spec.generated_index_name().is_some()
+                        && left_spec.generated_index_name()
+                            == right_spec.generated_index_name() =>
+                {
+                    conflicts.push(Conflict::BodyItemName(
+                        left_spec
+                            .generated_index_name()
+                            .unwrap_or_default()
+                            .to_owned(),
+                    ));
                 },
-            ) = (left_change, right_change);
-            if left_item == right_item && left_change != right_change {
-                conflicts.push(Conflict::BodyItem(*left_item));
+                _ => {},
             }
         }
-        let BodyItemChange::Remove {
-            item: left_item, ..
-        } = left_change;
-        if right.generated_indexes.iter().any(|change| {
-            matches!(change, GeneratedIndexChange::Rename { item, .. } if item == left_item)
-        }) {
-            conflicts.push(Conflict::BodyItem(*left_item));
+        match left_change {
+            BodyItemChange::Remove {
+                item: left_item, ..
+            } if right.generated_indexes.iter().any(|change| {
+                matches!(change, GeneratedIndexChange::Rename { item, .. } if item == left_item)
+            }) => conflicts.push(Conflict::BodyItem(*left_item)),
+            BodyItemChange::Add(spec) => {
+                if let Some(name) = spec.generated_index_name()
+                    && right.generated_indexes.iter().any(|change| {
+                        matches!(change, GeneratedIndexChange::Rename { after, .. } if after == name)
+                    })
+                {
+                    conflicts.push(Conflict::BodyItemName(name.to_owned()));
+                }
+            },
+            BodyItemChange::Remove { .. } => {},
         }
     }
     for right_change in &right.body_items {
-        let BodyItemChange::Remove {
-            item: right_item, ..
-        } = right_change;
-        if left.generated_indexes.iter().any(|change| {
-            matches!(change, GeneratedIndexChange::Rename { item, .. } if item == right_item)
-        }) {
-            conflicts.push(Conflict::BodyItem(*right_item));
+        match right_change {
+            BodyItemChange::Remove {
+                item: right_item, ..
+            } if left.generated_indexes.iter().any(|change| {
+                matches!(change, GeneratedIndexChange::Rename { item, .. } if item == right_item)
+            }) => conflicts.push(Conflict::BodyItem(*right_item)),
+            BodyItemChange::Add(spec) => {
+                if let Some(name) = spec.generated_index_name()
+                    && left.generated_indexes.iter().any(|change| {
+                        matches!(change, GeneratedIndexChange::Rename { after, .. } if after == name)
+                    })
+                {
+                    conflicts.push(Conflict::BodyItemName(name.to_owned()));
+                }
+            },
+            BodyItemChange::Remove { .. } => {},
         }
     }
     for left_change in &left.styles {
@@ -2313,8 +2429,14 @@ fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
         if edit.body_items.contains(body_item) {
             continue;
         }
-        let BodyItemChange::Remove { item, .. } = body_item;
-        edit.remove_body_item(*item)?;
+        match body_item {
+            BodyItemChange::Add(spec) => {
+                edit.add_body_item(spec.clone())?;
+            },
+            BodyItemChange::Remove { item, .. } => {
+                edit.remove_body_item(*item)?;
+            },
+        }
     }
     // Style additions/renames must be visible before strict section staging:
     // an added section may reference a style imported by the same patch.

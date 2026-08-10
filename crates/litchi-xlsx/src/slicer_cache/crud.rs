@@ -100,7 +100,11 @@ where
             .iter_mut()
             .find(|slicer| slicer.name.eq_ignore_ascii_case(slicer_name))
         {
-            update.take().expect("used once")(slicer);
+            update
+                .take()
+                .unwrap_or_else(|| crate::error::panic_missing_invariant("used once"))(
+                slicer
+            );
             if !slicer.name.eq_ignore_ascii_case(slicer_name) {
                 return Err(invalid("slicer update cannot change its name"));
             }
@@ -156,7 +160,7 @@ pub fn remove_slicer(
         .slicers
         .iter()
         .position(|slicer| slicer.name.eq_ignore_ascii_case(slicer_name))
-        .expect("located");
+        .unwrap_or_else(|| crate::error::panic_missing_invariant("located"));
     parts[part_index].slicers.slicers.remove(item_index);
     if parts[part_index].slicers.slicers.is_empty() {
         let removed = parts.remove(part_index);
@@ -827,7 +831,10 @@ fn validate_slicer_views(
         .filter(|part| part.content_type() == SLICERS_CONTENT_TYPE)
     {
         let value = if replacement.is_some_and(|(name, _)| name == part.partname().as_str()) {
-            replacement.expect("checked").1.clone()
+            replacement
+                .unwrap_or_else(|| crate::error::panic_missing_invariant("checked"))
+                .1
+                .clone()
         } else {
             super::views::parse_slicers(part.blob())?
         };
@@ -973,7 +980,7 @@ fn rewrite_integration_refs(
     let mut open: Option<(usize, usize)> = None;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("XML offset overflow"))?;
+            .map_err(|_source| invalid("XML offset overflow"))?;
         let event = reader
             .read_event()
             .map_err(|e| invalid(e.to_string()))?
@@ -1008,7 +1015,7 @@ fn rewrite_integration_refs(
                     return Err(invalid("duplicate integration extension"));
                 }
                 let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_| invalid("XML offset overflow"))?;
+                    .map_err(|_source| invalid("XML offset overflow"))?;
                 target = Some((start, end));
             },
             Event::End(_) => {
@@ -1017,9 +1024,11 @@ fn rewrite_integration_refs(
                 }
                 depth -= 1;
                 if open.is_some_and(|(_, open_depth)| open_depth == depth) {
-                    let (begin, _) = open.take().expect("checked");
+                    let (begin, _) = open
+                        .take()
+                        .unwrap_or_else(|| crate::error::panic_missing_invariant("checked"));
                     let end = usize::try_from(reader.buffer_position())
-                        .map_err(|_| invalid("XML offset overflow"))?;
+                        .map_err(|_source| invalid("XML offset overflow"))?;
                     target = Some((begin, end));
                 }
             },
@@ -1027,7 +1036,12 @@ fn rewrite_integration_refs(
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     let (start, end) =
@@ -1067,14 +1081,24 @@ fn root_namespaces(xml: &[u8]) -> Result<(&'static str, &'static str)> {
                     ResolveResult::Bound(Namespace(value)) if value == STRICT_SML.as_bytes() => {
                         Ok((STRICT_SML, STRICT_REL))
                     },
-                    _ => Err(invalid("unsupported SpreadsheetML root namespace")),
+                    ResolveResult::Unbound
+                    | ResolveResult::Bound(_)
+                    | ResolveResult::Unknown(_) => {
+                        Err(invalid("unsupported SpreadsheetML root namespace"))
+                    },
                 };
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => return Err(invalid("missing XML root")),
-            _ => {},
+            Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -1094,10 +1118,13 @@ fn integration_fragment(
         "<ext xmlns=\"{core}\" uri=\"{uri}\"><f:{list} xmlns:f=\"{family_ns}\" xmlns:r=\"{rel}\">"
     );
     for id in ids {
-        write!(output, "<f:{item} r:id=\"{}\"/>", xml_escape(id))
-            .expect("writing to a String is infallible");
+        write!(output, "<f:{item} r:id=\"{}\"/>", xml_escape(id)).unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("writing to a String is infallible", error)
+        });
     }
-    write!(output, "</f:{list}></ext>").expect("writing to a String is infallible");
+    write!(output, "</f:{list}></ext>").unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("writing to a String is infallible", error)
+    });
     output.into_bytes()
 }
 

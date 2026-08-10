@@ -294,7 +294,7 @@ impl Cell {
 
         Some(Cell {
             row: record.row,
-            col: record.col as u32,
+            col: u32::from(record.col),
             style_id: 0,
             show_phonetic: false,
             value,

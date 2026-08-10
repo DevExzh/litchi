@@ -19,6 +19,62 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 #[test]
+fn real_excel_formula_references_shift_reopen_and_invert() {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/SimpleWithChoose.xls");
+    let source = Snapshot::from_bytes(std::fs::read(path).expect("read Microsoft Excel fixture"))
+        .expect("open Microsoft Excel formula fixture");
+    let mut transaction = source.transaction();
+    transaction
+        .insert_rows(Selector::Position(0), 0, 1)
+        .expect("stage reference-bearing Formula shift");
+    let commit = transaction
+        .commit()
+        .expect("commit and fully reopen real Formula shift");
+
+    let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes()))
+        .expect("reopen shifted Microsoft Excel fixture");
+    assert_eq!(
+        reopened
+            .xls_worksheet(0)
+            .expect("formula worksheet")
+            .get_cell(2, 1)
+            .expect("shifted formula cell")
+            .formula(),
+        Some("=CHOOSE(2,A3,A4,A5)")
+    );
+    assert_other_streams_equal(source.bytes(), commit.snapshot().bytes());
+
+    let restored = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.snapshot())
+        .expect("semantically invert real Formula shift");
+    let restored_reopen = Workbook::new(Cursor::new(restored.snapshot().bytes()))
+        .expect("reopen semantically restored Microsoft Excel fixture");
+    assert_eq!(
+        restored_reopen
+            .xls_worksheet(0)
+            .expect("restored formula worksheet")
+            .get_cell(1, 1)
+            .expect("restored formula cell")
+            .formula(),
+        Some("=CHOOSE(2,A2,A3,A4)")
+    );
+
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .expect("apply exact artifact inverse")
+            .bytes(),
+        source.bytes()
+    );
+}
+
+#[test]
 fn real_mulrk_field_edit_remains_packed() {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/FormulaSheetRange.xls");

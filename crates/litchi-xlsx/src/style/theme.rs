@@ -125,7 +125,7 @@ fn parse_hex_rgb(value: &str, context: &str) -> SheetResult<[u8; 3]> {
     }
     let byte = |offset: usize| {
         u8::from_str_radix(&value[offset..offset + 2], 16)
-            .map_err(|_| invalid(format!("{context} is not a 6-digit hex RGB value")))
+            .map_err(|_source| invalid(format!("{context} is not a 6-digit hex RGB value")))
     };
     Ok([byte(0)?, byte(2)?, byte(4)?])
 }
@@ -206,14 +206,16 @@ impl Theme {
 
         loop {
             let decoder = reader.decoder();
-            let event_start = reader.buffer_position() as usize;
+            let event_start = usize::try_from(reader.buffer_position())
+                .map_err(|_source| invalid("theme XML offset exceeds platform size"))?;
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| invalid(format!("theme XML error: {error}")))?;
             let drawingml =
                 matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == DRAWINGML);
             let event = event.into_owned();
-            let event_end = reader.buffer_position() as usize;
+            let event_end = usize::try_from(reader.buffer_position())
+                .map_err(|_source| invalid("theme XML offset exceeds platform size"))?;
             match event {
                 Event::Start(element) => {
                     let local_name = element.local_name();
@@ -295,8 +297,10 @@ impl Theme {
                     if fmt_depth > 0 {
                         fmt_depth -= 1;
                         if fmt_depth == 0 && drawingml && local == b"fmtScheme" {
-                            format_scheme_xml =
-                                xml[fmt_start.expect("fmt start")..event_end].to_string();
+                            format_scheme_xml = xml[fmt_start.unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant("fmt start")
+                            })..event_end]
+                                .to_string();
                         }
                     } else if drawingml && local == b"clrScheme" {
                         slot_index = None;
@@ -305,7 +309,13 @@ impl Theme {
                     }
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }
@@ -332,7 +342,7 @@ impl Theme {
             .collect::<SheetResult<Vec<_>>>()?;
         let colors: [ThemeColorValue; 12] = colors
             .try_into()
-            .map_err(|_| invalid("a:clrScheme must contain exactly 12 slots"))?;
+            .map_err(|_source| invalid("a:clrScheme must contain exactly 12 slots"))?;
         Ok(Self {
             name,
             color_scheme_name,

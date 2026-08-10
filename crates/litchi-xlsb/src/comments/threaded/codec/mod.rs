@@ -603,11 +603,12 @@ fn write_mention(xml: &mut String, mention: &Mention) -> Result<()> {
     xml.push_str(&escape_xml(&mention.mention_person_id));
     xml.push_str("\" mentionId=\"");
     xml.push_str(&escape_xml(&mention.mention_id));
-    let _ = write!(
+    write!(
         xml,
         "\" startIndex=\"{}\" length=\"{}\"",
         mention.start_index, mention.length
-    );
+    )
+    .map_err(|error| Error::Encoding(error.to_string()))?;
     write_attributes(
         xml,
         &mention.attributes,

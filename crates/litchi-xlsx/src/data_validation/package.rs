@@ -188,7 +188,7 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
         let start = previous;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("data-validation XML offset overflow"))?;
+            .map_err(|_source| invalid("data-validation XML offset overflow"))?;
         previous = end;
         let decoder = reader.decoder();
         let resolver = reader.resolver().clone();
@@ -227,7 +227,9 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
                         ResolveResult::Bound(value) if value.as_ref() == STRICT => {
                             Some(Conformance::Strict)
                         },
-                        _ => None,
+                        ResolveResult::Unbound
+                        | ResolveResult::Bound(_)
+                        | ResolveResult::Unknown(_) => None,
                     };
                     if conformance.is_none() || local.as_ref() != b"worksheet" {
                         return Err(invalid("invalid worksheet namespace"));

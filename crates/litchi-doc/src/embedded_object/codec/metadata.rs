@@ -304,7 +304,7 @@ fn read_ansi_range(cursor: &mut Cursor<'_>, name: &str, max_length: usize) -> Re
 }
 
 fn read_ansi_reserved(cursor: &mut Cursor<'_>) -> Result<()> {
-    let _ = read_ansi_range(cursor, "CompObj ANSI reserved string", MAX_RESERVED_ANSI)?;
+    read_ansi_range(cursor, "CompObj ANSI reserved string", MAX_RESERVED_ANSI)?;
     Ok(())
 }
 
@@ -341,7 +341,7 @@ fn read_unicode_range(cursor: &mut Cursor<'_>, name: &str) -> Result<Range<usize
 }
 
 fn read_unicode_reserved(cursor: &mut Cursor<'_>) -> Result<()> {
-    let _ = read_unicode_range(cursor, "CompObj Unicode reserved string")?;
+    read_unicode_range(cursor, "CompObj Unicode reserved string")?;
     Ok(())
 }
 

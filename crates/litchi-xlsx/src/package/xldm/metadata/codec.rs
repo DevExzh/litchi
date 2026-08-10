@@ -49,7 +49,26 @@ pub fn parse_file<'a>(storage_path: &'a str, bytes: &'a [u8]) -> MetadataResult<
         GeneratedNameKind::ColumnHierarchyMetadata => MetadataFileKind::ColumnHierarchy,
         GeneratedNameKind::UserHierarchyMetadata => MetadataFileKind::UserHierarchy,
         GeneratedNameKind::TableRelationshipMetadata => MetadataFileKind::TableRelationship,
-        _ => {
+        GeneratedNameKind::DatabaseDefinition
+        | GeneratedNameKind::DataSourceViewDefinition
+        | GeneratedNameKind::CubeDefinition
+        | GeneratedNameKind::DataSourceOrDimensionDefinition
+        | GeneratedNameKind::CubeInformation
+        | GeneratedNameKind::PartitionInformation
+        | GeneratedNameKind::TableInformation
+        | GeneratedNameKind::MdxScriptMetadata
+        | GeneratedNameKind::MeasureGroupMetadata
+        | GeneratedNameKind::PartitionMetadata
+        | GeneratedNameKind::ColumnData
+        | GeneratedNameKind::TableRelationshipIndex
+        | GeneratedNameKind::ColumnPositionToId
+        | GeneratedNameKind::ColumnIdToPosition
+        | GeneratedNameKind::ColumnHashIndex
+        | GeneratedNameKind::ColumnDictionary
+        | GeneratedNameKind::UserHierarchyChildCount
+        | GeneratedNameKind::UserHierarchyFirstChildPosition
+        | GeneratedNameKind::UserHierarchyParentPosition
+        | GeneratedNameKind::UserHierarchyMultilevelId => {
             return Err(MetadataError::new(
                 "section 2.5 metadata requires a .tbl.xml path",
             ));
@@ -636,7 +655,7 @@ fn validate_scalar_constraints(object: &MetadataObject) -> MetadataResult<()> {
         } else if double_property(name) {
             value
                 .parse::<f64>()
-                .map_err(|_| MetadataError::new(format!("invalid double {name}")))?;
+                .map_err(|_source| MetadataError::new(format!("invalid double {name}")))?;
         } else if !string_property(name) {
             parse_i64(value, name)?;
         }
@@ -848,7 +867,9 @@ fn validate_nested_constraints(object: &MetadataObject) -> MetadataResult<()> {
                     ("SubCompression", &["@matching_subcompression"]),
                 ],
             )?;
-            let sub = object.member("SubCompression").expect("validated member");
+            let sub = object
+                .member("SubCompression")
+                .unwrap_or_else(|| crate::error::panic_missing_invariant("validated member"));
             let correct = if let Some(width) = hybrid_width(value) {
                 sub.class.no_split_width() == Some(width) && !sub.class.is_hybrid_compression()
             } else if value.contains("XM123CompressionInfo") {
@@ -949,12 +970,16 @@ fn require_collections_multi(
 }
 
 fn validate_table_file_kind(kind: MetadataFileKind, table: &MetadataObject) -> MetadataResult<()> {
-    let columns = table.collection("Columns").expect("validated table");
+    let columns = table
+        .collection("Columns")
+        .unwrap_or_else(|| crate::error::panic_missing_invariant("validated table"));
     let roles: Vec<i64> = columns
         .iter()
         .map(|column| {
             parse_i64(
-                column.property("Settings").expect("validated column"),
+                column
+                    .property("Settings")
+                    .unwrap_or_else(|| crate::error::panic_missing_invariant("validated column")),
                 "Settings",
             )
             .map(|value| value & 0x1f)
@@ -978,7 +1003,10 @@ fn validate_table_file_kind(kind: MetadataFileKind, table: &MetadataObject) -> M
                 "relationship metadata requires exactly one generated column",
             ));
         },
-        _ => {},
+        MetadataFileKind::Table
+        | MetadataFileKind::ColumnHierarchy
+        | MetadataFileKind::UserHierarchy
+        | MetadataFileKind::TableRelationship => {},
     }
     Ok(())
 }
@@ -994,21 +1022,27 @@ fn derive_policies(
     let mut relationships = Vec::new();
     let mut hierarchies = Vec::new();
     for file in files {
-        for column in file.table.collection("Columns").expect("validated table") {
+        for column in file
+            .table
+            .collection("Columns")
+            .unwrap_or_else(|| crate::error::panic_missing_invariant("validated table"))
+        {
             let partition = column
                 .data_objects
                 .iter()
                 .find(|item| item.object.class.as_str() == "XMRawColumnPartitionDataObject")
-                .expect("validated raw column")
+                .unwrap_or_else(|| crate::error::panic_missing_invariant("validated raw column"))
                 .object
                 .as_ref();
-            let stats = column.member("ColumnStats").expect("validated raw column");
+            let stats = column
+                .member("ColumnStats")
+                .unwrap_or_else(|| crate::error::panic_missing_invariant("validated raw column"));
             let dictionary_object = column
                 .data_objects
                 .iter()
                 .map(|item| item.object.as_ref())
                 .find(|item| item.class.as_str() != "XMRawColumnPartitionDataObject")
-                .expect("validated raw column");
+                .unwrap_or_else(|| crate::error::panic_missing_invariant("validated raw column"));
             let dictionary = if dictionary_object
                 .class
                 .as_str()
@@ -1026,8 +1060,9 @@ fn derive_policies(
                         .property("DictionaryFlags")
                         .map(|value| {
                             parse_i64(value, "DictionaryFlags").and_then(|value| {
-                                u16::try_from(value)
-                                    .map_err(|_| MetadataError::new("DictionaryFlags overflow"))
+                                u16::try_from(value).map_err(|_source| {
+                                    MetadataError::new("DictionaryFlags overflow")
+                                })
                             })
                         })
                         .transpose()?,
@@ -1043,22 +1078,24 @@ fn derive_policies(
                 required_property(partition, "SegmentCount")?,
                 "SegmentCount",
             )?)
-            .map_err(|_| MetadataError::new("negative or overflowing SegmentCount"))?;
+            .map_err(|_source| MetadataError::new("negative or overflowing SegmentCount"))?;
             let row_count = u64::try_from(parse_i64(
                 required_property(stats, "RowCount")?,
                 "RowCount",
             )?)
-            .map_err(|_| MetadataError::new("negative RowCount"))?;
+            .map_err(|_source| MetadataError::new("negative RowCount"))?;
             let compression_type = u8::try_from(parse_i64(
                 required_property(stats, "CompressionType")?,
                 "CompressionType",
             )?)
-            .map_err(|_| MetadataError::new("CompressionType overflow"))?;
+            .map_err(|_source| MetadataError::new("CompressionType overflow"))?;
             let compression_param = parse_i64(
                 required_property(stats, "CompressionParam")?,
                 "CompressionParam",
             )?;
-            let segments = column.collection("Segments").expect("validated raw column");
+            let segments = column
+                .collection("Segments")
+                .unwrap_or_else(|| crate::error::panic_missing_invariant("validated raw column"));
             if segments.len() != segment_count {
                 return Err(MetadataError::new(
                     "SegmentCount disagrees with the Segments collection",
@@ -1070,15 +1107,15 @@ fn derive_policies(
                     required_property(segment, "Records")?,
                     "Records",
                 )?)
-                .map_err(|_| MetadataError::new("negative segment Records"))?;
+                .map_err(|_source| MetadataError::new("negative segment Records"))?;
                 let stats = segment
                     .member("ColumnSegmentStats")
-                    .expect("validated segment");
+                    .unwrap_or_else(|| crate::error::panic_missing_invariant("validated segment"));
                 let stats_rows = u64::try_from(parse_i64(
                     required_property(stats, "RowCount")?,
                     "RowCount",
                 )?)
-                .map_err(|_| MetadataError::new("negative segment RowCount"))?;
+                .map_err(|_source| MetadataError::new("negative segment RowCount"))?;
                 if records != stats_rows {
                     return Err(MetadataError::new(
                         "segment Records disagrees with ColumnSegmentStats.RowCount",
@@ -1089,7 +1126,7 @@ fn derive_policies(
                     .ok_or_else(|| MetadataError::new("segment row-count overflow"))?;
                 let compression = segment
                     .member("CompressionInfo")
-                    .expect("validated segment")
+                    .unwrap_or_else(|| crate::error::panic_missing_invariant("validated segment"))
                     .class
                     .as_str();
                 if compression_type == 1 {
@@ -1128,12 +1165,12 @@ fn derive_policies(
                     required_property(column, "Settings")?,
                     "Settings",
                 )?)
-                .map_err(|_| MetadataError::new("Settings overflow"))?,
+                .map_err(|_source| MetadataError::new("Settings overflow"))?,
                 dictionary,
             });
             let hierarchy = column
                 .member("IntrinsicHierarchy")
-                .expect("validated raw column");
+                .unwrap_or_else(|| crate::error::panic_missing_invariant("validated raw column"));
             let processed =
                 parse_bool(required_property(hierarchy, "IsProcessed")?, "IsProcessed")?;
             let materialization = parse_i64(
@@ -1167,7 +1204,7 @@ fn derive_policies(
         for relationship in file
             .table
             .collection("Relationships")
-            .expect("validated table")
+            .unwrap_or_else(|| crate::error::panic_missing_invariant("validated table"))
         {
             let index = relationship.data_objects[0].object.class.as_str();
             relationships.push(RelationshipPolicy {
@@ -1185,7 +1222,7 @@ fn derive_policies(
         for hierarchy in file
             .table
             .collection("UserHierarchies")
-            .expect("validated table")
+            .unwrap_or_else(|| crate::error::panic_missing_invariant("validated table"))
         {
             let processed =
                 parse_bool(required_property(hierarchy, "IsProcessed")?, "IsProcessed")?;
@@ -1267,7 +1304,9 @@ pub(crate) fn validate_columns(
                     DictionaryType::String,
                     DictionaryBody::String(strings),
                 ) => {
-                    let flags = policy.dictionary_flags.expect("string policy flags");
+                    let flags = policy.dictionary_flags.unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant("string policy flags")
+                    });
                     if dictionary.hash.is_some() != (flags & 0x001 != 0) {
                         return Err(MetadataError::new(
                             "DictionaryFlags lookup bit disagrees with string hash header presence",
@@ -1459,7 +1498,7 @@ fn parse_user_hierarchy_store(value: &str) -> MetadataResult<(Vec<String>, Vec<u
         }
         let offset = pair[1]
             .parse::<u64>()
-            .map_err(|_| MetadataError::new("invalid user hierarchy offset"))?;
+            .map_err(|_source| MetadataError::new("invalid user hierarchy offset"))?;
         if offsets.last().is_some_and(|previous| *previous > offset) {
             return Err(MetadataError::new(
                 "user hierarchy offsets MUST be cumulative",
@@ -1483,12 +1522,12 @@ fn required_property<'a>(object: &'a MetadataObject, name: &str) -> MetadataResu
 fn parse_i64(value: &str, name: &str) -> MetadataResult<i64> {
     value
         .parse()
-        .map_err(|_| MetadataError::new(format!("invalid integer {name}")))
+        .map_err(|_source| MetadataError::new(format!("invalid integer {name}")))
 }
 fn parse_i32(value: &str, name: &str) -> MetadataResult<i32> {
     value
         .parse()
-        .map_err(|_| MetadataError::new(format!("invalid integer {name}")))
+        .map_err(|_source| MetadataError::new(format!("invalid integer {name}")))
 }
 fn parse_bool(value: &str, name: &str) -> MetadataResult<bool> {
     match value {

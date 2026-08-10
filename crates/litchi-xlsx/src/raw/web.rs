@@ -399,7 +399,7 @@ fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
     let mut worksheet_close = None;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("worksheet XML offset exceeds usize"))?;
+            .map_err(|_source| invalid("worksheet XML offset exceeds usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| invalid(error.to_string()))?;
@@ -439,7 +439,7 @@ fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
                         return Err(invalid("duplicate worksheet webExtensions extension"));
                     }
                     let end = usize::try_from(reader.buffer_position())
-                        .map_err(|_| invalid("worksheet XML offset exceeds usize"))?;
+                        .map_err(|_source| invalid("worksheet XML offset exceeds usize"))?;
                     extension = Some(start..end);
                 }
             },
@@ -458,7 +458,7 @@ fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
                     extension = Some(
                         begin
                             ..usize::try_from(reader.buffer_position())
-                                .map_err(|_| invalid("worksheet XML offset exceeds usize"))?,
+                                .map_err(|_source| invalid("worksheet XML offset exceeds usize"))?,
                     );
                 }
                 if local == b"extLst" && is_sml(&namespace) && depth == 1 {
@@ -470,7 +470,12 @@ fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
             },
             Event::DocType(_) => return Err(invalid("DTD is forbidden in worksheet XML")),
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Ok(ExtensionScan {

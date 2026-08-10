@@ -725,7 +725,13 @@ impl IconSet {
             | Self::FourRating
             | Self::FourTrafficLights => 4,
             Self::NoIcons => 1,
-            _ => 5,
+            Self::FiveArrows
+            | Self::FiveArrowsGray
+            | Self::FiveRating
+            | Self::FiveQuarters
+            | Self::ThreeStars
+            | Self::ThreeTriangles
+            | Self::FiveBoxes => 5,
         }
     }
 }
@@ -854,7 +860,10 @@ pub struct Column {
 }
 impl Column {
     pub fn new(column_id: u32) -> Result<Self> {
-        if column_id >= MAX_COLUMNS as u32 {
+        let max_columns = u32::try_from(MAX_COLUMNS).map_err(|_source| {
+            invalid("worksheet column limit exceeds the filterColumn wire type")
+        })?;
+        if column_id >= max_columns {
             return Err(invalid("filterColumn colId is outside worksheet range"));
         }
         Ok(Self {

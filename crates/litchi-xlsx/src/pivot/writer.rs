@@ -497,7 +497,12 @@ fn validate_pivot_cache_definition(cache_def: &Definition) -> SheetResult<()> {
                 Item::Number(value) if !value.is_finite() => {
                     return Err("pivot cache shared number must be finite".into());
                 },
-                _ => {},
+                Item::Missing
+                | Item::Number(_)
+                | Item::Boolean(_)
+                | Item::Error(_)
+                | Item::String(_)
+                | Item::DateTime(_) => {},
             }
         }
     }

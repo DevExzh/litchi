@@ -122,6 +122,25 @@ pub enum ProtectionSupport {
     Unsupported,
 }
 
+/// Exact reason a protected write operation is unavailable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ProtectionRefusal {
+    /// ODB cannot create replacement package signatures.
+    ReSigningUnavailable,
+    /// ODB cannot publish newly encrypted changed packages.
+    ReEncryptionUnavailable,
+}
+
+/// Typed decision for one protected-package operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ProtectionDecision {
+    /// The operation is implemented.
+    Supported,
+    /// The operation is unavailable for the exact stated reason.
+    Refused(ProtectionRefusal),
+}
+
 impl SignatureCapability {
     /// Whether signature math can be verified without making a trust claim.
     #[must_use]
@@ -229,18 +248,26 @@ impl ProtectionCapabilities {
     /// Returns explicit support for a protected-package operation.
     #[must_use]
     pub const fn support(self, operation: ProtectionOperation) -> ProtectionSupport {
-        let supported = match operation {
-            ProtectionOperation::VerifySignatures => self.signature.can_verify(),
-            ProtectionOperation::RemoveInvalidatedSignatures => {
-                self.signature.can_remove_invalidated()
-            },
-            ProtectionOperation::ReSign => self.signature.can_re_sign(),
-            ProtectionOperation::ReEncrypt => self.encryption.can_re_encrypt(),
-        };
-        if supported {
+        if matches!(self.decision(operation), ProtectionDecision::Supported) {
             ProtectionSupport::Supported
         } else {
             ProtectionSupport::Unsupported
+        }
+    }
+
+    /// Returns a typed decision before credentials or key material are
+    /// gathered.
+    #[must_use]
+    pub const fn decision(self, operation: ProtectionOperation) -> ProtectionDecision {
+        match operation {
+            ProtectionOperation::VerifySignatures
+            | ProtectionOperation::RemoveInvalidatedSignatures => ProtectionDecision::Supported,
+            ProtectionOperation::ReSign => {
+                ProtectionDecision::Refused(ProtectionRefusal::ReSigningUnavailable)
+            },
+            ProtectionOperation::ReEncrypt => {
+                ProtectionDecision::Refused(ProtectionRefusal::ReEncryptionUnavailable)
+            },
         }
     }
 

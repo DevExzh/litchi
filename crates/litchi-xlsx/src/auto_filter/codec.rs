@@ -79,10 +79,12 @@ pub fn write_auto_filter_fragment(value: &Definition) -> Result<Vec<u8>> {
     }
     x.push(b'>');
     let mut ids = HashSet::with_capacity(value.columns.len());
+    let max_columns = u32::try_from(MAX_COLUMNS)
+        .map_err(|_source| invalid("worksheet column limit exceeds the filterColumn wire type"))?;
     if value
         .columns
         .iter()
-        .any(|column| column.column_id >= MAX_COLUMNS as u32 || !ids.insert(column.column_id))
+        .any(|column| column.column_id >= max_columns || !ids.insert(column.column_id))
     {
         return Err(invalid("invalid or duplicate filterColumn colId"));
     }
@@ -102,7 +104,12 @@ pub fn write_auto_filter_fragment(value: &Definition) -> Result<Vec<u8>> {
                     }
                 },
                 ChildOrder::Unknown(index) => write_unknown_index(&mut x, opaque, index)?,
-                _ => {},
+                ChildOrder::Column(_)
+                | ChildOrder::SortState
+                | ChildOrder::Payload
+                | ChildOrder::Item(_)
+                | ChildOrder::Custom(_)
+                | ChildOrder::Condition(_) => {},
             }
         }
         if opaque.order.is_empty() {
@@ -147,7 +154,12 @@ fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
                                 written[index] = true;
                             },
                             ChildOrder::Unknown(index) => write_unknown_index(x, opaque, index)?,
-                            _ => {},
+                            ChildOrder::Column(_)
+                            | ChildOrder::SortState
+                            | ChildOrder::Payload
+                            | ChildOrder::Item(_)
+                            | ChildOrder::Custom(_)
+                            | ChildOrder::Condition(_) => {},
                         }
                     }
                 }
@@ -178,7 +190,12 @@ fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
                             written[index] = true;
                         },
                         ChildOrder::Unknown(index) => write_unknown_index(x, opaque, index)?,
-                        _ => {},
+                        ChildOrder::Column(_)
+                        | ChildOrder::SortState
+                        | ChildOrder::Payload
+                        | ChildOrder::Item(_)
+                        | ChildOrder::Custom(_)
+                        | ChildOrder::Condition(_) => {},
                     }
                 }
             }
@@ -262,7 +279,12 @@ fn write_column(x: &mut Vec<u8>, value: &Column) -> Result<()> {
                     }
                 },
                 ChildOrder::Unknown(index) => write_unknown_index(x, opaque, index)?,
-                _ => {},
+                ChildOrder::Column(_)
+                | ChildOrder::SortState
+                | ChildOrder::Payload
+                | ChildOrder::Item(_)
+                | ChildOrder::Custom(_)
+                | ChildOrder::Condition(_) => {},
             }
         }
     }
@@ -302,7 +324,12 @@ fn write_state(x: &mut Vec<u8>, value: &State) -> Result<()> {
                     written[index] = true;
                 },
                 ChildOrder::Unknown(index) => write_unknown_index(x, opaque, index)?,
-                _ => {},
+                ChildOrder::Column(_)
+                | ChildOrder::SortState
+                | ChildOrder::Payload
+                | ChildOrder::Item(_)
+                | ChildOrder::Custom(_)
+                | ChildOrder::Condition(_) => {},
             }
         }
     }
@@ -349,7 +376,14 @@ fn write_condition(x: &mut Vec<u8>, state: &State, value: &Condition) -> Result<
     write_unknown_attributes(x, value.opaque.as_deref())?;
     if has_unknown_children(value.opaque.as_deref()) {
         x.push(b'>');
-        write_unknown_elements(x, value.opaque.as_deref().unwrap())?;
+        write_unknown_elements(
+            x,
+            value.opaque.as_deref().unwrap_or_else(|| {
+                crate::error::panic_missing_invariant(
+                    "required value was checked before extraction",
+                )
+            }),
+        )?;
         x.extend_from_slice(b"</x:sortCondition>");
     } else {
         x.extend_from_slice(b"/>");
@@ -387,7 +421,14 @@ fn write_date_group(x: &mut Vec<u8>, value: &DateGroup) -> Result<()> {
     write_unknown_attributes(x, value.opaque.as_deref())?;
     if has_unknown_children(value.opaque.as_deref()) {
         x.push(b'>');
-        write_unknown_elements(x, value.opaque.as_deref().unwrap())?;
+        write_unknown_elements(
+            x,
+            value.opaque.as_deref().unwrap_or_else(|| {
+                crate::error::panic_missing_invariant(
+                    "required value was checked before extraction",
+                )
+            }),
+        )?;
         x.extend_from_slice(b"</x:dateGroupItem>");
     } else {
         x.extend_from_slice(b"/>");
@@ -404,7 +445,14 @@ fn write_custom(x: &mut Vec<u8>, value: &Custom) -> Result<()> {
     write_unknown_attributes(x, value.opaque.as_deref())?;
     if has_unknown_children(value.opaque.as_deref()) {
         x.push(b'>');
-        write_unknown_elements(x, value.opaque.as_deref().unwrap())?;
+        write_unknown_elements(
+            x,
+            value.opaque.as_deref().unwrap_or_else(|| {
+                crate::error::panic_missing_invariant(
+                    "required value was checked before extraction",
+                )
+            }),
+        )?;
         x.extend_from_slice(b"</x:customFilter>");
     } else {
         x.extend_from_slice(b"/>");
@@ -636,8 +684,18 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                                 .or_else(|| Some(Box::new(OpaqueFields::default()))),
                         },
                     ));
-                    opaque_mut(&mut column.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Payload)?;
+                    opaque_mut(
+                        &mut column
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Payload)?;
                     payload_depth = Some(depth);
                 } else if spreadsheet(&namespace)
                     && name.as_ref() == b"customFilters"
@@ -654,24 +712,71 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                                 .or_else(|| Some(Box::new(OpaqueFields::default()))),
                         },
                     ));
-                    opaque_mut(&mut column.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Payload)?;
+                    opaque_mut(
+                        &mut column
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Payload)?;
                     payload_depth = Some(depth);
                 } else if spreadsheet(&namespace)
                     && values.as_ref().is_some_and(|v| v.0 == depth)
                     && matches!(name.as_ref(), b"filter" | b"dateGroupItem")
                 {
-                    let index = push_value(values.as_mut().unwrap(), name.as_ref(), &e, decoder)?;
-                    opaque_mut(&mut values.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Item(index))?;
+                    let index = push_value(
+                        values.as_mut().unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        }),
+                        name.as_ref(),
+                        &e,
+                        decoder,
+                    )?;
+                    opaque_mut(
+                        &mut values
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Item(index))?;
                     depth += 1;
                 } else if spreadsheet(&namespace)
                     && custom.as_ref().is_some_and(|v| v.0 == depth)
                     && name.as_ref() == b"customFilter"
                 {
-                    let index = push_custom(custom.as_mut().unwrap(), &e, decoder)?;
-                    opaque_mut(&mut custom.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Custom(index))?;
+                    let index = push_custom(
+                        custom.as_mut().unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        }),
+                        &e,
+                        decoder,
+                    )?;
+                    opaque_mut(
+                        &mut custom
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Custom(index))?;
                     depth += 1;
                 } else if spreadsheet(&namespace)
                     && column.as_ref().is_some_and(|v| v.0 == depth)
@@ -680,9 +785,28 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                         b"dynamicFilter" | b"colorFilter" | b"iconFilter" | b"top10"
                     )
                 {
-                    set_simple_payload(column.as_mut().unwrap(), name.as_ref(), &e, decoder)?;
-                    opaque_mut(&mut column.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Payload)?;
+                    set_simple_payload(
+                        column.as_mut().unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        }),
+                        name.as_ref(),
+                        &e,
+                        decoder,
+                    )?;
+                    opaque_mut(
+                        &mut column
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Payload)?;
                     depth += 1;
                     payload_depth = Some(depth);
                 } else if spreadsheet(&namespace)
@@ -700,9 +824,27 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && name.as_ref() == b"sortCondition"
                     && sort.as_ref().is_some_and(|v| v.0 == depth)
                 {
-                    let index = push_sort(sort.as_mut().unwrap(), &e, decoder)?;
-                    opaque_mut(&mut sort.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Condition(index))?;
+                    let index = push_sort(
+                        sort.as_mut().unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        }),
+                        &e,
+                        decoder,
+                    )?;
+                    opaque_mut(
+                        &mut sort
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Condition(index))?;
                     depth += 1;
                 } else if let Some(owner) = unknown_owner(
                     depth,
@@ -755,7 +897,15 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && column.as_ref().is_some_and(|v| v.0 == depth)
                 {
                     ensure_payload_empty(&column)?;
-                    column.as_mut().unwrap().1.payload = Some(Payload::Values(Values {
+                    column
+                        .as_mut()
+                        .unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        })
+                        .1
+                        .payload = Some(Payload::Values(Values {
                         blank: optional_bool(&e, b"blank", decoder)?.unwrap_or(false),
                         calendar_type: Calendar::parse(
                             optional_attr(&e, b"calendarType", decoder)?
@@ -765,8 +915,18 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                         items: Vec::new(),
                         opaque: None,
                     }));
-                    opaque_mut(&mut column.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Payload)?;
+                    opaque_mut(
+                        &mut column
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Payload)?;
                 } else if spreadsheet(&namespace)
                     && name.as_ref() == b"customFilters"
                     && column.as_ref().is_some_and(|v| v.0 == depth)
@@ -778,16 +938,53 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && values.as_ref().is_some_and(|v| v.0 == depth)
                     && matches!(name.as_ref(), b"filter" | b"dateGroupItem")
                 {
-                    let index = push_value(values.as_mut().unwrap(), name.as_ref(), &e, decoder)?;
-                    opaque_mut(&mut values.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Item(index))?;
+                    let index = push_value(
+                        values.as_mut().unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        }),
+                        name.as_ref(),
+                        &e,
+                        decoder,
+                    )?;
+                    opaque_mut(
+                        &mut values
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Item(index))?;
                 } else if spreadsheet(&namespace)
                     && custom.as_ref().is_some_and(|v| v.0 == depth)
                     && name.as_ref() == b"customFilter"
                 {
-                    let index = push_custom(custom.as_mut().unwrap(), &e, decoder)?;
-                    opaque_mut(&mut custom.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Custom(index))?;
+                    let index = push_custom(
+                        custom.as_mut().unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        }),
+                        &e,
+                        decoder,
+                    )?;
+                    opaque_mut(
+                        &mut custom
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Custom(index))?;
                 } else if spreadsheet(&namespace)
                     && column.as_ref().is_some_and(|v| v.0 == depth)
                     && matches!(
@@ -795,9 +992,28 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                         b"dynamicFilter" | b"colorFilter" | b"iconFilter" | b"top10"
                     )
                 {
-                    set_simple_payload(column.as_mut().unwrap(), name.as_ref(), &e, decoder)?;
-                    opaque_mut(&mut column.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Payload)?;
+                    set_simple_payload(
+                        column.as_mut().unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        }),
+                        name.as_ref(),
+                        &e,
+                        decoder,
+                    )?;
+                    opaque_mut(
+                        &mut column
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Payload)?;
                 } else if spreadsheet(&namespace)
                     && name.as_ref() == b"sortState"
                     && root == Some(depth)
@@ -812,9 +1028,27 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && name.as_ref() == b"sortCondition"
                     && sort.as_ref().is_some_and(|v| v.0 == depth)
                 {
-                    let index = push_sort(sort.as_mut().unwrap(), &e, decoder)?;
-                    opaque_mut(&mut sort.as_mut().unwrap().1.opaque)
-                        .push_order(ChildOrder::Condition(index))?;
+                    let index = push_sort(
+                        sort.as_mut().unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        }),
+                        &e,
+                        decoder,
+                    )?;
+                    opaque_mut(
+                        &mut sort
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .1
+                            .opaque,
+                    )
+                    .push_order(ChildOrder::Condition(index))?;
                 } else if let Some(owner) = unknown_owner(
                     depth,
                     root,
@@ -840,9 +1074,21 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                 if values.as_ref().is_some_and(|v| v.0 == depth)
                     && e.local_name().as_ref() == b"filters"
                 {
-                    let (_, b) = values.take().unwrap();
+                    let (_, b) = values.take().unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    });
                     let order = (0..b.items.len()).map(ChildOrder::Item).collect::<Vec<_>>();
-                    column.as_mut().unwrap().1.payload = Some(Payload::Values(Values {
+                    column
+                        .as_mut()
+                        .unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        })
+                        .1
+                        .payload = Some(Payload::Values(Values {
                         blank: b.blank,
                         calendar_type: b.calendar_type,
                         items: b.items,
@@ -853,7 +1099,11 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                 if custom.as_ref().is_some_and(|v| v.0 == depth)
                     && e.local_name().as_ref() == b"customFilters"
                 {
-                    let (_, b) = custom.take().unwrap();
+                    let (_, b) = custom.take().unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    });
                     if !(1..=2).contains(&b.filters.len()) {
                         return Err(invalid(
                             "customFilters requires one or two customFilter children",
@@ -862,7 +1112,15 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     let order = (0..b.filters.len())
                         .map(ChildOrder::Custom)
                         .collect::<Vec<_>>();
-                    column.as_mut().unwrap().1.payload = Some(Payload::Custom(Customs {
+                    column
+                        .as_mut()
+                        .unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        })
+                        .1
+                        .payload = Some(Payload::Custom(Customs {
                         and: b.and,
                         filters: b.filters,
                         opaque: normalize_opaque(b.opaque, &order),
@@ -872,7 +1130,11 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                 if column.as_ref().is_some_and(|v| v.0 == depth)
                     && e.local_name().as_ref() == b"filterColumn"
                 {
-                    let (_, b) = column.take().unwrap();
+                    let (_, b) = column.take().unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    });
                     columns.push(finish_column(b)?);
                     opaque_mut(&mut root_opaque)
                         .push_order(ChildOrder::Column(columns.len() - 1))?;
@@ -883,7 +1145,11 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                 if sort.as_ref().is_some_and(|v| v.0 == depth)
                     && e.local_name().as_ref() == b"sortState"
                 {
-                    let (_, b) = sort.take().unwrap();
+                    let (_, b) = sort.take().unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    });
                     sort_state = Some(finish_sort(b));
                 }
                 if root == Some(depth) && e.local_name().as_ref() == b"autoFilter" {
@@ -897,7 +1163,11 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !closed || column.is_some() || values.is_some() || custom.is_some() || sort.is_some() {
@@ -923,7 +1193,9 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
 
 fn parse_column(e: &BytesStart<'_>, d: Decoder, width: Option<u32>) -> Result<ColumnBuilder> {
     let id = required_u32(e, b"colId", d)?;
-    if id >= MAX_COLUMNS as u32 || width.is_some_and(|w| id >= w) {
+    let max_columns = u32::try_from(MAX_COLUMNS)
+        .map_err(|_source| invalid("worksheet column limit exceeds the filterColumn wire type"))?;
+    if id >= max_columns || width.is_some_and(|w| id >= w) {
         return Err(invalid("filterColumn colId is outside autoFilter range"));
     }
     Ok(ColumnBuilder {
@@ -948,7 +1220,7 @@ fn unknown_attributes(
             continue;
         }
         let name = std::str::from_utf8(name)
-            .map_err(|_| invalid("autoFilter attribute name is not UTF-8"))?
+            .map_err(|_source| invalid("autoFilter attribute name is not UTF-8"))?
             .to_owned();
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, d)
@@ -991,7 +1263,15 @@ fn capture_unknown(reader: &mut NsReader<&[u8]>, first: Event<'static>) -> Resul
     let mut depth = match first {
         Event::Start(_) => 1usize,
         Event::Empty(_) => 0,
-        _ => {
+        Event::End(_)
+        | Event::Text(_)
+        | Event::CData(_)
+        | Event::Comment(_)
+        | Event::Decl(_)
+        | Event::PI(_)
+        | Event::DocType(_)
+        | Event::GeneralRef(_)
+        | Event::Eof => {
             return Err(invalid(
                 "unknown autoFilter capture did not start at an element",
             ));
@@ -1012,7 +1292,14 @@ fn capture_unknown(reader: &mut NsReader<&[u8]>, first: Event<'static>) -> Resul
                     .ok_or_else(|| invalid("unknown autoFilter nesting underflow"))?;
             },
             Event::Eof => return Err(invalid("unterminated unknown autoFilter element")),
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         if writer.get_ref().len() > MAX_UNKNOWN_BYTES {
             return Err(invalid("unknown autoFilter element is too large"));
@@ -1032,10 +1319,50 @@ fn attach_unknown(
 ) -> Result<()> {
     let target = match owner {
         UnknownOwner::Root => root,
-        UnknownOwner::Column => &mut column.as_mut().unwrap().1.opaque,
-        UnknownOwner::Values => &mut values.as_mut().unwrap().1.opaque,
-        UnknownOwner::Customs => &mut custom.as_mut().unwrap().1.opaque,
-        UnknownOwner::Sort => &mut sort.as_mut().unwrap().1.opaque,
+        UnknownOwner::Column => {
+            &mut column
+                .as_mut()
+                .unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                })
+                .1
+                .opaque
+        },
+        UnknownOwner::Values => {
+            &mut values
+                .as_mut()
+                .unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                })
+                .1
+                .opaque
+        },
+        UnknownOwner::Customs => {
+            &mut custom
+                .as_mut()
+                .unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                })
+                .1
+                .opaque
+        },
+        UnknownOwner::Sort => {
+            &mut sort
+                .as_mut()
+                .unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                })
+                .1
+                .opaque
+        },
         UnknownOwner::Payload => {
             let payload = column
                 .as_mut()
@@ -1141,7 +1468,8 @@ fn parse_date_group(e: &BytesStart<'_>, d: Decoder) -> Result<DateGroup> {
         return Err(invalid("date-group components do not match grouping"));
     }
     Ok(DateGroup {
-        year: year as u16,
+        year: u16::try_from(year)
+            .map_err(|_source| invalid("date-group year exceeds the unsigned 16-bit wire type"))?,
         month,
         day,
         hour,
@@ -1306,10 +1634,20 @@ fn push_sort(s: &mut (usize, SortBuilder), e: &BytesStart<'_>, d: Decoder) -> Re
             return Err(invalid("color sort requires dxfId"));
         },
         SortBy::Icon if icon.is_none() => return Err(invalid("icon sort requires iconSet")),
-        SortBy::Icon if icon_id.is_some_and(|v| v >= icon.unwrap().cardinality()) => {
+        SortBy::Icon
+            if icon_id.is_some_and(|v| {
+                v >= icon
+                    .unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    })
+                    .cardinality()
+            }) =>
+        {
             return Err(invalid("sort iconId exceeds icon-set cardinality"));
         },
-        _ => {},
+        SortBy::Value | SortBy::CellColor | SortBy::FontColor | SortBy::Icon => {},
     }
     let custom = optional_attr(e, b"customList", d)?;
     if custom
@@ -1489,7 +1827,7 @@ fn optional_u32(e: &BytesStart<'_>, n: &[u8], d: Decoder) -> Result<Option<u32>>
     optional_attr(e, n, d)?
         .map(|v| {
             v.parse()
-                .map_err(|_| invalid(format!("invalid unsigned integer '{v}'")))
+                .map_err(|_source| invalid(format!("invalid unsigned integer '{v}'")))
         })
         .transpose()
 }
@@ -1515,7 +1853,7 @@ fn optional_f64(e: &BytesStart<'_>, n: &[u8], d: Decoder) -> Result<Option<f64>>
         .map(|v| {
             let x = v
                 .parse::<f64>()
-                .map_err(|_| invalid(format!("invalid number '{v}'")))?;
+                .map_err(|_source| invalid(format!("invalid number '{v}'")))?;
             if x.is_finite() {
                 Ok(x)
             } else {

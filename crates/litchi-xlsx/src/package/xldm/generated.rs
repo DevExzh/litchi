@@ -231,7 +231,9 @@ pub fn validate_system_generated_files(
                     SystemGeneratedKind::UserHierarchyFirstChildPosition => 0b0010,
                     SystemGeneratedKind::UserHierarchyMultilevelIdentifier => 0b0100,
                     SystemGeneratedKind::UserHierarchyParentPosition => 0b1000,
-                    _ => unreachable!(),
+                    SystemGeneratedKind::PositionToIdentifier
+                    | SystemGeneratedKind::IdentifierToPosition
+                    | SystemGeneratedKind::RelationshipIndex => unreachable!(),
                 };
                 let entry = hierarchies
                     .entry(file.object_key.as_str())
@@ -348,7 +350,7 @@ fn parse_generated_name(path: &str) -> GeneratedDataResult<Option<GeneratedName>
                 "invalid generated file version in {path}"
             )));
         }
-        let version = version_text.parse::<u64>().map_err(|_| {
+        let version = version_text.parse::<u64>().map_err(|_source| {
             GeneratedDataError::new(format!("generated file version overflows in {path}"))
         })?;
         let Some((ordinal, identity)) = prefix.split_once('.') else {

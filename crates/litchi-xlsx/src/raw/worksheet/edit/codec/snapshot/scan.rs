@@ -256,7 +256,7 @@ pub(crate) fn scan(content: &[u8]) -> Result<Layout> {
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -842,7 +842,7 @@ impl Scanner {
                     empty: false,
                 });
             },
-            _ => {},
+            FrameKind::Other => {},
         }
         Ok(())
     }
@@ -992,7 +992,9 @@ impl Scanner {
         let count = optional_u32(element, b"count", decoder, "worksheet merged-range count")?
             .map(usize::try_from)
             .transpose()
-            .map_err(|_| invalid("worksheet merged-range count does not fit usize during edit"))?;
+            .map_err(|_source| {
+                invalid("worksheet merged-range count does not fit usize during edit")
+            })?;
         self.pending_merge_cells = Some(PendingMergeCells {
             start,
             tag_end,

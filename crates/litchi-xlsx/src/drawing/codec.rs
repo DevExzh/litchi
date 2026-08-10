@@ -171,7 +171,13 @@ impl Parser {
                     return Err(invalid("drawing XML has an unterminated root"));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
         Ok(Some(parser.drawing))
@@ -230,7 +236,11 @@ impl Parser {
         let target = match parent {
             Context::From => Some(MarkerTarget::From),
             Context::To => Some(MarkerTarget::To),
-            _ => None,
+            Context::Root
+            | Context::TwoCellAnchor
+            | Context::AbsoluteAnchor
+            | Context::Marker(..)
+            | Context::Other => None,
         };
         if let Some(target) = target {
             for (name, field) in [
@@ -288,7 +298,7 @@ impl Parser {
             Context::Marker(target, field) => self.finish_marker(target, field),
             Context::TwoCellAnchor => self.finish_anchor(),
             Context::AbsoluteAnchor => self.finish_absolute_anchor(),
-            _ => Ok(()),
+            Context::Root | Context::From | Context::To | Context::Other => Ok(()),
         }
     }
 
@@ -522,7 +532,7 @@ fn set_once<T>(target: &mut Option<T>, value: T, description: &str) -> Result<()
 fn parse_value<T: std::str::FromStr>(value: &str, description: &str) -> Result<T> {
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+        .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
 }
 
 fn invalid(message: impl Into<String>) -> Error {

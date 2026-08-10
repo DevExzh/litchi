@@ -150,7 +150,12 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<IgnoredErrors
                 declaration_seen = true;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if parser.capture.is_some()
@@ -291,7 +296,11 @@ impl Parser {
                 Ok(())
             },
             Context::Outside => Ok(()),
-            _ => Err(invalid("mismatched ignoredErrors end element")),
+            Context::Worksheet
+            | Context::Collection
+            | Context::IgnoredError
+            | Context::ExtensionList
+            | Context::Extension => Err(invalid("mismatched ignoredErrors end element")),
         }
     }
 
@@ -396,7 +405,14 @@ impl Parser {
                     .ok_or_else(|| invalid("extension capture depth underflow"))?;
             },
             Event::Eof => return Err(invalid("unterminated ignoredErrors extension")),
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         capture.writer.write_event(event).map_err(xml_error)?;
         if capture.writer.get_ref().len() > MAX_EXTENSION_BYTES {
@@ -567,7 +583,7 @@ fn validate_cell_reference(value: &str) -> Result<()> {
     }
     let row = value[row_start..]
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid ignoredError row in '{value}'")))?;
+        .map_err(|_source| invalid(format!("invalid ignoredError row in '{value}'")))?;
     if row == 0 || row > MAX_ROW {
         return Err(invalid(format!(
             "ignoredError row is out of range in '{value}'"

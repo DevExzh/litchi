@@ -145,7 +145,11 @@ fn scan(xml: &[u8], selected: &[u8], successors: &[&[u8]], context: &str) -> Res
                 )));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if depth != 0 || open.is_some() {
@@ -163,7 +167,7 @@ fn scan(xml: &[u8], selected: &[u8], successors: &[&[u8]], context: &str) -> Res
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("worksheet XML position does not fit usize"))
+        .map_err(|_source| invalid("worksheet XML position does not fit usize"))
 }
 
 fn sml(namespace: &ResolveResult<'_>) -> bool {

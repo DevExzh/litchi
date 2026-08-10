@@ -43,41 +43,11 @@
     clippy::similar_names,
     reason = "short-lived streaming parser bindings mirror wire tokens and their successive decoded forms"
 )]
-// XML event and schema enums are non-exhaustive integration boundaries. The
-// catch-all arms are required so newer quick-xml events and future Office enum
-// values remain inert instead of making older readers fail closed.
-#![allow(
-    clippy::match_wildcard_for_single_variants,
-    clippy::wildcard_enum_match_arm,
-    reason = "forward-compatible readers deliberately treat unknown wire variants as inert"
-)]
 // Codec declarations are ordered by wire traversal and package transaction
 // phases, not alphabetically or by Rust item kind.
 #![allow(
     clippy::arbitrary_source_item_ordering,
     reason = "wire codecs keep declarations in parse/write and transaction order for auditability"
-)]
-// Dependency errors are normalized at the public boundary so implementation
-// details from quick-xml and OPC do not leak through the stable XLSX Error API.
-#![allow(
-    clippy::map_err_ignore,
-    reason = "discarded dependency errors are intentionally normalized into stable contextual XLSX errors"
-)]
-// These conversions occur only after validating the corresponding OOXML bound
-// or while decoding fixed-width fields whose schema type supplies that bound.
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_sign_loss,
-    reason = "all narrowing conversions are dominated by schema-bound validation or decode fixed-width wire values"
-)]
-// Remaining unwraps and expectations are parser-state invariants: fixed schema
-// constants, a successful lookup checked immediately beforehand, or a token
-// pushed by the same control-flow branch. They cannot depend on hostile input.
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "uses are confined to locally proven parser-state and compile-time schema invariants"
 )]
 // OPC part names and relationship suffixes are case-sensitive ASCII wire names;
 // treating them as case-insensitive would accept a different package member.

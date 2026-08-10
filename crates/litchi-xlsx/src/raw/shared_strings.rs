@@ -205,7 +205,7 @@ impl SharedStringParser {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
             }
         }
 
@@ -419,7 +419,7 @@ impl SharedStringParser {
             let value = required_string(element, b"val", decoder, "rich-text font size")?;
             let size = value
                 .parse::<f64>()
-                .map_err(|_| invalid(format!("invalid rich-text font size '{value}'")))?;
+                .map_err(|_source| invalid(format!("invalid rich-text font size '{value}'")))?;
             if !size.is_finite() || size <= 0.0 {
                 return Err(invalid(format!("invalid rich-text font size '{value}'")));
             }
@@ -460,7 +460,10 @@ impl SharedStringParser {
         match context {
             StringContext::RichRun => self.finish_run(),
             StringContext::StringItem => self.finish_string(),
-            _ => Ok(()),
+            StringContext::SharedStringTable
+            | StringContext::RunProperties
+            | StringContext::Text(_)
+            | StringContext::Other => Ok(()),
         }
     }
 
@@ -561,13 +564,17 @@ impl Table {
             .map_err(|source| allocation("shared-string table", source))?;
         self.index
             .as_mut()
-            .expect("shared-string index initialized")
+            .unwrap_or_else(|| {
+                crate::error::panic_missing_invariant("shared-string index initialized")
+            })
             .try_reserve(1)
             .map_err(|source| allocation("shared-string index", source))?;
         self.strings.push(value.clone());
         self.index
             .as_mut()
-            .expect("shared-string index initialized")
+            .unwrap_or_else(|| {
+                crate::error::panic_missing_invariant("shared-string index initialized")
+            })
             .insert(value, index);
         Ok(index)
     }
@@ -626,7 +633,7 @@ impl Table {
             self.strings.len(),
             self.strings.len()
         )
-        .map_err(|_| invalid("shared-string XML formatting failed"))?;
+        .map_err(|_source| invalid("shared-string XML formatting failed"))?;
 
         for (index, value) in self.strings.iter().enumerate() {
             if let Some(runs) = self.rich_text.get(&index) {
@@ -642,8 +649,9 @@ impl Table {
                     {
                         xml.push_str("<rPr>");
                         if let Some(font_name) = &run.font_name {
-                            write!(xml, r#"<rFont val="{}"/>"#, escape_xml(font_name))
-                                .map_err(|_| invalid("shared-string XML formatting failed"))?;
+                            write!(xml, r#"<rFont val="{}"/>"#, escape_xml(font_name)).map_err(
+                                |_source| invalid("shared-string XML formatting failed"),
+                            )?;
                         }
                         if let Some(font_size) = run.font_size {
                             if !font_size.is_finite() || font_size <= 0.0 {
@@ -651,8 +659,9 @@ impl Table {
                                     "rich-text font size must be finite and positive",
                                 ));
                             }
-                            write!(xml, r#"<sz val="{font_size}"/>"#)
-                                .map_err(|_| invalid("shared-string XML formatting failed"))?;
+                            write!(xml, r#"<sz val="{font_size}"/>"#).map_err(|_source| {
+                                invalid("shared-string XML formatting failed")
+                            })?;
                         }
                         if run.bold {
                             xml.push_str("<b/>");
@@ -664,8 +673,9 @@ impl Table {
                             xml.push_str("<u/>");
                         }
                         if let Some(color) = &run.color {
-                            write!(xml, r#"<color rgb="{}"/>"#, escape_xml(color))
-                                .map_err(|_| invalid("shared-string XML formatting failed"))?;
+                            write!(xml, r#"<color rgb="{}"/>"#, escape_xml(color)).map_err(
+                                |_source| invalid("shared-string XML formatting failed"),
+                            )?;
                         }
                         xml.push_str("</rPr>");
                     }
@@ -713,7 +723,7 @@ fn append_text(xml: &mut String, value: &str) -> Result<()> {
         xml.push_str("<t>");
     }
     write!(xml, "{}", escape_xml(&encoded))
-        .map_err(|_| invalid("shared-string XML formatting failed"))?;
+        .map_err(|_source| invalid("shared-string XML formatting failed"))?;
     xml.push_str("</t>");
     Ok(())
 }

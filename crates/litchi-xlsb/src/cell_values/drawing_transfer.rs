@@ -37,6 +37,7 @@ const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006
 const MAX_ANCHORS: usize = 100_000;
 const MAX_GRAPH_PARTS: usize = 4_096;
 const MAX_GRAPH_BYTES: usize = 256 * 1024 * 1024;
+const MAX_XML_DEPTH: usize = 4_096;
 const MAX_URI_ATTEMPTS: u32 = 10_000;
 
 /// A semantic drawing graph that cannot be copied without guessing ownership.
@@ -59,6 +60,17 @@ pub enum DrawingTransferRefusal {
     ConformanceMismatch,
     /// A shape/group graph carries package relationships outside ordinary shape ownership.
     RelationshipBearingShape,
+    /// A shape relationship reference has no declaration on the source drawing part.
+    MissingShapeRelationship(String),
+    /// A shape relationship is not an inert external hyperlink.
+    UnsupportedShapeRelationship {
+        /// Referenced drawing relationship ID.
+        relationship_id: String,
+        /// Declared relationship type, or an empty string when unavailable.
+        relationship_type: String,
+        /// Whether the declared target is external.
+        external: bool,
+    },
     /// A non-visual object has no usable numeric identity.
     MissingObjectId,
     /// A non-visual or connector identity is not an unsigned integer.
@@ -98,6 +110,17 @@ impl fmt::Display for DrawingTransferRefusal {
             Self::RelationshipBearingShape => {
                 formatter.write_str("shape/group graph carries package relationships")
             },
+            Self::MissingShapeRelationship(relationship_id) => {
+                write!(formatter, "shape relationship {relationship_id} is missing")
+            },
+            Self::UnsupportedShapeRelationship {
+                relationship_id,
+                relationship_type,
+                external,
+            } => write!(
+                formatter,
+                "shape relationship {relationship_id} has unsupported type {relationship_type:?} and external={external}"
+            ),
             Self::MissingObjectId => {
                 formatter.write_str("drawing graph contains a missing object ID")
             },
@@ -190,6 +213,13 @@ struct TargetChart {
     relationship_type: String,
 }
 
+#[derive(Debug)]
+struct TargetExternalRelationship {
+    relationship_id: String,
+    relationship_type: String,
+    target: String,
+}
+
 pub(super) fn transfer(
     target: &mut Workbook,
     source_bytes: &[u8],
@@ -210,13 +240,24 @@ pub(super) fn transfer(
     )?;
     let mut package = target.package.clone();
     let target_chart = copy_selected_chart(&source, &mut package, &source_plan, &target_plan)?;
+    let mut relationship_mapping = BTreeMap::new();
+    if let (Some(source_id), Some(chart)) = (&source_plan.chart_relationship, target_chart.as_ref())
+    {
+        relationship_mapping.insert(source_id.clone(), chart.relationship_id.clone());
+    }
+    let target_external_relationships = copy_shape_relationships(
+        &source,
+        &mut package,
+        &source_plan,
+        &target_plan,
+        &mut relationship_mapping,
+        target_chart.as_ref(),
+    )?;
     let fragments = rewrite_selected_anchors(
         &source_plan,
         &id_mapping,
         &name_mapping,
-        target_chart
-            .as_ref()
-            .map(|chart| chart.relationship_id.as_str()),
+        &relationship_mapping,
     )?;
     let drawing_xml =
         crate::package::drawing_write::append_drawing_anchors(&target_plan.xml, &fragments)?;
@@ -227,6 +268,7 @@ pub(super) fn transfer(
         &target_plan,
         drawing_xml,
         target_chart,
+        target_external_relationships,
     )?;
     package.unsign();
     *target = Workbook::from_opc_package(package)?;
@@ -354,11 +396,120 @@ fn copy_selected_chart(
     }))
 }
 
+fn copy_shape_relationships(
+    source: &Workbook,
+    package: &mut litchi_opc::OpcPackage,
+    source_plan: &SourcePlan,
+    target_plan: &TargetPlan,
+    mapping: &mut BTreeMap<String, String>,
+    target_chart: Option<&TargetChart>,
+) -> Result<Vec<TargetExternalRelationship>> {
+    let source_part = source.package.get_part(&source_plan.drawing_uri)?;
+    let mut references = BTreeSet::new();
+    for index in &source_plan.selected {
+        let anchor = source_plan.layout.anchors.get(*index).ok_or_else(|| {
+            Error::InvalidFormat("selected drawing anchor disappeared".to_string())
+        })?;
+        for reference in &anchor.relationship_references {
+            if source_plan.chart_relationship.as_deref() != Some(reference.value.as_str()) {
+                references.insert(reference.value.clone());
+            }
+        }
+    }
+    let mut planned = Vec::new();
+    let mut used = target_relationship_ids(package, target_plan, target_chart)?;
+    let mut equivalent = BTreeMap::<(String, String), String>::new();
+    for source_id in references {
+        let relationship = source_part.rels().get(&source_id).ok_or_else(|| {
+            refused(DrawingTransferRefusal::MissingShapeRelationship(
+                source_id.clone(),
+            ))
+        })?;
+        if !relationship.is_external()
+            || !matches!(relationship.reltype(), rt::HYPERLINK | rt::STRICT_HYPERLINK)
+        {
+            return Err(refused(
+                DrawingTransferRefusal::UnsupportedShapeRelationship {
+                    relationship_id: source_id,
+                    relationship_type: relationship.reltype().to_string(),
+                    external: relationship.is_external(),
+                },
+            ));
+        }
+        let target_id = if target_plan.location.is_some() {
+            package
+                .get_part_mut(&target_plan.uri)?
+                .relate_to_ext(relationship.target_ref(), relationship.reltype())
+        } else {
+            plan_external_relationship(relationship, &mut equivalent, &mut used, &mut planned)?
+        };
+        mapping.insert(source_id, target_id);
+    }
+    Ok(planned)
+}
+
+fn target_relationship_ids(
+    package: &litchi_opc::OpcPackage,
+    target: &TargetPlan,
+    chart: Option<&TargetChart>,
+) -> Result<BTreeSet<String>> {
+    let mut used = if target.location.is_some() {
+        package
+            .get_part(&target.uri)?
+            .rels()
+            .iter()
+            .map(|relationship| relationship.r_id().to_string())
+            .collect()
+    } else {
+        BTreeSet::new()
+    };
+    if let Some(chart) = chart {
+        used.insert(chart.relationship_id.clone());
+    }
+    Ok(used)
+}
+
+fn plan_external_relationship(
+    relationship: &litchi_opc::Relationship,
+    equivalent: &mut BTreeMap<(String, String), String>,
+    used: &mut BTreeSet<String>,
+    planned: &mut Vec<TargetExternalRelationship>,
+) -> Result<String> {
+    let key = (
+        relationship.reltype().to_string(),
+        relationship.target_ref().to_string(),
+    );
+    if let Some(existing) = equivalent.get(&key) {
+        return Ok(existing.clone());
+    }
+    let relationship_id = free_relationship_id(used)?;
+    used.insert(relationship_id.clone());
+    equivalent.insert(key.clone(), relationship_id.clone());
+    planned.push(TargetExternalRelationship {
+        relationship_id: relationship_id.clone(),
+        relationship_type: key.0,
+        target: key.1,
+    });
+    Ok(relationship_id)
+}
+
+fn free_relationship_id(used: &BTreeSet<String>) -> Result<String> {
+    for index in 1..=MAX_URI_ATTEMPTS {
+        let candidate = format!("rId{index}");
+        if !used.contains(&candidate) {
+            return Ok(candidate);
+        }
+    }
+    Err(Error::InvalidFormat(
+        "no collision-free drawing relationship ID remains".to_string(),
+    ))
+}
+
 fn rewrite_selected_anchors(
     source: &SourcePlan,
     id_mapping: &BTreeMap<u32, u32>,
     name_mapping: &BTreeMap<u32, String>,
-    target_chart_relationship: Option<&str>,
+    relationship_mapping: &BTreeMap<String, String>,
 ) -> Result<Vec<Vec<u8>>> {
     let mut fragments = Vec::new();
     for index in &source.selected {
@@ -373,8 +524,7 @@ fn rewrite_selected_anchors(
             &source.layout.namespaces,
             id_mapping,
             name_mapping,
-            source.chart_relationship.as_deref(),
-            target_chart_relationship,
+            relationship_mapping,
         )?);
     }
     Ok(fragments)
@@ -387,6 +537,7 @@ fn install_transfer(
     plan: &TargetPlan,
     drawing_xml: Vec<u8>,
     chart: Option<TargetChart>,
+    external_relationships: Vec<TargetExternalRelationship>,
 ) -> Result<()> {
     if let Some(location) = &plan.location {
         package.get_part_mut(&location.uri)?.set_blob(drawing_xml);
@@ -399,6 +550,14 @@ fn install_transfer(
                 chart.uri.relative_ref(plan.uri.base_uri()),
                 chart.relationship_id,
                 TargetMode::Internal,
+            )?;
+        }
+        for relationship in external_relationships {
+            drawing_part.rels_mut().try_add_relationship(
+                relationship.relationship_type,
+                relationship.target,
+                relationship.relationship_id,
+                TargetMode::External,
             )?;
         }
         package.try_add_part(Box::new(drawing_part))?;
@@ -769,8 +928,8 @@ fn shape_graph(
         if info.ids.is_empty() {
             return Err(refused(DrawingTransferRefusal::MissingObjectId));
         }
-        if info.foreign_descendant || !info.relationship_references.is_empty() {
-            return Err(refused(DrawingTransferRefusal::RelationshipBearingShape));
+        if info.foreign_descendant {
+            return Err(refused(DrawingTransferRefusal::ForeignObject));
         }
         validate_ordinary_object(source, info)?;
         for endpoint in &info.endpoints {
@@ -906,25 +1065,29 @@ fn rewrite_anchor(
     inherited_namespaces: &BTreeMap<String, String>,
     id_mapping: &BTreeMap<u32, u32>,
     name_mapping: &BTreeMap<u32, String>,
-    source_chart_relationship: Option<&str>,
-    target_chart_relationship: Option<&str>,
+    relationship_mapping: &BTreeMap<String, String>,
 ) -> Result<Vec<u8>> {
+    let context = RewriteContext {
+        namespaces: inherited_namespaces,
+        ids: id_mapping,
+        names: name_mapping,
+        relationships: relationship_mapping,
+    };
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut writer = Writer::new(Vec::with_capacity(xml.len()));
     let mut first_element = true;
     loop {
         let event = reader.read_event().map_err(xml_error)?.into_owned();
+        let resolver = reader.resolver().clone();
         match event {
             Event::Start(element) => {
                 let rewritten = rewrite_element(
                     &element,
                     reader.decoder(),
-                    id_mapping,
-                    name_mapping,
-                    source_chart_relationship,
-                    target_chart_relationship,
-                    first_element.then_some(inherited_namespaces),
+                    &resolver,
+                    &context,
+                    first_element,
                 )?;
                 writer
                     .write_event(Event::Start(rewritten))
@@ -935,11 +1098,9 @@ fn rewrite_anchor(
                 let rewritten = rewrite_element(
                     &element,
                     reader.decoder(),
-                    id_mapping,
-                    name_mapping,
-                    source_chart_relationship,
-                    target_chart_relationship,
-                    first_element.then_some(inherited_namespaces),
+                    &resolver,
+                    &context,
+                    first_element,
                 )?;
                 writer
                     .write_event(Event::Empty(rewritten))
@@ -967,14 +1128,19 @@ fn rewrite_anchor(
     Ok(writer.into_inner())
 }
 
+struct RewriteContext<'a> {
+    namespaces: &'a BTreeMap<String, String>,
+    ids: &'a BTreeMap<u32, u32>,
+    names: &'a BTreeMap<u32, String>,
+    relationships: &'a BTreeMap<String, String>,
+}
+
 fn rewrite_element(
     source: &BytesStart<'_>,
     decoder: quick_xml::Decoder,
-    id_mapping: &BTreeMap<u32, u32>,
-    name_mapping: &BTreeMap<u32, String>,
-    source_chart_relationship: Option<&str>,
-    target_chart_relationship: Option<&str>,
-    inherited_namespaces: Option<&BTreeMap<String, String>>,
+    resolver: &NamespaceResolver,
+    context: &RewriteContext<'_>,
+    inject_namespaces: bool,
 ) -> Result<BytesStart<'static>> {
     let element_name = std::str::from_utf8(source.name().as_ref())
         .map_err(|error| Error::Encoding(format!("drawing element name is not UTF-8: {error}")))?
@@ -1003,19 +1169,21 @@ fn rewrite_element(
         present.insert(key.clone());
         let output = if local == b"cNvPr" && attribute.key.local_name().as_ref() == b"id" {
             let source_id = parse_object_id(&value)?;
-            id_mapping
+            context
+                .ids
                 .get(&source_id)
                 .ok_or_else(|| refused(DrawingTransferRefusal::MissingObjectId))?
                 .to_string()
         } else if local == b"cNvPr" && attribute.key.local_name().as_ref() == b"name" {
             let source_id =
                 source_object_id.ok_or_else(|| refused(DrawingTransferRefusal::MissingObjectId))?;
-            name_mapping.get(&source_id).cloned().unwrap_or(value)
+            context.names.get(&source_id).cloned().unwrap_or(value)
         } else if matches!(local, b"stCxn" | b"endCxn")
             && attribute.key.local_name().as_ref() == b"id"
         {
             let source_id = parse_object_id(&value)?;
-            id_mapping
+            context
+                .ids
                 .get(&source_id)
                 .ok_or_else(|| {
                     refused(DrawingTransferRefusal::UnresolvedConnectorEndpoint(
@@ -1023,26 +1191,45 @@ fn rewrite_element(
                     ))
                 })?
                 .to_string()
-        } else if local == b"chart"
-            && attribute.key.local_name().as_ref() == b"id"
-            && source_chart_relationship == Some(value.as_str())
-        {
-            target_chart_relationship
-                .ok_or_else(|| refused(DrawingTransferRefusal::InvalidChartRelationship))?
-                .to_string()
+        } else if relationship_attribute(resolver, attribute.key, context.namespaces) {
+            context.relationships.get(&value).cloned().ok_or_else(|| {
+                refused(DrawingTransferRefusal::MissingShapeRelationship(
+                    value.clone(),
+                ))
+            })?
         } else {
             value
         };
         rewritten.push_attribute((key.as_str(), output.as_str()));
     }
-    if let Some(namespaces) = inherited_namespaces {
-        for (key, value) in namespaces {
+    if inject_namespaces {
+        for (key, value) in context.namespaces {
             if !present.contains(key) {
                 rewritten.push_attribute((key.as_str(), value.as_str()));
             }
         }
     }
     Ok(rewritten.into_owned())
+}
+
+fn relationship_attribute(
+    resolver: &NamespaceResolver,
+    name: quick_xml::name::QName<'_>,
+    inherited_namespaces: &BTreeMap<String, String>,
+) -> bool {
+    if relationship_namespace(&resolver.resolve_attribute(name).0) {
+        return true;
+    }
+    let bytes = name.as_ref();
+    let Some(separator) = bytes.iter().position(|byte| *byte == b':') else {
+        return false;
+    };
+    let Ok(prefix) = std::str::from_utf8(&bytes[..separator]) else {
+        return false;
+    };
+    inherited_namespaces
+        .get(&format!("xmlns:{prefix}"))
+        .is_some_and(|value| value.as_bytes() == REL || value.as_bytes() == STRICT_REL)
 }
 
 fn collect_chart_graph(source: &Workbook, root: PackURI) -> Result<ChartGraph> {
@@ -1146,11 +1333,25 @@ fn copy_chart_graph(
         let target_uri = mapping.get(source_uri.as_str()).ok_or_else(|| {
             Error::InvalidFormat("chart graph part has no target mapping".to_string())
         })?;
-        let mut target_part = BlobPart::new_shared(
-            target_uri.clone(),
-            source_part.content_type().to_string(),
-            source_part.blob_arc(),
-        );
+        let mut target_part = if source_uri
+            .as_str()
+            .rsplit_once('.')
+            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("xml"))
+            || source_part.content_type().ends_with("+xml")
+            || source_part.content_type() == "application/xml"
+        {
+            BlobPart::new(
+                target_uri.clone(),
+                source_part.content_type().to_string(),
+                compact_xml(source_part.blob())?,
+            )
+        } else {
+            BlobPart::new_shared(
+                target_uri.clone(),
+                source_part.content_type().to_string(),
+                source_part.blob_arc(),
+            )
+        };
         let mut relationships = source_part.rels().iter().collect::<Vec<_>>();
         relationships.sort_unstable_by_key(|relationship| relationship.r_id());
         for relationship in relationships {
@@ -1178,6 +1379,90 @@ fn copy_chart_graph(
         target.try_add_part(Box::new(target_part))?;
     }
     Ok(mapping)
+}
+
+fn compact_xml(source: &[u8]) -> Result<Vec<u8>> {
+    let mut reader = quick_xml::Reader::from_reader(source);
+    reader.config_mut().check_end_names = true;
+    let mut writer = Writer::new(Vec::with_capacity(source.len()));
+    let mut preserve_space = Vec::new();
+    loop {
+        let event = reader.read_event().map_err(xml_error)?;
+        match event {
+            Event::Start(element) => {
+                if preserve_space.len() >= MAX_XML_DEPTH {
+                    return Err(Error::InvalidFormat(
+                        "chart XML nesting exceeds transfer limits".to_string(),
+                    ));
+                }
+                let inherited = preserve_space.last().copied().unwrap_or(false);
+                preserve_space.push(xml_space(&element)?.unwrap_or(inherited));
+                writer
+                    .write_event(Event::Start(element.into_owned()))
+                    .map_err(xml_error)?;
+            },
+            Event::End(element) => {
+                preserve_space.pop().ok_or_else(|| {
+                    Error::InvalidFormat("chart XML nesting underflow".to_string())
+                })?;
+                writer
+                    .write_event(Event::End(element.into_owned()))
+                    .map_err(xml_error)?;
+            },
+            Event::Text(text)
+                if !preserve_space.last().copied().unwrap_or(false)
+                    && text.as_ref().iter().all(u8::is_ascii_whitespace)
+                    && text
+                        .as_ref()
+                        .iter()
+                        .any(|byte| matches!(byte, b'\n' | b'\r' | b'\t')) => {},
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "chart XML transfer rejects DTDs".to_string(),
+                ));
+            },
+            Event::GeneralRef(reference)
+                if !matches!(
+                    reference.as_ref(),
+                    b"amp" | b"apos" | b"gt" | b"lt" | b"quot"
+                ) =>
+            {
+                return Err(Error::InvalidFormat(
+                    "chart XML transfer rejects named entities".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            remaining @ (Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_)) => writer
+                .write_event(remaining.into_owned())
+                .map_err(xml_error)?,
+        }
+    }
+    if !preserve_space.is_empty() {
+        return Err(Error::InvalidFormat(
+            "chart XML nesting is incomplete".to_string(),
+        ));
+    }
+    Ok(writer.into_inner())
+}
+
+fn xml_space(element: &BytesStart<'_>) -> Result<Option<bool>> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| {
+            Error::Encoding(format!(
+                "invalid chart XML attribute during compaction: {error}"
+            ))
+        })?;
+        if attribute.key.as_ref() == b"xml:space" {
+            return Ok(Some(attribute.value.as_ref() == b"preserve"));
+        }
+    }
+    Ok(None)
 }
 
 fn allocate_graph_uri(
@@ -1357,6 +1642,38 @@ mod tests {
         }
     }
 
+    fn genuine_shape_plan(source: &Workbook, relationship_id: &str) -> SourcePlan {
+        let location = locate_drawing(source, 0)
+            .expect("fixture drawing lookup")
+            .expect("fixture drawing");
+        let part = source
+            .package
+            .get_part(&location.uri)
+            .expect("fixture drawing part");
+        let mut layout = drawing_layout(part.blob()).expect("fixture drawing layout");
+        layout.anchors[0].relationship_references = vec![RelationshipReference {
+            value: relationship_id.to_string(),
+            chart_reference: false,
+        }];
+        SourcePlan {
+            drawing_uri: location.uri,
+            xml: part.blob().to_vec(),
+            layout,
+            selected: BTreeSet::from([0]),
+            chart_relationship: None,
+        }
+    }
+
+    fn empty_target_plan() -> TargetPlan {
+        let xml = empty_drawing_xml(false);
+        TargetPlan {
+            location: None,
+            uri: PackURI::new("/xl/drawings/drawing1.xml").expect("target drawing URI"),
+            layout: drawing_layout(&xml).expect("empty target drawing layout"),
+            xml,
+        }
+    }
+
     #[test]
     fn selected_duplicate_non_visual_identity_is_a_typed_refusal() {
         let source = DrawingLayout {
@@ -1375,6 +1692,53 @@ mod tests {
             Err(Error::DrawingTransfer(
                 DrawingTransferRefusal::AmbiguousObjectId(7)
             ))
+        ));
+    }
+
+    #[test]
+    fn missing_and_non_hyperlink_shape_relationships_are_precise_refusals() {
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("3rdparty/poi/test-data/spreadsheet/testVarious.xlsb");
+        let source = Workbook::new(std::fs::File::open(fixture).expect("drawing fixture"))
+            .expect("drawing workbook");
+        let target_plan = empty_target_plan();
+
+        let missing = genuine_shape_plan(&source, "rIdMissing");
+        let mut package = litchi_opc::OpcPackage::new();
+        let error = copy_shape_relationships(
+            &source,
+            &mut package,
+            &missing,
+            &target_plan,
+            &mut BTreeMap::new(),
+            None,
+        )
+        .expect_err("missing shape relationship");
+        assert!(matches!(
+            error,
+            Error::DrawingTransfer(DrawingTransferRefusal::MissingShapeRelationship(id))
+                if id == "rIdMissing"
+        ));
+
+        let unsupported = genuine_shape_plan(&source, "rId2");
+        let mut package = litchi_opc::OpcPackage::new();
+        let error = copy_shape_relationships(
+            &source,
+            &mut package,
+            &unsupported,
+            &target_plan,
+            &mut BTreeMap::new(),
+            None,
+        )
+        .expect_err("internal chart is not a shape hyperlink");
+        assert!(matches!(
+            error,
+            Error::DrawingTransfer(DrawingTransferRefusal::UnsupportedShapeRelationship {
+                relationship_id,
+                relationship_type,
+                external: false,
+            }) if relationship_id == "rId2" && relationship_type == rt::CHART
         ));
     }
 }

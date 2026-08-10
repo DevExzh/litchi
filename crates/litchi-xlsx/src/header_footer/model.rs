@@ -179,7 +179,10 @@ fn split_sections(raw: &str) -> (Option<String>, Option<String>, Option<String>)
                 continue;
             }
         }
-        let character = tail.chars().next().expect("non-empty tail");
+        let character = tail
+            .chars()
+            .next()
+            .unwrap_or_else(|| crate::error::panic_missing_invariant("non-empty tail"));
         sections[current]
             .get_or_insert_with(String::new)
             .push(character);

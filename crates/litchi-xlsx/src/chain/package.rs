@@ -203,9 +203,9 @@ fn validate_sheet_ids(package: &OpcPackage, workbook_uri: &PackURI, chain: &Chai
                             .map_err(|error| {
                                 invalid(format!("invalid workbook sheetId: {error}"))
                             })?;
-                        let value = value
-                            .parse::<u32>()
-                            .map_err(|_| invalid("workbook sheetId is not an unsigned integer"))?;
+                        let value = value.parse::<u32>().map_err(|_source| {
+                            invalid("workbook sheetId is not an unsigned integer")
+                        })?;
                         if sheet_id.replace(value).is_some() {
                             return Err(invalid("duplicate workbook sheetId attribute"));
                         }
@@ -221,7 +221,16 @@ fn validate_sheet_ids(package: &OpcPackage, workbook_uri: &PackURI, chain: &Chai
                 catalog.push(sheet_id);
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     catalog.sort_unstable();

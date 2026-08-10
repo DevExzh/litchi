@@ -133,7 +133,13 @@ impl PivotTableParser {
                     return Err("pivot table has a missing or unterminated root".into());
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -211,7 +217,8 @@ impl PivotTableParser {
                 self.column_field_count += 1;
             }
             if index >= 0 {
-                let index = u32::try_from(index).map_err(|_| "pivot field index overflows")?;
+                let index =
+                    u32::try_from(index).map_err(|_source| "pivot field index overflows")?;
                 if parent == TableContext::RowFields {
                     self.row_indexes.push(index);
                 } else {
@@ -238,7 +245,7 @@ impl PivotTableParser {
                 return Err(format!("invalid pivot page field index '{index}'").into());
             }
             self.filter_indexes
-                .push(u32::try_from(index).map_err(|_| "pivot page field index overflows")?);
+                .push(u32::try_from(index).map_err(|_source| "pivot page field index overflows")?);
             return Ok(TableContext::Other);
         }
         if parent == TableContext::Root
@@ -296,7 +303,10 @@ impl PivotTableParser {
                 self.data_fields.len(),
                 "dataFields",
             ),
-            _ => Ok(()),
+            TableContext::Root
+            | TableContext::Location
+            | TableContext::PivotField
+            | TableContext::Other => Ok(()),
         }
     }
 
@@ -574,7 +584,13 @@ impl PivotCacheParser {
                     return Err("pivot cache has a missing or unterminated root".into());
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
         Ok(parser.map(|parser| parser.cache))
@@ -709,7 +725,11 @@ impl PivotCacheParser {
                 self.cache.cache_fields.len(),
                 "pivot cacheFields",
             ),
-            _ => Ok(()),
+            CacheContext::Root
+            | CacheContext::CacheSource
+            | CacheContext::WorksheetSource
+            | CacheContext::Item
+            | CacheContext::Other => Ok(()),
         }
     }
 }
@@ -845,7 +865,13 @@ impl RecordsParser {
                     return Err("pivot cache records have a missing or unterminated root".into());
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
         Ok(parser.map(|parser| parser.records))
@@ -926,7 +952,7 @@ impl RecordsParser {
                 Ok(())
             },
             CacheRecordsContext::Root => self.validate_count(),
-            _ => Ok(()),
+            CacheRecordsContext::Item | CacheRecordsContext::Other => Ok(()),
         }
     }
 
@@ -1067,10 +1093,13 @@ fn build_roles(
             .get(*idx as usize)
             .cloned()
             .unwrap_or_else(|| format!("Field{idx}"));
+        let position = u32::try_from(position).unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("pivot field position exceeds u32", error)
+        });
         roles.push(PivotFieldRole {
             field_name: name,
             axis,
-            position: position as u32,
+            position,
         });
     }
 

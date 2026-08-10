@@ -26,7 +26,7 @@ pub(crate) fn parse_defaults_element(
     )?
     .map(|value| {
         u8::try_from(value)
-            .map_err(|_| invalid("worksheet base column width exceeds Office maximum 255"))
+            .map_err(|_source| invalid("worksheet base column width exceeds Office maximum 255"))
     })
     .transpose()?;
     let width = optional_f64(
@@ -142,7 +142,7 @@ fn validate_defaults_attributes(
 pub(crate) fn parse_one_based_row(value: &str) -> Result<u32> {
     let row = value
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid worksheet row '{value}'")))?;
+        .map_err(|_source| invalid(format!("invalid worksheet row '{value}'")))?;
     if !(1..=ROWS).contains(&row) {
         return Err(invalid(format!("worksheet row {row} exceeds the grid")));
     }
@@ -191,7 +191,7 @@ pub(crate) fn optional_u32(
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
         })
         .transpose()
 }
@@ -216,7 +216,7 @@ pub(crate) fn optional_f64(
         .map(|value| {
             value
                 .parse::<f64>()
-                .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
         })
         .transpose()
 }

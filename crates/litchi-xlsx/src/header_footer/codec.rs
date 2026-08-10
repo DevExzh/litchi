@@ -187,7 +187,9 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Settings>> {
                     .as_ref()
                     .is_some_and(|(text_depth, _, _)| *text_depth == depth)
                 {
-                    let (_, kind, value) = text.take().expect("checked above");
+                    let (_, kind, value) = text
+                        .take()
+                        .unwrap_or_else(|| crate::error::panic_missing_invariant("checked above"));
                     let (_, settings, _) = header_footer
                         .as_mut()
                         .ok_or_else(|| invalid("orphan header/footer text"))?;
@@ -196,7 +198,9 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Settings>> {
                     .as_ref()
                     .is_some_and(|(container_depth, _, _)| *container_depth == depth)
                 {
-                    let (_, settings, _) = header_footer.take().expect("checked above");
+                    let (_, settings, _) = header_footer
+                        .take()
+                        .unwrap_or_else(|| crate::error::panic_missing_invariant("checked above"));
                     result = Some(settings);
                 }
                 if depth == 1 {

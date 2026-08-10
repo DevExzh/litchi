@@ -299,7 +299,13 @@ fn scan(content: &[u8]) -> Result<Layout> {
                 scanner.finish(frame, event_start, event_end)?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -561,7 +567,7 @@ fn required_u32(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Resu
         .ok_or_else(|| invalid("sheetView is missing workbookViewId during tab edit"))?;
     value
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid workbookViewId '{value}' during tab edit")))
+        .map_err(|_source| invalid(format!("invalid workbookViewId '{value}' during tab edit")))
 }
 
 fn attribute_bool(tag: &Tag, name: &str) -> Result<Option<bool>> {
@@ -656,7 +662,7 @@ fn is_mce_name(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, local: &
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("sheet XML position does not fit usize"))
+        .map_err(|_source| invalid("sheet XML position does not fit usize"))
 }
 
 #[cfg(test)]

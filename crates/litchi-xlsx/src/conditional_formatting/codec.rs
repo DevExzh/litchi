@@ -97,7 +97,15 @@ pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<Differential>> {
             match event {
                 Event::Start(_) => *capture_depth += 1,
                 Event::End(_) => *capture_depth -= 1,
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_)
+                | Event::Eof => {},
             }
             if *capture_depth == 0 {
                 let (_, _, writer) = capture
@@ -143,7 +151,12 @@ pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<Differential>> {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if depth != 0 || capture.is_some() {
@@ -171,7 +184,15 @@ pub(crate) fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>
             match event {
                 Event::Start(_) => *depth += 1,
                 Event::End(_) => *depth -= 1,
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_)
+                | Event::Eof => {},
             }
             if *depth == 0 {
                 let (_, source, prefix, writer) = capture
@@ -226,7 +247,14 @@ pub(crate) fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if capture.is_some() {
@@ -247,9 +275,13 @@ fn parse_container(fragment: &Captured) -> Result<Formatting> {
     let mut depth = 0usize;
     loop {
         let decoder = reader.decoder();
-        let event_start = reader.buffer_position() as usize;
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source| {
+            invalid("conditional-formatting XML offset exceeds platform size")
+        })?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let event_end = reader.buffer_position() as usize;
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source| {
+            invalid("conditional-formatting XML offset exceeds platform size")
+        })?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         if let Some((capture_depth, formulas, writer)) = capture.as_mut() {
@@ -296,7 +328,15 @@ fn parse_container(fragment: &Captured) -> Result<Formatting> {
             match event {
                 Event::Start(_) => *capture_depth += 1,
                 Event::End(_) => *capture_depth -= 1,
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_)
+                | Event::Eof => {},
             }
             if *capture_depth == 0 {
                 let (_, formulas, writer) = capture
@@ -378,7 +418,7 @@ fn parse_container(fragment: &Captured) -> Result<Formatting> {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
     }
     if capture.is_some() || sqref_text.is_some() {
@@ -428,9 +468,13 @@ fn parse_rule(raw: &[u8], source: Source) -> Result<Rule> {
     let mut payload = PayloadBuilder::new(source);
     loop {
         let decoder = reader.decoder();
-        let event_start = reader.buffer_position() as usize;
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source| {
+            invalid("conditional-formatting XML offset exceeds platform size")
+        })?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let event_end = reader.buffer_position() as usize;
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source| {
+            invalid("conditional-formatting XML offset exceeds platform size")
+        })?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -539,7 +583,7 @@ fn parse_rule(raw: &[u8], source: Source) -> Result<Rule> {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) => {},
         }
     }
     if source == Source::Core && rule.priority.is_none() {
@@ -572,9 +616,9 @@ fn parse_rule_attributes(
         .transpose()?;
     rule.priority = optional_attr(element, b"priority", decoder)?
         .map(|value| {
-            value
-                .parse::<i32>()
-                .map_err(|_| invalid(format!("invalid conditional-formatting priority '{value}'")))
+            value.parse::<i32>().map_err(|_source| {
+                invalid(format!("invalid conditional-formatting priority '{value}'"))
+            })
         })
         .transpose()?;
     if rule.priority.is_some_and(|value| value <= 0) {
@@ -605,7 +649,7 @@ fn parse_rule_attributes(
         .map(|value| {
             value
                 .parse::<i32>()
-                .map_err(|_| invalid(format!("invalid stdDev '{value}'")))
+                .map_err(|_source| invalid(format!("invalid stdDev '{value}'")))
         })
         .transpose()?;
     rule.extension_id = optional_attr(element, b"id", decoder)?;
@@ -782,7 +826,10 @@ impl PayloadBuilder {
                 indexed: optional_u32(element, b"indexed", decoder)?,
                 theme: optional_u32(element, b"theme", decoder)?,
                 tint: optional_attr(element, b"tint", decoder)?
-                    .map(|v| v.parse::<f64>().map_err(|_| invalid("invalid color tint")))
+                    .map(|v| {
+                        v.parse::<f64>()
+                            .map_err(|_source| invalid("invalid color tint"))
+                    })
                     .transpose()?,
                 automatic: optional_bool(element, b"auto", decoder)?,
             },
@@ -979,7 +1026,7 @@ fn parse_dxf(raw: &[u8]) -> Result<Differential> {
                     value.number_format = Some(NumberFormat {
                         id: required_attr(e, b"numFmtId", decoder)?
                             .parse()
-                            .map_err(|_| invalid("invalid dxf numFmtId"))?,
+                            .map_err(|_source| invalid("invalid dxf numFmtId"))?,
                         code: required_attr(e, b"formatCode", decoder)?,
                         raw_xml: component.bytes.into_boxed_slice(),
                     });
@@ -1022,7 +1069,15 @@ fn capture_all(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Vec<Ca
             match event {
                 Event::Start(_) => *depth += 1,
                 Event::End(_) => *depth -= 1,
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_)
+                | Event::Eof => {},
             }
             if *depth == 0 {
                 let (_, prefix, writer) = cap
@@ -1063,7 +1118,14 @@ fn capture_all(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Vec<Ca
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if cap.is_some() {
@@ -1191,7 +1253,7 @@ fn optional_u32(e: &BytesStart<'_>, name: &[u8], d: Decoder) -> Result<Option<u3
     optional_attr(e, name, d)?
         .map(|v| {
             v.parse()
-                .map_err(|_| invalid(format!("invalid unsigned integer '{v}'")))
+                .map_err(|_source| invalid(format!("invalid unsigned integer '{v}'")))
         })
         .transpose()
 }
@@ -1214,7 +1276,16 @@ fn optional_u32_from_raw(raw: &[u8], name: &[u8]) -> Result<Option<u32>> {
                 return optional_u32(&e, name, d);
             },
             Event::Eof => return Ok(None),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -1242,7 +1313,7 @@ fn decode_raw_text(bytes: &[u8]) -> Result<String> {
             "apos" => value.push('\''),
             _ if entity.starts_with("#x") => {
                 let scalar = u32::from_str_radix(&entity[2..], 16)
-                    .map_err(|_| invalid("invalid hexadecimal XML character reference"))?;
+                    .map_err(|_source| invalid("invalid hexadecimal XML character reference"))?;
                 value.push(
                     char::from_u32(scalar)
                         .ok_or_else(|| invalid("invalid XML character reference"))?,
@@ -1251,7 +1322,7 @@ fn decode_raw_text(bytes: &[u8]) -> Result<String> {
             _ if entity.starts_with('#') => {
                 let scalar = entity[1..]
                     .parse::<u32>()
-                    .map_err(|_| invalid("invalid decimal XML character reference"))?;
+                    .map_err(|_source| invalid("invalid decimal XML character reference"))?;
                 value.push(
                     char::from_u32(scalar)
                         .ok_or_else(|| invalid("invalid XML character reference"))?,

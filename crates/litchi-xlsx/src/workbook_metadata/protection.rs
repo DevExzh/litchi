@@ -311,7 +311,13 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Metadata>> {
                 return Err(invalid("workbook XML is incomplete"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -394,7 +400,7 @@ fn finish_credential(
         }
         return Ok(Some(ProtectionPasswordVerifier::Legacy(
             u16::from_str_radix(&password, 16)
-                .map_err(|_| invalid(format!("invalid {prefix} password verifier")))?,
+                .map_err(|_source| invalid(format!("invalid {prefix} password verifier")))?,
         )));
     }
     if !strong_present {
@@ -418,7 +424,7 @@ fn finish_credential(
         .spin_count
         .ok_or_else(|| invalid(format!("{prefix} strong verifier is missing spinCount")))?
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid {prefix} spinCount")))?;
+        .map_err(|_source| invalid(format!("invalid {prefix} spinCount")))?;
 
     StrongProtectionPasswordVerifier::new(algorithm_name, hash_value, salt_value, spin_count)
         .map(ProtectionPasswordVerifier::Strong)
@@ -435,7 +441,7 @@ fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {
     }
     let decoded = BASE64
         .decode(compact.as_bytes())
-        .map_err(|_| invalid(format!("invalid base64 in {field}")))?;
+        .map_err(|_source| invalid(format!("invalid base64 in {field}")))?;
     if decoded.is_empty() || decoded.len() > MAX_BINARY_BYTES || BASE64.encode(&decoded) != compact
     {
         return Err(invalid(format!(

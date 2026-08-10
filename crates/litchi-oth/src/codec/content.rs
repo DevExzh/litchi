@@ -846,7 +846,7 @@ fn handle_start(
     if root_closed || stack.len() >= MAX_DEPTH {
         return invalid("OTH content.xml has an invalid element depth or trailing root");
     }
-    validate_text_block_position(stack, current)?;
+    validate_semantic_position(stack, current)?;
     validate_position(
         stack.last().copied(),
         stack.is_empty(),
@@ -869,7 +869,7 @@ fn handle_empty(
     if root_closed || stack.len() >= MAX_DEPTH {
         return invalid("OTH content.xml has an invalid empty element depth or trailing root");
     }
-    validate_text_block_position(stack, current)?;
+    validate_semantic_position(stack, current)?;
     validate_position(
         stack.last().copied(),
         stack.is_empty(),
@@ -902,11 +902,62 @@ fn handle_empty(
     }
 }
 
-fn validate_text_block_position(stack: &[Element], current: Element) -> Result<()> {
-    if matches!(current, Element::Paragraph | Element::Heading) && !stack.contains(&Element::Text) {
-        return invalid("OTH text blocks must occur inside the office:text body");
+fn validate_semantic_position(stack: &[Element], current: Element) -> Result<()> {
+    let in_text = stack.contains(&Element::Text);
+    let in_block = stack
+        .iter()
+        .any(|element| matches!(element, Element::Paragraph | Element::Heading));
+    match current {
+        Element::Paragraph | Element::Heading if !in_text => {
+            invalid("OTH text blocks must occur inside the office:text body")
+        },
+        Element::Paragraph | Element::Heading if in_block => {
+            invalid("OTH text blocks cannot contain text blocks")
+        },
+        Element::Bookmark
+        | Element::BookmarkEnd
+        | Element::BookmarkStart
+        | Element::Field
+        | Element::LineBreak
+        | Element::Link
+        | Element::Space
+        | Element::Span
+        | Element::Tab
+            if !in_block =>
+        {
+            invalid("OTH inline text elements must occur inside a paragraph or heading")
+        },
+        Element::List if !in_text => invalid("OTH text:list must occur inside office:text"),
+        Element::ListItem if stack.last() != Some(&Element::List) => {
+            invalid("OTH list item must occur directly inside text:list")
+        },
+        Element::Form | Element::FormControl | Element::Resource if !in_text => {
+            invalid("OTH form and resource content must occur inside office:text")
+        },
+        Element::FormControl if !stack.contains(&Element::Form) => {
+            invalid("OTH form control must occur inside form:form")
+        },
+        Element::Body
+        | Element::DocumentContent
+        | Element::Form
+        | Element::FormControl
+        | Element::List
+        | Element::ListItem
+        | Element::Other
+        | Element::Paragraph
+        | Element::Heading
+        | Element::Resource
+        | Element::Text
+        | Element::Bookmark
+        | Element::BookmarkEnd
+        | Element::BookmarkStart
+        | Element::Field
+        | Element::LineBreak
+        | Element::Link
+        | Element::Space
+        | Element::Span
+        | Element::Tab => Ok(()),
     }
-    Ok(())
 }
 
 fn validate_position(

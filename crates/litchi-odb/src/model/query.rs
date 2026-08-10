@@ -91,6 +91,146 @@ pub struct QueryCommandInventory {
     joins: Vec<QueryJoin>,
 }
 
+/// The leading operation of one inert stored SQL command.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum QueryStatementKind {
+    /// A `SELECT` statement.
+    Select,
+    /// An `INSERT` statement.
+    Insert,
+    /// An `UPDATE` statement.
+    Update,
+    /// A `DELETE` statement.
+    Delete,
+    /// A statement outside the bounded common subset.
+    Other,
+}
+
+/// The role of a relation reference in one common SQL statement shape.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum QueryRelationRole {
+    /// A relation read through `FROM`, a comma source, or `USING`.
+    Source,
+    /// A relation read through an explicit join.
+    Join,
+    /// The relation mutated by `INSERT`, `UPDATE`, or `DELETE`.
+    MutationTarget,
+}
+
+/// One qualified relation reference from a common SQL statement shape.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QueryRelation {
+    role: QueryRelationRole,
+    name: String,
+}
+
+impl QueryRelation {
+    /// Returns how the statement uses the relation.
+    #[must_use]
+    pub const fn role(&self) -> QueryRelationRole {
+        self.role
+    }
+
+    /// Returns the source spelling without identifier quote delimiters.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+/// Why exact local-relation dependency closure is unavailable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum QueryDependencyReason {
+    /// The leading statement keyword is outside the supported subset.
+    UnknownStatement,
+    /// A `WITH` common-table-expression owns part of the relation graph.
+    CommonTableExpression,
+    /// A nested query owns part of the relation graph.
+    Subquery,
+    /// `UNION`, `INTERSECT`, or `EXCEPT` owns another relation graph.
+    SetOperation,
+    /// A function call occupies a relation position.
+    TableFunction,
+    /// More than one statement is present.
+    MultipleStatements,
+    /// A required relation token is absent or is a derived relation.
+    MissingRelation,
+    /// Parenthesis nesting is not balanced.
+    UnbalancedGrouping,
+}
+
+/// Whether all local relation dependencies were derived conservatively.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum QueryDependencySupport {
+    /// All relation dependencies in the bounded common shape were found.
+    Complete,
+    /// Exact closure is unavailable for the stated syntax family.
+    Unsupported(QueryDependencyReason),
+}
+
+/// Typed, inert semantics for common stored SQL statement shapes.
+///
+/// This value describes only source text. It never resolves database objects,
+/// prepares a statement, opens a connection, or executes SQL.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QueryCommandSemantics {
+    statement_kind: QueryStatementKind,
+    relations: Vec<QueryRelation>,
+    dependency_support: QueryDependencySupport,
+    clauses: u8,
+}
+
+const DISTINCT_CLAUSE: u8 = 1 << 0;
+const GROUP_CLAUSE: u8 = 1 << 1;
+const HAVING_CLAUSE: u8 = 1 << 2;
+const ORDER_CLAUSE: u8 = 1 << 3;
+const ROW_LIMIT_CLAUSE: u8 = 1 << 4;
+
+impl QueryCommandSemantics {
+    #[must_use]
+    pub const fn statement_kind(&self) -> QueryStatementKind {
+        self.statement_kind
+    }
+
+    #[must_use]
+    pub fn relations(&self) -> &[QueryRelation] {
+        &self.relations
+    }
+
+    #[must_use]
+    pub const fn dependency_support(&self) -> QueryDependencySupport {
+        self.dependency_support
+    }
+
+    #[must_use]
+    pub const fn is_distinct(&self) -> bool {
+        self.clauses & DISTINCT_CLAUSE != 0
+    }
+
+    #[must_use]
+    pub const fn is_grouped(&self) -> bool {
+        self.clauses & GROUP_CLAUSE != 0
+    }
+
+    #[must_use]
+    pub const fn has_having(&self) -> bool {
+        self.clauses & HAVING_CLAUSE != 0
+    }
+
+    #[must_use]
+    pub const fn is_ordered(&self) -> bool {
+        self.clauses & ORDER_CLAUSE != 0
+    }
+
+    #[must_use]
+    pub const fn is_row_limited(&self) -> bool {
+        self.clauses & ROW_LIMIT_CLAUSE != 0
+    }
+}
+
 impl QueryCommandInventory {
     /// Returns parameter occurrences in command order.
     #[must_use]
@@ -329,6 +469,19 @@ impl Query {
     pub fn command_inventory(&self) -> Result<QueryCommandInventory> {
         command_inventory(&self.command)
     }
+
+    /// Returns conservative typed semantics for common SQL statement shapes.
+    ///
+    /// [`QueryDependencySupport`] reports whether relation dependency closure
+    /// is complete. Unsupported shapes remain inert and are never executed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for the same bounded lexical failures as
+    /// [`Self::command_inventory`].
+    pub fn command_semantics(&self) -> Result<QueryCommandSemantics> {
+        command_semantics(&self.command)
+    }
 }
 
 fn set_once(target: &mut Option<String>, value: String, kind: &str) -> Result<()> {
@@ -344,9 +497,19 @@ enum SqlToken {
     Word(String),
     QuotedIdentifier(String),
     Dot,
+    Comma,
+    OpenParen,
+    CloseParen,
+    Semicolon,
 }
 
 fn command_inventory(command: &str) -> Result<QueryCommandInventory> {
+    let (tokens, parameters) = tokenize_command(command)?;
+    let joins = joined_relations(&tokens)?;
+    Ok(QueryCommandInventory { parameters, joins })
+}
+
+fn tokenize_command(command: &str) -> Result<(Vec<SqlToken>, Vec<QueryParameter>)> {
     if command.len() > MAX_COMMAND_BYTES {
         return Err(Error::InvalidFormat(
             "ODB query command exceeds the inventory byte limit".to_string(),
@@ -425,14 +588,335 @@ fn command_inventory(command: &str) -> Result<QueryCommandInventory> {
                 SqlToken::Word(command[start..cursor].to_owned()),
             )?;
         } else {
-            if bytes[cursor] == b'.' {
-                push_sql_token(&mut tokens, SqlToken::Dot)?;
+            let token = match bytes[cursor] {
+                b'.' => Some(SqlToken::Dot),
+                b',' => Some(SqlToken::Comma),
+                b'(' => Some(SqlToken::OpenParen),
+                b')' => Some(SqlToken::CloseParen),
+                b';' => Some(SqlToken::Semicolon),
+                _ => None,
+            };
+            if let Some(token) = token {
+                push_sql_token(&mut tokens, token)?;
             }
             cursor += 1;
         }
     }
-    let joins = joined_relations(&tokens)?;
-    Ok(QueryCommandInventory { parameters, joins })
+    Ok((tokens, parameters))
+}
+
+fn command_semantics(command: &str) -> Result<QueryCommandSemantics> {
+    let (tokens, _parameters) = tokenize_command(command)?;
+    let statement_kind = statement_kind(&tokens);
+    let mut dependency_support = dependency_shape_support(&tokens, statement_kind);
+    let (relations, relation_reason) = statement_relations(&tokens, statement_kind)?;
+    if dependency_support == QueryDependencySupport::Complete
+        && let Some(reason) = relation_reason
+    {
+        dependency_support = QueryDependencySupport::Unsupported(reason);
+    }
+    Ok(QueryCommandSemantics {
+        statement_kind,
+        relations,
+        dependency_support,
+        clauses: semantic_clauses(&tokens),
+    })
+}
+
+fn semantic_clauses(tokens: &[SqlToken]) -> u8 {
+    let mut clauses = 0u8;
+    if tokens
+        .get(1)
+        .is_some_and(|token| identifier_is(token, "distinct"))
+    {
+        clauses |= DISTINCT_CLAUSE;
+    }
+    if top_level_pair(tokens, "group", "by") {
+        clauses |= GROUP_CLAUSE;
+    }
+    if top_level_word(tokens, "having") {
+        clauses |= HAVING_CLAUSE;
+    }
+    if top_level_pair(tokens, "order", "by") {
+        clauses |= ORDER_CLAUSE;
+    }
+    if ["limit", "fetch", "offset"]
+        .iter()
+        .any(|word| top_level_word(tokens, word))
+    {
+        clauses |= ROW_LIMIT_CLAUSE;
+    }
+    clauses
+}
+
+fn statement_kind(tokens: &[SqlToken]) -> QueryStatementKind {
+    let Some(first) = tokens.first() else {
+        return QueryStatementKind::Other;
+    };
+    if identifier_is(first, "select") {
+        QueryStatementKind::Select
+    } else if identifier_is(first, "insert") {
+        QueryStatementKind::Insert
+    } else if identifier_is(first, "update") {
+        QueryStatementKind::Update
+    } else if identifier_is(first, "delete") {
+        QueryStatementKind::Delete
+    } else {
+        QueryStatementKind::Other
+    }
+}
+
+fn dependency_shape_support(
+    tokens: &[SqlToken],
+    statement_kind: QueryStatementKind,
+) -> QueryDependencySupport {
+    if tokens
+        .first()
+        .is_some_and(|token| identifier_is(token, "with"))
+    {
+        return QueryDependencySupport::Unsupported(QueryDependencyReason::CommonTableExpression);
+    }
+    if statement_kind == QueryStatementKind::Other {
+        return QueryDependencySupport::Unsupported(QueryDependencyReason::UnknownStatement);
+    }
+    let mut depth = 0usize;
+    for (index, token) in tokens.iter().enumerate() {
+        match token {
+            SqlToken::OpenParen => depth += 1,
+            SqlToken::CloseParen => {
+                let Some(next) = depth.checked_sub(1) else {
+                    return QueryDependencySupport::Unsupported(
+                        QueryDependencyReason::UnbalancedGrouping,
+                    );
+                };
+                depth = next;
+            },
+            SqlToken::Semicolon if has_tokens_after_statement_end(tokens, index) => {
+                return QueryDependencySupport::Unsupported(
+                    QueryDependencyReason::MultipleStatements,
+                );
+            },
+            SqlToken::Word(word) if depth > 0 && word.eq_ignore_ascii_case("select") => {
+                return QueryDependencySupport::Unsupported(QueryDependencyReason::Subquery);
+            },
+            SqlToken::Word(word)
+                if depth == 0
+                    && ["union", "intersect", "except"]
+                        .iter()
+                        .any(|operator| word.eq_ignore_ascii_case(operator)) =>
+            {
+                return QueryDependencySupport::Unsupported(QueryDependencyReason::SetOperation);
+            },
+            SqlToken::Word(_)
+            | SqlToken::QuotedIdentifier(_)
+            | SqlToken::Dot
+            | SqlToken::Comma
+            | SqlToken::Semicolon => {},
+        }
+    }
+    if depth == 0 {
+        QueryDependencySupport::Complete
+    } else {
+        QueryDependencySupport::Unsupported(QueryDependencyReason::UnbalancedGrouping)
+    }
+}
+
+fn has_tokens_after_statement_end(tokens: &[SqlToken], index: usize) -> bool {
+    tokens[index + 1..]
+        .iter()
+        .any(|token| !matches!(token, SqlToken::Semicolon))
+}
+
+fn statement_relations(
+    tokens: &[SqlToken],
+    statement_kind: QueryStatementKind,
+) -> Result<(Vec<QueryRelation>, Option<QueryDependencyReason>)> {
+    let mut relations = Vec::new();
+    let mut reason = None;
+    let target_start = match statement_kind {
+        QueryStatementKind::Update => Some(1),
+        QueryStatementKind::Insert => word_after(tokens, 0, "into"),
+        QueryStatementKind::Delete => word_after(tokens, 0, "from"),
+        QueryStatementKind::Select | QueryStatementKind::Other => None,
+    };
+    if matches!(
+        statement_kind,
+        QueryStatementKind::Insert | QueryStatementKind::Update | QueryStatementKind::Delete
+    ) && target_start.is_none()
+    {
+        reason = Some(QueryDependencyReason::MissingRelation);
+    }
+    if let Some(start) = target_start {
+        append_relation(
+            tokens,
+            start,
+            QueryRelationRole::MutationTarget,
+            &mut relations,
+            &mut reason,
+        )?;
+    }
+    append_source_relations(
+        tokens,
+        statement_kind == QueryStatementKind::Delete,
+        &mut relations,
+        &mut reason,
+    )?;
+    Ok((relations, reason))
+}
+
+fn word_after(tokens: &[SqlToken], start: usize, expected: &str) -> Option<usize> {
+    tokens
+        .get(start + 1)
+        .is_some_and(|token| identifier_is(token, expected))
+        .then_some(start + 2)
+}
+
+fn append_source_relations(
+    tokens: &[SqlToken],
+    mut skip_first_from: bool,
+    relations: &mut Vec<QueryRelation>,
+    reason: &mut Option<QueryDependencyReason>,
+) -> Result<()> {
+    let mut depth = 0usize;
+    let mut source_list = false;
+    for (index, token) in tokens.iter().enumerate() {
+        update_depth(token, &mut depth);
+        if depth != 0 {
+            continue;
+        }
+        if clause_stops_sources(token) {
+            source_list = false;
+        }
+        if identifier_is(token, "from") {
+            source_list = true;
+            if skip_first_from {
+                skip_first_from = false;
+                continue;
+            }
+            append_relation(
+                tokens,
+                index + 1,
+                QueryRelationRole::Source,
+                relations,
+                reason,
+            )?;
+        } else if identifier_is(token, "using") {
+            source_list = true;
+            append_relation(
+                tokens,
+                index + 1,
+                QueryRelationRole::Source,
+                relations,
+                reason,
+            )?;
+        } else if identifier_is(token, "join") {
+            append_relation(
+                tokens,
+                index + 1,
+                QueryRelationRole::Join,
+                relations,
+                reason,
+            )?;
+        } else if source_list && matches!(token, SqlToken::Comma) {
+            append_relation(
+                tokens,
+                index + 1,
+                QueryRelationRole::Source,
+                relations,
+                reason,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn update_depth(token: &SqlToken, depth: &mut usize) {
+    match token {
+        SqlToken::OpenParen => *depth += 1,
+        SqlToken::CloseParen => *depth = depth.saturating_sub(1),
+        SqlToken::Word(_)
+        | SqlToken::QuotedIdentifier(_)
+        | SqlToken::Dot
+        | SqlToken::Comma
+        | SqlToken::Semicolon => {},
+    }
+}
+
+fn clause_stops_sources(token: &SqlToken) -> bool {
+    [
+        "where",
+        "group",
+        "having",
+        "order",
+        "limit",
+        "fetch",
+        "offset",
+        "returning",
+        "set",
+        "values",
+    ]
+    .iter()
+    .any(|word| identifier_is(token, word))
+}
+
+fn append_relation(
+    tokens: &[SqlToken],
+    mut start: usize,
+    role: QueryRelationRole,
+    relations: &mut Vec<QueryRelation>,
+    reason: &mut Option<QueryDependencyReason>,
+) -> Result<()> {
+    while tokens
+        .get(start)
+        .is_some_and(|token| identifier_is(token, "lateral") || identifier_is(token, "only"))
+    {
+        start += 1;
+    }
+    let Some((name, next)) = qualified_relation(tokens, start) else {
+        reason.get_or_insert(QueryDependencyReason::MissingRelation);
+        return Ok(());
+    };
+    if matches!(tokens.get(next), Some(SqlToken::OpenParen)) {
+        reason.get_or_insert(QueryDependencyReason::TableFunction);
+    }
+    relations
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODB query semantic relations",
+            source,
+        })?;
+    relations.push(QueryRelation { role, name });
+    Ok(())
+}
+
+fn qualified_relation(tokens: &[SqlToken], start: usize) -> Option<(String, usize)> {
+    let mut cursor = start;
+    let first = relation_identifier(tokens.get(cursor))?;
+    let mut name = first.to_owned();
+    cursor += 1;
+    while matches!(tokens.get(cursor), Some(SqlToken::Dot)) {
+        let next = relation_identifier(tokens.get(cursor + 1))?;
+        name.push('.');
+        name.push_str(next);
+        cursor += 2;
+    }
+    Some((name, cursor))
+}
+
+fn top_level_word(tokens: &[SqlToken], expected: &str) -> bool {
+    let mut depth = 0usize;
+    tokens.iter().any(|token| {
+        update_depth(token, &mut depth);
+        depth == 0 && identifier_is(token, expected)
+    })
+}
+
+fn top_level_pair(tokens: &[SqlToken], first: &str, second: &str) -> bool {
+    let mut depth = 0usize;
+    tokens.windows(2).any(|pair| {
+        update_depth(&pair[0], &mut depth);
+        depth == 0 && identifier_is(&pair[0], first) && identifier_is(&pair[1], second)
+    })
 }
 
 fn quoted_end(bytes: &[u8], start: usize, quote: u8, kind: &str) -> Result<usize> {
@@ -574,7 +1058,11 @@ fn identifier_is(token: &SqlToken, expected: &str) -> bool {
 fn relation_identifier(token: Option<&SqlToken>) -> Option<&str> {
     match token? {
         SqlToken::Word(value) | SqlToken::QuotedIdentifier(value) => Some(value),
-        SqlToken::Dot => None,
+        SqlToken::Dot
+        | SqlToken::Comma
+        | SqlToken::OpenParen
+        | SqlToken::CloseParen
+        | SqlToken::Semicolon => None,
     }
 }
 

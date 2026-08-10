@@ -265,7 +265,7 @@ fn write_border(xml: &mut String, border: &Border, conformance: Conformance) -> 
 fn write_side(xml: &mut String, name: &str, side: Option<&Side>) -> Result<()> {
     let Some(side) = side else {
         write_xml(xml, format_args!("<{name}/>"))
-            .map_err(|_| invalid("styles XML formatting failed"))?;
+            .map_err(|_source| invalid("styles XML formatting failed"))?;
         return Ok(());
     };
     let mut element = format!("<{name}");
@@ -276,7 +276,7 @@ fn write_side(xml: &mut String, name: &str, side: Option<&Side>) -> Result<()> {
         write_border_color(xml, color)?;
     }
     write_xml(xml, format_args!("</{name}>"))
-        .map_err(|_| invalid("styles XML formatting failed"))?;
+        .map_err(|_source| invalid("styles XML formatting failed"))?;
     Ok(())
 }
 
@@ -352,7 +352,7 @@ fn write_xfs(
         }
     }
     write_xml(xml, format_args!("</{section}>"))
-        .map_err(|_| invalid("styles XML formatting failed"))?;
+        .map_err(|_source| invalid("styles XML formatting failed"))?;
     Ok(())
 }
 
@@ -411,7 +411,7 @@ fn write_differential_formats(xml: &mut String, formats: &[Differential]) -> Res
             xml.push_str("<dxf/>");
         } else {
             let value = std::str::from_utf8(raw)
-                .map_err(|_| invalid("differential-format XML is not UTF-8"))?;
+                .map_err(|_source| invalid("differential-format XML is not UTF-8"))?;
             xml.push_str(value);
         }
     }
@@ -426,12 +426,12 @@ fn write_string_color(xml: &mut String, element: &str, value: &str) -> Result<()
     } else if let Some(index) = value.strip_prefix("theme:") {
         index
             .parse::<u32>()
-            .map_err(|_| invalid(format!("invalid theme color '{value}'")))?;
+            .map_err(|_source| invalid(format!("invalid theme color '{value}'")))?;
         attr(&mut output, "theme", index)?;
     } else if let Some(index) = value.strip_prefix("indexed:") {
         index
             .parse::<u32>()
-            .map_err(|_| invalid(format!("invalid indexed color '{value}'")))?;
+            .map_err(|_source| invalid(format!("invalid indexed color '{value}'")))?;
         attr(&mut output, "indexed", index)?;
     } else {
         let rgb = value.strip_prefix('#').unwrap_or(value);
@@ -501,7 +501,7 @@ fn attr(xml: &mut String, name: &str, value: &str) -> Result<()> {
 
 fn write_xml(xml: &mut String, arguments: fmt::Arguments<'_>) -> Result<()> {
     xml.write_fmt(arguments)
-        .map_err(|_| invalid("styles XML formatting failed"))
+        .map_err(|_source| invalid("styles XML formatting failed"))
 }
 
 #[cfg(test)]

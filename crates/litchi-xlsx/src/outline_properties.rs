@@ -202,7 +202,7 @@ pub fn parse_outline_properties(xml: &[u8]) -> Result<Option<OutlineProperties>>
                 declaration_seen = true;
             },
             Event::Eof => break,
-            _ => {},
+            Event::CData(_) | Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
     if !root_seen || !root_closed || !parser.stack.is_empty() {
@@ -281,7 +281,9 @@ impl Parser {
             Context::SheetProperties if local == b"sheetPr" => Ok(()),
             Context::OutlineProperties if local == b"outlinePr" => Ok(()),
             Context::Outside => Ok(()),
-            _ => Err(invalid("mismatched worksheet outline end element")),
+            Context::Worksheet | Context::SheetProperties | Context::OutlineProperties => {
+                Err(invalid("mismatched worksheet outline end element"))
+            },
         }
     }
 

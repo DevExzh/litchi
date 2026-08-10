@@ -892,9 +892,10 @@ impl Snapshot {
     /// for floating pictures, a re-homed singleton `PlcfSpaMom` and `DggInfo`.
     /// The selected PICF/Data block is proved independently. Floating pictures
     /// additionally prove one exact SPA/top-level-shape/`pib`/`BStore` identity,
-    /// so unrelated bounded shapes, groups, textboxes, and shared slots may
-    /// remain in the donor. Selected nested/extended graphs, delay-loaded
-    /// images, auxiliary stories, and occupied receivers are refused.
+    /// so unrelated bounded main/header shapes, groups, textboxes, and shared
+    /// slots may remain in the donor. Selected nested/extended graphs,
+    /// delay-loaded images, auxiliary-story selection, and occupied receivers
+    /// are refused.
     #[deny(
         clippy::cast_possible_truncation,
         clippy::cast_possible_wrap,
@@ -4494,7 +4495,7 @@ mod tests {
     }
 
     #[test]
-    fn picture_transfer_rehomes_shared_pictures_beside_shapes_and_textboxes() {
+    fn picture_transfer_rehomes_shared_pictures_beside_main_and_header_drawings() {
         let singleton = Snapshot::parse(&picture_doc(false)).expect("singleton donor");
         let receiver_with_picture =
             Snapshot::parse(&picture_doc(false)).expect("occupied receiver");
@@ -4530,6 +4531,22 @@ mod tests {
                 "unrelated textbox content",
             )
             .expect("neighbor textbox run");
+        writer
+            .insert_header_text_box(
+                crate::HeaderKind::Odd,
+                crate::writer::Shape::new(crate::writer::Kind::Rectangle, 720, 400)
+                    .expect("header textbox"),
+                FloatingPosition::new(90, 110),
+                "unrelated header textbox content",
+            )
+            .expect("header textbox run");
+        writer
+            .insert_header_picture(
+                crate::HeaderKind::Odd,
+                Picture::new(bytes.clone()).expect("header picture"),
+                FloatingPosition::new(130, 150),
+            )
+            .expect("header picture run");
         writer
             .insert_picture(Picture::new(bytes.clone()).expect("first picture"))
             .expect("first picture run");

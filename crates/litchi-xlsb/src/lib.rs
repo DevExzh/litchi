@@ -38,22 +38,18 @@
     clippy::unused_self,
     reason = "retrofitting these API lints would churn public signatures and documentation independently of BIFF12 correctness"
 )]
-// Parser and writer conversions below mirror BIFF12's fixed-width fields. Changing
-// their failure or wrapping behavior as lint cleanup would be a wire-format change.
+// The remaining legacy wire conversions and error collapses require a dedicated
+// codec migration. Newer correctness-sensitive paths override these lints with
+// local `deny` attributes.
 #![allow(
-    clippy::cast_lossless,
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
     clippy::cast_precision_loss,
     clippy::cast_sign_loss,
-    clippy::checked_conversions,
     clippy::expect_used,
-    clippy::float_cmp,
-    clippy::let_underscore_must_use,
     clippy::map_err_ignore,
-    clippy::unnecessary_unwrap,
     clippy::wildcard_enum_match_arm,
-    reason = "BIFF12 decoding deliberately preserves fixed-width casts, exact sentinels, and established error mapping"
+    reason = "legacy BIFF12 codecs retain established fixed-width and error-mapping behavior pending typed codec migration"
 )]
 // These style-only rewrites touch much of the legacy codec and obscure review of
 // semantic changes; keep them local to this crate rather than weakening workspace

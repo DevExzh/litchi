@@ -263,7 +263,9 @@ fn parse_selected(xml: &[u8]) -> Result<Metadata> {
                     .as_ref()
                     .is_some_and(|(sqref_depth, _)| *sqref_depth == depth)
                 {
-                    let (_, value) = sqref_text.take().expect("checked above");
+                    let (_, value) = sqref_text
+                        .take()
+                        .unwrap_or_else(|| crate::error::panic_missing_invariant("checked above"));
                     let Some((_, range)) = pending.as_mut() else {
                         return Err(invalid("orphan x14 sqref"));
                     };
@@ -274,7 +276,9 @@ fn parse_selected(xml: &[u8]) -> Result<Metadata> {
                     .as_ref()
                     .is_some_and(|(range_depth, _)| *range_depth == depth)
                 {
-                    let (_, range) = pending.take().expect("checked above");
+                    let (_, range) = pending
+                        .take()
+                        .unwrap_or_else(|| crate::error::panic_missing_invariant("checked above"));
                     push_range(
                         finish_range(range)?,
                         &mut core_collection,
@@ -284,7 +288,9 @@ fn parse_selected(xml: &[u8]) -> Result<Metadata> {
                     .as_ref()
                     .is_some_and(|(collection_depth, _)| *collection_depth == depth)
                 {
-                    let (_, ranges) = core_collection.take().expect("checked above");
+                    let (_, ranges) = core_collection
+                        .take()
+                        .unwrap_or_else(|| crate::error::panic_missing_invariant("checked above"));
                     if ranges.is_empty() {
                         return Err(invalid(
                             "protectedRanges must contain at least one protectedRange",
@@ -300,7 +306,9 @@ fn parse_selected(xml: &[u8]) -> Result<Metadata> {
                     .as_ref()
                     .is_some_and(|(collection_depth, _)| *collection_depth == depth)
                 {
-                    let (_, ranges) = x14_collection.take().expect("checked above");
+                    let (_, ranges) = x14_collection
+                        .take()
+                        .unwrap_or_else(|| crate::error::panic_missing_invariant("checked above"));
                     if ranges.is_empty() {
                         return Err(invalid(
                             "x14 protectedRanges must contain at least one protectedRange",
@@ -559,7 +567,7 @@ fn finish_credential(raw: RawCredential) -> Result<Option<ProtectionPasswordVeri
         }
         return Ok(Some(ProtectionPasswordVerifier::Legacy(
             u16::from_str_radix(&password, 16)
-                .map_err(|_| invalid("invalid legacy password verifier"))?,
+                .map_err(|_source| invalid("invalid legacy password verifier"))?,
         )));
     }
     if !strong_present {
@@ -583,7 +591,7 @@ fn finish_credential(raw: RawCredential) -> Result<Option<ProtectionPasswordVeri
         .spin_count
         .ok_or_else(|| invalid("strong verifier is missing spinCount"))?
         .parse::<u32>()
-        .map_err(|_| invalid("invalid spinCount"))?;
+        .map_err(|_source| invalid("invalid spinCount"))?;
     if spin_count > MAX_SPIN_COUNT {
         return Err(invalid("spinCount exceeds 10000000"));
     }
@@ -623,7 +631,9 @@ fn parse_reference(raw: &str) -> Result<ProtectionRangeReference> {
                 end_row: row,
                 end_column: column,
             },
-            _ => return Err(invalid("single protected-range reference must be a cell")),
+            Endpoint::Column(_) | Endpoint::Row(_) => {
+                return Err(invalid("single protected-range reference must be a cell"));
+            },
         },
         [start, end] => match (parse_endpoint(start)?, parse_endpoint(end)?) {
             (Endpoint::Cell(sr, sc), Endpoint::Cell(er, ec)) if sr <= er && sc <= ec => {
@@ -713,7 +723,7 @@ fn parse_row(value: &str) -> Result<u32> {
     }
     let row = value
         .parse::<u32>()
-        .map_err(|_| invalid("protected-range row overflow"))?;
+        .map_err(|_source| invalid("protected-range row overflow"))?;
     if row == 0 || row > MAX_ROW {
         return Err(invalid("protected-range row is outside worksheet limits"));
     }
@@ -739,7 +749,9 @@ pub fn write_core(metadata: &Metadata, conformance: Conformance) -> Result<Strin
             "<sheetProtection xmlns=\"{}\"",
             conformance.namespace()
         )
-        .unwrap();
+        .unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("operation was checked before extraction", error)
+        });
         write_verifier_attributes(&mut xml, protection.verifier.as_ref());
         write_nondefault_bool(&mut xml, "sheet", protection.sheet, false);
         write_nondefault_bool(&mut xml, "objects", protection.objects, false);
@@ -783,7 +795,12 @@ pub fn write_core(metadata: &Metadata, conformance: Conformance) -> Result<Strin
                     "<protectedRanges xmlns=\"{}\">",
                     conformance.namespace()
                 )
-                .unwrap();
+                .unwrap_or_else(|error| {
+                    crate::error::panic_error_invariant(
+                        "operation was checked before extraction",
+                        error,
+                    )
+                });
                 for range in &collection.ranges {
                     write_core_range(&mut xml, range)?;
                 }
@@ -805,7 +822,7 @@ pub fn write_extensions(metadata: &Metadata, conformance: Conformance) -> Result
     if let Some(collection) = office2010 {
         write!(xml, "<extLst xmlns=\"{}\"><ext uri=\"{}\"><x14:protectedRanges xmlns:x14=\"{}\" xmlns:xm=\"{}\">",
             conformance.namespace(), PROTECTED_RANGES_EXTENSION_URI,
-            X14_NAMESPACE, XM_NAMESPACE).unwrap();
+            X14_NAMESPACE, XM_NAMESPACE).unwrap_or_else(|error| crate::error::panic_error_invariant("operation was checked before extraction", error));
         for range in &collection.ranges {
             xml.push_str("<x14:protectedRange");
             write_xml_attribute(&mut xml, "name", &range.name);
@@ -943,20 +960,32 @@ fn write_verifier_attributes(xml: &mut String, verifier: Option<&ProtectionPassw
     match verifier {
         None => {},
         Some(ProtectionPasswordVerifier::Legacy(value)) => {
-            write!(xml, " password=\"{value:04X}\"").unwrap();
+            write!(xml, " password=\"{value:04X}\"").unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            });
         },
         Some(ProtectionPasswordVerifier::Strong(value)) => {
             write_xml_attribute(xml, "algorithmName", &value.algorithm_name);
             write_xml_attribute(xml, "hashValue", &BASE64.encode(&value.hash_value));
             write_xml_attribute(xml, "saltValue", &BASE64.encode(&value.salt_value));
-            write!(xml, " spinCount=\"{}\"", value.spin_count).unwrap();
+            write!(xml, " spinCount=\"{}\"", value.spin_count).unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            });
         },
     }
 }
 
 fn write_nondefault_bool(xml: &mut String, name: &str, value: bool, default: bool) {
     if value != default {
-        write!(xml, " {name}=\"{}\"", if value { '1' } else { '0' }).unwrap();
+        write!(xml, " {name}=\"{}\"", if value { '1' } else { '0' }).unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("operation was checked before extraction", error)
+        });
     }
 }
 
@@ -1085,7 +1114,8 @@ fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
     loop {
         let start = previous;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = reader.buffer_position() as usize;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_source| invalid("worksheet-protection XML offset exceeds platform size"))?;
         previous = end;
         let decoder = reader.decoder();
         let resolver = reader.resolver().clone();
@@ -1102,7 +1132,9 @@ fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
                         ResolveResult::Bound(value) if value.as_ref() == STRICT => {
                             Some(Conformance::Strict)
                         },
-                        _ => None,
+                        ResolveResult::Unbound
+                        | ResolveResult::Bound(_)
+                        | ResolveResult::Unknown(_) => None,
                     };
                 } else if depth == 2 && spreadsheet(&namespace) {
                     match local.as_ref() {
@@ -1150,11 +1182,19 @@ fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
             Event::End(element) => {
                 let local = element.local_name();
                 if direct_start.is_some_and(|(element_depth, _)| element_depth == depth) {
-                    let (_, range_start) = direct_start.take().unwrap();
+                    let (_, range_start) = direct_start.take().unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    });
                     direct_ranges.push(range_start..end);
                 }
                 if x14_start.is_some_and(|(element_depth, _)| element_depth == depth) {
-                    let (_, range_start) = x14_start.take().unwrap();
+                    let (_, range_start) = x14_start.take().unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    });
                     x14_ranges.push(range_start..end);
                 }
                 if sheet_data_start == Some(depth) {
@@ -1175,7 +1215,13 @@ fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
                 depth = depth.saturating_sub(1);
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Ok(ProtectionXmlScan {
@@ -1190,7 +1236,9 @@ fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
 }
 
 fn write_xml_attribute(xml: &mut String, name: &str, value: &str) {
-    write!(xml, " {name}=\"").unwrap();
+    write!(xml, " {name}=\"").unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    });
     write_xml_escaped(xml, value, true);
     xml.push('"');
 }
@@ -1222,7 +1270,7 @@ fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {
     }
     let decoded = BASE64
         .decode(compact.as_bytes())
-        .map_err(|_| invalid(format!("invalid base64 in {field}")))?;
+        .map_err(|_source| invalid(format!("invalid base64 in {field}")))?;
     if decoded.is_empty() || decoded.len() > MAX_BINARY_BYTES || BASE64.encode(&decoded) != compact
     {
         return Err(invalid(format!(

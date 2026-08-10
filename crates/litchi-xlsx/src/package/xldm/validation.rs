@@ -357,7 +357,23 @@ pub(super) fn validate_kind_location(kind: GeneratedNameKind, parents: &[&str]) 
         GeneratedNameKind::PartitionInformation => {
             parents.len() == 4 && folder(parents[3], ".prt", false)
         },
-        _ => parents.len() == 2 && folder(parents[1], ".dim", true),
+        GeneratedNameKind::TableInformation
+        | GeneratedNameKind::TableMetadata
+        | GeneratedNameKind::TableRelationshipMetadata
+        | GeneratedNameKind::ColumnHierarchyMetadata
+        | GeneratedNameKind::UserHierarchyMetadata
+        | GeneratedNameKind::ColumnData
+        | GeneratedNameKind::TableRelationshipIndex
+        | GeneratedNameKind::ColumnPositionToId
+        | GeneratedNameKind::ColumnIdToPosition
+        | GeneratedNameKind::ColumnHashIndex
+        | GeneratedNameKind::ColumnDictionary
+        | GeneratedNameKind::UserHierarchyChildCount
+        | GeneratedNameKind::UserHierarchyFirstChildPosition
+        | GeneratedNameKind::UserHierarchyParentPosition
+        | GeneratedNameKind::UserHierarchyMultilevelId => {
+            parents.len() == 2 && folder(parents[1], ".dim", true)
+        },
     };
     if valid {
         Ok(())
@@ -506,7 +522,13 @@ pub(super) fn validate_allocations(
         }
         let payload_end = end - CRC_SIZE;
         let expected = crc32(&bytes[start..payload_end]);
-        let marker = u32::from_le_bytes(bytes[payload_end..end].try_into().unwrap());
+        let marker =
+            u32::from_le_bytes(bytes[payload_end..end].try_into().unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            }));
         if marker != expected {
             return Err(invalid(format!(
                 "CRC mismatch for allocation '{}'",

@@ -663,12 +663,12 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
         .rename_generated_index(Position::new(1), "Competing Contents")
         .unwrap();
     let competing = competing_edit.commit().unwrap();
-    let conflict = index_commit
+    let conflict_plan = index_commit
         .patch()
         .plan_three_way(competing.patch())
         .unwrap();
-    assert!(conflict.conflicts().conflicts().iter().any(
-        |conflict| matches!(conflict, Conflict::GeneratedIndex(item) if *item == Position::new(1))
+    assert!(conflict_plan.conflicts().conflicts().iter().any(
+        |candidate| matches!(candidate, Conflict::GeneratedIndex(item) if *item == Position::new(1))
     ));
 
     let mut body_edit = master.edit_with_policy(policy);
@@ -730,18 +730,18 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
         merged_body.structure().items()[0],
         Kind::GeneratedIndex(IndexKind::TableOfContents)
     );
-    let mut removed_index = master.edit_with_policy(policy);
-    removed_index.remove_body_item(Position::new(1)).unwrap();
-    let removed_index = removed_index.commit().unwrap();
-    let index_remove_conflict = removed_index
+    let mut remove_index_edit = master.edit_with_policy(policy);
+    remove_index_edit
+        .remove_body_item(Position::new(1))
+        .unwrap();
+    let remove_index_commit = remove_index_edit.commit().unwrap();
+    let index_remove_conflict = remove_index_commit
         .patch()
         .plan_three_way(index_commit.patch())
         .unwrap();
-    assert!(
-        index_remove_conflict.conflicts().conflicts().iter().any(
-            |conflict| matches!(conflict, Conflict::BodyItem(item) if *item == Position::new(1))
-        )
-    );
+    assert!(index_remove_conflict.conflicts().conflicts().iter().any(
+        |candidate| matches!(candidate, Conflict::BodyItem(item) if *item == Position::new(1))
+    ));
 
     let mut container_edit = master.edit_with_policy(policy);
     container_edit
@@ -843,12 +843,12 @@ fn collision_safe_transfer_renames_complete_style_and_resource_closures_atomical
     assert!(history.redo());
     assert_eq!(history.current().as_bytes(), changed.as_bytes());
 
-    let mut title = destination.edit();
-    title.set_title("parallel metadata").unwrap();
-    let title = title.commit().unwrap();
+    let mut title_edit = destination.edit();
+    title_edit.set_title("parallel metadata").unwrap();
+    let title_commit = title_edit.commit().unwrap();
     let merged = commit
         .patch()
-        .plan_three_way(title.patch())
+        .plan_three_way(title_commit.patch())
         .unwrap()
         .commit()
         .unwrap()
@@ -945,12 +945,12 @@ fn styles_owned_transfer_creates_a_compact_styles_part_when_absent() {
     assert!(history.current().styles_xml().is_none());
     assert!(history.redo());
     assert!(history.current().styles_xml().is_some());
-    let mut title = destination.edit();
-    title.set_title("parallel styles owner").unwrap();
-    let title = title.commit().unwrap();
+    let mut title_edit = destination.edit();
+    title_edit.set_title("parallel styles owner").unwrap();
+    let title_commit = title_edit.commit().unwrap();
     let merged = commit
         .patch()
-        .merge(title.patch())
+        .merge(title_commit.patch())
         .unwrap()
         .apply(&destination)
         .unwrap();

@@ -830,7 +830,21 @@ impl Change {
     pub fn defaults(&self) -> Option<(Option<&Defaults>, Option<&Defaults>)> {
         match self {
             Self::Defaults { before, after, .. } => Some((before.as_ref(), after.as_ref())),
-            _ => None,
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -839,7 +853,21 @@ impl Change {
     pub fn web(&self) -> Option<(&WebBindings, &WebBindings)> {
         match self {
             Self::Web { before, after, .. } => Some((before, after)),
-            _ => None,
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -848,7 +876,21 @@ impl Change {
     pub const fn merged(&self) -> Option<(Rect, crate::merge::Change)> {
         match self {
             Self::Merge { range, change, .. } => Some((*range, *change)),
-            _ => None,
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -940,7 +982,21 @@ impl Change {
             Self::Create {
                 sheet, position, ..
             } => Some((*position, sheet)),
-            _ => None,
+            Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -951,7 +1007,21 @@ impl Change {
             Self::Remove {
                 sheet, position, ..
             } => Some((*position, sheet)),
-            _ => None,
+            Self::Create { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -965,7 +1035,21 @@ impl Change {
     )> {
         match self {
             Self::PageBreaks { before, after, .. } => Some((before, after)),
-            _ => None,
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -979,7 +1063,21 @@ impl Change {
     )> {
         match self {
             Self::PageMargins { before, after, .. } => Some((before.as_ref(), after.as_ref())),
-            _ => None,
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -993,7 +1091,21 @@ impl Change {
     )> {
         match self {
             Self::PageSetup { before, after, .. } => Some((before.as_ref(), after.as_ref())),
-            _ => None,
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -1007,7 +1119,21 @@ impl Change {
     )> {
         match self {
             Self::PrintOptions { before, after, .. } => Some((before.as_ref(), after.as_ref())),
-            _ => None,
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. } => None,
         }
     }
 
@@ -1173,7 +1299,19 @@ impl Change {
                 before.rebind_style(&workbook.inner.style_lineage);
                 after.rebind_style(&workbook.inner.style_lineage);
             },
-            _ => {},
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => {},
         }
     }
 
@@ -1188,7 +1326,19 @@ impl Change {
             Self::Row { before, after, .. } => {
                 before.uses_shared_style() || after.uses_shared_style()
             },
-            _ => false,
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => false,
         }
     }
 }
@@ -1348,7 +1498,20 @@ impl Conflict {
     pub const fn defaults(&self) -> Option<layout::Fields> {
         match self {
             Self::Defaults { fields, .. } => Some(*fields),
-            _ => None,
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Web { .. }
+            | Self::Merges { .. }
+            | Self::Cells { .. }
+            | Self::Rows { .. }
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 
@@ -1387,7 +1550,20 @@ impl Conflict {
     pub fn merges(&self) -> Option<&[Rect]> {
         match self {
             Self::Merges { ranges, .. } => Some(ranges),
-            _ => None,
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Cells { .. }
+            | Self::Rows { .. }
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
         }
     }
 

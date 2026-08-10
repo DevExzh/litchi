@@ -628,7 +628,9 @@ pub(super) fn validate_global_views(values: &[Part]) -> Result<()> {
 fn validate_defined_name(value: &str) -> Result<()> {
     bounded_nonempty(value, "View Cache name")?;
     let mut chars = value.chars();
-    let first = chars.next().unwrap();
+    let first = chars.next().unwrap_or_else(|| {
+        crate::error::panic_missing_invariant("required value was checked before extraction")
+    });
     if !(first.is_alphabetic() || matches!(first, '_' | '\\'))
         || !chars
             .all(|character| character.is_alphanumeric() || matches!(character, '_' | '.' | '\\'))
@@ -776,8 +778,12 @@ impl XsdDateTime {
             minutes -= 1440;
             result.shift_day(1);
         }
-        result.hour = (minutes / 60) as u8;
-        result.minute = (minutes % 60) as u8;
+        result.hour = u8::try_from(minutes / 60).unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("normalized timeline hour is in 0..24", error)
+        });
+        result.minute = u8::try_from(minutes % 60).unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("normalized timeline minute is in 0..60", error)
+        });
         result.timezone_minutes = Some(0);
         result
     }
@@ -824,7 +830,9 @@ fn decimal_add_one(value: &mut String) {
     if carry {
         bytes.insert(0, b'1');
     }
-    *value = String::from_utf8(bytes).expect("decimal digits remain valid UTF-8");
+    *value = String::from_utf8(bytes).unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("decimal digits remain valid UTF-8", error)
+    });
 }
 fn decimal_sub_one(value: &mut String) {
     let mut bytes = value.as_bytes().to_vec();
@@ -839,7 +847,9 @@ fn decimal_sub_one(value: &mut String) {
     if bytes.len() > 4 && bytes.first() == Some(&b'0') {
         bytes.remove(0);
     }
-    *value = String::from_utf8(bytes).expect("decimal digits remain valid UTF-8");
+    *value = String::from_utf8(bytes).unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("decimal digits remain valid UTF-8", error)
+    });
 }
 fn is_leap_year(year: &XsdYear) -> bool {
     let value = year.astronomical_mod_400();
@@ -893,8 +903,18 @@ fn parse_xsd_datetime(value: &str) -> Result<XsdDateTime> {
             {
                 return Err(invalid("invalid xsd:dateTime timezone"));
             }
-            let hours = zone[1..3].parse::<i16>().unwrap();
-            let minutes = zone[4..].parse::<i16>().unwrap();
+            let hours = zone[1..3].parse::<i16>().unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            });
+            let minutes = zone[4..].parse::<i16>().unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            });
             if hours > 14 || minutes > 59 || (hours == 14 && minutes != 0) {
                 return Err(invalid("xsd:dateTime timezone exceeds 14:00"));
             }
@@ -949,11 +969,21 @@ fn parse_xsd_datetime(value: &str) -> Result<XsdDateTime> {
     } else {
         return Err(invalid(format!("invalid xsd:dateTime '{value}'")));
     };
-    let month = date_tail[..2].parse::<u8>().unwrap();
-    let day = date_tail[3..].parse::<u8>().unwrap();
-    let hour = time[..2].parse::<u8>().unwrap();
-    let minute = time[3..5].parse::<u8>().unwrap();
-    let second = time[6..8].parse::<u8>().unwrap();
+    let month = date_tail[..2].parse::<u8>().unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    });
+    let day = date_tail[3..].parse::<u8>().unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    });
+    let hour = time[..2].parse::<u8>().unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    });
+    let minute = time[3..5].parse::<u8>().unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    });
+    let second = time[6..8].parse::<u8>().unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    });
     let year = XsdYear {
         negative,
         digits: year_digits.into(),

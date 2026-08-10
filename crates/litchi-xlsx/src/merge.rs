@@ -186,7 +186,7 @@ fn build(
         .get(indices.len() / 2)
         .ok_or_else(|| invalid("merged-range tree lost its median"))?;
     let center = ranges
-        .get(usize::try_from(median).map_err(|_| invalid("merge index does not fit usize"))?)
+        .get(usize::try_from(median).map_err(|_source| invalid("merge index does not fit usize"))?)
         .ok_or_else(|| invalid("merged-range tree median escaped its source"))?
         .start()
         .row()
@@ -194,7 +194,10 @@ fn build(
     let (mut lower_count, mut spanning_count, mut upper_count) = (0usize, 0usize, 0usize);
     for index in &indices {
         let range = ranges
-            .get(usize::try_from(*index).map_err(|_| invalid("merge index does not fit usize"))?)
+            .get(
+                usize::try_from(*index)
+                    .map_err(|_source| invalid("merge index does not fit usize"))?,
+            )
             .ok_or_else(|| invalid("merged-range tree index escaped its source"))?;
         if range.end().0 <= center {
             lower_count = lower_count.saturating_add(1);
@@ -218,7 +221,10 @@ fn build(
         .map_err(|source| allocation("upper merge tree", source))?;
     for index in indices {
         let range = ranges
-            .get(usize::try_from(index).map_err(|_| invalid("merge index does not fit usize"))?)
+            .get(
+                usize::try_from(index)
+                    .map_err(|_source| invalid("merge index does not fit usize"))?,
+            )
             .ok_or_else(|| invalid("merged-range tree index escaped its source"))?;
         if range.end().0 <= center {
             lower.push(index);
@@ -242,9 +248,9 @@ fn build(
         .filter(|position| *position != NONE)
         .ok_or_else(|| invalid("merged-range tree exceeds its compact node domain"))?;
     let spans_start = u32::try_from(spans.len())
-        .map_err(|_| invalid("merged-range span offset does not fit u32"))?;
+        .map_err(|_source| invalid("merged-range span offset does not fit u32"))?;
     let spans_len = u32::try_from(spanning.len())
-        .map_err(|_| invalid("merged-range span length does not fit u32"))?;
+        .map_err(|_source| invalid("merged-range span length does not fit u32"))?;
     spans.extend(spanning);
     nodes.push(Node {
         center,
@@ -258,7 +264,7 @@ fn build(
     let node = nodes
         .get_mut(
             usize::try_from(position)
-                .map_err(|_| invalid("merge node index does not fit usize"))?,
+                .map_err(|_source| invalid("merge node index does not fit usize"))?,
         )
         .ok_or_else(|| invalid("merged-range tree node disappeared during construction"))?;
     node.lower = lower;

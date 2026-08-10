@@ -158,6 +158,34 @@ fn standard_drawing_xml(workbook: &Workbook) -> Vec<u8> {
         .to_vec()
 }
 
+fn standard_drawing_external_hyperlinks(workbook: &Workbook) -> Vec<(String, String)> {
+    let mut bytes = Cursor::new(Vec::new());
+    workbook.save(&mut bytes).expect("workbook package save");
+    let package = Package::from_slice(bytes.get_ref()).expect("package reopen");
+    let drawing = package
+        .opc_package()
+        .iter_parts()
+        .find(|part| {
+            part.content_type() == "application/vnd.openxmlformats-officedocument.drawing+xml"
+        })
+        .expect("standard drawing part");
+    let mut hyperlinks = drawing
+        .rels()
+        .iter()
+        .filter(|relationship| {
+            relationship.is_external() && relationship.reltype().ends_with("/hyperlink")
+        })
+        .map(|relationship| {
+            (
+                relationship.r_id().to_string(),
+                relationship.target_ref().to_string(),
+            )
+        })
+        .collect::<Vec<_>>();
+    hyperlinks.sort_unstable();
+    hyperlinks
+}
+
 fn formula_dependency_workbook(source_order: bool) -> Workbook {
     let mut data = MutableWorksheet::new("Data");
     data.set_cell(0, 0, "Region");
@@ -681,6 +709,107 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
             DrawingTransferRefusal::PictureUsesImageTransfer
         )
     ));
+}
+
+#[test]
+fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
+    let source = Workbook::new(
+        File::open(fixture(
+            "3rdparty/poi/test-data/spreadsheet/testVarious.xlsb",
+        ))
+        .expect("genuine hyperlink-shape fixture"),
+    )
+    .expect("genuine hyperlink-shape workbook");
+    assert_eq!(
+        standard_drawing_external_hyperlinks(&source),
+        vec![("rId1".to_string(), "http://lucene.apache.org/".to_string())]
+    );
+    let mut target = producer_workbook("Hyperlink target", None);
+    let mut drawing_edit = target.edit_workbook_structure().expect("hyperlink edit");
+    drawing_edit
+        .transfer_drawing_object(&source, 0, 0, 0)
+        .expect("genuine shape hyperlink transfer");
+    let drawing_commit = drawing_edit.commit().expect("hyperlink commit");
+    let durable = drawing_commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable hyperlink patch");
+    let drawing_patch = WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
+        .expect("durable hyperlink replay");
+
+    let mut rename_edit = target.edit_workbook_structure().expect("rename edit");
+    rename_edit
+        .rename_sheet(0, "Hyperlinked shape".to_string())
+        .expect("rename");
+    let rename_commit = rename_edit.commit().expect("rename commit");
+    let merged = drawing_patch
+        .merge_three_way(rename_commit.patch())
+        .expect("hyperlink/name merge");
+    assert!(merged.conflicts().is_empty());
+    let merged = merged.patch().expect("merged hyperlink patch").clone();
+    merged.apply(&mut target).expect("publish hyperlink shape");
+    assert_eq!(
+        standard_drawing_external_hyperlinks(&target),
+        vec![("rId1".to_string(), "http://lucene.apache.org/".to_string())]
+    );
+
+    let mut history = WorkbookHistory::new(TransferLimits::DEFAULT).expect("hyperlink history");
+    history.push(merged).expect("retain hyperlink patch");
+    history.undo(&mut target).expect("inverse hyperlink patch");
+    assert!(target.sheet_drawing(0).is_none());
+    history.redo(&mut target).expect("redo hyperlink patch");
+
+    let mut reopened_bytes = Cursor::new(Vec::new());
+    target
+        .save(&mut reopened_bytes)
+        .expect("save transferred hyperlink workbook");
+    let reopened = Workbook::new(Cursor::new(reopened_bytes.into_inner()))
+        .expect("full reopen transferred hyperlink workbook");
+    assert_eq!(
+        reopened.worksheet_names(),
+        &["Hyperlinked shape".to_string()]
+    );
+    assert_eq!(
+        standard_drawing_external_hyperlinks(&reopened),
+        vec![("rId1".to_string(), "http://lucene.apache.org/".to_string())]
+    );
+}
+
+#[test]
+fn checked_in_unique_standard_drawing_corpus_transfers_every_anchor() {
+    let corpus = [
+        "3rdparty/libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb",
+        "3rdparty/libreoffice-core/sc/qa/unit/data/xlsb/universal-content.xlsb",
+        "3rdparty/poi/test-data/spreadsheet/WithTextBox.xlsb",
+        "3rdparty/poi/test-data/spreadsheet/testVarious.xlsb",
+    ];
+    let mut transferred = 0usize;
+    for relative in corpus {
+        let source = Workbook::new(File::open(fixture(relative)).expect("drawing corpus fixture"))
+            .expect("drawing corpus workbook");
+        for sheet in 0..source.worksheet_count() {
+            let Some(drawing) = source.sheet_drawing(sheet) else {
+                continue;
+            };
+            for anchor in 0..drawing.drawing.anchors.len() {
+                let mut target = producer_workbook("Corpus target", None);
+                let mut edit = target.edit_workbook_structure().expect("corpus edit");
+                edit.transfer_drawing_object(&source, sheet, anchor, 0)
+                    .expect("corpus drawing transfer");
+                let commit = edit.commit().expect("corpus commit");
+                target
+                    .apply_workbook_structure(&commit)
+                    .expect("publish corpus drawing");
+                let mut bytes = Cursor::new(Vec::new());
+                target.save(&mut bytes).expect("save corpus transfer");
+                let reopened = Workbook::new(Cursor::new(bytes.into_inner()))
+                    .expect("full reopen corpus transfer");
+                assert!(reopened.sheet_drawing(0).is_some());
+                transferred = transferred.saturating_add(1);
+            }
+        }
+    }
+    assert_eq!(transferred, 6, "the unique corpus anchor census changed");
 }
 
 #[test]

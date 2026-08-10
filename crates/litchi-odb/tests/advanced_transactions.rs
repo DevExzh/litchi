@@ -1,9 +1,12 @@
 use litchi_odb::{
     ActiveContentDisposition, ActiveContentKind, Builder, ChangeKind, Column, Component,
-    ComponentKind, CompositionLimits, Connection, Database, DependencyDisposition, EditPolicy,
-    History, HistoryLimits, Index, IndexColumn, JoinedEdits, Key, KeyColumn, KeyKind, MergeChoice,
-    MergePlan, Patch, ProtectionOperation, ProtectionSupport, Query, QueryJoinKind,
-    QueryParameterKind, QueryUpdateTarget, SealedPatch, SignaturePolicy, Table, TableKind,
+    ComponentDependencyKind, ComponentKind, ComponentTransferRefusal, ComponentTransferSupport,
+    CompositionLimits, Connection, Database, DependencyDisposition, EditPolicy, History,
+    HistoryLimits, Index, IndexColumn, JoinedEdits, Key, KeyColumn, KeyKind, MergeChoice,
+    MergePlan, Patch, ProtectionDecision, ProtectionOperation, ProtectionRefusal,
+    ProtectionSupport, Query, QueryDependencyReason, QueryDependencySupport, QueryJoinKind,
+    QueryParameterKind, QueryRelationRole, QueryStatementKind, QueryUpdateTarget,
+    RelationResolution, SealedPatch, SignaturePolicy, Table, TableKind,
 };
 
 const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:database><d:data-source/><d:queries/></o:database></o:body></o:document-content>"#;
@@ -578,10 +581,168 @@ fn query_command_inventory_is_bounded_lexical_metadata_only() {
             .joins()
             .is_empty()
     );
+    let semantics = query.command_semantics().unwrap();
+    assert_eq!(semantics.statement_kind(), QueryStatementKind::Select);
+    assert_eq!(
+        semantics.dependency_support(),
+        QueryDependencySupport::Complete
+    );
+    assert_eq!(
+        semantics
+            .relations()
+            .iter()
+            .map(|relation| (relation.role(), relation.name()))
+            .collect::<Vec<_>>(),
+        vec![
+            (QueryRelationRole::Source, "base"),
+            (QueryRelationRole::Join, "one"),
+            (QueryRelationRole::Join, "two"),
+            (QueryRelationRole::Join, "three"),
+            (QueryRelationRole::Join, "four"),
+            (QueryRelationRole::Join, "five table"),
+            (QueryRelationRole::Join, "public.six"),
+        ]
+    );
+    assert_eq!(
+        Query::new("cte", "WITH c AS (SELECT * FROM base) SELECT * FROM c")
+            .command_semantics()
+            .unwrap()
+            .dependency_support(),
+        QueryDependencySupport::Unsupported(QueryDependencyReason::CommonTableExpression)
+    );
+}
+
+#[test]
+#[expect(clippy::unwrap_used, reason = "fixed dependency-closed SQL fixture")]
+fn typed_query_transfer_closes_tables_and_refuses_incomplete_sql_shapes() {
+    let donor_source = source();
+    let mut author = donor_source.edit();
+    author
+        .add_table(
+            Table::new("parent", TableKind::Definition)
+                .with_column(Column::new("id"))
+                .with_key(
+                    Key::new("parent-primary", KeyKind::Primary).with_column(KeyColumn::new("id")),
+                ),
+        )
+        .unwrap();
+    author
+        .add_table(
+            Table::new("child", TableKind::Definition)
+                .with_column(Column::new("parent_id"))
+                .with_key(
+                    Key::new("child-parent", KeyKind::Foreign)
+                        .with_referenced_table("parent")
+                        .with_column(KeyColumn::new("parent_id").with_related_column("id")),
+                ),
+        )
+        .unwrap();
+    author
+        .add_query(Query::new(
+            "closed-query",
+            "SELECT DISTINCT child.parent_id FROM child JOIN parent ON parent.id=child.parent_id GROUP BY child.parent_id HAVING COUNT(*)>0 ORDER BY child.parent_id LIMIT 10",
+        ))
+        .unwrap();
+    author
+        .add_query(Query::new(
+            "unsupported-query",
+            "WITH selected AS (SELECT * FROM child) SELECT * FROM selected",
+        ))
+        .unwrap();
+    let authored_donor = author.commit().unwrap().into_database();
+
+    let destination = source();
+    let mut refused = destination.edit();
+    let before = refused.staged_content_xml().to_owned();
+    assert!(
+        refused
+            .transfer_query_from_with(
+                &authored_donor,
+                "closed-query",
+                DependencyDisposition::Refuse,
+            )
+            .is_err()
+    );
+    assert_eq!(refused.staged_content_xml(), before);
+    assert!(refused.changes().is_empty());
+    assert!(
+        refused
+            .transfer_query_from_with(
+                &authored_donor,
+                "unsupported-query",
+                DependencyDisposition::Cascade,
+            )
+            .is_err()
+    );
+
+    let mut transfer = destination.edit();
+    transfer
+        .transfer_query_from_with(
+            &authored_donor,
+            "closed-query",
+            DependencyDisposition::Cascade,
+        )
+        .unwrap();
+    let commit = transfer.commit().unwrap();
+    let catalog = commit.database().catalog().unwrap();
+    assert!(catalog.table("parent").unwrap().is_some());
+    assert!(catalog.table("child").unwrap().is_some());
+    let query = catalog.query("closed-query").unwrap().unwrap();
+    let semantics = query.command_semantics().unwrap();
+    assert!(semantics.is_distinct());
+    assert!(semantics.is_grouped());
+    assert!(semantics.has_having());
+    assert!(semantics.is_ordered());
+    assert!(semantics.is_row_limited());
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.database())
+            .unwrap()
+            .as_bytes(),
+        destination.as_bytes()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .apply(&destination)
+            .unwrap()
+            .as_bytes(),
+        commit.database().as_bytes()
+    );
+}
+
+#[test]
+fn authored_schema_refuses_ambiguous_constraint_and_index_shapes_atomically() {
+    let database = source();
+    let mut edit = database.edit();
+    let duplicate_columns = Table::new("duplicate-columns", TableKind::Definition)
+        .with_column(Column::new("id"))
+        .with_column(Column::new("id"));
+    assert!(edit.add_table(duplicate_columns).is_err());
+    let multiple_primary = Table::new("multiple-primary", TableKind::Definition)
+        .with_column(Column::new("id"))
+        .with_key(Key::new("primary-one", KeyKind::Primary).with_column(KeyColumn::new("id")))
+        .with_key(Key::new("primary-two", KeyKind::Primary).with_column(KeyColumn::new("id")));
+    assert!(edit.add_table(multiple_primary).is_err());
+    let duplicate_index_mapping = Table::new("duplicate-index", TableKind::Definition)
+        .with_column(Column::new("id"))
+        .with_index(
+            Index::new("duplicate-index-columns")
+                .with_column(IndexColumn::new("id"))
+                .with_column(IndexColumn::new("id")),
+        );
+    assert!(edit.add_table(duplicate_index_mapping).is_err());
+    assert!(edit.changes().is_empty());
+    assert_eq!(edit.staged_content_xml(), database.content_xml());
 }
 
 #[test]
 #[expect(
+    clippy::shadow_reuse,
     clippy::shadow_unrelated,
     clippy::unwrap_used,
     reason = "unexpected fixture failure"
@@ -662,6 +823,25 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
             .unwrap()
             .is_empty()
     );
+    let dependencies = donor
+        .component_dependencies(ComponentKind::Report, "payload-report")
+        .unwrap();
+    assert!(dependencies.active_content_count() > 0);
+    assert_eq!(
+        dependencies.transfer_support(),
+        ComponentTransferSupport::Supported
+    );
+    assert!(dependencies.entries().iter().any(|entry| {
+        entry.kind() == ComponentDependencyKind::PayloadFile
+            && entry.path() == "reports/source/content.xml"
+    }));
+    assert!(dependencies.entries().iter().any(|entry| {
+        entry.kind() == ComponentDependencyKind::LinkedFile
+            && entry.path() == "Shared/dependency.xml"
+    }));
+    assert!(dependencies.entries().iter().any(|entry| {
+        entry.kind() == ComponentDependencyKind::LinkedFile && entry.path() == "Pictures/shared.png"
+    }));
     let mut refused = destination.edit();
     assert!(
         refused
@@ -789,7 +969,55 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
 }
 
 #[test]
-#[expect(clippy::unwrap_used, reason = "unexpected fixture failure")]
+#[expect(
+    clippy::unwrap_used,
+    reason = "genuine LibreOffice Base report fixture"
+)]
+fn genuine_base_report_inventory_final_scopes_formatted_payload_transfer() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../3rdparty/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb");
+    let donor = Database::open(path).unwrap();
+    let dependencies = donor
+        .component_dependencies(ComponentKind::Report, "BasicFields")
+        .unwrap();
+    assert!(dependencies.entries().iter().any(|entry| {
+        entry.kind() == ComponentDependencyKind::PayloadFile
+            && entry.path() == "reports/Obj21/content.xml"
+            && entry.byte_len().is_some_and(|length| length > 10_000)
+    }));
+    assert!(dependencies.entries().iter().any(|entry| {
+        entry.kind() == ComponentDependencyKind::PayloadFile
+            && entry.path() == "reports/Obj21/styles.xml"
+    }));
+    assert_eq!(
+        dependencies.transfer_support(),
+        ComponentTransferSupport::Refused(
+            ComponentTransferRefusal::FormattedXmlRequiresSourceProvenance
+        )
+    );
+
+    let destination = source();
+    let mut edit = destination.edit();
+    assert!(
+        edit.transfer_component_from_to_with(
+            &donor,
+            ComponentKind::Report,
+            "BasicFields",
+            "reports/imported-genuine",
+            ActiveContentDisposition::CopyInert,
+        )
+        .is_err()
+    );
+    assert!(edit.changes().is_empty());
+    assert_eq!(edit.staged_content_xml(), destination.content_xml());
+}
+
+#[test]
+#[expect(
+    clippy::shadow_reuse,
+    clippy::unwrap_used,
+    reason = "unexpected fixture failure"
+)]
 fn active_content_inventory_is_inert_bounded_and_source_located() {
     const ACTIVE_SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:script:1.0"><o:body><o:database><d:data-source/><o:scripts><s:script/><s:event-listener/></o:scripts></o:database></o:body></o:document-content>"#;
     use litchi_odf_common::{
@@ -841,6 +1069,14 @@ fn active_content_inventory_is_inert_bounded_and_source_located() {
     assert_eq!(
         database.protection_support(ProtectionOperation::ReSign),
         ProtectionSupport::Unsupported
+    );
+    assert_eq!(
+        database.protection_decision(ProtectionOperation::ReSign),
+        ProtectionDecision::Refused(ProtectionRefusal::ReSigningUnavailable)
+    );
+    assert_eq!(
+        database.protection_decision(ProtectionOperation::ReEncrypt),
+        ProtectionDecision::Refused(ProtectionRefusal::ReEncryptionUnavailable)
     );
     assert!(
         database
@@ -1109,6 +1345,10 @@ fn dependency_closed_transfer_spans_schema_resources_and_components() {
     assert_eq!(catalog.outgoing_relations("child").count(), 1);
     assert_eq!(catalog.incoming_relations("parent").count(), 1);
     assert_eq!(
+        catalog.relation_resolution(&catalog.relations()[0]),
+        RelationResolution::Resolved
+    );
+    assert_eq!(
         catalog
             .table("parent")
             .unwrap()
@@ -1147,6 +1387,8 @@ fn dependency_closed_transfer_spans_schema_resources_and_components() {
 #[test]
 #[expect(clippy::unwrap_used, reason = "unexpected fixture failure")]
 fn multiple_genuine_libreoffice_base_packages_survive_changed_full_reopen() {
+    use litchi_odf_common::core::OwnedPackage;
+
     let fixtures = [
         "../../3rdparty/libreoffice-core/extras/source/database/biblio.odb",
         "../../3rdparty/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb",
@@ -1155,6 +1397,7 @@ fn multiple_genuine_libreoffice_base_packages_survive_changed_full_reopen() {
     for (index, relative) in fixtures.into_iter().enumerate() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(relative);
         let database = Database::open(path).unwrap();
+        let original_package = OwnedPackage::from_bytes(database.as_bytes().to_vec()).unwrap();
         let query_name = format!("__litchi_inert_reopen_{index}");
         let mut edit = database.edit();
         edit.add_query(
@@ -1164,9 +1407,76 @@ fn multiple_genuine_libreoffice_base_packages_survive_changed_full_reopen() {
         .unwrap();
         let committed = edit.commit().unwrap();
         let reopened = Database::from_bytes(committed.database().as_bytes().to_vec()).unwrap();
+        let reopened_package = OwnedPackage::from_bytes(reopened.as_bytes().to_vec()).unwrap();
         let catalog = reopened.catalog().unwrap();
         let query = catalog.query(&query_name).unwrap().unwrap();
         assert_eq!(query.columns().len(), 1);
         assert!(reopened.as_bytes().len() <= 256 * 1024 * 1024);
+        for member in original_package.files().unwrap() {
+            if matches!(
+                member.as_str(),
+                "mimetype" | "content.xml" | "META-INF/manifest.xml"
+            ) || member.ends_with('/')
+            {
+                continue;
+            }
+            assert_eq!(
+                reopened_package.get_file(&member).unwrap(),
+                original_package.get_file(&member).unwrap(),
+                "genuine Base resource changed: {member}"
+            );
+        }
+        let durable = committed.patch().durable().unwrap();
+        let replayed = durable.apply(&database).unwrap();
+        assert_eq!(replayed.as_bytes(), reopened.as_bytes());
+        assert_eq!(
+            durable.inverse().apply(&replayed).unwrap().as_bytes(),
+            database.as_bytes()
+        );
+        let mut history = History::new(database.clone(), HistoryLimits::new(2, 32 * 1024 * 1024));
+        history
+            .record(replayed.clone(), replayed.as_bytes().len() as u64)
+            .unwrap();
+        assert!(history.undo());
+        assert_eq!(history.current().as_bytes(), database.as_bytes());
+        assert!(history.redo());
+        assert_eq!(history.current().as_bytes(), replayed.as_bytes());
+
+        if index == 0 {
+            let second_patch = query_patch(&database, "__litchi_joined_genuine", "SELECT 99");
+            let first = committed
+                .patch()
+                .prepare("genuine-first", limits())
+                .unwrap();
+            let second_prepared = second_patch.prepare("genuine-second", limits()).unwrap();
+            let mut joined = JoinedEdits::new(first.lineage().clone(), limits());
+            joined.join(second_prepared).unwrap();
+            joined.join(first).unwrap();
+            let composed_snapshot = Patch::compose(joined).unwrap().apply(&database).unwrap();
+            let composed_database = Database::from_bytes(composed_snapshot.into_bytes()).unwrap();
+            let composed_catalog = composed_database.catalog().unwrap();
+            assert!(composed_catalog.query(&query_name).unwrap().is_some());
+            assert!(
+                composed_catalog
+                    .query("__litchi_joined_genuine")
+                    .unwrap()
+                    .is_some()
+            );
+            let composed_package =
+                OwnedPackage::from_bytes(composed_database.into_bytes()).unwrap();
+            for member in original_package.files().unwrap() {
+                if matches!(
+                    member.as_str(),
+                    "mimetype" | "content.xml" | "META-INF/manifest.xml"
+                ) || member.ends_with('/')
+                {
+                    continue;
+                }
+                assert_eq!(
+                    composed_package.get_file(&member).unwrap(),
+                    original_package.get_file(&member).unwrap()
+                );
+            }
+        }
     }
 }

@@ -434,7 +434,7 @@ impl ColInfoRecord {
         let last_col = binary::read_u32_le_at(data, 4)?;
         // Width is stored as 256ths of a character
         let width_raw = binary::read_u32_le_at(data, 8)?;
-        let width = width_raw as f64 / 256.0;
+        let width = f64::from(width_raw) / 256.0;
 
         let style_xf = if data.len() >= 16 {
             binary::read_u32_le_at(data, 12)?

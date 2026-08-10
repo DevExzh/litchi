@@ -140,9 +140,9 @@ fn serialize_data_validation(dv: &Validation) -> Result<Vec<u8>> {
     // --- flags (u32) ---
     let mut flags: u32 = 0;
     // bits 0-3: validation type
-    flags |= (dv.validation_type as u32) & 0x0F;
+    flags |= u32::from(dv.validation_type) & 0x0F;
     // bits 4-6: error style
-    flags |= ((dv.error_style as u32) & 0x07) << 4;
+    flags |= (u32::from(dv.error_style) & 0x07) << 4;
     // bit 7: string list flag (set for list type with comma-separated values)
     if dv.string_list {
         flags |= 0x0080;
@@ -166,7 +166,7 @@ fn serialize_data_validation(dv: &Validation) -> Result<Vec<u8>> {
         flags |= 0x0008_0000;
     }
     // bits 20-23: operator
-    flags |= ((dv.operator as u32) & 0x0F) << 20;
+    flags |= (u32::from(dv.operator) & 0x0F) << 20;
 
     buf.extend_from_slice(&flags.to_le_bytes());
 
@@ -496,10 +496,10 @@ fn invalid(value: impl Into<String>) -> Error {
 fn build_ptg_for_value(text: &str, ptg: &mut Vec<u8>) {
     // Try integer first (PtgInt: 0x1E + u16)
     if let Ok(n) = text.parse::<u64>()
-        && n <= u16::MAX as u64
+        && let Ok(n) = u16::try_from(n)
     {
         ptg.push(0x1E);
-        ptg.extend_from_slice(&(n as u16).to_le_bytes());
+        ptg.extend_from_slice(&n.to_le_bytes());
         return;
     }
 

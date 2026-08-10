@@ -224,10 +224,12 @@ pub fn load_external_links(package: &OpcPackage) -> Result<Vec<Entry>> {
                 part.content_type()
             )));
         }
+        let index =
+            u32::try_from(index).map_err(|_source| invalid("external-link index exceeds u32"))?;
         entries.push(load_external_link(
             part,
             relationship.r_id().to_owned(),
-            index as u32,
+            index,
         )?);
     }
     Ok(entries)
@@ -559,8 +561,10 @@ fn allocate_entries(package: &OpcPackage, links: &[Link]) -> Result<Vec<Entry>> 
                 break PackURI::new(candidate).map_err(invalid)?;
             }
         };
+        let index =
+            u32::try_from(index).map_err(|_source| invalid("external-link index exceeds u32"))?;
         entries.push(Entry {
-            index: index as u32,
+            index,
             relationship_id,
             part_uri,
             link,

@@ -258,12 +258,12 @@ fn add_reference_to_worksheet(
     let mut page_setup = None;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("worksheet XML offset overflow"))?;
+            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("worksheet XML offset overflow"))?;
+            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
         match event {
             Event::Start(element) => {
                 let core = exact(&namespace, conformance.sml());
@@ -313,7 +313,11 @@ fn add_reference_to_worksheet(
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !root || depth != 0 {
@@ -417,14 +421,23 @@ fn worksheet_conformance(xml: &[u8]) -> Result<PrinterSettingsConformance> {
                     ResolveResult::Bound(Namespace(value)) if value == STRICT_SML.as_bytes() => {
                         Ok(PrinterSettingsConformance::Strict)
                     },
-                    _ => Err(invalid("unsupported worksheet namespace")),
+                    ResolveResult::Unbound
+                    | ResolveResult::Bound(_)
+                    | ResolveResult::Unknown(_) => Err(invalid("unsupported worksheet namespace")),
                 };
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => return Err(invalid("missing worksheet root")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }

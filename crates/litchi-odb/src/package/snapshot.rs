@@ -127,6 +127,15 @@ impl Snapshot {
             .collect::<Vec<_>>();
         directories.sort_by(|left, right| left.0.cmp(&right.0));
         directories.dedup_by(|left, right| left.0 == right.0);
+        if additions
+            .len()
+            .checked_add(directories.len())
+            .is_none_or(|count| count > 4_096)
+        {
+            return Err(Error::InvalidFormat(
+                "ODB component dependency closure exceeds the entry limit".to_string(),
+            ));
+        }
         Ok((additions.into_values().collect(), directories))
     }
 
@@ -189,6 +198,22 @@ impl Snapshot {
             scan_active_xml(&addition.path, xml, &mut findings, MAX_FINDINGS)?;
         }
         Ok(findings.len())
+    }
+
+    pub(crate) fn payload_transfer_support(
+        additions: &[Addition],
+    ) -> crate::ComponentTransferSupport {
+        let requires_provenance = additions.iter().any(|addition| {
+            is_xml_member(&addition.path, &addition.media_type)
+                && litchi_odf_common::compact_xml::validate(&addition.bytes).is_err()
+        });
+        if requires_provenance {
+            crate::ComponentTransferSupport::Refused(
+                crate::ComponentTransferRefusal::FormattedXmlRequiresSourceProvenance,
+            )
+        } else {
+            crate::ComponentTransferSupport::Supported
+        }
     }
 
     pub(crate) fn contains_package_prefix(&self, prefix: &str) -> Result<bool> {

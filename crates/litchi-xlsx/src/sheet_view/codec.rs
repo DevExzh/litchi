@@ -137,7 +137,13 @@ pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Collection>> {
             Event::Empty(element) => parser.empty(&namespace, &element, decoder, &resolver)?,
             Event::End(element) => parser.end(&namespace, element.local_name().as_ref())?,
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if parser.capture.is_some() || !parser.stack.is_empty() {
@@ -600,7 +606,14 @@ impl Parser {
             Event::Start(_) => capture.depth += 1,
             Event::End(_) => capture.depth -= 1,
             Event::Eof => return Err(invalid("unterminated retained worksheet-view markup")),
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         if capture.depth != 0 {
             return Ok(());
@@ -662,8 +675,10 @@ fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<Entry> {
     if let Some(origin) = optional_cell(element, b"topLeftCell", decoder)? {
         view.origin = origin;
     }
+    let color_id =
+        u8::try_from(color_id).map_err(|_source| invalid("worksheet-view colorId exceeds 64"))?;
     view.color =
-        Color::new(color_id as u8).map_err(|_| invalid("worksheet-view colorId exceeds 64"))?;
+        Color::new(color_id).map_err(|_source| invalid("worksheet-view colorId exceeds 64"))?;
     view.zoom.current = current_zoom(element, b"zoomScale", decoder)?.unwrap_or_default();
     view.zoom.normal = remembered_zoom(element, b"zoomScaleNormal", decoder)?;
     view.zoom.page_break_preview = remembered_zoom(element, b"zoomScaleSheetLayoutView", decoder)?;
@@ -722,7 +737,7 @@ fn parse_selection(element: &BytesStart<'_>, decoder: Decoder) -> Result<Selecti
         active_range,
         ranges,
     )
-    .map_err(|_| invalid("invalid worksheet-view selection"))
+    .map_err(|_source| invalid("invalid worksheet-view selection"))
 }
 fn parse_pivot(
     element: &BytesStart<'_>,
@@ -837,7 +852,7 @@ fn optional_u32(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Resu
     attr(element, name, decoder)?
         .map(|v| {
             v.parse::<u32>()
-                .map_err(|_| invalid(format!("invalid unsigned integer '{v}'")))
+                .map_err(|_source| invalid(format!("invalid unsigned integer '{v}'")))
         })
         .transpose()
 }
@@ -853,7 +868,7 @@ fn optional_i32(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Resu
     attr(element, name, decoder)?
         .map(|v| {
             v.parse::<i32>()
-                .map_err(|_| invalid(format!("invalid integer '{v}'")))
+                .map_err(|_source| invalid(format!("invalid integer '{v}'")))
         })
         .transpose()
 }
@@ -866,14 +881,15 @@ fn nonnegative_f64(
         .map(|v| {
             let n = v
                 .parse::<f64>()
-                .map_err(|_| invalid(format!("invalid split value '{v}'")))?;
+                .map_err(|_source| invalid(format!("invalid split value '{v}'")))?;
             if !n.is_finite() || n < 0.0 {
                 Err(invalid(
                     "worksheet-view split must be finite and nonnegative",
                 ))
             } else {
-                Split::new(n)
-                    .map_err(|_| invalid("worksheet-view split must be finite and nonnegative"))
+                Split::new(n).map_err(|_source| {
+                    invalid("worksheet-view split must be finite and nonnegative")
+                })
             }
         })
         .transpose()
@@ -882,8 +898,12 @@ fn current_zoom(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Resu
     optional_u32(element, name, decoder)?
         .map(|v| {
             if (10..=400).contains(&v) {
-                Scale::new(v as u16)
-                    .map_err(|_| invalid("current worksheet-view zoom must be 10 through 400"))
+                let value = u16::try_from(v).map_err(|_source| {
+                    invalid("current worksheet-view zoom exceeds the unsigned 16-bit wire type")
+                })?;
+                Scale::new(value).map_err(|_source| {
+                    invalid("current worksheet-view zoom must be 10 through 400")
+                })
             } else {
                 Err(invalid(
                     "current worksheet-view zoom must be 10 through 400",
@@ -899,9 +919,14 @@ fn remembered_zoom(
 ) -> Result<Option<Scale>> {
     match optional_u32(element, name, decoder)? {
         None | Some(0) => Ok(None),
-        Some(value) if (10..=400).contains(&value) => Scale::new(value as u16)
-            .map(Some)
-            .map_err(|_| invalid("remembered worksheet-view zoom must be zero or 10 through 400")),
+        Some(value) if (10..=400).contains(&value) => {
+            let value = u16::try_from(value).map_err(|_source| {
+                invalid("remembered worksheet-view zoom exceeds the unsigned 16-bit wire type")
+            })?;
+            Scale::new(value).map(Some).map_err(|_source| {
+                invalid("remembered worksheet-view zoom must be zero or 10 through 400")
+            })
+        },
         Some(_) => Err(invalid(
             "remembered worksheet-view zoom must be zero or 10 through 400",
         )),

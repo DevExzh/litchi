@@ -240,7 +240,7 @@ pub fn parse_cell_watches(xml: &[u8]) -> Result<Option<CellWatches>> {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -428,7 +428,7 @@ fn validate_cell_reference(value: &str) -> Result<()> {
     }
     let row = value[row_start..]
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid cellWatch row in '{value}'")))?;
+        .map_err(|_source| invalid(format!("invalid cellWatch row in '{value}'")))?;
     if row == 0 || row > MAX_ROW {
         return Err(invalid(format!(
             "cellWatch row is out of range in '{value}'"

@@ -27,7 +27,7 @@ pub(super) fn optional_u32(
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_| format!("invalid {description} '{value}'").into())
+                .map_err(|_source| format!("invalid {description} '{value}'").into())
         })
         .transpose()
 }
@@ -51,7 +51,7 @@ pub(super) fn required_i32(
     let value = required_string(element, name, decoder, description)?;
     value
         .parse::<i32>()
-        .map_err(|_| format!("invalid {description} '{value}'").into())
+        .map_err(|_source| format!("invalid {description} '{value}'").into())
 }
 
 pub(super) fn optional_i32(
@@ -64,7 +64,7 @@ pub(super) fn optional_i32(
         .map(|value| {
             value
                 .parse::<i32>()
-                .map_err(|_| format!("invalid {description} '{value}'").into())
+                .map_err(|_source| format!("invalid {description} '{value}'").into())
         })
         .transpose()
 }
@@ -79,7 +79,7 @@ pub(super) fn optional_u8(
         .map(|value| {
             value
                 .parse::<u8>()
-                .map_err(|_| format!("invalid {description} '{value}'").into())
+                .map_err(|_source| format!("invalid {description} '{value}'").into())
         })
         .transpose()
 }
@@ -119,7 +119,7 @@ pub(super) fn optional_f64(
         .map(|value| {
             let parsed = value
                 .parse::<f64>()
-                .map_err(|_| format!("invalid {description} '{value}'"))?;
+                .map_err(|_source| format!("invalid {description} '{value}'"))?;
             if !parsed.is_finite() {
                 return Err(format!("{description} must be finite").into());
             }

@@ -567,7 +567,7 @@ impl Parser {
                     );
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
             }
         }
         Ok(parser.groups)
@@ -805,7 +805,14 @@ impl Parser {
         match context {
             Context::Formula => sparkline.data_range.push_str(value),
             Context::Location => sparkline.location.push_str(value),
-            _ => return Err("unexpected sparkline text context".into()),
+            Context::Worksheet
+            | Context::ExtensionList
+            | Context::SparklineExtension
+            | Context::Groups
+            | Context::Group
+            | Context::Sparklines
+            | Context::Item
+            | Context::Other => return Err("unexpected sparkline text context".into()),
         }
         Ok(())
     }
@@ -860,7 +867,13 @@ impl Parser {
             Context::SparklineExtension if !self.extension_saw_groups => {
                 return Err("sparkline extension contains no sparklineGroups".into());
             },
-            _ => {},
+            Context::Worksheet
+            | Context::ExtensionList
+            | Context::SparklineExtension
+            | Context::Sparklines
+            | Context::Formula
+            | Context::Location
+            | Context::Other => {},
         }
         Ok(())
     }
@@ -934,7 +947,7 @@ fn sparkline_f64(
 ) -> SheetResult<Option<f64>> {
     unqualified_attribute_value(element, name, decoder)?
         .map(|value| {
-            let number = value.parse::<f64>().map_err(|_| {
+            let number = value.parse::<f64>().map_err(|_source| {
                 format!(
                     "invalid sparkline number {}='{value}'",
                     String::from_utf8_lossy(name)
@@ -959,7 +972,7 @@ fn sparkline_u32(
 ) -> SheetResult<Option<u32>> {
     unqualified_attribute_value(element, name, decoder)?
         .map(|value| {
-            value.parse::<u32>().map_err(|_| {
+            value.parse::<u32>().map_err(|_source| {
                 format!(
                     "invalid sparkline unsigned integer {}='{value}'",
                     String::from_utf8_lossy(name)

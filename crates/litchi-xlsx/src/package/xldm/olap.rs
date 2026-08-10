@@ -253,7 +253,21 @@ pub fn parse_file<'a>(storage_path: &'a str, bytes: &'a [u8]) -> OlapResult<Opti
         GeneratedNameKind::PartitionInformation => OlapFileKind::PartitionInformation,
         GeneratedNameKind::TableInformation => OlapFileKind::DimensionInformation,
         GeneratedNameKind::CubeInformation => OlapFileKind::CubeInformation,
-        _ => return Ok(None),
+        GeneratedNameKind::DataSourceOrDimensionDefinition
+        | GeneratedNameKind::TableMetadata
+        | GeneratedNameKind::TableRelationshipMetadata
+        | GeneratedNameKind::ColumnHierarchyMetadata
+        | GeneratedNameKind::UserHierarchyMetadata
+        | GeneratedNameKind::ColumnData
+        | GeneratedNameKind::TableRelationshipIndex
+        | GeneratedNameKind::ColumnPositionToId
+        | GeneratedNameKind::ColumnIdToPosition
+        | GeneratedNameKind::ColumnHashIndex
+        | GeneratedNameKind::ColumnDictionary
+        | GeneratedNameKind::UserHierarchyChildCount
+        | GeneratedNameKind::UserHierarchyFirstChildPosition
+        | GeneratedNameKind::UserHierarchyParentPosition
+        | GeneratedNameKind::UserHierarchyMultilevelId => return Ok(None),
     };
     let root = parse_xml(bytes)?;
     let document = match kind {
@@ -438,7 +452,10 @@ fn parse_tabular_extension(
         ],
         OlapObjectKind::Dimension => &["PermissionFileList"],
         OlapObjectKind::MeasureGroup => &["AggregationDesignFileList", "PartitionFileList"],
-        _ => &[],
+        OlapObjectKind::Database
+        | OlapObjectKind::DataSourceView
+        | OlapObjectKind::MdxScript
+        | OlapObjectKind::Partition => &[],
     };
     let suffix_len = 5 + extras.len();
     if object.children.len() < suffix_len {
@@ -554,7 +571,9 @@ fn parse_dimension_information(root: OlapElement) -> OlapResult<DimensionInforma
             "Properties",
         ],
     )?;
-    let properties_node = root.child("Properties").expect("validated sequence");
+    let properties_node = root
+        .child("Properties")
+        .unwrap_or_else(|| crate::error::panic_missing_invariant("validated sequence"));
     if !properties_node.text.trim().is_empty()
         || properties_node
             .children
@@ -570,7 +589,9 @@ fn parse_dimension_information(root: OlapElement) -> OlapResult<DimensionInforma
             "Property",
             &["ParentChild", "Depth", "Balanced", "HasHoles", "MapDataset"],
         )?;
-        let map = property.child("MapDataset").expect("validated sequence");
+        let map = property
+            .child("MapDataset")
+            .unwrap_or_else(|| crate::error::panic_missing_invariant("validated sequence"));
         let names = [
             "m_cbOffsetHeader",
             "m_cbOffsetData",
@@ -632,7 +653,9 @@ fn validate_model(
         .iter()
         .filter_map(|file| match &file.document {
             OlapDocument::Definition(value) => Some((file.storage_path, value)),
-            _ => None,
+            OlapDocument::PartitionInformation(_)
+            | OlapDocument::DimensionInformation(_)
+            | OlapDocument::CubeInformation(_) => None,
         })
         .collect();
     let mut ids = HashSet::new();
@@ -765,7 +788,7 @@ fn validate_model(
         for column in file
             .table
             .collection("Columns")
-            .expect("validated metadata")
+            .unwrap_or_else(|| crate::error::panic_missing_invariant("validated metadata"))
         {
             let id = column
                 .name
@@ -829,7 +852,10 @@ fn validate_parent_shape(kind: OlapObjectKind, parent: &OlapParentReference) -> 
         OlapObjectKind::MdxScript | OlapObjectKind::MeasureGroup | OlapObjectKind::Partition => {
             parent.database_id.is_some() && parent.cube_id.is_some()
         },
-        _ => parent.database_id.is_some() && parent.cube_id.is_none(),
+        OlapObjectKind::Cube
+        | OlapObjectKind::DataSource
+        | OlapObjectKind::DataSourceView
+        | OlapObjectKind::Dimension => parent.database_id.is_some() && parent.cube_id.is_none(),
     };
     if !valid {
         return Err(OlapError::new(format!(
@@ -876,7 +902,7 @@ fn persist_folder(path: &str, definition: &OlapDefinition) -> OlapResult<String>
         .kind
         .suffix()
         .strip_suffix(".xml")
-        .expect("fixed suffix");
+        .unwrap_or_else(|| crate::error::panic_missing_invariant("fixed suffix"));
     let folder = format!(
         "{id}.{}{object_suffix}",
         definition.extension.persist_location
@@ -1202,12 +1228,12 @@ fn require_sequence(node: &OlapElement, root: &str, names: &[&str]) -> OlapResul
 fn parse_i32(value: &str, name: &str) -> OlapResult<i32> {
     value
         .parse()
-        .map_err(|_| OlapError::new(format!("invalid integer {name}")))
+        .map_err(|_source| OlapError::new(format!("invalid integer {name}")))
 }
 fn parse_i64(value: &str, name: &str) -> OlapResult<i64> {
     value
         .parse()
-        .map_err(|_| OlapError::new(format!("invalid integer {name}")))
+        .map_err(|_source| OlapError::new(format!("invalid integer {name}")))
 }
 fn parse_bool(value: &str, name: &str) -> OlapResult<bool> {
     match value {

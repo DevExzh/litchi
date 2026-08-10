@@ -204,5 +204,5 @@ fn signed_30(value: f64) -> Option<i32> {
         return None;
     }
     let integer = value as i32;
-    (f64::from(integer) == value).then_some(integer)
+    (f64::from(integer).to_bits() == value.to_bits()).then_some(integer)
 }

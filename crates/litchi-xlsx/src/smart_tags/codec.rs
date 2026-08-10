@@ -88,7 +88,11 @@ pub fn parse(xml: &[u8]) -> Result<Option<Collection>> {
                 declaration_seen = true;
             },
             Event::Eof => break,
-            _ => {},
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !parser.scopes.is_empty() || !parser.root_seen || !parser.root_closed {
@@ -143,7 +147,7 @@ impl Parser {
             Scope::Cell => {
                 return Err(invalid("cellSmartTags requires at least one cellSmartTag"));
             },
-            _ => {},
+            Scope::Tag | Scope::Property | Scope::Other => {},
         }
         Ok(())
     }
@@ -231,7 +235,9 @@ impl Parser {
             Scope::Tag if local == b"cellSmartTag" => {},
             Scope::Property if local == b"cellSmartTagPr" => {},
             Scope::Other => {},
-            _ => return Err(invalid("mismatched smart-tag end element")),
+            Scope::Worksheet | Scope::Collection | Scope::Cell | Scope::Tag | Scope::Property => {
+                return Err(invalid("mismatched smart-tag end element"));
+            },
         }
         Ok(())
     }
@@ -347,10 +353,10 @@ fn locate(xml: &[u8]) -> Result<Location> {
     let mut insertion = None;
     loop {
         let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("smart-tag XML offset overflow"))?;
+            .map_err(|_source| invalid("smart-tag XML offset overflow"))?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("smart-tag XML offset overflow"))?;
+            .map_err(|_source| invalid("smart-tag XML offset overflow"))?;
         reject_unsafe_event(&event)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
@@ -417,7 +423,13 @@ fn locate(xml: &[u8]) -> Result<Location> {
                 return Err(invalid("smart-tag XML text is outside the root"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if depth != 0 || !root_seen || !root_closed || start.is_some() {
@@ -498,11 +510,10 @@ fn parse_tag(
             .map_err(xml_error)?;
         match local.as_ref() {
             b"type" if type_id.is_none() => {
-                type_id = Some(
-                    value
-                        .parse::<u32>()
-                        .map_err(|_| invalid("cellSmartTag type is not an unsigned integer"))?,
-                );
+                type_id =
+                    Some(value.parse::<u32>().map_err(|_source| {
+                        invalid("cellSmartTag type is not an unsigned integer")
+                    })?);
             },
             b"deleted" if deleted.is_none() => deleted = Some(parse_bool(&value, "deleted")?),
             b"xmlBased" if xml_based.is_none() => xml_based = Some(parse_bool(&value, "xmlBased")?),
@@ -584,7 +595,9 @@ fn conformance_of(namespace: &ResolveResult<'_>) -> Result<Conformance> {
         ResolveResult::Bound(value) if value.as_ref() == STRICT.as_bytes() => {
             Ok(Conformance::Strict)
         },
-        _ => Err(invalid("worksheet root uses an unsupported namespace")),
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            Err(invalid("worksheet root uses an unsupported namespace"))
+        },
     }
 }
 

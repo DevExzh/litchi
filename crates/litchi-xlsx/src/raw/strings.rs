@@ -127,7 +127,13 @@ impl Parser {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
         Ok(parser.strings.into_boxed_slice())
@@ -257,7 +263,7 @@ fn current(stack: &[Context]) -> Result<Context> {
 fn count_hint(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<usize>> {
     unqualified_attribute_value(element, name, decoder)?
         .map(|value| {
-            let count = value.parse::<u64>().map_err(|_| {
+            let count = value.parse::<u64>().map_err(|_source| {
                 invalid(format!(
                     "invalid shared-string {} '{value}'",
                     String::from_utf8_lossy(name)
@@ -270,7 +276,7 @@ fn count_hint(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result
                 )));
             }
             usize::try_from(count)
-                .map_err(|_| invalid("shared-string count does not fit this platform"))
+                .map_err(|_source| invalid("shared-string count does not fit this platform"))
         })
         .transpose()
 }
@@ -347,7 +353,9 @@ pub(crate) fn encode_spreadsheet_text(value: &str) -> String {
         let mut units = [0; 2];
         for unit in character.encode_utf16(&mut units) {
             use std::fmt::Write as _;
-            write!(encoded, "_x{unit:04X}_").expect("writing to a String is infallible");
+            write!(encoded, "_x{unit:04X}_").unwrap_or_else(|error| {
+                crate::error::panic_error_invariant("writing to a String is infallible", error)
+            });
         }
     }
     encoded

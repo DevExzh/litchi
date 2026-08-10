@@ -55,9 +55,9 @@ fn normalize_legacy_boolean_attributes(xml: &[u8]) -> Option<Vec<u8>> {
     let mut stack = Vec::new();
     let mut replacements = Vec::new();
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = usize::try_from(reader.buffer_position()).ok()?;
         let event = reader.read_event().ok()?;
-        let end = reader.buffer_position() as usize;
+        let end = usize::try_from(reader.buffer_position()).ok()?;
         match event {
             Event::Start(element) => {
                 let context = classify_context(
@@ -89,7 +89,13 @@ fn normalize_legacy_boolean_attributes(xml: &[u8]) -> Option<Vec<u8>> {
                 stack.pop()?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if replacements.is_empty() {

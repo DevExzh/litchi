@@ -167,7 +167,13 @@ pub(super) fn scan(content: &[u8]) -> Result<Layout> {
                 scanner.finish(frame, event_start, event_end)?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -573,7 +579,7 @@ impl Scanner {
                     payload: self.defined_names_payload,
                 });
             },
-            _ => {},
+            Kind::Workbook | Kind::Other => {},
         }
         Ok(())
     }
@@ -640,7 +646,7 @@ fn optional_u32(
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid {description} '{value}' during edit")))
+                .map_err(|_source| invalid(format!("invalid {description} '{value}' during edit")))
         })
         .transpose()
 }
@@ -654,7 +660,7 @@ fn optional_usize(
     optional_u32(element, name, decoder, description)?
         .map(|value| {
             usize::try_from(value)
-                .map_err(|_| invalid(format!("{description} does not fit usize during edit")))
+                .map_err(|_source| invalid(format!("{description} does not fit usize during edit")))
         })
         .transpose()
 }
@@ -750,5 +756,5 @@ fn is_order_dependency_name(namespace: &ResolveResult<'_>, element: &BytesStart<
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("workbook XML position does not fit usize"))
+        .map_err(|_source| invalid("workbook XML position does not fit usize"))
 }

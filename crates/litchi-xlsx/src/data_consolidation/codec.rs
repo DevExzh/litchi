@@ -120,7 +120,12 @@ pub fn parse_worksheet_data_consolidation(xml: &[u8]) -> Result<Option<DataConso
                 return Err(invalid("worksheet XML cannot contain a document type"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -328,7 +333,7 @@ fn parse_data_refs_attributes(
             .map_err(|error| invalid(format!("invalid dataRefs count: {error}")))?;
         let parsed = text
             .parse::<u32>()
-            .map_err(|_| invalid("dataRefs count must be unsignedInt"))?;
+            .map_err(|_source| invalid("dataRefs count must be unsignedInt"))?;
         if parsed as usize > MAX_DATA_REFERENCES {
             return Err(invalid(format!(
                 "dataRefs count exceeds safety limit {MAX_DATA_REFERENCES}"
@@ -406,12 +411,23 @@ pub fn write_worksheet_data_consolidation(
         "<dataConsolidate xmlns=\"{}\"",
         conformance.main_namespace()
     )
-    .unwrap();
+    .unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    });
     if has_relationships {
-        write!(xml, " xmlns:r=\"{}\"", conformance.relationship_namespace()).unwrap();
+        write!(xml, " xmlns:r=\"{}\"", conformance.relationship_namespace()).unwrap_or_else(
+            |error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            },
+        );
     }
     if value.function() != Function::Sum {
-        write!(xml, " function=\"{}\"", value.function().as_str()).unwrap();
+        write!(xml, " function=\"{}\"", value.function().as_str()).unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("operation was checked before extraction", error)
+        });
     }
     write_true_attribute(&mut xml, "leftLabels", value.left_labels());
     write_true_attribute(&mut xml, "startLabels", value.start_labels());
@@ -422,7 +438,9 @@ pub fn write_worksheet_data_consolidation(
         return Ok(xml);
     };
     xml.push('>');
-    write!(xml, "<dataRefs count=\"{}\">", data_refs.references().len()).unwrap();
+    write!(xml, "<dataRefs count=\"{}\">", data_refs.references().len()).unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    });
     for reference in data_refs.references() {
         xml.push_str("<dataRef");
         match reference.source() {
@@ -443,12 +461,16 @@ pub fn write_worksheet_data_consolidation(
 
 fn write_true_attribute(xml: &mut String, name: &str, value: bool) {
     if value {
-        write!(xml, " {name}=\"1\"").unwrap();
+        write!(xml, " {name}=\"1\"").unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("operation was checked before extraction", error)
+        });
     }
 }
 
 fn write_attribute(xml: &mut String, name: &str, value: &str) {
-    write!(xml, " {name}=\"").unwrap();
+    write!(xml, " {name}=\"").unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    });
     for character in value.chars() {
         match character {
             '&' => xml.push_str("&amp;"),

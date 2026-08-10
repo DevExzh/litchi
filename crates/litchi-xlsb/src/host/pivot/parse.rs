@@ -1527,9 +1527,9 @@ fn parse_rule_filter(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<Pivot
     let mut cursor = Cursor::new(data, "BrtBeginPRFilter");
     let field = cursor.read_i32()?;
     let declared_items = cursor.read_u32()?;
-    let flags = cursor.read_u8()? as u32
-        | (cursor.read_u8()? as u32) << 8
-        | (cursor.read_u8()? as u32) << 16;
+    let flags = u32::from(cursor.read_u8()?)
+        | u32::from(cursor.read_u8()?) << 8
+        | u32::from(cursor.read_u8()?) << 16;
     cursor.finish()?;
     let mut filter = PivotRuleFilter {
         field,

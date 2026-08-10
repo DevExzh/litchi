@@ -257,10 +257,10 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
             return Err(limit("XML event count"));
         }
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("Slicer Cache XML offset overflow"))?;
+            .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?;
         let borrowed = reader.read_event().map_err(xml_error)?;
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("Slicer Cache XML offset overflow"))?;
+            .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?;
         let event_bytes = end
             .checked_sub(start)
             .ok_or_else(|| invalid("Slicer Cache XML offsets moved backwards"))?;
@@ -466,7 +466,7 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
             },
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {},
         }
     }
     if !root_seen
@@ -937,7 +937,7 @@ fn parse_u32(value: &str, name: &str) -> Result<u32> {
     }
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid {name} '{value}'")))
+        .map_err(|_source| invalid(format!("invalid {name} '{value}'")))
 }
 
 fn set_once<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {
@@ -999,7 +999,13 @@ fn validate_event_xml(
                 "XML CDATA",
             )
         },
-        _ => Ok(()),
+        Event::End(_)
+        | Event::Comment(_)
+        | Event::Decl(_)
+        | Event::PI(_)
+        | Event::DocType(_)
+        | Event::GeneralRef(_)
+        | Event::Eof => Ok(()),
     }
 }
 

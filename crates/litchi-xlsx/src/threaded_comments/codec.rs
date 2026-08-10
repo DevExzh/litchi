@@ -67,7 +67,7 @@ fn validate_cell_ref(reference: &str) -> SheetResult<()> {
         .transpose()?
         .ok_or_else(|| format!("Invalid row in cell reference: {reference}"))?
         .parse::<u32>()
-        .map_err(|_| format!("Invalid row number in cell reference: {reference}"))?;
+        .map_err(|_source| format!("Invalid row number in cell reference: {reference}"))?;
     if row == 0 || row > 1_048_576 {
         return Err(format!("Row exceeds Excel limits in cell reference: {reference}").into());
     }
@@ -154,7 +154,13 @@ pub fn parse_persons(xml: &str) -> SheetResult<People> {
                 return Err("people part has a missing or unterminated root".into());
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -323,7 +329,13 @@ pub fn parse_comments(xml: &str) -> SheetResult<Comments> {
                 return Err("threaded-comments part has a missing or unterminated root".into());
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -435,7 +447,7 @@ fn finish_comment_element(
     let pending = pending.take().ok_or("missing pending threaded comment")?;
     if let Some(text) = pending.comment.text.as_deref() {
         let text_len = u32::try_from(text.encode_utf16().count())
-            .map_err(|_| "threaded-comment text is too long")?;
+            .map_err(|_source| "threaded-comment text is too long")?;
         for mention in &pending.comment.mentions {
             let end = mention
                 .start_index
@@ -535,7 +547,7 @@ fn required_u32(
     let value = required_string(element, name, decoder, description)?;
     value
         .parse::<u32>()
-        .map_err(|_| format!("invalid {description} '{value}'").into())
+        .map_err(|_source| format!("invalid {description} '{value}'").into())
 }
 
 fn required_guid(
@@ -778,7 +790,7 @@ pub fn validate_comments(comments: &Comments) -> SheetResult<()> {
             .as_deref()
             .map(|text| {
                 u32::try_from(text.encode_utf16().count())
-                    .map_err(|_| "threaded-comment text is too long")
+                    .map_err(|_source| "threaded-comment text is too long")
             })
             .transpose()?;
         if text_len.is_some_and(|length| length as usize > MAX_TEXT_UTF16) {
@@ -898,7 +910,12 @@ pub fn validate_graph(graph: &Graph) -> SheetResult<()> {
             .iter()
             .filter(|comment| comment.parent_id.is_some())
         {
-            if !roots.contains(reply.parent_id.as_deref().expect("filtered")) {
+            if !roots.contains(
+                reply
+                    .parent_id
+                    .as_deref()
+                    .unwrap_or_else(|| crate::error::panic_missing_invariant("filtered")),
+            ) {
                 return Err(format!(
                     "threaded-comment reply '{}' must reference a root in the same worksheet",
                     reply.id

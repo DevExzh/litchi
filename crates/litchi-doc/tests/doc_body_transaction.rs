@@ -5,9 +5,11 @@
 
 use litchi_cfb::OleWriter;
 use litchi_core::Position;
-use litchi_doc::Package;
-use litchi_doc::body_text::{CharacterProperty, Projection, Snapshot, Story, TextTarget};
+use litchi_doc::body_text::{
+    CharacterProperty, DrawingDependency, Error, Projection, Refusal, Snapshot, Story, TextTarget,
+};
 use litchi_doc::writer::{FloatingPosition, Kind, Picture, Shape, Writer};
+use litchi_doc::{HeaderKind, Package};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -265,7 +267,7 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
 }
 
 #[test]
-fn genuine_receivers_accept_pictures_beside_shapes_and_textboxes() {
+fn genuine_receivers_accept_pictures_beside_main_and_header_drawings() {
     let image = std::fs::read(fixture("test-data/images/png/lena.png")).expect("PNG fixture");
     for floating in [false, true] {
         let mut writer = Writer::new();
@@ -282,6 +284,21 @@ fn genuine_receivers_accept_pictures_beside_shapes_and_textboxes() {
                 "unrelated textbox content",
             )
             .expect("neighbor textbox run");
+        writer
+            .insert_header_text_box(
+                HeaderKind::Odd,
+                Shape::new(Kind::Rectangle, 720, 400).expect("header textbox"),
+                FloatingPosition::new(240, 280),
+                "unrelated header textbox content",
+            )
+            .expect("header textbox run");
+        writer
+            .insert_header_picture(
+                HeaderKind::Odd,
+                Picture::new(image.clone()).expect("header picture"),
+                FloatingPosition::new(300, 340),
+            )
+            .expect("header picture run");
         let picture = Picture::new(image.clone()).expect("native PNG picture");
         if floating {
             writer
@@ -380,5 +397,46 @@ fn genuine_receivers_accept_pictures_beside_shapes_and_textboxes() {
                 .expect("receiver paragraphs")[destination.get()]
             .text()
         );
+    }
+}
+
+#[test]
+fn genuine_word97_noncanonical_picture_graphs_are_typed_refusals() {
+    let donor = Snapshot::parse(
+        &std::fs::read(fixture("test-data/ole/doc/FloatingPictures.doc"))
+            .expect("genuine Word 97 picture donor"),
+    )
+    .expect("genuine donor snapshot");
+    let receiver = Snapshot::parse(
+        &std::fs::read(fixture("test-data/ole/doc/documentProperties.doc"))
+            .expect("genuine receiver fixture"),
+    )
+    .expect("genuine receiver snapshot");
+    let destination = receiver
+        .paragraphs(Projection::All)
+        .expect("genuine receiver paragraphs")
+        .into_iter()
+        .find(|paragraph| !paragraph.text().is_empty())
+        .expect("genuine receiver placeholder")
+        .position();
+    let candidates = donor
+        .paragraphs(Projection::All)
+        .expect("genuine donor paragraphs")
+        .into_iter()
+        .filter(|paragraph| paragraph.text().contains('\u{0008}'))
+        .map(|paragraph| paragraph.position())
+        .collect::<Vec<_>>();
+    assert!(!candidates.is_empty(), "genuine donor has picture anchors");
+    for position in candidates {
+        assert!(matches!(
+            receiver.plan_picture_transfer_from(
+                &donor,
+                TextTarget::body_paragraph(position),
+                TextTarget::body_paragraph(destination),
+            ),
+            Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::UnsupportedPictureGraph
+            }))
+        ));
     }
 }

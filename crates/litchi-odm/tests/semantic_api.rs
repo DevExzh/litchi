@@ -3,7 +3,13 @@
     reason = "test code panics on failure; unwrap keeps assertions concise"
 )]
 
-use litchi_odm::{Builder, Master, section::Section, subdocument::Subdocument};
+use litchi_odm::{
+    Builder, Master,
+    section::Section,
+    structure::{IndexKind, Kind},
+    subdocument::Subdocument,
+    transaction::BodyItemSpec,
+};
 
 const COMPACT_CONTENT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
@@ -69,4 +75,50 @@ fn semantic_whitespace_is_preserved_exactly() {
     )
     .unwrap();
     assert_eq!(master.content_xml(), SEMANTIC_WHITESPACE_CONTENT);
+}
+
+#[test]
+fn typed_builder_authors_common_master_body_content() {
+    let bytes = Builder::new()
+        .body_item(BodyItemSpec::paragraph("Introduction & scope").unwrap())
+        .body_item(BodyItemSpec::heading(1, "Part one").unwrap())
+        .body_item(BodyItemSpec::list(vec!["First".to_string(), "Second".to_string()]).unwrap())
+        .body_item(
+            BodyItemSpec::table(
+                "Summary",
+                vec![
+                    vec!["Key".to_string(), "Value".to_string()],
+                    vec!["Mode".to_string(), "Exact".to_string()],
+                ],
+            )
+            .unwrap(),
+        )
+        .body_item(BodyItemSpec::generated_index(IndexKind::TableOfContents, "Contents").unwrap())
+        .build()
+        .unwrap();
+    let master = Master::from_bytes(bytes).unwrap();
+    assert_eq!(
+        master.structure().items(),
+        &[
+            Kind::Paragraph,
+            Kind::Heading,
+            Kind::List,
+            Kind::Table,
+            Kind::GeneratedIndex(IndexKind::TableOfContents),
+        ]
+    );
+    assert!(master.content_xml().contains("Introduction &amp; scope"));
+    assert!(!master.content_xml().contains('\n'));
+    assert!(BodyItemSpec::heading(0, "invalid").is_err());
+    assert!(BodyItemSpec::list(Vec::new()).is_err());
+    assert!(
+        BodyItemSpec::table(
+            "Ragged",
+            vec![
+                vec!["one".to_string()],
+                vec!["two".to_string(), "three".to_string()]
+            ],
+        )
+        .is_err()
+    );
 }

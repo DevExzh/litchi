@@ -327,6 +327,24 @@ pub struct Relation {
     columns: Vec<KeyColumn>,
 }
 
+/// Local catalog resolution state for one foreign-key relation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RelationResolution {
+    /// Owner, target, and every column mapping resolve locally.
+    Resolved,
+    /// The relation owner is absent from the inspected catalog.
+    MissingOwnerTable,
+    /// The referenced table is external or absent from the inspected catalog.
+    MissingReferencedTable,
+    /// A mapping has no local column name.
+    IncompleteLocalColumn,
+    /// A named local column is absent from the owner table.
+    MissingLocalColumn,
+    /// A named related column is absent from the referenced table.
+    MissingReferencedColumn,
+}
+
 impl Relation {
     pub(crate) fn from_key(table: &str, key: &Key) -> Option<Self> {
         let referenced_table = key.referenced_table()?.to_owned();

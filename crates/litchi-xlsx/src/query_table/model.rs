@@ -186,7 +186,7 @@ impl IconSet {
             | Self::FourRedToBlack
             | Self::FourRating
             | Self::FourTrafficLights => 4,
-            _ => 5,
+            Self::FiveArrows | Self::FiveArrowsGray | Self::FiveRating | Self::FiveQuarters => 5,
         }
     }
 }

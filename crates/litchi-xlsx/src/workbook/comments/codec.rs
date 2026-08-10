@@ -167,7 +167,7 @@ impl Parser {
                     return Err(invalid("comments part has a missing or unterminated root"));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
             }
         }
 
@@ -388,7 +388,13 @@ impl Parser {
             Context::CommentList if self.comments.len() == self.comment_list_start => {
                 return Err(invalid("comments commentList contains no comment"));
             },
-            _ => {},
+            Context::Comments
+            | Context::Authors
+            | Context::CommentList
+            | Context::CommentText
+            | Context::RichRun
+            | Context::Text(_)
+            | Context::Other => {},
         }
         Ok(())
     }
@@ -427,7 +433,7 @@ fn optional_u32(
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
         })
         .transpose()
 }
@@ -514,7 +520,7 @@ pub fn write_comments(value: &Comments) -> Result<Vec<u8>> {
     );
     for author in &value.authors {
         write!(xml, "<author>{}</author>", escape_text(author))
-            .map_err(|_| invalid("classic comments XML formatting failed"))?;
+            .map_err(|_source| invalid("classic comments XML formatting failed"))?;
     }
     xml.push_str("</authors><commentList>");
     for comment in value.comments.values() {
@@ -524,14 +530,14 @@ pub fn write_comments(value: &Comments) -> Result<Vec<u8>> {
             escape_attribute(&comment.cell_ref),
             comment.author_id
         )
-        .map_err(|_| invalid("classic comments XML formatting failed"))?;
+        .map_err(|_source| invalid("classic comments XML formatting failed"))?;
         if let Some(guid) = &comment.guid {
             write!(xml, " guid=\"{}\"", escape_attribute(guid))
-                .map_err(|_| invalid("classic comments XML formatting failed"))?;
+                .map_err(|_source| invalid("classic comments XML formatting failed"))?;
         }
         if let Some(shape_id) = comment.shape_id {
             write!(xml, " shapeId=\"{shape_id}\"")
-                .map_err(|_| invalid("classic comments XML formatting failed"))?;
+                .map_err(|_source| invalid("classic comments XML formatting failed"))?;
         }
         xml.push('>');
         write!(
@@ -539,7 +545,7 @@ pub fn write_comments(value: &Comments) -> Result<Vec<u8>> {
             "<text><t>{}</t></text></comment>",
             escape_text(&comment.text)
         )
-        .map_err(|_| invalid("classic comments XML formatting failed"))?;
+        .map_err(|_source| invalid("classic comments XML formatting failed"))?;
     }
     xml.push_str("</commentList></comments>");
     if xml.len() > MAX_PART_BYTES {

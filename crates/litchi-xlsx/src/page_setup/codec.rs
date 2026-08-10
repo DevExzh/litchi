@@ -94,11 +94,22 @@ fn relationship_namespace_for_worksheet(xml: &[u8]) -> Result<&'static str> {
                             invalid(format!("relationship namespace is not UTF-8: {error}"))
                         })
                     },
-                    _ => Err(invalid("page-setup writer requires a worksheet root")),
+                    ResolveResult::Unbound
+                    | ResolveResult::Bound(_)
+                    | ResolveResult::Unknown(_) => {
+                        Err(invalid("page-setup writer requires a worksheet root"))
+                    },
                 };
             },
             Event::Decl(_) | Event::Comment(_) | Event::Text(_) => {},
-            _ => return Err(invalid("page-setup writer requires a worksheet root")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::CData(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::Eof => return Err(invalid("page-setup writer requires a worksheet root")),
         }
     }
 }
@@ -578,13 +589,13 @@ fn parse_measure(raw: &str, field: &str) -> Result<Measure> {
         .ok_or_else(|| invalid(format!("invalid {field} unit")))?;
     let unit = suffix
         .parse()
-        .map_err(|_| invalid(format!("invalid {field} unit")))?;
-    Measure::new(number, unit).map_err(|_| invalid(format!("invalid {field} measure")))
+        .map_err(|_source| invalid(format!("invalid {field} unit")))?;
+    Measure::new(number, unit).map_err(|_source| invalid(format!("invalid {field} measure")))
 }
 
 fn parse_u32(raw: &str, field: &str) -> Result<u32> {
     raw.parse()
-        .map_err(|_| invalid(format!("invalid pageSetup {field}")))
+        .map_err(|_source| invalid(format!("invalid pageSetup {field}")))
 }
 fn parse_bool(raw: &str, field: &str) -> Result<bool> {
     match raw {
@@ -595,18 +606,19 @@ fn parse_bool(raw: &str, field: &str) -> Result<bool> {
 }
 fn parse_orientation(raw: &str) -> Result<Orientation> {
     raw.parse()
-        .map_err(|_| invalid("invalid pageSetup orientation"))
+        .map_err(|_source| invalid("invalid pageSetup orientation"))
 }
 fn parse_order(raw: &str) -> Result<Order> {
     raw.parse()
-        .map_err(|_| invalid("invalid pageSetup pageOrder"))
+        .map_err(|_source| invalid("invalid pageSetup pageOrder"))
 }
 fn parse_comments(raw: &str) -> Result<Comments> {
     raw.parse()
-        .map_err(|_| invalid("invalid pageSetup cellComments"))
+        .map_err(|_source| invalid("invalid pageSetup cellComments"))
 }
 fn parse_errors(raw: &str) -> Result<ErrorMode> {
-    raw.parse().map_err(|_| invalid("invalid pageSetup errors"))
+    raw.parse()
+        .map_err(|_source| invalid("invalid pageSetup errors"))
 }
 
 fn spreadsheet(namespace: &ResolveResult<'_>) -> bool {
@@ -616,7 +628,7 @@ fn spreadsheet_namespace(namespace: &ResolveResult<'_>) -> Option<&'static [u8]>
     match namespace {
         ResolveResult::Bound(Namespace(value)) if *value == CORE => Some(CORE),
         ResolveResult::Bound(Namespace(value)) if *value == STRICT => Some(STRICT),
-        _ => None,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => None,
     }
 }
 fn relationship_namespace(namespace: &[u8]) -> Result<&'static [u8]> {

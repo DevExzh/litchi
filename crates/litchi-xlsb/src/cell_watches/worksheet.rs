@@ -308,12 +308,14 @@ fn render(
                 append_watch_block(&mut output, parsed, items)?;
                 watch_inserted = true;
             }
-            if parsed.phonetic_index.is_none() && phonetic.is_some() && !phonetic_inserted {
-                output.extend_from_slice(&codec::encode_record(
-                    kind::PHONETIC_INFO,
-                    &codec::write_phonetic(phonetic.expect("checked above"))?,
-                )?);
-                phonetic_inserted = true;
+            if parsed.phonetic_index.is_none() && !phonetic_inserted {
+                if let Some(value) = phonetic {
+                    output.extend_from_slice(&codec::encode_record(
+                        kind::PHONETIC_INFO,
+                        &codec::write_phonetic(value)?,
+                    )?);
+                    phonetic_inserted = true;
+                }
             }
         }
 

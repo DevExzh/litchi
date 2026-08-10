@@ -531,7 +531,7 @@ fn insert_extension(
     let mut root_close = None;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("XML offset overflow"))?;
+            .map_err(|_source| invalid("XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let mut empty_candidate = None;
         match event {
@@ -578,11 +578,15 @@ fn insert_extension(
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         if let Some((start, qname)) = empty_candidate {
             let end = usize::try_from(reader.buffer_position())
-                .map_err(|_| invalid("XML offset overflow"))?;
+                .map_err(|_source| invalid("XML offset overflow"))?;
             empty_ext = Some((start, end, qname));
         }
     }

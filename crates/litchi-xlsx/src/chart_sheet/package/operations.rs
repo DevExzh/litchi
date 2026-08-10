@@ -455,14 +455,15 @@ pub(super) fn load_chart_resource(
                 .iter()
                 .filter_map(|value| match value {
                     ChartOutboundResource::Image(image) => Some(image.relationship_id.clone()),
-                    _ => None,
+                    ChartOutboundResource::ThemeOverride(_)
+                    | ChartOutboundResource::EmbeddedPackage(_) => None,
                 })
                 .collect::<BTreeSet<_>>();
             let package_id = outbound_resources.iter().find_map(|value| match value {
                 ChartOutboundResource::EmbeddedPackage(package) => {
                     Some(package.relationship_id.clone())
                 },
-                _ => None,
+                ChartOutboundResource::Image(_) | ChartOutboundResource::ThemeOverride(_) => None,
             });
             if image_ids != references.images || package_id != references.package {
                 return Err(invalid(
@@ -1734,7 +1735,7 @@ pub(super) fn parse_entry(
         name: required(node, "", "name")?.to_owned(),
         sheet_id: required(node, "", "sheetId")?
             .parse()
-            .map_err(|_| invalid("invalid workbook sheetId"))?,
+            .map_err(|_source| invalid("invalid workbook sheetId"))?,
         state,
         workbook_relationship_id: required(node, conformance.rel(), "id")?.to_owned(),
         part_name,
@@ -1814,7 +1815,7 @@ pub(super) fn insert_workbook_entry(
     let mut position = None;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("workbook XML offset overflow"))?;
+            .map_err(|_source| invalid("workbook XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
@@ -1844,7 +1845,12 @@ pub(super) fn insert_workbook_entry(
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     let position = position.ok_or_else(|| invalid("workbook is missing sheets collection"))?;

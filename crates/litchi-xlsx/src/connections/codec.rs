@@ -528,7 +528,7 @@ fn parse_parameters(n: &Node) -> Result<Vec<ConnectionParameter>> {
             Some(x) => {
                 let v = x
                     .parse::<f64>()
-                    .map_err(|_| invalid("invalid parameter double"))?;
+                    .map_err(|_source| invalid("invalid parameter double"))?;
                 if !v.is_finite() {
                     return Err(invalid("non-finite parameter double"));
                 }
@@ -604,7 +604,7 @@ impl BoundedXml {
         }
         self.bytes
             .try_reserve_exact(value.len())
-            .map_err(|_| invalid("serialized connections output allocation failed"))?;
+            .map_err(|_source| invalid("serialized connections output allocation failed"))?;
         self.bytes.extend_from_slice(value);
         Ok(())
     }
@@ -890,7 +890,9 @@ pub(super) fn kids(n: &Node) -> Result<Vec<&Node>> {
             Content::Node(x) => v.push(x),
             Content::Text(x) if x.trim().is_empty() => {},
             Content::Comment(_) => {},
-            _ => return Err(invalid("unexpected text in typed connections")),
+            Content::Text(_) | Content::CData(_) => {
+                return Err(invalid("unexpected text in typed connections"));
+            },
         }
     }
     Ok(v)
@@ -942,7 +944,10 @@ fn bopt(n: &Node, l: &str) -> Result<Option<bool>> {
 }
 fn u32opt(n: &Node, l: &str) -> Result<Option<u32>> {
     aopt(n, l)?
-        .map(|x| x.parse().map_err(|_| invalid(format!("invalid u32 '{l}'"))))
+        .map(|x| {
+            x.parse()
+                .map_err(|_source| invalid(format!("invalid u32 '{l}'")))
+        })
         .transpose()
 }
 pub(super) fn u32req(n: &Node, l: &str) -> Result<u32> {
@@ -950,7 +955,10 @@ pub(super) fn u32req(n: &Node, l: &str) -> Result<u32> {
 }
 fn u8opt(n: &Node, l: &str) -> Result<Option<u8>> {
     aopt(n, l)?
-        .map(|x| x.parse().map_err(|_| invalid(format!("invalid u8 '{l}'"))))
+        .map(|x| {
+            x.parse()
+                .map_err(|_source| invalid(format!("invalid u8 '{l}'")))
+        })
         .transpose()
 }
 fn u8req(n: &Node, l: &str) -> Result<u8> {
@@ -958,7 +966,10 @@ fn u8req(n: &Node, l: &str) -> Result<u8> {
 }
 fn i32opt(n: &Node, l: &str) -> Result<Option<i32>> {
     aopt(n, l)?
-        .map(|x| x.parse().map_err(|_| invalid(format!("invalid i32 '{l}'"))))
+        .map(|x| {
+            x.parse()
+                .map_err(|_source| invalid(format!("invalid i32 '{l}'")))
+        })
         .transpose()
 }
 fn only(n: &Node, a: &[&str]) -> Result<()> {
@@ -1133,7 +1144,7 @@ pub(super) fn patch_connections_source(
             .attribute(source, *node, "id")?
             .ok_or_else(|| invalid("connection source is missing its id"))?
             .parse::<u32>()
-            .map_err(|_| invalid("connection source has an invalid id"))?;
+            .map_err(|_source| invalid("connection source has an invalid id"))?;
         source_ids.push(id);
     }
     let mut edits = Vec::new();

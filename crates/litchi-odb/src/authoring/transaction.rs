@@ -178,6 +178,71 @@ impl<'source> Edit<'source> {
         self.stage_atomically(|candidate| candidate.add_query(query))
     }
 
+    /// Copies one stored query with an explicit local-table dependency policy.
+    ///
+    /// Common `SELECT`, `INSERT`, `UPDATE`, and `DELETE` shapes use
+    /// [`Query::command_semantics`] to discover exact relation names.
+    /// `Cascade` copies missing donor tables and their foreign-key closure;
+    /// `Refuse` requires every dependency to exist already. SQL shapes whose
+    /// dependency graph is not conservatively complete are refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an absent/duplicate query, unsupported SQL
+    /// dependency shape, unresolved donor relation, destination collision, or
+    /// table dependency failure. No command or database content is executed.
+    pub fn transfer_query_from_with(
+        &mut self,
+        source: &Database,
+        name: &str,
+        disposition: crate::DependencyDisposition,
+    ) -> Result<()> {
+        let catalog = source.catalog()?.to_owned();
+        let query = owned_query(&catalog, name)?.clone();
+        let semantics = query.command_semantics()?;
+        if let crate::QueryDependencySupport::Unsupported(reason) = semantics.dependency_support() {
+            return Err(Error::Unsupported(format!(
+                "ODB query dependency closure is unsupported: {reason:?}"
+            )));
+        }
+        let mut dependencies = semantics
+            .relations()
+            .iter()
+            .map(|relation| relation.name().to_owned())
+            .collect::<BTreeSet<_>>();
+        if let Some(target) = query.update_target() {
+            dependencies.insert(target.name().to_owned());
+        }
+        self.stage_atomically(|candidate| {
+            if candidate.staged_catalog()?.query(name)?.is_some() {
+                return invalid("ODB transfer query already exists in destination");
+            }
+            let mut visiting = BTreeSet::new();
+            for dependency in dependencies {
+                if candidate.staged_table(&dependency)?.is_some() {
+                    continue;
+                }
+                if disposition == crate::DependencyDisposition::Refuse {
+                    return dependency_refusal(
+                        "ODB query transfer requires a local relation dependency",
+                    );
+                }
+                if owned_table(&catalog, &dependency).is_err() {
+                    return dependency_refusal(
+                        "ODB query transfer cannot close an external or qualified relation",
+                    );
+                }
+                candidate.transfer_table_from_catalog(
+                    &catalog,
+                    &dependency,
+                    crate::DependencyDisposition::Cascade,
+                    &mut visiting,
+                )?;
+            }
+            candidate.add_query(query)
+        })
+    }
+
     /// Copies the inert connection declaration, including a file or resource
     /// IRI, without opening it. An absent declaration removes the destination
     /// declaration.
@@ -487,6 +552,13 @@ impl<'source> Edit<'source> {
             .component_payload(&source_prefix, &destination_prefix)?;
         if additions.is_empty() && directories.is_empty() {
             return invalid("ODB linked component package payload does not exist");
+        }
+        if let crate::ComponentTransferSupport::Refused(reason) =
+            crate::package::Snapshot::payload_transfer_support(&additions)
+        {
+            return Err(Error::Unsupported(format!(
+                "ODB component payload transfer is refused: {reason:?}"
+            )));
         }
         let active_dependencies =
             crate::package::Snapshot::payload_active_content_count(&additions)?;
@@ -2747,6 +2819,23 @@ fn owned_table<'catalog>(
     Ok(table)
 }
 
+fn owned_query<'catalog>(
+    catalog: &'catalog crate::OwnedCatalog,
+    name: &str,
+) -> Result<&'catalog Query> {
+    let mut matches = catalog
+        .queries()
+        .iter()
+        .filter(|query| query.name() == name);
+    let query = matches
+        .next()
+        .ok_or_else(|| Error::InvalidFormat("ODB transfer query does not exist".to_string()))?;
+    if matches.next().is_some() {
+        return invalid("ODB transfer query selector is ambiguous");
+    }
+    Ok(query)
+}
+
 fn validate_source_table_dependencies(catalog: &crate::OwnedCatalog, table: &Table) -> Result<()> {
     for key in table.keys() {
         validate_key_columns(table, key)?;
@@ -2828,11 +2917,29 @@ fn validate_table(table: &Table) -> Result<()> {
             validate_value(value, kind)?;
         }
     }
+    let mut column_names = BTreeSet::new();
     for column in table.columns() {
         validate_column(column)?;
+        if !column_names.insert(column.name()) {
+            return invalid("ODB table contains duplicate column names");
+        }
     }
+    let mut key_names = BTreeSet::new();
+    let mut primary_keys = 0usize;
     for key in table.keys() {
         validate_key(key)?;
+        let name = key
+            .name()
+            .ok_or_else(|| Error::InvalidFormat("ODB authored key requires a name".to_string()))?;
+        if !key_names.insert(name) {
+            return invalid("ODB table contains duplicate key names");
+        }
+        if key.kind() == crate::KeyKind::Primary {
+            primary_keys += 1;
+            if primary_keys > 1 {
+                return invalid("ODB table contains multiple primary keys");
+            }
+        }
         for mapping in key.columns() {
             if let Some(name) = mapping.name()
                 && !table.columns().iter().any(|column| column.name() == name)
@@ -2841,8 +2948,12 @@ fn validate_table(table: &Table) -> Result<()> {
             }
         }
     }
+    let mut index_names = BTreeSet::new();
     for index in table.indices() {
         validate_index(index)?;
+        if !index_names.insert(index.name()) {
+            return invalid("ODB table contains duplicate index names");
+        }
         if index.columns().iter().any(|indexed| {
             !table
                 .columns()
@@ -2890,13 +3001,20 @@ fn validate_key(key: &Key) -> Result<()> {
     if let Some(value) = key.referenced_table() {
         validate_name(value, "referenced table")?;
     }
+    let mut columns = BTreeSet::new();
     for column in key.columns() {
         let local = column.name().ok_or_else(|| {
             Error::InvalidFormat("ODB authored key column requires a name".to_string())
         })?;
         validate_name(local, "key column")?;
+        if !columns.insert(local) {
+            return invalid("ODB key contains duplicate local column mappings");
+        }
         if let Some(value) = column.related_column() {
             validate_name(value, "related key column")?;
+            if key.kind() != crate::KeyKind::Foreign {
+                return invalid("ODB non-foreign key cannot map related columns");
+            }
         }
     }
     Ok(())
@@ -2907,8 +3025,12 @@ fn validate_index(index: &Index) -> Result<()> {
     if index.columns().is_empty() {
         return invalid("ODB authored index requires at least one column");
     }
+    let mut columns = BTreeSet::new();
     for column in index.columns() {
         validate_name(column.name(), "index column")?;
+        if !columns.insert(column.name()) {
+            return invalid("ODB index contains duplicate column mappings");
+        }
     }
     Ok(())
 }

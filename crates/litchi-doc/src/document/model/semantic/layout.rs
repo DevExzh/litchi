@@ -88,8 +88,8 @@ impl Document {
                     if pic_offset > 0 {
                         // Reuse buffer to avoid repeated allocations
                         object_name_buffer.clear();
-                        use std::fmt::Write;
-                        let _ = write!(object_name_buffer, "_{pic_offset}");
+                        object_name_buffer.push('_');
+                        object_name_buffer.push_str(&pic_offset.to_string());
 
                         if let Some(mtef_ast) = self.parsed_mtef.get(object_name_buffer.as_str()) {
                             // Found matching formula - create run with MTEF AST (Arc::clone is cheap)

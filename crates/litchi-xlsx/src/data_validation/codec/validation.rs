@@ -37,7 +37,11 @@ pub(super) fn validate_formula_cardinality(
                 return Err(invalid("between validation requires formula1 and formula2"));
             }
         },
-        _ => {
+        ValidationType::Whole
+        | ValidationType::Decimal
+        | ValidationType::Date
+        | ValidationType::Time
+        | ValidationType::TextLength => {
             if f1.is_none() || f2.is_some() {
                 return Err(invalid("validation requires formula1 and forbids formula2"));
             }

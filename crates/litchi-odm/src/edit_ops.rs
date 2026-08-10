@@ -1,6 +1,6 @@
 //! Structural transaction values and XML mutation helpers.
 
-use litchi_core::{Error, Metadata, Position, Result};
+use litchi_core::{BlobId, Error, Metadata, Position, Result};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -14,6 +14,10 @@ use crate::{Master, style::Origin};
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const MAX_VALUE_BYTES: usize = 16 * 1024;
 const MAX_RESOURCE_BYTES: usize = 64 * 1024 * 1024;
+const MAX_LIST_ITEMS: usize = 100_000;
+const MAX_TABLE_ROWS: usize = 100_000;
+const MAX_TABLE_COLUMNS: usize = 1_024;
+const MAX_TABLE_CELLS: usize = 1_000_000;
 
 /// Explicit security policy for one ODM transaction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -299,7 +303,7 @@ impl StyleSpec {
         let raw = source_xml
             .get(definition.source_span.clone())
             .ok_or_else(|| invalid("ODM imported style source span is stale"))?;
-        let raw_fragment = standalone_style_fragment(source_xml, raw)?;
+        let raw_fragment = standalone_fragment(source_xml, raw, "style")?;
         let raw_fragment = rewrite_imported_style(
             &raw_fragment,
             definition.name(),
@@ -366,6 +370,257 @@ impl ResourceSpec {
     }
 }
 
+/// Exact immutable source identity retained for a transferred body item.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BodyItemProvenance {
+    package_sha256: String,
+    item: Position,
+    kind: crate::structure::Kind,
+}
+
+impl BodyItemProvenance {
+    /// Returns the SHA-256 identity of the immutable source package.
+    #[must_use]
+    pub fn package_sha256(&self) -> &str {
+        &self.package_sha256
+    }
+
+    /// Returns the direct body position in the source package.
+    #[must_use]
+    pub const fn item(&self) -> Position {
+        self.item
+    }
+
+    /// Returns the checked source item kind.
+    #[must_use]
+    pub const fn kind(&self) -> crate::structure::Kind {
+        self.kind
+    }
+}
+
+/// One bounded, compact direct master-body item for typed authoring.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BodyItemSpec {
+    content: DetachedBodyItem,
+    provenance: Option<BodyItemProvenance>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum DetachedBodyItem {
+    Paragraph(String),
+    Heading {
+        level: u8,
+        text: String,
+    },
+    List(Vec<String>),
+    Table {
+        name: String,
+        rows: Vec<Vec<String>>,
+    },
+    GeneratedIndex {
+        kind: crate::structure::IndexKind,
+        name: String,
+    },
+    Imported {
+        kind: crate::structure::Kind,
+        fragment: String,
+        generated_index_name: Option<String>,
+    },
+}
+
+impl BodyItemSpec {
+    /// Creates a plain-text paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for excessive or invalid XML text.
+    pub fn paragraph(text: impl Into<String>) -> Result<Self> {
+        let text = text.into();
+        validate_value(&text, "ODM paragraph text", true)?;
+        Ok(Self {
+            content: DetachedBodyItem::Paragraph(text),
+            provenance: None,
+        })
+    }
+
+    /// Creates a common level 1 through 10 heading.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unsupported level or invalid bounded text.
+    pub fn heading(level: u8, text: impl Into<String>) -> Result<Self> {
+        if !(1..=10).contains(&level) {
+            return Err(invalid("ODM heading level must be between 1 and 10"));
+        }
+        let text = text.into();
+        validate_value(&text, "ODM heading text", true)?;
+        Ok(Self {
+            content: DetachedBodyItem::Heading { level, text },
+            provenance: None,
+        })
+    }
+
+    /// Creates a non-empty plain-text list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty/excessive list or invalid bounded text.
+    pub fn list(items: Vec<String>) -> Result<Self> {
+        if items.is_empty() || items.len() > MAX_LIST_ITEMS {
+            return Err(invalid(
+                "ODM list item count is outside the supported limit",
+            ));
+        }
+        for item in &items {
+            validate_value(item, "ODM list item text", true)?;
+        }
+        Ok(Self {
+            content: DetachedBodyItem::List(items),
+            provenance: None,
+        })
+    }
+
+    /// Creates a named, non-empty rectangular plain-text table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid identity/text, ragged rows, or bounds.
+    pub fn table(name: impl Into<String>, rows: Vec<Vec<String>>) -> Result<Self> {
+        let name = name.into();
+        validate_value(&name, "ODM table name", false)?;
+        if rows.is_empty() || rows.len() > MAX_TABLE_ROWS {
+            return Err(invalid(
+                "ODM table row count is outside the supported limit",
+            ));
+        }
+        let columns = rows[0].len();
+        if columns == 0 || columns > MAX_TABLE_COLUMNS {
+            return Err(invalid(
+                "ODM table column count is outside the supported limit",
+            ));
+        }
+        if rows.iter().any(|row| row.len() != columns)
+            || rows.len().saturating_mul(columns) > MAX_TABLE_CELLS
+        {
+            return Err(invalid(
+                "ODM table must be rectangular and within the cell limit",
+            ));
+        }
+        for cell in rows.iter().flatten() {
+            validate_value(cell, "ODM table cell text", true)?;
+        }
+        Ok(Self {
+            content: DetachedBodyItem::Table { name, rows },
+            provenance: None,
+        })
+    }
+
+    /// Creates a generated index with an empty cache paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty, excessive, or invalid XML identity.
+    pub fn generated_index(
+        kind: crate::structure::IndexKind,
+        name: impl Into<String>,
+    ) -> Result<Self> {
+        let name = name.into();
+        validate_value(&name, "ODM generated index name", false)?;
+        Ok(Self {
+            content: DetachedBodyItem::GeneratedIndex { kind, name },
+            provenance: None,
+        })
+    }
+
+    /// Returns the authored direct-body kind.
+    #[must_use]
+    pub const fn kind(&self) -> crate::structure::Kind {
+        match &self.content {
+            DetachedBodyItem::Paragraph(_) => crate::structure::Kind::Paragraph,
+            DetachedBodyItem::Heading { .. } => crate::structure::Kind::Heading,
+            DetachedBodyItem::List(_) => crate::structure::Kind::List,
+            DetachedBodyItem::Table { .. } => crate::structure::Kind::Table,
+            DetachedBodyItem::GeneratedIndex { kind, .. } => {
+                crate::structure::Kind::GeneratedIndex(*kind)
+            },
+            DetachedBodyItem::Imported { kind, .. } => *kind,
+        }
+    }
+
+    /// Returns exact source provenance for a transferred item.
+    #[must_use]
+    pub const fn provenance(&self) -> Option<&BodyItemProvenance> {
+        self.provenance.as_ref()
+    }
+
+    pub(crate) fn generated_index_name(&self) -> Option<&str> {
+        match &self.content {
+            DetachedBodyItem::GeneratedIndex { name, .. } => Some(name),
+            DetachedBodyItem::Imported {
+                generated_index_name,
+                ..
+            } => generated_index_name.as_deref(),
+            DetachedBodyItem::Paragraph(_)
+            | DetachedBodyItem::Heading { .. }
+            | DetachedBodyItem::List(_)
+            | DetachedBodyItem::Table { .. } => None,
+        }
+    }
+
+    pub(crate) fn imported(source: &Master, item: Position) -> Result<Self> {
+        let kind = *source
+            .structure()
+            .items()
+            .get(item.get())
+            .ok_or_else(|| invalid("ODM body transfer selector is out of bounds"))?;
+        if !matches!(
+            kind,
+            crate::structure::Kind::Paragraph
+                | crate::structure::Kind::Heading
+                | crate::structure::Kind::List
+                | crate::structure::Kind::Table
+                | crate::structure::Kind::GeneratedIndex(_)
+        ) {
+            return Err(invalid(
+                "ODM body transfer supports only common content items",
+            ));
+        }
+        let raw = source
+            .content_xml()
+            .get(
+                source
+                    .structure()
+                    .item_spans
+                    .get(item.get())
+                    .cloned()
+                    .ok_or_else(|| invalid("ODM body transfer source span is stale"))?,
+            )
+            .ok_or_else(|| invalid("ODM body transfer source span is outside content.xml"))?;
+        ensure_dependency_free_body_fragment(raw)?;
+        let fragment = standalone_fragment(source.content_xml(), raw, "body item")?;
+        validate_standalone_body_fragment(&fragment, kind)?;
+        let generated_index_name = source
+            .structure()
+            .generated_indexes()
+            .iter()
+            .find(|index| index.item() == item)
+            .and_then(crate::structure::GeneratedIndex::name)
+            .map(str::to_owned);
+        Ok(Self {
+            content: DetachedBodyItem::Imported {
+                kind,
+                fragment,
+                generated_index_name,
+            },
+            provenance: Some(BodyItemProvenance {
+                package_sha256: BlobId::of(source.as_bytes()).as_hex(),
+                item,
+                kind,
+            }),
+        })
+    }
+}
+
 /// One staged or committed section-tree effect.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -398,6 +653,8 @@ pub enum GeneratedIndexChange {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BodyItemChange {
+    /// Appends a typed, compact direct body item.
+    Add(BodyItemSpec),
     /// Removes an exactly addressed direct body subtree.
     Remove {
         /// The source [`crate::structure::Structure::items`] position.
@@ -498,6 +755,12 @@ pub(crate) fn mutate_xml(
                 insert_before_element_end(&content, OFFICE, b"text", &section_fragment(spec))?;
         }
     }
+    for intent in body_items {
+        if let BodyItemChange::Add(spec) = intent {
+            content =
+                insert_before_element_end(&content, OFFICE, b"text", &body_item_fragment(spec))?;
+        }
+    }
     if styles
         .iter()
         .any(|intent| matches!(intent, StyleChange::Add(spec) if spec.origin() == Origin::Content))
@@ -551,6 +814,7 @@ fn stage_body_item(
     edits: &mut Vec<(Range<usize>, String)>,
 ) -> Result<()> {
     match intent {
+        BodyItemChange::Add(_) => Ok(()),
         BodyItemChange::Remove { item, kind } => {
             let actual = source
                 .structure()
@@ -771,7 +1035,9 @@ fn removed_content_spans(
         spans.push(node.source_span.clone());
     }
     for change in body_items {
-        let BodyItemChange::Remove { item, .. } = change;
+        let BodyItemChange::Remove { item, .. } = change else {
+            continue;
+        };
         spans.push(
             source
                 .structure()
@@ -885,6 +1151,46 @@ fn insert_before_element_end(
                 output.push_str(&xml[..start]);
                 output.push_str(fragment);
                 output.push_str(&xml[start..]);
+                return Ok(output);
+            },
+            Event::Empty(element)
+                if matches!(resolved, ResolveResult::Bound(Namespace(uri)) if uri == namespace)
+                    && element.local_name().as_ref() == local =>
+            {
+                let end = position(&reader)?;
+                let raw = std::str::from_utf8(element.as_ref()).map_err(|error| {
+                    invalid(format!("ODM XML insertion owner is not UTF-8: {error}"))
+                })?;
+                let qualified_name = element.name();
+                let qualified = std::str::from_utf8(qualified_name.as_ref()).map_err(|error| {
+                    invalid(format!(
+                        "ODM XML insertion owner name is not UTF-8: {error}"
+                    ))
+                })?;
+                let mut output = String::new();
+                output
+                    .try_reserve_exact(
+                        xml.len()
+                            .saturating_add(fragment.len())
+                            .saturating_add(qualified.len())
+                            .saturating_add(3),
+                    )
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODM XML empty-owner expansion",
+                        source,
+                    })?;
+                output.push_str(&xml[..start]);
+                output.push('<');
+                output.push_str(raw);
+                output.push('>');
+                output.push_str(fragment);
+                output.push_str("</");
+                output.push_str(qualified);
+                output.push('>');
+                output.push_str(
+                    xml.get(end..)
+                        .ok_or_else(|| invalid("ODM XML insertion owner span is stale"))?,
+                );
                 return Ok(output);
             },
             Event::Eof => return Err(invalid("ODM XML insertion owner was not found")),
@@ -1006,6 +1312,91 @@ fn section_fragment(spec: &SectionSpec) -> String {
     )
 }
 
+pub(crate) fn body_item_fragment(spec: &BodyItemSpec) -> String {
+    match &spec.content {
+        DetachedBodyItem::Paragraph(text) => format!(
+            r#"<text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{}</text:p>"#,
+            escape(text)
+        ),
+        DetachedBodyItem::Heading { level, text } => format!(
+            r#"<text:h xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" text:outline-level="{level}">{}</text:h>"#,
+            escape(text)
+        ),
+        DetachedBodyItem::List(items) => {
+            let mut fragment = String::from(
+                r#"<text:list xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
+            );
+            for item in items {
+                fragment.push_str("<text:list-item><text:p>");
+                fragment.push_str(&escape(item));
+                fragment.push_str("</text:p></text:list-item>");
+            }
+            fragment.push_str("</text:list>");
+            fragment
+        },
+        DetachedBodyItem::Table { name, rows } => {
+            let mut fragment = format!(
+                concat!(
+                    r#"<table:table xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+                    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" table:name="{}">"#,
+                ),
+                escape(name)
+            );
+            fragment.push_str(r#"<table:table-column table:number-columns-repeated=""#);
+            fragment.push_str(&rows[0].len().to_string());
+            fragment.push_str(r#""/>"#);
+            for row in rows {
+                fragment.push_str("<table:table-row>");
+                for cell in row {
+                    fragment.push_str("<table:table-cell><text:p>");
+                    fragment.push_str(&escape(cell));
+                    fragment.push_str("</text:p></table:table-cell>");
+                }
+                fragment.push_str("</table:table-row>");
+            }
+            fragment.push_str("</table:table>");
+            fragment
+        },
+        DetachedBodyItem::GeneratedIndex { kind, name } => {
+            let (owner, source) = generated_index_elements(*kind);
+            format!(
+                concat!(
+                    r#"<text:{owner} xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" text:name="{name}">"#,
+                    r#"<text:{source}/><text:index-body><text:p/></text:index-body></text:{owner}>"#,
+                ),
+                owner = owner,
+                source = source,
+                name = escape(name),
+            )
+        },
+        DetachedBodyItem::Imported { fragment, .. } => fragment.clone(),
+    }
+}
+
+pub(crate) fn append_body_item(xml: &str, spec: &BodyItemSpec) -> Result<String> {
+    insert_before_element_end(xml, OFFICE, b"text", &body_item_fragment(spec))
+}
+
+const fn generated_index_elements(
+    kind: crate::structure::IndexKind,
+) -> (&'static str, &'static str) {
+    match kind {
+        crate::structure::IndexKind::TableOfContents => {
+            ("table-of-content", "table-of-content-source")
+        },
+        crate::structure::IndexKind::Illustration => {
+            ("illustration-index", "illustration-index-source")
+        },
+        crate::structure::IndexKind::Table => ("table-index", "table-index-source"),
+        crate::structure::IndexKind::Object => ("object-index", "object-index-source"),
+        crate::structure::IndexKind::User => ("user-index", "user-index-source"),
+        crate::structure::IndexKind::Alphabetical => {
+            ("alphabetical-index", "alphabetical-index-source")
+        },
+        crate::structure::IndexKind::Bibliography => ("bibliography", "bibliography-source"),
+    }
+}
+
 fn style_fragment(spec: &StyleSpec) -> String {
     if let Some(fragment) = spec.raw_fragment() {
         return fragment.to_string();
@@ -1017,7 +1408,7 @@ fn style_fragment(spec: &StyleSpec) -> String {
     )
 }
 
-fn standalone_style_fragment(document: &str, fragment: &str) -> Result<String> {
+fn standalone_fragment(document: &str, fragment: &str, scope: &str) -> Result<String> {
     use std::collections::HashSet;
 
     let mut reader = NsReader::from_reader(document.as_bytes());
@@ -1025,7 +1416,7 @@ fn standalone_style_fragment(document: &str, fragment: &str) -> Result<String> {
     loop {
         match reader
             .read_event()
-            .map_err(|error| invalid(format!("invalid ODM style namespace source: {error}")))?
+            .map_err(|error| invalid(format!("invalid ODM {scope} namespace source: {error}")))?
         {
             Event::Start(root) => {
                 for raw in root.attributes() {
@@ -1052,8 +1443,8 @@ fn standalone_style_fragment(document: &str, fragment: &str) -> Result<String> {
                 }
                 break;
             },
-            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM style XML")),
-            Event::Eof => return Err(invalid("ODM style document has no root element")),
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM source XML")),
+            Event::Eof => return Err(invalid("ODM source document has no root element")),
             Event::Empty(_)
             | Event::End(_)
             | Event::Text(_)
@@ -1071,7 +1462,7 @@ fn standalone_style_fragment(document: &str, fragment: &str) -> Result<String> {
     }
     let insertion = fragment
         .find(|byte: char| byte.is_whitespace() || matches!(byte, '/' | '>'))
-        .ok_or_else(|| invalid("ODM imported style start tag is malformed"))?;
+        .ok_or_else(|| invalid(format!("ODM imported {scope} start tag is malformed")))?;
     let mut output = fragment.to_string();
     let mut attributes = String::new();
     for (key, value) in declarations {
@@ -1083,6 +1474,67 @@ fn standalone_style_fragment(document: &str, fragment: &str) -> Result<String> {
     }
     output.insert_str(insertion, &attributes);
     crate::codec::compact_source_xml(&output)
+}
+
+fn ensure_dependency_free_body_fragment(fragment: &str) -> Result<()> {
+    let mut reader = quick_xml::Reader::from_reader(fragment.as_bytes());
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("invalid ODM transferred body item: {error}")))?
+        {
+            Event::Start(element) | Event::Empty(element) => {
+                for raw in element.attributes() {
+                    let attribute = raw.map_err(|error| {
+                        invalid(format!("invalid ODM transferred body attribute: {error}"))
+                    })?;
+                    let local = attribute.key.local_name();
+                    if local.as_ref() == b"href"
+                        || local
+                            .as_ref()
+                            .windows(b"style".len())
+                            .any(|window| window == b"style")
+                    {
+                        return Err(invalid(
+                            "ODM body transfer refuses unresolved style or resource dependencies",
+                        ));
+                    }
+                }
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM body items")),
+            Event::Eof => break,
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    Ok(())
+}
+
+fn validate_standalone_body_fragment(
+    fragment: &str,
+    expected: crate::structure::Kind,
+) -> Result<()> {
+    let document = format!(
+        concat!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+            r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0">"#,
+            r#"<office:body><office:text>{fragment}</office:text></office:body>"#,
+            r#"</office:document-content>"#,
+        ),
+        fragment = fragment,
+    );
+    let semantics = crate::codec::parse(&document)?;
+    if semantics.structure().items() != [expected] {
+        return Err(invalid(
+            "ODM transferred body fragment changed its checked direct kind",
+        ));
+    }
+    Ok(())
 }
 
 fn rewrite_imported_style(

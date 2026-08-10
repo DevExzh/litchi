@@ -24,6 +24,24 @@ FILTER_DIRECTORY = (
 )
 
 EVIDENCE_SHA256 = {
+    "test-data/ole/doc/NoHeadFoot.doc": (
+        "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    ),
+    "test-data/office-interop/litchi-changed/noheadfoot-litchi.doc": (
+        "152da496f5b376a0d0430bfbc87658a9d1f2f0afc25c592238ec52800347249e"
+    ),
+    "test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc": (
+        "02f6b96ed94e027e652df5d9e527ecee825c958db8ddf9bd398ecb7b0870aa35"
+    ),
+    "test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls": (
+        "940fb6f143e8d54c545e62599dd7c38e45846db6787397283b7ec93e70eb96ae"
+    ),
+    "test-data/office-interop/litchi-changed/tdf78897-litchi.xls": (
+        "8f881ec4ccdef867154424f296665c37cdd114456c7c9ec5efe85ff460da870d"
+    ),
+    "test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls": (
+        "eab8ae4797e6499e5c45c01b0ad55502c021103385c6fd14271e91b81e9ec537"
+    ),
     "test-data/ooxml/docx/documentProperties.docx": (
         "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
     ),
@@ -59,6 +77,15 @@ EVIDENCE_SHA256 = {
     ),
     "test-data/office-interop/libreoffice-resaved/relsize-litchi.rtf": (
         "224707aea42c7b38712bc66a76424d3666b52794e2aed010fe64d5adda54f3d9"
+    ),
+    "test-data/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb": (
+        "ef32cabf31818b2fff52a6fbabb570952e823bfec6237da402a0392546c5d5af"
+    ),
+    "test-data/office-interop/litchi-changed/tdf132924-litchi.odb": (
+        "3af6b848500601f5bb9d3b56e421539880eedfdf5a3ed31146c53b479e55299c"
+    ),
+    "test-data/office-interop/libreoffice-resaved/tdf132924-litchi.odb": (
+        "fbe56e2711dc1876f4b8a0b841e4a530f26e0304095f5a9d000b92fb15d0b607"
     ),
     "test-data/odf/corpus/calc-two-sheets.ods": (
         "67ed3f8831aa078a849badd8f2a15bdee7cf965a628ff4eb73740aa96ba0d4c0"
@@ -111,6 +138,12 @@ EVIDENCE_SHA256 = {
 }
 
 SUCCESS_LOGS = {
+    "test-data/office-interop/logs/doc-resave.log": (
+        "test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc"
+    ),
+    "test-data/office-interop/logs/xls-resave.log": (
+        "test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls"
+    ),
     "test-data/office-interop/logs/docx-resave.log": (
         "test-data/office-interop/libreoffice-resaved/document-properties-litchi.docx"
     ),
@@ -122,6 +155,9 @@ SUCCESS_LOGS = {
     ),
     "test-data/office-interop/logs/rtf-resave.log": (
         "test-data/office-interop/libreoffice-resaved/relsize-litchi.rtf"
+    ),
+    "test-data/office-interop/logs/odb-uno-store.log": (
+        "test-data/office-interop/libreoffice-resaved/tdf132924-litchi.odb"
     ),
     "test-data/odf/native-resave/logs/ods-resave.log": (
         "test-data/odf/native-resave/libreoffice-resaved/calc-two-sheets-litchi.ods"

@@ -6,7 +6,20 @@ use std::io;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "rtf",
+    feature = "odt",
+    feature = "odp"
+))]
 const SENTINEL: &str = "Litchi native resave 2026-08-10";
+#[cfg(feature = "xls")]
+const XLS_SENTINEL: f64 = 42.25;
+#[cfg(feature = "odb")]
+const ODB_QUERY: &str = "__litchi_native_resave";
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -35,6 +48,8 @@ fn main() -> Result<()> {
 
 fn generate(format: &str, output: &Path) -> Result<()> {
     match format {
+        #[cfg(feature = "doc")]
+        "doc" => generate_doc(output),
         #[cfg(feature = "docx")]
         "docx" => generate_docx(output),
         #[cfg(feature = "xlsx")]
@@ -45,6 +60,8 @@ fn generate(format: &str, output: &Path) -> Result<()> {
         "ppt" => generate_ppt(output),
         #[cfg(feature = "rtf")]
         "rtf" => generate_rtf(output),
+        #[cfg(feature = "xls")]
+        "xls" => generate_xls(output),
         #[cfg(feature = "odt")]
         "odt" => generate_odt(output),
         #[cfg(feature = "ods")]
@@ -53,6 +70,8 @@ fn generate(format: &str, output: &Path) -> Result<()> {
         "odp" => generate_odp(output),
         #[cfg(feature = "odf")]
         "odf" => generate_odf(output),
+        #[cfg(feature = "odb")]
+        "odb" => generate_odb(output),
         #[cfg(feature = "odg")]
         "odg" => generate_odg(output),
         _ => Err(format!("unsupported generator format: {format}").into()),
@@ -61,6 +80,8 @@ fn generate(format: &str, output: &Path) -> Result<()> {
 
 fn readback(format: &str, input: &Path) -> Result<()> {
     match format {
+        #[cfg(feature = "doc")]
+        "doc" => readback_doc(input),
         #[cfg(feature = "docx")]
         "docx" => readback_docx(input),
         #[cfg(feature = "xlsx")]
@@ -71,6 +92,8 @@ fn readback(format: &str, input: &Path) -> Result<()> {
         "ppt" => readback_ppt(input),
         #[cfg(feature = "rtf")]
         "rtf" => readback_rtf(input),
+        #[cfg(feature = "xls")]
+        "xls" => readback_xls(input),
         #[cfg(feature = "odt")]
         "odt" => readback_odt(input),
         #[cfg(feature = "ods")]
@@ -79,6 +102,8 @@ fn readback(format: &str, input: &Path) -> Result<()> {
         "odp" => readback_odp(input),
         #[cfg(feature = "odf")]
         "odf" => readback_odf(input),
+        #[cfg(feature = "odb")]
+        "odb" => readback_odb(input),
         #[cfg(feature = "odg")]
         "odg" => readback_odg(input),
         _ => Err(format!("unsupported readback format: {format}").into()),
@@ -93,6 +118,37 @@ fn fixture(path: &str) -> PathBuf {
 
 fn missing(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::NotFound, message)
+}
+
+#[cfg(feature = "doc")]
+fn generate_doc(output: &Path) -> Result<()> {
+    let source = fixture("test-data/ole/doc/NoHeadFoot.doc");
+    let snapshot = litchi_doc::body_text::Snapshot::from_bytes(fs::read(source)?)?;
+    let paragraph = snapshot
+        .paragraphs(litchi_doc::body_text::Projection::All)?
+        .into_iter()
+        .find(|paragraph| !paragraph.text().is_empty())
+        .ok_or_else(|| missing("DOC has no nonempty ordinary paragraph"))?;
+    println!("doc source paragraph={}", paragraph.text());
+    let mut edit = snapshot.edit()?;
+    edit.replace_paragraph(paragraph.position(), SENTINEL)?;
+    let commit = edit.commit()?;
+    fs::write(output, commit.snapshot().finish())?;
+    readback_doc(output)
+}
+
+#[cfg(feature = "doc")]
+fn readback_doc(input: &Path) -> Result<()> {
+    let snapshot = litchi_doc::body_text::Snapshot::from_bytes(fs::read(input)?)?;
+    let found = snapshot
+        .paragraphs(litchi_doc::body_text::Projection::All)?
+        .into_iter()
+        .any(|paragraph| paragraph.text() == SENTINEL);
+    if !found {
+        return Err("DOC sentinel paragraph is absent after reopen".into());
+    }
+    println!("doc paragraph={SENTINEL}");
+    Ok(())
 }
 
 #[cfg(feature = "docx")]
@@ -318,6 +374,68 @@ fn readback_rtf(input: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "xls")]
+fn generate_xls(output: &Path) -> Result<()> {
+    let source = fixture("test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls");
+    let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(fs::read(source)?)?;
+    let mut candidates = Vec::new();
+    for sheet in snapshot.worksheets() {
+        for cell in sheet.cells() {
+            if matches!(cell.value(), litchi_xls::cell_values::Value::Number(_)) {
+                candidates.push((sheet.name().to_string(), cell.reference()));
+            }
+        }
+    }
+    let mut changed = None;
+    for (sheet, reference) in candidates {
+        let mut edit = snapshot.edit();
+        if edit
+            .set_value(
+                litchi_xls::cell_values::Selector::Name(&sheet),
+                reference,
+                litchi_xls::cell_values::Value::Number(XLS_SENTINEL),
+            )
+            .is_err()
+        {
+            continue;
+        }
+        let Ok(commit) = edit.commit() else {
+            continue;
+        };
+        println!(
+            "xls source target={}!R{}C{}",
+            sheet,
+            reference.row(),
+            reference.column()
+        );
+        changed = Some(commit.snapshot().bytes().to_vec());
+        break;
+    }
+    fs::write(
+        output,
+        changed.ok_or_else(|| missing("XLS has no safely editable numeric cell"))?,
+    )?;
+    readback_xls(output)
+}
+
+#[cfg(feature = "xls")]
+fn readback_xls(input: &Path) -> Result<()> {
+    let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(fs::read(input)?)?;
+    let found = snapshot.worksheets().any(|sheet| {
+        sheet.cells().any(|cell| {
+            matches!(
+                cell.value(),
+                litchi_xls::cell_values::Value::Number(value) if value.to_bits() == XLS_SENTINEL.to_bits()
+            )
+        })
+    });
+    if !found {
+        return Err(format!("XLS sentinel number {XLS_SENTINEL} is absent after reopen").into());
+    }
+    println!("xls numeric sentinel={XLS_SENTINEL}");
+    Ok(())
+}
+
 #[cfg(feature = "odt")]
 fn generate_odt(output: &Path) -> Result<()> {
     let source = fixture("test-data/odf/corpus/writer-header-footer.odt");
@@ -425,6 +543,39 @@ fn readback_odf(input: &Path) -> Result<()> {
         return Err("ODF Formula StarMath source g is absent after reopen".into());
     }
     println!("odf token-path[0,0,0]=g; starmath=g");
+    Ok(())
+}
+
+#[cfg(feature = "odb")]
+fn generate_odb(output: &Path) -> Result<()> {
+    let source = fixture("test-data/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb");
+    let database = litchi_odb::Database::open(source)?;
+    let mut edit = database.edit();
+    edit.add_query(litchi_odb::Query::new(ODB_QUERY, "SELECT 424242"))?;
+    let commit = edit.commit()?;
+    fs::write(output, commit.database().as_bytes())?;
+    readback_odb(output)
+}
+
+#[cfg(feature = "odb")]
+fn readback_odb(input: &Path) -> Result<()> {
+    let database = litchi_odb::Database::open(input)?;
+    let catalog = database.catalog()?;
+    let query = catalog
+        .query(ODB_QUERY)?
+        .ok_or_else(|| missing("ODB sentinel query is absent after reopen"))?;
+    if query.command() != "SELECT 424242" || !query.columns().is_empty() {
+        return Err(format!(
+            "ODB sentinel query mismatch: command={:?}, columns={}",
+            query.command(),
+            query.columns().len()
+        )
+        .into());
+    }
+    if catalog.table("test")?.is_none() {
+        return Err("ODB source table is absent after reopen".into());
+    }
+    println!("odb query={ODB_QUERY}; command=SELECT 424242; columns=0; source-table=test");
     Ok(())
 }
 

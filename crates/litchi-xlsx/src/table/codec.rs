@@ -231,7 +231,7 @@ impl TableParser {
                     return Err(invalid("table XML has a missing or unterminated root"));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
             }
         }
         Ok(parser.map(|parser| parser.table))
@@ -444,7 +444,7 @@ impl TableParser {
                 "tableColumns",
             ),
             TableContext::Root => self.validate_root(),
-            _ => Ok(()),
+            TableContext::AutoFilter | TableContext::SortState | TableContext::Other => Ok(()),
         }
     }
 
@@ -598,7 +598,7 @@ fn optional_u32(
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+                .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
         })
         .transpose()
 }

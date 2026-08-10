@@ -21,6 +21,126 @@ pub enum ComponentLinkKind {
     ExternalIri,
 }
 
+/// The ownership role of one package member in a linked component closure.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ComponentDependencyKind {
+    /// A file below the component's declared package subtree.
+    PayloadFile,
+    /// A package-local file reached through an XML `xlink:href` chain.
+    LinkedFile,
+    /// A manifest directory below the component subtree.
+    PayloadDirectory,
+    /// A manifest directory that owns a linked file dependency.
+    LinkedDirectory,
+}
+
+/// Why exact component payload publication is unavailable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ComponentTransferRefusal {
+    /// A relocated XML member is producer-formatted and the shared writer
+    /// cannot yet attach its donor provenance to a different package path.
+    FormattedXmlRequiresSourceProvenance,
+}
+
+/// Whether the inventoried payload can pass the current audited writer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum ComponentTransferSupport {
+    #[default]
+    Supported,
+    Refused(ComponentTransferRefusal),
+}
+
+/// One inert member in a component's bounded package dependency closure.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ComponentDependency {
+    kind: ComponentDependencyKind,
+    path: String,
+    media_type: String,
+    byte_len: Option<usize>,
+}
+
+impl ComponentDependency {
+    pub(crate) fn new(
+        kind: ComponentDependencyKind,
+        path: String,
+        media_type: String,
+        byte_len: Option<usize>,
+    ) -> Self {
+        Self {
+            kind,
+            path,
+            media_type,
+            byte_len,
+        }
+    }
+
+    #[must_use]
+    pub const fn kind(&self) -> ComponentDependencyKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    #[must_use]
+    pub fn media_type(&self) -> &str {
+        &self.media_type
+    }
+
+    /// Returns the decoded package-member size; directories return `None`.
+    #[must_use]
+    pub const fn byte_len(&self) -> Option<usize> {
+        self.byte_len
+    }
+}
+
+/// Bounded inert package dependencies for one linked form or report.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ComponentDependencyInventory {
+    entries: Vec<ComponentDependency>,
+    active_content_count: usize,
+    transfer_support: ComponentTransferSupport,
+}
+
+impl ComponentDependencyInventory {
+    pub(crate) const fn new(
+        entries: Vec<ComponentDependency>,
+        active_content_count: usize,
+        transfer_support: ComponentTransferSupport,
+    ) -> Self {
+        Self {
+            entries,
+            active_content_count,
+            transfer_support,
+        }
+    }
+
+    #[must_use]
+    pub fn entries(&self) -> &[ComponentDependency] {
+        &self.entries
+    }
+
+    #[must_use]
+    pub const fn active_content_count(&self) -> usize {
+        self.active_content_count
+    }
+
+    /// Returns whether exact bytes can pass the audited package writer.
+    #[must_use]
+    pub const fn transfer_support(&self) -> ComponentTransferSupport {
+        self.transfer_support
+    }
+
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
 /// A detached form or report component declaration.
 ///
 /// Linked and embedded component payloads remain inert package resources.

@@ -299,7 +299,7 @@ fn parse_infos(data: &[u8]) -> Result<Vec<SmartTagBookmarkInfo>> {
             _ => return Err(corrupted("FACTOIDINFO contains an invalid origin")),
         };
         // The final four bytes are pfpb and are explicitly ignored by consumers.
-        let _ = read_u32(data, offset + 8, "FACTOIDINFO ignored pointer")?;
+        read_u32(data, offset + 8, "FACTOIDINFO ignored pointer")?;
         if !ids.insert(id) {
             return Err(corrupted("FACTOIDINFO ids must be unique"));
         }

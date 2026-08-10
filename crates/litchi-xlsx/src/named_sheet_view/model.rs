@@ -76,7 +76,9 @@ impl DifferentialFormat {
             markup: Markup(
                 format!(
                     r#"<dxf xmlns="{}"/>"#,
-                    std::str::from_utf8(NSV).expect("constant namespace is UTF-8")
+                    std::str::from_utf8(NSV).unwrap_or_else(|error| {
+                        crate::error::panic_error_invariant("constant namespace is UTF-8", error)
+                    })
                 )
                 .into_bytes(),
             ),
@@ -746,11 +748,29 @@ impl Views {
     /// empty collection is deliberately not constructible through this API.
     #[must_use]
     pub fn new(view: View) -> Self {
-        let mut namespace_declarations =
-            vec![("xmlns".into(), std::str::from_utf8(NSV).unwrap().into())];
+        let mut namespace_declarations = vec![(
+            "xmlns".into(),
+            std::str::from_utf8(NSV)
+                .unwrap_or_else(|error| {
+                    crate::error::panic_error_invariant(
+                        "operation was checked before extraction",
+                        error,
+                    )
+                })
+                .into(),
+        )];
         if view_has_filter_payload(&view) {
-            namespace_declarations
-                .push(("xmlns:x".into(), std::str::from_utf8(CORE).unwrap().into()));
+            namespace_declarations.push((
+                "xmlns:x".into(),
+                std::str::from_utf8(CORE)
+                    .unwrap_or_else(|error| {
+                        crate::error::panic_error_invariant(
+                            "operation was checked before extraction",
+                            error,
+                        )
+                    })
+                    .into(),
+            ));
         }
         Self {
             views: vec![view],
@@ -778,8 +798,17 @@ impl Views {
                 .iter()
                 .any(|(name, _)| name == "xmlns:x")
         {
-            self.namespace_declarations
-                .push(("xmlns:x".into(), std::str::from_utf8(CORE).unwrap().into()));
+            self.namespace_declarations.push((
+                "xmlns:x".into(),
+                std::str::from_utf8(CORE)
+                    .unwrap_or_else(|error| {
+                        crate::error::panic_error_invariant(
+                            "operation was checked before extraction",
+                            error,
+                        )
+                    })
+                    .into(),
+            ));
         }
         self.views.push(view);
         Ok(self)

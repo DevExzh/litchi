@@ -328,7 +328,11 @@ fn integration_ids(xml: &[u8]) -> Result<(&'static str, &'static str, Vec<String
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if depth != 0 || in_extension || in_caches {
@@ -353,7 +357,7 @@ fn rewrite_or_insert(
     let mut end = None;
     loop {
         let offset = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("Slicer Cache XML offset overflow"))?;
+            .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?;
         let event = reader
             .read_resolved_event()
             .map_err(|error| invalid(format!("Slicer Cache integration XML: {error}")))?;
@@ -383,7 +387,7 @@ fn rewrite_or_insert(
                 start = Some(offset);
                 end = Some(
                     usize::try_from(reader.buffer_position())
-                        .map_err(|_| invalid("Slicer Cache XML offset overflow"))?,
+                        .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?,
                 );
             },
             Event::End(element) => {
@@ -398,7 +402,7 @@ fn rewrite_or_insert(
                 {
                     end = Some(
                         usize::try_from(reader.buffer_position())
-                            .map_err(|_| invalid("Slicer Cache XML offset overflow"))?,
+                            .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?,
                     );
                 }
             },
@@ -408,7 +412,11 @@ fn rewrite_or_insert(
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         if depth > MAX_DEPTH {
             return Err(invalid("Slicer Cache integration XML is too deep"));
@@ -465,10 +473,13 @@ fn integration_fragment(
         "<ext xmlns=\"{core}\" uri=\"{uri}\"><f:{list} xmlns:f=\"{family_ns}\" xmlns:r=\"{rel}\">"
     );
     for id in ids {
-        write!(output, "<f:{item} r:id=\"{}\"/>", xml_escape(id))
-            .expect("writing to a String is infallible");
+        write!(output, "<f:{item} r:id=\"{}\"/>", xml_escape(id)).unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("writing to a String is infallible", error)
+        });
     }
-    write!(output, "</f:{list}></ext>").expect("writing to a String is infallible");
+    write!(output, "</f:{list}></ext>").unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("writing to a String is infallible", error)
+    });
     output.into_bytes()
 }
 
@@ -490,14 +501,24 @@ fn root_namespaces(xml: &[u8]) -> Result<(&'static str, &'static str)> {
                     ResolveResult::Bound(Namespace(value)) if value == STRICT_SML.as_bytes() => {
                         Ok((STRICT_SML, STRICT_REL))
                     },
-                    _ => Err(invalid("unsupported SpreadsheetML workbook namespace")),
+                    ResolveResult::Unbound
+                    | ResolveResult::Bound(_)
+                    | ResolveResult::Unknown(_) => {
+                        Err(invalid("unsupported SpreadsheetML workbook namespace"))
+                    },
                 };
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => return Err(invalid("workbook XML root is missing")),
-            _ => {},
+            Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }

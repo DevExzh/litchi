@@ -79,7 +79,11 @@ pub fn parse_named_sheet_views(xml: &[u8]) -> Result<Views> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if parser.capture.is_some() || !parser.stack.is_empty() {
@@ -94,7 +98,13 @@ pub fn write_named_sheet_views(value: &Views) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
     output.extend_from_slice(b"<namedSheetViews");
-    write_xml_attribute(&mut output, "xmlns", std::str::from_utf8(NSV).unwrap());
+    write_xml_attribute(
+        &mut output,
+        "xmlns",
+        std::str::from_utf8(NSV).unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("operation was checked before extraction", error)
+        }),
+    );
 
     let needs_spreadsheet_prefix = has_filter_payload(value);
     let spreadsheet_prefix_needs_local_binding =
@@ -108,7 +118,16 @@ pub fn write_named_sheet_views(value: &Views) -> Result<Vec<u8>> {
         write_xml_attribute(&mut output, name, namespace);
     }
     if needs_spreadsheet_prefix && !declared.contains("xmlns:x") {
-        write_xml_attribute(&mut output, "xmlns:x", std::str::from_utf8(CORE).unwrap());
+        write_xml_attribute(
+            &mut output,
+            "xmlns:x",
+            std::str::from_utf8(CORE).unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            }),
+        );
     }
     output.push(b'>');
 
@@ -209,7 +228,9 @@ fn write_column_filter(
     column: &ColumnFilter,
     spreadsheet_prefix_needs_local_binding: bool,
 ) -> Result<()> {
-    if column.column_id >= MAX_COLUMNS as u32 {
+    let max_columns = u32::try_from(MAX_COLUMNS)
+        .map_err(|_source| invalid("worksheet column limit exceeds the named-view wire type"))?;
+    if column.column_id >= max_columns {
         return Err(invalid(
             "named-sheet-view colId exceeds worksheet column limit",
         ));
@@ -256,7 +277,16 @@ fn write_filter_payload(
         return Ok(());
     };
     if spreadsheet_prefix_needs_local_binding {
-        write_xml_attribute(output, "xmlns:x", std::str::from_utf8(CORE).unwrap());
+        write_xml_attribute(
+            output,
+            "xmlns:x",
+            std::str::from_utf8(CORE).unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            }),
+        );
     }
     output.push(b'>');
     output.extend_from_slice(&filter_payload_markup(filter)?);
@@ -308,7 +338,16 @@ pub(crate) fn filter_payload_markup(filter: &Column) -> Result<Vec<u8>> {
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if in_column || depth != 0 {
@@ -343,7 +382,9 @@ fn write_sort_rules(output: &mut Vec<u8>, rules: &SortRules) -> Result<()> {
 }
 
 fn write_sort_rule(output: &mut Vec<u8>, rule: &SortRule) -> Result<()> {
-    if rule.column_id >= MAX_COLUMNS as u32 {
+    let max_columns = u32::try_from(MAX_COLUMNS)
+        .map_err(|_source| invalid("worksheet column limit exceeds the named-view wire type"))?;
+    if rule.column_id >= max_columns {
         return Err(invalid(
             "named-sheet-view colId exceeds worksheet column limit",
         ));
@@ -675,7 +716,9 @@ impl Parser {
             Ctx::SortRule if exact(ns, NSV) && name == b"sortRule" => self.finish_sort_rule()?,
             Ctx::Outside | Ctx::Leaf | Ctx::ExtList(_) => {},
             Ctx::Captured => return Err(invalid("invalid retained markup state")),
-            _ => return Err(invalid("mismatched Named Sheet Views end element")),
+            Ctx::Root | Ctx::View | Ctx::Filter | Ctx::Column | Ctx::SortRules | Ctx::SortRule => {
+                return Err(invalid("mismatched Named Sheet Views end element"));
+            },
         }
         Ok(())
     }
@@ -916,7 +959,9 @@ impl Parser {
             Ctx::Filter => Ok(ExtOwner::Filter),
             Ctx::Column => Ok(ExtOwner::Column),
             Ctx::SortRules => Ok(ExtOwner::SortRules),
-            _ => Err(invalid("extLst is not allowed here")),
+            Ctx::Outside | Ctx::SortRule | Ctx::Leaf | Ctx::ExtList(_) | Ctx::Captured => {
+                Err(invalid("extLst is not allowed here"))
+            },
         }
     }
     fn begin_ext(&mut self, owner: ExtOwner) -> Result<()> {
@@ -928,28 +973,44 @@ impl Parser {
                 self.root_phase = 1;
             },
             ExtOwner::View => {
-                let v = self.view.as_mut().unwrap();
+                let v = self.view.as_mut().unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                });
                 if v.phase > 0 {
                     return Err(invalid("duplicate view extLst"));
                 }
                 v.phase = 1;
             },
             ExtOwner::Filter => {
-                let v = self.filter.as_mut().unwrap();
+                let v = self.filter.as_mut().unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                });
                 if v.phase > 1 {
                     return Err(invalid("duplicate filter extLst"));
                 }
                 v.phase = 2;
             },
             ExtOwner::Column => {
-                let v = self.column.as_mut().unwrap();
+                let v = self.column.as_mut().unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                });
                 if v.phase > 1 {
                     return Err(invalid("duplicate columnFilter extLst"));
                 }
                 v.phase = 2;
             },
             ExtOwner::SortRules => {
-                let v = self.sort_rules.as_mut().unwrap();
+                let v = self.sort_rules.as_mut().unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                });
                 if v.phase > 0 {
                     return Err(invalid("duplicate sortRules extLst"));
                 }
@@ -961,14 +1022,22 @@ impl Parser {
     fn prepare_dxf(&mut self, owner: DxfOwner) -> Result<()> {
         match owner {
             DxfOwner::Column => {
-                let v = self.column.as_mut().unwrap();
+                let v = self.column.as_mut().unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                });
                 if v.phase > 0 || v.value.differential_format.is_some() {
                     return Err(invalid("duplicate or misplaced columnFilter dxf"));
                 }
                 v.value.differential_format = Some(Markup(Vec::new()));
             },
             DxfOwner::SortRule => {
-                let v = self.sort_rule.as_mut().unwrap();
+                let v = self.sort_rule.as_mut().unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "required value was checked before extraction",
+                    )
+                });
                 if v.phase > 0 || v.value.differential_format.is_some() {
                     return Err(invalid("duplicate or misplaced sortRule dxf"));
                 }
@@ -997,7 +1066,9 @@ impl Parser {
         self.attach(payload, writer.into_inner())
     }
     fn capture_event(&mut self, event: Event<'static>) -> Result<()> {
-        let capture = self.capture.as_mut().unwrap();
+        let capture = self.capture.as_mut().unwrap_or_else(|| {
+            crate::error::panic_missing_invariant("required value was checked before extraction")
+        });
         capture
             .writer
             .write_event(event.clone())
@@ -1006,10 +1077,21 @@ impl Parser {
             Event::Start(_) => capture.depth += 1,
             Event::End(_) => capture.depth -= 1,
             Event::Eof => return Err(invalid("unterminated retained Named Sheet Views markup")),
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         if capture.depth == 0 {
-            let capture = self.capture.take().unwrap();
+            let capture = self.capture.take().unwrap_or_else(|| {
+                crate::error::panic_missing_invariant(
+                    "required value was checked before extraction",
+                )
+            });
             self.stack.pop();
             self.attach(capture.payload, capture.writer.into_inner())?;
         }
@@ -1047,20 +1129,84 @@ impl Parser {
                 column.value.filters.push(parsed);
             },
             Payload::Dxf(DxfOwner::Column) => {
-                self.column.as_mut().unwrap().value.differential_format = Some(Markup(markup));
+                self.column
+                    .as_mut()
+                    .unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    })
+                    .value
+                    .differential_format = Some(Markup(markup));
             },
             Payload::Dxf(DxfOwner::SortRule) => {
-                self.sort_rule.as_mut().unwrap().value.differential_format = Some(Markup(markup));
+                self.sort_rule
+                    .as_mut()
+                    .unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    })
+                    .value
+                    .differential_format = Some(Markup(markup));
             },
             Payload::Extension(owner, mut x) => {
                 x.markup = Markup(markup);
                 match owner {
-                    ExtOwner::Root => self.root.as_mut().unwrap().extensions.push(x),
-                    ExtOwner::View => self.view.as_mut().unwrap().value.extensions.push(x),
-                    ExtOwner::Filter => self.filter.as_mut().unwrap().value.extensions.push(x),
-                    ExtOwner::Column => self.column.as_mut().unwrap().value.extensions.push(x),
+                    ExtOwner::Root => self
+                        .root
+                        .as_mut()
+                        .unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        })
+                        .extensions
+                        .push(x),
+                    ExtOwner::View => self
+                        .view
+                        .as_mut()
+                        .unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        })
+                        .value
+                        .extensions
+                        .push(x),
+                    ExtOwner::Filter => self
+                        .filter
+                        .as_mut()
+                        .unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        })
+                        .value
+                        .extensions
+                        .push(x),
+                    ExtOwner::Column => self
+                        .column
+                        .as_mut()
+                        .unwrap_or_else(|| {
+                            crate::error::panic_missing_invariant(
+                                "required value was checked before extraction",
+                            )
+                        })
+                        .value
+                        .extensions
+                        .push(x),
                     ExtOwner::SortRules => {
-                        self.sort_rules.as_mut().unwrap().value.extensions.push(x);
+                        self.sort_rules
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .value
+                            .extensions
+                            .push(x);
                     },
                 }
             },
@@ -1129,7 +1275,13 @@ fn parse_filter_payload(markup: &[u8]) -> Result<Column> {
                 writer.write_event(Event::End(e)).map_err(xml_error)?;
             },
             Event::Eof => break,
-            other => writer.write_event(other).map_err(xml_error)?,
+            other @ (Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)) => writer.write_event(other).map_err(xml_error)?,
         }
     }
     if !seen {
@@ -1154,7 +1306,15 @@ fn adapt_filter_root(e: &BytesStart<'_>, d: Decoder) -> Result<BytesStart<'stati
     let mut c = BytesStart::new("x:filterColumn");
     for name in [b"colId".as_slice(), b"hiddenButton", b"showButton"] {
         if let Some(value) = attr(e, name, d)? {
-            c.push_attribute((std::str::from_utf8(name).unwrap(), Cow::Owned(value)));
+            c.push_attribute((
+                std::str::from_utf8(name).unwrap_or_else(|error| {
+                    crate::error::panic_error_invariant(
+                        "operation was checked before extraction",
+                        error,
+                    )
+                }),
+                Cow::Owned(value),
+            ));
         }
     }
     Ok(c)
@@ -1269,7 +1429,9 @@ pub(crate) fn parse_authored_extension(uri: String, content_xml: &[u8]) -> Resul
     write_xml_attribute(
         &mut extension,
         "xmlns:x",
-        std::str::from_utf8(CORE).expect("constant namespace is UTF-8"),
+        std::str::from_utf8(CORE).unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("constant namespace is UTF-8", error)
+        }),
     );
     write_xml_attribute(&mut extension, "uri", &uri);
     if content_xml.is_empty() {
@@ -1350,7 +1512,11 @@ fn validate_fragment_content(content_xml: &[u8]) -> Result<usize> {
             },
             Event::Eof => break,
 
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         if depth > MAX_FRAGMENT_DEPTH || nodes > MAX_FRAGMENT_NODES {
             return Err(invalid(
@@ -1366,7 +1532,10 @@ fn validate_fragment_content(content_xml: &[u8]) -> Result<usize> {
 fn fragment_document_prefix() -> Vec<u8> {
     format!(
         r#"<namedSheetViews xmlns="{}"><namedSheetView name="Fragment" id="{FRAGMENT_VIEW_ID}">"#,
-        std::str::from_utf8(NSV).expect("constant namespace is UTF-8")
+        std::str::from_utf8(NSV).unwrap_or_else(|error| crate::error::panic_error_invariant(
+            "constant namespace is UTF-8",
+            error
+        ))
     )
     .into_bytes()
 }
@@ -1398,7 +1567,9 @@ pub(crate) fn validate_name(v: &str) -> Result<()> {
     Ok(())
 }
 pub(crate) fn validate_column_id(value: u32) -> Result<()> {
-    if value >= MAX_COLUMNS as u32 {
+    let max_columns = u32::try_from(MAX_COLUMNS)
+        .map_err(|_source| invalid("worksheet column limit exceeds the named-view wire type"))?;
+    if value >= max_columns {
         Err(invalid(
             "named-sheet-view colId exceeds worksheet column limit",
         ))
@@ -1448,7 +1619,9 @@ fn optional_guid(e: &BytesStart<'_>, name: &[u8], d: Decoder) -> Result<Option<G
 }
 fn column_id(e: &BytesStart<'_>, d: Decoder) -> Result<u32> {
     let v = required_u32(e, b"colId", d)?;
-    if v >= MAX_COLUMNS as u32 {
+    let max_columns = u32::try_from(MAX_COLUMNS)
+        .map_err(|_source| invalid("worksheet column limit exceeds the named-view wire type"))?;
+    if v >= max_columns {
         return Err(invalid(
             "named-sheet-view colId exceeds worksheet column limit",
         ));
@@ -1532,7 +1705,7 @@ fn optional_u32(e: &BytesStart<'_>, name: &[u8], d: Decoder) -> Result<Option<u3
     attr(e, name, d)?
         .map(|v| {
             v.parse::<u32>()
-                .map_err(|_| invalid(format!("invalid unsigned integer '{v}'")))
+                .map_err(|_source| invalid(format!("invalid unsigned integer '{v}'")))
         })
         .transpose()
 }

@@ -396,6 +396,15 @@ fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
         1,
     );
     assert!(Template::from_bytes(raw_negative_package(&dtd)).is_err());
+    let pretty_misplaced_inline = concat!(
+        "<?xml version=\"1.0\"?>\n",
+        "<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
+        "xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\">\n",
+        "  <office:body>\n    <office:text>\n",
+        "      <text:span>outside block</text:span>\n",
+        "    </office:text>\n  </office:body>\n</office:document-content>",
+    );
+    assert!(Template::from_bytes(raw_negative_package(pretty_misplaced_inline)).is_err());
 }
 
 #[test]
@@ -414,6 +423,8 @@ fn odf_grammar_derived_list_and_form_negatives_are_test_only_raw() {
         "<text:list/>",
         "<text:list><text:p>direct</text:p></text:list>",
         "<text:list><text:list-item/></text:list>",
+        "<text:list-item><text:p>orphan</text:p></text:list-item>",
+        "<text:span>inline-outside-block</text:span>",
         "<office:forms><form:text/></office:forms>",
     ] {
         let xml = format!("{PREFIX}{invalid_body}{SUFFIX}");
@@ -832,6 +843,199 @@ fn rich_inline_crud_is_durable_reversible_and_reopened() {
     assert_eq!(
         inverse.apply(commit.template()).unwrap().as_bytes(),
         source.as_bytes()
+    );
+}
+
+#[test]
+fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink" "#,
+        r#"xmlns:foreign="urn:example:producer"><office:body><office:text>"#,
+        r#"<text:h text:outline-level="1">head <foreign:opaque foreign:id="heading">opaque</foreign:opaque></text:h>"#,
+        r#"<text:list><text:list-item><text:p>outer</text:p><text:list><text:list-item>"#,
+        r#"<text:p>inner <foreign:opaque foreign:id="nested"><text:span>opaque</text:span></foreign:opaque></text:p>"#,
+        r#"</text:list-item></text:list></text:list-item></text:list>"#,
+        r#"<text:p><draw:frame><draw:image xlink:href="Pictures/source.bin"/></draw:frame></text:p>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let source = Template::from_bytes(resource_package(
+        CONTENT,
+        &[("Pictures/source.bin", b"source-pixels", "image/png")],
+    ))
+    .unwrap();
+    let source_bytes = source.as_bytes().to_vec();
+
+    let mut boundary = source.edit();
+    boundary
+        .prepend_heading_inline(Position::new(0), &[Inline::text("[")])
+        .unwrap();
+    boundary
+        .append_heading_inline(Position::new(0), &[Inline::text("]")])
+        .unwrap();
+    boundary
+        .append_paragraph_inline(
+            Position::new(0),
+            &[Inline::Link(Link::new(
+                "https://example.test/list",
+                " linked",
+            ))],
+        )
+        .unwrap();
+    boundary
+        .prepend_paragraph_inline(
+            Position::new(1),
+            &[Inline::bookmark("nested-start"), Inline::text("before ")],
+        )
+        .unwrap();
+    boundary
+        .append_paragraph_inline(
+            Position::new(1),
+            &[Inline::Field(
+                InlineField::new(field::Kind::PageNumber, " after").fixed(),
+            )],
+        )
+        .unwrap();
+    let commit = boundary.commit().unwrap();
+    assert_eq!(commit.patch().inline_changes().len(), 3);
+    assert!(commit.template().content_xml().contains(
+        r#"<foreign:opaque foreign:id="nested"><text:span>opaque</text:span></foreign:opaque>"#
+    ));
+    assert!(
+        commit
+            .template()
+            .content_xml()
+            .contains(r#"<foreign:opaque foreign:id="heading">opaque</foreign:opaque>"#)
+    );
+    assert!(!commit.template().content_xml().contains(">\n<"));
+    let body = commit.template().text_body().unwrap();
+    assert_eq!(body.headings()[0].text(), "[head opaque]");
+    assert_eq!(body.paragraphs()[0].text(), "outer linked");
+    assert_eq!(body.paragraphs()[1].text(), "before inner opaque after");
+    assert_eq!(body.bookmarks().len(), 1);
+    assert_eq!(body.resources().len(), 1);
+    assert!(
+        commit
+            .template()
+            .files()
+            .unwrap()
+            .iter()
+            .any(|path| path == "Pictures/source.bin")
+    );
+
+    let reopened = Template::from_bytes(commit.template().as_bytes().to_vec()).unwrap();
+    assert_eq!(reopened.as_bytes(), commit.template().as_bytes());
+    assert_eq!(
+        reopened.text_body().unwrap().paragraphs()[1].text(),
+        "before inner opaque after"
+    );
+    let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        durable.apply(&source).unwrap().as_bytes(),
+        commit.template().as_bytes()
+    );
+    let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        inverse.apply(commit.template()).unwrap().as_bytes(),
+        source_bytes
+    );
+
+    let mut payload = source.edit();
+    payload
+        .set_resource_payload(Position::new(0), "image/png", b"changed-pixels".to_vec())
+        .unwrap();
+    let payload_commit = payload.commit().unwrap();
+    let plan = Patch::plan_three_way(&source, commit.patch(), payload_commit.patch()).unwrap();
+    assert!(plan.conflicts().is_empty());
+    let merged = plan.publish().unwrap();
+    assert_eq!(
+        merged.text_body().unwrap().paragraphs()[1].text(),
+        "before inner opaque after"
+    );
+    assert_eq!(merged.text_body().unwrap().resources().len(), 1);
+
+    let mut history = History::new(source.clone(), HistoryLimits::new(3, 1_000_000));
+    history.record(commit).unwrap();
+    assert!(history.undo());
+    assert_eq!(history.current().as_bytes(), source.as_bytes());
+    assert!(history.redo());
+    assert_eq!(
+        history.current().text_body().unwrap().paragraphs()[1].text(),
+        "before inner opaque after"
+    );
+
+    let destination = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let paragraph_transfer = destination
+        .plan_transfer_from(
+            history.current(),
+            TransferSelector::Paragraph(Position::new(0)),
+            TransferPolicy {
+                security: SecurityPolicy {
+                    allow_embedded_objects: true,
+                    ..SecurityPolicy::default()
+                },
+                ..TransferPolicy::default()
+            },
+        )
+        .unwrap()
+        .publish()
+        .unwrap();
+    assert_eq!(
+        paragraph_transfer
+            .template()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
+        "outer linked"
+    );
+    let resource_transfer = destination
+        .plan_transfer_from(
+            history.current(),
+            TransferSelector::Resource(Position::new(0)),
+            TransferPolicy {
+                security: SecurityPolicy {
+                    allow_embedded_objects: true,
+                    ..SecurityPolicy::default()
+                },
+                ..TransferPolicy::default()
+            },
+        )
+        .unwrap()
+        .publish()
+        .unwrap();
+    assert!(
+        resource_transfer
+            .template()
+            .files()
+            .unwrap()
+            .iter()
+            .any(|path| path == "Pictures/source.bin")
+    );
+
+    const EMPTY: &str = concat!(
+        r#"<?xml version="1.0"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
+        r#"<office:body><office:text><text:p/></office:text></office:body></office:document-content>"#,
+    );
+    let empty = Template::from_bytes(Builder::new().content_xml(EMPTY).build().unwrap()).unwrap();
+    let mut fill = empty.edit();
+    fill.append_paragraph_inline(Position::new(0), &[Inline::text("filled")])
+        .unwrap();
+    let filled = fill.commit().unwrap();
+    assert_eq!(
+        filled.template().text_body().unwrap().paragraphs()[0].text(),
+        "filled"
+    );
+    assert!(
+        filled
+            .template()
+            .content_xml()
+            .contains("<text:p>filled</text:p>")
     );
 }
 
@@ -1612,6 +1816,27 @@ fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
         "Web template"
     );
     assert_eq!(rich_reopen.text_body().unwrap().bookmarks().len(), 1);
+    let mut resource_edit = rich_reopen.edit();
+    resource_edit
+        .append_resource_with_payload(
+            resource::Resource::new(resource::Kind::Image, "Pictures/derived.bin").unwrap(),
+            "image/png",
+            b"derived-pixels".to_vec(),
+        )
+        .unwrap();
+    let resource_commit = resource_edit.commit().unwrap();
+    let resource_reopen =
+        Template::from_bytes(resource_commit.template().as_bytes().to_vec()).unwrap();
+    assert_eq!(resource_reopen.text_body().unwrap().resources().len(), 1);
+    assert!(
+        resource_reopen
+            .files()
+            .unwrap()
+            .iter()
+            .any(|path| path == "Pictures/derived.bin")
+    );
+    assert_eq!(resource_reopen.meta_xml(), source.meta_xml());
+    assert_eq!(resource_reopen.styles_xml(), source.styles_xml());
     assert_eq!(
         commit
             .patch()

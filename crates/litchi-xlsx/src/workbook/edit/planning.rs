@@ -117,7 +117,7 @@ impl ThreeWayPlan {
         let joined = self
             .inner
             .finish()
-            .map_err(|_| invalid("three-way workbook conflicts remain unresolved"))?;
+            .map_err(|_source| invalid("three-way workbook conflicts remain unresolved"))?;
         let mut edits = joined.into_sub_edits().map(SubEdit::into_payload);
         let Some(mut merged) = edits.next() else {
             return Edit::new(self.base);

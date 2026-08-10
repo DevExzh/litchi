@@ -162,7 +162,7 @@ pub(super) fn parse_processed_defaults(
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::Decl(_) => {},
         }
     }
 
@@ -310,7 +310,7 @@ impl Parser {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
             }
         }
 
@@ -420,7 +420,9 @@ impl Parser {
                 optional_u32(element, b"count", decoder, "worksheet merged-range count")?
                     .map(usize::try_from)
                     .transpose()
-                    .map_err(|_| invalid("worksheet merged-range count does not fit usize"))?;
+                    .map_err(|_source| {
+                        invalid("worksheet merged-range count does not fit usize")
+                    })?;
             return Ok(Context::MergeCells);
         }
         if parent == Context::MergeCells
@@ -896,7 +898,15 @@ impl Parser {
                 }
                 Ok(())
             },
-            _ => Ok(()),
+            Context::Worksheet
+            | Context::SheetFormat
+            | Context::Columns
+            | Context::SheetData
+            | Context::Merge
+            | Context::Inline
+            | Context::Run
+            | Context::Text(_)
+            | Context::Other => Ok(()),
         }
     }
 

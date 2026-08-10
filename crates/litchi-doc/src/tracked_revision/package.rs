@@ -246,7 +246,7 @@ fn picture_shape_id(block: &[u8]) -> Result<u32> {
     clippy::let_underscore_must_use,
     clippy::map_err_ignore,
     clippy::unwrap_used,
-    reason = "main-story OfficeArt traversal is bounded and checked"
+    reason = "main/header OfficeArt traversal is bounded and checked"
 )]
 fn main_drawing_shapes(dgg_info: &[u8]) -> Result<Vec<litchi_odraw::shape::Shape<'_>>> {
     let (first, first_size) = litchi_odraw::Record::parse(dgg_info, 0)
@@ -258,14 +258,15 @@ fn main_drawing_shapes(dgg_info: &[u8]) -> Result<Vec<litchi_odraw::shape::Shape
     }
     let mut offset = first_size;
     let mut main = None;
+    let mut header_seen = false;
     while offset < dgg_info.len() {
         let label = *dgg_info
             .get(offset)
             .ok_or_else(|| corrupted("OfficeArtWordDrawing label is truncated"))?;
-        if label != 0 {
-            return Err(corrupted(
-                "picture transfer does not rewrite header drawing graphs",
-            ));
+        if label > 1 {
+            return Err(corrupted(format!(
+                "OfficeArtWordDrawing has invalid story label {label}"
+            )));
         }
         let record_offset = offset
             .checked_add(1)
@@ -277,21 +278,25 @@ fn main_drawing_shapes(dgg_info: &[u8]) -> Result<Vec<litchi_odraw::shape::Shape
                 "OfficeArtWordDrawing does not contain a DgContainer",
             ));
         }
-        if main.is_some() {
-            return Err(corrupted(
-                "OfficeArtContent contains more than one main-story drawing",
-            ));
-        }
         let drawing_end = record_offset
             .checked_add(drawing_size)
-            .ok_or_else(|| corrupted("main OfficeArt drawing extent overflow"))?;
+            .ok_or_else(|| corrupted("OfficeArt drawing extent overflow"))?;
         let drawing_bytes = dgg_info
             .get(record_offset..drawing_end)
-            .ok_or_else(|| corrupted("main OfficeArt drawing extends past DggInfo"))?;
-        main =
-            Some(litchi_odraw::shape::parse(drawing_bytes).map_err(|error| {
-                corrupted(format!("main OfficeArt shapes are invalid: {error}"))
-            })?);
+            .ok_or_else(|| corrupted("OfficeArt drawing extends past DggInfo"))?;
+        let shapes = litchi_odraw::shape::parse(drawing_bytes)
+            .map_err(|error| corrupted(format!("OfficeArt shapes are invalid: {error}")))?;
+        if label == 0 {
+            if main.replace(shapes).is_some() {
+                return Err(corrupted(
+                    "OfficeArtContent contains more than one main-story drawing",
+                ));
+            }
+        } else if std::mem::replace(&mut header_seen, true) {
+            return Err(corrupted(
+                "OfficeArtContent contains more than one header drawing",
+            ));
+        }
         offset = drawing_end;
     }
     main.ok_or_else(|| corrupted("floating picture has no main-story OfficeArt drawing"))
@@ -1066,11 +1071,15 @@ impl RevisionEditor {
         let (picture, width, height, shape_id) = self.canonical_picture_at_cp(cp)?;
         let selected_spa = if floating {
             let (spa_offset, spa_length) = fib_pair(&self.word, 40)?;
-            let (_header_spa_offset, header_spa_length) = fib_pair(&self.word, 41)?;
+            let (header_spa_offset, header_spa_length) = fib_pair(&self.word, 41)?;
             if header_spa_length != 0 {
-                return Err(corrupted(
-                    "picture transfer does not rewrite header drawing graphs",
-                ));
+                let header_spa = slice(
+                    &self.table,
+                    header_spa_offset,
+                    header_spa_length,
+                    "PlcfSpaHdr",
+                )?;
+                drop(crate::parts::spa::parse_plcf_spa(header_spa)?);
             }
             if spa_length == 0 {
                 return Err(corrupted("floating picture has no PlcfSpaMom"));

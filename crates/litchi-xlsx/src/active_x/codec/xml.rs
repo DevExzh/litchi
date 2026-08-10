@@ -281,7 +281,7 @@ pub(crate) fn controls_span(xml: &[u8]) -> Result<ControlsLocation> {
     let mut insertion = None;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("worksheet XML offset overflow"))?;
+            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_error)?;
@@ -336,7 +336,7 @@ pub(crate) fn controls_span(xml: &[u8]) -> Result<ControlsLocation> {
                         .take()
                         .ok_or_else(|| invalid("mismatched controls closing element"))?;
                     let end = usize::try_from(reader.buffer_position())
-                        .map_err(|_| invalid("worksheet XML offset overflow"))?;
+                        .map_err(|_source| invalid("worksheet XML offset overflow"))?;
                     controls_span = Some((start, end));
                 }
                 if depth == 1 && element.local_name().as_ref() == b"worksheet" {
@@ -348,7 +348,11 @@ pub(crate) fn controls_span(xml: &[u8]) -> Result<ControlsLocation> {
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -394,7 +398,12 @@ pub(crate) fn relationship_ids_in_xml(xml: &[u8]) -> Result<HashSet<String>> {
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -949,7 +958,7 @@ fn relationship_attr(node: &Node, local: &str) -> Result<Option<String>> {
 fn req_u32(node: &Node, ns: &str, local: &str) -> Result<u32> {
     req_attr(node, ns, local)?
         .parse()
-        .map_err(|_| invalid(format!("invalid unsigned integer {local}")))
+        .map_err(|_source| invalid(format!("invalid unsigned integer {local}")))
 }
 fn opt_bool(node: &Node, local: &str) -> Result<Option<bool>> {
     attr(node, "", local)?.map(|v| parse_bool(&v)).transpose()
@@ -965,13 +974,13 @@ fn text_i32(node: &Node) -> Result<i32> {
     node.text
         .trim()
         .parse()
-        .map_err(|_| invalid("invalid anchor signed integer"))
+        .map_err(|_source| invalid("invalid anchor signed integer"))
 }
 fn text_i64(node: &Node) -> Result<i64> {
     node.text
         .trim()
         .parse()
-        .map_err(|_| invalid("invalid anchor coordinate"))
+        .map_err(|_source| invalid("invalid anchor coordinate"))
 }
 fn parse_persistence(value: &str) -> Result<Persistence> {
     match value {

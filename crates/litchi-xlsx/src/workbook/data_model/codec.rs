@@ -98,7 +98,7 @@ pub(crate) fn parse_data_model_node(root: &Node) -> Result<Definition> {
         .map(|value| {
             value
                 .parse::<u8>()
-                .map_err(|_| invalid("minVersionLoad must be an unsigned byte"))
+                .map_err(|_source| invalid("minVersionLoad must be an unsigned byte"))
         })
         .transpose()?
         .unwrap_or(5);
@@ -330,11 +330,11 @@ pub(crate) fn insert_extension(xml: &[u8], core: &str, fragment: &[u8]) -> Resul
     let mut empty_ext = None;
     let mut root_close = None;
     loop {
-        let start =
-            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_source| limit("rewrite position"))?;
         let event = reader.read_event().map_err(xml_error)?;
-        let end =
-            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_source| limit("rewrite position"))?;
         match event {
             Event::Start(element) => {
                 let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
@@ -366,7 +366,13 @@ pub(crate) fn insert_extension(xml: &[u8], core: &str, fragment: &[u8]) -> Resul
                 depth -= 1;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if let Some((start, end, qname)) = empty_ext {

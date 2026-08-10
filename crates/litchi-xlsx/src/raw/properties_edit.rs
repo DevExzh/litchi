@@ -460,7 +460,14 @@ fn scan(content: &[u8]) -> Result<(Option<Vector>, Vec<Title>, Vec<Variant>)> {
                         tag: tag(&element, decoder)?,
                         text: String::new(),
                     }),
-                    _ => {},
+                    Kind::Properties
+                    | Kind::Titles
+                    | Kind::HeadingPairs
+                    | Kind::HeadingVector
+                    | Kind::Variant
+                    | Kind::Label
+                    | Kind::Count
+                    | Kind::Other => {},
                 }
             },
             Event::Text(text) => {
@@ -528,7 +535,7 @@ fn scan(content: &[u8]) -> Result<(Option<Vector>, Vec<Title>, Vec<Variant>)> {
                     },
                     Kind::Count if !frame.markup => {
                         if let Some(variant) = pending_variant.as_mut() {
-                            let value = frame.text.parse::<usize>().map_err(|_| {
+                            let value = frame.text.parse::<usize>().map_err(|_source| {
                                 invalid("invalid worksheet count in extended properties")
                             })?;
                             variant.count = Some((frame.inner_start, start, value));
@@ -539,11 +546,18 @@ fn scan(content: &[u8]) -> Result<(Option<Vector>, Vec<Title>, Vec<Variant>)> {
                             .take()
                             .ok_or_else(|| invalid("extended-properties variant lost state"))?,
                     ),
-                    _ => {},
+                    Kind::Properties
+                    | Kind::Titles
+                    | Kind::Title
+                    | Kind::HeadingPairs
+                    | Kind::HeadingVector
+                    | Kind::Label
+                    | Kind::Count
+                    | Kind::Other => {},
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -604,7 +618,7 @@ fn optional_usize(tag: &Tag, name: &str) -> Result<Option<usize>> {
         .map(|value| {
             value
                 .parse::<usize>()
-                .map_err(|_| invalid(format!("invalid extended-properties {name} '{value}'")))
+                .map_err(|_source| invalid(format!("invalid extended-properties {name} '{value}'")))
         })
         .transpose()
 }
@@ -665,7 +679,7 @@ fn sibling_name(name: &str, local: &str) -> String {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("extended-properties byte position does not fit usize"))
+        .map_err(|_source| invalid("extended-properties byte position does not fit usize"))
 }
 
 #[cfg(test)]

@@ -82,7 +82,7 @@ fn parse_object(node: &Node, conformance: OleObjectConformance) -> Result<OleObj
         .transpose()?;
     let shape_id = required(node, "", "shapeId")?
         .parse()
-        .map_err(|_| invalid("invalid oleObject shapeId"))?;
+        .map_err(|_source| invalid("invalid oleObject shapeId"))?;
     let relationship_id = required(node, conformance.rel(), "id")?.to_owned();
     no_attributes(
         node,
@@ -617,7 +617,7 @@ fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Resul
     let mut nodes = 0usize;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("worksheet XML offset overflow"))?;
+            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
@@ -638,7 +638,7 @@ fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Resul
                 };
                 let parent = stack.last().copied();
                 let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_| invalid("worksheet XML offset overflow"))?;
+                    .map_err(|_source| invalid("worksheet XML offset overflow"))?;
                 let attributes = raw_attributes(source, start, end, &reader, element)?;
                 let id = elements.len();
                 elements.push(RawElement {
@@ -647,7 +647,7 @@ fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Resul
                     parent,
                     object,
                     start_end: usize::try_from(reader.buffer_position())
-                        .map_err(|_| invalid("worksheet XML offset overflow"))?,
+                        .map_err(|_source| invalid("worksheet XML offset overflow"))?,
                     end_start: None,
                     empty,
                     attributes,
@@ -671,7 +671,7 @@ fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Resul
                 return Err(invalid("unsafe XML construct in worksheet OLE source"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -688,7 +688,7 @@ fn raw_object_key(
     let shape_id = raw_attribute_value(reader, element, "", "shapeId")?
         .ok_or_else(|| invalid("OLE source object is missing shapeId"))?
         .parse()
-        .map_err(|_| invalid("invalid OLE source shapeId"))?;
+        .map_err(|_source| invalid("invalid OLE source shapeId"))?;
     let relationship_id = raw_attribute_value(reader, element, conformance.rel(), "id")?
         .ok_or_else(|| invalid("OLE source object is missing relationship ID"))?;
     Ok(RawObjectKey {
@@ -1034,10 +1034,10 @@ fn apply_edits(source: &[u8], mut edits: Vec<Edit>) -> Result<Vec<u8>> {
     }
     let mut delta = 0isize;
     for edit in &edits {
-        let replacement =
-            isize::try_from(edit.replacement.len()).map_err(|_| limit("updated XML bytes"))?;
+        let replacement = isize::try_from(edit.replacement.len())
+            .map_err(|_source| limit("updated XML bytes"))?;
         let removed =
-            isize::try_from(edit.end - edit.start).map_err(|_| limit("updated XML bytes"))?;
+            isize::try_from(edit.end - edit.start).map_err(|_source| limit("updated XML bytes"))?;
         delta = delta
             .checked_add(replacement - removed)
             .ok_or_else(|| limit("updated XML bytes"))?;
@@ -1045,11 +1045,11 @@ fn apply_edits(source: &[u8], mut edits: Vec<Edit>) -> Result<Vec<u8>> {
     let size = if delta >= 0 {
         source
             .len()
-            .checked_add(usize::try_from(delta).map_err(|_| limit("updated XML bytes"))?)
+            .checked_add(usize::try_from(delta).map_err(|_source| limit("updated XML bytes"))?)
     } else {
         source
             .len()
-            .checked_sub(usize::try_from(-delta).map_err(|_| limit("updated XML bytes"))?)
+            .checked_sub(usize::try_from(-delta).map_err(|_source| limit("updated XML bytes"))?)
     }
     .ok_or_else(|| limit("updated XML bytes"))?;
     if size > MAX_XML_BYTES {
@@ -1289,7 +1289,7 @@ pub(super) fn insert_collection(
     let mut root = false;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("worksheet XML offset overflow"))?;
+            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
@@ -1326,7 +1326,11 @@ pub(super) fn insert_collection(
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !root || depth != 0 {
@@ -1382,13 +1386,13 @@ fn coordinate(node: &Node, name: &str) -> Result<u32> {
     node.text
         .trim()
         .parse()
-        .map_err(|_| invalid(format!("invalid object marker {name}")))
+        .map_err(|_source| invalid(format!("invalid object marker {name}")))
 }
 fn signed_coordinate(node: &Node, name: &str) -> Result<i64> {
     node.text
         .trim()
         .parse()
-        .map_err(|_| invalid(format!("invalid object marker {name}")))
+        .map_err(|_source| invalid(format!("invalid object marker {name}")))
 }
 fn parse_bool(value: &str, name: &str) -> Result<bool> {
     match value {

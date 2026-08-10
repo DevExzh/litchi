@@ -151,7 +151,7 @@ pub(super) fn validate_metadata(kind: RevisionKind, metadata: &RevisionMetadata)
         ));
     }
     if let Some(value) = metadata.timestamp {
-        let _ = pack_dttm(Some(value))?;
+        pack_dttm(Some(value))?;
     }
     Ok(())
 }
@@ -1047,7 +1047,7 @@ pub(super) fn decode_dttm(raw: u32) -> Result<Option<DateTime>> {
         year: ((raw >> 20) & 0x1ff) as u16 + 1900,
         weekday: ((raw >> 29) & 7) as u8,
     };
-    let _ = pack_dttm(Some(value))?;
+    pack_dttm(Some(value))?;
     Ok(Some(value))
 }
 pub(super) fn push_byte(out: &mut Vec<u8>, op: u16, v: u8) {

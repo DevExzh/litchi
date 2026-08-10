@@ -63,13 +63,13 @@ fn parse_state(n: &Node) -> Result<State> {
         single_range_filter_state: optional_bool(n, "singleRangeFilterState")?,
         minimal_refresh_version: required(n, "", "minimalRefreshVersion")?
             .parse()
-            .map_err(|_| invalid("invalid minimalRefreshVersion"))?,
+            .map_err(|_source| invalid("invalid minimalRefreshVersion"))?,
         last_refresh_version: required(n, "", "lastRefreshVersion")?
             .parse()
-            .map_err(|_| invalid("invalid lastRefreshVersion"))?,
+            .map_err(|_source| invalid("invalid lastRefreshVersion"))?,
         pivot_cache_id: required(n, "", "pivotCacheId")?
             .parse()
-            .map_err(|_| invalid("invalid pivotCacheId"))?,
+            .map_err(|_source| invalid("invalid pivotCacheId"))?,
         filter_type: FilterType::parse(required(n, "", "filterType")?)?,
     };
     validate_state(&state)?;
@@ -107,10 +107,10 @@ fn parse_timeline_pivot_filter(n: &Node) -> Result<PivotFilter> {
         use_whole_day: optional_bool(n, "useWholeDay")?,
         field: required(n, "", "fld")?
             .parse()
-            .map_err(|_| invalid("invalid timeline filter fld"))?,
+            .map_err(|_source| invalid("invalid timeline filter fld"))?,
         id: required(n, "", "id")?
             .parse()
-            .map_err(|_| invalid("invalid timeline filter id"))?,
+            .map_err(|_source| invalid("invalid timeline filter id"))?,
         name: optional(n, "", "name").map(str::to_owned),
         description: optional(n, "", "description").map(str::to_owned),
         auto_filter,
@@ -268,7 +268,7 @@ fn parse_pivot_tables(node: &Node, output: &mut Vec<CachePivotTable>) -> Result<
         empty(child)?;
         let tab_id = required(child, "", "tabId")?
             .parse::<u32>()
-            .map_err(|_| invalid("invalid View Cache pivotTable tabId"))?;
+            .map_err(|_source| invalid("invalid View Cache pivotTable tabId"))?;
         let name = required(child, "", "name")?.to_owned();
         bounded(&name, "pivot table name")?;
         if !bindings.insert((tab_id, name.to_lowercase())) {

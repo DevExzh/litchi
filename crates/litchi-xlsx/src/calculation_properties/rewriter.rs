@@ -203,7 +203,11 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
                             mixed_target = true;
                         },
                         Kind::ExtList { other } => *other = true,
-                        _ => {},
+                        Kind::Root
+                        | Kind::Calc
+                        | Kind::FeatureList
+                        | Kind::Feature
+                        | Kind::Other => {},
                     }
                 }
             },
@@ -215,12 +219,16 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
                             mixed_target = true;
                         },
                         Kind::ExtList { other } => *other = true,
-                        _ => {},
+                        Kind::Root
+                        | Kind::Calc
+                        | Kind::FeatureList
+                        | Kind::Feature
+                        | Kind::Other => {},
                     }
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
     if !root_seen || !root_closed || !stack.is_empty() {
@@ -463,7 +471,7 @@ fn close_frame(
                         *mixed = true;
                         *mixed_target = true;
                     },
-                    _ => {},
+                    Kind::Root | Kind::Calc | Kind::FeatureList | Kind::Feature | Kind::Other => {},
                 }
             }
         },
@@ -576,7 +584,17 @@ fn plan_features(
                 .as_ref()
                 .is_some_and(|list| !list.has_other_content)
             {
-                inspection.layout.ext_list.as_ref().unwrap().element.span
+                inspection
+                    .layout
+                    .ext_list
+                    .as_ref()
+                    .unwrap_or_else(|| {
+                        crate::error::panic_missing_invariant(
+                            "required value was checked before extraction",
+                        )
+                    })
+                    .element
+                    .span
             } else {
                 target.span
             };
@@ -1198,7 +1216,7 @@ fn check_attributes(element: &BytesStart<'_>, limits: &Limits) -> Result<()> {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("XML position does not fit usize"))
+        .map_err(|_source| invalid("XML position does not fit usize"))
 }
 
 fn is_xcalcf(namespace: &ResolveResult<'_>, local: &[u8], expected: &[u8]) -> bool {

@@ -677,7 +677,9 @@ pub fn parse_hash_index(bytes: &[u8]) -> NativeResult<HashIndexFile<'_>> {
     let record_count = cursor.read_u64("hash record count")?;
     bound_count(record_count, MAX_NATIVE_ITEMS, "hash record count")?;
     let current_mask = cursor.read_u64("hash current mask")?;
-    if current_mask != header.bin_count as u64 - 1 {
+    let wire_bin_count = u64::try_from(header.bin_count)
+        .map_err(|_source| NativeError::new("hash bin count is negative"))?;
+    if current_mask != wire_bin_count - 1 {
         return Err(NativeError::new(
             "hash current mask does not equal bins minus one",
         ));
@@ -688,6 +690,8 @@ pub fn parse_hash_index(bytes: &[u8]) -> NativeResult<HashIndexFile<'_>> {
     } else {
         None
     };
+    let bin_count = usize::try_from(header.bin_count)
+        .map_err(|_source| NativeError::new("hash bin count exceeds platform size"))?;
     let bins_len = bin_count
         .checked_mul(bin_size)
         .ok_or_else(|| NativeError::new("hash bins size overflow"))?;
@@ -701,7 +705,9 @@ pub fn parse_hash_index(bytes: &[u8]) -> NativeResult<HashIndexFile<'_>> {
     let mut histogram_counts = vec![0u64; 1];
     for (index, raw_bin) in bins_bytes.chunks_exact(bin_size).enumerate() {
         require_zeroes(&raw_bin[..8], "persisted hash chain pointer")?;
-        let count = u32::from_le_bytes(raw_bin[8..12].try_into().unwrap());
+        let count = u32::from_le_bytes(raw_bin[8..12].try_into().unwrap_or_else(|error| {
+            crate::error::panic_error_invariant("operation was checked before extraction", error)
+        }));
         let count64 = u64::from(count);
         summed_records = summed_records
             .checked_add(count64)
@@ -759,7 +765,7 @@ pub fn parse_hash_index(bytes: &[u8]) -> NativeResult<HashIndexFile<'_>> {
         validate_hash_statistics(
             statistics,
             record_count,
-            bin_count as u64,
+            wire_bin_count,
             used_bins,
             fast_access,
             expected_locals as u64,
@@ -877,8 +883,12 @@ fn validate_hash_statistics(
 }
 
 fn validate_hash_entry(entry: &[u8], bin_index: usize, bin_count: usize) -> NativeResult<()> {
-    let persisted_hash = u32::from_le_bytes(entry[..4].try_into().unwrap());
-    let key = u32::from_le_bytes(entry[4..8].try_into().unwrap());
+    let persisted_hash = u32::from_le_bytes(entry[..4].try_into().unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    }));
+    let key = u32::from_le_bytes(entry[4..8].try_into().unwrap_or_else(|error| {
+        crate::error::panic_error_invariant("operation was checked before extraction", error)
+    }));
     let bits = bin_count.trailing_zeros();
     let calculated = key
         .wrapping_mul(HASH_MAGIC)
@@ -954,19 +964,47 @@ impl<'a> Cursor<'a> {
     }
 
     fn read_u32(&mut self, field: &str) -> NativeResult<u32> {
-        Ok(u32::from_le_bytes(self.take(4, field)?.try_into().unwrap()))
+        Ok(u32::from_le_bytes(
+            self.take(4, field)?.try_into().unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            }),
+        ))
     }
 
     fn read_i32(&mut self, field: &str) -> NativeResult<i32> {
-        Ok(i32::from_le_bytes(self.take(4, field)?.try_into().unwrap()))
+        Ok(i32::from_le_bytes(
+            self.take(4, field)?.try_into().unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            }),
+        ))
     }
 
     fn read_u64(&mut self, field: &str) -> NativeResult<u64> {
-        Ok(u64::from_le_bytes(self.take(8, field)?.try_into().unwrap()))
+        Ok(u64::from_le_bytes(
+            self.take(8, field)?.try_into().unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            }),
+        ))
     }
 
     fn read_i64(&mut self, field: &str) -> NativeResult<i64> {
-        Ok(i64::from_le_bytes(self.take(8, field)?.try_into().unwrap()))
+        Ok(i64::from_le_bytes(
+            self.take(8, field)?.try_into().unwrap_or_else(|error| {
+                crate::error::panic_error_invariant(
+                    "operation was checked before extraction",
+                    error,
+                )
+            }),
+        ))
     }
 
     fn rest(&self) -> &'a [u8] {
@@ -975,11 +1013,11 @@ impl<'a> Cursor<'a> {
 }
 
 fn usize_from_u64(value: u64, field: &str) -> NativeResult<usize> {
-    usize::try_from(value).map_err(|_| NativeError::new(format!("{field} exceeds usize")))
+    usize::try_from(value).map_err(|_source| NativeError::new(format!("{field} exceeds usize")))
 }
 
 fn usize_from_i64(value: i64, field: &str) -> NativeResult<usize> {
-    usize::try_from(value).map_err(|_| NativeError::new(format!("invalid {field}")))
+    usize::try_from(value).map_err(|_source| NativeError::new(format!("invalid {field}")))
 }
 
 fn bound_count(value: u64, maximum: usize, field: &str) -> NativeResult<usize> {

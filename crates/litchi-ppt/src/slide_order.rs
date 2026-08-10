@@ -22,6 +22,88 @@ use crate::package::{Error as PackageError, Package, RecordLimits};
 /// Explicit bounded undo/redo history for slide-order snapshots.
 pub type History = litchi_core::patch::History<Snapshot>;
 
+/// Maximum automatic slide-advance delay permitted by `[MS-PPT]` 2.6.6.
+pub const MAX_SLIDE_ADVANCE_MS: u32 = 86_399_000;
+
+/// Fixed-width manual and automatic advance state from one
+/// `SlideShowSlideInfoAtom`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SlideAdvance {
+    manual: bool,
+    automatic: bool,
+    delay_ms: u32,
+}
+
+impl SlideAdvance {
+    /// Creates a validated advance state.
+    ///
+    /// The stored delay remains explicit even when automatic advance is off,
+    /// allowing exact inverse restoration of producer-authored ignored bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `delay_ms` exceeds the binary-format maximum.
+    pub fn new(manual: bool, automatic: bool, delay_ms: u32) -> Result<Self> {
+        if delay_ms > MAX_SLIDE_ADVANCE_MS {
+            return Err(PackageError::InvalidFormat(format!(
+                "PPT slide advance delay {delay_ms} exceeds {MAX_SLIDE_ADVANCE_MS}"
+            ))
+            .into());
+        }
+        Ok(Self {
+            manual,
+            automatic,
+            delay_ms,
+        })
+    }
+
+    /// Creates click-only advance state with a zero stored delay.
+    #[must_use]
+    pub const fn on_click() -> Self {
+        Self {
+            manual: true,
+            automatic: false,
+            delay_ms: 0,
+        }
+    }
+
+    /// Creates automatic-only advance state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `delay_ms` exceeds the format maximum.
+    pub fn automatic(delay_ms: u32) -> Result<Self> {
+        Self::new(false, true, delay_ms)
+    }
+
+    /// Creates click-or-automatic advance state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `delay_ms` exceeds the format maximum.
+    pub fn both(delay_ms: u32) -> Result<Self> {
+        Self::new(true, true, delay_ms)
+    }
+
+    /// Whether the user may manually advance the slide.
+    #[must_use]
+    pub const fn manual(self) -> bool {
+        self.manual
+    }
+
+    /// Whether the slide advances automatically.
+    #[must_use]
+    pub const fn automatic_enabled(self) -> bool {
+        self.automatic
+    }
+
+    /// Stored automatic delay in milliseconds.
+    #[must_use]
+    pub const fn delay_ms(self) -> u32 {
+        self.delay_ms
+    }
+}
+
 /// A native owner edge that must be closed before a slide can be transferred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TransferDependency {
@@ -91,6 +173,9 @@ pub enum Refusal {
     MismatchedMasterDependency { master_id: u32 },
     /// A transfer plan was prepared for a different exact receiving artifact.
     TransferTargetMismatch,
+    /// The selected slide does not contain exactly one valid fixed-width
+    /// `SlideShowSlideInfoAtom` to mutate without record insertion/removal.
+    UnsupportedSlideAdvance { position: Position },
     /// A shape edit selected a slide inserted but not yet published.
     UncommittedSlideDependency,
 }
@@ -125,6 +210,11 @@ impl fmt::Display for Refusal {
             Self::TransferTargetMismatch => {
                 formatter.write_str("PPT slide transfer plan belongs to a different target")
             },
+            Self::UnsupportedSlideAdvance { position } => write!(
+                formatter,
+                "PPT slide position {} has no unique fixed-width slide-show information atom",
+                position.get()
+            ),
             Self::UncommittedSlideDependency => formatter
                 .write_str("PPT shape text cannot target an inserted slide before publication"),
         }
@@ -308,6 +398,17 @@ impl Snapshot {
         Ok(self.document.slides()[position.get()].flags() & (1 << 2) != 0)
     }
 
+    /// Returns one slide's fixed-width manual/automatic advance state.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the position is absent or does not own
+    /// exactly one valid `SlideShowSlideInfoAtom`.
+    pub fn slide_advance(&self, position: Position) -> Result<SlideAdvance> {
+        self.require_position(position)?;
+        inspect_slide_advance(self, position)
+    }
+
     /// Returns the checked complete host anchor for one existing shape.
     ///
     /// # Errors
@@ -372,6 +473,7 @@ impl Snapshot {
             changes: Vec::new(),
             structural: Vec::new(),
             visibility_changes: Vec::new(),
+            advance_changes: Vec::new(),
             text_changes: Vec::new(),
             anchor_changes: Vec::new(),
             media_path_changes: Vec::new(),
@@ -506,6 +608,9 @@ impl Snapshot {
                     },
                     "presentation.shape-anchor.set" => {
                         apply_durable_anchor(&current, &operations[index])?
+                    },
+                    "presentation.slide-advance.set" => {
+                        apply_durable_slide_advance(&current, &operations[index])?
                     },
                     "presentation.external-media-path.set" => {
                         apply_durable_media_path(&current, &operations[index])?
@@ -698,6 +803,35 @@ impl SlideVisibilityChange {
     }
 }
 
+/// One fixed-width replacement of slide-show advance timing and flags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SlideAdvanceChange {
+    target: Position,
+    slide_id: u32,
+    before: SlideAdvance,
+    after: SlideAdvance,
+}
+
+impl SlideAdvanceChange {
+    /// Semantic source-order slide target.
+    #[must_use]
+    pub const fn target(self) -> Position {
+        self.target
+    }
+
+    /// Advance state required before replacement.
+    #[must_use]
+    pub const fn before(self) -> SlideAdvance {
+        self.before
+    }
+
+    /// Replacement advance state.
+    #[must_use]
+    pub const fn after(self) -> SlideAdvance {
+        self.after
+    }
+}
+
 impl ExternalMediaPlaybackChange {
     /// External-object identifier retained by the replacement.
     #[must_use]
@@ -742,6 +876,7 @@ impl ShapeAnchorChange {
 enum FormattingChange {
     Text(ShapeTextChange),
     Anchor(ShapeAnchorChange),
+    SlideAdvance(SlideAdvanceChange),
     MediaPath(ExternalMediaPathChange),
     MediaPlayback(ExternalMediaPlaybackChange),
 }
@@ -894,6 +1029,7 @@ pub struct Transaction {
     changes: Vec<Change>,
     structural: Vec<StructuralChange>,
     visibility_changes: Vec<SlideVisibilityChange>,
+    advance_changes: Vec<SlideAdvanceChange>,
     text_changes: Vec<ShapeTextChange>,
     anchor_changes: Vec<ShapeAnchorChange>,
     media_path_changes: Vec<ExternalMediaPathChange>,
@@ -927,6 +1063,12 @@ impl Transaction {
     #[must_use]
     pub fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
         &self.visibility_changes
+    }
+
+    /// Fixed-width slide advance changes staged in call order.
+    #[must_use]
+    pub fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
+        &self.advance_changes
     }
 
     /// Checked shape-text replacements staged in this root transaction.
@@ -1012,6 +1154,44 @@ impl Transaction {
         };
         self.visibility_changes.push(change);
         self.structural.push(StructuralChange::Visibility(change));
+        Ok(())
+    }
+
+    /// Replaces one existing slide's manual/automatic advance state.
+    ///
+    /// This changes only `slideTime`, `fManualAdvance`, and `fAutoAdvance` in
+    /// the fixed-width `SlideShowSlideInfoAtom`. Transition visuals, sounds,
+    /// hidden/cursor flags, reserved bits, and every other persisted record
+    /// remain exact.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an absent, ambiguous, malformed, or newly
+    /// inserted slide-show information owner.
+    pub fn set_slide_advance(&mut self, position: Position, advance: SlideAdvance) -> Result<()> {
+        self.require_position(position)?;
+        let selected = self.document.slides()?[position.get()];
+        let source_position = self
+            .source
+            .document
+            .slides()
+            .iter()
+            .position(|slide| slide.persist_id() == selected.persist_id())
+            .map(Position::new)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let before = self.working.slide_advance(source_position)?;
+        if before == advance {
+            return Ok(());
+        }
+        self.working = replace_slide_advance(&self.working, source_position, advance)?;
+        let change = SlideAdvanceChange {
+            target: source_position,
+            slide_id: selected.slide_id(),
+            before,
+            after: advance,
+        };
+        self.advance_changes.push(change);
+        self.formatting.push(FormattingChange::SlideAdvance(change));
         Ok(())
     }
 
@@ -1282,6 +1462,7 @@ impl Transaction {
                 changes: self.changes,
                 structural: self.structural,
                 visibility_changes: self.visibility_changes,
+                advance_changes: self.advance_changes,
                 text_changes: self.text_changes,
                 anchor_changes: self.anchor_changes,
                 media_path_changes: self.media_path_changes,
@@ -1343,6 +1524,7 @@ impl Transaction {
             changes: self.changes,
             structural: self.structural,
             visibility_changes: self.visibility_changes,
+            advance_changes: self.advance_changes,
             text_changes: self.text_changes,
             anchor_changes: self.anchor_changes,
             media_path_changes: self.media_path_changes,
@@ -1408,6 +1590,7 @@ pub struct Patch {
     changes: Vec<Change>,
     structural: Vec<StructuralChange>,
     visibility_changes: Vec<SlideVisibilityChange>,
+    advance_changes: Vec<SlideAdvanceChange>,
     text_changes: Vec<ShapeTextChange>,
     anchor_changes: Vec<ShapeAnchorChange>,
     media_path_changes: Vec<ExternalMediaPathChange>,
@@ -1429,6 +1612,12 @@ impl Patch {
     #[must_use]
     pub fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
         &self.visibility_changes
+    }
+
+    /// Slide advance replacements composed into this root patch.
+    #[must_use]
+    pub fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
+        &self.advance_changes
     }
 
     /// Shape-text replacements composed into this root patch.
@@ -1520,6 +1709,17 @@ impl Patch {
                     after_order: change.before_order,
                 })
                 .collect(),
+            advance_changes: self
+                .advance_changes
+                .iter()
+                .rev()
+                .map(|change| SlideAdvanceChange {
+                    target: change.target,
+                    slide_id: change.slide_id,
+                    before: change.after,
+                    after: change.before,
+                })
+                .collect(),
             text_changes: self
                 .text_changes
                 .iter()
@@ -1577,6 +1777,14 @@ impl Patch {
                             target: anchor_change.target,
                             before: anchor_change.after,
                             after: anchor_change.before,
+                        })
+                    },
+                    FormattingChange::SlideAdvance(advance_change) => {
+                        FormattingChange::SlideAdvance(SlideAdvanceChange {
+                            target: advance_change.target,
+                            slide_id: advance_change.slide_id,
+                            before: advance_change.after,
+                            after: advance_change.before,
                         })
                     },
                     FormattingChange::MediaPath(media_change) => {
@@ -1651,6 +1859,20 @@ impl Patch {
                         anchor_change.target,
                         anchor_change.after,
                         anchor_change.before,
+                    )?,
+                ),
+                FormattingChange::SlideAdvance(advance_change) => ReversibleOperation::new(
+                    durable_slide_advance_operation(
+                        limits,
+                        advance_change.target,
+                        advance_change.before,
+                        advance_change.after,
+                    )?,
+                    durable_slide_advance_operation(
+                        limits,
+                        advance_change.target,
+                        advance_change.after,
+                        advance_change.before,
                     )?,
                 ),
                 FormattingChange::MediaPath(media_change) => ReversibleOperation::new(
@@ -2055,6 +2277,62 @@ fn durable_anchor_operation(
     )
 }
 
+fn durable_slide_advance_operation(
+    limits: litchi_core::patch::PatchLimits,
+    target: Position,
+    before: SlideAdvance,
+    after: SlideAdvance,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let preconditions = BTreeMap::from([(
+        "advance_sha256".to_string(),
+        serde_json::Value::String(artifact_hash(&slide_advance_bytes(before))),
+    )]);
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "presentation.slide-advance.set",
+        format!("slide:{}", target.get()),
+        preconditions,
+        slide_advance_value(after),
+    )
+}
+
+fn slide_advance_bytes(advance: SlideAdvance) -> [u8; 6] {
+    let mut bytes = [0_u8; 6];
+    bytes[0] = u8::from(advance.manual);
+    bytes[1] = u8::from(advance.automatic);
+    bytes[2..6].copy_from_slice(&advance.delay_ms.to_le_bytes());
+    bytes
+}
+
+fn slide_advance_value(advance: SlideAdvance) -> serde_json::Value {
+    serde_json::json!({
+        "automatic": advance.automatic,
+        "delay_ms": advance.delay_ms,
+        "manual": advance.manual,
+    })
+}
+
+fn parse_slide_advance_value(value: &serde_json::Value) -> Result<SlideAdvance> {
+    let object = value
+        .as_object()
+        .filter(|object| object.len() == 3)
+        .ok_or_else(|| invalid_durable_patch("slide-advance value must have three fields"))?;
+    let manual = object
+        .get("manual")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| invalid_durable_patch("slide-advance manual flag is invalid"))?;
+    let automatic = object
+        .get("automatic")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| invalid_durable_patch("slide-advance automatic flag is invalid"))?;
+    let delay_ms = object
+        .get("delay_ms")
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|delay| u32::try_from(delay).ok())
+        .ok_or_else(|| invalid_durable_patch("slide-advance delay is invalid"))?;
+    SlideAdvance::new(manual, automatic, delay_ms)
+}
+
 fn durable_media_path_operation(
     limits: litchi_core::patch::PatchLimits,
     id: u32,
@@ -2189,6 +2467,7 @@ fn is_formatting_operation(operation: &str) -> bool {
         operation,
         "presentation.shape-text.set"
             | "presentation.shape-anchor.set"
+            | "presentation.slide-advance.set"
             | "presentation.external-media-path.set"
             | "presentation.external-media-playback.set"
     )
@@ -2346,6 +2625,35 @@ fn apply_durable_anchor(
     let replacement = parse_anchor_value(&operation.value)?;
     let rewritten = crate::text_edit::replace_shape_anchor(snapshot.bytes(), target, replacement)?;
     Snapshot::from_bytes_with_limits(rewritten.bytes, snapshot.limits)
+}
+
+fn apply_durable_slide_advance(
+    snapshot: &Snapshot,
+    operation: &litchi_core::patch::PatchOperation,
+) -> Result<Snapshot> {
+    if operation.preconditions.len() != 1 {
+        return Err(invalid_durable_patch(
+            "slide-advance operation has unexpected preconditions",
+        ));
+    }
+    let target = parse_target(&operation.target)?;
+    let expected = operation
+        .preconditions
+        .get("advance_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_durable_patch("missing slide-advance precondition"))?;
+    let current = snapshot.slide_advance(target)?;
+    if artifact_hash(&slide_advance_bytes(current)) != expected {
+        return Err(PackageError::InvalidFormat(
+            "PPT durable slide-advance semantic precondition does not match".into(),
+        )
+        .into());
+    }
+    replace_slide_advance(
+        snapshot,
+        target,
+        parse_slide_advance_value(&operation.value)?,
+    )
 }
 
 fn parse_anchor_value(value: &serde_json::Value) -> Result<crate::Anchor> {
@@ -2635,6 +2943,138 @@ fn persisted_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
     )?
     .persisted_record(persist_id)
     .map_err(Error::from)
+}
+
+fn inspect_slide_advance(snapshot: &Snapshot, position: Position) -> Result<SlideAdvance> {
+    let slide = snapshot
+        .document
+        .slides()
+        .get(position.get())
+        .copied()
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
+    let bytes = persisted_record(snapshot, slide.persist_id())?;
+    let (root, consumed) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits)?;
+    if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
+        return Err(PackageError::Corrupted(
+            "PPT slide advance owner is not one complete SlideContainer".into(),
+        )
+        .into());
+    }
+    let atom = unique_slide_advance_atom(&root, position)?;
+    parse_slide_advance_atom(atom, position)
+}
+
+fn unique_slide_advance_atom(root: &crate::Record, position: Position) -> Result<&crate::Record> {
+    let mut atoms = root
+        .children
+        .iter()
+        .filter(|child| child.record_type == crate::RecordType::SSSlideInfoAtom);
+    let atom = atoms
+        .next()
+        .ok_or(Error::Refused(Refusal::UnsupportedSlideAdvance {
+            position,
+        }))?;
+    if atoms.next().is_some() {
+        return Err(Error::Refused(Refusal::UnsupportedSlideAdvance {
+            position,
+        }));
+    }
+    Ok(atom)
+}
+
+fn parse_slide_advance_atom(atom: &crate::Record, position: Position) -> Result<SlideAdvance> {
+    const RESERVED_FLAGS: u16 =
+        (1 << 1) | (1 << 3) | (1 << 5) | (1 << 7) | (1 << 9) | (1 << 11) | (0b111 << 13);
+
+    if atom.version != 0 || atom.instance != 0 || !atom.children.is_empty() || atom.data.len() != 16
+    {
+        return Err(Error::Refused(Refusal::UnsupportedSlideAdvance {
+            position,
+        }));
+    }
+    let flags = u16::from_le_bytes([atom.data[10], atom.data[11]]);
+    let delay_ms = read_payload_u32(&atom.data, 0)?;
+    if flags & RESERVED_FLAGS != 0 || delay_ms > MAX_SLIDE_ADVANCE_MS {
+        return Err(Error::Refused(Refusal::UnsupportedSlideAdvance {
+            position,
+        }));
+    }
+    SlideAdvance::new(flags & 1 != 0, flags & (1 << 10) != 0, delay_ms)
+}
+
+fn replace_slide_advance(
+    snapshot: &Snapshot,
+    position: Position,
+    replacement: SlideAdvance,
+) -> Result<Snapshot> {
+    let slide = snapshot
+        .document
+        .slides()
+        .get(position.get())
+        .copied()
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
+    let source_record = persisted_record(snapshot, slide.persist_id())?;
+    let (mut root, consumed) =
+        crate::Record::parse_with_limits(&source_record, 0, snapshot.limits)?;
+    if consumed != source_record.len() || root.record_type != crate::RecordType::Slide {
+        return Err(PackageError::Corrupted(
+            "PPT slide advance owner is not one complete SlideContainer".into(),
+        )
+        .into());
+    }
+    if encode_record(&root)? != source_record {
+        return Err(PackageError::Corrupted(
+            "PPT slide advance source record is not byte-exactly re-encodable".into(),
+        )
+        .into());
+    }
+    let atom_index = {
+        let _current =
+            parse_slide_advance_atom(unique_slide_advance_atom(&root, position)?, position)?;
+        root.children
+            .iter()
+            .position(|child| child.record_type == crate::RecordType::SSSlideInfoAtom)
+            .ok_or(Error::Refused(Refusal::UnsupportedSlideAdvance {
+                position,
+            }))?
+    };
+    let atom = &mut root.children[atom_index];
+    let before = atom.data.clone();
+    atom.data[0..4].copy_from_slice(&replacement.delay_ms.to_le_bytes());
+    let mut flags = u16::from_le_bytes([atom.data[10], atom.data[11]]);
+    flags &= !((1 << 0) | (1 << 10));
+    flags |= u16::from(replacement.manual);
+    flags |= u16::from(replacement.automatic) << 10;
+    atom.data[10..12].copy_from_slice(&flags.to_le_bytes());
+    if atom.data[4..10] != before[4..10] || atom.data[12..16] != before[12..16] {
+        return Err(PackageError::Corrupted(
+            "PPT slide advance rewrite changed preserved transition fields".into(),
+        )
+        .into());
+    }
+    let rewritten_record = encode_record(&root)?;
+    if rewritten_record.len() != source_record.len() {
+        return Err(PackageError::Corrupted(
+            "PPT fixed-width slide advance rewrite changed record length".into(),
+        )
+        .into());
+    }
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        snapshot.bytes.clone(),
+        snapshot.limits.max_package_bytes,
+    )?;
+    editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
+    let bytes = editor.finish()?;
+    crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
+    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    if published.document != snapshot.document || published.slide_advance(position)? != replacement
+    {
+        return Err(PackageError::Corrupted(
+            "PPT slide advance replacement did not round-trip exactly".into(),
+        )
+        .into());
+    }
+    Ok(published)
 }
 
 fn expected_persisted_slides(
@@ -3855,6 +4295,9 @@ fn replay_structural_changes(
 
 fn patch_effects(patch: &Patch) -> BTreeSet<String> {
     let mut effects = BTreeSet::new();
+    for change in &patch.advance_changes {
+        effects.insert(format!("slide-id:{}/advance", change.slide_id));
+    }
     for change in &patch.text_changes {
         effects.insert(format!(
             "slide:{}/shape:{}/text",
@@ -4108,6 +4551,68 @@ mod tests {
             }
         }
         panic!("real fixture must expose one external-media object");
+    }
+
+    fn genuine_advance_cases() -> Vec<(&'static str, &'static str, Snapshot, Position)> {
+        let roots = [
+            (
+                "poi-slideshow",
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../test-data/poi/test-data/slideshow"),
+                &[
+                    "basic_test_ppt_file.ppt",
+                    "SampleShow.ppt",
+                    "WithLinks.ppt",
+                    "sound.ppt",
+                    "45543.ppt",
+                    "incorrect_slide_order.ppt",
+                ][..],
+            ),
+            (
+                "ole-ppt",
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/ppt"),
+                &[
+                    "SampleShow.ppt",
+                    "text_shapes.ppt",
+                    "text-margins.ppt",
+                    "ppt_with_png.ppt",
+                    "empty_textbox.ppt",
+                ][..],
+            ),
+        ];
+        let mut cases = Vec::new();
+        for (family, root, names) in roots {
+            for name in names {
+                let Ok(bytes) = std::fs::read(root.join(name)) else {
+                    continue;
+                };
+                let Ok(snapshot) = Snapshot::from_bytes(bytes) else {
+                    continue;
+                };
+                for index in 0..snapshot.slide_count() {
+                    let position = Position::new(index);
+                    if snapshot.slide_advance(position).is_ok() {
+                        cases.push((family, *name, snapshot, position));
+                        break;
+                    }
+                }
+            }
+        }
+        cases
+    }
+
+    fn advance_atom_data(snapshot: &Snapshot, position: Position) -> [u8; 16] {
+        let slide = snapshot.document.slides()[position.get()];
+        let bytes = persisted_record(snapshot, slide.persist_id()).unwrap();
+        let (root, consumed) =
+            crate::Record::parse_with_limits(&bytes, 0, snapshot.limits).unwrap();
+        assert_eq!(consumed, bytes.len());
+        unique_slide_advance_atom(&root, position)
+            .unwrap()
+            .data
+            .as_slice()
+            .try_into()
+            .unwrap()
     }
 
     fn patch_limits() -> litchi_core::patch::PatchLimits {
@@ -4827,5 +5332,140 @@ mod tests {
                 .target(),
             expected_conflict
         );
+    }
+
+    #[test]
+    fn genuine_corpus_slide_advance_reopens_reverses_merges_and_uses_history() {
+        let cases = genuine_advance_cases();
+        let producer_files = cases
+            .iter()
+            .filter_map(|(family, name, _, _)| (*family == "poi-slideshow").then_some(*name))
+            .collect::<BTreeSet<_>>();
+        assert!(
+            producer_files.is_superset(&BTreeSet::from(["45543.ppt", "WithLinks.ppt"])),
+            "the two checked-in genuine producer files must expose slide-show information"
+        );
+
+        for (family, name, source, position) in &cases {
+            let before = source.slide_advance(*position).unwrap();
+            let replacement = if before == SlideAdvance::both(1_750).unwrap() {
+                SlideAdvance::on_click()
+            } else {
+                SlideAdvance::both(1_750).unwrap()
+            };
+            let before_atom = advance_atom_data(source, *position);
+            let mut edit = source.edit().unwrap();
+            edit.set_slide_advance(*position, replacement).unwrap();
+            let commit = edit.commit().unwrap();
+            assert_eq!(
+                commit.snapshot().slide_advance(*position).unwrap(),
+                replacement
+            );
+            let after_atom = advance_atom_data(commit.snapshot(), *position);
+            assert_eq!(&after_atom[4..10], &before_atom[4..10], "{family}/{name}");
+            assert_eq!(&after_atom[12..16], &before_atom[12..16], "{family}/{name}");
+            let mut reopened =
+                Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+            assert_eq!(
+                reopened.presentation().unwrap().slide_count(),
+                source.slide_count(),
+                "{family}/{name}"
+            );
+        }
+
+        let (_family, _name, source, position) = cases.into_iter().next().unwrap();
+        let before = source.slide_advance(position).unwrap();
+        let replacement = if before == SlideAdvance::automatic(2_250).unwrap() {
+            SlideAdvance::both(2_250).unwrap()
+        } else {
+            SlideAdvance::automatic(2_250).unwrap()
+        };
+        let mut edit = source.edit().unwrap();
+        edit.set_slide_advance(position, replacement).unwrap();
+        let destination = if source.slide_count() > 1 {
+            if position.get() == 0 {
+                Position::new(1)
+            } else {
+                Position::new(0)
+            }
+        } else {
+            position
+        };
+        if destination != position {
+            edit.move_slide(position, destination).unwrap();
+        }
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.patch().slide_advance_changes().len(), 1);
+        assert_eq!(
+            commit.snapshot().slide_advance(destination).unwrap(),
+            replacement
+        );
+        assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
+        assert_eq!(
+            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            source
+        );
+
+        let durable = commit.patch().to_durable(patch_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                patch_limits(),
+            )
+            .unwrap();
+        let applied = source.apply_durable(&decoded).unwrap();
+        assert_eq!(applied, *commit.snapshot());
+        let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+        assert_eq!(restored.slide_advance(position).unwrap(), before);
+        assert_eq!(slide_texts(restored.bytes()), slide_texts(source.bytes()));
+
+        let mut history = source.history(HistoryLimits::new(4, 64 * 1024));
+        history
+            .record(commit.snapshot().clone(), wire.len() as u64)
+            .unwrap();
+        assert!(history.undo());
+        assert_eq!(history.current(), &source);
+        assert!(history.redo());
+        assert_eq!(history.current(), commit.snapshot());
+
+        let mut competing = source.edit().unwrap();
+        competing
+            .set_slide_advance(position, SlideAdvance::both(3_500).unwrap())
+            .unwrap();
+        let competing = competing.commit().unwrap();
+        assert!(
+            source
+                .plan_three_way(commit.patch(), competing.patch())
+                .unwrap()
+                .conflicts()
+                .iter()
+                .any(|conflict| conflict.target().ends_with("/advance"))
+        );
+    }
+
+    #[test]
+    fn slide_advance_refuses_missing_owner_and_out_of_range_delay() {
+        assert!(SlideAdvance::automatic(MAX_SLIDE_ADVANCE_MS + 1).is_err());
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/ole/ppt/SampleShow.ppt"),
+        )
+        .unwrap();
+        let source = Snapshot::from_bytes(bytes).unwrap();
+        let position = Position::new(0);
+        assert!(matches!(
+            source.slide_advance(position),
+            Err(Error::Refused(Refusal::UnsupportedSlideAdvance { position: refused }))
+                if refused == position
+        ));
+        let mut edit = source.edit().unwrap();
+        assert!(matches!(
+            edit.set_slide_advance(position, SlideAdvance::on_click()),
+            Err(Error::Refused(Refusal::UnsupportedSlideAdvance { position: refused }))
+                if refused == position
+        ));
+        assert!(edit.slide_advance_changes().is_empty());
+        assert_eq!(edit.commit().unwrap().snapshot(), &source);
     }
 }

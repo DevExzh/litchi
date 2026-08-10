@@ -162,16 +162,21 @@ pub fn decompress_no_split(
     let mask = (1u64 << bits) - 1;
     let mut result = Vec::with_capacity(count);
     for chunk in input.chunks_exact(8) {
-        let word = u64::from_le_bytes(chunk.try_into().expect("exact chunk"));
+        let word = u64::from_le_bytes(
+            chunk
+                .try_into()
+                .unwrap_or_else(|error| crate::error::panic_error_invariant("exact chunk", error)),
+        );
         for slot in 0..per_word {
             if result.len() == count {
                 break;
             }
-            let delta = ((word >> (slot * bits)) & mask) as i64;
+            let delta = i64::try_from((word >> (slot * bits)) & mask)
+                .map_err(|_source| CodecError::IntegerOverflow)?;
             let value = i64::from(min)
                 .checked_add(delta)
                 .ok_or(CodecError::IntegerOverflow)?;
-            result.push(i32::try_from(value).map_err(|_| {
+            result.push(i32::try_from(value).map_err(|_source| {
                 CodecError::Invalid("XMRENoSplit value exceeds signed 32-bit range")
             })?);
         }
@@ -200,15 +205,24 @@ pub fn compress_no_split(
         let mut word = 0u64;
         for (slot, &value) in group.iter().enumerate() {
             let delta = i64::from(value) - i64::from(min);
-            if delta < 0 || (delta as u64) > max_delta {
+            let unsigned_delta = u64::try_from(delta).map_err(|_source| {
+                CodecError::Invalid("value cannot be represented by XMRENoSplit width and Min")
+            })?;
+            if unsigned_delta > max_delta {
                 return Err(CodecError::Invalid(
                     "value cannot be represented by XMRENoSplit width and Min",
                 ));
             }
             let bit_offset = slot * bits;
-            let mask = no_split_compression_mask(width.bits(), bit_offset as u8)
-                .expect("supported widths and slots are within the Appendix A table");
-            word = (word & mask) | ((delta as u64) << bit_offset);
+            let bit_offset_u8 =
+                u8::try_from(bit_offset).map_err(|_source| CodecError::IntegerOverflow)?;
+            let mask =
+                no_split_compression_mask(width.bits(), bit_offset_u8).unwrap_or_else(|| {
+                    crate::error::panic_missing_invariant(
+                        "supported widths and slots are within the Appendix A table",
+                    )
+                });
+            word = (word & mask) | (unsigned_delta << bit_offset);
         }
         output[word_index * 8..word_index * 8 + 8].copy_from_slice(&word.to_le_bytes());
     }
@@ -248,11 +262,11 @@ pub fn decompress_hybrid(
         return Err(CodecError::LimitExceeded("max_input_bytes"));
     }
     let used = usize::try_from(storage_used_units)
-        .map_err(|_| CodecError::IntegerOverflow)?
+        .map_err(|_source| CodecError::IntegerOverflow)?
         .checked_mul(4)
         .ok_or(CodecError::IntegerOverflow)?;
     let allocated = usize::try_from(storage_alloc_units)
-        .map_err(|_| CodecError::IntegerOverflow)?
+        .map_err(|_source| CodecError::IntegerOverflow)?
         .checked_mul(4)
         .ok_or(CodecError::IntegerOverflow)?;
     if used > allocated || allocated != primary.len() || used % 8 != 0 {
@@ -272,13 +286,19 @@ pub fn decompress_hybrid(
                 "XM123 requires one primary entry and an eight-byte zero subsegment",
             ));
         }
-        let offset = i32::from_le_bytes(primary[0..4].try_into().expect("length checked"));
-        let count = i32::from_le_bytes(primary[4..8].try_into().expect("length checked"));
+        let offset =
+            i32::from_le_bytes(primary[0..4].try_into().unwrap_or_else(|error| {
+                crate::error::panic_error_invariant("length checked", error)
+            }));
+        let count =
+            i32::from_le_bytes(primary[4..8].try_into().unwrap_or_else(|error| {
+                crate::error::panic_error_invariant("length checked", error)
+            }));
         if offset != -1 || usize::try_from(count).ok() != Some(row_count) {
             return Err(CodecError::Invalid("XM123 primary entry is invalid"));
         }
         let last = i64::from(min)
-            .checked_add(i64::try_from(row_count).map_err(|_| CodecError::IntegerOverflow)?)
+            .checked_add(i64::try_from(row_count).map_err(|_source| CodecError::IntegerOverflow)?)
             .and_then(|value| value.checked_sub(1))
             .unwrap_or(i64::from(min));
         if row_count != 0 && last > 2_000_000_000 {
@@ -289,7 +309,9 @@ pub fn decompress_hybrid(
         return (0..row_count)
             .map(|index| {
                 i64::from(min)
-                    .checked_add(i64::try_from(index).map_err(|_| CodecError::IntegerOverflow)?)
+                    .checked_add(
+                        i64::try_from(index).map_err(|_source| CodecError::IntegerOverflow)?,
+                    )
                     .and_then(|value| i32::try_from(value).ok())
                     .ok_or(CodecError::IntegerOverflow)
             })
@@ -304,10 +326,18 @@ pub fn decompress_hybrid(
     let mut packed_count = 0usize;
     let mut logical_count = 0usize;
     for entry in primary[..used].chunks_exact(8) {
-        let value_or_offset = i32::from_le_bytes(entry[0..4].try_into().expect("exact chunk"));
-        let count = i32::from_le_bytes(entry[4..8].try_into().expect("exact chunk"));
+        let value_or_offset = i32::from_le_bytes(
+            entry[0..4]
+                .try_into()
+                .unwrap_or_else(|error| crate::error::panic_error_invariant("exact chunk", error)),
+        );
+        let count = i32::from_le_bytes(
+            entry[4..8]
+                .try_into()
+                .unwrap_or_else(|error| crate::error::panic_error_invariant("exact chunk", error)),
+        );
         let count = usize::try_from(count)
-            .map_err(|_| CodecError::Invalid("hybrid entry count is not positive"))?;
+            .map_err(|_source| CodecError::Invalid("hybrid entry count is not positive"))?;
         if count == 0 {
             return Err(CodecError::Invalid("hybrid entry count is zero"));
         }
@@ -328,7 +358,7 @@ pub fn decompress_hybrid(
             entries.push(Entry::Run(value_or_offset, count));
         } else {
             let expected = i64::try_from(packed_count)
-                .map_err(|_| CodecError::IntegerOverflow)?
+                .map_err(|_source| CodecError::IntegerOverflow)?
                 .checked_add(1)
                 .and_then(i64::checked_neg)
                 .ok_or(CodecError::IntegerOverflow)?;
@@ -375,7 +405,7 @@ pub fn compress_hybrid(
     if let HybridKind::Xm123 { min } = kind {
         for (index, &value) in values.iter().enumerate() {
             let expected = i64::from(min)
-                .checked_add(i64::try_from(index).map_err(|_| CodecError::IntegerOverflow)?)
+                .checked_add(i64::try_from(index).map_err(|_source| CodecError::IntegerOverflow)?)
                 .ok_or(CodecError::IntegerOverflow)?;
             if i64::from(value) != expected || expected > 2_000_000_000 {
                 return Err(CodecError::Invalid(
@@ -383,7 +413,7 @@ pub fn compress_hybrid(
                 ));
             }
         }
-        let count = i32::try_from(values.len()).map_err(|_| CodecError::IntegerOverflow)?;
+        let count = i32::try_from(values.len()).map_err(|_source| CodecError::IntegerOverflow)?;
         let mut primary = Vec::with_capacity(8);
         primary.extend_from_slice(&(-1i32).to_le_bytes());
         primary.extend_from_slice(&count.to_le_bytes());
@@ -411,7 +441,7 @@ pub fn compress_hybrid(
             primary.extend_from_slice(&values[position].to_le_bytes());
             primary.extend_from_slice(
                 &i32::try_from(run_length)
-                    .map_err(|_| CodecError::IntegerOverflow)?
+                    .map_err(|_source| CodecError::IntegerOverflow)?
                     .to_le_bytes(),
             );
             position = run_end;
@@ -435,14 +465,14 @@ pub fn compress_hybrid(
                 .checked_add(1)
                 .ok_or(CodecError::IntegerOverflow)?,
         )
-        .map_err(|_| CodecError::IntegerOverflow)?
+        .map_err(|_source| CodecError::IntegerOverflow)?
         .checked_neg()
         .ok_or(CodecError::IntegerOverflow)?;
         let count = position - packed_start;
         primary.extend_from_slice(&offset.to_le_bytes());
         primary.extend_from_slice(
             &i32::try_from(count)
-                .map_err(|_| CodecError::IntegerOverflow)?
+                .map_err(|_source| CodecError::IntegerOverflow)?
                 .to_le_bytes(),
         );
         packed.extend_from_slice(&values[packed_start..position]);
@@ -451,7 +481,7 @@ pub fn compress_hybrid(
         return Err(CodecError::LimitExceeded("max_output_bytes"));
     }
     let subsegment = compress_no_split(&packed, width, min, limits)?;
-    let units = u32::try_from(primary.len() / 4).map_err(|_| CodecError::IntegerOverflow)?;
+    let units = u32::try_from(primary.len() / 4).map_err(|_source| CodecError::IntegerOverflow)?;
     Ok(HybridStorage {
         primary,
         subsegment,
@@ -540,7 +570,7 @@ fn canonical_codes(encode_array: &[u8]) -> CodecResult<[Option<HuffmanCode>; 256
         if length != 0 {
             let slot = &mut next[usize::from(length)];
             result[symbol] = Some(HuffmanCode {
-                bits: u16::try_from(*slot).map_err(|_| CodecError::IntegerOverflow)?,
+                bits: u16::try_from(*slot).map_err(|_source| CodecError::IntegerOverflow)?,
                 len: length,
             });
             *slot += 1;
@@ -571,7 +601,7 @@ pub fn decompress_huffman_strings(
     if buffer.len() > limits.max_input_bytes {
         return Err(CodecError::LimitExceeded("max_input_bytes"));
     }
-    let total_bits = usize::try_from(total_bits).map_err(|_| CodecError::IntegerOverflow)?;
+    let total_bits = usize::try_from(total_bits).map_err(|_source| CodecError::IntegerOverflow)?;
     let required_bytes = total_bits
         .checked_add(7)
         .ok_or(CodecError::IntegerOverflow)?
@@ -593,7 +623,7 @@ pub fn decompress_huffman_strings(
     let codes = canonical_codes(encode_array)?;
     let mut previous = 0usize;
     for &offset in offsets {
-        let offset = usize::try_from(offset).map_err(|_| CodecError::IntegerOverflow)?;
+        let offset = usize::try_from(offset).map_err(|_source| CodecError::IntegerOverflow)?;
         if offset < previous || offset > total_bits {
             return Err(CodecError::Invalid(
                 "Huffman string offsets are not ordered or exceed TotalBits",
@@ -609,11 +639,11 @@ pub fn decompress_huffman_strings(
     let mut total_output = 0usize;
     let mut strings = Vec::with_capacity(offsets.len());
     for (index, &start) in offsets.iter().enumerate() {
-        let mut position = usize::try_from(start).map_err(|_| CodecError::IntegerOverflow)?;
+        let mut position = usize::try_from(start).map_err(|_source| CodecError::IntegerOverflow)?;
         let end = offsets
             .get(index + 1)
             .copied()
-            .map(|value| usize::try_from(value).map_err(|_| CodecError::IntegerOverflow))
+            .map(|value| usize::try_from(value).map_err(|_source| CodecError::IntegerOverflow))
             .transpose()?
             .unwrap_or(total_bits);
         let mut decoded = Vec::new();
@@ -632,7 +662,8 @@ pub fn decompress_huffman_strings(
                     candidate
                         .is_some_and(|candidate| candidate.len == length && candidate.bits == code)
                 }) {
-                    matched = Some(symbol as u8);
+                    matched =
+                        Some(u8::try_from(symbol).map_err(|_source| CodecError::IntegerOverflow)?);
                     break;
                 }
             }
@@ -678,7 +709,7 @@ pub fn compress_huffman_strings(
     let mut buffer = Vec::<u8>::new();
     let mut bit_count = 0usize;
     for string in strings {
-        offsets.push(u32::try_from(bit_count).map_err(|_| CodecError::IntegerOverflow)?);
+        offsets.push(u32::try_from(bit_count).map_err(|_source| CodecError::IntegerOverflow)?);
         let symbols: Vec<u8> = match mode {
             HuffmanMode::MultipleCharacterSets => string.to_vec(),
             HuffmanMode::SingleCharacterSet { upper_byte } => {
@@ -712,7 +743,7 @@ pub fn compress_huffman_strings(
         }
     }
     Ok(HuffmanEncoded {
-        total_bits: u32::try_from(bit_count).map_err(|_| CodecError::IntegerOverflow)?,
+        total_bits: u32::try_from(bit_count).map_err(|_source| CodecError::IntegerOverflow)?,
         offsets,
         buffer,
     })
@@ -748,7 +779,9 @@ pub fn decompress_xpress_block(
             flags = u32::from_le_bytes(
                 take(input, &mut input_position, 4)?
                     .try_into()
-                    .expect("length checked"),
+                    .unwrap_or_else(|error| {
+                        crate::error::panic_error_invariant("length checked", error)
+                    }),
             );
             flag_count = 32;
         }
@@ -774,7 +807,9 @@ pub fn decompress_xpress_block(
         let match_bytes = u16::from_le_bytes(
             take(input, &mut input_position, 2)?
                 .try_into()
-                .expect("length checked"),
+                .unwrap_or_else(|error| {
+                    crate::error::panic_error_invariant("length checked", error)
+                }),
         );
         let offset = usize::from(match_bytes >> 3) + 1;
         let mut length = usize::from(match_bytes & 7);
@@ -792,15 +827,19 @@ pub fn decompress_xpress_block(
                     length = usize::from(u16::from_le_bytes(
                         take(input, &mut input_position, 2)?
                             .try_into()
-                            .expect("length checked"),
+                            .unwrap_or_else(|error| {
+                                crate::error::panic_error_invariant("length checked", error)
+                            }),
                     ));
                     if length == 0 {
                         length = usize::try_from(u32::from_le_bytes(
                             take(input, &mut input_position, 4)?
                                 .try_into()
-                                .expect("length checked"),
+                                .unwrap_or_else(|error| {
+                                    crate::error::panic_error_invariant("length checked", error)
+                                }),
                         ))
-                        .map_err(|_| CodecError::IntegerOverflow)?;
+                        .map_err(|_source| CodecError::IntegerOverflow)?;
                     }
                     if length < 22 {
                         return Err(CodecError::Invalid(
@@ -885,17 +924,21 @@ pub fn decompress_xpress(input: &[u8], limits: CodecLimits) -> CodecResult<Vec<u
         let original = i32::from_le_bytes(
             take(input, &mut position, 4)?
                 .try_into()
-                .expect("length checked"),
+                .unwrap_or_else(|error| {
+                    crate::error::panic_error_invariant("length checked", error)
+                }),
         );
         let compressed = i32::from_le_bytes(
             take(input, &mut position, 4)?
                 .try_into()
-                .expect("length checked"),
+                .unwrap_or_else(|error| {
+                    crate::error::panic_error_invariant("length checked", error)
+                }),
         );
         let original = usize::try_from(original)
-            .map_err(|_| CodecError::Invalid("negative Xpress original block size"))?;
+            .map_err(|_source| CodecError::Invalid("negative Xpress original block size"))?;
         let compressed = usize::try_from(compressed)
-            .map_err(|_| CodecError::Invalid("negative Xpress compressed block size"))?;
+            .map_err(|_source| CodecError::Invalid("negative Xpress compressed block size"))?;
         if original > XPRESS_BLOCK_MAX || compressed > XPRESS_BLOCK_MAX {
             return Err(CodecError::Invalid(
                 "Xpress block header exceeds 65,535 bytes",
@@ -931,12 +974,12 @@ pub fn compress_xpress(input: &[u8], limits: CodecLimits) -> CodecResult<Vec<u8>
         }
         output.extend_from_slice(
             &i32::try_from(block.len())
-                .map_err(|_| CodecError::IntegerOverflow)?
+                .map_err(|_source| CodecError::IntegerOverflow)?
                 .to_le_bytes(),
         );
         output.extend_from_slice(
             &i32::try_from(compressed.len())
-                .map_err(|_| CodecError::IntegerOverflow)?
+                .map_err(|_source| CodecError::IntegerOverflow)?
                 .to_le_bytes(),
         );
         output.extend_from_slice(&compressed);

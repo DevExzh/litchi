@@ -349,7 +349,7 @@ pub fn parse_sheet_properties(xml: &[u8]) -> Result<Option<SheetProperties>> {
                 declaration_seen = true;
             },
             Event::Eof => break,
-            _ => {},
+            Event::CData(_) | Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
     if !root_seen || !root_closed || !parser.stack.is_empty() {
@@ -466,7 +466,13 @@ impl Parser {
             Context::OutlineProperties if local == b"outlinePr" => Ok(()),
             Context::PageSetupProperties if local == b"pageSetUpPr" => Ok(()),
             Context::Outside => Ok(()),
-            _ => Err(invalid("mismatched worksheet sheetPr end element")),
+            Context::Worksheet
+            | Context::SheetProperties
+            | Context::TabColor
+            | Context::OutlineProperties
+            | Context::PageSetupProperties => {
+                Err(invalid("mismatched worksheet sheetPr end element"))
+            },
         }
     }
 
@@ -744,7 +750,7 @@ fn parse_reference(value: &str) -> Result<SynchronizationReference> {
     }
     let row = value[row_start..]
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid sheetPr syncRef '{value}'")))?;
+        .map_err(|_source| invalid(format!("invalid sheetPr syncRef '{value}'")))?;
     if !(1..=MAX_ROW).contains(&row) || !(1..=MAX_COLUMN).contains(&column) {
         return Err(invalid(format!(
             "sheetPr syncRef is outside worksheet bounds: '{value}'"
@@ -764,7 +770,7 @@ fn parse_argb(value: &str) -> Result<[u8; 4]> {
     let mut result = [0u8; 4];
     for (index, byte) in result.iter_mut().enumerate() {
         *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
-            .map_err(|_| invalid(format!("invalid tabColor ARGB value '{value}'")))?;
+            .map_err(|_source| invalid(format!("invalid tabColor ARGB value '{value}'")))?;
     }
     Ok(result)
 }
@@ -772,7 +778,7 @@ fn parse_argb(value: &str) -> Result<[u8; 4]> {
 fn parse_tint(value: &str) -> Result<f64> {
     let tint = value
         .parse::<f64>()
-        .map_err(|_| invalid(format!("invalid tabColor tint '{value}'")))?;
+        .map_err(|_source| invalid(format!("invalid tabColor tint '{value}'")))?;
     if !tint.is_finite() || !(-1.0..=1.0).contains(&tint) {
         return Err(invalid(format!("tabColor tint outside -1..1: '{value}'")));
     }
@@ -782,7 +788,7 @@ fn parse_tint(value: &str) -> Result<f64> {
 fn parse_u32(value: &str, name: &str) -> Result<u32> {
     value
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid {name} unsigned integer '{value}'")))
+        .map_err(|_source| invalid(format!("invalid {name} unsigned integer '{value}'")))
 }
 
 fn parse_bool(value: &str, name: &str) -> Result<bool> {

@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=MS Word 97
+input=test-data/office-interop/litchi-changed/noheadfoot-litchi.doc
+output=test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+status=success
+output_sha256=02f6b96ed94e027e652df5d9e527ecee825c958db8ddf9bd398ecb7b0870aa35

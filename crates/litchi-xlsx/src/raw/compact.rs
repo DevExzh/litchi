@@ -52,7 +52,13 @@ pub(crate) fn changed(input: &[u8], resource: &'static str) -> Result<Vec<u8>> {
                 if text.as_ref().iter().all(u8::is_ascii_whitespace)
                     && !preserve.last().copied().unwrap_or(false) => {},
             Event::Eof => break,
-            _ => writer.write_event(event).map_err(xml_error)?,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => writer.write_event(event).map_err(xml_error)?,
         }
     }
     Ok(writer.into_inner())

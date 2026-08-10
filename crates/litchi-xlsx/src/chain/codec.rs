@@ -212,7 +212,14 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
                 ));
             },
             Event::Eof => break,
-            _ => return Err(invalid("invalid calculation-chain XML structure")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {
+                return Err(invalid("invalid calculation-chain XML structure"));
+            },
         }
     }
     if !saw_root || !closed_root {
@@ -237,7 +244,14 @@ fn preflight_raw_attributes(xml: &[u8]) -> Result<()> {
                 }
             },
             Event::Eof => return Ok(()),
-            _ => {},
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -442,7 +456,12 @@ fn consume_leaf(reader: &mut NsReader<&[u8]>, local: &[u8], start: usize) -> Res
                 return Err(invalid("calculation cell must be empty"));
             },
             Event::Eof => return Err(invalid("unterminated calculation cell")),
-            _ => return Err(invalid("invalid calculation-cell content")),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => return Err(invalid("invalid calculation-cell content")),
         }
     }
 }
@@ -495,7 +514,11 @@ fn consume_extension_list(reader: &mut NsReader<&[u8]>, start: usize) -> Result<
                 ));
             },
             Event::Eof => return Err(invalid("unterminated calculation-chain extLst")),
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     position(reader)
@@ -511,7 +534,7 @@ fn parse_reference(value: &str) -> Result<Address> {
 fn parse_sheet(value: &str) -> Result<Sheet> {
     let value = value
         .parse::<u32>()
-        .map_err(|_| invalid("calculation-cell i is not an unsigned integer"))?;
+        .map_err(|_source| invalid("calculation-cell i is not an unsigned integer"))?;
     Sheet::new(value)
 }
 
@@ -726,7 +749,7 @@ fn push_u16(output: &mut String, mut value: u16) {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("calculation-chain XML offset overflow"))
+        .map_err(|_source| invalid("calculation-chain XML offset overflow"))
 }
 
 fn raw_range(bytes: &[u8], start: usize, end: usize) -> Result<String> {

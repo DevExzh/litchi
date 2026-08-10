@@ -353,9 +353,10 @@ impl WorkbookEdit {
     /// # Errors
     ///
     /// Returns a typed [`super::DrawingTransferRefusal`] for pictures (use
-    /// [`Self::transfer_image`]), foreign/OLE objects, relationship-bearing
-    /// shapes, ambiguous object IDs, unresolved connector endpoints, and chart
-    /// resources that escape the bounded chart-owned package graph.
+    /// [`Self::transfer_image`]), foreign/OLE objects, shape relationships
+    /// other than inert external hyperlinks, ambiguous object IDs, unresolved
+    /// connector endpoints, and chart resources that escape the bounded
+    /// chart-owned package graph.
     pub fn transfer_drawing_object(
         &mut self,
         source: &Workbook,

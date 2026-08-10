@@ -54,9 +54,9 @@ dependencies = [
 
 [[package]]
 name = "android_system_properties"
-version = "0.1.6"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae221649c9976a6f6c56ae1facf410f3ddb33cc661c4b7b61020a912d4237fbc"
+checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
 dependencies = [
  "libc",
 ]
@@ -284,6 +284,7 @@ dependencies = [
  "block-buffer 0.12.1",
  "crypto-common 0.2.2",
  "inout 0.2.2",
+ "zeroize",
 ]
 
 [[package]]
@@ -716,6 +717,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "707114b52a152fa7bdb290cd7cd5912d9467273b6d74e21b8d81aca1f8533f6b"
 dependencies = [
  "typenum",
+ "zeroize",
 ]
 
 [[package]]
@@ -872,9 +874,9 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "js-sys"
-version = "0.3.104"
+version = "0.3.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0c1080212aad755ea003d18543e8768dd432c48819efd73a7bf1e39b7a5a3a"
+checksum = "53b44bfcdb3f8d5837a46dae1ca9660a837176eee74a28b229bc626816589102"
 dependencies = [
  "cfg-if",
  "futures-util",
@@ -952,6 +954,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-crypto"
+version = "0.0.1"
+dependencies = [
+ "bitflags",
+ "litchi-cfb",
+ "litchi-core",
+ "litchi-ole-common",
+ "quick-xml",
+ "rc4",
+ "sha1 0.11.0",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "litchi-doc"
+version = "0.0.1"
+dependencies = [
+ "bitflags",
+ "bumpalo",
+ "encoding_rs",
+ "litchi-cfb",
+ "litchi-codepage",
+ "litchi-core",
+ "litchi-crypto",
+ "litchi-odraw",
+ "litchi-ole-common",
+ "litchi-sign",
+ "litchi-vba",
+ "md-5",
+ "rand 0.10.2",
+ "rc4",
+ "serde_json",
+ "smallvec",
+ "subtle",
+ "thiserror",
+ "zerocopy",
+ "zerocopy-derive",
+ "zeroize",
+]
+
+[[package]]
 name = "litchi-docx"
 version = "0.0.1"
 dependencies = [
@@ -986,7 +1030,9 @@ name = "litchi-native-resave-evidence"
 version = "0.0.0"
 dependencies = [
  "litchi-core",
+ "litchi-doc",
  "litchi-docx",
+ "litchi-odb",
  "litchi-odf-formula",
  "litchi-odg",
  "litchi-odp",
@@ -995,7 +1041,18 @@ dependencies = [
  "litchi-ppt",
  "litchi-pptx",
  "litchi-rtf",
+ "litchi-xls",
  "litchi-xlsx",
+]
+
+[[package]]
+name = "litchi-odb"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+ "serde_json",
 ]
 
 [[package]]
@@ -1236,6 +1293,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-sign"
+version = "0.0.1"
+dependencies = [
+ "base64",
+ "chrono",
+ "litchi-cfb",
+ "p256",
+ "quick-xml",
+ "rsa",
+ "sha1 0.10.7",
+ "sha2 0.10.9",
+ "signature",
+ "subtle",
+ "thiserror",
+ "x509-cert",
+ "zeroize",
+]
+
+[[package]]
 name = "litchi-spreadsheet-drawing"
 version = "0.0.1"
 dependencies = [
@@ -1245,6 +1321,38 @@ dependencies = [
  "litchi-opc",
  "quick-xml",
  "thiserror",
+]
+
+[[package]]
+name = "litchi-vba"
+version = "0.0.1"
+dependencies = [
+ "litchi-cfb",
+ "litchi-codepage",
+]
+
+[[package]]
+name = "litchi-xls"
+version = "0.0.1"
+dependencies = [
+ "bitflags",
+ "chrono",
+ "litchi-biff",
+ "litchi-cfb",
+ "litchi-codepage",
+ "litchi-core",
+ "litchi-crypto",
+ "litchi-odraw",
+ "litchi-ograph",
+ "litchi-ole-common",
+ "litchi-sign",
+ "litchi-vba",
+ "md-5",
+ "rand 0.10.2",
+ "rc4",
+ "serde_json",
+ "zerocopy",
+ "zeroize",
 ]
 
 [[package]]
@@ -1283,6 +1391,16 @@ name = "log"
 version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
+
+[[package]]
+name = "md-5"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69b6441f590336821bb897fb28fc622898ccceb1d6cea3fde5ea86b090c4de98"
+dependencies = [
+ "cfg-if",
+ "digest 0.11.3",
+]
 
 [[package]]
 name = "memchr"
@@ -1604,6 +1722,15 @@ checksum = "22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
+]
+
+[[package]]
+name = "rc4"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "840038b674daa9f7a7957440d937951d15c0143c056e631e529141fd780e0c92"
+dependencies = [
+ "cipher 0.5.2",
 ]
 
 [[package]]
@@ -2028,9 +2155,9 @@ checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.127"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b70935747edd64d89de3efa29d73789b806c15798f8e7dca4d8ac356b50ce70"
+checksum = "4b067c0c11094aef6b7a801c1e34a26affafdf3d051dba08456b868789aaf9a4"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -2041,9 +2168,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.127"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77775f8f3f7217702089053b94958f8f54061a3f663417df76e19cbdcca29bc1"
+checksum = "167ce5e579f6bcf889c4f7175a8a5a585de84e8ff93976ce393efa5f2837aab1"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -2051,9 +2178,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.127"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e11d33f857dc2fb11b8bc75aee111aa9cbeb12cd9f25efd3d4c2a3dd4e235284"
+checksum = "f3997c7839262f4ef12cf90b818d6340c18e80f263f1a94bf157d0ec4420380e"
 dependencies = [
  "bumpalo",
  "proc-macro2",
@@ -2064,9 +2191,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.127"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ef64dbcc55df09c7e5a46182d181c2cfa3e925f3da937ea764728b4bbb9dcbf"
+checksum = "dc1b4cb0cc549fcf58d7dfc081778139b3d283a081644e833e84682ad71cea24"
 dependencies = [
  "unicode-ident",
 ]

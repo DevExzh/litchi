@@ -660,7 +660,7 @@ fn is_mce_name(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, local: &
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("sheet-reference XML position does not fit usize"))
+        .map_err(|_source| invalid("sheet-reference XML position does not fit usize"))
 }
 
 #[cfg(test)]

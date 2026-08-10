@@ -60,7 +60,7 @@ impl OutlineAt {
         match self {
             Self::Checked(level) => Ok(level),
             Self::Level(value) if value < 0 || value > 7 => Err(OutlineError { value }),
-            Self::Level(value) => Outline::new(value as u8),
+            Self::Level(value) => Outline::new(value.to_le_bytes()[0]),
         }
     }
 }

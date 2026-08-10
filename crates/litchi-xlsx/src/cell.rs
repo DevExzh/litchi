@@ -386,7 +386,7 @@ impl Number {
         let parsed = value
             .trim()
             .parse::<f64>()
-            .map_err(|_| invalid(format!("invalid worksheet number '{value}'")))?;
+            .map_err(|_source| invalid(format!("invalid worksheet number '{value}'")))?;
         if !parsed.is_finite() {
             return Err(invalid(format!("non-finite worksheet number '{value}'")));
         }

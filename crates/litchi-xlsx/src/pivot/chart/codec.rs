@@ -89,7 +89,11 @@ pub fn parse_binding(xml: &[u8]) -> Result<Option<Binding>> {
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !root_seen || !root_closed || !stack.is_empty() {
@@ -343,7 +347,13 @@ fn finalize_end(context: Context, state: &mut BindingState) -> Result<()> {
                 .ok_or_else(|| invalid("mismatched pivot-options close"))?;
             attach_options(state, options)?;
         },
-        _ => {},
+        Context::ChartSpace
+        | Context::Chart
+        | Context::PivotSourceExtensionList
+        | Context::Extension
+        | Context::SeriesExtensionList
+        | Context::SeriesPivotExtension
+        | Context::Other => {},
     }
     Ok(())
 }
@@ -483,7 +493,7 @@ fn parse_u32(value: &str, description: &str) -> Result<u32> {
     }
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+        .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
 }
 
 pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {

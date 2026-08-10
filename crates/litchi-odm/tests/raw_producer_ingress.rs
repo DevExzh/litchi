@@ -102,7 +102,7 @@ fn subtree_removal_checks_incoming_references_to_descendants() {
 fn generated_indexes_require_unique_addressable_names() {
     let missing = COMPACT_CONTENT.replace(
         r#"<text:section text:name="A"/>"#,
-        r#"<text:table-of-content/>"#,
+        r"<text:table-of-content/>",
     );
     assert!(Master::from_bytes(raw_package(&missing)).is_err());
 
@@ -120,12 +120,12 @@ fn generated_indexes_require_unique_addressable_names() {
 fn common_body_children_are_schema_checked_at_raw_ingress() {
     let invalid_list = COMPACT_CONTENT.replace(
         r#"<text:section text:name="A"/>"#,
-        r#"<text:list><text:p>not-an-item</text:p></text:list>"#,
+        r"<text:list><text:p>not-an-item</text:p></text:list>",
     );
     assert!(Master::from_bytes(raw_package(&invalid_list)).is_err());
     let header_only_list = COMPACT_CONTENT.replace(
         r#"<text:section text:name="A"/>"#,
-        r#"<text:list><text:list-header><text:p>header</text:p></text:list-header></text:list>"#,
+        r"<text:list><text:list-header><text:p>header</text:p></text:list-header></text:list>",
     );
     assert!(Master::from_bytes(raw_package(&header_only_list)).is_err());
 
@@ -139,12 +139,12 @@ fn common_body_children_are_schema_checked_at_raw_ingress() {
         )
         .replace(
             r#"<text:section text:name="A"/>"#,
-            r#"<table:table><text:p>not-a-row</text:p></table:table>"#,
+            r"<table:table><text:p>not-a-row</text:p></table:table>",
         );
     assert!(Master::from_bytes(raw_package(&invalid_table)).is_err());
     let no_row_table = invalid_table.replace(
-        r#"<table:table><text:p>not-a-row</text:p></table:table>"#,
-        r#"<table:table><table:table-column/></table:table>"#,
+        r"<table:table><text:p>not-a-row</text:p></table:table>",
+        r"<table:table><table:table-column/></table:table>",
     );
     assert!(Master::from_bytes(raw_package(&no_row_table)).is_err());
 

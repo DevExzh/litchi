@@ -19,7 +19,9 @@ use std::collections::HashSet;
 pub fn classify_generated_path(path: &str) -> Result<GeneratedPath> {
     let normalized_path = normalize_generated_path(path)?;
     let segments: Vec<_> = normalized_path.split('/').collect();
-    let file = *segments.last().unwrap();
+    let file = *segments.last().unwrap_or_else(|| {
+        crate::error::panic_missing_invariant("required value was checked before extraction")
+    });
     let parents = &segments[..segments.len() - 1];
     validate_generated_hierarchy(parents)?;
     let kind = classify_generated_name(file, parents.last().copied())?;
@@ -250,7 +252,8 @@ fn parse_logged_files(node: &Node, class: FileGroupClass) -> Result<Vec<LoggedFi
                 source_path,
                 storage_path,
                 last_write_timestamp,
-                size: signed_size as u32,
+                size: u32::try_from(signed_size)
+                    .map_err(|_source| invalid("file-log size exceeds u32"))?,
                 generated,
             })
         })

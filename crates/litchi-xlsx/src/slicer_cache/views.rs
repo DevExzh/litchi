@@ -129,12 +129,12 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
 
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("Slicers XML offset overflow"))?;
+            .map_err(|_source| invalid("Slicers XML offset overflow"))?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("Slicers XML offset overflow"))?;
+            .map_err(|_source| invalid("Slicers XML offset overflow"))?;
 
         match event {
             Event::Start(element) => {
@@ -274,7 +274,7 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
             },
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {},
         }
     }
 
@@ -786,7 +786,7 @@ fn parse_u32(value: &str, name: &str) -> Result<u32> {
     }
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid {name} '{value}'")))
+        .map_err(|_source| invalid(format!("invalid {name} '{value}'")))
 }
 
 fn parse_bool(value: &str, name: &str) -> Result<bool> {
@@ -843,7 +843,9 @@ fn validate_relationship_id(value: &str) -> Result<()> {
         return Err(invalid("invalid Slicers relationship ID length"));
     }
     let mut bytes = value.bytes();
-    let first = bytes.next().unwrap();
+    let first = bytes.next().unwrap_or_else(|| {
+        crate::error::panic_missing_invariant("required value was checked before extraction")
+    });
     if !(first.is_ascii_alphabetic() || first == b'_')
         || !bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
     {

@@ -54,8 +54,8 @@ operation model. A second bounded transfer slice accepts canonical native
 inline or floating pictures: it proves the selected PICF/Data block and, for a
 floating picture, its exact SPA-to-top-level-shape-to-`pib`-to-BStore binary
 identity, then re-homes that closed slice as a collision-free singleton.
-Unrelated bounded main-story shapes, groups, textboxes, and shared BStore slots
-may coexist in the donor without being copied or regenerated. Marker CHPX,
+Unrelated bounded main/header-story shapes, groups, textboxes, and shared
+BStore slots may coexist in the donor without being copied or regenerated. Marker CHPX,
 PICF/Data, and floating `PlcfSpaMom`/`DggInfo` are regenerated together. The
 slice participates in exact in-memory inverse/history, three-way planning, and
 blob-backed durable replay/inversion.
@@ -63,13 +63,19 @@ Structural table edits, field delimiters or nesting, destructive revision
 dispositions, auxiliary-story length changes, mixed formatting, and unmodeled
 CP dependencies are typed refusals. A selected nested/group-owned picture,
 textbox, primitive, ambiguous shape/SPA owner, noncanonical picture frame,
-scaling/cropping, producer extension, delay-loaded BLIP, auxiliary/header
-drawing graph, receiver shape-ID collision,
+scaling/cropping, producer extension, delay-loaded BLIP, selection outside the
+main story, receiver shape-ID collision,
 producer-defined object characters, and other active controls have specific
 dependency refusals. Selection uses the
 format-neutral, zero-based
 `litchi_core::Position`; resolving it against a source collection reports a
 typed not-found refusal.
+
+The closure tests include a checked-in genuine DOC receiver and a genuine Word
+97 floating-picture donor corpus. The supported writer graph is fully reopened
+after ordinary and durable replay; the genuine producer graph remains a typed
+refusal where its selected records are outside the proven canonical slice. No
+native Word or LibreOffice changed-save result is claimed by this test suite.
 
 Format-neutral OfficeArt image discovery lives in `litchi-odraw`; optional
 codec operations are provided by the separate `litchi-imgconv::Convert`

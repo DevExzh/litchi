@@ -171,8 +171,10 @@ pub struct References {
 impl References {
     pub fn new(references: Vec<Reference>) -> Result<Self> {
         validate_reference_count(references.len())?;
+        let declared_count = u32::try_from(references.len())
+            .map_err(|_source| invalid("data-consolidation reference count exceeds u32"))?;
         Ok(Self {
-            declared_count: Some(references.len() as u32),
+            declared_count: Some(declared_count),
             references,
         })
     }

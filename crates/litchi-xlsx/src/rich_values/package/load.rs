@@ -130,15 +130,27 @@ fn validate_parts(parts: &[Part]) -> Result<()> {
 
     let data = parts.iter().find_map(|part| match &part.document {
         Document::Data(value) => Some(value),
-        _ => None,
+        Document::Structures(_)
+        | Document::Arrays(_)
+        | Document::Relationships(_)
+        | Document::FeatureBags(_)
+        | Document::Opaque(_) => None,
     });
     let structures = parts.iter().find_map(|part| match &part.document {
         Document::Structures(value) => Some(value),
-        _ => None,
+        Document::Data(_)
+        | Document::Arrays(_)
+        | Document::Relationships(_)
+        | Document::FeatureBags(_)
+        | Document::Opaque(_) => None,
     });
     let arrays = parts.iter().find_map(|part| match &part.document {
         Document::Arrays(value) => Some(value),
-        _ => None,
+        Document::Data(_)
+        | Document::Structures(_)
+        | Document::Relationships(_)
+        | Document::FeatureBags(_)
+        | Document::Opaque(_) => None,
     });
     if let Some(value) = data {
         validate_data(value, structures, arrays)?;
@@ -151,13 +163,21 @@ fn validate_parts(parts: &[Part]) -> Result<()> {
     }
     if let Some(value) = parts.iter().find_map(|part| match &part.document {
         Document::Relationships(value) => Some(value),
-        _ => None,
+        Document::Data(_)
+        | Document::Structures(_)
+        | Document::Arrays(_)
+        | Document::FeatureBags(_)
+        | Document::Opaque(_) => None,
     }) {
         validate_rich_value_rels(value)?;
     }
     if let Some(value) = parts.iter().find_map(|part| match &part.document {
         Document::FeatureBags(value) => Some(value),
-        _ => None,
+        Document::Data(_)
+        | Document::Structures(_)
+        | Document::Arrays(_)
+        | Document::Relationships(_)
+        | Document::Opaque(_) => None,
     }) {
         validate_bags(value)?;
     }

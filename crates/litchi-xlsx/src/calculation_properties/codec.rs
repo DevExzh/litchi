@@ -369,7 +369,12 @@ fn parse_semantic(
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !root_seen || !root_closed || depth != 0 || calc_depth.is_some() || feature_depth.is_some() {
@@ -625,7 +630,7 @@ fn parse_u32(value: &str, name: &str) -> Result<u32> {
     }
     value
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid calcPr {name} value '{value}'")))
+        .map_err(|_source| invalid(format!("invalid calcPr {name} value '{value}'")))
 }
 
 fn parse_delta(value: &str) -> Result<f64> {
@@ -635,7 +640,7 @@ fn parse_delta(value: &str) -> Result<f64> {
         "NaN" => Ok(f64::NAN),
         _ if valid_finite_double_lexical(value) => value
             .parse::<f64>()
-            .map_err(|_| invalid(format!("invalid calcPr iterateDelta '{value}'"))),
+            .map_err(|_source| invalid(format!("invalid calcPr iterateDelta '{value}'"))),
         _ => Err(invalid(format!("invalid calcPr iterateDelta '{value}'"))),
     }
 }
@@ -682,7 +687,7 @@ fn spreadsheet_dialect(namespace: &ResolveResult<'_>) -> Option<Dialect> {
         ResolveResult::Bound(Namespace(value)) if *value == STRICT_SPREADSHEETML_NAMESPACE => {
             Some(Dialect::Strict)
         },
-        _ => None,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => None,
     }
 }
 

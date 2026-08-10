@@ -199,7 +199,9 @@ impl TryFrom<u32> for Rotation {
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
-            0..=180 => Ok(Self(value as u8)),
+            0..=180 => u8::try_from(value)
+                .map(Self)
+                .map_err(|_source| InvalidRotation(value)),
             254 => Ok(Self::contextual()),
             255 => Ok(Self::stacked()),
             _ => Err(InvalidRotation(value)),
@@ -318,7 +320,7 @@ impl TryFrom<u32> for Indent {
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         u8::try_from(value)
             .map(Self)
-            .map_err(|_| InvalidIndent(value))
+            .map_err(|_source| InvalidIndent(value))
     }
 }
 
