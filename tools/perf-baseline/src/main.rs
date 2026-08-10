@@ -375,6 +375,7 @@ enum Case {
     OdsSemanticOpen,
     OdsSemanticListSheets,
     OdsSemanticOneCell,
+    OdsSemanticCellSweep,
     OdsSemanticFullCellText,
     OdsSemanticCreateSmall,
     OdsSemanticNoopEditSave,
@@ -530,6 +531,7 @@ impl Case {
             Self::OdsSemanticOpen => "ods_semantic_open",
             Self::OdsSemanticListSheets => "ods_semantic_list_sheets",
             Self::OdsSemanticOneCell => "ods_semantic_one_cell",
+            Self::OdsSemanticCellSweep => "ods_semantic_cell_sweep",
             Self::OdsSemanticFullCellText => "ods_semantic_full_cell_text",
             Self::OdsSemanticCreateSmall => "ods_semantic_create_small",
             Self::OdsSemanticNoopEditSave => "ods_semantic_noop_edit_save",
@@ -709,6 +711,7 @@ impl Case {
             Self::OdsSemanticOpen
                 | Self::OdsSemanticListSheets
                 | Self::OdsSemanticOneCell
+                | Self::OdsSemanticCellSweep
                 | Self::OdsSemanticFullCellText
                 | Self::OdsSemanticCreateSmall
                 | Self::OdsSemanticNoopEditSave
@@ -2077,6 +2080,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_semantic_open" => Some(Case::OdsSemanticOpen),
         "ods_semantic_list_sheets" => Some(Case::OdsSemanticListSheets),
         "ods_semantic_one_cell" => Some(Case::OdsSemanticOneCell),
+        "ods_semantic_cell_sweep" => Some(Case::OdsSemanticCellSweep),
         "ods_semantic_full_cell_text" => Some(Case::OdsSemanticFullCellText),
         "ods_semantic_create_small" => Some(Case::OdsSemanticCreateSmall),
         "ods_semantic_noop_edit_save" => Some(Case::OdsSemanticNoopEditSave),
@@ -2194,6 +2198,7 @@ fn print_usage() {
                                        odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
                                        odt_semantic_one_edit_save,ods_semantic_open,\n\
                                        ods_semantic_list_sheets,ods_semantic_one_cell,\n\
+                                       ods_semantic_cell_sweep,\n\
                                        ods_semantic_full_cell_text,ods_semantic_create_small,\n\
                                        ods_semantic_noop_edit_save,ods_semantic_one_edit_save,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
@@ -3372,6 +3377,7 @@ fn run_case_with_config(
         Case::OdsSemanticOpen
         | Case::OdsSemanticListSheets
         | Case::OdsSemanticOneCell
+        | Case::OdsSemanticCellSweep
         | Case::OdsSemanticFullCellText
         | Case::OdsSemanticCreateSmall
         | Case::OdsSemanticNoopEditSave
@@ -3739,6 +3745,31 @@ fn semantic_ods_full_cell_text(
         }
     }
     Ok(values.join("\n"))
+}
+
+fn semantic_ods_cell_sweep(
+    spreadsheet: &litchi_ods::Spreadsheet,
+    shape: SemanticShape,
+) -> Result<usize, Box<dyn Error>> {
+    let mut stored_cells = 0usize;
+    for sheet in 0..shape.ods_sheet_count() {
+        let name = semantic_ods_sheet_name(sheet);
+        for row in 0..shape.ods_rows_per_sheet() {
+            for column in 0..shape.ods_columns_per_sheet() {
+                let cell = spreadsheet
+                    .cell(&name, row, column)
+                    .ok_or("semantic ODS sheet is missing")?;
+                let litchi_ods::CellView::Stored(cell) = cell else {
+                    return Err("semantic ODS cell is missing".into());
+                };
+                std::hint::black_box(cell);
+                stored_cells = stored_cells
+                    .checked_add(1)
+                    .ok_or("semantic ODS stored-cell count overflowed")?;
+            }
+        }
+    }
+    Ok(stored_cells)
 }
 
 fn expected_semantic_ods_full_cell_text(shape: SemanticShape, updated: bool) -> String {
@@ -5040,6 +5071,18 @@ fn run_semantic_ods(
                     return Err("semantic ODS selected cell differs from specification".into());
                 }
                 verify_semantic_ods(&spreadsheet, shape, false)?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdsSemanticCellSweep => {
+                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let stored_cells = semantic_ods_cell_sweep(&spreadsheet, shape)?;
+                let duration = started.elapsed();
+                if stored_cells != shape.ods_cell_count() {
+                    return Err("semantic ODS stored-cell count differs from specification".into());
+                }
+                verify_semantic_ods(&spreadsheet, shape, false)?;
+                std::hint::black_box(stored_cells);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdsSemanticFullCellText => {
@@ -7348,6 +7391,7 @@ mod tests {
                 .archive
         );
         assert_eq!(ods.manifest.entry_count, 64);
+        run_case(Case::OdsSemanticCellSweep, &ods, 0, 1).unwrap();
         run_case(Case::OdsSemanticOneEditSave, &ods, 0, 1).unwrap();
 
         let odp = build_semantic_odp_corpus(SemanticShape::Tiny).unwrap();

@@ -24,7 +24,7 @@ Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one XLSX commit/read attribution case,
 20 native OLE2 semantic cases, 16 DOCX/PPTX semantic cases, seven RTF semantic
-cases, and 21 ODF semantic cases are opt-in, for 109 selectable cases in total:
+cases, and 22 ODF semantic cases are opt-in, for 110 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -92,12 +92,12 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/semantic-office-smoke.json
 ```
 
-Run the complete tiny semantic ODF smoke matrix (21 records):
+Run the complete tiny semantic ODF smoke matrix (22 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
-  --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
+  --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_cell_sweep,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
   --json target/perf/semantic-odf-smoke.json
 ```
 
@@ -261,13 +261,16 @@ and then selects the middle value because ODT has no public indexed paragraph
 query; it is deliberately not described as a lazy lookup.
 
 Each ODS batch uses `Builder`, `Spreadsheet::from_bytes`, `sheets()`, the
-public logical `cell()` view, a deterministic row-major cell-text aggregate,
-and the unified `document::Snapshot` transaction. ODS snapshot construction is
+public logical `cell()` view, a row-major cell sweep without cell-text
+cloning, a deterministic row-major cell-text aggregate, and the unified
+`document::Snapshot` transaction. ODS snapshot construction is
 inside the timed edit/save interval so these cases expose the package-open cost
 paid by this public editing entry point; the source-byte clone is outside the
 interval. The timed work also includes staging, commit, and published-byte
-observation. `ods_semantic_full_cell_text` is named explicitly because the
-facade exposes cells rather than a single full-text method.
+observation. `ods_semantic_cell_sweep` isolates repeated public lookup cost
+without cloning cell text, while `ods_semantic_full_cell_text` retains the
+end-to-end aggregate because the facade exposes cells rather than a single
+full-text method.
 
 Each ODP batch uses `Builder`, `Presentation::from_bytes`, `slides()`,
 `Presentation::text`, source snapshots, and public presentation transactions.

@@ -1,7 +1,15 @@
 //! Concise user-facing ODS entry points.
 
+mod cell_locator;
+
 use litchi_core::Result;
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::{
+        OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 pub use crate::authoring::{Builder, MutableSpreadsheet};
 use crate::model::names::{Definition, Expression, Range, Scope};
@@ -14,6 +22,8 @@ pub struct Spreadsheet {
     sheets: Vec<crate::worksheet::Sheet>,
     metadata: crate::metadata::Snapshot,
     settings: Option<crate::settings::Settings>,
+    cell_queries: AtomicUsize,
+    cell_locator: OnceLock<Option<cell_locator::CellLocator>>,
 }
 
 impl Spreadsheet {
@@ -66,6 +76,8 @@ impl Spreadsheet {
             sheets,
             metadata,
             settings,
+            cell_queries: AtomicUsize::new(0),
+            cell_locator: OnceLock::new(),
         })
     }
 
@@ -391,8 +403,34 @@ impl Spreadsheet {
         row: usize,
         column: usize,
     ) -> Option<crate::worksheet::CellView<'_>> {
-        self.sheet(sheet_name)
-            .map(|sheet| sheet.cell_view(row, column))
+        let sheet_index = self
+            .sheets
+            .iter()
+            .position(|sheet| sheet.name == sheet_name)?;
+        let direct = || self.sheets[sheet_index].cell_view(row, column);
+
+        if let Some(locator) = self.cell_locator.get() {
+            return Some(locator.as_ref().map_or_else(direct, |locator| {
+                locator.cell_view(&self.sheets, sheet_index, row, column)
+            }));
+        }
+
+        let previous = self
+            .cell_queries
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                Some(count.saturating_add(1))
+            })
+            .unwrap_or(usize::MAX);
+        if previous.saturating_add(1) >= cell_locator::BUILD_QUERY_THRESHOLD {
+            let locator = self
+                .cell_locator
+                .get_or_init(|| cell_locator::CellLocator::try_build(&self.sheets));
+            return Some(locator.as_ref().map_or_else(direct, |locator| {
+                locator.cell_view(&self.sheets, sheet_index, row, column)
+            }));
+        }
+
+        Some(direct())
     }
 
     /// Discover package, inline, missing, and inert linked images.
@@ -741,6 +779,7 @@ impl Spreadsheet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     const ANNOTATED_CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:vendor="urn:example:vendor" office:version="1.3"><office:body><office:spreadsheet><vendor:keep/><table:table table:name="Data"><table:table-row><table:table-cell><office:annotation><text:p>existing</text:p></office:annotation></table:table-cell><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
 
@@ -752,6 +791,103 @@ mod tests {
         let spreadsheet =
             Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
         assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
+    }
+
+    #[test]
+    fn cell_locator_builds_at_the_threshold_and_preserves_snapshot_traits() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<Spreadsheet>();
+
+        let bytes = Builder::new()
+            .content_xml(ANNOTATED_CONTENT)
+            .build()
+            .expect("test fixture or operation should succeed");
+        let spreadsheet =
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+
+        for _ in 1..cell_locator::BUILD_QUERY_THRESHOLD {
+            assert!(matches!(
+                spreadsheet.cell("Data", 0, 0),
+                Some(crate::worksheet::CellView::Stored(_))
+            ));
+        }
+        assert!(spreadsheet.cell_locator.get().is_none());
+        assert!(matches!(
+            spreadsheet.cell("Data", 0, 0),
+            Some(crate::worksheet::CellView::Stored(_))
+        ));
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+    }
+
+    #[test]
+    fn concurrent_first_cell_locator_build_is_shared_and_identical() {
+        let bytes = Builder::new()
+            .content_xml(ANNOTATED_CONTENT)
+            .build()
+            .expect("test fixture or operation should succeed");
+        let spreadsheet = Arc::new(
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed"),
+        );
+        let expected = std::ptr::from_ref(
+            spreadsheet
+                .sheet("Data")
+                .and_then(|sheet| sheet.cell(0, 0))
+                .expect("test fixture or operation should succeed"),
+        ) as usize;
+
+        let threads = (0..8)
+            .map(|_| {
+                let spreadsheet = Arc::clone(&spreadsheet);
+                std::thread::spawn(move || {
+                    for _ in 0..cell_locator::BUILD_QUERY_THRESHOLD {
+                        let Some(crate::worksheet::CellView::Stored(cell)) =
+                            spreadsheet.cell("Data", 0, 0)
+                        else {
+                            panic!("test fixture or operation should succeed");
+                        };
+                        assert_eq!(std::ptr::from_ref(cell) as usize, expected);
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for thread in threads {
+            thread
+                .join()
+                .expect("test fixture or operation should succeed");
+        }
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+    }
+
+    #[test]
+    fn facade_replacement_discards_built_cell_locator() {
+        let bytes = Builder::new()
+            .content_xml(ANNOTATED_CONTENT)
+            .build()
+            .expect("test fixture or operation should succeed");
+        let mut spreadsheet =
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+        for _ in 0..cell_locator::BUILD_QUERY_THRESHOLD {
+            assert!(spreadsheet.cell("Data", 0, 0).is_some());
+        }
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+
+        let updated = ANNOTATED_CONTENT.replace("existing", "replacement");
+        spreadsheet
+            .publish_annotations(&updated)
+            .expect("test fixture or operation should succeed");
+        assert!(spreadsheet.cell_locator.get().is_none());
+        assert_eq!(spreadsheet.cell_queries.load(Ordering::Relaxed), 0);
+        assert_eq!(
+            spreadsheet
+                .annotations()
+                .expect("test fixture or operation should succeed")
+                .cell("Data", 0, 0)
+                .expect("test fixture or operation should succeed")
+                .expect("test fixture or operation should succeed")
+                .annotation()
+                .text(),
+            "replacement"
+        );
     }
 
     #[test]

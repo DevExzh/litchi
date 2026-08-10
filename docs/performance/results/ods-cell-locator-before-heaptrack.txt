@@ -1,0 +1,1206 @@
+reading file "target/perf/ods-cell-locator/results/heaptrack-before-process.gz.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before --warmup 5 --samples 100 --case ods_semantic_cell_sweep --semantic-shape large --json target/perf/ods-cell-locator/results/heaptrack-before-process.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+35338058 calls to allocation functions with 0B peak consumption from
+quick_xml::events::Event::into_owned::h66cdc02723ba981e
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+10349325 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+10349325 calls with 0B peak consumption from:
+    litchi_ods::settings::codec::locate::h53a21a74a89035cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+6908790 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+6908790 calls with 0B peak consumption from:
+    litchi_ods::settings::codec::locate::h53a21a74a89035cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+147849 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 673979 from 9 other places
+
+7145168 calls to allocation functions with 21B peak consumption from
+litchi_ods::worksheet::codec::Attributes::from_element::h52803476486005ac
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3440640 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3440640 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+49152 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+49152 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::build::h4b141d68408101cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 132816 from 15 other places
+
+7083726 calls to allocation functions with 3.54M peak consumption from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3440640 calls with 0B peak consumption from:
+    litchi_perf_baseline::semantic_ods_full_cell_text::ha67f41f91c26f838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_ods::h8a50f2865c1cf900
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3440640 calls with 0B peak consumption from:
+    litchi_ods::worksheet::codec::Attributes::cell::h8ce3b8442539f40f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+49152 calls with 1.77M peak consumption from:
+    litchi_ods::worksheet::codec::Attributes::cell::h8ce3b8442539f40f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 calls with 0B peak consumption from:
+    litchi_ods::worksheet::codec::Attributes::cell::h8ce3b8442539f40f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::build::h4b141d68408101cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 calls with 884.74K peak consumption from:
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 87758 from 63 other places
+
+7012991 calls to allocation functions with 1.31M peak consumption from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3440640 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_ods::h8a50f2865c1cf900
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3440640 calls with 0B peak consumption from:
+    litchi_perf_baseline::expected_semantic_ods_full_cell_text::h551dca80bbb9d0b3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_ods::h8a50f2865c1cf900
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 calls with 1.31M peak consumption from:
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_ods::h8a50f2865c1cf900
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 calls with 0B peak consumption from:
+    litchi_perf_baseline::expected_semantic_ods_full_cell_text::h551dca80bbb9d0b3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::verify_semantic_ods::h8a50f2865c1cf900
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 33407 from 11 other places
+
+6974482 calls to allocation functions with 0B peak consumption from
+litchi_ods::settings::codec::locate::h53a21a74a89035cf
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+6908685 calls with 0B peak consumption from:
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+65797 calls with 0B peak consumption from:
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+
+
+PEAK MEMORY CONSUMERS
+32.21M peak memory consumed over 3742486 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.12772021287227650851
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+8.39M consumed over 14 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hc8b04cd80d16a75e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::push_span::hb4254df71801d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::scan::hf4d0abea5d1fa443
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+4.98M consumed over 1920 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h2cba367e1be258d7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+4.78M consumed over 6 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h992984fb6abf73c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN10litchi_ods9worksheet5codec16write_cell_inner17ha2c1d38e0033c813E.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::codec::write_sheet::h794e6bed411f3329
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+4.43M consumed over 2 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h992984fb6abf73c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::apply_edits::h7dfc118507deab64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+4.43M consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h992984fb6abf73c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::apply_edits::h7dfc118507deab64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 5.19M from 90 other places
+
+3.54M peak memory consumed over 7083726 calls from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+1.77M consumed over 49152 calls from:
+    litchi_ods::worksheet::codec::Attributes::cell::h8ce3b8442539f40f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+884.74K consumed over 32768 calls from:
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+884.74K consumed over 16384 calls from:
+    litchi_ods::worksheet::codec::Attributes::cell::h8ce3b8442539f40f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 0B from 63 other places
+
+2.49M peak memory consumed over 256 calls from
+litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+2.49M consumed over 256 calls from:
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+
+2.07M peak memory consumed over 98709 calls from
+litchi_ods::worksheet::package::decode::he26db1b2692db6bf
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+1.53M consumed over 32902 calls from:
+    litchi_ods::worksheet::package::resolve_namespace::h89adb3384f311485
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::scan::hf4d0abea5d1fa443
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+362.43K consumed over 32902 calls from:
+    litchi_ods::worksheet::package::scan::hf4d0abea5d1fa443
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+181.41K consumed over 32902 calls from:
+    litchi_ods::worksheet::package::scan::hf4d0abea5d1fa443
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 0B from 1 other places
+
+1.31M peak memory consumed over 7012991 calls from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+1.31M consumed over 32768 calls from:
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+12B consumed over 2 calls from:
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 0B from 11 other places
+
+
+MOST TEMPORARY ALLOCATIONS
+10672317 temporary allocations of 35338058 allocations in total (30.20%) from
+quick_xml::events::Event::into_owned::h66cdc02723ba981e
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3467835 temporary allocations of 6908790 allocations in total (50.19%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3466680 temporary allocations of 10349325 allocations in total (33.50%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3440745 temporary allocations of 10349325 allocations in total (33.25%) from:
+    litchi_ods::settings::codec::locate::h53a21a74a89035cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+49542 temporary allocations of 98699 allocations in total (50.20%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+49525 temporary allocations of 147849 allocations in total (33.50%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 197.99K from 9 other places
+
+3572584 temporary allocations of 7145168 allocations in total (50.00%) from
+litchi_ods::worksheet::codec::Attributes::from_element::h52803476486005ac
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3440640 temporary allocations of 3440640 allocations in total (100.00%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+49152 temporary allocations of 49152 allocations in total (100.00%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 temporary allocations of 32768 allocations in total (100.00%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 temporary allocations of 32768 allocations in total (100.00%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::build::h4b141d68408101cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+16384 temporary allocations of 16384 allocations in total (100.00%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 872B from 15 other places
+
+3506386 temporary allocations of 7012991 allocations in total (50.00%) from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3440640 temporary allocations of 3440640 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_ods::h8a50f2865c1cf900
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 temporary allocations of 32768 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_ods::h8a50f2865c1cf900
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32768 temporary allocations of 32768 allocations in total (100.00%) from:
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+105 temporary allocations of 105 allocations in total (100.00%) from:
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+105 temporary allocations of 105 allocations in total (100.00%) from:
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 0B from 11 other places
+
+49131 temporary allocations of 49155 allocations in total (99.95%) from
+aho_corasick::automaton::Automaton::try_replace_all::hd61848cda2b64a69
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+49128 temporary allocations of 49152 allocations in total (99.95%) from:
+    _ZN10litchi_ods9worksheet5codec16write_cell_inner17ha2c1d38e0033c813E.llvm.6697293378678740289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::codec::write_sheet::h794e6bed411f3329
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+3 temporary allocations of 3 allocations in total (100.00%) from:
+    litchi_ods::worksheet::codec::write_sheet::h794e6bed411f3329
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+
+36836 temporary allocations of 3620954 allocations in total (1.02%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+32771 temporary allocations of 32771 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    xml_minifier::audit::inspect_attributes::h21503e799ad44cc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    xml_minifier::audit::verify_with_policy::hf92fea616437bc28
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    xml_minifier::audit::verify_authored::h7669e88e64eefaaf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17h175558f4c6827367E.llvm.173061512633258340
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::Builder::build::h4b141d68408101cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::semantic_ods_bytes::h84505dc07385006d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+105 temporary allocations of 105 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hdc0f06912ecfb720
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _$LT$quick_xml..name..NamespaceResolver$u20$as$u20$core..default..Default$GT$::default::h67088fe58058db28
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::validate_content_xml::h598155d26d8093cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::package::document::Package::from_bytes::h27ae8810f5901835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+105 temporary allocations of 105 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hdc0f06912ecfb720
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _$LT$quick_xml..name..NamespaceResolver$u20$as$u20$core..default..Default$GT$::default::h67088fe58058db28
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::validate_content_xml::h598155d26d8093cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::package::document::Package::from_bytes::h27ae8810f5901835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+105 temporary allocations of 315 allocations in total (33.33%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hdc0f06912ecfb720
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    quick_xml::reader::state::ReaderState::emit_start::hbb4dc0a782ce0536
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_odf_common::calculation::codec::parse::h51299ea325646823
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_package::hc922288932ddcb05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+105 temporary allocations of 105 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hdc0f06912ecfb720
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    quick_xml::name::NamespaceResolver::add::hf5d45820f9ac18ef
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    quick_xml::name::NamespaceResolver::push::hdfe43361e68e6e7a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    quick_xml::reader::ns_reader::NsReader$LT$R$GT$::read_event_impl::h040ae2cbab3cd548
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::authoring::builder::validate_content_xml::h598155d26d8093cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::package::document::Package::from_bytes::h27ae8810f5901835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_ods::facade::Spreadsheet::from_bytes::hd10eef10512961e2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::run_case_with_config::he10a3b69bf97b289
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    litchi_perf_baseline::main::h22cfe5a8bf7630cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    std::sys::backtrace::__rust_begin_short_backtrace::he6ad2df6b39e92cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17ha8ac52155c577812E.llvm.2457899866040929755
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/ods-cell-locator/frozen/litchi-perf-baseline-before
+  and 3.65K from 342 other places
+
+
+total runtime: 25.07s.
+calls to allocation functions: 74691573 (2979320/s)
+temporary memory allocations: 17840929 (711644/s)
+peak heap memory consumption: 41.70M
+peak RSS (including heaptrack overhead): 47.28M
+total memory leaked: 1.78K

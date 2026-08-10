@@ -1,0 +1,1410 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 12K of event 'cycles:P'
+# Event count (approx.): 62364828579
+#
+# Overhead  Command          Shared Object                       Symbol                                                                                                                   IPC   [IPC Coverage]
+# ........  ...............  ..................................  .......................................................................................................................  ....................
+#
+    11.95%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::name::NamespaceResolver::resolve_event                                                                    -      -
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_event
+               |
+               |--2.93%--litchi_ods::settings::codec::locate
+               |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          litchi_ods::package::document::Package::calculation_settings
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |
+               |           --2.90%--litchi_perf_baseline::run_case_with_config
+               |                     0xffffffffffffffff
+               |
+               |--2.78%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          litchi_ods::codec::names::parse
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          litchi_perf_baseline::run_case_with_config
+               |          0xffffffffffffffff
+               |
+               |--2.62%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |
+               |           --2.59%--litchi_ods::facade::Spreadsheet::from_package
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     0xffffffffffffffff
+               |
+               |--2.41%--litchi_ods::authoring::builder::validate_content_xml
+               |          litchi_ods::package::document::Package::from_bytes
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          litchi_perf_baseline::run_case_with_config
+               |          0xffffffffffffffff
+               |
+                --1.19%--litchi_odf_common::calculation::codec::parse
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     7.85%  litchi-perf-bas  libc.so.6                           [.] __memcmp_evex_movbe                                                                                                  -      -
+            |
+            ---__memcmp_evex_movbe
+
+     7.47%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::facade::Spreadsheet::cell                                                                                -      -
+            |
+            ---litchi_ods::facade::Spreadsheet::cell
+               |
+               |--3.12%--litchi_perf_baseline::run_case_with_config
+               |          0xffffffffffffffff
+               |
+               |--2.45%--litchi_perf_baseline::verify_semantic_ods
+               |          |
+               |           --2.43%--litchi_perf_baseline::run_case_with_config
+               |                     0xffffffffffffffff
+               |
+                --1.90%--litchi_perf_baseline::semantic_ods_full_cell_text
+                          litchi_perf_baseline::verify_semantic_ods
+                          |
+                           --1.88%--litchi_perf_baseline::run_case_with_config
+                                     0xffffffffffffffff
+
+     6.88%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::reader::ns_reader::NsReader<R>::read_event_impl                                                           -      -
+            |
+            ---quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |
+               |--1.97%--litchi_ods::settings::codec::locate
+               |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          litchi_ods::package::document::Package::calculation_settings
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          litchi_perf_baseline::run_case_with_config
+               |          0xffffffffffffffff
+               |
+               |--1.93%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |
+               |           --1.88%--litchi_ods::facade::Spreadsheet::from_package
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     0xffffffffffffffff
+               |
+               |--1.55%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          litchi_ods::codec::names::parse
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |
+               |           --1.54%--litchi_perf_baseline::run_case_with_config
+               |                     0xffffffffffffffff
+               |
+                --1.43%--litchi_ods::authoring::builder::validate_content_xml
+                          litchi_ods::package::document::Package::from_bytes
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          |
+                           --1.42%--litchi_perf_baseline::run_case_with_config
+                                     0xffffffffffffffff
+
+     5.71%  litchi-perf-bas  libc.so.6                           [.] __memmove_avx512_unaligned_erms                                                                                      -      -
+            |
+            ---__memcpy_avx512_unaligned_erms (inlined)
+               |
+               |--0.28%--0x2
+               |
+               |--0.21%--0xffffffffffffffff
+               |
+               |--0.16%--litchi_perf_baseline::semantic_ods_full_cell_text
+               |          0x1
+               |
+               |--0.12%--__GI___libc_realloc (inlined)
+               |          _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.12772021287227650851
+               |          |
+               |           --0.11%--0x7fff3816340f
+               |
+                --0.06%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                          |
+                           --0.06%--litchi_perf_baseline::verify_semantic_ods
+                                     litchi_perf_baseline::run_case_with_config
+                                     0xffffffffffffffff
+
+     5.29%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289                             -      -
+            |
+            ---_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |
+                --5.22%--litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          0xffffffffffffffff
+
+     3.33%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral                                                       -      -
+            |
+            ---_RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+               _RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+               |
+                --3.32%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                          |
+                          |--1.85%--litchi_perf_baseline::verify_semantic_ods
+                          |          litchi_perf_baseline::run_case_with_config
+                          |          0xffffffffffffffff
+                          |
+                           --1.45%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+                                     litchi_perf_baseline::verify_semantic_ods
+                                     |
+                                      --1.44%--litchi_perf_baseline::run_case_with_config
+                                                0xffffffffffffffff
+
+     3.04%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::settings::codec::locate                                                                                  -      -
+            |
+            ---litchi_ods::settings::codec::locate
+               litchi_ods::settings::model::Snapshot::from_content_xml
+               litchi_ods::package::document::Package::calculation_settings
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               |
+                --3.03%--litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     2.94%  litchi-perf-bas  libc.so.6                           [.] __memmove_avx512_unaligned                                                                                           -      -
+            |
+            ---__memcpy_avx512_unaligned (inlined)
+               |
+                --0.15%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                          |
+                          |--0.08%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+                          |          litchi_perf_baseline::verify_semantic_ods
+                          |          litchi_perf_baseline::run_case_with_config
+                          |          0xffffffffffffffff
+                          |
+                           --0.07%--litchi_perf_baseline::verify_semantic_ods
+                                     litchi_perf_baseline::run_case_with_config
+                                     0xffffffffffffffff
+
+     2.59%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::worksheet::validation::validate_text                                                                     -      -
+            |
+            ---litchi_ods::worksheet::validation::validate_text
+               |
+               |--1.37%--litchi_ods::worksheet::validation::validate_cell
+               |          |
+               |           --1.34%--litchi_ods::worksheet::validation::validate_sheet
+               |                     litchi_ods::worksheet::validation::validate_sheets
+               |                     _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |                     |
+               |                      --1.33%--litchi_ods::facade::Spreadsheet::from_package
+               |                                litchi_ods::facade::Spreadsheet::from_bytes
+               |                                0xffffffffffffffff
+               |
+                --1.23%--litchi_ods::worksheet::model::CellValue::validate
+                          litchi_ods::worksheet::validation::validate_cell
+                          |
+                           --1.20%--litchi_ods::worksheet::validation::validate_sheet
+                                     |
+                                      --1.18%--litchi_ods::worksheet::validation::validate_sheets
+                                                |
+                                                 --1.17%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+                                                           |
+                                                            --1.14%--litchi_ods::facade::Spreadsheet::from_package
+                                                                      |
+                                                                      |--1.09%--0xffffffffffffffff
+                                                                      |
+                                                                       --0.05%--litchi_ods::facade::Spreadsheet::from_bytes
+                                                                                 0xffffffffffffffff
+
+     2.44%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with   -      -
+            |
+            ---quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+               quick_xml::reader::Reader<R>::read_event_impl
+               quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |
+               |--0.78%--litchi_ods::settings::codec::locate
+               |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          litchi_ods::package::document::Package::calculation_settings
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          0xffffffffffffffff
+               |
+               |--0.68%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |
+               |           --0.67%--litchi_ods::facade::Spreadsheet::from_package
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     0xffffffffffffffff
+               |
+               |--0.54%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          litchi_ods::codec::names::parse
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |
+               |           --0.50%--0xffffffffffffffff
+               |
+                --0.44%--litchi_ods::authoring::builder::validate_content_xml
+                          |
+                           --0.41%--litchi_ods::package::document::Package::from_bytes
+                                     litchi_ods::facade::Spreadsheet::from_bytes
+                                     litchi_perf_baseline::run_case_with_config
+                                     0xffffffffffffffff
+
+     2.23%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::reader::state::ReaderState::emit_start                                                                    -      -
+            |
+            ---quick_xml::reader::state::ReaderState::emit_start
+               |
+               |--1.88%--quick_xml::reader::Reader<R>::read_event_impl
+               |          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |          |
+               |          |--0.54%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          |          litchi_ods::codec::names::parse
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          |
+               |          |          |--0.34%--0xffffffffffffffff
+               |          |          |
+               |          |           --0.20%--litchi_perf_baseline::run_case_with_config
+               |          |                     0xffffffffffffffff
+               |          |
+               |          |--0.53%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.41%--litchi_ods::settings::codec::locate
+               |          |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          |          litchi_ods::package::document::Package::calculation_settings
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.40%--litchi_ods::authoring::builder::validate_content_xml
+               |                     litchi_ods::package::document::Package::from_bytes
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     |
+               |                      --0.39%--litchi_perf_baseline::run_case_with_config
+               |                                0xffffffffffffffff
+               |
+                --0.35%--quick_xml::reader::Reader<R>::read_event_impl
+                          litchi_odf_common::calculation::codec::parse
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          |
+                           --0.31%--0xffffffffffffffff
+
+     2.12%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::authoring::builder::validate_content_xml                                                                 -      -
+            |
+            ---litchi_ods::authoring::builder::validate_content_xml
+               |
+                --2.07%--litchi_ods::package::document::Package::from_bytes
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          |
+                           --2.06%--litchi_perf_baseline::run_case_with_config
+                                     0xffffffffffffffff
+
+     2.07%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_odf_common::calculation::codec::parse                                                                         -      -
+            |
+            ---litchi_odf_common::calculation::codec::parse
+               litchi_ods::settings::model::Snapshot::from_content_xml
+               litchi_ods::package::document::Package::calculation_settings
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               |
+                --2.05%--litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     1.79%  litchi-perf-bas  litchi-perf-baseline-before         [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2                                                             -      -
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+               memchr::arch::x86_64::avx2::memchr::Three::find_raw
+               memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+               |
+               |--1.31%--quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+               |          quick_xml::reader::Reader<R>::read_event_impl
+               |          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |          |
+               |          |--0.40%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |          |
+               |          |           --0.39%--litchi_ods::facade::Spreadsheet::from_package
+               |          |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |          |                     0xffffffffffffffff
+               |          |
+               |          |--0.34%--litchi_ods::settings::codec::locate
+               |          |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          |          litchi_ods::package::document::Package::calculation_settings
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.32%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          |          litchi_ods::codec::names::parse
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.24%--litchi_ods::authoring::builder::validate_content_xml
+               |                     litchi_ods::package::document::Package::from_bytes
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     litchi_perf_baseline::run_case_with_config
+               |                     0xffffffffffffffff
+               |
+                --0.47%--quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+                          quick_xml::reader::Reader<R>::read_event_impl
+                          litchi_odf_common::calculation::codec::parse
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          0xffffffffffffffff
+
+     1.72%  litchi-perf-bas  litchi-perf-baseline-before         [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2                                                                 -      -
+            |
+            ---memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+               |
+               |--1.32%--quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+               |          quick_xml::reader::Reader<R>::read_event_impl
+               |          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |          |
+               |          |--0.56%--litchi_ods::settings::codec::locate
+               |          |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          |          litchi_ods::package::document::Package::calculation_settings
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.40%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.21%--litchi_ods::authoring::builder::validate_content_xml
+               |          |          litchi_ods::package::document::Package::from_bytes
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          litchi_perf_baseline::run_case_with_config
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.15%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |                     litchi_ods::codec::names::parse
+               |                     litchi_ods::facade::Spreadsheet::from_package
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     0xffffffffffffffff
+               |
+                --0.40%--quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+                          quick_xml::reader::Reader<R>::read_event_impl
+                          litchi_odf_common::calculation::codec::parse
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          0xffffffffffffffff
+
+     1.48%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17ha34f0284a646bfcbE.llvm.9759586407250474178        -      -
+            |
+            ---_ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17ha34f0284a646bfcbE.llvm.9759586407250474178
+               litchi_odf_common::calculation::codec::parse
+               litchi_ods::settings::model::Snapshot::from_content_xml
+               litchi_ods::package::document::Package::calculation_settings
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               |
+                --1.47%--litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     1.34%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::reader::Reader<R>::read_event_impl                                                                        -      -
+            |
+            ---quick_xml::reader::Reader<R>::read_event_impl
+               quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |
+               |--0.48%--litchi_ods::settings::codec::locate
+               |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          litchi_ods::package::document::Package::calculation_settings
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |
+               |          |--0.39%--0xffffffffffffffff
+               |          |
+               |           --0.08%--litchi_perf_baseline::run_case_with_config
+               |                     0xffffffffffffffff
+               |
+               |--0.47%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |
+               |           --0.46%--litchi_ods::facade::Spreadsheet::from_package
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     0xffffffffffffffff
+               |
+               |--0.21%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          litchi_ods::codec::names::parse
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |
+               |           --0.20%--litchi_perf_baseline::run_case_with_config
+               |                     0xffffffffffffffff
+               |
+                --0.17%--litchi_ods::authoring::builder::validate_content_xml
+                          litchi_ods::package::document::Package::from_bytes
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     1.32%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_perf_baseline::semantic_ods_full_cell_text                                                                    -      -
+            |
+            ---litchi_perf_baseline::semantic_ods_full_cell_text
+               litchi_perf_baseline::verify_semantic_ods
+               |
+                --1.32%--litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     1.25%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner                                                                -      -
+            |
+            ---_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |
+               |--0.76%--litchi_perf_baseline::verify_semantic_ods
+               |          |
+               |           --0.76%--litchi_perf_baseline::run_case_with_config
+               |                     0xffffffffffffffff
+               |
+                --0.49%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+                          litchi_perf_baseline::verify_semantic_ods
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     1.23%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859                                        -      -
+            |
+            ---_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               litchi_ods::codec::names::parse
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               |
+                --1.21%--litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     1.22%  litchi-perf-bas  libc.so.6                           [.] _int_free                                                                                                            -      -
+            |
+            |--1.13%--_int_free
+            |          |
+            |           --1.01%--__GI___libc_free (inlined)
+            |                     |
+            |                     |--0.50%--_ZN4core3ptr55drop_in_place$LT$litchi_ods..worksheet..model..Cell$GT$17h57860541fcce05dcE.llvm.15583307666200999645
+            |                     |
+            |                     |--0.22%--litchi_ods::settings::codec::locate
+            |                     |
+            |                     |--0.09%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+            |                     |          |
+            |                     |           --0.09%--0x7fff3816547f
+            |                     |
+            |                     |--0.08%--<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop
+            |                     |
+            |                      --0.07%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+            |                                0x7
+            |
+             --0.09%--tcache_put (inlined)
+                       _int_free
+                       __GI___libc_free (inlined)
+
+     1.20%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::events::attributes::IterState::next                                                                       -      -
+            |
+            ---quick_xml::events::attributes::IterState::next
+               |
+               |--0.89%--quick_xml::name::NamespaceResolver::push
+               |          |
+               |          |--0.72%--quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |          |          |
+               |          |          |--0.24%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |          |          |
+               |          |          |           --0.23%--litchi_ods::facade::Spreadsheet::from_package
+               |          |          |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          |                     0xffffffffffffffff
+               |          |          |
+               |          |          |--0.17%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          |          |          litchi_ods::codec::names::parse
+               |          |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          |          |
+               |          |          |           --0.13%--0xffffffffffffffff
+               |          |          |
+               |          |          |--0.17%--litchi_ods::authoring::builder::validate_content_xml
+               |          |          |          litchi_ods::package::document::Package::from_bytes
+               |          |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          |          litchi_perf_baseline::run_case_with_config
+               |          |          |          0xffffffffffffffff
+               |          |          |
+               |          |           --0.15%--litchi_ods::settings::codec::locate
+               |          |                     litchi_ods::settings::model::Snapshot::from_content_xml
+               |          |                     litchi_ods::package::document::Package::calculation_settings
+               |          |                     litchi_ods::facade::Spreadsheet::from_package
+               |          |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |          |                     0xffffffffffffffff
+               |          |
+               |           --0.16%--_ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17ha34f0284a646bfcbE.llvm.9759586407250474178
+               |                     |
+               |                      --0.16%--litchi_odf_common::calculation::codec::parse
+               |                                litchi_ods::settings::model::Snapshot::from_content_xml
+               |                                litchi_ods::package::document::Package::calculation_settings
+               |                                litchi_ods::facade::Spreadsheet::from_package
+               |                                litchi_ods::facade::Spreadsheet::from_bytes
+               |                                0xffffffffffffffff
+               |
+                --0.30%--<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+                          litchi_ods::worksheet::codec::Attributes::from_element
+                          _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+                          litchi_ods::facade::Spreadsheet::from_package
+                          0xffffffffffffffff
+
+     1.17%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::reader::state::ReaderState::emit_end                                                                      -      -
+            |
+            ---quick_xml::reader::state::ReaderState::emit_end
+               |
+               |--1.02%--quick_xml::reader::Reader<R>::read_event_impl
+               |          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |          |
+               |          |--0.40%--litchi_ods::settings::codec::locate
+               |          |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          |          litchi_ods::package::document::Package::calculation_settings
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.38%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.12%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          |          litchi_ods::codec::names::parse
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          |
+               |          |           --0.09%--0xffffffffffffffff
+               |          |
+               |           --0.12%--litchi_ods::authoring::builder::validate_content_xml
+               |                     litchi_ods::package::document::Package::from_bytes
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     litchi_perf_baseline::run_case_with_config
+               |                     0xffffffffffffffff
+               |
+                --0.15%--quick_xml::reader::Reader<R>::read_event_impl
+                          litchi_odf_common::calculation::codec::parse
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          |
+                           --0.13%--0xffffffffffffffff
+
+     1.12%  litchi-perf-bas  litchi-perf-baseline-before         [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2                                                               -      -
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+               memchr::arch::x86_64::avx2::memchr::Two::find_raw
+               memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+               |
+               |--0.93%--quick_xml::reader::Reader<R>::read_event_impl
+               |          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |          |
+               |          |--0.33%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.32%--litchi_ods::settings::codec::locate
+               |          |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          |          litchi_ods::package::document::Package::calculation_settings
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.15%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          |          litchi_ods::codec::names::parse
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.13%--litchi_ods::authoring::builder::validate_content_xml
+               |                     |
+               |                      --0.13%--litchi_ods::package::document::Package::from_bytes
+               |                                litchi_ods::facade::Spreadsheet::from_bytes
+               |                                litchi_perf_baseline::run_case_with_config
+               |                                0xffffffffffffffff
+               |
+                --0.20%--quick_xml::reader::Reader<R>::read_event_impl
+                          litchi_odf_common::calculation::codec::parse
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          0xffffffffffffffff
+
+     1.11%  litchi-perf-bas  libc.so.6                           [.] unlink_chunk.isra.0                                                                                                  -      -
+            |
+            ---unlink_chunk (inlined)
+               |
+                --1.02%--malloc_consolidate
+                          |
+                          |--0.92%--_int_free_maybe_consolidate
+                          |          __GI___libc_free (inlined)
+                          |          |
+                          |          |--0.58%--_ZN4core3ptr54drop_in_place$LT$litchi_ods..worksheet..model..Row$GT$17h96deb51c3de9a2e9E.llvm.15583307666200999645
+                          |          |          |
+                          |          |           --0.55%--0x5f92f4952def
+                          |          |
+                          |          |--0.17%--litchi_perf_baseline::semantic_ods_full_cell_text
+                          |          |          0x7f
+                          |          |
+                          |           --0.17%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+                          |
+                           --0.10%--_int_malloc
+                                     |
+                                      --0.09%--__GI___libc_malloc (inlined)
+                                                |
+                                                 --0.09%--litchi_perf_baseline::run_case_with_config
+                                                           0xffffffffffffffff
+
+     1.07%  litchi-perf-bas  libc.so.6                           [.] _int_malloc                                                                                                          -      -
+            |
+             --1.02%--_int_malloc
+                       |
+                        --0.91%--__GI___libc_malloc (inlined)
+                                  |
+                                  |--0.32%--litchi_ods::worksheet::codec::Attributes::from_element
+                                  |          |
+                                  |           --0.30%--0x3
+                                  |
+                                  |--0.22%--_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+                                  |          litchi_perf_baseline::semantic_ods_full_cell_text
+                                  |          litchi_perf_baseline::verify_semantic_ods
+                                  |          litchi_perf_baseline::run_case_with_config
+                                  |          0xffffffffffffffff
+                                  |
+                                  |--0.20%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.12772021287227650851
+                                  |          |
+                                  |           --0.17%--0x6049503f52ab76ff
+                                  |
+                                   --0.14%--_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                                             litchi_perf_baseline::expected_semantic_ods_full_cell_text
+                                             litchi_perf_baseline::verify_semantic_ods
+                                             litchi_perf_baseline::run_case_with_config
+                                             0xffffffffffffffff
+
+     1.06%  litchi-perf-bas  libc.so.6                           [.] malloc                                                                                                               -      -
+            |
+            |--0.86%--__GI___libc_malloc (inlined)
+            |          |
+            |          |--0.21%--_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+            |          |          litchi_perf_baseline::semantic_ods_full_cell_text
+            |          |          litchi_perf_baseline::verify_semantic_ods
+            |          |          litchi_perf_baseline::run_case_with_config
+            |          |          0xffffffffffffffff
+            |          |
+            |          |--0.09%--_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+            |          |          |
+            |          |           --0.06%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+            |          |                     litchi_perf_baseline::verify_semantic_ods
+            |          |                     litchi_perf_baseline::run_case_with_config
+            |          |                     0xffffffffffffffff
+            |          |
+            |          |--0.09%--litchi_ods::worksheet::codec::Attributes::from_element
+            |          |
+            |          |--0.09%--quick_xml::events::Event::into_owned
+            |          |          |
+            |          |           --0.06%--0x7fff381637f7
+            |          |
+            |          |--0.07%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+            |          |          |
+            |          |           --0.05%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+            |          |                     alloc::raw_vec::RawVec<T,A>::grow_one
+            |          |                     quick_xml::events::attributes::IterState::check_for_duplicates
+            |          |                     quick_xml::events::attributes::IterState::next
+            |          |                     <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+            |          |                     litchi_ods::worksheet::codec::Attributes::from_element
+            |          |                     _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+            |          |                     litchi_ods::facade::Spreadsheet::from_package
+            |          |                     0xffffffffffffffff
+            |          |
+            |          |--0.06%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.12772021287227650851
+            |          |
+            |           --0.06%--quick_xml::encoding::Decoder::content
+            |                     0x35
+            |
+             --0.20%--tcache_get_n (inlined)
+                       tcache_get (inlined)
+                       __GI___libc_malloc (inlined)
+
+     0.94%  litchi-perf-bas  libc.so.6                           [.] cfree@GLIBC_2.2.5                                                                                                    -      -
+            |
+            |--0.88%--__GI___libc_free (inlined)
+            |          |
+            |          |--0.37%--_ZN4core3ptr55drop_in_place$LT$litchi_ods..worksheet..model..Cell$GT$17h57860541fcce05dcE.llvm.15583307666200999645
+            |          |          |
+            |          |          |--0.18%--0x7fff381659ef
+            |          |          |
+            |          |           --0.13%--_ZN4core3ptr54drop_in_place$LT$litchi_ods..worksheet..model..Row$GT$17h96deb51c3de9a2e9E.llvm.15583307666200999645
+            |          |                     _ZN4core3ptr56drop_in_place$LT$litchi_ods..worksheet..model..Sheet$GT$17h6b8843808d4a13bfE.llvm.15583307666200999645
+            |          |                     core::ptr::drop_in_place<litchi_ods::facade::Spreadsheet>
+            |          |                     litchi_perf_baseline::run_case_with_config
+            |          |                     0xffffffffffffffff
+            |          |
+            |          |--0.13%--litchi_ods::settings::codec::locate
+            |          |          |
+            |          |           --0.09%--0x7fff38163e97
+            |          |
+            |          |--0.13%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+            |          |          |
+            |          |           --0.06%--0x7fff381653ff
+            |          |
+            |           --0.08%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+            |
+             --0.06%--arena_for_chunk (inlined)
+                       __GI___libc_free (inlined)
+
+     0.89%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with                                          -      -
+            |
+            ---quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+               quick_xml::events::attributes::Attribute::decoded_and_normalized_value
+               litchi_ods::worksheet::codec::Attributes::from_element
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |
+                --0.87%--litchi_ods::facade::Spreadsheet::from_package
+                          0xffffffffffffffff
+
+     0.84%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with   -      -
+            |
+            ---quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+               quick_xml::reader::Reader<R>::read_event_impl
+               litchi_odf_common::calculation::codec::parse
+               litchi_ods::settings::model::Snapshot::from_content_xml
+               litchi_ods::package::document::Package::calculation_settings
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               |
+                --0.82%--0xffffffffffffffff
+
+     0.82%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::worksheet::codec::Attributes::cell                                                                       -      -
+            |
+            ---litchi_ods::worksheet::codec::Attributes::cell
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |
+                --0.80%--litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          0xffffffffffffffff
+
+     0.62%  litchi-perf-bas  libc.so.6                           [.] malloc_consolidate                                                                                                   -      -
+            |
+            ---malloc_consolidate
+               |
+               |--0.56%--_int_free_maybe_consolidate
+               |          |
+               |          |--0.39%--__GI___libc_free (inlined)
+               |          |          |
+               |          |          |--0.15%--litchi_perf_baseline::semantic_ods_full_cell_text
+               |          |          |          0x7f
+               |          |          |
+               |          |          |--0.12%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+               |          |          |
+               |          |           --0.12%--_ZN4core3ptr54drop_in_place$LT$litchi_ods..worksheet..model..Row$GT$17h96deb51c3de9a2e9E.llvm.15583307666200999645
+               |          |                     |
+               |          |                      --0.07%--0x5f92f4952def
+               |          |
+               |           --0.17%--_int_realloc
+               |                     __GI___libc_realloc (inlined)
+               |                     _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.12772021287227650851
+               |                     _int_free_maybe_consolidate
+               |
+                --0.06%--_int_malloc
+                          |
+                           --0.06%--_int_realloc
+                                     __GI___libc_realloc (inlined)
+                                     _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.12772021287227650851
+                                     _int_malloc
+
+     0.58%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::worksheet::codec::Attributes::from_element                                                               -      -
+            |
+            ---litchi_ods::worksheet::codec::Attributes::from_element
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |
+                --0.56%--litchi_ods::facade::Spreadsheet::from_package
+                          |
+                           --0.55%--0xffffffffffffffff
+
+     0.54%  litchi-perf-bas  litchi-perf-baseline-before         [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw                                                                  -      -
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Three::find_raw
+               memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+               |
+                --0.50%--quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+                          quick_xml::reader::Reader<R>::read_event_impl
+                          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+                          |
+                          |--0.24%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+                          |          litchi_ods::facade::Spreadsheet::from_package
+                          |          litchi_ods::facade::Spreadsheet::from_bytes
+                          |          0xffffffffffffffff
+                          |
+                          |--0.15%--litchi_ods::settings::codec::locate
+                          |          litchi_ods::settings::model::Snapshot::from_content_xml
+                          |          litchi_ods::package::document::Package::calculation_settings
+                          |          litchi_ods::facade::Spreadsheet::from_package
+                          |          litchi_ods::facade::Spreadsheet::from_bytes
+                          |          0xffffffffffffffff
+                          |
+                           --0.06%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+                                     litchi_ods::codec::names::parse
+                                     litchi_ods::facade::Spreadsheet::from_package
+                                     litchi_ods::facade::Spreadsheet::from_bytes
+                                     0xffffffffffffffff
+
+     0.54%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8                                                                   -      -
+            |
+            ---_RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8
+               |
+               |--0.14%--litchi_odf_common::core::xml::part::XmlPart::from_bytes
+               |          litchi_odf_common::core::family::Package::from_owned_package
+               |          litchi_odf_common::core::family::Package::from_bytes
+               |          litchi_ods::package::document::Package::from_bytes
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          litchi_perf_baseline::run_case_with_config
+               |          0xffffffffffffffff
+               |
+               |--0.13%--litchi_ods::settings::codec::locate
+               |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          litchi_ods::package::document::Package::calculation_settings
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |
+               |           --0.12%--litchi_perf_baseline::run_case_with_config
+               |                     0xffffffffffffffff
+               |
+               |--0.10%--quick_xml::encoding::Decoder::content
+               |          _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          0xffffffffffffffff
+               |
+               |--0.09%--quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+               |          quick_xml::events::attributes::Attribute::decoded_and_normalized_value
+               |          litchi_ods::worksheet::codec::Attributes::from_element
+               |          _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |
+               |           --0.08%--litchi_ods::facade::Spreadsheet::from_package
+               |                     0xffffffffffffffff
+               |
+                --0.08%--litchi_odf_common::core::family::Package::from_owned_package
+                          litchi_odf_common::core::family::Package::from_bytes
+                          litchi_ods::package::document::Package::from_bytes
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     0.49%  litchi-perf-bas  litchi-perf-baseline-before         [.] memchr::arch::x86_64::avx2::memchr::One::find_raw                                                                    -      -
+            |
+            ---memchr::arch::x86_64::avx2::memchr::One::find_raw
+               memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+               |
+                --0.30%--quick_xml::name::NamespaceResolver::resolve_event
+                          |
+                          |--0.09%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+                          |          litchi_ods::codec::names::parse
+                          |          litchi_ods::facade::Spreadsheet::from_package
+                          |          litchi_ods::facade::Spreadsheet::from_bytes
+                          |          litchi_perf_baseline::run_case_with_config
+                          |          0xffffffffffffffff
+                          |
+                          |--0.06%--litchi_ods::authoring::builder::validate_content_xml
+                          |          litchi_ods::package::document::Package::from_bytes
+                          |          litchi_ods::facade::Spreadsheet::from_bytes
+                          |          litchi_perf_baseline::run_case_with_config
+                          |          0xffffffffffffffff
+                          |
+                           --0.06%--litchi_odf_common::calculation::codec::parse
+                                     litchi_ods::settings::model::Snapshot::from_content_xml
+                                     litchi_ods::package::document::Package::calculation_settings
+                                     litchi_ods::facade::Spreadsheet::from_package
+                                     litchi_ods::facade::Spreadsheet::from_bytes
+                                     0xffffffffffffffff
+
+     0.46%  litchi-perf-bas  litchi-perf-baseline-before         [.] crc32fast::specialized::pclmulqdq::calculate                                                                         -      -
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate
+               crc32fast::Hasher::update
+               <soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+               std::io::default_read_to_end
+               soapberry_zip::office::ArchiveReader::read
+               litchi_odf_common::package::codec::<impl litchi_odf_common::package::model::Archive>::read
+               litchi_odf_common::core::package::Package::get_file
+               litchi_odf_common::core::package::OwnedPackage::get_file
+               litchi_odf_common::core::family::Package::from_owned_package
+               litchi_odf_common::core::family::Package::from_bytes
+               litchi_ods::package::document::Package::from_bytes
+               litchi_ods::facade::Spreadsheet::from_bytes
+               litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     0.46%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::name::NamespaceResolver::resolve_prefix                                                                   -      -
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_prefix
+               |
+                --0.45%--quick_xml::name::NamespaceResolver::resolve_event
+                          |
+                          |--0.14%--litchi_ods::authoring::builder::validate_content_xml
+                          |          |
+                          |           --0.13%--litchi_ods::package::document::Package::from_bytes
+                          |                     litchi_ods::facade::Spreadsheet::from_bytes
+                          |                     litchi_perf_baseline::run_case_with_config
+                          |                     0xffffffffffffffff
+                          |
+                          |--0.09%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+                          |          litchi_ods::facade::Spreadsheet::from_package
+                          |          litchi_ods::facade::Spreadsheet::from_bytes
+                          |          0xffffffffffffffff
+                          |
+                          |--0.09%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+                          |          litchi_ods::codec::names::parse
+                          |          litchi_ods::facade::Spreadsheet::from_package
+                          |          litchi_ods::facade::Spreadsheet::from_bytes
+                          |          litchi_perf_baseline::run_case_with_config
+                          |          0xffffffffffffffff
+                          |
+                          |--0.07%--litchi_odf_common::calculation::codec::parse
+                          |          litchi_ods::settings::model::Snapshot::from_content_xml
+                          |          litchi_ods::package::document::Package::calculation_settings
+                          |          litchi_ods::facade::Spreadsheet::from_package
+                          |          litchi_ods::facade::Spreadsheet::from_bytes
+                          |          litchi_perf_baseline::run_case_with_config
+                          |          0xffffffffffffffff
+                          |
+                           --0.06%--litchi_ods::settings::codec::locate
+                                     litchi_ods::settings::model::Snapshot::from_content_xml
+                                     litchi_ods::package::document::Package::calculation_settings
+                                     litchi_ods::facade::Spreadsheet::from_package
+                                     litchi_ods::facade::Spreadsheet::from_bytes
+                                     litchi_perf_baseline::run_case_with_config
+                                     0xffffffffffffffff
+
+     0.46%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::reader::Reader<R>::read_event_impl                                                                        -      -
+            |
+            ---quick_xml::reader::Reader<R>::read_event_impl
+               litchi_odf_common::calculation::codec::parse
+               litchi_ods::settings::model::Snapshot::from_content_xml
+               litchi_ods::package::document::Package::calculation_settings
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     0.45%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvNtCsgEmfK2I1SDS_4core3fmt5write                                                                                  -      -
+            |
+            ---_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |
+               |--0.24%--litchi_perf_baseline::verify_semantic_ods
+               |          litchi_perf_baseline::run_case_with_config
+               |          0xffffffffffffffff
+               |
+                --0.20%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+                          litchi_perf_baseline::verify_semantic_ods
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     0.43%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt                                                      -      -
+            |
+            ---_RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+               _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |
+               |--0.25%--litchi_perf_baseline::verify_semantic_ods
+               |          litchi_perf_baseline::run_case_with_config
+               |          0xffffffffffffffff
+               |
+                --0.17%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+                          litchi_perf_baseline::verify_semantic_ods
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     0.41%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str                         -      -
+            |
+            ---_RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+               |
+                --0.35%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          |
+                           --0.33%--_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                                     |
+                                     |--0.17%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+                                     |          litchi_perf_baseline::verify_semantic_ods
+                                     |          litchi_perf_baseline::run_case_with_config
+                                     |          0xffffffffffffffff
+                                     |
+                                      --0.16%--litchi_perf_baseline::verify_semantic_ods
+                                                litchi_perf_baseline::run_case_with_config
+                                                0xffffffffffffffff
+
+     0.39%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::name::NamespaceResolver::push                                                                             -      -
+            |
+            ---quick_xml::name::NamespaceResolver::push
+               |
+               |--0.34%--quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |          |
+               |          |--0.09%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |          |
+               |          |           --0.09%--litchi_ods::facade::Spreadsheet::from_package
+               |          |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |          |                     0xffffffffffffffff
+               |          |
+               |          |--0.09%--_ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.4734003875239008859
+               |          |          litchi_ods::codec::names::parse
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          litchi_perf_baseline::run_case_with_config
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.08%--litchi_ods::authoring::builder::validate_content_xml
+               |          |          litchi_ods::package::document::Package::from_bytes
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          litchi_perf_baseline::run_case_with_config
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.08%--litchi_ods::settings::codec::locate
+               |                     litchi_ods::settings::model::Snapshot::from_content_xml
+               |                     litchi_ods::package::document::Package::calculation_settings
+               |                     litchi_ods::facade::Spreadsheet::from_package
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     |
+               |                      --0.07%--0xffffffffffffffff
+               |
+                --0.06%--_ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17ha34f0284a646bfcbE.llvm.9759586407250474178
+                          litchi_odf_common::calculation::codec::parse
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+
+     0.39%  litchi-perf-bas  litchi-perf-baseline-before         [.] zlib_rs::inflate::inflate_fast_help_avx2                                                                             -      -
+            |
+            ---zlib_rs::inflate::inflate_fast_help_avx2
+               zlib_rs::inflate::inflate
+               zlib_rs::stable::Inflate::decompress
+               <flate2::mem::Decompress as flate2::zio::Ops>::run
+               flate2::zio::read
+               <soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+               std::io::default_read_to_end
+               soapberry_zip::office::ArchiveReader::read
+               litchi_odf_common::package::codec::<impl litchi_odf_common::package::model::Archive>::read
+               litchi_odf_common::core::package::Package::get_file
+               litchi_odf_common::core::package::OwnedPackage::get_file
+               litchi_odf_common::core::family::Package::from_owned_package
+               litchi_odf_common::core::family::Package::from_bytes
+               litchi_ods::package::document::Package::from_bytes
+               litchi_ods::facade::Spreadsheet::from_bytes
+               litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     0.36%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::name::NamespaceResolver::set_level                                                                        -      -
+            |
+            ---quick_xml::name::NamespaceResolver::set_level
+               |
+                --0.34%--quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+                          |
+                           --0.28%--litchi_ods::settings::codec::locate
+                                     litchi_ods::settings::model::Snapshot::from_content_xml
+                                     litchi_ods::package::document::Package::calculation_settings
+                                     litchi_ods::facade::Spreadsheet::from_package
+                                     litchi_ods::facade::Spreadsheet::from_bytes
+                                     litchi_perf_baseline::run_case_with_config
+                                     0xffffffffffffffff
+
+     0.35%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::events::attributes::IterState::check_for_duplicates                                                       -      -
+            |
+            ---quick_xml::events::attributes::IterState::check_for_duplicates
+               quick_xml::events::attributes::IterState::next
+               |
+               |--0.26%--<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+               |          litchi_ods::worksheet::codec::Attributes::from_element
+               |          _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          |
+               |           --0.25%--litchi_ods::facade::Spreadsheet::from_package
+               |                     0xffffffffffffffff
+               |
+                --0.09%--quick_xml::name::NamespaceResolver::push
+                          |
+                           --0.08%--quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+
+     0.28%  litchi-perf-bas  litchi-perf-baseline-before         [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next                          -      -
+            |
+            ---<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+               litchi_ods::worksheet::codec::Attributes::from_element
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               0xffffffffffffffff
+
+     0.27%  litchi-perf-bas  litchi-perf-baseline-before         [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2                                                                 -      -
+            |
+            ---memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+               |
+               |--0.17%--quick_xml::reader::Reader<R>::read_event_impl
+               |          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |          |
+               |          |--0.07%--litchi_ods::settings::codec::locate
+               |          |          litchi_ods::settings::model::Snapshot::from_content_xml
+               |          |          litchi_ods::package::document::Package::calculation_settings
+               |          |          litchi_ods::facade::Spreadsheet::from_package
+               |          |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.06%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |                     |
+               |                      --0.06%--litchi_ods::facade::Spreadsheet::from_package
+               |                                litchi_ods::facade::Spreadsheet::from_bytes
+               |                                0xffffffffffffffff
+               |
+                --0.09%--quick_xml::reader::Reader<R>::read_event_impl
+                          litchi_odf_common::calculation::codec::parse
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          |
+                           --0.08%--0xffffffffffffffff
+
+     0.27%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone                           -      -
+            |
+            ---_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+               |
+                --0.26%--litchi_perf_baseline::semantic_ods_full_cell_text
+                          litchi_perf_baseline::verify_semantic_ods
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     0.27%  litchi-perf-bas  litchi-perf-baseline-before         [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw                                                                    -      -
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Two::find_raw
+               memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+               |
+               |--0.19%--quick_xml::reader::Reader<R>::read_event_impl
+               |          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |          |
+               |           --0.11%--litchi_ods::settings::codec::locate
+               |                     litchi_ods::settings::model::Snapshot::from_content_xml
+               |                     litchi_ods::package::document::Package::calculation_settings
+               |                     litchi_ods::facade::Spreadsheet::from_package
+               |                     litchi_ods::facade::Spreadsheet::from_bytes
+               |                     0xffffffffffffffff
+               |
+                --0.08%--quick_xml::reader::Reader<R>::read_event_impl
+                          litchi_odf_common::calculation::codec::parse
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          0xffffffffffffffff
+
+     0.26%  litchi-perf-bas  [unknown]                           [k] 0xffffffff9d800f30                                                                                                   -      -
+            |
+            ---0xffffffff9d800f30
+
+     0.19%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvXs2_NtNtCsgEmfK2I1SDS_4core3str5lossyNtB5_10Utf8ChunksNtNtNtNtB9_4iter6traits8iterator8Iterator4next             -      -
+            |
+            ---_RNvXs2_NtNtCsgEmfK2I1SDS_4core3str5lossyNtB5_10Utf8ChunksNtNtNtNtB9_4iter6traits8iterator8Iterator4next
+               _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String15from_utf8_lossy
+               litchi_ods::worksheet::codec::Attributes::from_element
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               0xffffffffffffffff
+
+     0.19%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::events::Event::into_owned                                                                                 -      -
+            |
+            ---quick_xml::events::Event::into_owned
+               |
+               |--0.10%--_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               |          litchi_ods::facade::Spreadsheet::from_package
+               |          litchi_ods::facade::Spreadsheet::from_bytes
+               |          0xffffffffffffffff
+               |
+                --0.09%--litchi_ods::settings::codec::locate
+                          litchi_ods::settings::model::Snapshot::from_content_xml
+                          litchi_ods::package::document::Package::calculation_settings
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     0.19%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN4core3ptr55drop_in_place$LT$litchi_ods..worksheet..model..Cell$GT$17h57860541fcce05dcE.llvm.15583307666200999645  -      -
+            |
+            ---_ZN4core3ptr55drop_in_place$LT$litchi_ods..worksheet..model..Cell$GT$17h57860541fcce05dcE.llvm.15583307666200999645
+               _ZN4core3ptr54drop_in_place$LT$litchi_ods..worksheet..model..Row$GT$17h96deb51c3de9a2e9E.llvm.15583307666200999645
+               _ZN4core3ptr56drop_in_place$LT$litchi_ods..worksheet..model..Sheet$GT$17h6b8843808d4a13bfE.llvm.15583307666200999645
+               core::ptr::drop_in_place<litchi_ods::facade::Spreadsheet>
+               litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     0.17%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::worksheet::model::CellValue::validate                                                                    -      -
+            |
+            ---litchi_ods::worksheet::model::CellValue::validate
+               litchi_ods::worksheet::validation::validate_cell
+               |
+                --0.16%--litchi_ods::worksheet::validation::validate_sheet
+                          litchi_ods::worksheet::validation::validate_sheets
+                          _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          0xffffffffffffffff
+
+     0.16%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::worksheet::validation::validate_cell                                                                     -      -
+            |
+            ---litchi_ods::worksheet::validation::validate_cell
+               litchi_ods::worksheet::validation::validate_sheet
+               |
+                --0.16%--litchi_ods::worksheet::validation::validate_sheets
+                          _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+                          litchi_ods::facade::Spreadsheet::from_package
+                          litchi_ods::facade::Spreadsheet::from_bytes
+                          0xffffffffffffffff
+
+     0.16%  litchi-perf-bas  litchi-perf-baseline-before         [.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2                                                                  -      -
+            |
+            ---memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+               |
+                --0.08%--quick_xml::name::NamespaceResolver::resolve_event
+
+     0.15%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::escape::normalize_attribute_value                                                                         -      -
+            |
+            ---quick_xml::escape::normalize_attribute_value
+               quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+               quick_xml::events::attributes::Attribute::decoded_and_normalized_value
+               litchi_ods::worksheet::codec::Attributes::from_element
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               0xffffffffffffffff
+
+     0.14%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::worksheet::model::Sheet::logical_column_count                                                            -      -
+            |
+            ---litchi_ods::worksheet::model::Sheet::logical_column_count
+               litchi_perf_baseline::verify_semantic_ods
+               litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     0.14%  litchi-perf-bas  libc.so.6                           [.] __memset_avx512_unaligned_erms                                                                                       -      -
+            |
+            ---__memset_avx512_unaligned_erms
+
+     0.11%  litchi-perf-bas  litchi-perf-baseline-before         [.] alloc::str::join_generic_copy                                                                                        -      -
+            |
+            ---alloc::str::join_generic_copy
+               |
+                --0.07%--litchi_perf_baseline::expected_semantic_ods_full_cell_text
+                          litchi_perf_baseline::verify_semantic_ods
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     0.11%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_ods::worksheet::validation::validate_sheet                                                                    -      -
+            |
+            ---litchi_ods::worksheet::validation::validate_sheet
+               litchi_ods::worksheet::validation::validate_sheets
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               0xffffffffffffffff
+
+     0.10%  litchi-perf-bas  litchi-perf-baseline-before         [.] <&T as core::fmt::Display>::fmt                                                                                      -      -
+            |
+            ---<&T as core::fmt::Display>::fmt
+               _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |
+                --0.05%--litchi_perf_baseline::verify_semantic_ods
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     0.10%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvCsfLfy6EI15iL_7___rustc35___rust_no_alloc_shim_is_unstable_v2                                                    -      -
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc35___rust_no_alloc_shim_is_unstable_v2
+
+     0.09%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.12772021287227650851                   -      -
+            |
+            ---_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.12772021287227650851
+               alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               0xffffffffffffffff
+
+     0.09%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc                                                                         -      -
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc
+
+     0.09%  litchi-perf-bas  litchi-perf-baseline-before         [.] litchi_perf_baseline::verify_semantic_ods                                                                            -      -
+            |
+            ---litchi_perf_baseline::verify_semantic_ods
+               litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     0.09%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvCsfLfy6EI15iL_7___rustc12___rust_alloc                                                                           -      -
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc12___rust_alloc
+
+     0.08%  litchi-perf-bas  libc.so.6                           [.] alloc_perturb                                                                                                        -      -
+            |
+            ---alloc_perturb
+               __GI___libc_malloc (inlined)
+
+     0.07%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::reader::state::ReaderState::emit_text                                                                     -      -
+            |
+            ---quick_xml::reader::state::ReaderState::emit_text
+               |
+                --0.06%--quick_xml::reader::Reader<R>::read_event_impl
+                          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+
+     0.07%  litchi-perf-bas  litchi-perf-baseline-before         [.] quick_xml::encoding::Decoder::content                                                                                -      -
+            |
+            ---quick_xml::encoding::Decoder::content
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               0xffffffffffffffff
+
+     0.07%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvCsfLfy6EI15iL_7___rustc13___rdl_dealloc                                                                          -      -
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc13___rdl_dealloc
+
+     0.07%  litchi-perf-bas  litchi-perf-baseline-before         [.] alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle                                                       -      -
+            |
+            ---alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               litchi_ods::facade::Spreadsheet::from_bytes
+               0xffffffffffffffff
+
+     0.06%  litchi-perf-bas  litchi-perf-baseline-before         [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780                   -      -
+            |
+            ---_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+               alloc::raw_vec::RawVec<T,A>::grow_one
+               quick_xml::events::attributes::IterState::check_for_duplicates
+               quick_xml::events::attributes::IterState::next
+               <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+               litchi_ods::worksheet::codec::Attributes::from_element
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               0xffffffffffffffff
+
+     0.06%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String15from_utf8_lossy                                                      -      -
+            |
+            ---_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String15from_utf8_lossy
+               litchi_ods::worksheet::codec::Attributes::from_element
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               0xffffffffffffffff
+
+     0.06%  litchi-perf-bas  litchi-perf-baseline-before         [.] alloc::raw_vec::RawVec<T,A>::grow_one                                                                                -      -
+            |
+            ---alloc::raw_vec::RawVec<T,A>::grow_one
+               quick_xml::events::attributes::IterState::check_for_duplicates
+               quick_xml::events::attributes::IterState::next
+               <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+               litchi_ods::worksheet::codec::Attributes::from_element
+               _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.6697293378678740289
+               litchi_ods::facade::Spreadsheet::from_package
+               0xffffffffffffffff
+
+     0.06%  litchi-perf-bas  litchi-perf-baseline-before         [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter3pad                                                                 -      -
+            |
+            ---_RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter3pad
+               _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
