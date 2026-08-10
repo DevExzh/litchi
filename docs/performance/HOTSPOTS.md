@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Source revision: `2665d572b78f0b3efd9ecfc4bd1fda09f8786ae3`
+Evidence through: [`change 0010`](changes/0010-docx-pptx-semantic-queries-and-edits.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -102,20 +102,28 @@ Confirmed source facts:
 ## DOCX and PPTX paths
 
 DOCX format views are borrowed after eager OPC materialization. Repeated
-`paragraphs`, `tables`, and `blocks` queries rescan and allocate result vectors;
-single-index paragraph/table lookup currently builds the complete collection.
-Changed document transactions reconstruct, compact, and reparse the complete
-main document XML.
+`paragraphs`, `tables`, and `blocks` queries rescan and allocate result vectors.
+Single-index paragraph lookup now scans the complete bounded XML but constructs
+only the selected shared range; the 10,000-paragraph cell improves 4.72% p50
+and removes ten collection-growth allocations per call. Table lookup still
+builds the complete collection. Changed document transactions reconstruct,
+compact, and reparse the complete main document XML for each paragraph
+replacement, so the 1% path remains a higher-impact coalescing candidate.
 
 PPTX ordinary reads defer slide payload parsing, but repeatedly parse the
 presentation slide-reference list. Exact-name slide lookup resolves and parses
 all candidate slide names. The opened-transaction snapshot is deliberately
 stronger and more expensive: it resolves every slide, notes graph, Part and
 relationship fingerprint, and retains a cloned shared OPC graph. Commit
-recaptures and re-fingerprints the candidate after readback.
+recaptures and re-fingerprints the candidate after readback. Shape-text edits
+now reuse the selected scene when mapping its raw span, removing one redundant
+scene parse per change. The 100-edit cell improves 9.37% p50/mean and allocation
+calls fall 11.67%; the single-edit end-to-end guardrail remains neutral because
+complete capture/commit work dominates.
 
-These paths have strong preservation and atomicity tests. They do not yet have
-representative timing, allocation, copy, or peak-RSS measurements.
+These paths have strong preservation and atomicity tests plus generated-text
+timing/allocation evidence. Real-producer, media/dependency, malformed,
+security, copied-byte and cold-source matrices remain missing.
 
 ## Legacy CFB data path
 
@@ -202,7 +210,7 @@ The order below is provisional until baseline measurements are recorded.
 | 6 | Move already-owned XLS/PPT writer buffers into `OleWriter`. | Legacy fresh creation and some rebuilds. | Low | Implemented for XLS/PPT; DOC rejected by measurement. See `changes/0003-legacy-owned-stream-handoff.md`. |
 | 7 | Use validated cached CFB sibling-tree descent and reusable sector buffers. | Legacy stream-heavy open/rebuild workflows. | Medium | Implemented; see `changes/0002-cfb-lookup-and-sector-buffers.md`. |
 | 8 | Extend the accepted XLSX row-start index to broader selector and edit matrices. | Sparse range queries after sheet load. | Low-medium | Narrow ranges are accepted; preservation/readback gates and broad CRUD coverage remain unchanged. |
-| 9 | Cache or directly index DOCX/PPTX collection/slide-reference queries. | Repeated semantic reads and exact-name lookup. | Medium | Must keep immutable bounded snapshot state and deterministic ambiguity. |
+| 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Direct DOCX selection and PPTX selected-scene reuse are accepted; complete source validation and candidate readback remain mandatory. |
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
 | 11 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
 
@@ -221,5 +229,5 @@ changes. Remaining gaps are:
   that the environment reports `perf_event_paranoid=1`; stage-1 remains without
   counters and no claim is generalized from the one measured save workload.
 - Contention evidence beyond the committed explicit-context scaling curves.
-- Format-semantic preservation evidence beyond the native targeted-OPC raw
-  passthrough corpus.
+- Format-semantic preservation evidence beyond the generated DOCX/PPTX text
+  slice and native targeted-OPC raw passthrough corpus.

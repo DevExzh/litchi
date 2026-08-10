@@ -538,7 +538,7 @@ impl Package {
     /// and content types to a writer stream.
     ///
     /// # Arguments
-    /// * `writer` - A writer that implements Write + Seek
+    /// * `writer` - A forward-only output sink
     ///
     /// # Examples
     ///
@@ -556,7 +556,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_stream<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+    pub fn to_stream<W: Write>(&mut self, writer: W) -> Result<()> {
         self.ensure_plain_output("to_stream")?;
         self.write_plain(writer)
     }
@@ -566,7 +566,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_plain_stream<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+    pub fn to_plain_stream<W: Write>(&mut self, writer: W) -> Result<()> {
         self.write_plain(writer)
     }
 
@@ -692,7 +692,7 @@ impl Package {
         })
     }
 
-    fn write_plain<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+    fn write_plain<W: Write>(&mut self, writer: W) -> Result<()> {
         use crate::writer::relmap::RelationshipMapper;
         use litchi_opc::constants::relationship_type as rt;
 

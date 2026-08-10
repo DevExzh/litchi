@@ -302,8 +302,16 @@ fn selected_layout(owner: &dyn OpcPart, key: crate::shape::Key<'_>) -> Result<La
 pub(crate) fn selected_raw_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
     let scene = crate::shape::read(xml)?;
     let shape = scene.shape(key)?;
+    selected_raw_span_for_shape(xml, shape, scene.len())
+}
+
+pub(crate) fn selected_raw_span_for_shape(
+    xml: &[u8],
+    shape: crate::shape::Shape<'_>,
+    scene_len: usize,
+) -> Result<Range<usize>> {
     let family = selected_family(shape)?;
-    raw_shape_span(xml, shape.common().index(), scene.len(), family)
+    raw_shape_span(xml, shape.common().index(), scene_len, family)
 }
 
 fn selected_family(shape: crate::shape::Shape<'_>) -> Result<Family> {

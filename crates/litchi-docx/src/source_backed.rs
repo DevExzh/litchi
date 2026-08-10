@@ -8,7 +8,9 @@
 use crate::error::Result;
 use crate::package::validate_document_main_content_type;
 use crate::paragraph::Paragraph;
-use crate::parts::document_part::{document_paragraphs, visible_document_xml};
+use crate::parts::document_part::{
+    document_paragraph, document_paragraph_count, document_paragraphs, visible_document_xml,
+};
 use litchi_core::ReadAt;
 use litchi_opc::SourceBackedPackage;
 use smallvec::SmallVec;
@@ -78,11 +80,16 @@ impl Document {
 
     /// Count visible paragraphs in the pinned document.
     pub fn paragraph_count(&self) -> Result<usize> {
-        Ok(self.paragraphs()?.len())
+        document_paragraph_count(self.xml.as_slice())
     }
 
     /// Return visible paragraphs sharing the pinned main-document allocation.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
         document_paragraphs(Arc::clone(&self.xml))
+    }
+
+    /// Return one visible paragraph without allocating all paragraph views.
+    pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
+        document_paragraph(Arc::clone(&self.xml), index)
     }
 }

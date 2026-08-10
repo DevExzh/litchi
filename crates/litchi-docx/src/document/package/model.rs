@@ -385,8 +385,7 @@ impl<'a> Document<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
-        let paragraphs = self.paragraphs()?;
-        Ok(paragraphs.into_iter().nth(index))
+        self.part.paragraph(index)
     }
 
     /// Get a specific table by index.

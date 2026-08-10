@@ -28,7 +28,7 @@ pub use codec::{load, put, remove};
 // selector-to-byte-span mapping as programmable tags. Keep the scanner
 // implementation private while exposing this crate-internal seam to sibling
 // shape owners.
-pub(crate) use codec::selected_raw_span;
+pub(crate) use codec::{selected_raw_span, selected_raw_span_for_shape};
 
 // `tag::package` uses this narrow lexical seam while discovering package-level
 // tag anchors. The implementation remains private to the tag subsystem.

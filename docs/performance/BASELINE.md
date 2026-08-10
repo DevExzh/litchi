@@ -220,10 +220,10 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **44
+The stage-1 records above are retained unchanged. The current harness has **60
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
-simulated-range cases and two opt-in execution-scaling cases. It remains a
-substrate/selective-open harness, not a complete program or CRUD matrix.
+simulated-range cases, two opt-in execution-scaling cases and 16 opt-in
+DOCX/PPTX semantic cases. It remains an incomplete program and CRUD matrix.
 
 - The XLSX row-start index is accepted for the narrow-range case: ABBA p50
   geometric mean **-80.499%**, mean geometric mean **-79.962%**; full scan
@@ -263,6 +263,12 @@ substrate/selective-open harness, not a complete program or CRUD matrix.
   six large OPC tasks and 5.93x for four large CFB streams at 12 visible CPUs;
   sub-kilobyte many-task cases are overhead dominated. See
   [`0009`](changes/0009-range-source-and-scaling.md).
+- Generated 10,000-paragraph DOCX and 10,000-text-box PPTX corpora now cover
+  semantic list/one/full-text/create/no-op/one-edit/1%-edit paths. Direct DOCX
+  selection improves 4.72% p50; reusing PPTX's selected scene improves the
+  1% edit/save case 9.37% p50/mean and cuts process allocation calls 11.67%.
+  The PPTX one-edit guardrail is neutral. See
+  [`0010`](changes/0010-docx-pptx-semantic-queries-and-edits.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

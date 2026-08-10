@@ -1,5 +1,37 @@
 use super::*;
 
+#[derive(Default)]
+struct ForwardOnlySink(Vec<u8>);
+
+impl Write for ForwardOnlySink {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.0.extend_from_slice(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn plain_stream_accepts_a_forward_only_sink() {
+    let mut package = Package::new().unwrap();
+    package
+        .document_mut()
+        .unwrap()
+        .add_paragraph_with_text("forward-only DOCX output");
+
+    let mut sink = ForwardOnlySink::default();
+    package.to_plain_stream(&mut sink).unwrap();
+
+    let reopened = Package::from_reader(Cursor::new(sink.0)).unwrap();
+    assert_eq!(
+        reopened.document().unwrap().text().unwrap(),
+        "forward-only DOCX output"
+    );
+}
+
 fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
     let comment_len = u16::try_from(comment.len()).expect("ZIP comment fits in EOCD");
     let eocd = archive.len().checked_sub(22).expect("archive has an EOCD");

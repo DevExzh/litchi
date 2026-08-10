@@ -174,6 +174,11 @@ fn opening_stays_cold_and_document_query_loads_only_main_document() {
     assert_eq!(source.unused_reads.load(Ordering::SeqCst), 0);
     assert_eq!(document.extract_text().unwrap(), "alphabeta");
     assert_eq!(document.paragraph_count().unwrap(), 2);
+    assert_eq!(
+        document.paragraph(1).unwrap().unwrap().text().unwrap(),
+        "beta"
+    );
+    assert!(document.paragraph(2).unwrap().is_none());
     let paragraphs = document.paragraphs().unwrap();
     assert_eq!(paragraphs[0].text().unwrap(), "alpha");
     assert_eq!(paragraphs[1].text().unwrap(), "beta");

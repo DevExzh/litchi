@@ -195,7 +195,11 @@ impl Transaction {
                 "opened-presentation selected shape has no text body",
             ));
         }
-        let span = crate::tag::shape::selected_raw_span(owner.blob(), key)?;
+        let span = crate::tag::shape::selected_raw_span_for_shape(
+            owner.blob(),
+            selected_shape,
+            scene.len(),
+        )?;
         let xml = super::xml::rewrite_shape_text(
             owner.blob(),
             span,

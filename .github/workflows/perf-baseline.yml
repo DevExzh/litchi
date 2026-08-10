@@ -83,6 +83,7 @@ jobs:
             --shape tiny \
             --payload compressible \
             --writer-shape tiny \
+            --xlsx-shape tiny \
             --json target/perf/opc-smoke.json
           python3 - <<'PY'
           import json
@@ -90,16 +91,31 @@ jobs:
 
           report = json.loads(Path("target/perf/opc-smoke.json").read_text())
           assert report["schema_version"] == 1
-          assert len(report["results"]) == 14
-          assert {item["case"] for item in report["results"]} == {
-              "zip_index", "zip_read_one", "opc_open", "opc_open_owned",
-              "opc_noop_save", "opc_mutated_save",
-              "cfb_open", "cfb_list_streams", "cfb_read_one",
-              "cfb_create_stream_borrowed", "cfb_create_stream_owned",
-              "doc_fresh_write_to", "xls_fresh_write_to", "ppt_fresh_write_to"
-          }
+          assert len(report["results"]) == 36
+          assert len({item["case"] for item in report["results"]}) == 36
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 2
+              assert item["corpus"]["archive_sha256"]
+          PY
+
+      - name: Run DOCX/PPTX semantic smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
+            --semantic-shape tiny \
+            --json target/perf/semantic-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/semantic-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 16
+          assert len({item["case"] for item in report["results"]}) == 16
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 1
               assert item["corpus"]["archive_sha256"]
           PY
 
@@ -135,7 +151,28 @@ jobs:
 
           report = json.loads(Path("target/perf/container-baseline.json").read_text())
           assert report["schema_version"] == 1
-          assert len(report["results"]) == 97
+          assert len(report["results"]) == 198
+          assert len({item["case"] for item in report["results"]}) == 36
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 15
+              assert item["corpus"]["archive_sha256"]
+          PY
+
+      - name: Run release DOCX/PPTX semantic matrix
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
+            --semantic-shape tiny,large \
+            --json target/perf/semantic-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/semantic-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 30
+          assert len({item["case"] for item in report["results"]}) == 16
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 15
               assert item["corpus"]["archive_sha256"]
@@ -145,6 +182,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: container-performance-baseline-${{ github.run_id }}
-          path: target/perf/container-baseline.json
+          path: |
+            target/perf/container-baseline.json
+            target/perf/semantic-baseline.json
           if-no-files-found: error
           retention-days: 14

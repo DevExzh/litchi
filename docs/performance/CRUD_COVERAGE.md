@@ -2,24 +2,24 @@
 
 Date: 2026-08-10
 
-This is a coverage map, not a completion claim. It compares the 44 selectable
+This is a coverage map, not a completion claim. It compares the 60 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
 | Required scenario | Current status | Measured coverage |
 |---|---|---|
 | Open and identify format | Partial | ZIP/OPC/CFB and owned/source-backed XLSX open; no smart-detection handoff case |
-| List semantic children without payloads | Partial | XLSX sheets, including zero-request source-backed listing; no DOCX section or PPTX slide listing |
-| Query one property or named object | Partial | XLSX first cell; lower-level one-Part/stream reads are not semantic property queries |
-| Read one cell/paragraph/slide/image/Part | Partial | XLSX cell and generic OPC Part; paragraph/slide/image cases missing |
-| Scan all cells/paragraphs/slides | Partial | XLSX full and narrow scans; DOCX/PPTX missing |
-| Full text extraction | Missing | No end-to-end format case |
+| List semantic children without payloads | Partial | XLSX sheets, including zero-request source-backed listing, and PPTX slides; DOCX section listing remains missing |
+| Query one property or named object | Partial | XLSX first cell, one DOCX paragraph and one PPTX slide; broader properties/images remain missing |
+| Read one cell/paragraph/slide/image/Part | Partial | XLSX cell, DOCX paragraph, PPTX slide and generic OPC Part; semantic image selection remains missing |
+| Scan all cells/paragraphs/slides | Covered for XLSX/DOCX/PPTX synthetic corpora | XLSX full/narrow cell scans, DOCX paragraph enumeration and PPTX slide/text enumeration |
+| Full text extraction | Covered for generated DOCX/PPTX | Complete deterministic text is checked; real-producer/media-heavy corpora remain missing |
 | Semantic conversion to sequential sink | Missing | Package serialization exists; semantic export/conversion does not |
-| Create a small document | Partial | Fresh DOC/XLS/PPT writers; no OOXML creator case |
+| Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX public authoring; other families remain missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
-| Exact no-op edit and commit | Partial | XLSX patch/commit/save; generic exact OPC save is not a semantic edit |
-| One semantic edit and save | Partial | XLSX one-cell only |
-| About 1% semantic update and save | Partial | XLSX only |
+| Exact no-op edit and commit | Covered for XLSX/DOCX/PPTX generated corpora | Public semantic transaction plus save/reopen; signed/extension corpora remain missing |
+| One semantic edit and save | Covered for XLSX/DOCX/PPTX generated corpora | Cell, paragraph and shape edit/save/reopen |
+| About 1% semantic update and save | Covered for XLSX/DOCX/PPTX generated corpora | Deterministic evenly spaced cell, paragraph and shape changes |
 | Bulk update matching objects | Missing | No semantic end-to-end case |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
 | Sanitization and irreversible redaction | Missing | No complete matrix |
@@ -33,27 +33,31 @@ substrate measurements do not certify format-semantic CRUD behavior.
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
-latency/range effects. Borrowed-byte comparisons, filesystem positional cold
-reads, atomic-save timing, and non-seek semantic conversion output remain.
+latency/range effects. DOCX final package serialization now accepts and tests a
+forward-only non-seek sink, but this is not semantic conversion or
+memory-bounded authoring. Borrowed-byte comparisons, filesystem positional
+cold reads, atomic-save timing, PPTX facade streaming output, and non-seek
+semantic conversion remain.
 
 ## Highest-return next cases
 
-1. DOCX paragraph scan, full text, one-paragraph and 1% edit/save through
-   `litchi_docx::Package` and document edit APIs.
-2. PPTX slide scan/full text plus one-shape and 1% edit/save through the opened
-   presentation transaction APIs.
-3. Separate logical authoring/append time from final serialization and reopen
+1. Coalesce DOCX same-structure paragraph replacements so a 1% transaction
+   does not rebuild and reparse the complete XML once per paragraph.
+2. Separate logical authoring/append time from final serialization and reopen
    for DOCX, PPTX and XLSX.
-4. XLSX bulk update plus distinct clear/remove/hide behavior.
-5. Unknown OOXML extension and media preservation during a known semantic edit.
-6. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
+3. XLSX bulk update plus distinct clear/remove/hide behavior.
+4. Unknown OOXML extension and media preservation during a known semantic edit.
+5. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
    including stale-base and conflict cases.
-7. PPTX dependency-closure transfer and slide split/removal with charts, media,
+6. PPTX dependency-closure transfer and slide split/removal with charts, media,
    themes and collision names.
-8. Validate/security matrix for valid, malformed-within-limits, encrypted,
+7. Validate/security matrix for valid, malformed-within-limits, encrypted,
    macro-enabled, protected and external-link fixtures.
-9. Smart detection versus prepared-source reuse; iWork has an opaque
-   `PreparedSource`, while generic OOXML currently has no reusable handoff.
+8. Smart detection versus prepared-source reuse. OOXML smart results retain an
+   adoptable parsed OPC package and focused iWork has an opaque
+   `PreparedSource`; ODF and generic iWork handoff gaps remain.
+9. Add ODF and iWork public semantic open/query/edit/save matrices without
+   using OOXML substrate results as proxy evidence.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

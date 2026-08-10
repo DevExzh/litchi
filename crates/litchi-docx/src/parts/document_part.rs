@@ -69,6 +69,37 @@ pub(crate) fn document_paragraphs(xml: Arc<Vec<u8>>) -> Result<SmallVec<[Paragra
     Ok(paragraphs)
 }
 
+/// Select one visible paragraph without materializing every paragraph view.
+///
+/// The scanner still consumes the complete payload so malformed trailing XML
+/// and the shared depth/node limits retain their established error timing.
+pub(crate) fn document_paragraph(xml: Arc<Vec<u8>>, index: usize) -> Result<Option<Paragraph>> {
+    let mut position = 0usize;
+    let mut paragraph = None;
+    scan_word_element_ranges(xml.as_slice(), &[b"p".as_slice()], |_, start, length| {
+        if position == index {
+            paragraph = Some(Paragraph::from_arc_range(Arc::clone(&xml), start, length));
+        }
+        position = position.checked_add(1).ok_or_else(|| {
+            crate::Error::InvalidFormat("document paragraph counter overflow".into())
+        })?;
+        Ok(())
+    })?;
+    Ok(paragraph)
+}
+
+/// Count visible paragraphs without allocating paragraph range objects.
+pub(crate) fn document_paragraph_count(xml: &[u8]) -> Result<usize> {
+    let mut count = 0usize;
+    scan_word_element_ranges(xml, &[b"p".as_slice()], |_, _, _| {
+        count = count.checked_add(1).ok_or_else(|| {
+            crate::Error::InvalidFormat("document paragraph counter overflow".into())
+        })?;
+        Ok(())
+    })?;
+    Ok(count)
+}
+
 /// Select the active supported block ranges from original document XML.
 ///
 /// This remains available to the mutable writer, whose source-preserving body
@@ -304,12 +335,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn paragraph_count(&self) -> Result<usize> {
-        let mut count = 0;
-        scan_word_element_ranges(self.xml_bytes(), &[b"p".as_slice()], |_, _, _| {
-            count += 1;
-            Ok(())
-        })?;
-        Ok(count)
+        document_paragraph_count(self.xml_bytes())
     }
 
     /// Count the number of tables in the document.
@@ -341,6 +367,16 @@ impl<'a> DocumentPart<'a> {
     /// Returns an error if the operation cannot be completed.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
         document_paragraphs(self.get_xml_arc())
+    }
+
+    /// Get one paragraph by zero-based index without allocating the complete
+    /// paragraph collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the document XML is malformed or exceeds bounds.
+    pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
+        document_paragraph(self.get_xml_arc(), index)
     }
 
     /// Get all tables in the document.
@@ -493,6 +529,15 @@ mod tests {
         assert_eq!(paragraphs[1].text().unwrap(), "cell");
         assert_eq!(paragraphs[2].text().unwrap(), "tail");
         assert_eq!(paragraphs[3].text().unwrap(), "");
+        assert_eq!(
+            document.paragraph(0).unwrap().unwrap().text().unwrap(),
+            "A < B"
+        );
+        assert_eq!(
+            document.paragraph(2).unwrap().unwrap().text().unwrap(),
+            "tail"
+        );
+        assert!(document.paragraph(4).unwrap().is_none());
 
         let elements = document.elements().unwrap();
         assert_eq!(elements.len(), 6);
@@ -527,6 +572,7 @@ mod tests {
         let document = DocumentPart::from_part(&part).unwrap();
 
         assert!(document.paragraphs().is_err());
+        assert!(document.paragraph(0).is_err());
         assert!(document.elements().is_err());
     }
 }

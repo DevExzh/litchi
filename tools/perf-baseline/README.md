@@ -2,12 +2,12 @@
 
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
-public-API XLSX snapshot/edit/save flows. It creates every corpus in memory; it
-also exercises source-backed XLSX catalog and worksheet reads over positional
-I/O. It does not depend on untracked office files, network state, randomness,
-or the system clock. The JSON report contains the generator parameters and SHA-256
-hashes for the generated container and target entry, so a result always
-identifies its exact input or packaged output.
+public-API XLSX snapshot/edit/save flows, and opt-in DOCX/PPTX semantic flows.
+It creates every corpus in memory; it also exercises source-backed XLSX catalog
+and worksheet reads over positional I/O. It does not depend on untracked office
+files, network state, randomness, or the system clock. The JSON report contains
+the generator parameters and SHA-256 hashes for the generated container and
+target entry, so a result always identifies its exact input or packaged output.
 
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
@@ -19,7 +19,7 @@ public APIs and therefore does not change the default 36 cases / 198 records.
 
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
-range cases and two execution-scaling cases are opt-in:
+range cases, two execution-scaling cases and 16 semantic cases are opt-in:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -31,7 +31,7 @@ For a short local smoke run:
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 1 --samples 2 --shape tiny --payload compressible \
-  --writer-shape tiny --json -
+  --writer-shape tiny --xlsx-shape tiny --json -
 ```
 
 Select comma-separated subsets when investigating a change:
@@ -169,6 +169,9 @@ always truthful.
 The DOCX cases use `Package::from_reader`, `document().paragraph(index)`,
 paragraph enumeration/text extraction, document transactions, and `to_stream`.
 The seekable stream is instrumented with the existing `sink` schema field.
+DOCX also accepts a forward-only `Write` sink; production correctness tests
+cover that contract while the frozen before/after benchmark keeps the same
+seekable counter implementation in both binaries.
 PPTX uses `Package::from_bytes`/`from_vec`, presentation slide/text views,
 opened-presentation transactions, and `to_bytes`. PPTX currently has no public
 writer-sink API, so PPTX save records intentionally leave `sink` as `null`
