@@ -1319,6 +1319,13 @@ creation/topology examples survive through private helpers or focused package
 handoffs. The `table_headers` module/source, wire codec, attached helpers,
 package bridge, structural/sort callers, and Pages/Keynote owners remain.
 
+Within `litchi-numbers`, the private package owner is now split into `api`,
+`dependencies`, `error`, `ownership`, `resolve`, and `rewrite` modules; every
+file is under 600 lines and the public `table::headers::transaction` surface is
+unchanged. Category-owner group declarations are indexed once and resolved
+under linear aggregate work, preserving exact aggregate/path metadata rules
+without repeated full metadata scans.
+
 The sheet-scoped selector is a deliberate break from the old workbook-wide
 catalog. Rooted canonical/legacy roles remain supported when unambiguous;
 changed nested legacy physical packages refuse as `UnsupportedSource`. Locked
@@ -1344,9 +1351,9 @@ HeaderNameMgr stayed exact. The native off-to-on control hash was
 Both saves regenerated equivalent ViewState with different IDs, so no native
 raw-byte equality is claimed.
 
-Verification passes 6/6 focused tests with defaults and 6/6 without default
+Verification passes 8/8 focused tests with defaults and 8/8 without default
 features, 4/4 codec tests, 2/2 root-facade tests with `--features numbers`, and
-113/113 boundary regressions. `cargo check -p litchi-numbers --all-targets`,
+114/114 boundary regressions. `cargo check -p litchi-numbers --all-targets`,
 formatting, diff, warning-denied no-dependency rustdoc, and the doctest gate
 (one compile-fail pass, one ignored example) are green. Strict Clippy has no new
 header-file
@@ -1360,6 +1367,12 @@ produced changed artifact
 `a8b88d21806b547a5265c60662610f68f524173cac1ca4252d368596c8ef8d2a`
 with changed=true, one touched component, and three deleted previews. It was
 not a native UI-open gate.
+
+A distinct post-split freeze-row-only candidate, SHA-256
+`c938d74bcf04be692097488af838f5105a8470e337eafa06fdc8b94b36231d6a`,
+did pass a Numbers 14.4 Computer Use open: no repair/warning, Table 1 at 22 by
+7, header columns/rows/footer rows 1/1/0, Freeze Header Rows unselected, and
+B2/B3 preserved as the fixture text and 42. Its inverse was byte-exact.
 
 Remaining debt is aggregate memory/work and fallible-allocation accounting,
 process-local complete-artifact patches without stable semantic operations,

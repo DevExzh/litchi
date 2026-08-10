@@ -210,6 +210,70 @@ fn locked_table_allows_exact_header_noop_and_refuses_change() -> TestResult<()> 
 }
 
 #[test]
+fn raw_selected_header_scalars_fail_without_normalizing_source() -> TestResult<()> {
+    let source = fixture::synthetic_package()?;
+    let mut focused_rejections = 0usize;
+    for raw in [
+        &[0x48, 0][..],          // f9 header rows = zero
+        &[0x50, 6][..],          // f10 header columns exceeds supported range
+        &[0x58, 0][..],          // f11 footer rows = zero
+        &[0x60, 2][..],          // f12 boolean is neither false nor true
+        &[0x48, 1, 0x48, 2][..], // duplicate f9
+        &[0x65, 0, 0, 0, 0][..], // f12 wrong fixed32 wire type
+    ] {
+        let malformed = fixture::append_selected_model_raw(&source, raw)?;
+        let Ok(package) = Package::from_bytes(&malformed) else {
+            // Some wrong-wire mutations are already rejected by the broader
+            // semantic package ingress. That is an equally atomic refusal.
+            Catalog::from_bytes(&malformed)?;
+            continue;
+        };
+        let before = package.exact_bytes();
+        assert!(matches!(
+            package.table_header_settings(0usize, 0usize),
+            Err(Error::InvalidSource { .. })
+        ));
+        focused_rejections += 1;
+        assert_eq!(package.exact_bytes(), before);
+    }
+    assert!(
+        focused_rejections > 0,
+        "focused strict decoding was exercised"
+    );
+    Ok(())
+}
+
+#[test]
+fn selected_model_reference_metadata_must_be_unique_and_exact() -> TestResult<()> {
+    let source = fixture::synthetic_package()?;
+    for references in [Vec::new(), vec![fixture::TABLE_MODEL, fixture::TABLE_MODEL]] {
+        let malformed = fixture::rewrite_tables(&source, |archive| {
+            let table_info = archive
+                .object_mut(fixture::TABLE_INFO)
+                .ok_or_else(|| io::Error::other("synthetic table info is missing"))?;
+            table_info.archive_info.message_infos[0].object_references = references;
+            Ok(())
+        })?;
+        let package = Package::from_bytes(&malformed)?;
+        let before = package.exact_bytes();
+        let base = package.table_header_settings(0usize, 0usize)?;
+        let changed = Settings {
+            header_rows_frozen: Some(!base.header_rows_are_frozen()),
+            ..base
+        };
+        assert!(matches!(
+            package
+                .edit_table_headers(0usize, 0usize)?
+                .set(changed)
+                .commit(),
+            Err(Error::InvalidSource { .. })
+        ));
+        assert_eq!(package.exact_bytes(), before);
+    }
+    Ok(())
+}
+
+#[test]
 fn synthetic_bounds_and_dependency_role_aliases_fail_atomically() -> TestResult<()> {
     let base_bytes = fixture::synthetic_package()?;
     let package = Package::from_bytes(&base_bytes)?;

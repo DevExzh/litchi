@@ -3029,6 +3029,12 @@ class BoundaryPolicyTests(unittest.TestCase):
                 Path("crates/litchi-numbers/src/table/headers.rs"),
                 Path("crates/litchi-numbers/src/table/headers/transaction.rs"),
                 Path("crates/litchi-numbers/src/package/table_headers.rs"),
+                Path("crates/litchi-numbers/src/package/table_headers/api.rs"),
+                Path("crates/litchi-numbers/src/package/table_headers/dependencies.rs"),
+                Path("crates/litchi-numbers/src/package/table_headers/error.rs"),
+                Path("crates/litchi-numbers/src/package/table_headers/ownership.rs"),
+                Path("crates/litchi-numbers/src/package/table_headers/resolve.rs"),
+                Path("crates/litchi-numbers/src/package/table_headers/rewrite.rs"),
             ),
         )
         self.assertEqual(
@@ -3497,10 +3503,11 @@ class BoundaryPolicyTests(unittest.TestCase):
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            semantic, transaction, owner = (
-                root / path
-                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES
+            semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+            transaction = (
+                root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE
             )
+            owner = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_OWNER_SOURCE
             semantic.parent.mkdir(parents=True)
             semantic.write_text(
                 "pub fn headers(r#source_bytes: &[u8], r#object_id: u64, "
@@ -3635,15 +3642,55 @@ class BoundaryPolicyTests(unittest.TestCase):
                         msg=f"missing focused table-header leak: {fragment}",
                     )
 
+    def test_focused_numbers_table_header_settings_scans_split_owner_modules(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_header_settings_canonical_scaffold(root)
+            split_owner = root / Path(
+                "crates/litchi-numbers/src/package/table_headers/api.rs"
+            )
+            split_owner.parent.mkdir(parents=True, exist_ok=True)
+            split_owner.write_text(
+                "impl Package {\n"
+                "    pub fn table_header_settings(&self, object_id: u64) "
+                "-> Archive { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any(
+                    "raw identifier object_id" in violation
+                    and "package/table_headers/api.rs" in violation
+                    for violation in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    "archive/IWA type Archive" in violation
+                    and "package/table_headers/api.rs" in violation
+                    for violation in violations
+                )
+            )
+
     def test_focused_numbers_table_header_settings_allows_nested_private_surfaces(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            semantic, transaction, owner = (
-                root / path
-                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES
+            semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+            transaction = (
+                root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE
             )
+            owner = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_OWNER_SOURCE
             semantic.parent.mkdir(parents=True)
             semantic.write_text(
                 "pub struct Count;\n"
