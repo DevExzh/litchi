@@ -2,8 +2,8 @@
 
 Date: 2026-08-10
 
-Revision under review: committed tree `edff2304400da52c310de35bc8621a1a1b931bab`
-(`feat: close remaining non-iwork format gaps`).
+Revision under review: committed tree `0a025dbb72117d8feb33688b8d47b59914835dcf`
+(`fix: close xlsb and ppt conformance gaps`).
 
 This is an independent review of that exact commit. The tree was clean before this
 document-only update. Earlier score tables, test counts, and conclusions are superseded.
@@ -40,8 +40,8 @@ least 95.
 | PPTX | 96 | 97 | Transfer now classifies table, classic-chart, DiagramML, and inert OLE graphic frames and rewrites all relationship-namespace attributes, with typed refusal for unclassified payloads. A current LibreOffice changed-save/readback is checked and exact-reproducible; Microsoft PowerPoint resave is not claimed. |
 | DOC | 95 | 95 | Canonical picture transfer now proves the selected graph while tolerating unrelated main/header-story shapes, groups, text boxes, reordered slots, and shared BStore resources. The ordinary body-text root and critical picture-graph boundaries override the legacy lint quarantine with strict correctness denies, and an exact-reproducible LibreOffice 26.2.5 DOC changed-save/readback preserves the paragraph sentinel. Nested/group-owned and other noncanonical selected graphs remain typed refusals, and Microsoft Word resave is not claimed. |
 | XLS | 95 | 95 | Reversible row/column shifts now rewrite bounded same-sheet `PtgRef`/`PtgArea` formula tokens while preserving relative/absolute flags, alongside selections, merged ranges, external hyperlinks, and simple drawing anchors. The crate-wide production `unwrap`/`expect` quarantine is replaced by reasoned module-local exceptions, and an exact-reproducible LibreOffice 26.2.5 XLS changed-save/readback preserves `42.25`. Names/3-D/shared-relative tokens and harder drawing owners remain refused; Microsoft Excel resave is not claimed. |
-| XLSB | 95 | 94 | The durable transfer root covers every anchor in the checked four-workbook/six-anchor standard-drawing corpus, including shape hyperlinks and chart-part MCE, with compact chart XML and collision-safe graph remapping. Active OLE, other relationship-bearing shapes, drawing-level MCE, mixed conformance, and package-global chart dependencies remain refused; LibreOffice is import-only and no current Excel resave exists. API quality remains below 95 because crate-wide cast, `expect`, ignored-error, and wildcard correctness suppressions still cover the legacy codec outside the strict new transfer module. |
-| PPT | 94 | 96 | The durable root now edits slide visibility and canonical fixed-width manual/automatic advance timing while retaining effects, sound, hidden/cursor flags, reserved bits, and framing; genuine producer PPT cases reopen and durable/inverse/history/merge behavior passes. The attempted LibreOffice resave still failed to preserve the tested order/visibility/anchor semantics, so no native artifact is claimed; broader BLIP, animation, and shape-reference closure remains unsupported. |
+| XLSB | 95 | 95 | The durable transfer root covers every anchor in the checked four-workbook/six-anchor standard-drawing corpus, including shape hyperlinks and chart-part MCE, with compact chart XML and collision-safe graph remapping. The crate root now denies the seven prior correctness families; ordinary/new roots retain stricter denies, and remaining legacy exceptions are reasoned at module scope. All-feature testing passes 513 library and 87 integration tests, and strict Clippy passes. Active OLE, other relationship-bearing shapes, drawing-level MCE, mixed conformance, package-global chart dependencies, and current Excel resave remain outside the bounded claim. |
+| PPT | 95 | 97 | Append-only publication now emits the specification/LibreOffice-compatible UserEdit-linked `PersistPtrIncrementalBlock` 6002. The durable root independently replaces canonical fixed-width visual transition type/direction/speed with reopen, inverse, durable replay, merge/history, and typed refusal coverage. An exact-reproducible LibreOffice 26.2.5 same-format PPT save preserves `Random`/`None`/`Slow` -> `Dissolve`/`None`/`Medium`, and final Litchi readback passes. Broader BLIP, animation, and shape-reference closure remains bounded or refused; Microsoft PowerPoint resave is not claimed. |
 | RTF | 95 | 96 | Root shape-text editing/transfer now joins comments and note stories on the durable ordinary root, and a LibreOffice changed-save/readback preserves the sentinel. The current generator produces an equivalent but not byte-identical pre-native RTF because surrounding character controls differ, so the score stays at the threshold rather than receiving full provenance credit. |
 | ODT | 95 | 95 | Advanced layout/protection durability, narrower correctness lint exceptions, manifest-version-safe writing, and a current Writer changed-save/readback meet the threshold. The current generator changes only the regenerated manifest versus the checked pre-native package, remaining layout/security breadth is bounded, and one broad legacy XML-position cast allowance remains. |
 | ODS | 95 | 96 | Automatic styles now cover common data-style families, controls and geometry are wider, terminal password encryption/reopen is implemented, and current Calc changed-save/readback succeeds. Encrypted-source transactional re-encryption, signing, structured grid controls, full style/geometry breadth, and byte-exact replay of the checked pre-native manifest remain absent. |
@@ -57,16 +57,10 @@ least 95.
 
 ## Threshold result
 
-Seventeen formats meet both required scores: DOCX, XLSX, PPTX, DOC, XLS, RTF, ODT, ODS, ODP,
-OpenDocument Formula, ODC, ODG, ODI, ODM, OTH, ODB, and Markdown.
+All 19 reviewed formats meet both required scores: DOCX, XLSX, PPTX, DOC, XLS, XLSB, PPT, RTF,
+ODT, ODS, ODP, OpenDocument Formula, ODC, ODG, ODI, ODM, OTH, ODB, and Markdown.
 
-The exact sub-95 pairs are:
-
-- XLSB: API/Quality `94`.
-- PPT: Functional/Completeness `94`.
-
-Because two formats have one score below 95, the all-format completion threshold is not
-met.
+There are no sub-95 score pairs. The all-format completion threshold is met.
 
 ## Cross-cutting evidence
 
@@ -79,11 +73,11 @@ library Clippy passes for all 19 plus `litchi-core`, `litchi-opc`, `litchi-ooxml
 Passing Clippy does not neutralize explicit `allow` attributes. XLSX has removed its crate-wide
 correctness suppressions. XLS no longer grants crate-wide production `unwrap`/`expect` exemptions,
 although many bounded legacy modules retain individually reasoned exceptions. DOC still has a broad
-legacy codec quarantine, but its ordinary body-text root and critical picture-graph functions now
-override it with strict correctness denies. XLSB still grants crate-wide cast, `expect`,
-ignored-error, and wildcard exceptions outside its strict new drawing-transfer module; that is the
-remaining lint-based threshold blocker. ODT's broad legacy XML-position truncation allowance is
-unchanged and remains reflected in its threshold API score.
+legacy codec quarantine, but its ordinary body-text root and critical picture-graph functions
+override it with strict correctness denies. XLSB now denies cast truncation/wrap/precision/sign
+loss, `expect`, ignored-error, and wildcard enum arms at crate scope; legacy exceptions are
+localized with reasons, while ordinary/new roots retain stricter denies. ODT's broad legacy
+XML-position truncation allowance is unchanged and remains reflected in its threshold API score.
 
 Feature matrices were treated as claims, not proof. The ODC feature matrix and producer-evidence
 document now accurately record the genuine standalone ODFDOM chain, and the Formula matrix now
@@ -118,9 +112,10 @@ Every reviewed ordinary root retains source-checked durable replay, exact or sem
 rejection, failure-atomic commit, deterministic join/three-way planning, bounded history, full
 candidate reopen, and a bounded transfer disposition for its claimed owners. The commit expands
 real ordinary-root behavior rather than merely relabeling refusals: DOC picture graph coexistence;
-XLS same-sheet reference-token shifts; XLSB drawing/chart/hyperlink closure; PPT slide-advance
-timing; ODM typed common body authoring/transfer; OTH provenance-safe inline boundary edits; and ODB
-typed SQL, dependency, schema, and component closure.
+XLS same-sheet reference-token shifts; XLSB drawing/chart/hyperlink closure plus strict root lints;
+PPT slide-advance/visual-transition edits and native-compatible incremental publication; ODM typed
+common body authoring/transfer; OTH provenance-safe inline boundary edits; and ODB typed SQL,
+dependency, schema, and component closure.
 
 Security remains explicit and format-specific. ODS supports terminal fresh encryption but not
 encrypted transactional re-encryption. ODP publishes closed typed refusals. ODG supports fresh
@@ -133,24 +128,25 @@ as implemented functionality.
 ### Producer and native-application evidence
 
 The LibreOffice 26.2.5.2 evidence follows genuine source -> public Litchi semantic change ->
-isolated-profile LibreOffice save -> final Litchi semantic readback for DOC, DOCX, XLS, XLSX, PPTX,
-RTF, ODT, ODS, ODP, Formula, and ODG. ODB uses a fresh isolated profile and loopback-only live UNO
-`XStorable.store()` because its CLI filter is import-only. All 12 checked resaved artifacts have
+isolated-profile LibreOffice save -> final Litchi semantic readback for DOC, DOCX, XLS, XLSX, PPT,
+PPTX, RTF, ODT, ODS, ODP, Formula, and ODG. ODB uses a fresh isolated profile and loopback-only live
+UNO `XStorable.store()` because its CLI filter is import-only. All 13 checked resaved artifacts have
 pinned hashes and pass the current readback executable. Seven provenance/harness tests validate
 artifact hashes, logs, filter registry mappings, isolated profiles, and unavailable routes.
 
-The current generator reproduces the checked DOC, DOCX, XLS, XLSX, PPTX, ODB, and ODG pre-native
-artifacts byte-for-byte. RTF remains semantically equivalent but differs in surrounding character
-controls; ODT, ODS, ODP, and Formula differ only in regenerated `manifest.xml` after the manifest
-correctness change. Their native outputs and final semantic readbacks remain valid, but this review
-does not call those five pre-native artifacts exact-current-generator reproductions.
+The current generator reproduces the checked DOC, DOCX, XLS, XLSX, PPT, PPTX, ODB, and ODG
+pre-native artifacts byte-for-byte. RTF remains semantically equivalent but differs in surrounding
+character controls; ODT, ODS, ODP, and Formula differ only in regenerated `manifest.xml` after the
+manifest correctness change. Their native outputs and final semantic readbacks remain valid, but
+this review does not call those five pre-native artifacts exact-current-generator reproductions.
 
 The evidence is LibreOffice interoperability, not Microsoft Office evidence. XLSB has an
-import-only LibreOffice filter and no current Excel resave; ODI has no registered filter. PPT was
-attempted, but LibreOffice restored or canonicalized tested visibility/order/anchor semantics, so
-no successful PPT artifact is retained. ODM and OTH were not attempted. The ODB helper loads hidden
-with macros disabled, requests no connection/query/form/report, and therefore proves same-package
-persistence only, not database execution.
+import-only LibreOffice filter and no current Excel resave; ODI has no registered filter. Initial
+PPT probes failed because the publisher used full-directory record 6001 inside a UserEdit chain;
+after correction to incremental record 6002, the retained transition probe survives same-format
+save and semantic readback. ODM and OTH were not attempted. The ODB helper loads hidden with macros
+disabled, requests no connection/query/form/report, and therefore proves same-package persistence
+only, not database execution.
 
 ODC separately has a genuine standalone ODFDOM 0.13.0 producer chain. Recorded library/source,
 artifact, validator, and license hashes match; creation and changed resave ran in separate JVMs;
@@ -169,8 +165,8 @@ source-identical roots retain the previously selected counts after the full all-
 | PPTX opened presentation | 13 passed |
 | DOC body/resource transaction | 6 passed |
 | XLS cell/resource and genuine fixtures | 24 passed |
-| XLSB workbook structure/resources | 9 passed |
-| PPT slide root | 17 passed |
+| XLSB all-feature library/integrations | 513 + 87 passed |
+| PPT all-feature library/integrations/doctests | 1,055 + 92 + 14 passed; 11 explicitly ignored handoff/example/doc cases |
 | RTF dependency transfer/transactions | 27 passed |
 | ODT package/layout/real corpus | 32 passed |
 | ODS advanced transaction | 12 passed |
@@ -183,25 +179,24 @@ source-identical roots retain the previously selected counts after the full all-
 | OTH semantic API | 33 passed |
 | ODB advanced transaction | 19 passed |
 | Markdown release gate | 49 passed, including 1,322 normative examples |
-| Native evidence | 12 semantic readbacks; 7 provenance/harness tests |
+| Native evidence | 13 semantic readbacks; 7 provenance/harness tests |
 | XML/package publication | 14 XML, 4 static assets, 5 ODF splice, 24 ODF writer, 9 OPC |
 
 These focused runs do not substitute for Microsoft Office resaves, unexecuted coverage-guided fuzz
 campaigns, or the missing native routes named above.
 
-## Concrete remediation for every sub-95 format
+## Threshold remediation
 
-| Format | Required remediation to reach both scores |
-|---|---|
-| XLSB | Remove or tightly localize the remaining crate-wide cast, `expect`, ignored-error, and wildcard correctness suppressions, with strict warning-denied coverage across the ordinary workbook root. Current Excel same-format changed-save/readback would strengthen functional evidence but is not the scored API blocker. |
-| PPT | Demonstrate a same-format native changed-save that preserves one claimed durable-root semantic operation (order, visibility, anchor, or advance timing), or narrow/final-scope the interoperability claim if compatible applications canonicalize it. The recorded failed LibreOffice result cannot be counted. |
+No format requires threshold remediation at this revision. Remaining bounded feature families and
+missing Microsoft Office routes are recorded in the score findings and feature matrices; they limit
+higher scores but do not place an ordinary root below 95.
 
 ## Bottom line
 
-The commit materially improves the eight former sub-95 roots and adds credible current LibreOffice
-interoperability for 12 formats plus genuine standalone ODC producer evidence. The shared XML
+The reviewed history closes the former sub-95 roots and provides credible current LibreOffice
+interoperability for 13 formats plus genuine standalone ODC producer evidence. The shared XML
 minimality and provenance rules remain enforced, raw direct ZIP negatives remain test-only, and
 the selected build, lint, durability, security, publication, and readback tests are green.
 
-The all-format threshold is nevertheless not met. XLSB retains API/Quality `94`, and PPT retains
-Functional/Completeness `94`; the other 17 formats meet both required scores.
+All 19 non-iWork formats meet both required scores at the exact reviewed commit. This review makes
+no iWork claim and uses no iWork implementation or evidence.
