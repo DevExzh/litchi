@@ -2,7 +2,7 @@
 
 Date: 2026-08-10
 
-Revision under review: committed tree `f5fd760d5eaed150b3222fa6b71419b888289c03`.
+Revision under review: committed tree `2ca898bfc1df2279b984fd5a87b615eed6c5fbcc`.
 
 This is the authoritative independent review of that commit. The tree was clean before this
 document-only update. Earlier score tables, test counts, and XML conclusions are superseded.
@@ -34,57 +34,65 @@ is below 95 in at least one dimension, so the user's required threshold is not m
 
 | Format | Functional/Completeness | API/Quality | Decisive reason it remains below 95 |
 |---|---:|---:|---|
-| DOCX | 94 | 96 | The ordinary document root now has rich-owner durable edits, joins, three-way planning, history, and relationship-checked transfer; complex fields, nested controls/tables, structural run content, and complete relationship-subgraph transfer remain bounded |
-| XLSX | 93 | 94 | Cell-region transfer closes formulas, shared strings, and exact styles, with page-break transfer and full merge/history support; rich-run transfer, formula evaluation, facade-write gaps, and broad correctness lint allowances remain |
-| PPTX | 93 | 95 | One opened transaction now spans slide order/removal, text, tables, charts, media, layouts/masters, comments, and relationship closure; fully general shape/part creation, modern-comment/extension breadth, and current PowerPoint changed-file evidence remain incomplete |
-| DOC | 89 | 91 | Story, field-result, table-cell, revision, and formatting edits now share a durable root with merge/history/limited transfer; OfficeArt/resource closure and broad legacy correctness lint debt remain |
-| XLS | 88 | 91 | The durable root now inserts/removes scalar cells, assigns existing XFs, renames sheets, safely shifts rows/columns, rebuilds row indexes, and supports merge/history/transfer; new SST/XF authoring and formula/drawing dependency closure remain incomplete |
-| XLSB | 91 | 93 | The workbook root now transfers SST/rich-string-font/style dependency closure and supports rename, three-way planning, history, and exact durable inversion; general resource authoring and the workspace's broadest correctness lint quarantine remain |
-| PPT | 89 | 94 | The durable root adds shape/table geometry, slide removal, merge/history, and simple dependency transfer; drawing/comment/external relationship transfer is refused and most presentation semantics remain outside the root |
-| RTF | 93 | 95 | Retained body, paragraph, table-cell, header/footer, and formatting destinations now share durable multi-operation editing, merge/history, and dependency-free transfer; fields, lists, styles, objects, and richer structural transfer remain outside the ordinary root |
-| ODT | 92 | 94 | Styles, fields, revisions, RDF, protection, forms/resources, and script blobs now participate in semantic durable replay, merge/history, transfer checks, and producer full reopen; structural breadth and broad correctness lint quarantine remain |
-| ODS | 91 | 94 | One provenance-splice root now spans sheets/cells, structure, styles, conditional formats, sparklines, drawings/forms, definitions, annotations, RDF, protection, pivots, changes, charts, and resources; deep style/form/chart semantics, security lifecycle, and broad lint debt remain |
-| ODP | 88 | 94 | The unified root has durable presentation owners plus typed chart transfer and genuine Impress full reopen; rich text, tables/forms, fine chart data, and general cross-deck dependency closure remain incomplete |
-| ODF Formula | 92 | 96 | Checked MathML arity/value structure, granular durable edits, transfer, merge/history, bounds, and changed LibreOffice-package reopen are strong; MathML construction breadth, semantic StarMath, and current native Math resave evidence remain incomplete |
-| ODC | 89 | 96 | Canonical packages have typed chart/style/data/resource transfer plus durable merge/history, and noncanonical XML supports checked exact-span edits; there is still no genuine standalone producer ODC/FODC or native changed-file evidence |
-| ODG | 87 | 95 | Durable drawing transactions now cover groups, layers, geometry/path, styles, forms, resources, and dependency-checked group transfer on genuine Draw files; arbitrary style/form breadth, collision rewriting, security writes, and native resave remain incomplete |
-| ODI | 82 | 94 | Frame/image/style/map/resource semantics now share durable transfer/merge/history with compact publication and hostile-input refusal; no genuine producer ODI/FODI exists, the normative fixture is synthetic, and one lint exception remains |
-| ODM | 86 | 95 | Genuine raw LibreOffice ingress plus durable tree/style/resource/metadata CRUD, dependency-closed linked-section transfer, merge/history, and exact inverse are verified; master-document breadth, security writes, and native resave remain incomplete |
-| OTH | 80 | 93 | Genuine template ingress now has durable heading/paragraph/list/style/metadata edits, merge/history, optional-part deletion, and style-parent transfer; rich inline/nested lists, resources/forms/objects, and complete transfer remain absent |
-| ODB | 84 | 95 | The inert root now has durable dependency-closed schema/component/resource transfer, merge/history, genuine changed Base reopen, encrypted open, and signature policy; linked payload copying, broader typed database semantics, re-sign/re-encrypt, and native resave remain incomplete |
-| Markdown | 91 | 96 | Exact ranged nested block/inline edits, reference-graph preflight, dependency-aware transfer, durable merge/history, selected upstream CommonMark/GFM examples, and real-document round trips are verified; corpus coverage is selected rather than the complete normative suites |
+| DOCX | 94 | 97 | The ordinary root now covers complex-field results, nested controls/tables, structural run content, and complete bounded relationship-subgraph transfer; nested hyperlinks/crossing selectors and current Word changed-file resave evidence remain absent |
+| XLSX | 94 | 94 | The root adds rich shared-string ownership, selected picture-graph transfer, defined-name/page-setup/print/worksheet-property writes, and durable closure; selected rather than general drawing transfer, no recalculation, stale feature-matrix rows, and broad correctness lint allowances remain |
+| PPTX | 94 | 96 | Common shape creation/removal, picture and grouped-connector identity/dependency transfer, and modern comments/extensions now share the opened root; unknown shape kinds/external connectors and current PowerPoint changed-file resave remain explicit gaps |
+| DOC | 92 | 92 | Managed embedded objects and bounded singleton inline/floating pictures now close field/preview/Data/ObjectPool or drawing dependencies on genuine DOCs; picture changes are not on the durable wire, richer drawing graphs remain refused, and broad lint debt remains |
+| XLS | 92 | 92 | Plain SST interning, validated XF authoring, string formula caches, and edge `MulRk` deletion now reopen and invert; rich SST runs, formula compilation/evaluation, interior packed deletion, and cross-range/drawing shifts remain refused under broad lint quarantine |
+| XLSB | 94 | 93 | The root now authors SST/rich strings, complete typed styles, formula cache families, images, and image transfer; broader formula/drawing dependency semantics and the workspace's broadest correctness lint quarantine still prevent release-grade quality |
+| PPT | 92 | 94 | External-media edits and bounded slide transfer now reuse matching drawing, hyperlink, sound, author, and extension owners; mismatched/native-ID dependencies, active OLE/actions, and much broader presentation mutation remain refused |
+| RTF | 94 | 96 | Ordinary transfer now closes passive fields, nested tables, styles, picture-bullet lists, drawings, and inert object/result-picture dependencies; opaque destinations, active links, broader structural editing, and current native changed-file evidence remain gaps |
+| ODT | 94 | 89 | Rich notes/ruby, forms, charts, and package resources now use semantic durable replay and transfer; the strict production Clippy gate fails with 334 surfaced `unwrap`/`expect` diagnostics, and advanced layout/security/native-resave coverage remains incomplete |
+| ODS | 94 | 96 | Deep automatic-style graphs, rich cells, typed forms/events, grouped text drawings, charts/resources, and explicit stale-signature stripping now share the provenance root; full style/form/geometry breadth, encryption writes, and current Calc resave remain incomplete |
+| ODP | 92 | 95 | Rich text boxes, tables, inert controls, fine chart data, and collision-remapped dependency transfer are durable; arbitrary story/list/table/form models, producer extensions, security operations, and current Impress resave remain incomplete |
+| ODF Formula | 94 | 97 | The public checked model/constructors now cover every accepted Content MathML symbol and consistent opaque StarMath boundaries with mutation/property corpora; native Math changed-file resave and broader independent/fuzz evidence remain absent |
+| ODC | 91 | 97 | Noncanonical exact-span editing now covers chart/plot/series/ODF-1.4 geometry and participates in verified transfer; no genuine standalone producer ODC/FODC or native changed-file evidence exists |
+| ODG | 92 | 96 | Nested-group edits, arbitrary automatic styles/forms, collision-remapped style/form/resource transfer, active-content inventory, and signature-removal policy are durable; broader drawing semantics, encryption/signing writes, and current Draw resave remain incomplete |
+| ODI | 84 | 95 | Package-origin frame transfer now carries exact resource/style dependencies and the remaining correctness lint exception was removed; no genuine producer ODI/FODI exists, the fixture remains synthetic, and native resave evidence is unavailable |
+| ODM | 90 | 96 | Common master structure, active-content policy, complete style/resource closure, collision remapping, and absent-`styles.xml` creation now share the durable root; broader schema validation, signing/encryption writes, and current Writer resave remain incomplete |
+| OTH | 87 | 95 | Rich inline blocks, nested-list edits, form-catalog CRUD, durable replay, and full reopen are added; resource/object payload mutation and resource-bearing or rich/nested transfer remain unsupported |
+| ODB | 89 | 96 | Local component subtrees now transfer with collision remapping, typed query columns, active-content dispositions, and machine-readable protection capabilities; broader database semantics, re-sign/re-encrypt, and current Base resave remain incomplete |
+| Markdown | 97 | 94 | All 652 CommonMark 0.31.2 and 670 pinned GFM examples pass with exact ranges and reversible edits, but the checked-in release script fails its all-target Clippy step on `tests/normative.rs` |
 
 ## Cross-cutting findings
 
 ### Build and lint evidence
 
 The all-target/all-feature check for all 19 format crates passes. Warning-denied production-library
-Clippy also passes for all 19 formats plus `litchi-core`, `litchi-opc`, `litchi-ooxml-common`,
-`litchi-odf-common`, and `xml-minifier`:
+Clippy passes for 18 formats plus `litchi-core`, `litchi-opc`, `litchi-ooxml-common`,
+`litchi-odf-common`, and `xml-minifier`, but fails for ODT:
 
 ```text
 cargo check -p <all 19 format crates> --all-targets --all-features
 # exit 0
 
-cargo clippy -p <all 19 formats and reviewed common crates> \
+cargo clippy -p <18 formats except ODT and reviewed common crates> \
   --lib --all-features --no-deps -- -D warnings
 # exit 0
+
+cargo clippy -p litchi-odt --lib --all-features --no-deps -- -D warnings
+# exit 101: 334 clippy::unwrap_used / clippy::expect_used diagnostics
 ```
 
-That is a genuine strict production gate, but it does not mean the lint debt is removed. Explicit
-`#![allow(...)]` attributes take precedence over `-D warnings`:
+ODT changed those two lints from crate-wide `allow` to `warn`, which is useful visibility but means
+the required warning-denied production gate is concretely red. For the passing crates, explicit
+`#![allow(...)]` attributes still take precedence over `-D warnings`:
 
 - DOCX, ODP, OpenDocument Formula, ODC, OTH, and Markdown have no material crate-wide correctness
-  quarantine. PPT, RTF, ODG, ODI, ODM, and ODB use narrow or mostly organizational exceptions.
-- XLSX, DOC, XLS, XLSB, ODT, and ODS retain broad crate-wide allowances. These include combinations
-  of narrowing/sign casts, `unwrap`/`expect`, ignored `Result`s, wildcard handling, and parser-state
-  assumptions. XLSB is the broadest; DOC and ODT also suppress correctness-relevant families.
+  quarantine. PPT, RTF, ODS, ODG, ODI, ODM, and ODB use narrow or mostly organizational exceptions;
+  ODS removed its crate-wide cast/`expect` exceptions and ODI removed `map_err_ignore`.
+- XLSX, DOC, XLS, XLSB, and ODT retain broad crate-wide allowances for other families. These include
+  combinations of narrowing/sign casts, ignored `Result`s, wildcard handling, and parser-state
+  assumptions. XLSB remains the broadest; DOC and ODT retain correctness-relevant exceptions in
+  addition to ODT's newly surfaced panic diagnostics.
 - PPTX's allowances are broad but mostly schema/API/style-oriented; shared `litchi-ooxml-common`
   retains broad parser and style quarantines inherited by every OOXML host.
 
 For 95, each correctness-relevant allowance needs direct remediation or a narrowly located proof
-next to generated/spec-shaped code. A reproducible all-target Clippy and rustdoc pass from the CRUD
-release checklist is also still required; this review ran strict Clippy for production libraries.
+next to generated/spec-shaped code. Markdown adds a reproducible release script and its hashes,
+format check, complete tests, and rustdoc pass, but the script itself exits 101 because all-target
+Clippy reports `clippy::struct_field_names` on the `Example.example` test fixture field. Production
+library Clippy is green; the advertised release gate is not.
 
 ### Authored and referenced XML publication
 
@@ -103,7 +111,12 @@ ODF publication applies the same authored-versus-exact distinction. The new
 `XmlSourcePart`/`XmlSourceRange`/`AuthoredXmlFragment`/`XmlSplicePublication` API binds ranges to one
 exact source archive and part, audits each authored markup/start-tag/text fragment, refuses stale or
 overlapping ranges, fully reparses the assembled XML, and publishes through the shared ODF writer.
-ODB now uses this boundary; no reviewed format crate directly constructs production ZIP output.
+This commit adds an audited end-tag class and a bounded single-contiguous-delta helper: it derives a
+checked source range, classifies only the replacement fragment, preserves every unrelated producer
+byte, and fully verifies the assembled document. If a candidate cannot be proven as that exact
+splice it falls back to strict whole-part authored compactness rather than receiving a source
+exemption. ODB and the expanded ODF roots use this boundary; no reviewed format crate directly
+constructs production ZIP output.
 
 Raw malformed/prettified packages are constructed with `zip::ZipWriter` only in tests. The raw
 negative fixtures cover `.rdf`, manifest-declared XML, `+xml`, signature XML, arbitrary noncompact
@@ -113,27 +126,32 @@ ignored, and OPC package-writer 9.
 
 ### Durable patches, composition, history, and transfer
 
-Commit `f5fd760d` materially extends ADR-0003 adoption. Every reviewed format now has source-checked
-durable replay, exact or semantic inverse, deterministic joins, non-mutating three-way planning,
-bounded commit-coupled history, and at least an explicit bounded transfer disposition at its claimed
-ordinary root. The decisive additions include:
+Commit `2ca898bfc` closes substantially more common dependencies without weakening ADR-0003. Every
+reviewed format retains source-checked durable replay, exact or semantic inverse, deterministic
+joins, non-mutating three-way planning, bounded commit-coupled history, and an explicit bounded
+transfer disposition at its claimed ordinary root. The decisive additions include:
 
-- DOCX rich owners and PPTX's opened presentation now compose ordinary edits with durable merge,
-  history, and relationship-aware transfer rather than leaving those capabilities in isolated
-  owners.
-- XLS/XLSB now perform structural workbook changes and dependency-aware cell transfer. XLSX cell
-  transfer closes relative-formula, shared-string, and exact-style dependencies; unsupported
-  range-owned formulas and unavailable receiver resources fail atomically.
-- ODT's residual semantic families are now on the durable wire; ODS spans its advanced owners in
-  one provenance-spliced root; ODP transfers typed chart data; ODG/ODM/ODB close substantial
-  package dependencies; Markdown transfers nested content with reference-definition preflight.
+- DOCX copies complete bounded internal relationship subgraphs and addresses complex-field,
+  structural-run, nested-control, and nested-table owners. PPTX creates common shapes, edits modern
+  comments/extensions, and remaps group, connector, relationship, and non-visual identities.
+- XLSX transfers rich shared strings and selected picture graphs and adds ordinary worksheet/catalog
+  writes. XLS authors SST/XF/string-cache resources. XLSB authors rich strings, styles, formulas,
+  and images. DOC closes managed embedded and bounded native-picture graphs; PPT and RTF close
+  materially broader external-media, drawing, style, list, table, field, and inert-object owners.
+- ODT puts rich notes/ruby, forms, charts, and resources on the semantic wire. ODS closes deep
+  style/form/drawing/chart dependencies. ODP adds rich text/table/form/fine-chart owners. ODG,
+  ODI, ODM, OTH, and ODB expand collision-aware package closure and active/security dispositions.
+- OpenDocument Formula exposes complete checked constructors for its accepted Content MathML
+  model. Markdown vendors and executes the complete pinned CommonMark and GFM example corpora.
 
-The remaining problem is breadth, not missing common machinery. A transfer implementation that
+The remaining functional problem is breadth, not missing common machinery. A transfer implementation that
 correctly refuses drawings, rich text, nested lists, style collisions, or source-local dependencies
 is safe and API-valuable, but it does not make those format features complete. Likewise, exact
 artifact envelopes do not replace semantic replay after independent evolution. The scores therefore
 credit failure atomicity and explicit refusal while keeping Functional/Completeness below 95 where
-ordinary documents still contain common unsupported owners or dependencies.
+ordinary documents still contain common unsupported owners or dependencies. Separately, ODT's
+strict production lint failure and Markdown's failing advertised release script are direct quality
+failures even though their focused behavioral tests pass.
 
 ### Fixture and native-application evidence
 
@@ -148,8 +166,9 @@ Important provenance limits remain:
 
 - ODC has real chart subdocuments extracted from FODS/FODT but no standalone producer ODC/FODC.
 - ODI has no genuine producer ODI/FODI; its checked-in normative fixture is explicitly synthetic.
-- Markdown now checks selected vendored upstream CommonMark 0.31.2/GFM examples and real-document
-  fixtures, but not the complete normative CommonMark suite or a broad independent GFM corpus.
+- Markdown's pinned corpora now include all 652 CommonMark 0.31.2 examples and all 670 examples from
+  the recorded `cmark-gfm` specification, with checked hashes, licenses, expected HTML, exact ranges,
+  deterministic reparsing, and reversible edits. That closes the prior corpus-breadth finding.
 - A producer-created input is not the same as current native application interoperability. Most
   new transaction roots still lack documented Litchi-edit -> current Word/Excel/PowerPoint or
   LibreOffice resave -> Litchi-reopen evidence. Exact no-op evidence does not certify changed files.
@@ -160,70 +179,72 @@ All independently selected high-risk suites passed:
 
 | Target | Result |
 |---|---:|
-| DOCX document transaction | 10 passed |
-| XLSX durable workbook | 9 passed |
-| PPTX opened presentation | 9 passed |
-| DOC body transaction | 3 passed |
-| XLS cell-value transaction | 12 passed |
-| XLSB workbook structure | 3 passed |
-| PPT slide-order root | 8 passed |
-| RTF transaction | 20 passed |
-| ODT packaged transaction | 18 passed |
-| ODS advanced document transaction | 4 passed |
-| ODP unified transaction | 6 passed |
-| OpenDocument Formula capabilities and limits | 18 passed |
-| ODC next-wave transaction | 6 passed |
-| ODG package/capability transactions | 23 passed |
-| ODI semantic planning | 8 passed |
-| ODM advanced transaction and raw ingress | 9 passed |
-| OTH semantic API | 24 passed |
-| ODB advanced transaction | 13 passed |
-| Markdown reader and selected normative corpus | 22 passed |
+| DOCX document/package root | 12 passed |
+| XLSX durable workbook and cell dependencies | 21 passed |
+| PPTX opened presentation | 13 passed |
+| DOC body/resource transaction | 5 passed |
+| XLS cell/resource transaction and genuine fixtures | 19 passed |
+| XLSB workbook structure/resources | 4 passed |
+| PPT slide-order/media root | 10 passed |
+| RTF transaction and dependency transfer | 23 passed |
+| ODT packaged transaction | 22 passed |
+| ODS advanced document transaction | 8 passed |
+| ODP unified and rich-content transactions | 9 passed |
+| OpenDocument Formula capability/property corpora | 19 passed |
+| ODC next-wave transaction | 8 passed |
+| ODG package/capability transactions | 28 passed |
+| ODI semantic planning | 10 passed |
+| ODM advanced transaction | 9 passed |
+| OTH semantic API | 27 passed |
+| ODB advanced transaction | 15 passed |
+| Markdown all targets | 49 passed, including 1,322 normative examples |
 | XML authored audit | 14 passed |
 | Static OOXML asset audit | 4 passed, 1 explicit regeneration test ignored |
 | ODF exact-source splice provenance | 5 passed |
 | OPC package writer publication | 9 passed |
 
 These focused runs verify the scored high-risk seams; they do not replace the final full-workspace,
-all-feature, rustdoc, fuzz, and native-application release matrix. A broad `--tests --all-features`
-attempt was also started, but linking all integration targets exhausted the review environment's
-disk before execution. It reported no assertion failure and is not counted as a passing gate; the
-focused targets above were then built and run individually.
+all-feature, fuzz, and native-application release matrix. Markdown's corpus hashes, format check,
+all-target tests, and rustdoc pass independently; its all-target Clippy step fails as described
+above, so the checked-in release script is not counted as passing.
 
 ## Smallest actionable remediation to reach the 95 threshold
 
 | Format | Smallest defensible next remediation wave |
 |---|---|
-| DOCX | Extend the strong root across complex field sequences, block/nested controls, nested/rich tables, structural run content, and complete relationship subgraphs; prove a changed document through current Word resave/reopen. |
-| XLSX | Add rich-run and drawing dependency transfer, complete defined-name/page-setup/property facade writes, narrow correctness lint allowances, and prove changed output in current Excel. |
-| PPTX | Complete general shape/part creation and modern comment/extension handling, narrow remaining host/shared lint debt, and prove a complex changed deck through current PowerPoint resave/reopen. |
-| DOC | Close OfficeArt/drawing/resource dependencies across story/table/field edits and transfer, then localize or remove the broad cast/unwrap/error lint quarantine and validate current Word output. |
-| XLS | Author new SST/XF resources, support string formula caches and safe packed deletion, close formula/range/drawing dependencies, narrow the lint quarantine, and validate current Excel output. |
-| XLSB | Generalize shared/rich-string and style resource authoring beyond transfer, close formula/drawing dependencies, remove the broad correctness lint quarantine, and validate current Excel output. |
-| PPT | Extend the root to drawing, formatting, chart/media, master, comment, and external-relationship owners; close those transfer dependencies and add current PowerPoint resave evidence. |
-| RTF | Bring fields, nested tables/lists, styles, objects, and their dependencies into the immutable root and transfer plan; add changed-file Word and LibreOffice resave coverage. |
-| ODT | Complete rich structural and chart/resource transfer semantics, remove broad correctness lint allowances, and add current Writer changed-file resave/reopen evidence. |
-| ODS | Complete deep style graphs, rich cell runs, form/drawing/chart dependencies, and signature/encryption write policy; remove broad lint allowances and add current Calc resave evidence. |
-| ODP | Add rich text, tables/forms, fine chart data, and general style/resource dependency transfer; add current Impress changed-file resave evidence. |
-| ODF Formula | Complete the checked MathML constructor/model corpus, keep StarMath uniformly opaque or parse it semantically, and add current LibreOffice Math changed-file resave plus broader fuzz evidence. |
-| ODC | Obtain a genuine standalone producer ODC/FODC, broaden noncanonical exact-span edits beyond axis name/style, and prove transferred changed output through a native chart producer. |
-| ODG | Broaden arbitrary style/form semantics, support safe style/resource collision rewriting in transfer, add security-write policy, and validate complex changed drawings in current LibreOffice Draw. |
-| ODI | Obtain a genuine producer ODI/FODI, broaden frame/map/style semantics, remove the remaining correctness lint exception, and validate changed output through that producer. |
-| ODM | Complete master-document structure/reference semantics, security-write policy, and collision-safe cross-master transfer; validate changed output in current LibreOffice Writer. |
-| OTH | Add rich inline/nested-list, bookmark/field, resource, form, and object CRUD plus dependency-complete template transfer and current Writer/Web resave evidence. |
-| ODB | Copy or explicitly remap linked component payloads, deepen typed schema/query semantics and active-content inventory, add re-sign/re-encrypt support or documented refusal, and prove a changed Base resave. |
-| Markdown | Run the complete normative CommonMark suite and a broad independent GFM corpus, close any discovered parser/edit gaps, and publish those results as a reproducible release gate. |
+| DOCX | Add checked nested-hyperlink and non-crossing composite selectors where lossless ownership is provable, then run a complex Litchi edit through current Word resave and Litchi reopen. |
+| XLSX | Generalize selected-picture transfer to the supported drawing/chart graph, update stale matrix rows for ordinary writes, localize broad cast/unwrap/error assumptions, and run current Excel changed-file interoperability. |
+| PPTX | Support or precisely classify remaining common shape kinds and externally attached connectors, narrow host/shared lint exceptions, and prove the changed opened root through current PowerPoint resave/reopen. |
+| DOC | Put bounded native-picture changes on the durable wire, extend closure beyond singleton/nonshared graphs, localize broad lint assumptions, and validate the changed binary in current Word. |
+| XLS | Support interior packed deletion and dependency-safe formula/range/drawing shifts, close remaining rich-SST/formula authoring gaps, narrow lint allowances, and validate current Excel output. |
+| XLSB | Close broader formula/name/table and drawing dependencies, remove the crate-wide correctness quarantine, and validate rich/resource-bearing changed workbooks in current Excel. |
+| PPT | Remap rather than require identical safe drawing/hyperlink/sound/comment owners, broaden ordinary-root presentation mutation, and add current PowerPoint changed-file evidence. |
+| RTF | Extend typed editing beyond the transferred retained owners into the remaining common destinations while keeping active/opaque refusal, and add current Word plus LibreOffice changed-file resave coverage. |
+| ODT | Eliminate the 334 warning-denied `unwrap`/`expect` diagnostics first, localize remaining correctness allowances, then complete advanced layout/security owners and current Writer changed-file resave evidence. |
+| ODS | Complete automatic-style replacement/removal and package-wide resolution, broader form/drawing geometry, encryption policy, and current Calc changed-file resave evidence. |
+| ODP | Complete arbitrary story/list/table/form read-edit models and producer-specific dependency families, add signature/encryption policy, and run current Impress changed-file resave/reopen. |
+| ODF Formula | Add independent schema/fuzz validation beyond deterministic mutation, and prove a changed package through current LibreOffice Math resave/reopen. |
+| ODC | Obtain a genuine standalone producer ODC/FODC and current native changed-file round trip; retain exact-span provenance for any newly encountered producer layout. |
+| ODG | Complete remaining advanced drawing/style semantics and password/signing lifecycle, then validate collision-remapped complex changed drawings in current LibreOffice Draw. |
+| ODI | Obtain a genuine producer ODI/FODI and native changed-file round trip, then add semantic active-content inventory and broader granular style/security lifecycle support. |
+| ODM | Broaden master-document schema validation and editing beyond the common structure, add signature/encryption write lifecycle, and validate current Writer resave/reopen. |
+| OTH | Add resource/object reference and payload mutation plus dependency-complete rich-inline/nested-list/resource transfer and current Writer/Web resave evidence. |
+| ODB | Deepen typed query/schema/component semantics, add supported re-sign/re-encrypt lifecycle or final explicit scope, and prove resource-bearing changed databases through current Base resave. |
+| Markdown | Rename or narrowly justify the `Example.example` test field so the checked-in all-target Clippy step passes, then keep the complete corpus gate green in CI. |
 
 ## Bottom line
 
 The commit is materially stronger than the prior review. The authored XML publication contract
-remains correctly enforced with controlled exact-source provenance; no reviewed format production
+remains correctly enforced with controlled exact-source provenance; the new contiguous-splice path
+retains only proven source bytes and audits every authored delta. No reviewed format production
 source directly constructs ZIP output, while raw malformed/prettified ZIP construction stays in
-tests. The selected builds, strict production Clippy, ordinary-root transactions, transfer/history
-tests, raw negatives, and full-reopen checks pass.
+tests. All selected ordinary-root, dependency-transfer, history, raw-negative, and full-reopen tests
+pass, as does the 19-format all-target build.
 
-The user's threshold still is not met. Several roots now reach 95-96 API/Quality, but no format also
-reaches 95 Functional/Completeness; DOCX is highest at 94 Functional/Completeness. The remaining
-release gap is common-format semantic and dependency breadth plus genuine current native
-changed-file interoperability. Formats with broad correctness lint quarantines also cannot receive
-95 API/Quality until those assumptions are locally proved or removed.
+The user's threshold still is not met. Markdown reaches 97 Functional/Completeness but only 94
+API/Quality because its advertised release script fails all-target Clippy. Several other roots reach
+95-97 API/Quality but remain below 95 Functional/Completeness due to documented common-feature or
+producer/native-interoperability gaps. ODT is additionally blocked at 89 API/Quality by 334 strict
+production Clippy errors. ODC and ODI still lack genuine standalone producer evidence. Those are
+release evidence and quality failures, not score-table formalities, so no reviewed format receives
+both required scores.
