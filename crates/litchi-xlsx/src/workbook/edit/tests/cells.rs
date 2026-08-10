@@ -990,6 +990,141 @@ fn cell_transfer_clones_selected_picture_graph_and_is_reversible() {
 }
 
 #[test]
+fn cell_transfer_clones_classic_chart_leaf_through_merge_and_durable_inverse() {
+    let baseline = two_sheet_workbook(WorksheetKind::Worksheet);
+    let mut package = baseline.inner.package.clone();
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("source worksheet")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1"/><sheetData/><drawing r:id="rIdDrawing"/></worksheet>"#.to_vec(),
+        );
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/drawings/drawing1.xml").expect("drawing URI"),
+            litchi_opc::constants::content_type::OFC_DRAWING.to_owned(),
+            br#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><xdr:twoCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame><a:graphic><a:graphicData><c:chart r:id="rIdChart"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>"#.to_vec(),
+        )))
+        .expect("drawing part");
+    let chart_xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea/></c:chart></c:chartSpace>"#.to_vec();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/charts/chart1.xml").expect("chart URI"),
+            litchi_opc::constants::content_type::DML_CHART.to_owned(),
+            chart_xml.clone(),
+        )))
+        .expect("chart part");
+    package
+        .get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").expect("drawing URI"))
+        .expect("drawing part")
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::CHART.to_owned(),
+            "../charts/chart1.xml".to_owned(),
+            "rIdChart".to_owned(),
+            TargetMode::Internal,
+        )
+        .expect("chart relationship");
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("source worksheet")
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::DRAWING.to_owned(),
+            "../drawings/drawing1.xml".to_owned(),
+            "rIdDrawing".to_owned(),
+            TargetMode::Internal,
+        )
+        .expect("drawing relationship");
+    let source = Workbook::from_package(package).expect("chart workbook");
+    let source_bytes = source.to_bytes().expect("source bytes");
+
+    let mut transfer = source.edit().expect("transfer edit");
+    transfer
+        .copy_cells("Sheet1", "A1:C3", "Sheet2", "E5")
+        .expect("chart transfer")
+        .expect("selectors");
+    let mut disjoint = source.edit().expect("disjoint edit");
+    disjoint
+        .sheet("Sheet2")
+        .expect("lookup")
+        .expect("target sheet")
+        .set("H8", "joined")
+        .expect("disjoint cell");
+    let merged = transfer
+        .plan_three_way(disjoint, MergeLimits::new(2, 64, 128, 64))
+        .expect("plan chart transfer merge");
+    assert!(merged.conflicts().is_empty());
+    let committed = merged
+        .finish()
+        .expect("finish chart transfer merge")
+        .commit()
+        .expect("commit chart transfer");
+
+    let target_drawing = part_text(committed.workbook(), "/xl/drawings/drawing1_copy1.xml");
+    assert!(target_drawing.contains(r#"r:id="rIdChart""#));
+    let target_drawing_uri =
+        PackURI::new("/xl/drawings/drawing1_copy1.xml").expect("cloned drawing URI");
+    let target_chart_uri = PackURI::new("/xl/charts/chart1_copy1.xml").expect("cloned chart URI");
+    let target_chart_relationship = committed
+        .workbook()
+        .inner
+        .package
+        .get_part(&target_drawing_uri)
+        .expect("cloned drawing")
+        .rels()
+        .get("rIdChart")
+        .expect("cloned chart relationship");
+    assert_eq!(
+        target_chart_relationship
+            .target_partname()
+            .expect("chart target"),
+        target_chart_uri
+    );
+    assert_eq!(
+        committed
+            .workbook()
+            .inner
+            .package
+            .get_part(&target_chart_uri)
+            .expect("cloned chart")
+            .blob(),
+        chart_xml.as_slice()
+    );
+    assert!(matches!(
+        committed
+            .workbook()
+            .sheet("Sheet2")
+            .expect("lookup")
+            .expect("target")
+            .cell("H8")
+            .expect("joined cell")
+            .stored(),
+        Some(Cell::Value(Value::Text(text))) if text.as_str() == "joined"
+    ));
+
+    let durable = committed.patch().durable().expect("durable chart patch");
+    let json = durable
+        .to_deterministic_json()
+        .expect("deterministic chart patch");
+    let durable = DurablePatch::from_deterministic_json(&json).expect("parse chart patch");
+    let replayed = durable.apply(&source).expect("replay chart graph");
+    assert_eq!(
+        replayed.to_bytes().expect("replayed bytes"),
+        committed.workbook().to_bytes().expect("committed bytes")
+    );
+    assert_eq!(
+        durable
+            .inverse()
+            .apply(&replayed)
+            .expect("inverse chart graph")
+            .to_bytes()
+            .expect("restored bytes"),
+        source_bytes
+    );
+}
+
+#[test]
 fn resetting_style_is_distinct_from_removal_and_missing_is_a_no_op() {
     let source = styled_workbook();
     let source_bytes = source.to_bytes().expect("source bytes");

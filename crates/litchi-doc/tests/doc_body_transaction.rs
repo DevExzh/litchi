@@ -329,5 +329,43 @@ fn genuine_receivers_accept_bounded_inline_and_floating_picture_graphs() {
                 .expect("genuine picture exact inverse"),
             receiver
         );
+        let durable_limits = litchi_core::PatchLimits::new(
+            litchi_core::BlobLimits::new(8, 16 * 1024 * 1024, 32 * 1024 * 1024),
+            40 * 1024 * 1024,
+            16,
+            8,
+            16 * 1024,
+            40 * 1024 * 1024,
+        );
+        let durable = commit
+            .patch()
+            .to_durable(durable_limits)
+            .expect("genuine picture durable patch");
+        let replay = receiver
+            .apply_durable(&durable)
+            .expect("genuine picture durable replay");
+        let mut replay_package = Package::from_reader(Cursor::new(replay.finish()))
+            .expect("durable picture CFB reopens");
+        assert_eq!(
+            replay_package
+                .document()
+                .expect("durable picture DOC reopens")
+                .fib()
+                .version(),
+            0x0101
+        );
+        let restored = replay
+            .apply_durable(&durable.inverse())
+            .expect("genuine picture durable inverse");
+        assert_eq!(
+            restored
+                .paragraphs(Projection::All)
+                .expect("durable inverse paragraphs")[destination.get()]
+            .text(),
+            receiver
+                .paragraphs(Projection::All)
+                .expect("receiver paragraphs")[destination.get()]
+            .text()
+        );
     }
 }

@@ -302,19 +302,28 @@ pub fn parse_image_maps(xml: &str) -> Result<Vec<ImageMap>> {
                 if let Some(area) = active_area.as_mut() {
                     if area.depth == 2 {
                         if area.title_start.is_some() && svg_element && local == b"title" {
-                            let start = area.title_start.take().expect("title start");
+                            let start = area
+                                .title_start
+                                .take()
+                                .ok_or_else(|| invalid("missing image-map title start"))?;
                             area.area.title_xml = Some(xml[start..event_end].to_string());
                         } else if area.description_start.is_some()
                             && svg_element
                             && local == b"desc"
                         {
-                            let start = area.description_start.take().expect("desc start");
+                            let start = area
+                                .description_start
+                                .take()
+                                .ok_or_else(|| invalid("missing image-map description start"))?;
                             area.area.description_xml = Some(xml[start..event_end].to_string());
                         } else if area.listeners_start.is_some()
                             && office_element
                             && local == b"event-listeners"
                         {
-                            let start = area.listeners_start.take().expect("listeners start");
+                            let start = area
+                                .listeners_start
+                                .take()
+                                .ok_or_else(|| invalid("missing image-map listeners start"))?;
                             area.area.event_listeners_xml = Some(xml[start..event_end].to_string());
                         }
                     }
@@ -323,10 +332,14 @@ pub fn parse_image_maps(xml: &str) -> Result<Vec<ImageMap>> {
                         .checked_sub(1)
                         .ok_or_else(|| invalid("image-map area nesting underflow"))?;
                     if area.depth == 0 {
-                        let capture = active_area.take().expect("active area");
+                        let capture = active_area
+                            .take()
+                            .ok_or_else(|| invalid("missing completed image-map area"))?;
                         let mut area = capture.area;
                         area.xml = xml[capture.start..event_end].to_string();
-                        let (areas, _, _) = active_map.as_mut().expect("active map");
+                        let (areas, _, _) = active_map
+                            .as_mut()
+                            .ok_or_else(|| invalid("image-map area has no parent map"))?;
                         areas.push(area);
                     }
                 }

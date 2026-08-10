@@ -41,14 +41,14 @@ impl TrackedChanges {
         }
         xml.push('>');
         for change in &self.changes {
-            write_change(&mut xml, change);
+            write_change(&mut xml, change)?;
         }
         xml.push_str("</text:tracked-changes>");
         Ok(xml)
     }
 }
 
-fn write_change(xml: &mut String, change: &TrackChange) {
+fn write_change(xml: &mut String, change: &TrackChange) -> Result<()> {
     xml.push_str(r#"<text:changed-region text:id=""#);
     push_escaped(xml, &change.id, true);
     xml.push('"');
@@ -76,11 +76,21 @@ fn write_change(xml: &mut String, change: &TrackChange) {
     xml.push_str("<office:change-info><dc:creator>");
     push_escaped(
         xml,
-        change.author.as_deref().expect("validated creator"),
+        change
+            .author
+            .as_deref()
+            .ok_or_else(|| make_error("tracked change has no creator"))?,
         false,
     );
     xml.push_str("</dc:creator><dc:date>");
-    push_escaped(xml, change.date.as_deref().expect("validated date"), false);
+    push_escaped(
+        xml,
+        change
+            .date
+            .as_deref()
+            .ok_or_else(|| make_error("tracked change has no date"))?,
+        false,
+    );
     xml.push_str("</dc:date></office:change-info>");
     if let Some(comment) = &change.comment {
         xml.truncate(xml.len() - "</office:change-info>".len());
@@ -96,6 +106,7 @@ fn write_change(xml: &mut String, change: &TrackChange) {
     xml.push_str("</text:");
     xml.push_str(kind);
     xml.push_str("></text:changed-region>");
+    Ok(())
 }
 
 fn write_text_content(xml: &mut String, value: &str) {
@@ -411,7 +422,9 @@ pub(super) fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
                     .as_ref()
                     .is_some_and(|story| story.depth == depth)
                 {
-                    let mut story = active_story.take().expect("checked active story");
+                    let mut story = active_story
+                        .take()
+                        .ok_or_else(|| make_error("missing completed tracked-change story"))?;
                     if let Some(last) = story.boundaries.last_mut() {
                         *last = Some(span.start);
                     }
@@ -421,8 +434,10 @@ pub(super) fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
                         empty: None,
                     });
                 }
-                if tracked == Some((depth, tracked.map_or(0, |value| value.1))) {
-                    let (_, start) = tracked.take().expect("checked tracked container");
+                if tracked.is_some_and(|value| value.0 == depth) {
+                    let (_, start) = tracked
+                        .take()
+                        .ok_or_else(|| make_error("missing completed tracked-changes container"))?;
                     if tracked_changes.replace(start..span.end).is_some() {
                         return invalid("multiple text:tracked-changes elements are not allowed");
                     }

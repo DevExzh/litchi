@@ -202,6 +202,14 @@ fn changed_signed_and_encrypted_transactions_are_refused_but_noops_are_exact() {
         litchi_odm::security::ChangedWriteDisposition::RefusedSigned
     );
     assert_eq!(
+        signed.security().write_capabilities().signatures(),
+        litchi_odm::security::CryptographicWriteCapability::ExactPreservationOnly
+    );
+    assert_eq!(
+        signed.security().write_capabilities().encryption(),
+        litchi_odm::security::CryptographicWriteCapability::Unavailable
+    );
+    assert_eq!(
         signed.edit().commit().unwrap().snapshot().as_bytes(),
         signed.as_bytes()
     );
@@ -222,6 +230,10 @@ fn changed_signed_and_encrypted_transactions_are_refused_but_noops_are_exact() {
     assert_eq!(
         encrypted.security().changed_write_disposition(),
         litchi_odm::security::ChangedWriteDisposition::RefusedEncrypted
+    );
+    assert_eq!(
+        encrypted.security().write_capabilities().encryption(),
+        litchi_odm::security::CryptographicWriteCapability::ExactPreservationOnly
     );
     assert_eq!(
         encrypted.edit().commit().unwrap().snapshot().as_bytes(),

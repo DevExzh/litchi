@@ -303,7 +303,12 @@ impl BookmarkParser {
                         .map_err(|error| {
                             Error::InvalidFormat(format!("invalid bookmark range text: {error}"))
                         })?;
-                    add_character_offset(paragraph.as_mut().unwrap(), value.chars().count())?;
+                    add_character_offset(
+                        paragraph.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat("missing active bookmark paragraph".to_string())
+                        })?,
+                        value.chars().count(),
+                    )?;
                 },
                 Event::CData(ref value) if paragraph.is_some() => {
                     let value = value
@@ -311,11 +316,21 @@ impl BookmarkParser {
                         .map_err(|error| {
                             Error::InvalidFormat(format!("invalid bookmark range CDATA: {error}"))
                         })?;
-                    add_character_offset(paragraph.as_mut().unwrap(), value.chars().count())?;
+                    add_character_offset(
+                        paragraph.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat("missing active bookmark paragraph".to_string())
+                        })?,
+                        value.chars().count(),
+                    )?;
                 },
                 Event::GeneralRef(ref reference) if paragraph.is_some() => {
                     let value = decode_reference(reference, "bookmark range")?;
-                    add_character_offset(paragraph.as_mut().unwrap(), value.chars().count())?;
+                    add_character_offset(
+                        paragraph.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat("missing active bookmark paragraph".to_string())
+                        })?,
+                        value.chars().count(),
+                    )?;
                 },
                 Event::End(_) => {
                     if marker_depth == Some(document_depth) {

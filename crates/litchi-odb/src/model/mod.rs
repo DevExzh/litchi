@@ -5,7 +5,9 @@ mod catalog;
 mod component;
 pub mod connection;
 mod extension;
-pub mod query;
+#[path = "query.rs"]
+pub mod stored_query;
+pub use stored_query as query;
 mod table;
 
 pub use active::{ActiveContentEntry, ActiveContentInventory, ActiveContentKind};

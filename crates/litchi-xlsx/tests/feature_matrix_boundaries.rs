@@ -19,7 +19,7 @@ fn assert_compact_xml(xml: &[u8]) {
 }
 
 #[test]
-fn documented_read_only_worksheet_projections_parse_compact_source_without_rewriting_it() {
+fn worksheet_projections_parse_compact_source_without_rewriting_it() {
     let xml = format!(
         r#"<worksheet xmlns="{MAIN}"><sheetData/><conditionalFormatting sqref="A1"><cfRule type="expression" priority="1"><formula>A1&gt;0</formula></cfRule></conditionalFormatting><printOptions gridLines="1" gridLinesSet="1"/><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup orientation="landscape"/></worksheet>"#
     )
@@ -40,7 +40,7 @@ fn documented_read_only_worksheet_projections_parse_compact_source_without_rewri
 }
 
 #[test]
-fn unowned_conditional_hyperlink_and_page_break_xml_stays_byte_exact_through_save() {
+fn untouched_conditional_hyperlink_and_page_break_xml_stays_byte_exact_through_save() {
     let worksheet = format!(
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="{MAIN}"><dimension ref="A1"/><sheetData/><conditionalFormatting sqref="A1"><cfRule type="expression" priority="1"><formula>A1&gt;0</formula></cfRule></conditionalFormatting><hyperlinks><hyperlink ref="A1" location="Sheet1!A1" display="local"/></hyperlinks><rowBreaks count="1" manualBreakCount="1"><brk id="1" min="0" max="16383" man="1"/></rowBreaks><colBreaks count="1" manualBreakCount="1"><brk id="1" min="0" max="1048575" man="1"/></colBreaks></worksheet>"#
     )

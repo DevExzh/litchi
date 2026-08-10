@@ -47,9 +47,10 @@ assert_eq!(
 - Immutable, cheap-to-share `Document` snapshots for ordinary reads
 - Bounded source-checked `Document::edit()` transactions composing disjoint
   UTF-8 body spans, paragraph alignment, character bold ranges, ordinary
-  paragraph insertion, table-cell text, and header/footer text, with atomic
-  commits, reversible durable patches, deterministic sub-edit/three-way
-  composition and commit-coupled bounded history
+  paragraph insertion, table-cell text, header/footer text, comment bodies,
+  and footnote/endnote stories, with atomic commits, reversible durable
+  patches, deterministic sub-edit/three-way composition and commit-coupled
+  bounded history
 - Checked ordinary-root transfer plans for passive fields, nested table trees
   with inert drawings/breaks/cell fields, style dependency closures,
   picture-bullet lists with remapped shared pictures and overrides, and inert

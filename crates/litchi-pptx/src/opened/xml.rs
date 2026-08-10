@@ -1,6 +1,6 @@
 //! Namespace-aware, range-preserving XML edits for the transaction root.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
 use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
@@ -577,12 +577,61 @@ pub(crate) fn remap_shape_fragment(
             Event::Eof => break,
         }
     }
-    if depth != 0 || roots != 1 || remap.written_shape_ids.len() != shape_ids.len() {
+    if depth != 0 || roots != 1 || !remap.written_shape_ids.contains(&root_source_id) {
         return Err(invalid(
             "opened-presentation transferred shape must have one root and a complete identity map",
         ));
     }
     Ok(output)
+}
+
+pub(crate) fn connector_connection_ids(source: &[u8]) -> Result<BTreeSet<u32>> {
+    let mut reader = Reader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let mut connections = BTreeSet::new();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Start(element) | Event::Empty(element)
+                if matches!(element.local_name().as_ref(), b"stCxn" | b"endCxn") =>
+            {
+                let mut identity = None;
+                for attribute in element.attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    if attribute.key.as_ref() != b"id" {
+                        continue;
+                    }
+                    if identity.is_some() {
+                        return Err(invalid(
+                            "opened-presentation connector endpoint repeats its identity attribute",
+                        ));
+                    }
+                    let value = attribute
+                        .decoded_and_normalized_value(
+                            quick_xml::XmlVersion::Implicit1_0,
+                            reader.decoder(),
+                        )
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    identity = Some(value.parse::<u32>().map_err(|_err| {
+                        invalid("opened-presentation connector endpoint identity is invalid")
+                    })?);
+                }
+                connections.insert(identity.ok_or_else(|| {
+                    invalid("opened-presentation connector endpoint identity is missing")
+                })?);
+            },
+            Event::Decl(_) | Event::DocType(_) => {
+                return Err(invalid(
+                    "opened-presentation shape fragment contains document-level markup",
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(connections)
 }
 
 struct ShapeRemap<'a> {
@@ -616,13 +665,19 @@ fn write_remapped_shape_start(
         None
     };
     let mapped_identity = source_identity
-        .and_then(|source_id| {
+        .map(|source_id| {
             remap
                 .shape_ids
                 .get(&source_id)
                 .copied()
                 .map(|destination_id| (source_id, destination_id))
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "opened-presentation transferred shape identity {source_id} was not remapped"
+                    ))
+                })
         })
+        .transpose()?
         .map(|(source_id, destination_id)| {
             if !remap.written_shape_ids.insert(source_id) {
                 return Err(invalid(format!(
@@ -658,9 +713,12 @@ fn write_remapped_shape_start(
                 .shape_ids
                 .get(&connected_id)
                 .ok_or_else(|| {
-                    invalid(format!(
-                        "opened-presentation connector endpoint {connected_id} lies outside the transferred shape subtree"
-                    ))
+                    Error::ShapeTransfer {
+                        kind: crate::ShapeTransferRefusal::UnresolvedConnectorEndpoint,
+                        detail: format!(
+                            "connector endpoint {connected_id} lies outside the planned transfer closure"
+                        ),
+                    }
                 })?
                 .to_string()
         } else if key.starts_with(b"r:") && matches!(&key[2..], b"id" | b"embed" | b"link") {

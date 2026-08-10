@@ -456,7 +456,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
             Ok(Event::End(_)) => {
                 let depth = stack.len();
                 if active.as_ref().is_some_and(|state| state.depth == depth) {
-                    push_style(&mut styles, active.take().unwrap().style, &mut total)?;
+                    let state = active
+                        .take()
+                        .ok_or_else(|| bad("missing active paragraph writing-mode style"))?;
+                    push_style(&mut styles, state.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -595,7 +598,13 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                         missing_style_ns: missing_style_ns(&reader),
                         ..Default::default()
                     };
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    if active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target paragraph writing-mode style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
+                    {
                         return Err(bad("duplicate style:paragraph-properties"));
                     }
                 }
@@ -635,7 +644,13 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                         missing_style_ns: missing_style_ns(&reader),
                         ..span
                     };
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    if active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target paragraph writing-mode style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
+                    {
                         return Err(bad("duplicate style:paragraph-properties"));
                     }
                 }
@@ -651,7 +666,9 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                         .is_some_and(|span| span.end_start == 0)
                         && depth_target.is_some_and(|target| depth == target + 1)
                     {
-                        let span = spans.properties.as_mut().unwrap();
+                        let span = spans.properties.as_mut().ok_or_else(|| {
+                            bad("missing target paragraph writing-mode properties span")
+                        })?;
                         span.end_start = begin;
                     }
                     if depth_target == Some(depth) {
@@ -703,7 +720,11 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     if requested.properties.is_none() {
         return Ok(xml.to_owned());
     }
-    let fragment = requested.properties.as_ref().unwrap().to_xml_fragment()?;
+    let fragment = requested
+        .properties
+        .as_ref()
+        .ok_or_else(|| bad("missing requested paragraph writing-mode properties"))?
+        .to_xml_fragment()?;
     if spans.style.empty {
         return expand_span(xml, &spans.style, &fragment);
     }

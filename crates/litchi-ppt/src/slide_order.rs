@@ -426,14 +426,15 @@ impl Snapshot {
         donor.require_position(slide)?;
         let donor_slide = donor.document.slides()[slide.get()];
         let group = donor.document.edit().slide_group(slide.get())?;
-        let record = persisted_record(donor, donor_slide.persist_id())?;
-        let reused_dependencies = require_portable_slide(self, donor, &record)?;
+        let mut record = persisted_record(donor, donor_slide.persist_id())?;
+        let closure = require_portable_slide(self, donor, &mut record)?;
         let payload = slide_payload(group, record)?;
         require_master_closure(self, donor, payload.master_id)?;
         Ok(TransferPlan {
             target_artifact: artifact_hash(self.bytes()),
             payload: normalized_payload(&payload),
-            reused_dependencies,
+            reused_dependencies: closure.dependencies,
+            relationship_remaps: closure.remaps,
         })
     }
 
@@ -700,6 +701,36 @@ pub struct TransferPlan {
     target_artifact: String,
     payload: SlidePayload,
     reused_dependencies: Vec<TransferDependency>,
+    relationship_remaps: Vec<RelationshipRemap>,
+}
+
+/// One donor-native relationship ID rewritten to a semantically equivalent
+/// target-native relationship during bounded transfer planning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RelationshipRemap {
+    dependency: TransferDependency,
+    source_id: u32,
+    target_id: u32,
+}
+
+impl RelationshipRemap {
+    /// Owner family whose identifier is remapped.
+    #[must_use]
+    pub const fn dependency(self) -> TransferDependency {
+        self.dependency
+    }
+
+    /// Native donor identifier found in the slide.
+    #[must_use]
+    pub const fn source_id(self) -> u32 {
+        self.source_id
+    }
+
+    /// Semantically equivalent native identifier in the target.
+    #[must_use]
+    pub const fn target_id(self) -> u32 {
+        self.target_id
+    }
 }
 
 impl TransferPlan {
@@ -714,6 +745,20 @@ impl TransferPlan {
     #[must_use]
     pub fn reused_dependencies(&self) -> &[TransferDependency] {
         &self.reused_dependencies
+    }
+
+    /// Presentation-global owners resolved by semantic reuse or fixed-width
+    /// native-ID remapping for this plan.
+    #[must_use]
+    pub fn resolved_dependencies(&self) -> &[TransferDependency] {
+        &self.reused_dependencies
+    }
+
+    /// Native relationship rewrites already applied to the staged slide
+    /// payload. Identity mappings are omitted.
+    #[must_use]
+    pub fn relationship_remaps(&self) -> &[RelationshipRemap] {
+        &self.relationship_remaps
     }
 }
 
@@ -2280,6 +2325,7 @@ fn apply_durable_structural(
                 target_artifact: artifact.to_string(),
                 payload,
                 reused_dependencies: Vec::new(),
+                relationship_remaps: Vec::new(),
             };
             transaction.insert_transfer(position, &plan)
         },
@@ -2591,12 +2637,18 @@ fn slide_payload(group: Vec<crate::records::Record>, record: Vec<u8>) -> Result<
     })
 }
 
+struct TransferClosure {
+    dependencies: Vec<TransferDependency>,
+    remaps: Vec<RelationshipRemap>,
+}
+
 fn require_portable_slide(
     target: &Snapshot,
     donor: &Snapshot,
-    record: &[u8],
-) -> Result<Vec<TransferDependency>> {
-    let (root, consumed) = crate::Record::parse_with_limits(record, 0, RecordLimits::default())?;
+    record: &mut Vec<u8>,
+) -> Result<TransferClosure> {
+    let (mut root, consumed) =
+        crate::Record::parse_with_limits(record, 0, RecordLimits::default())?;
     if consumed != record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "slide transfer persist record is not one SlideContainer".into(),
@@ -2614,10 +2666,15 @@ fn require_portable_slide(
         }));
     }
     let mut reused = Vec::new();
-    if !crate::comments::parse_slide_comments(&root)?.is_empty() {
-        let donor_authors = crate::comments::Authors::parse(donor.document.record())?;
+    let comments = crate::comments::parse_slide_comments(&root)?;
+    if !comments.is_empty() {
         let target_authors = crate::comments::Authors::parse(target.document.record())?;
-        if donor_authors != target_authors {
+        if comments.iter().any(|comment| {
+            target_authors
+                .find(&comment.author)
+                .and_then(|author| author.comment_index_seed)
+                .is_none_or(|seed| comment.index > seed)
+        }) {
             return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
                 dependency: TransferDependency::CommentAuthorCatalog,
             }));
@@ -2625,112 +2682,105 @@ fn require_portable_slide(
         reused.push(TransferDependency::CommentAuthorCatalog);
     }
 
-    let mut interactions = Vec::new();
-    collect_interactions(&root, &mut interactions)?;
-    if interactions.iter().any(|interaction| {
-        matches!(
-            interaction.action,
-            crate::InteractionAction::Macro
-                | crate::InteractionAction::RunProgram
-                | crate::InteractionAction::Ole
-        )
-    }) {
+    let relationships = scan_slide_relationships(&root)?;
+    if relationships.active_action {
         return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
             dependency: TransferDependency::ActiveOrUnknownExternalObject,
         }));
     }
-    let has_hyperlink_action =
-        interactions.iter().any(|interaction| {
-            interaction.hyperlink_id != 0
-                || matches!(
-                    interaction.action,
-                    crate::InteractionAction::Hyperlink | crate::InteractionAction::CustomShow
-                )
-        }) || contains_record_type(&root, crate::RecordType::TextInteractiveInfoAtom);
-    if has_hyperlink_action {
-        if crate::Hyperlinks::parse(donor.document.record())?
-            != crate::Hyperlinks::parse(target.document.record())?
-        {
-            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-                dependency: TransferDependency::HyperlinkAction,
-            }));
-        }
+    let hyperlink_remaps = hyperlink_remaps(target, donor, &relationships.hyperlink_ids)?;
+    if !relationships.hyperlink_ids.is_empty() {
         reused.push(TransferDependency::HyperlinkAction);
     }
-    if interactions
-        .iter()
-        .any(|interaction| interaction.sound_id != 0)
-        && !record_owners_equal(
-            donor.document.record(),
-            target.document.record(),
-            crate::RecordType::SoundCollection,
-        )
-    {
-        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-            dependency: TransferDependency::ExternalObjectRelationship,
-        }));
+    let sound_remaps = sound_remaps(target, donor, &relationships.sound_ids)?;
+    if !relationships.sound_ids.is_empty() {
+        reused.push(TransferDependency::ExternalObjectRelationship);
     }
     let has_drawing = contains_record_type(&root, crate::RecordType::PPDrawing);
-    let has_external = contains_record_type(&root, crate::RecordType::ExternalObjectRefAtom)
-        || interactions
-            .iter()
-            .any(|interaction| interaction.action == crate::InteractionAction::Media);
+    let drawing_remaps = drawing_remaps(target, &relationships)?;
+    let has_external = !relationships.external_object_ids.is_empty();
+    let external_remaps =
+        external_object_remaps(target, donor, &relationships.external_object_ids)?;
     if has_external {
         if external_owner_contains_active_or_unknown(donor.document.record()) {
             return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
                 dependency: TransferDependency::ActiveOrUnknownExternalObject,
             }));
         }
-        if !record_owners_equal(
-            donor.document.record(),
-            target.document.record(),
-            crate::RecordType::ExObjList,
-        ) {
-            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-                dependency: TransferDependency::ExternalObjectRelationship,
-            }));
-        }
         reused.push(TransferDependency::ExternalObjectRelationship);
     }
+    rewrite_slide_relationships(
+        &mut root,
+        &hyperlink_remaps,
+        &sound_remaps,
+        &external_remaps,
+        &drawing_remaps,
+    )?;
+    *record = encode_record(&root)?;
     if has_drawing {
-        if !has_orphaned_persisted_record(target, record)? {
-            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-                dependency: TransferDependency::DrawingGroup,
-            }));
-        }
-        if !record_owners_equal(
-            donor.document.record(),
-            target.document.record(),
-            crate::RecordType::PPDrawingGroup,
-        ) {
-            return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
-                dependency: TransferDependency::DrawingGroup,
-            }));
-        }
         reused.push(TransferDependency::DrawingGroup);
     }
     reused.sort_by_key(|dependency| transfer_dependency_order(*dependency));
     reused.dedup();
-    Ok(reused)
+    let mut remaps = relationship_remaps(
+        &hyperlink_remaps,
+        &sound_remaps,
+        &external_remaps,
+        &drawing_remaps,
+    );
+    remaps.sort_by_key(|remap| {
+        (
+            transfer_dependency_order(remap.dependency),
+            remap.source_id,
+            remap.target_id,
+        )
+    });
+    Ok(TransferClosure {
+        dependencies: reused,
+        remaps,
+    })
 }
 
-fn has_orphaned_persisted_record(target: &Snapshot, record: &[u8]) -> Result<bool> {
-    let live_ids = target
-        .document
-        .slides()
-        .iter()
-        .map(|slide| slide.persist_id())
-        .collect::<BTreeSet<_>>();
-    let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-        target.bytes.clone(),
-        target.limits.max_package_bytes,
-    )?;
-    Ok(editor.persist_ids().into_iter().any(|persist_id| {
-        !live_ids.contains(&persist_id)
-            && editor
-                .persisted_record(persist_id)
-                .is_ok_and(|candidate| candidate == record)
-    }))
+fn relationship_remaps(
+    hyperlinks: &BTreeMap<u32, u32>,
+    sounds: &BTreeMap<u32, u32>,
+    external_objects: &BTreeMap<u32, u32>,
+    drawings: &BTreeMap<u32, u32>,
+) -> Vec<RelationshipRemap> {
+    let mut output = Vec::new();
+    output.extend(hyperlinks.iter().filter_map(|(source_id, target_id)| {
+        (source_id != target_id).then_some(RelationshipRemap {
+            dependency: TransferDependency::HyperlinkAction,
+            source_id: *source_id,
+            target_id: *target_id,
+        })
+    }));
+    output.extend(sounds.iter().filter_map(|(source_id, target_id)| {
+        (source_id != target_id).then_some(RelationshipRemap {
+            dependency: TransferDependency::ExternalObjectRelationship,
+            source_id: *source_id,
+            target_id: *target_id,
+        })
+    }));
+    output.extend(
+        external_objects
+            .iter()
+            .filter_map(|(source_id, target_id)| {
+                (source_id != target_id).then_some(RelationshipRemap {
+                    dependency: TransferDependency::ExternalObjectRelationship,
+                    source_id: *source_id,
+                    target_id: *target_id,
+                })
+            }),
+    );
+    output.extend(drawings.iter().filter_map(|(source_id, target_id)| {
+        (source_id != target_id).then_some(RelationshipRemap {
+            dependency: TransferDependency::DrawingGroup,
+            source_id: *source_id,
+            target_id: *target_id,
+        })
+    }));
+    output
 }
 
 fn read_payload_u32(bytes: &[u8], offset: usize) -> Result<u32> {
@@ -2749,30 +2799,665 @@ fn contains_record_type(record: &crate::Record, target: crate::RecordType) -> bo
             .any(|child| contains_record_type(child, target))
 }
 
-fn collect_interactions(
-    record: &crate::Record,
-    output: &mut Vec<crate::Interaction>,
-) -> Result<()> {
-    if record.record_type == crate::RecordType::InteractiveInfo {
-        output.push(crate::Interaction::parse(record)?);
-        return Ok(());
+#[derive(Default)]
+struct SlideRelationships {
+    hyperlink_ids: BTreeSet<u32>,
+    sound_ids: BTreeSet<u32>,
+    external_object_ids: BTreeSet<u32>,
+    shape_ids: BTreeSet<u32>,
+    active_action: bool,
+    unsafe_drawing_reference: bool,
+}
+
+fn scan_slide_relationships(root: &crate::Record) -> Result<SlideRelationships> {
+    let mut relationships = SlideRelationships::default();
+    scan_ppt_record(root, &mut relationships)?;
+    Ok(relationships)
+}
+
+fn scan_ppt_record(record: &crate::Record, output: &mut SlideRelationships) -> Result<()> {
+    if record.record_type == crate::RecordType::InteractiveInfoAtom {
+        scan_interactive_atom(&record.data, output)?;
+    } else if record.record_type == crate::RecordType::ExternalObjectRefAtom {
+        scan_external_reference(&record.data, output)?;
+    } else if record.record_type == crate::RecordType::PPDrawing {
+        scan_officeart_records(&record.data, output)?;
+    } else if record.record_type == crate::RecordType::BinaryTagData {
+        scan_host_records(&record.data, output)?;
+    } else if matches!(
+        record.record_type,
+        crate::RecordType::AnimationInfo
+            | crate::RecordType::BuildList
+            | crate::RecordType::ChartBuild
+            | crate::RecordType::DiagramBuild
+            | crate::RecordType::ParaBuild
+    ) {
+        output.unsafe_drawing_reference = true;
     }
     for child in &record.children {
-        collect_interactions(child, output)?;
+        scan_ppt_record(child, output)?;
     }
     Ok(())
 }
 
-fn record_owners_equal(
-    donor: &crate::Record,
-    target: &crate::Record,
-    owner: crate::RecordType,
+fn option_has_blip_reference(instance: u16, payload: &[u8]) -> Result<bool> {
+    let property_bytes = usize::from(instance)
+        .checked_mul(6)
+        .ok_or_else(|| PackageError::Corrupted("OfficeArt property count overflow".into()))?;
+    let properties = payload
+        .get(..property_bytes)
+        .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
+    Ok(properties
+        .chunks_exact(6)
+        .any(|property| u16::from_le_bytes([property[0], property[1]]) & 0x4000 != 0))
+}
+
+fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTreeMap<u32, u32>> {
+    if donor.shape_ids.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    if donor.unsafe_drawing_reference {
+        return Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::DrawingGroup,
+        }));
+    }
+    let live_persist_ids = target
+        .document
+        .slides()
+        .iter()
+        .map(|slide| slide.persist_id())
+        .collect::<BTreeSet<_>>();
+    let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        target.bytes.clone(),
+        target.limits.max_package_bytes,
+    )?;
+    let mut live_shape_ids = BTreeSet::new();
+    let mut available_shape_ids = BTreeSet::new();
+    for persist_id in editor.persist_ids() {
+        let Ok(bytes) = editor.persisted_record(persist_id) else {
+            continue;
+        };
+        let Ok((root, consumed)) = crate::Record::parse_with_limits(&bytes, 0, target.limits)
+        else {
+            continue;
+        };
+        if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
+            continue;
+        }
+        let relationships = scan_slide_relationships(&root)?;
+        if live_persist_ids.contains(&persist_id) {
+            live_shape_ids.extend(relationships.shape_ids);
+        } else {
+            available_shape_ids.extend(relationships.shape_ids);
+        }
+    }
+    available_shape_ids.retain(|shape_id| !live_shape_ids.contains(shape_id));
+    let mut clusters = BTreeMap::<u32, BTreeSet<u32>>::new();
+    for shape_id in available_shape_ids {
+        clusters.entry(shape_id >> 10).or_default().insert(shape_id);
+    }
+    let mut remaining = clusters
+        .into_values()
+        .find(|cluster| cluster.len() >= donor.shape_ids.len())
+        .ok_or(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::DrawingGroup,
+        }))?;
+    let mut remaps = BTreeMap::new();
+    for source_id in &donor.shape_ids {
+        let target_id = if remaining.remove(source_id) {
+            *source_id
+        } else {
+            let candidate = remaining.iter().next().copied().ok_or(Error::Refused(
+                Refusal::UnsupportedSlideDependency {
+                    dependency: TransferDependency::DrawingGroup,
+                },
+            ))?;
+            remaining.remove(&candidate);
+            candidate
+        };
+        remaps.insert(*source_id, target_id);
+    }
+    Ok(remaps)
+}
+
+fn scan_officeart_records(bytes: &[u8], output: &mut SlideRelationships) -> Result<()> {
+    visit_raw_records(
+        bytes,
+        "OfficeArt drawing",
+        |version, instance, kind, payload| {
+            match kind {
+                0xF00A => {
+                    output.shape_ids.insert(read_payload_u32(payload, 0)?);
+                },
+                0xF00B if option_has_blip_reference(instance, payload)? => {
+                    output.unsafe_drawing_reference = true;
+                },
+                0xF012 => output.unsafe_drawing_reference = true,
+                0xF00D | 0xF011 => scan_host_records(payload, output)?,
+                _ if version == 0x0f => scan_officeart_records(payload, output)?,
+                _ => {},
+            }
+            Ok(())
+        },
+    )
+}
+
+fn scan_host_records(bytes: &[u8], output: &mut SlideRelationships) -> Result<()> {
+    visit_raw_records(
+        bytes,
+        "PowerPoint host records",
+        |_version, _instance, kind, payload| {
+            let record_type = crate::RecordType::from(kind);
+            if record_type == crate::RecordType::InteractiveInfoAtom {
+                scan_interactive_atom(payload, output)?;
+            } else if record_type == crate::RecordType::ExternalObjectRefAtom {
+                scan_external_reference(payload, output)?;
+            } else if record_type == crate::RecordType::InteractiveInfo {
+                scan_host_records(payload, output)?;
+            } else if matches!(
+                record_type,
+                crate::RecordType::AnimationInfo
+                    | crate::RecordType::BuildList
+                    | crate::RecordType::ChartBuild
+                    | crate::RecordType::DiagramBuild
+                    | crate::RecordType::ParaBuild
+            ) {
+                output.unsafe_drawing_reference = true;
+            }
+            Ok(())
+        },
+    )
+}
+
+fn scan_interactive_atom(bytes: &[u8], output: &mut SlideRelationships) -> Result<()> {
+    let atom = crate::InteractiveInfoAtom::parse_payload(bytes)?;
+    if atom.hyperlink_id != 0 {
+        output.hyperlink_ids.insert(atom.hyperlink_id);
+    }
+    if atom.sound_id != 0 {
+        output.sound_ids.insert(atom.sound_id);
+    }
+    if matches!(
+        atom.action,
+        crate::InteractionAction::Macro
+            | crate::InteractionAction::RunProgram
+            | crate::InteractionAction::Ole
+    ) {
+        output.active_action = true;
+    }
+    Ok(())
+}
+
+fn scan_external_reference(bytes: &[u8], output: &mut SlideRelationships) -> Result<()> {
+    let id = read_payload_u32(bytes, 0)?;
+    if bytes.len() != 4 || id == 0 {
+        return Err(PackageError::Corrupted(
+            "PPT ExternalObjectRefAtom has an invalid payload".into(),
+        )
+        .into());
+    }
+    output.external_object_ids.insert(id);
+    Ok(())
+}
+
+fn hyperlink_remaps(
+    target: &Snapshot,
+    donor: &Snapshot,
+    references: &BTreeSet<u32>,
+) -> Result<BTreeMap<u32, u32>> {
+    let donor_links = crate::Hyperlinks::parse(donor.document.record())?;
+    let target_links = crate::Hyperlinks::parse(target.document.record())?;
+    references
+        .iter()
+        .map(|source_id| {
+            let source = donor_links.get(*source_id).ok_or_else(|| {
+                PackageError::Corrupted(format!(
+                    "PPT slide references missing donor hyperlink {source_id}"
+                ))
+            })?;
+            let target_id = target_links
+                .hyperlinks
+                .iter()
+                .find(|candidate| hyperlink_semantics_equal(source, candidate))
+                .map(|candidate| candidate.id)
+                .ok_or(Error::Refused(Refusal::UnsupportedSlideDependency {
+                    dependency: TransferDependency::HyperlinkAction,
+                }))?;
+            Ok((*source_id, target_id))
+        })
+        .collect()
+}
+
+fn hyperlink_semantics_equal(left: &crate::Hyperlink, right: &crate::Hyperlink) -> bool {
+    left.friendly_name == right.friendly_name
+        && left.target == right.target
+        && left.location == right.location
+        && left.extension == right.extension
+}
+
+fn sound_remaps(
+    target: &Snapshot,
+    donor: &Snapshot,
+    references: &BTreeSet<u32>,
+) -> Result<BTreeMap<u32, u32>> {
+    if references.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let donor_owner =
+        unique_record_owner(donor.document.record(), crate::RecordType::SoundCollection)?;
+    let target_owner =
+        unique_record_owner(target.document.record(), crate::RecordType::SoundCollection)?;
+    let donor_sounds = crate::sound_collection::Collection::parse(donor_owner)?;
+    let target_sounds = crate::sound_collection::Collection::parse(target_owner)?;
+    references
+        .iter()
+        .map(|source_id| {
+            let source = donor_sounds.get(*source_id).ok_or_else(|| {
+                PackageError::Corrupted(format!(
+                    "PPT slide references missing donor sound {source_id}"
+                ))
+            })?;
+            let target_id = target_sounds
+                .sounds
+                .iter()
+                .find(|candidate| sound_semantics_equal(source, candidate))
+                .map(|candidate| candidate.id)
+                .ok_or(Error::Refused(Refusal::UnsupportedSlideDependency {
+                    dependency: TransferDependency::ExternalObjectRelationship,
+                }))?;
+            Ok((*source_id, target_id))
+        })
+        .collect()
+}
+
+fn sound_semantics_equal(
+    left: &crate::sound_collection::Sound<'_>,
+    right: &crate::sound_collection::Sound<'_>,
 ) -> bool {
-    let mut donor_records = Vec::new();
-    let mut target_records = Vec::new();
-    collect_record_owners(donor, owner, &mut donor_records);
-    collect_record_owners(target, owner, &mut target_records);
-    !donor_records.is_empty() && donor_records == target_records
+    left.name == right.name
+        && left.extension == right.extension
+        && left.builtin_id == right.builtin_id
+        && left.data == right.data
+}
+
+fn unique_record_owner(root: &crate::Record, owner: crate::RecordType) -> Result<&crate::Record> {
+    let mut records = Vec::new();
+    collect_record_owners(root, owner, &mut records);
+    match records.as_slice() {
+        [record] => Ok(*record),
+        [] => Err(Error::Refused(Refusal::UnsupportedSlideDependency {
+            dependency: TransferDependency::ExternalObjectRelationship,
+        })),
+        _ => Err(PackageError::Corrupted(format!(
+            "PPT document contains multiple {owner:?} owners"
+        ))
+        .into()),
+    }
+}
+
+fn external_object_remaps(
+    target: &Snapshot,
+    donor: &Snapshot,
+    references: &BTreeSet<u32>,
+) -> Result<BTreeMap<u32, u32>> {
+    if references.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let donor_media = external_media_snapshot(donor)?;
+    let target_media = external_media_snapshot(target)?;
+    let donor_collection =
+        donor_media
+            .collection()
+            .ok_or(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::ActiveOrUnknownExternalObject,
+            }))?;
+    let target_collection =
+        target_media
+            .collection()
+            .ok_or(Error::Refused(Refusal::UnsupportedSlideDependency {
+                dependency: TransferDependency::ExternalObjectRelationship,
+            }))?;
+    references
+        .iter()
+        .map(|source_id| {
+            let source = donor_collection.get(*source_id).ok_or(Error::Refused(
+                Refusal::UnsupportedSlideDependency {
+                    dependency: TransferDependency::ActiveOrUnknownExternalObject,
+                },
+            ))?;
+            let target_id = target_collection
+                .objects
+                .iter()
+                .find(|candidate| media_semantics_equal(source, candidate))
+                .map(crate::external_media::Object::id)
+                .ok_or(Error::Refused(Refusal::UnsupportedSlideDependency {
+                    dependency: TransferDependency::ExternalObjectRelationship,
+                }))?;
+            Ok((*source_id, target_id))
+        })
+        .collect()
+}
+
+fn media_semantics_equal(
+    left: &crate::external_media::Object,
+    right: &crate::external_media::Object,
+) -> bool {
+    use crate::external_media::Object;
+    match (left, right) {
+        (Object::Movie(left_movie), Object::Movie(right_movie)) => {
+            left_movie.kind == right_movie.kind
+                && left_movie.video.path == right_movie.video.path
+                && media_values_equal(left_movie.video.media, right_movie.video.media)
+        },
+        (Object::LinkedAudio(left_audio), Object::LinkedAudio(right_audio)) => {
+            left_audio.kind == right_audio.kind
+                && left_audio.path == right_audio.path
+                && media_values_equal(left_audio.media, right_audio.media)
+        },
+        (Object::CdAudio(left_cd), Object::CdAudio(right_cd)) => {
+            left_cd.start == right_cd.start
+                && left_cd.end == right_cd.end
+                && media_values_equal(left_cd.media, right_cd.media)
+        },
+        (Object::EmbeddedWav(left_wav), Object::EmbeddedWav(right_wav)) => {
+            left_wav.sound_id == right_wav.sound_id
+                && left_wav.duration_ms == right_wav.duration_ms
+                && media_values_equal(left_wav.media, right_wav.media)
+        },
+        _ => false,
+    }
+}
+
+fn media_values_equal(
+    left: crate::external_media::Media,
+    right: crate::external_media::Media,
+) -> bool {
+    left.loop_playback == right.loop_playback
+        && left.rewind_after_playing == right.rewind_after_playing
+        && left.narration == right.narration
+        && left.unused == right.unused
+}
+
+fn rewrite_slide_relationships(
+    root: &mut crate::Record,
+    hyperlinks: &BTreeMap<u32, u32>,
+    sounds: &BTreeMap<u32, u32>,
+    external_objects: &BTreeMap<u32, u32>,
+    drawings: &BTreeMap<u32, u32>,
+) -> Result<()> {
+    if root.record_type == crate::RecordType::InteractiveInfoAtom {
+        rewrite_interactive_atom(&mut root.data, hyperlinks, sounds)?;
+    } else if root.record_type == crate::RecordType::ExternalObjectRefAtom {
+        rewrite_external_reference(&mut root.data, external_objects)?;
+    } else if root.record_type == crate::RecordType::RoundTripShapeId12Atom {
+        rewrite_u32_reference(&mut root.data, drawings, "RoundTripShapeId12Atom")?;
+    } else if root.record_type == crate::RecordType::BinaryTagData {
+        rewrite_host_records(
+            &mut root.data,
+            hyperlinks,
+            sounds,
+            external_objects,
+            drawings,
+        )?;
+    } else if root.record_type == crate::RecordType::PPDrawing {
+        rewrite_officeart_records(
+            {
+                rewrite_officeart_drawing_identity(&mut root.data, drawings)?;
+                &mut root.data
+            },
+            hyperlinks,
+            sounds,
+            external_objects,
+            drawings,
+        )?;
+    }
+    for child in &mut root.children {
+        rewrite_slide_relationships(child, hyperlinks, sounds, external_objects, drawings)?;
+    }
+    Ok(())
+}
+
+fn rewrite_officeart_drawing_identity(
+    bytes: &mut [u8],
+    drawings: &BTreeMap<u32, u32>,
+) -> Result<()> {
+    if drawings.is_empty() {
+        return Ok(());
+    }
+    let mut drawing_groups = drawings.values().map(|shape_id| shape_id >> 10);
+    let drawing_group = drawing_groups
+        .next()
+        .filter(|drawing_group| *drawing_group != 0 && *drawing_group <= 0x0fff)
+        .ok_or_else(|| PackageError::Corrupted("PPT target drawing ID is invalid".into()))?;
+    if drawing_groups.any(|candidate| candidate != drawing_group) {
+        return Err(PackageError::Corrupted(
+            "PPT drawing remap spans multiple target drawing groups".into(),
+        )
+        .into());
+    }
+    let spid_cur = drawings
+        .values()
+        .copied()
+        .max()
+        .and_then(|value| value.checked_add(1))
+        .ok_or_else(|| PackageError::Corrupted("PPT target shape ID overflow".into()))?;
+    let mut rewritten = 0usize;
+    rewrite_officeart_dg_records(
+        bytes,
+        u16::try_from(drawing_group)
+            .map_err(|_error| PackageError::Corrupted("PPT drawing ID exceeds u16".into()))?,
+        spid_cur,
+        &mut rewritten,
+    )?;
+    if rewritten != 1 {
+        return Err(PackageError::Corrupted(
+            "PPT ordinary drawing must contain exactly one OfficeArtDg atom".into(),
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn rewrite_officeart_dg_records(
+    bytes: &mut [u8],
+    drawing_group: u16,
+    spid_cur: u32,
+    rewritten: &mut usize,
+) -> Result<()> {
+    let mut offset = 0usize;
+    while offset < bytes.len() {
+        let (version, _instance, kind, payload_start, end) =
+            raw_record_bounds(bytes, offset, "OfficeArt drawing")?;
+        if kind == 0xF008 {
+            let payload = bytes.get_mut(payload_start..end).ok_or_else(|| {
+                PackageError::Corrupted("OfficeArtDg payload is truncated".into())
+            })?;
+            if payload.len() != 8 {
+                return Err(PackageError::Corrupted(
+                    "OfficeArtDg payload must contain eight bytes".into(),
+                )
+                .into());
+            }
+            let header = (drawing_group << 4) | version;
+            bytes[offset..offset + 2].copy_from_slice(&header.to_le_bytes());
+            bytes[payload_start + 4..payload_start + 8].copy_from_slice(&spid_cur.to_le_bytes());
+            *rewritten = rewritten.saturating_add(1);
+        } else if version == 0x0f {
+            rewrite_officeart_dg_records(
+                &mut bytes[payload_start..end],
+                drawing_group,
+                spid_cur,
+                rewritten,
+            )?;
+        }
+        offset = end;
+    }
+    Ok(())
+}
+
+fn rewrite_officeart_records(
+    bytes: &mut [u8],
+    hyperlinks: &BTreeMap<u32, u32>,
+    sounds: &BTreeMap<u32, u32>,
+    external_objects: &BTreeMap<u32, u32>,
+    drawings: &BTreeMap<u32, u32>,
+) -> Result<()> {
+    visit_raw_records_mut(
+        bytes,
+        "OfficeArt drawing",
+        |version, _instance, kind, payload| {
+            match kind {
+                0xF00A => rewrite_u32_reference(payload, drawings, "OfficeArtSp.spid")?,
+                0xF00D | 0xF011 => {
+                    rewrite_host_records(payload, hyperlinks, sounds, external_objects, drawings)?;
+                },
+                _ if version == 0x0f => {
+                    rewrite_officeart_records(
+                        payload,
+                        hyperlinks,
+                        sounds,
+                        external_objects,
+                        drawings,
+                    )?;
+                },
+                _ => {},
+            }
+            Ok(())
+        },
+    )
+}
+
+fn rewrite_host_records(
+    bytes: &mut [u8],
+    hyperlinks: &BTreeMap<u32, u32>,
+    sounds: &BTreeMap<u32, u32>,
+    external_objects: &BTreeMap<u32, u32>,
+    drawings: &BTreeMap<u32, u32>,
+) -> Result<()> {
+    visit_raw_records_mut(
+        bytes,
+        "PowerPoint host records",
+        |_version, _instance, kind, payload| {
+            let record_type = crate::RecordType::from(kind);
+            if record_type == crate::RecordType::InteractiveInfoAtom {
+                rewrite_interactive_atom(payload, hyperlinks, sounds)?;
+            } else if record_type == crate::RecordType::ExternalObjectRefAtom {
+                rewrite_external_reference(payload, external_objects)?;
+            } else if record_type == crate::RecordType::RoundTripShapeId12Atom {
+                rewrite_u32_reference(payload, drawings, "RoundTripShapeId12Atom")?;
+            } else if record_type == crate::RecordType::InteractiveInfo {
+                rewrite_host_records(payload, hyperlinks, sounds, external_objects, drawings)?;
+            }
+            Ok(())
+        },
+    )
+}
+
+fn rewrite_interactive_atom(
+    bytes: &mut [u8],
+    hyperlinks: &BTreeMap<u32, u32>,
+    sounds: &BTreeMap<u32, u32>,
+) -> Result<()> {
+    let mut atom = crate::InteractiveInfoAtom::parse_payload(bytes)?;
+    if let Some(id) = sounds.get(&atom.sound_id) {
+        atom.sound_id = *id;
+    }
+    if let Some(id) = hyperlinks.get(&atom.hyperlink_id) {
+        atom.hyperlink_id = *id;
+    }
+    bytes.copy_from_slice(&atom.to_payload());
+    Ok(())
+}
+
+fn rewrite_external_reference(bytes: &mut [u8], remaps: &BTreeMap<u32, u32>) -> Result<()> {
+    let id = read_payload_u32(bytes, 0)?;
+    if bytes.len() != 4 || id == 0 {
+        return Err(PackageError::Corrupted(
+            "PPT ExternalObjectRefAtom has an invalid payload".into(),
+        )
+        .into());
+    }
+    if let Some(replacement) = remaps.get(&id) {
+        bytes.copy_from_slice(&replacement.to_le_bytes());
+    }
+    Ok(())
+}
+
+fn rewrite_u32_reference(
+    bytes: &mut [u8],
+    remaps: &BTreeMap<u32, u32>,
+    context: &str,
+) -> Result<()> {
+    if bytes.len() < 4 {
+        return Err(
+            PackageError::Corrupted(format!("PPT {context} reference is truncated")).into(),
+        );
+    }
+    let id = read_payload_u32(bytes, 0)?;
+    if let Some(replacement) = remaps.get(&id) {
+        bytes[0..4].copy_from_slice(&replacement.to_le_bytes());
+    }
+    Ok(())
+}
+
+fn visit_raw_records(
+    bytes: &[u8],
+    context: &str,
+    mut visit: impl FnMut(u16, u16, u16, &[u8]) -> Result<()>,
+) -> Result<()> {
+    let mut offset = 0usize;
+    while offset < bytes.len() {
+        let (version, instance, kind, payload_start, end) =
+            raw_record_bounds(bytes, offset, context)?;
+        visit(version, instance, kind, &bytes[payload_start..end])?;
+        offset = end;
+    }
+    Ok(())
+}
+
+fn visit_raw_records_mut(
+    bytes: &mut [u8],
+    context: &str,
+    mut visit: impl FnMut(u16, u16, u16, &mut [u8]) -> Result<()>,
+) -> Result<()> {
+    let mut offset = 0usize;
+    while offset < bytes.len() {
+        let (version, instance, kind, payload_start, end) =
+            raw_record_bounds(bytes, offset, context)?;
+        visit(version, instance, kind, &mut bytes[payload_start..end])?;
+        offset = end;
+    }
+    Ok(())
+}
+
+fn raw_record_bounds(
+    bytes: &[u8],
+    offset: usize,
+    context: &str,
+) -> Result<(u16, u16, u16, usize, usize)> {
+    let header_end = offset
+        .checked_add(8)
+        .ok_or_else(|| PackageError::Corrupted(format!("{context} header offset overflow")))?;
+    let header = bytes
+        .get(offset..header_end)
+        .ok_or_else(|| PackageError::Corrupted(format!("truncated record header in {context}")))?;
+    let version_instance = u16::from_le_bytes([header[0], header[1]]);
+    let kind = u16::from_le_bytes([header[2], header[3]]);
+    let length = usize::try_from(u32::from_le_bytes([
+        header[4], header[5], header[6], header[7],
+    ]))
+    .map_err(|_error| PackageError::Corrupted(format!("{context} record size overflow")))?;
+    let end = header_end
+        .checked_add(length)
+        .filter(|end| *end <= bytes.len())
+        .ok_or_else(|| PackageError::Corrupted(format!("record extends beyond {context}")))?;
+    Ok((
+        version_instance & 0x0f,
+        version_instance >> 4,
+        kind,
+        header_end,
+        end,
+    ))
 }
 
 fn collect_record_owners<'a>(
@@ -2915,6 +3600,20 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
                     "slide-list/position:{}",
                     list_change.position.get()
                 ));
+                if let Ok((root, consumed)) = crate::Record::parse_with_limits(
+                    &list_change.payload.record,
+                    0,
+                    RecordLimits::default(),
+                ) && consumed == list_change.payload.record.len()
+                    && let Ok(relationships) = scan_slide_relationships(&root)
+                {
+                    effects.extend(
+                        relationships
+                            .shape_ids
+                            .into_iter()
+                            .map(|shape_id| format!("drawing/shape-id:{shape_id}")),
+                    );
+                }
             },
         }
     }
@@ -3597,5 +4296,91 @@ mod tests {
                 .reused_dependencies()
                 .contains(&TransferDependency::CommentAuthorCatalog)
         );
+    }
+
+    #[test]
+    fn ordinary_drawing_transfer_remaps_into_target_owned_orphan_ids() {
+        let donor = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let mut remove = donor.edit().unwrap();
+        remove.remove_slide(Position::new(1)).unwrap();
+        let receiver = remove.commit().unwrap().snapshot().clone();
+        let plan = receiver
+            .plan_transfer_from(&donor, Position::new(0))
+            .unwrap();
+        assert!(plan.relationship_remaps().iter().any(|remap| {
+            remap.dependency() == TransferDependency::DrawingGroup
+                && remap.source_id() != remap.target_id()
+        }));
+
+        let mut edit = receiver.edit().unwrap();
+        edit.insert_transfer(Position::new(1), &plan).unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.snapshot().slide_count(), 2);
+        assert_eq!(
+            slide_texts(commit.snapshot().bytes())[0],
+            slide_texts(commit.snapshot().bytes())[1]
+        );
+        let mut reopened = Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+        assert_eq!(reopened.presentation().unwrap().slide_count(), 2);
+
+        let durable = commit.patch().to_durable(transfer_patch_limits()).unwrap();
+        let applied = receiver.apply_durable(&durable).unwrap();
+        assert_eq!(applied.slide_count(), 2);
+        let restored = applied.apply_durable(&durable.inverse()).unwrap();
+        assert_eq!(restored.slide_count(), 1);
+        assert_eq!(
+            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            receiver
+        );
+
+        let mut left = receiver.edit().unwrap();
+        left.insert_transfer(Position::new(0), &plan).unwrap();
+        let left = left.commit().unwrap();
+        let mut right = receiver.edit().unwrap();
+        right.insert_transfer(Position::new(1), &plan).unwrap();
+        let right = right.commit().unwrap();
+        let merge = receiver
+            .plan_three_way(left.patch(), right.patch())
+            .unwrap();
+        assert!(
+            merge
+                .conflicts()
+                .iter()
+                .any(|conflict| conflict.target().starts_with("drawing/shape-id:"))
+        );
+    }
+
+    #[test]
+    fn relationship_atom_remapping_is_fixed_width_and_fail_closed() {
+        let mut atom = crate::InteractiveInfoAtom {
+            sound_id: 7,
+            hyperlink_id: 11,
+            action: crate::InteractionAction::Hyperlink,
+            ole_verb: 0,
+            jump: crate::InteractionJump::None,
+            animated: false,
+            stop_sound: false,
+            custom_show_return: false,
+            visited: false,
+            link_target: crate::InteractionLinkTarget::Url,
+            unused: [0; 3],
+        }
+        .to_payload();
+        rewrite_interactive_atom(
+            &mut atom,
+            &BTreeMap::from([(11, 101)]),
+            &BTreeMap::from([(7, 107)]),
+        )
+        .unwrap();
+        let parsed = crate::InteractiveInfoAtom::parse_payload(&atom).unwrap();
+        assert_eq!(parsed.hyperlink_id, 101);
+        assert_eq!(parsed.sound_id, 107);
+        assert_eq!(atom.len(), 16);
+
+        let mut active = atom;
+        active[8] = 5;
+        let mut relationships = SlideRelationships::default();
+        scan_interactive_atom(&active, &mut relationships).unwrap();
+        assert!(relationships.active_action);
     }
 }

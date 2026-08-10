@@ -341,7 +341,7 @@ pub fn parse_graphic_style_properties(xml: &str) -> Result<Styles> {
                             .style
                             .properties
                             .as_ref()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing graphic properties"))?
                             .child(kind)
                             .is_some()
                         {
@@ -397,7 +397,7 @@ pub fn parse_graphic_style_properties(xml: &str) -> Result<Styles> {
                             .style
                             .properties
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing graphic properties"))?
                             .set_child(child)
                             .is_some()
                         {
@@ -437,16 +437,27 @@ pub fn parse_graphic_style_properties(xml: &str) -> Result<Styles> {
                         .as_ref()
                         .is_some_and(|(_, child_depth, _)| *child_depth == depth)
                     {
-                        let (kind, _, begin) = value.child.take().unwrap();
+                        let (kind, _, begin) = value
+                            .child
+                            .take()
+                            .ok_or_else(|| bad("missing active graphic property child"))?;
                         let child = Child::new(kind, &xml[begin..end])?;
-                        value.style.properties.as_mut().unwrap().set_child(child);
+                        value
+                            .style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing graphic properties"))?
+                            .set_child(child);
                     }
                     if value.property_depth == Some(depth) {
                         value.property_depth = None;
                     }
                 }
                 if active.as_ref().is_some_and(|value| value.depth == depth) {
-                    push(&mut out, active.take().unwrap().style, &mut total)?;
+                    let value = active
+                        .take()
+                        .ok_or_else(|| bad("missing active graphic style"))?;
+                    push(&mut out, value.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -548,7 +559,13 @@ pub fn set_graphic_style_properties_xml(xml: &str, requested: &Style) -> Result<
                         qname: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
                         ..Default::default()
                     };
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    if active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target graphic style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
+                    {
                         return Err(bad("duplicate style:graphic-properties"));
                     }
                 }
@@ -588,7 +605,12 @@ pub fn set_graphic_style_properties_xml(xml: &str, requested: &Style) -> Result<
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == ElementNs::Style
                     && current.1 == b"graphic-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                    && active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target graphic style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
                 {
                     return Err(bad("duplicate style:graphic-properties"));
                 }
@@ -601,7 +623,10 @@ pub fn set_graphic_style_properties_xml(xml: &str, requested: &Style) -> Result<
                     if spans.properties.as_ref().is_some_and(|span| span.end == 0)
                         && target_depth.is_some_and(|d| depth == d + 1)
                     {
-                        let span = spans.properties.as_mut().unwrap();
+                        let span = spans
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target graphic properties span"))?;
                         span.end_start = begin;
                         span.end = end;
                     }

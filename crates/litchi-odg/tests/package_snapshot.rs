@@ -3,8 +3,10 @@
     reason = "tests are expected to panic on unexpected fixture failures"
 )]
 
+use litchi_odf_common::core::PackageWriter;
 use litchi_odg::Drawing;
 use soapberry_zip::office::StreamingArchiveWriter;
+use std::fmt::Write as _;
 
 const CONTENT: &str =
     include_str!("../../../test-data/odf/odg/drawing-style-resources-content.xml");
@@ -191,5 +193,101 @@ fn complex_real_nested_group_geometry_change_reopens_and_inverts_exactly() {
             .unwrap()
             .as_bytes(),
         drawing.as_bytes()
+    );
+}
+
+#[test]
+fn genuine_complex_group_transfer_remaps_all_colliding_dependency_families() {
+    let bytes = REAL_DRAW_CORPUS
+        .iter()
+        .find_map(|(name, bytes)| (*name == "complex-groups").then_some(*bytes))
+        .unwrap();
+    let source = Drawing::from_bytes(bytes.to_vec()).unwrap();
+    let group_shape = source.pages()[0]
+        .shapes()
+        .iter()
+        .enumerate()
+        .filter(|(_, shape)| shape.kind() == litchi_odg::shape::ShapeKind::Group)
+        .max_by_key(|(position, _shape)| source.group(0, *position).unwrap().descendants().len())
+        .map(|(position, _shape)| position)
+        .unwrap();
+    let transfer = source
+        .snapshot()
+        .prepare_shape_transfer(0, group_shape)
+        .unwrap();
+    assert!(source.group(0, group_shape).unwrap().descendants().len() >= 3);
+
+    let mut automatic_styles = String::new();
+    for resource in transfer.style_resources() {
+        let named_resource = resource.resource();
+        write!(
+            automatic_styles,
+            "<draw:{} draw:name=\"{}\" draw:display-name=\"destination collision\"/>",
+            named_resource.kind().element(),
+            quick_xml::escape::escape(named_resource.name())
+        )
+        .unwrap();
+    }
+    for style in transfer.style_definitions() {
+        write!(
+            automatic_styles,
+            "<style:style style:name=\"{}\" style:family=\"{}\"><style:graphic-properties draw:fill-color=\"#010203\"/></style:style>",
+            quick_xml::escape::escape(style.name()),
+            quick_xml::escape::escape(style.family())
+        )
+        .unwrap();
+    }
+    let mut forms = String::new();
+    for control in transfer.control_definitions() {
+        write!(
+            forms,
+            "<form:control form:id=\"{}\" form:label=\"destination collision\"/>",
+            quick_xml::escape::escape(control.control().id())
+        )
+        .unwrap();
+    }
+    let mut layers = String::new();
+    for layer in transfer.layers() {
+        write!(
+            layers,
+            "<draw:layer draw:name=\"{}\"/>",
+            quick_xml::escape::escape(layer.name())
+        )
+        .unwrap();
+    }
+    let content = format!(
+        r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:automatic-styles>{automatic_styles}</office:automatic-styles><office:body><office:drawing><office:forms><form:form form:name="Destination">{forms}</form:form></office:forms><draw:page draw:name="Destination"><draw:layer-set>{layers}</draw:layer-set></draw:page></office:drawing></office:body></office:document-content>"#
+    );
+    let mut writer = PackageWriter::new();
+    writer
+        .set_mimetype("application/vnd.oasis.opendocument.graphics")
+        .unwrap();
+    writer.add_file("content.xml", content.as_bytes()).unwrap();
+    for resource in transfer.resources() {
+        writer
+            .add_file_with_media_type(
+                resource.path(),
+                b"destination collision",
+                resource.media_type().unwrap_or("application/octet-stream"),
+            )
+            .unwrap();
+    }
+    let destination = Drawing::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let mut edit = destination.edit();
+    edit.insert_shape_transfer(0, 0, &transfer).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.snapshot().content_xml().contains("_litchi_"));
+    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    assert_eq!(reopened.as_bytes(), commit.snapshot().as_bytes());
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        destination.as_bytes()
     );
 }

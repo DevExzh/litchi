@@ -601,7 +601,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         .as_ref()
                         .is_some_and(|image| image.depth == depth)
                     {
-                        let image = state.image.take().unwrap();
+                        let image = state
+                            .image
+                            .take()
+                            .ok_or_else(|| bad("missing completed list-level image"))?;
                         let source = match (image.href, image.binary_seen) {
                             (Some(href), false) => ImageSource::Linked(href),
                             (None, true) => ImageSource::Embedded(image.binary),
@@ -619,7 +622,9 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         level.validate()?;
                         state.push_level(level)?;
                     } else if state.depth == depth {
-                        let state = active.take().unwrap();
+                        let state = active
+                            .take()
+                            .ok_or_else(|| bad("missing completed list style"))?;
                         push_style(&mut styles, state.style, &mut total)?;
                     }
                 }

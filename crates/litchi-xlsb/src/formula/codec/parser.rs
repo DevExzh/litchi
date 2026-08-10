@@ -86,11 +86,37 @@ impl<'a> Parser<'a> {
     ///
     /// Returns a vector of formula tokens in RPN order.
     pub fn parse(&mut self) -> Result<Vec<Token>> {
+        Ok(self
+            .parse_spanned()?
+            .into_iter()
+            .map(|(token, _span)| token)
+            .collect())
+    }
+
+    /// Parse tokens together with their exact `Rgce` byte ranges.
+    ///
+    /// This remains crate-private because ranges are a checked rewrite seam,
+    /// not a stable public representation of every future Ptg family.
+    #[deny(
+        clippy::cast_lossless,
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::checked_conversions,
+        clippy::expect_used,
+        clippy::let_underscore_must_use,
+        clippy::unnecessary_unwrap,
+        reason = "formula dependency spans use parser-proven offsets without unchecked conversions"
+    )]
+    pub(crate) fn parse_spanned(&mut self) -> Result<Vec<(Token, std::ops::Range<usize>)>> {
         let mut tokens = Vec::new();
         let mut boundaries = Vec::new();
 
         while self.offset < self.data.len() {
-            tokens.push(self.parse_token()?);
+            let start = self.offset;
+            let token = self.parse_token()?;
+            tokens.push((token, start..self.offset));
             boundaries.push(self.offset);
         }
 

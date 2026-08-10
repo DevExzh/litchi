@@ -7,6 +7,7 @@
 mod codec;
 mod model;
 mod package;
+mod transaction;
 
 #[cfg(test)]
 mod tests;
@@ -14,6 +15,10 @@ mod tests;
 pub use model::MasterRegion as Region;
 pub use model::{
     Block, Child, ChildKind, Column, Field, FieldKind, Inline, Kind, Master, SenderKind,
+};
+pub use transaction::{
+    Commit, Dependency, DurablePatch, MergePlan, Patch, Resolution, Snapshot, Target, Transaction,
+    Transfer,
 };
 
 pub use codec::parse_page_layout_header_footer_properties;

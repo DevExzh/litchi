@@ -751,10 +751,13 @@ fn history_graph_transition(
             | Operation::ReplaceRevisionText { .. }
             | Operation::ReplaceContentControlText { .. }
             | Operation::ReplaceNestedContentControlText { .. }
+            | Operation::ReplaceNestedContentControlHyperlinkText { .. }
             | Operation::ReplaceBlockContentControlParagraphText { .. }
+            | Operation::ReplaceBlockContentControlParagraphHyperlinkText { .. }
             | Operation::ReplaceCellText { .. }
             | Operation::ReplaceCellParagraphText { .. }
             | Operation::ReplaceNestedCellParagraphText { .. }
+            | Operation::ReplaceNestedCellParagraphHyperlinkText { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. } => None,
         };
@@ -885,6 +888,22 @@ fn operation_effects(
                     position_path(controls)
                 ));
             },
+            Operation::ReplaceNestedContentControlHyperlinkText {
+                paragraph,
+                controls,
+                hyperlink,
+                ..
+            } => {
+                let owner = format!(
+                    "body/paragraph:{}/content-control-path:{}/text",
+                    paragraph.get(),
+                    position_path(controls)
+                );
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                reads.push(owner.clone());
+                writes.push(format!("{owner}/hyperlink:{}/text", hyperlink.get()));
+            },
             Operation::ReplaceBlockContentControlParagraphText {
                 controls,
                 paragraph,
@@ -894,6 +913,20 @@ fn operation_effects(
                 position_path(controls),
                 paragraph.get()
             )),
+            Operation::ReplaceBlockContentControlParagraphHyperlinkText {
+                controls,
+                paragraph,
+                hyperlink,
+                ..
+            } => {
+                let owner = format!(
+                    "body/block-content-control-path:{}/paragraph:{}/text",
+                    position_path(controls),
+                    paragraph.get()
+                );
+                reads.push(owner.clone());
+                writes.push(format!("{owner}/hyperlink:{}/text", hyperlink.get()));
+            },
             Operation::ReplaceCellText {
                 table, row, cell, ..
             } => writes.push(format!(
@@ -930,6 +963,20 @@ fn operation_effects(
                 table_cell_path(path),
                 paragraph.get()
             )),
+            Operation::ReplaceNestedCellParagraphHyperlinkText {
+                path,
+                paragraph,
+                hyperlink,
+                ..
+            } => {
+                let owner = format!(
+                    "body/table-cell-path:{}/paragraph:{}/text",
+                    table_cell_path(path),
+                    paragraph.get()
+                );
+                reads.push(owner.clone());
+                writes.push(format!("{owner}/hyperlink:{}/text", hyperlink.get()));
+            },
             Operation::InsertParagraph { position, .. }
             | Operation::InsertTransferredParagraph { position, .. }
                 if position.get() >= source_paragraphs =>
@@ -1087,6 +1134,25 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Operation::ReplaceNestedContentControlHyperlinkText {
+            paragraph,
+            controls,
+            hyperlink,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "content-control.nested-hyperlink-text.replace",
+                format!(
+                    "paragraph:{}/content-control-path:{}/hyperlink:{}",
+                    paragraph.get(),
+                    position_path(controls),
+                    hyperlink.get()
+                ),
+                Value::String(after.clone()),
+            )
+        },
         Operation::ReplaceBlockContentControlParagraphText {
             controls,
             paragraph,
@@ -1100,6 +1166,25 @@ fn durable_operation(
                     "block-content-control-path:{}/paragraph:{}",
                     position_path(controls),
                     paragraph.get()
+                ),
+                Value::String(after.clone()),
+            )
+        },
+        Operation::ReplaceBlockContentControlParagraphHyperlinkText {
+            controls,
+            paragraph,
+            hyperlink,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "content-control.block-paragraph-hyperlink-text.replace",
+                format!(
+                    "block-content-control-path:{}/paragraph:{}/hyperlink:{}",
+                    position_path(controls),
+                    paragraph.get(),
+                    hyperlink.get()
                 ),
                 Value::String(after.clone()),
             )
@@ -1157,6 +1242,25 @@ fn durable_operation(
                     "table-cell-path:{}/paragraph:{}",
                     table_cell_path(path),
                     paragraph.get()
+                ),
+                Value::String(after.clone()),
+            )
+        },
+        Operation::ReplaceNestedCellParagraphHyperlinkText {
+            path,
+            paragraph,
+            hyperlink,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), Value::String(before.clone()));
+            (
+                "cell.nested-paragraph-hyperlink-text.replace",
+                format!(
+                    "table-cell-path:{}/paragraph:{}/hyperlink:{}",
+                    table_cell_path(path),
+                    paragraph.get(),
+                    hyperlink.get()
                 ),
                 Value::String(after.clone()),
             )
@@ -1306,10 +1410,13 @@ fn restore_transfer_operation(
         | Operation::ReplaceRevisionText { .. }
         | Operation::ReplaceContentControlText { .. }
         | Operation::ReplaceNestedContentControlText { .. }
+        | Operation::ReplaceNestedContentControlHyperlinkText { .. }
         | Operation::ReplaceBlockContentControlParagraphText { .. }
+        | Operation::ReplaceBlockContentControlParagraphHyperlinkText { .. }
         | Operation::ReplaceCellText { .. }
         | Operation::ReplaceCellParagraphText { .. }
         | Operation::ReplaceNestedCellParagraphText { .. }
+        | Operation::ReplaceNestedCellParagraphHyperlinkText { .. }
         | Operation::InsertParagraph { .. }
         | Operation::RemoveParagraph { .. } => return Ok(None),
     };
@@ -1548,6 +1655,17 @@ fn parse_durable_operation(
                 after: after()?,
             })
         },
+        "content-control.nested-hyperlink-text.replace" if operation.preconditions.len() == 3 => {
+            let (owner, hyperlink) = parse_composite_hyperlink_target(&operation.target)?;
+            let (paragraph, controls) = parse_nested_control_target(owner)?;
+            Ok(Operation::ReplaceNestedContentControlHyperlinkText {
+                paragraph,
+                controls,
+                hyperlink,
+                before: before()?,
+                after: after()?,
+            })
+        },
         "content-control.block-paragraph-text.replace" if operation.preconditions.len() == 3 => {
             let (controls, paragraph) = parse_block_control_target(&operation.target)?;
             Ok(Operation::ReplaceBlockContentControlParagraphText {
@@ -1556,6 +1674,21 @@ fn parse_durable_operation(
                 before: before()?,
                 after: after()?,
             })
+        },
+        "content-control.block-paragraph-hyperlink-text.replace"
+            if operation.preconditions.len() == 3 =>
+        {
+            let (owner, hyperlink) = parse_composite_hyperlink_target(&operation.target)?;
+            let (controls, paragraph) = parse_block_control_target(owner)?;
+            Ok(
+                Operation::ReplaceBlockContentControlParagraphHyperlinkText {
+                    controls,
+                    paragraph,
+                    hyperlink,
+                    before: before()?,
+                    after: after()?,
+                },
+            )
         },
         "cell.text.replace" if operation.preconditions.len() == 3 => {
             let (table, row, cell) = parse_cell_target(&operation.target)?;
@@ -1583,6 +1716,17 @@ fn parse_durable_operation(
             Ok(Operation::ReplaceNestedCellParagraphText {
                 path,
                 paragraph,
+                before: before()?,
+                after: after()?,
+            })
+        },
+        "cell.nested-paragraph-hyperlink-text.replace" if operation.preconditions.len() == 3 => {
+            let (owner, hyperlink) = parse_composite_hyperlink_target(&operation.target)?;
+            let (path, paragraph) = parse_nested_cell_target(owner)?;
+            Ok(Operation::ReplaceNestedCellParagraphHyperlinkText {
+                path,
+                paragraph,
+                hyperlink,
                 before: before()?,
                 after: after()?,
             })
@@ -1893,6 +2037,13 @@ fn parse_position_path(value: &str) -> TransactionResult<Arc<[Position]>> {
         .map(parse_position)
         .collect::<TransactionResult<Vec<_>>>()
         .map(Arc::from)
+}
+
+fn parse_composite_hyperlink_target(target: &str) -> TransactionResult<(&str, Position)> {
+    let (owner, hyperlink) = target
+        .rsplit_once("/hyperlink:")
+        .ok_or_else(|| invalid_durable("invalid composite hyperlink target"))?;
+    Ok((owner, parse_position(hyperlink)?))
 }
 
 fn parse_nested_control_target(target: &str) -> TransactionResult<(Position, Arc<[Position]>)> {

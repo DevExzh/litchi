@@ -27,6 +27,12 @@ enum NamespaceKind {
     Other,
 }
 
+fn namespace_text(namespace: &[u8]) -> Result<&str> {
+    std::str::from_utf8(namespace).map_err(|error| {
+        Error::InvalidFormat(format!("invalid static namespace encoding: {error}"))
+    })
+}
+
 pub(super) fn write_scripts(scripts: &Scripts) -> Result<String> {
     scripts.validate()?;
     let mut output = String::with_capacity(256 + scripts.total_payload_bytes());
@@ -34,23 +40,19 @@ pub(super) fn write_scripts(scripts: &Scripts) -> Result<String> {
     namespace_attribute(
         &mut output,
         Some("office"),
-        std::str::from_utf8(OFFICE_NAMESPACE).expect("ODF namespace is UTF-8"),
+        namespace_text(OFFICE_NAMESPACE)?,
     );
     namespace_attribute(
         &mut output,
         Some("script"),
-        std::str::from_utf8(SCRIPT_NAMESPACE).expect("ODF namespace is UTF-8"),
+        namespace_text(SCRIPT_NAMESPACE)?,
     );
     namespace_attribute(
         &mut output,
         Some("presentation"),
-        std::str::from_utf8(PRESENTATION_NAMESPACE).expect("ODF namespace is UTF-8"),
+        namespace_text(PRESENTATION_NAMESPACE)?,
     );
-    namespace_attribute(
-        &mut output,
-        Some("xlink"),
-        std::str::from_utf8(XLINK_NAMESPACE).expect("XLink namespace is UTF-8"),
-    );
+    namespace_attribute(&mut output, Some("xlink"), namespace_text(XLINK_NAMESPACE)?);
     for declaration in &scripts.namespace_declarations {
         if matches!(
             declaration.prefix.as_deref(),

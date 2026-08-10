@@ -126,7 +126,12 @@ pub(crate) fn parse_change_declarations(content: &str) -> Result<TrackedChanges>
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid tracked-change text: {error}"))
                     })?;
-                append_change_declaration_text(active.as_mut().expect("checked change"), &value)?;
+                append_change_declaration_text(
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active tracked change".to_string())
+                    })?,
+                    &value,
+                )?;
             },
             Event::CData(ref value) if active.is_some() => {
                 let value = value
@@ -134,11 +139,21 @@ pub(crate) fn parse_change_declarations(content: &str) -> Result<TrackedChanges>
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid tracked-change CDATA: {error}"))
                     })?;
-                append_change_declaration_text(active.as_mut().expect("checked change"), &value)?;
+                append_change_declaration_text(
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active tracked change".to_string())
+                    })?,
+                    &value,
+                )?;
             },
             Event::GeneralRef(ref reference) if active.is_some() => {
                 let value = decode_reference(reference, "tracked change")?;
-                append_change_declaration_text(active.as_mut().expect("checked change"), &value)?;
+                append_change_declaration_text(
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active tracked change".to_string())
+                    })?,
+                    &value,
+                )?;
             },
             Event::End(_) => {
                 document_depth = document_depth.checked_sub(1).ok_or_else(|| {
@@ -168,7 +183,16 @@ pub(crate) fn parse_change_declarations(content: &str) -> Result<TrackedChanges>
                             Error::InvalidFormat("changed-region stack underflow".to_string())
                         })?;
                         if change.depth == 0 {
-                            changes.push(active.take().expect("checked change").finish()?);
+                            changes.push(
+                                active
+                                    .take()
+                                    .ok_or_else(|| {
+                                        Error::InvalidFormat(
+                                            "missing completed tracked change".to_string(),
+                                        )
+                                    })?
+                                    .finish()?,
+                            );
                         }
                     }
                     tracked_depth = tracked_depth.checked_sub(1).ok_or_else(|| {
@@ -464,9 +488,20 @@ fn process_change_declaration_empty(
 
 fn append_change_declaration_text(change: &mut ActiveTrackedChange, value: &str) -> Result<()> {
     if change.creator_depth.is_some() {
-        append_checked(change.author.as_mut().expect("creator initialized"), value)
+        append_checked(
+            change.author.as_mut().ok_or_else(|| {
+                Error::InvalidFormat("missing tracked-change creator".to_string())
+            })?,
+            value,
+        )
     } else if change.date_depth.is_some() {
-        append_checked(change.date.as_mut().expect("date initialized"), value)
+        append_checked(
+            change
+                .date
+                .as_mut()
+                .ok_or_else(|| Error::InvalidFormat("missing tracked-change date".to_string()))?,
+            value,
+        )
     } else if change.comment_depth.is_some() {
         append_checked(&mut change.comment, value)
     } else if change.paragraph_depth.is_some() {
@@ -808,7 +843,9 @@ pub(crate) fn parse_comments(content: &str) -> Result<Vec<Comment>> {
                 }
             },
             Event::Empty(ref element) if active.is_some() => {
-                let comment = active.as_mut().expect("checked annotation");
+                let comment = active
+                    .as_mut()
+                    .ok_or_else(|| Error::InvalidFormat("missing active annotation".to_string()))?;
                 if office_element && element.local_name().as_ref() == b"annotation" {
                     return Err(Error::InvalidFormat(
                         "nested office:annotation elements are not allowed".to_string(),
@@ -853,7 +890,12 @@ pub(crate) fn parse_comments(content: &str) -> Result<Vec<Comment>> {
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid annotation text: {error}"))
                     })?;
-                append_comment_text(active.as_mut().expect("checked annotation"), &value)?;
+                append_comment_text(
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active annotation".to_string())
+                    })?,
+                    &value,
+                )?;
             },
             Event::CData(ref value) if active.is_some() => {
                 let value = value
@@ -861,11 +903,21 @@ pub(crate) fn parse_comments(content: &str) -> Result<Vec<Comment>> {
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid annotation CDATA: {error}"))
                     })?;
-                append_comment_text(active.as_mut().expect("checked annotation"), &value)?;
+                append_comment_text(
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active annotation".to_string())
+                    })?,
+                    &value,
+                )?;
             },
             Event::GeneralRef(ref reference) if active.is_some() => {
                 let value = decode_reference(reference, "annotation")?;
-                append_comment_text(active.as_mut().expect("checked annotation"), &value)?;
+                append_comment_text(
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active annotation".to_string())
+                    })?,
+                    &value,
+                )?;
             },
             Event::End(_) => {
                 document_depth = document_depth.checked_sub(1).ok_or_else(|| {
@@ -888,7 +940,14 @@ pub(crate) fn parse_comments(content: &str) -> Result<Vec<Comment>> {
                         Error::InvalidFormat("annotation element stack underflow".to_string())
                     })?;
                     if comment.depth == 0 {
-                        comments.push(active.take().expect("checked annotation").finish());
+                        comments.push(
+                            active
+                                .take()
+                                .ok_or_else(|| {
+                                    Error::InvalidFormat("missing completed annotation".to_string())
+                                })?
+                                .finish(),
+                        );
                     }
                 }
             },

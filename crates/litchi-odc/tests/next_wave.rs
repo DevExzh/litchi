@@ -1,7 +1,8 @@
 use litchi_odc::{
     AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, Chart, ChartClass,
-    DataPointSpec, Definition, DefinitionSnapshot, ExactAttribute, ExactTarget, History, Limits,
-    Patch, SeriesSpec, StyleTarget, Text, chart::Dimension, validate_range_list,
+    DataPointSpec, Definition, DefinitionSnapshot, ExactAttribute, ExactTarget, History,
+    LegendSpec, Limits, Patch, SeriesSpec, StyleTarget, Text, chart::Dimension,
+    validate_range_list,
 };
 use litchi_odf_common::core::{PackageWriter, Profile};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -295,6 +296,78 @@ fn odf_1_4_coordinate_region_exact_edit_transfers_without_normalizing() -> TestR
     assert!(transferred
         .content_xml()
         .contains("<chart:coordinate-region svg:x=\"3cm\" svg:y=\"2cm\" svg:width=\"7cm\" svg:height=\"6cm\"/>"));
+    Ok(())
+}
+
+#[test]
+fn noncanonical_titles_footers_and_legends_have_controlled_exact_edits() -> TestResult<()> {
+    let mut authored = definition();
+    authored.title = Some(Text {
+        text: "Producer title".into(),
+        cell_range: Some("Data.A1".into()),
+        style_name: Some("title-old".into()),
+        x: Some("1cm".into()),
+        y: Some("2cm".into()),
+        ..Text::default()
+    });
+    authored.footer = Some(Text::new("Producer footer"));
+    authored.legend = Some(LegendSpec {
+        style_name: Some("legend-old".into()),
+        x: Some("12cm".into()),
+        y: Some("1cm".into()),
+        ..LegendSpec::default()
+    });
+    let canonical = litchi_odc::serialize_content(&authored)?;
+    let noncanonical = canonical
+        .replacen(
+            "<chart:legend",
+            "<chart:legend chart:legend-align=\"center\"",
+            1,
+        )
+        .replacen("><office:body>", ">\n<office:body>", 1);
+    let source = Chart::from_bytes(raw_negative_package(&noncanonical)?)?;
+    assert!(source.definition().is_err());
+
+    let mut edit = source.edit();
+    edit.update_exact(
+        ExactTarget::Title,
+        ExactAttribute::StyleName,
+        Some("title-new".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Title,
+        ExactAttribute::CellRange,
+        Some("Data.B1".into()),
+    )?;
+    edit.update_exact(ExactTarget::Title, ExactAttribute::X, Some("3cm".into()))?;
+    edit.update_exact(
+        ExactTarget::Legend,
+        ExactAttribute::LegendPosition,
+        Some("start".into()),
+    )?;
+    edit.update_exact(
+        ExactTarget::Legend,
+        ExactAttribute::LegendAlign,
+        Some("end".into()),
+    )?;
+    edit.update_exact(ExactTarget::Legend, ExactAttribute::Y, Some("2cm".into()))?;
+    edit.update_exact(
+        ExactTarget::Footer,
+        ExactAttribute::StyleName,
+        Some("footer-new".into()),
+    )?;
+    let changed = edit.commit()?;
+    assert_eq!(changed.patch().exact_changes().len(), 7);
+    let xml = changed.chart().content_xml();
+    assert!(xml.contains("\n<office:body>"));
+    assert!(xml.contains("table:cell-range=\"Data.B1\""));
+    assert!(xml.contains("chart:legend-position=\"start\""));
+    assert!(xml.contains("chart:legend-align=\"end\""));
+    assert!(xml.contains("chart:style-name=\"footer-new\""));
+    assert_eq!(
+        changed.patch().inverse().apply(changed.chart())?.as_bytes(),
+        source.as_bytes()
+    );
     Ok(())
 }
 

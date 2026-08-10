@@ -402,10 +402,11 @@ impl Transaction {
     /// reachable from it into a destination slide.
     ///
     /// Part collisions, relationship IDs, every grouped shape identity, and
-    /// connector endpoint references are remapped deterministically. A
-    /// connector attached to a shape outside the selected transfer subtree is
-    /// refused because publishing a dangling or misdirected endpoint would be
-    /// lossy. Unknown shape kinds remain an explicit refusal boundary.
+    /// connector endpoint references are remapped deterministically. Attached
+    /// connectors pull in the complete top-level owner of each endpoint,
+    /// including grouped children and their dependency relationships. Unknown
+    /// shape kinds and unresolved endpoint identities remain explicit refusal
+    /// boundaries.
     ///
     /// # Errors
     ///
@@ -424,27 +425,79 @@ impl Transaction {
         let source_scene = crate::shape::Scene::read(source_owner.blob())?;
         let key = source_shape.into();
         let shape = source_scene.shape(key)?;
-        if !source_scene
-            .roots()
-            .any(|root| root.common().index() == shape.common().index())
-        {
-            return Err(invalid(
-                "opened-presentation transfer requires a top-level shape",
+        let source_roots: Vec<_> = source_scene.roots().collect();
+        let selected_root = source_roots
+            .iter()
+            .position(|root| root.common().index() == shape.common().index());
+        let Some(selected_root) = selected_root else {
+            return Err(shape_transfer_refusal(
+                crate::ShapeTransferRefusal::NestedShape,
+                "transfer requires the selected shape's top-level owner",
             ));
+        };
+        let mut root_by_shape_id = HashMap::new();
+        for (root_index, root) in source_roots.iter().copied().enumerate() {
+            let mut root_ids = BTreeSet::new();
+            collect_routable_shape_ids(root, &mut root_ids)?;
+            for shape_id in root_ids {
+                if root_by_shape_id.insert(shape_id, root_index).is_some() {
+                    return Err(invalid(format!(
+                        "opened-presentation source slide repeats shape identity {shape_id}"
+                    )));
+                }
+            }
         }
+        let mut pending = VecDeque::from([selected_root]);
+        let mut included_roots = BTreeSet::new();
+        let mut planned_roots = Vec::new();
         let mut source_shape_ids = BTreeSet::new();
-        collect_transfer_shape_ids(shape, &mut source_shape_ids)?;
-        let span = crate::tag::shape::selected_raw_span(source_owner.blob(), key)?;
-        let fragment = &source_owner.blob()[span];
+        let mut relationship_ids = BTreeSet::new();
+        while let Some(root_index) = pending.pop_front() {
+            if !included_roots.insert(root_index) {
+                continue;
+            }
+            if included_roots.len() > self.source.limits.max_parts() {
+                return Err(Error::Limit {
+                    resource: "opened-presentation transferred shape roots",
+                    limit: self.source.limits.max_parts(),
+                });
+            }
+            let root = source_roots
+                .get(root_index)
+                .copied()
+                .ok_or_else(|| invalid("opened-presentation transferred shape root disappeared"))?;
+            collect_transfer_shape_ids(root, &mut source_shape_ids)?;
+            let span = crate::tag::shape::selected_raw_span(
+                source_owner.blob(),
+                crate::shape::Key::Index(root.common().index()),
+            )?;
+            let fragment = &source_owner.blob()[span.clone()];
+            relationship_ids.extend(shape_relationship_ids(fragment)?);
+            for connected_id in super::xml::connector_connection_ids(fragment)? {
+                let endpoint_root = root_by_shape_id.get(&connected_id).copied().ok_or_else(|| {
+                    shape_transfer_refusal(
+                        crate::ShapeTransferRefusal::UnresolvedConnectorEndpoint,
+                        format!(
+                            "connector endpoint {connected_id} does not identify a transferable source shape"
+                        ),
+                    )
+                })?;
+                pending.push_back(endpoint_root);
+            }
+            planned_roots.push((root_index, root, span));
+        }
+        planned_roots.sort_unstable_by_key(|(root_index, _, _)| *root_index);
         let source_shape_id = shape.id().ok_or_else(|| {
-            invalid("opened-presentation transferred shape has no non-visual identity")
+            shape_transfer_refusal(
+                crate::ShapeTransferRefusal::MissingIdentity,
+                "selected shape has no non-visual identity",
+            )
         })?;
         if !source_shape_ids.contains(&source_shape_id) {
             return Err(invalid(
                 "opened-presentation transferred root identity is absent from its XML",
             ));
         }
-        let relationship_ids = shape_relationship_ids(fragment)?;
         let mut roots = Vec::new();
         let mut relationships = Vec::new();
         for relationship_id in relationship_ids {
@@ -488,18 +541,27 @@ impl Transaction {
                 .relate_to(&target, relationship.reltype());
             relationship_mapping.insert(relationship.r_id().to_owned(), new_id);
         }
-        let name = format!("{} Copy {shape_id}", shape.name().unwrap_or("Shape"));
-        let fragment = super::xml::remap_shape_fragment(
-            fragment,
-            source_shape_id,
-            &name,
-            &shape_id_mapping,
-            &relationship_mapping,
-        )?;
-        let xml = super::xml::append_shape(
-            candidate.get_part(&destination.part_name)?.blob(),
-            &fragment,
-        )?;
+        let mut xml = candidate.get_part(&destination.part_name)?.blob().to_vec();
+        for (_root_index, root, span) in planned_roots {
+            let root_source_id = root.id().ok_or_else(|| {
+                invalid("opened-presentation transferred root has no non-visual identity")
+            })?;
+            let root_destination_id = shape_id_mapping.get(&root_source_id).ok_or_else(|| {
+                invalid("opened-presentation transferred root identity mapping disappeared")
+            })?;
+            let name = format!(
+                "{} Copy {root_destination_id}",
+                root.name().unwrap_or("Shape")
+            );
+            let fragment = super::xml::remap_shape_fragment(
+                &source_owner.blob()[span],
+                root_source_id,
+                &name,
+                &shape_id_mapping,
+                &relationship_mapping,
+            )?;
+            xml = super::xml::append_shape(&xml, &fragment)?;
+        }
         ensure_shape_id(&xml, shape_id, "transferred shape")?;
         candidate
             .get_part_mut(&destination.part_name)?
@@ -1292,13 +1354,20 @@ fn collect_transfer_shape_ids(
     identities: &mut BTreeSet<u32>,
 ) -> Result<()> {
     match shape {
-        crate::shape::Shape::Unknown(value) => Err(invalid(format!(
-            "opened-presentation cannot transfer unknown shape kind {}",
-            value
-                .common()
-                .source_name()
-                .unwrap_or("without a source name")
-        ))),
+        crate::shape::Shape::Content(_) => Err(shape_transfer_refusal(
+            crate::ShapeTransferRefusal::ContentPart,
+            "p:contentPart has no common non-visual identity; use its typed content owner",
+        )),
+        crate::shape::Shape::Unknown(value) => Err(shape_transfer_refusal(
+            crate::ShapeTransferRefusal::UnknownExtensionShape,
+            format!(
+                "unknown source element {} is retained but cannot be dependency-closed",
+                value
+                    .common()
+                    .source_name()
+                    .unwrap_or("without a source name")
+            ),
+        )),
         crate::shape::Shape::Group(group) => {
             insert_transfer_shape_id(shape, identities)?;
             for child in group.shapes() {
@@ -1310,15 +1379,37 @@ fn collect_transfer_shape_ids(
     }
 }
 
+fn collect_routable_shape_ids(
+    shape: crate::shape::Shape<'_>,
+    identities: &mut BTreeSet<u32>,
+) -> Result<()> {
+    if let Some(identity) = shape.id()
+        && !identities.insert(identity)
+    {
+        return Err(invalid(format!(
+            "opened-presentation source shape root repeats identity {identity}"
+        )));
+    }
+    if let crate::shape::Shape::Group(group) = shape {
+        for child in group.shapes() {
+            collect_routable_shape_ids(child, identities)?;
+        }
+    }
+    Ok(())
+}
+
 fn insert_transfer_shape_id(
     shape: crate::shape::Shape<'_>,
     identities: &mut BTreeSet<u32>,
 ) -> Result<()> {
     let identity = shape.id().ok_or_else(|| {
-        invalid(format!(
-            "opened-presentation transferred shape {} has no non-visual identity",
-            shape.name().unwrap_or("without a name")
-        ))
+        shape_transfer_refusal(
+            crate::ShapeTransferRefusal::MissingIdentity,
+            format!(
+                "shape {} has no non-visual identity",
+                shape.name().unwrap_or("without a name")
+            ),
+        )
     })?;
     if identities.insert(identity) {
         Ok(())
@@ -1326,6 +1417,13 @@ fn insert_transfer_shape_id(
         Err(invalid(format!(
             "opened-presentation transferred shape repeats identity {identity}"
         )))
+    }
+}
+
+fn shape_transfer_refusal(kind: crate::ShapeTransferRefusal, detail: impl Into<String>) -> Error {
+    Error::ShapeTransfer {
+        kind,
+        detail: detail.into(),
     }
 }
 

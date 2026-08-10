@@ -64,6 +64,10 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
     writer.add_file("content.xml", CONTENT).unwrap();
     writer.add_file("styles.xml", STYLES).unwrap();
     let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        source.security_policy().unwrap(),
+        edit::SecurityPolicy::Editable
+    );
     let source_bytes = source.bytes().to_vec();
 
     let mut transaction = source.transaction().unwrap();
@@ -423,6 +427,10 @@ fn encrypted_package_entries_are_refused_before_staging() {
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
     let source = edit::Snapshot::from_bytes(archive.finish_to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        source.security_policy().unwrap(),
+        edit::SecurityPolicy::EncryptedReadOnly
+    );
 
     let Err(error) = source.transaction() else {
         panic!("encrypted package unexpectedly admitted an editing transaction");

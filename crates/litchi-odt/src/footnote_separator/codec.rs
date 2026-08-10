@@ -149,7 +149,10 @@ pub fn parse(xml: &str) -> Result<Vec<Separator>> {
                     .as_ref()
                     .is_some_and(|current| current.depth == stack.len())
                 {
-                    let value = active.take().expect("active separator checked").value;
+                    let value = active
+                        .take()
+                        .ok_or_else(|| make_error("missing completed footnote separator"))?
+                        .value;
                     value.validate()?;
                     push_value(&mut values, value)?;
                 }
@@ -358,9 +361,16 @@ fn replace_first(xml: &str, replacement: &str) -> Result<String> {
             {
                 return splice(&wrapped, start, end, replacement, prefix, suffix);
             },
-            Event::Start(_) if active.is_some() => active.as_mut().expect("active").1 += 1,
+            Event::Start(_) if active.is_some() => {
+                active
+                    .as_mut()
+                    .ok_or_else(|| make_error("missing active footnote separator range"))?
+                    .1 += 1;
+            },
             Event::End(_) if active.is_some() => {
-                let current = active.as_mut().expect("active");
+                let current = active
+                    .as_mut()
+                    .ok_or_else(|| make_error("missing active footnote separator range"))?;
                 current.1 -= 1;
                 if current.1 == 0 {
                     return splice(&wrapped, current.0, end, replacement, prefix, suffix);
@@ -415,9 +425,12 @@ fn parse_color(value: &str) -> Result<(u8, u8, u8)> {
         .filter(|hex| hex.len() == 6 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
         .ok_or_else(|| make_error("invalid style:color"))?;
     Ok((
-        u8::from_str_radix(&hex[0..2], 16).expect("hex"),
-        u8::from_str_radix(&hex[2..4], 16).expect("hex"),
-        u8::from_str_radix(&hex[4..6], 16).expect("hex"),
+        u8::from_str_radix(&hex[0..2], 16)
+            .map_err(|error| make_error(format!("invalid red color component: {error}")))?,
+        u8::from_str_radix(&hex[2..4], 16)
+            .map_err(|error| make_error(format!("invalid green color component: {error}")))?,
+        u8::from_str_radix(&hex[4..6], 16)
+            .map_err(|error| make_error(format!("invalid blue color component: {error}")))?,
     ))
 }
 

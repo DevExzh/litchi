@@ -117,7 +117,9 @@ pub(crate) fn parse_reference_marks(xml: &str) -> Result<Vec<ReferenceMark>> {
                         Error::InvalidFormat(format!("invalid reference-mark text: {error}"))
                     })?;
                 append_text(
-                    paragraph.as_mut().expect("checked paragraph"),
+                    paragraph.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active reference-mark paragraph".to_string())
+                    })?,
                     &mut pending,
                     &value,
                 )?;
@@ -129,14 +131,18 @@ pub(crate) fn parse_reference_marks(xml: &str) -> Result<Vec<ReferenceMark>> {
                         Error::InvalidFormat(format!("invalid reference-mark CDATA: {error}"))
                     })?;
                 append_text(
-                    paragraph.as_mut().expect("checked paragraph"),
+                    paragraph.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active reference-mark paragraph".to_string())
+                    })?,
                     &mut pending,
                     &value,
                 )?;
             },
             Event::GeneralRef(ref reference) if paragraph.is_some() => {
                 append_text(
-                    paragraph.as_mut().expect("checked paragraph"),
+                    paragraph.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active reference-mark paragraph".to_string())
+                    })?,
                     &mut pending,
                     &decode_reference(reference, "reference mark")?,
                 )?;
@@ -259,8 +265,7 @@ fn process_marker(
 fn validate_marker_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<()> {
     let attributes = expanded_attributes(reader, element, "reference mark")?;
     if attributes.len() != 1
-        || attributes[0].namespace_uri.as_deref()
-            != Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ODF text namespace is UTF-8"))
+        || attributes[0].namespace_uri.as_deref().map(str::as_bytes) != Some(TEXT_NAMESPACE)
         || attributes[0].local_name != "name"
     {
         return Err(Error::InvalidFormat(

@@ -274,12 +274,13 @@ fn cross_drawing_transfer_copies_and_remaps_arbitrary_style_definitions() {
 
 #[test]
 fn nested_group_transfer_remaps_style_form_and_resource_collisions_together() {
-    const SOURCE: &str = r##"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:automatic-styles><style:style style:name="gr1" style:family="graphic"><style:graphic-properties draw:fill="solid" draw:fill-color="#ff0000"/></style:style></office:automatic-styles><office:body><office:drawing><office:forms><form:form form:name="Source"><form:checkbox form:id="control1" form:label="source"/></form:form></office:forms><draw:page draw:name="Source"><draw:g draw:name="Outer"><draw:g draw:name="Inner"><draw:control draw:name="Choice" draw:style-name="gr1" draw:control="control1"/><draw:frame draw:name="Media" draw:style-name="gr1"><draw:image xlink:href="Pictures/transfer.bin" xlink:type="simple"/></draw:frame></draw:g></draw:g></draw:page></office:drawing></office:body></office:document-content>"##;
-    const DESTINATION: &str = r##"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0"><office:automatic-styles><style:style style:name="gr1" style:family="graphic"><style:graphic-properties draw:fill="solid" draw:fill-color="#0000ff"/></style:style></office:automatic-styles><office:body><office:drawing><office:forms><form:form form:name="Destination"><form:checkbox form:id="control1" form:label="destination"/></form:form></office:forms><draw:page draw:name="Destination"/></office:drawing></office:body></office:document-content>"##;
+    const SOURCE: &str = r##"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:automatic-styles><draw:gradient draw:name="gradient1" draw:style="linear" draw:start-color="#ff0000" draw:end-color="#ffff00"/><style:style style:name="gr1" style:family="graphic"><style:graphic-properties draw:fill="gradient" draw:fill-gradient-name="gradient1"/></style:style></office:automatic-styles><office:body><office:drawing><office:forms><form:form form:name="Source"><form:checkbox form:id="control1" form:label="source"/></form:form></office:forms><draw:page draw:name="Source"><draw:g draw:name="Outer"><draw:g draw:name="Inner"><draw:control draw:name="Choice" draw:style-name="gr1" draw:control="control1"/><draw:frame draw:name="Media" draw:style-name="gr1"><draw:image xlink:href="Pictures/transfer.bin" xlink:type="simple"/></draw:frame></draw:g></draw:g></draw:page></office:drawing></office:body></office:document-content>"##;
+    const DESTINATION: &str = r##"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0"><office:automatic-styles><draw:gradient draw:name="gradient1" draw:style="radial" draw:start-color="#0000ff" draw:end-color="#00ffff"/><style:style style:name="gr1" style:family="graphic"><style:graphic-properties draw:fill="gradient" draw:fill-gradient-name="gradient1"/></style:style></office:automatic-styles><office:body><office:drawing><office:forms><form:form form:name="Destination"><form:checkbox form:id="control1" form:label="destination"/></form:form></office:forms><draw:page draw:name="Destination"/></office:drawing></office:body></office:document-content>"##;
     let source = drawing_with_resource(SOURCE, Some(b"source resource"));
     let destination = drawing_with_resource(DESTINATION, Some(b"destination resource"));
     let transfer = source.snapshot().prepare_shape_transfer(0, 0).unwrap();
     assert_eq!(transfer.shape().kind(), ShapeKind::Group);
+    assert_eq!(transfer.style_resources().len(), 1);
     assert_eq!(source.group(0, 0).unwrap().descendants().len(), 3);
     assert_eq!(transfer.resources().len(), 1, "{:#?}", transfer.resources());
 
@@ -295,7 +296,17 @@ fn nested_group_transfer_remaps_style_form_and_resource_collisions_together() {
     }));
     assert!(commit.snapshot().style_definitions().iter().any(|style| {
         style.name().starts_with("gr1_litchi_")
-            && style.property("draw:fill-color") == Some("#ff0000")
+            && style
+                .property("draw:fill-gradient-name")
+                .is_some_and(|name| name.starts_with("gradient1_litchi_"))
+    }));
+    assert!(commit.snapshot().style_resources().iter().any(|resource| {
+        resource.name().starts_with("gradient1_litchi_")
+            && resource
+                .attributes()
+                .get("draw:start-color")
+                .map(String::as_str)
+                == Some("#ff0000")
     }));
     let remapped_resource = commit
         .snapshot()

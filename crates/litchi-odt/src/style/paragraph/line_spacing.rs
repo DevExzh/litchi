@@ -595,7 +595,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
             Ok(Event::End(_)) => {
                 let depth = stack.len();
                 if active.as_ref().is_some_and(|state| state.depth == depth) {
-                    push_style(&mut styles, active.take().unwrap().style, &mut total)?;
+                    let state = active
+                        .take()
+                        .ok_or_else(|| bad("missing active paragraph line-spacing style"))?;
+                    push_style(&mut styles, state.style, &mut total)?;
                 }
                 stack.pop();
             },

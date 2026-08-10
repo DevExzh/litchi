@@ -6,7 +6,7 @@
 use super::super::model::*;
 use super::super::{FORM_NAMESPACE, STYLE_NAMESPACE, TEXT_DATABASE_NAMESPACE, XLINK_NAMESPACE};
 use super::validation::{validate_constructed_database_field, validate_database_field};
-use litchi_core::Result;
+use litchi_core::{Error, Result};
 
 impl DatabaseField {
     pub fn to_xml_fragment(&self) -> Result<String> {
@@ -43,7 +43,11 @@ impl DatabaseField {
                 attribute(
                     "text",
                     "column-name",
-                    field.column_name.as_deref().expect("validated"),
+                    field.column_name.as_deref().ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "text:database-display requires text:column-name".to_string(),
+                        )
+                    })?,
                 );
                 if let Some(value) = field.data_style_name.as_deref() {
                     attribute("style", "data-style-name", value);

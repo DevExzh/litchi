@@ -1094,7 +1094,9 @@ pub(crate) fn meta_child_grammar(
             Ok(MetaContentGrammar::Empty)
         },
         _ if is_odf_shape_root(namespace, local) => {
-            Ok(odf_shape_grammar(namespace, local).expect("checked shape root"))
+            odf_shape_grammar(namespace, local).ok_or_else(|| {
+                Error::InvalidFormat(format!("unsupported drawing shape {namespace}:{local}"))
+            })
         },
         _ => Err(Error::InvalidFormat(format!(
             "{namespace}:{local} is not paragraph-content in text:meta-field"
@@ -1121,7 +1123,9 @@ fn note_body_child_grammar(namespace: &str, local: &str) -> Result<MetaContentGr
         return Ok(MetaContentGrammar::Structured);
     }
     if is_odf_shape_root(namespace, local) {
-        return Ok(odf_shape_grammar(namespace, local).expect("checked shape root"));
+        return odf_shape_grammar(namespace, local).ok_or_else(|| {
+            Error::InvalidFormat(format!("unsupported drawing shape {namespace}:{local}"))
+        });
     }
     Err(Error::InvalidFormat(format!(
         "{namespace}:{local} is not text-content in text:note-body"
@@ -1149,7 +1153,9 @@ fn shape_child_grammar(
             Ok(MetaContentGrammar::Structured)
         },
         _ if owner == MetaContentGrammar::ShapeGroup && is_odf_shape_root(namespace, local) => {
-            Ok(odf_shape_grammar(namespace, local).expect("checked shape root"))
+            odf_shape_grammar(namespace, local).ok_or_else(|| {
+                Error::InvalidFormat(format!("unsupported drawing shape {namespace}:{local}"))
+            })
         },
         _ => Err(Error::InvalidFormat(format!(
             "{namespace}:{local} is not valid direct drawing-shape content"

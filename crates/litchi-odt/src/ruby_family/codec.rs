@@ -226,10 +226,18 @@ pub fn parse_ruby_styles(xml: &str) -> Result<Styles> {
                     .as_ref()
                     .is_some_and(|style| style.property_depth == Some(depth))
                 {
-                    active.as_mut().unwrap().property_depth = None;
+                    active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing active ruby style"))?
+                        .property_depth = None;
                 }
                 if active.as_ref().is_some_and(|style| style.depth == depth) {
-                    styles.push(active.take().unwrap().value);
+                    styles.push(
+                        active
+                            .take()
+                            .ok_or_else(|| bad("missing completed ruby style"))?
+                            .value,
+                    );
                 }
                 stack.pop();
             },
@@ -418,7 +426,9 @@ pub(super) fn parse_ruby_entries(xml: &str) -> Result<Vec<Entry>> {
                 let value = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| bad(format!("invalid ruby text: {error}")))?;
-                let ruby = active.last_mut().unwrap();
+                let ruby = active
+                    .last_mut()
+                    .ok_or_else(|| bad("missing active ruby annotation"))?;
                 if ruby.text.len() + value.len() > MAX_VALUE {
                     return Err(bad("ruby pronunciation is too large"));
                 }
@@ -430,14 +440,18 @@ pub(super) fn parse_ruby_entries(xml: &str) -> Result<Vec<Entry>> {
                 let value = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| bad(format!("invalid ruby CDATA: {error}")))?;
-                active.last_mut().unwrap().text.push_str(&value);
+                active
+                    .last_mut()
+                    .ok_or_else(|| bad("missing active ruby annotation"))?
+                    .text
+                    .push_str(&value);
             },
             Event::GeneralRef(ref value)
                 if active.last().is_some_and(|ruby| ruby.text_depth.is_some()) =>
             {
                 active
                     .last_mut()
-                    .unwrap()
+                    .ok_or_else(|| bad("missing active ruby annotation"))?
                     .text
                     .push_str(&crate::elements::xml::decode_reference(value, "ruby")?);
             },
@@ -839,7 +853,9 @@ fn locate_ruby_style(xml: &str, target_name: &str) -> Result<(Option<Span>, Styl
                 let depth = stack.len();
                 let begin = event_start(xml, reader.buffer_position() as usize)?;
                 if open.is_some_and(|(d, _)| d == depth) {
-                    let (_, start) = open.take().unwrap();
+                    let (_, start) = open
+                        .take()
+                        .ok_or_else(|| bad("missing open ruby style span"))?;
                     target = Some(Span {
                         start,
                         end: reader.buffer_position() as usize,

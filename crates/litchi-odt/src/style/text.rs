@@ -180,9 +180,10 @@ fn validate_ref(reference: &str, value: &str, depth: usize) -> Option<TextProper
         },
         "character" => {
             let mut chars = value.chars();
-            let first = chars.next();
-            (first.is_some() && chars.next().is_none())
-                .then(|| TextPropertyValue::Character(first.unwrap()))
+            match (chars.next(), chars.next()) {
+                (Some(first), None) => Some(TextPropertyValue::Character(first)),
+                _ => None,
+            }
         },
         "language" => language(value).then(|| TextPropertyValue::Language(value.to_owned())),
         "languageCode" => {
@@ -701,7 +702,10 @@ pub fn parse_text_style_properties(xml: &str) -> Result<TextStylePropertiesSet> 
                     value.property_depth = None;
                 }
                 if active.as_ref().is_some_and(|value| value.depth == depth) {
-                    push(&mut out, active.take().unwrap().style, &mut total)?;
+                    let value = active
+                        .take()
+                        .ok_or_else(|| bad("missing active text style"))?;
+                    push(&mut out, value.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -802,7 +806,13 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
                         qname: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
                         ..Default::default()
                     };
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    if active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target text style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
+                    {
                         return Err(bad("duplicate style:text-properties"));
                     }
                 }
@@ -842,7 +852,12 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"text-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                    && active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target text style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
                 {
                     return Err(bad("duplicate style:text-properties"));
                 }
@@ -855,7 +870,10 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
                     if spans.properties.as_ref().is_some_and(|span| span.end == 0)
                         && target_depth.is_some_and(|d| depth == d + 1)
                     {
-                        let span = spans.properties.as_mut().unwrap();
+                        let span = spans
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target text properties span"))?;
                         span.end_start = begin;
                         span.end = end;
                     }

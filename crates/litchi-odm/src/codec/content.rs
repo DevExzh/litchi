@@ -249,8 +249,10 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
     let mut depth = 0usize;
     let mut text_depth = None;
     let mut section_index = 0usize;
+    let mut generated_index_names = HashSet::new();
     let mut structure = crate::structure::Structure::default();
     loop {
+        let event_start = position(&reader)?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| invalid(format!("invalid ODM master structure XML: {error}")))?;
@@ -258,6 +260,7 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
         let is_text = matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == TEXT);
         let is_table = matches!(&namespace, ResolveResult::Bound(uri) if uri.as_ref() == TABLE);
         let event = event.into_owned();
+        let event_end = position(&reader)?;
         let (item_name, item_xml_id) = match &event {
             Event::Start(element) | Event::Empty(element) => (
                 attribute(&reader, element, TEXT, b"name")?,
@@ -272,6 +275,29 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
             | Event::DocType(_)
             | Event::GeneralRef(_)
             | Event::Eof => (None, None),
+        };
+        let item_name_span = match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                let key = attribute_key(&reader, element, TEXT, b"name")?;
+                key.map(|key| {
+                    let tag = xml
+                        .as_bytes()
+                        .get(event_start..event_end)
+                        .ok_or_else(|| invalid("ODM master-body tag span is stale"))?;
+                    let (start, end) = attribute_value_span(tag, &key)?;
+                    Ok::<Range<usize>, Error>(event_start + start..event_start + end)
+                })
+                .transpose()?
+            },
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::Eof => None,
         };
         for (value, scope) in [
             (item_name.as_deref(), "ODM master-body text:name"),
@@ -293,8 +319,10 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
                     &mut text_depth,
                     &mut section_index,
                     &mut structure,
+                    &mut generated_index_names,
                     item_name,
                     item_xml_id,
+                    item_name_span,
                 )?;
             },
             Event::Empty(element) => {
@@ -307,8 +335,10 @@ fn parse_master_structure(xml: &str) -> Result<crate::structure::Structure> {
                     &mut text_depth,
                     &mut section_index,
                     &mut structure,
+                    &mut generated_index_names,
                     item_name,
                     item_xml_id,
+                    item_name_span,
                 )?;
             },
             Event::End(element) => {
@@ -346,8 +376,10 @@ fn observe_master_item(
     text_depth: &mut Option<usize>,
     section_index: &mut usize,
     structure: &mut crate::structure::Structure,
+    generated_index_names: &mut HashSet<String>,
     item_name: Option<String>,
     item_xml_id: Option<String>,
+    item_name_span: Option<Range<usize>>,
 ) -> Result<()> {
     use crate::structure::{IndexKind, Kind};
 
@@ -392,6 +424,18 @@ fn observe_master_item(
         let item = Position::new(structure.items.len());
         structure.items.push(kind);
         if let Kind::GeneratedIndex(kind) = kind {
+            let name = item_name
+                .as_ref()
+                .ok_or_else(|| invalid("ODM generated index has no text:name"))?;
+            generated_index_names
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODM generated-index name identities",
+                    source,
+                })?;
+            if !generated_index_names.insert(name.clone()) {
+                return Err(invalid("duplicate ODM generated-index text:name"));
+            }
             structure
                 .generated_indexes
                 .try_reserve(1)
@@ -406,6 +450,7 @@ fn observe_master_item(
                     kind,
                     name: item_name,
                     xml_id: item_xml_id,
+                    name_span: item_name_span,
                 });
         }
     }

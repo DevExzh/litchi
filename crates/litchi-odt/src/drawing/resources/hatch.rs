@@ -475,7 +475,9 @@ fn validate_decimal(value: &str, complete: &str) -> Result<()> {
         return invalid(format!("invalid hatch distance '{complete}'"));
     }
     let mut parts = value.split('.');
-    let integer = parts.next().expect("split always yields one value");
+    let Some(integer) = parts.next() else {
+        return invalid(format!("invalid hatch distance '{complete}'"));
+    };
     let fraction = parts.next();
     if parts.next().is_some()
         || !integer.bytes().all(|byte| byte.is_ascii_digit())

@@ -5,6 +5,7 @@
 )]
 
 use crate::{
+    active::{ActiveContent, ActiveContentLocation},
     frame::{Frame, Properties},
     map::{Area, AreaKind, AreaProperties, ImageMap},
     source::Source,
@@ -43,6 +44,7 @@ struct State {
     frames: Vec<Frame>,
     sites: Vec<FrameSite>,
     metadata: Option<Metadata>,
+    active_content: Vec<ActiveContent>,
 }
 
 #[derive(Clone, Debug)]
@@ -158,6 +160,27 @@ impl FlatImage {
     #[must_use]
     pub fn metadata(&self) -> Option<&Metadata> {
         self.0.metadata.as_ref()
+    }
+
+    /// Returns inert script, event, macro, and DDE constructs in source order.
+    #[must_use]
+    pub fn active_content(&self) -> &[ActiveContent] {
+        &self.0.active_content
+    }
+
+    /// Classifies one style name/family dependency without changing XML.
+    pub fn style_dependency_state(
+        &self,
+        name: &str,
+        family: &str,
+    ) -> Result<crate::StyleDependencyState> {
+        crate::semantic::inspect_style_dependency(
+            std::str::from_utf8(self.as_bytes())
+                .map_err(|error| invalid(format!("flat ODI style XML is not UTF-8: {error}")))?,
+            None,
+            name,
+            family,
+        )
     }
 
     /// Audits whether this exact flat XML can enter changed-byte publication.
@@ -930,12 +953,20 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
     } else {
         None
     };
+    let active_content = crate::active::scan_xml(
+        xml,
+        match root {
+            Root::Flat => ActiveContentLocation::FlatXml,
+            Root::Content => ActiveContentLocation::ContentXml,
+        },
+    )?;
     Ok(State {
         bytes: input_bytes,
         root,
         frames,
         sites,
         metadata,
+        active_content,
     })
 }
 

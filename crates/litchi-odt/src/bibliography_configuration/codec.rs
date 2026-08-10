@@ -246,7 +246,9 @@ fn parse_part(
                         aggregate,
                         &mut temporary,
                     )?;
-                    let configuration = temporary.expect("configuration created").value;
+                    let configuration = temporary
+                        .ok_or_else(|| make_error("missing bibliography configuration"))?
+                        .value;
                     configuration.validate()?;
                     *result = Some(configuration);
                 }
@@ -259,7 +261,10 @@ fn parse_part(
                     .as_ref()
                     .is_some_and(|configuration| configuration.depth == depth)
                 {
-                    let configuration = active.take().expect("checked configuration").value;
+                    let configuration = active
+                        .take()
+                        .ok_or_else(|| make_error("missing completed bibliography configuration"))?
+                        .value;
                     configuration.validate()?;
                     *result = Some(configuration);
                 }
@@ -398,7 +403,9 @@ fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, Styl
                 let start = event_start(xml, end)?;
                 let depth = stack.len();
                 if open_target.is_some_and(|(target_depth, _)| target_depth == depth) {
-                    let (_, target_start) = open_target.take().expect("target depth checked");
+                    let (_, target_start) = open_target
+                        .take()
+                        .ok_or_else(|| make_error("missing bibliography target start"))?;
                     target = Some(XmlSpan {
                         start: target_start,
                         end,

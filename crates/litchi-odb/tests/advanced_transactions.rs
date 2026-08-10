@@ -2,7 +2,8 @@ use litchi_odb::{
     ActiveContentDisposition, ActiveContentKind, Builder, ChangeKind, Column, Component,
     ComponentKind, CompositionLimits, Connection, Database, DependencyDisposition, EditPolicy,
     History, HistoryLimits, Index, IndexColumn, JoinedEdits, Key, KeyColumn, KeyKind, MergeChoice,
-    MergePlan, Patch, Query, SealedPatch, SignaturePolicy, Table, TableKind,
+    MergePlan, Patch, ProtectionOperation, ProtectionSupport, Query, QueryUpdateTarget,
+    SealedPatch, SignaturePolicy, Table, TableKind,
 };
 
 const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:database><d:data-source/><d:queries/></o:database></o:body></o:document-content>"#;
@@ -461,9 +462,23 @@ fn bounded_transfer_copies_only_inert_semantic_declarations() {
         .add_table(Table::new("transferred", TableKind::Definition).with_column(Column::new("id")))
         .unwrap();
     author
+        .add_table(
+            Table::new("presented", TableKind::Representation)
+                .with_filter_statement("id > 0")
+                .with_order_statement("id ASC"),
+        )
+        .unwrap();
+    author
         .add_query(
             Query::new("transferred-query", "SELECT id FROM transferred")
-                .with_column(Column::new("id")),
+                .with_column(Column::new("id"))
+                .with_filter_statement("id > 0")
+                .with_order_statement("id ASC")
+                .with_update_target(
+                    QueryUpdateTarget::new("transferred")
+                        .with_schema_name("public")
+                        .with_catalog_name("main"),
+                ),
         )
         .unwrap();
     author
@@ -474,6 +489,7 @@ fn bounded_transfer_copies_only_inert_semantic_declarations() {
     let destination = source();
     let mut transfer = destination.edit();
     transfer.transfer_table_from(&donor, "transferred").unwrap();
+    transfer.transfer_table_from(&donor, "presented").unwrap();
     transfer
         .transfer_query_from(&donor, "transferred-query")
         .unwrap();
@@ -483,16 +499,18 @@ fn bounded_transfer_copies_only_inert_semantic_declarations() {
     let received = transfer.commit().unwrap().into_database();
     let catalog = received.catalog().unwrap();
     assert!(catalog.table("transferred").unwrap().is_some());
+    let presented = catalog.table("presented").unwrap().unwrap();
+    assert_eq!(presented.filter_statement(), Some("id > 0"));
+    assert_eq!(presented.order_statement(), Some("id ASC"));
     assert!(catalog.query("transferred-query").unwrap().is_some());
-    assert_eq!(
-        catalog
-            .query("transferred-query")
-            .unwrap()
-            .unwrap()
-            .columns()
-            .len(),
-        1
-    );
+    let query = catalog.query("transferred-query").unwrap().unwrap();
+    assert_eq!(query.columns().len(), 1);
+    assert_eq!(query.filter_statement(), Some("id > 0"));
+    assert_eq!(query.order_statement(), Some("id ASC"));
+    let update_target = query.update_target().unwrap();
+    assert_eq!(update_target.name(), "transferred");
+    assert_eq!(update_target.schema_name(), Some("public"));
+    assert_eq!(update_target.catalog_name(), Some("main"));
     assert!(catalog.components().iter().any(|component| {
         component.kind() == ComponentKind::Report && component.name() == Some("transferred-report")
     }));
@@ -560,6 +578,12 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
     .unwrap();
 
     let destination = source();
+    assert!(
+        !donor
+            .component_active_content(ComponentKind::Report, "payload-report")
+            .unwrap()
+            .is_empty()
+    );
     let mut refused = destination.edit();
     assert!(
         refused
@@ -609,6 +633,23 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
             .unwrap()
             .as_bytes(),
         received.as_bytes()
+    );
+    let durable_reopened = Database::from_bytes(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .apply(&destination)
+            .unwrap()
+            .into_bytes(),
+    )
+    .unwrap();
+    let durable_package = OwnedPackage::from_bytes(durable_reopened.into_bytes()).unwrap();
+    assert_eq!(
+        durable_package
+            .get_file("reports/imported/content.xml")
+            .unwrap(),
+        payload
     );
 
     let mut second = destination.edit();
@@ -687,6 +728,24 @@ fn active_content_inventory_is_inert_bounded_and_source_located() {
     assert!(capabilities.can_remove_invalidated_signatures());
     assert!(!capabilities.can_re_sign());
     assert!(!capabilities.can_re_encrypt());
+    assert_eq!(
+        database.protection_support(ProtectionOperation::VerifySignatures),
+        ProtectionSupport::Supported
+    );
+    assert_eq!(
+        database.protection_support(ProtectionOperation::ReSign),
+        ProtectionSupport::Unsupported
+    );
+    assert!(
+        database
+            .require_protection_operation(ProtectionOperation::ReSign)
+            .is_err()
+    );
+    assert!(
+        database
+            .require_protection_operation(ProtectionOperation::ReEncrypt)
+            .is_err()
+    );
 }
 
 #[test]

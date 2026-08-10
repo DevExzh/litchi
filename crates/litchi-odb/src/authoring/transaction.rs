@@ -488,12 +488,13 @@ impl<'source> Edit<'source> {
         if additions.is_empty() && directories.is_empty() {
             return invalid("ODB linked component package payload does not exist");
         }
+        let component_name = component.name().ok_or_else(|| {
+            Error::InvalidFormat("ODB transferred component has no name".to_string())
+        })?;
         let active_dependencies = source
-            .active_content()?
+            .component_active_content(component.kind(), component_name)?
             .entries()
-            .iter()
-            .filter(|entry| entry.package_path().starts_with(&source_prefix))
-            .count();
+            .len();
         if active_dependencies > 0 && active_content == crate::ActiveContentDisposition::Refuse {
             return Err(Error::Unsupported(format!(
                 "ODB component payload has {active_dependencies} active-content dependencies"
@@ -2298,6 +2299,20 @@ fn serialize_table(table: &Table, prefix: &str) -> String {
         }
         children.push_str(&format!("</{prefix}:indices>"));
     }
+    if let Some(command) = table.filter_statement() {
+        children.push_str(&empty_element(
+            prefix,
+            "filter-statement",
+            vec![("command", command.to_owned())],
+        ));
+    }
+    if let Some(command) = table.order_statement() {
+        children.push_str(&empty_element(
+            prefix,
+            "order-statement",
+            vec![("command", command.to_owned())],
+        ));
+    }
     element_with_children(
         prefix,
         local,
@@ -2402,6 +2417,30 @@ fn serialize_query(query: &Query, prefix: &str) -> String {
             children.push_str(&serialize_column(column, false, prefix));
         }
         children.push_str(&format!("</{prefix}:columns>"));
+    }
+    if let Some(command) = query.filter_statement() {
+        children.push_str(&empty_element(
+            prefix,
+            "filter-statement",
+            vec![("command", command.to_owned())],
+        ));
+    }
+    if let Some(command) = query.order_statement() {
+        children.push_str(&empty_element(
+            prefix,
+            "order-statement",
+            vec![("command", command.to_owned())],
+        ));
+    }
+    if let Some(target) = query.update_target() {
+        let mut update = vec![("name", target.name().to_owned())];
+        if let Some(value) = target.schema_name() {
+            update.push(("schema-name", value.to_owned()));
+        }
+        if let Some(value) = target.catalog_name() {
+            update.push(("catalog-name", value.to_owned()));
+        }
+        children.push_str(&empty_element(prefix, "update-table", update));
     }
     element_with_children(prefix, "query", attrs, &children)
 }
@@ -2742,6 +2781,19 @@ fn validate_table(table: &Table) -> Result<()> {
     {
         return invalid("ODB table representations cannot author schema keys or indices");
     }
+    if table.kind() == TableKind::Definition
+        && (table.filter_statement().is_some() || table.order_statement().is_some())
+    {
+        return invalid("ODB table definitions cannot author presentation statements");
+    }
+    for (kind, value) in [
+        ("table filter statement", table.filter_statement()),
+        ("table order statement", table.order_statement()),
+    ] {
+        if let Some(value) = value {
+            validate_value(value, kind)?;
+        }
+    }
     for column in table.columns() {
         validate_column(column)?;
     }
@@ -2858,6 +2910,25 @@ fn validate_query(query: &Query) -> Result<()> {
     validate_value(query.command(), "query command")?;
     for column in query.columns() {
         validate_column(column)?;
+    }
+    for (kind, value) in [
+        ("query filter statement", query.filter_statement()),
+        ("query order statement", query.order_statement()),
+    ] {
+        if let Some(value) = value {
+            validate_value(value, kind)?;
+        }
+    }
+    if let Some(target) = query.update_target() {
+        validate_name(target.name(), "query update table")?;
+        for (kind, value) in [
+            ("query update schema", target.schema_name()),
+            ("query update catalog", target.catalog_name()),
+        ] {
+            if let Some(value) = value {
+                validate_value(value, kind)?;
+            }
+        }
     }
     Ok(())
 }

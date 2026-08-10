@@ -90,3 +90,77 @@ fn flat_settings_can_receive_new_policy_items() {
     let parsed = codec::parse_flat(&output).expect("rewritten flat document parses");
     assert_eq!(parsed, replacement);
 }
+
+#[test]
+fn durable_patch_inverse_transfer_and_disjoint_merge_are_semantic() {
+    let mut forms = Transaction::package(PACKAGE_SETTINGS).expect("valid settings");
+    forms.set_forms(Some(false));
+    let forms = forms.commit().expect("form policy commits");
+
+    let durable = forms.patch().durable().expect("durable patch");
+    let wire = durable.to_deterministic_json().expect("deterministic JSON");
+    let reopened =
+        super::DurablePatch::from_deterministic_json(&wire).expect("durable patch reopens");
+    let replayed = reopened.apply(PACKAGE_SETTINGS).expect("patch replays");
+    let restored = reopened
+        .inverse()
+        .apply(replayed.as_bytes())
+        .expect("inverse restores");
+    assert_eq!(restored.as_bytes(), PACKAGE_SETTINGS);
+
+    let transferred = forms
+        .patch()
+        .transfer()
+        .apply_flat(FLAT_DOCUMENT)
+        .expect("policy transfers");
+    assert_eq!(
+        codec::parse_flat(transferred.as_bytes())
+            .expect("transferred policy parses")
+            .forms,
+        Some(false)
+    );
+
+    let mut bookmarks = Transaction::package(PACKAGE_SETTINGS).expect("valid settings");
+    bookmarks.set_bookmarks(Some(true));
+    let bookmarks = bookmarks.commit().expect("bookmark policy commits");
+    let merged = super::Patch::merge(forms.patch(), bookmarks.patch())
+        .expect("merge plan")
+        .finish()
+        .expect("disjoint merge finishes");
+    let merged = merged
+        .apply(PACKAGE_SETTINGS)
+        .expect("merged patch applies");
+    assert_eq!(merged.after().forms, Some(false));
+    assert_eq!(merged.after().bookmarks, Some(true));
+}
+
+#[test]
+fn conflicting_protection_merge_requires_an_explicit_branch() {
+    let mut left = Transaction::package(PACKAGE_SETTINGS).expect("valid settings");
+    left.set_forms(Some(false));
+    let left = left.commit().expect("left commits");
+
+    let mut right = Transaction::package(PACKAGE_SETTINGS).expect("valid settings");
+    right.set_forms(None);
+    let right = right.commit().expect("right commits");
+
+    let mut merge = super::Patch::merge(left.patch(), right.patch()).expect("merge plan");
+    assert_eq!(
+        merge.conflicts().collect::<Vec<_>>(),
+        vec![super::Field::Forms]
+    );
+    assert!(merge.clone().finish().is_err());
+    merge
+        .resolve(super::Field::Forms, super::Resolution::Right)
+        .expect("conflict resolves");
+    assert_eq!(
+        merge
+            .finish()
+            .expect("resolved merge finishes")
+            .apply(PACKAGE_SETTINGS)
+            .expect("merged patch applies")
+            .after()
+            .forms,
+        None
+    );
+}

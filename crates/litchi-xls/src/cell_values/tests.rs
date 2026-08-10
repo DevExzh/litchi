@@ -324,6 +324,42 @@ fn formula_cache_transfer_requires_identical_tokens() {
 }
 
 #[test]
+fn authored_formulas_join_reopen_and_durably_invert() {
+    let source = Snapshot::from_bytes(formula_free_package()).unwrap();
+    let first = Reference::new(1, 1).unwrap();
+    let second = Reference::new(3, 2).unwrap();
+    let mut left = source.transaction();
+    left.insert_formula("Plain".into(), first, "A2+1").unwrap();
+    let mut right = source.transaction();
+    right
+        .insert_formula("Plain".into(), second, "B4*2")
+        .unwrap();
+    left.join(right).unwrap();
+    let commit = left.commit().unwrap();
+    for reference in [first, second] {
+        assert_eq!(
+            commit
+                .snapshot()
+                .worksheet("Plain".into())
+                .unwrap()
+                .unwrap()
+                .cell(reference)
+                .unwrap()
+                .unwrap()
+                .value(),
+            &Value::FormulaCache(FormulaCache::Empty)
+        );
+    }
+    Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let wire = commit.patch().semantic().to_deterministic_json().unwrap();
+    let durable = SemanticPatch::from_deterministic_json(&wire).unwrap();
+    let replay = durable.apply(&source).unwrap();
+    assert_eq!(replay.snapshot().bytes(), commit.snapshot().bytes());
+    let restored = durable.inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(restored.snapshot().bytes(), source.bytes());
+}
+
+#[test]
 fn new_sst_and_xf_resources_round_trip_with_cells() {
     let source = Snapshot::from_bytes(package()).unwrap();
     let base_style = source
@@ -383,6 +419,63 @@ fn new_sst_and_xf_resources_round_trip_with_cells() {
         .unwrap();
     assert!(restored.cell(text_reference).unwrap().is_none());
     assert!(restored.cell(style_reference).unwrap().is_none());
+}
+
+#[test]
+fn rich_sst_resource_round_trips_and_semantically_inverts() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let font_index = binary::read_u16_le_at(&source.inner.xf_records[0], 0).unwrap();
+    let runs = vec![crate::records::SharedStringFormatRun {
+        character_index: 0,
+        font_index,
+    }];
+    let reference = Reference::new(6, 3).unwrap();
+    let text = "λ".repeat(5_000);
+    let mut transaction = source.transaction();
+    transaction
+        .insert_rich_text_cell("Sheet1".into(), reference, text.clone(), runs.clone())
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    assert_eq!(
+        commit
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap()
+            .value(),
+        &Value::Text(text.clone())
+    );
+    let index = commit
+        .snapshot()
+        .inner
+        .shared_strings
+        .iter()
+        .position(|candidate| candidate == &text)
+        .unwrap();
+    assert_eq!(
+        commit.snapshot().inner.shared_string_properties[index]
+            .as_deref()
+            .unwrap()
+            .formatting_runs,
+        runs
+    );
+    let restored = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.snapshot())
+        .unwrap();
+    let restored_bytes = restored.snapshot().bytes();
+    let source_bytes = source.bytes();
+    assert_eq!(restored_bytes.len(), source_bytes.len());
+    let first_difference = restored_bytes
+        .iter()
+        .zip(source_bytes)
+        .position(|(restored, source)| restored != source);
+    assert_eq!(first_difference, None);
 }
 
 #[test]

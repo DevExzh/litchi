@@ -83,7 +83,12 @@ pub(super) fn parse_hyperlinks(xml: &str) -> Result<Vec<(String, String)>> {
                         Error::InvalidFormat(format!("invalid hyperlink text: {error}"))
                     })?;
                 append_checked(
-                    &mut active.as_mut().expect("checked hyperlink").text,
+                    &mut active
+                        .as_mut()
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("missing active hyperlink".to_string())
+                        })?
+                        .text,
                     &value,
                 )?;
             },
@@ -94,14 +99,24 @@ pub(super) fn parse_hyperlinks(xml: &str) -> Result<Vec<(String, String)>> {
                         Error::InvalidFormat(format!("invalid hyperlink CDATA: {error}"))
                     })?;
                 append_checked(
-                    &mut active.as_mut().expect("checked hyperlink").text,
+                    &mut active
+                        .as_mut()
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("missing active hyperlink".to_string())
+                        })?
+                        .text,
                     &value,
                 )?;
             },
             Event::GeneralRef(ref reference) if active.is_some() => {
                 let value = decode_reference(reference, "hyperlink")?;
                 append_checked(
-                    &mut active.as_mut().expect("checked hyperlink").text,
+                    &mut active
+                        .as_mut()
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("missing active hyperlink".to_string())
+                        })?
+                        .text,
                     &value,
                 )?;
             },
@@ -114,7 +129,9 @@ pub(super) fn parse_hyperlinks(xml: &str) -> Result<Vec<(String, String)>> {
                         Error::InvalidFormat("hyperlink element stack underflow".to_string())
                     })?;
                     if link.depth == 0 {
-                        let link = active.take().expect("checked hyperlink");
+                        let link = active.take().ok_or_else(|| {
+                            Error::InvalidFormat("missing completed hyperlink".to_string())
+                        })?;
                         if let Some(href) = link.href {
                             validation::ensure_reference_capacity(links.len(), "hyperlinks")?;
                             links.push((link.text, href));

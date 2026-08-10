@@ -18,7 +18,8 @@ const GFM_EXTENSION_EXAMPLE_COUNT: usize = 22;
 struct Example {
     markdown: String,
     html: String,
-    example: usize,
+    #[serde(rename = "example")]
+    number: usize,
     section: String,
     #[serde(default)]
     extensions: Vec<String>,
@@ -89,7 +90,7 @@ fn assert_rendering(example: &Example, dialect: Dialect) -> Result<(), Error> {
         normalized_html(&actual),
         normalized_html(&example.html),
         "normative example {} ({})",
-        example.example,
+        example.number,
         example.section
     );
     Ok(())
@@ -124,7 +125,7 @@ fn assert_ranges(snapshot: &Snapshot, example: &Example) {
         assert!(
             prior_end <= block_range.start,
             "overlapping top-level block in example {} ({}): prior end {prior_end}, current {block_range:?} {:?}",
-            example.example,
+            example.number,
             example.section,
             block.kind()
         );

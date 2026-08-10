@@ -1,4 +1,4 @@
-//! Bounded worksheet DrawingML/picture transfer planning.
+//! Bounded worksheet DrawingML picture/chart transfer planning.
 
 use std::collections::{BTreeSet, HashSet};
 
@@ -22,6 +22,7 @@ const SML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const MAX_DRAWING_BYTES: usize = 32 * 1024 * 1024;
+const MAX_LEAF_BYTES: usize = 32 * 1024 * 1024;
 const MAX_ANCHORS: usize = 100_000;
 const MAX_REFERENCES: usize = 4_096;
 const MAX_URI_ATTEMPTS: u32 = 10_000;
@@ -144,6 +145,9 @@ pub(super) fn plan(
             ))
         })?;
         if relationship.is_external() {
+            if matches!(relationship.reltype(), rt::CHART | rt::STRICT_CHART) {
+                return Err(invalid("drawing chart relationship cannot be external"));
+            }
             target_drawing.rels_mut().try_add_relationship(
                 relationship.reltype().to_owned(),
                 relationship.target_ref().to_owned(),
@@ -152,28 +156,19 @@ pub(super) fn plan(
             )?;
             continue;
         }
-        if !matches!(relationship.reltype(), rt::IMAGE | rt::STRICT_IMAGE) {
-            return Err(unsupported(
-                "copying drawing dependencies other than picture images",
-            ));
-        }
-        let source_image_uri = relationship.target_partname()?;
-        let source_image = workbook.inner.package.get_part(&source_image_uri)?;
-        if !source_image.rels().is_empty() {
-            return Err(unsupported(
-                "copying image parts with outbound relationships",
-            ));
-        }
-        let target_image_uri = allocate_uri(&source_image_uri, &mut reserved)?;
-        let target_image = BlobPart::new_shared(
-            target_image_uri.clone(),
-            source_image.content_type().to_owned(),
-            source_image.blob_arc(),
+        let source_leaf_uri = relationship.target_partname()?;
+        let source_leaf = workbook.inner.package.get_part(&source_leaf_uri)?;
+        validate_leaf_dependency(relationship.reltype(), source_leaf)?;
+        let target_leaf_uri = allocate_uri(&source_leaf_uri, &mut reserved)?;
+        let target_leaf = BlobPart::new_shared(
+            target_leaf_uri.clone(),
+            source_leaf.content_type().to_owned(),
+            source_leaf.blob_arc(),
         );
         let cloned_relationship = Relationship::new_with_mode(
             relationship.r_id().to_owned(),
             relationship.reltype().to_owned(),
-            target_image_uri.relative_ref(target_drawing_uri.base_uri()),
+            target_leaf_uri.relative_ref(target_drawing_uri.base_uri()),
             target_drawing_uri.base_uri().to_owned(),
             TargetMode::Internal,
         );
@@ -181,7 +176,7 @@ pub(super) fn plan(
             action: GraphAction::Add,
             source: target_drawing_uri.clone(),
             relationship: cloned_relationship,
-            part: Box::new(target_image),
+            part: Box::new(target_leaf),
         });
     }
     let worksheet_relationship = Relationship::new_with_mode(
@@ -210,6 +205,102 @@ pub(super) fn plan(
         anchors: projection.anchors,
         graph,
     }))
+}
+
+fn validate_leaf_dependency(relationship_type: &str, part: &dyn Part) -> Result<()> {
+    if !part.rels().is_empty() {
+        return Err(unsupported(
+            "copying drawing dependencies with outbound relationships",
+        ));
+    }
+    if part.blob().len() > MAX_LEAF_BYTES {
+        return Err(invalid("drawing dependency exceeds the size limit"));
+    }
+    match relationship_type {
+        rt::IMAGE | rt::STRICT_IMAGE => validate_image_leaf(part),
+        rt::CHART | rt::STRICT_CHART => {
+            if part.content_type() != ct::DML_CHART {
+                return Err(invalid(format!(
+                    "drawing chart part has content type '{}', expected '{}'",
+                    part.content_type(),
+                    ct::DML_CHART
+                )));
+            }
+            if !part.partname().as_str().starts_with("/xl/charts/")
+                || !part.partname().as_str().ends_with(".xml")
+            {
+                return Err(invalid(
+                    "drawing chart target is outside /xl/charts or lacks .xml suffix",
+                ));
+            }
+            ensure_no_relationship_attributes(part.blob())?;
+            let anchor = crate::chart::Anchor::new(0, 0, 1, 1);
+            let _ = crate::chart::read(part.blob(), anchor)?;
+            Ok(())
+        },
+        _ => Err(unsupported(
+            "copying drawing dependencies other than images and classic charts",
+        )),
+    }
+}
+
+fn ensure_no_relationship_attributes(xml: &[u8]) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().check_end_names = true;
+    loop {
+        let event = reader.read_event().map_err(xml_error)?.into_owned();
+        let resolver = reader.resolver().clone();
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                for attribute in element.attributes().with_checks(true) {
+                    let attribute = attribute.map_err(xml_error)?;
+                    if relationship_namespace(&resolver.resolve_attribute(attribute.key).0) {
+                        return Err(unsupported(
+                            "copying classic charts with relationship attributes",
+                        ));
+                    }
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "drawing chart transfer rejects DTD and processing instructions",
+                ));
+            },
+            Event::Eof => return Ok(()),
+            _ => {},
+        }
+    }
+}
+
+fn validate_image_leaf(part: &dyn Part) -> Result<()> {
+    let name = part.partname().as_str();
+    if !name.starts_with("/xl/media/") {
+        return Err(invalid("drawing image target is outside /xl/media"));
+    }
+    let lower = name.to_ascii_lowercase();
+    let suffix_matches = match part.content_type() {
+        "image/bmp" => lower.ends_with(".bmp"),
+        "image/gif" => lower.ends_with(".gif"),
+        "image/png" => lower.ends_with(".png"),
+        "image/tif" => lower.ends_with(".tif"),
+        "image/tiff" => lower.ends_with(".tiff"),
+        "image/x-icon" => lower.ends_with(".ico"),
+        "image/x-pcx" => lower.ends_with(".pcx"),
+        "image/jpeg" => lower.ends_with(".jpg") || lower.ends_with(".jpeg"),
+        "image/jp2" => lower.ends_with(".jp2"),
+        "image/x-emf" => lower.ends_with(".emf"),
+        "image/x-wmf" => lower.ends_with(".wmf"),
+        "image/svg+xml" => lower.ends_with(".svg"),
+        _ => false,
+    };
+    if !suffix_matches {
+        return Err(invalid(format!(
+            "drawing image path '{}' does not match supported content type '{}'",
+            part.partname(),
+            part.content_type(),
+        )));
+    }
+    Ok(())
 }
 
 pub(super) fn attach_worksheet(xml: &[u8], relationship_id: &str) -> Result<Vec<u8>> {
@@ -574,6 +665,13 @@ struct WorksheetLayout {
     alternate_content: bool,
 }
 
+#[derive(Default)]
+struct WorksheetChildState {
+    successor: Option<usize>,
+    drawing_reference: Option<String>,
+    alternate_content: bool,
+}
+
 fn worksheet_drawing_reference(xml: &[u8]) -> Result<Option<String>> {
     Ok(worksheet_layout(xml)?.drawing_reference)
 }
@@ -586,9 +684,7 @@ fn worksheet_layout(xml: &[u8]) -> Result<WorksheetLayout> {
     let mut root_name = None;
     let mut root_relationship_namespace = None;
     let mut root_close = None;
-    let mut successor = None;
-    let mut drawing_reference = None;
-    let mut alternate_content = false;
+    let mut child_state = WorksheetChildState::default();
     loop {
         let start = position(&reader)?;
         let decoder = reader.decoder();
@@ -621,9 +717,7 @@ fn worksheet_layout(xml: &[u8]) -> Result<WorksheetLayout> {
                         decoder,
                         &resolver,
                         start,
-                        &mut successor,
-                        &mut drawing_reference,
-                        &mut alternate_content,
+                        &mut child_state,
                     )?;
                 }
                 depth = depth
@@ -636,9 +730,7 @@ fn worksheet_layout(xml: &[u8]) -> Result<WorksheetLayout> {
                 decoder,
                 &resolver,
                 start,
-                &mut successor,
-                &mut drawing_reference,
-                &mut alternate_content,
+                &mut child_state,
             )?,
             Event::End(_) => {
                 if depth == 1 {
@@ -661,39 +753,34 @@ fn worksheet_layout(xml: &[u8]) -> Result<WorksheetLayout> {
         root_name: root_name.ok_or_else(|| invalid("worksheet XML has no root"))?,
         relationship_namespace: root_relationship_namespace
             .ok_or_else(|| invalid("worksheet XML has no relationship namespace"))?,
-        insertion: successor
+        insertion: child_state
+            .successor
             .or(root_close)
             .ok_or_else(|| invalid("worksheet XML has no drawing insertion point"))?,
-        drawing_reference,
-        alternate_content,
+        drawing_reference: child_state.drawing_reference,
+        alternate_content: child_state.alternate_content,
     })
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the arguments are one worksheet-child scan state"
-)]
 fn inspect_worksheet_child(
     namespace: &ResolveResult<'_>,
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
     resolver: &quick_xml::name::NamespaceResolver,
     start: usize,
-    successor: &mut Option<usize>,
-    drawing_reference: &mut Option<String>,
-    alternate_content: &mut bool,
+    state: &mut WorksheetChildState,
 ) -> Result<()> {
     if matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE)
         && element.local_name().as_ref() == b"AlternateContent"
     {
-        *alternate_content = true;
+        state.alternate_content = true;
     }
     if !sml(namespace) {
         return Ok(());
     }
     let local = element.local_name();
     if local.as_ref() == b"drawing" {
-        if drawing_reference.is_some() {
+        if state.drawing_reference.is_some() {
             return Err(invalid("worksheet has duplicate drawing references"));
         }
         for attribute in element.attributes().with_checks(true) {
@@ -701,7 +788,7 @@ fn inspect_worksheet_child(
             if relationship_namespace(&resolver.resolve_attribute(attribute.key).0)
                 && attribute.key.local_name().as_ref() == b"id"
             {
-                *drawing_reference = Some(
+                state.drawing_reference = Some(
                     attribute
                         .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
                         .map_err(xml_error)?
@@ -709,13 +796,13 @@ fn inspect_worksheet_child(
                 );
             }
         }
-        if drawing_reference.is_none() {
+        if state.drawing_reference.is_none() {
             return Err(invalid(
                 "worksheet drawing reference has no relationship ID",
             ));
         }
-    } else if drawing_successor(local.as_ref()) && successor.is_none() {
-        *successor = Some(start);
+    } else if drawing_successor(local.as_ref()) && state.successor.is_none() {
+        state.successor = Some(start);
     }
     Ok(())
 }

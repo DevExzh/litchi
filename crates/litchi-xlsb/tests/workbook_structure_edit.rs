@@ -4,14 +4,17 @@
     reason = "integration tests use panic-on-failure assertions"
 )]
 
-use litchi_core::sheet::traits::WorkbookTrait;
+use litchi_core::sheet::{CellValue, traits::WorkbookTrait};
 use litchi_xlsb::Workbook;
 use litchi_xlsb::cell_values::{
     AuthoredStyle, CellFormula, Reference, TransferLimits, Value, WorkbookHistory, WorkbookPatch,
 };
+use litchi_xlsb::named_ranges::Definition as NamedRange;
+use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
 use litchi_xlsb::package::{SharedString, SharedStringRun};
 use litchi_xlsb::styles::{Alignment, Fill, Font, HorizontalAlignment, VerticalAlignment};
 use litchi_xlsb::writer::{ChartAnchor, Image, ImageFormat, MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::{Parser, TableColumns, TableDataType, TableReference, TableRowType, Token};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -32,6 +35,75 @@ fn producer_workbook(name: &str, initial_value: Option<&str>) -> Workbook {
     let mut bytes = Cursor::new(Vec::new());
     producer.save(&mut bytes).expect("producer save");
     Workbook::new(Cursor::new(bytes.into_inner())).expect("producer reopen")
+}
+
+fn formula_dependency_workbook(source_order: bool) -> Workbook {
+    let mut data = MutableWorksheet::new("Data");
+    data.set_cell(0, 0, "Region");
+    data.set_cell(0, 1, "Amount");
+    data.set_cell(1, 0, "North");
+    data.set_cell(1, 1, 42.5);
+    data.add_table(Table {
+        id: if source_order { 3 } else { 9 },
+        name: Some("SalesTable".to_string()),
+        display_name: Some("SalesTable".to_string()),
+        range: TableRange {
+            first_row: 0,
+            last_row: 1,
+            first_column: 0,
+            last_column: 1,
+        },
+        table_type: TableType::Range,
+        header_row_count: 1,
+        columns: vec![
+            Column {
+                id: 1,
+                name: Some("Region".to_string()),
+                ..Column::default()
+            },
+            Column {
+                id: 2,
+                name: Some("Amount".to_string()),
+                ..Column::default()
+            },
+        ],
+        ..Table::default()
+    })
+    .expect("valid structured table");
+    let mut summary = MutableWorksheet::new("Summary");
+    summary.set_cell(
+        0,
+        0,
+        CellValue::Formula {
+            formula: "Rate+Data!A1".to_string(),
+            cached_value: Some(Box::new(CellValue::Float(1.0))),
+            is_array: false,
+            array_range: None,
+        },
+    );
+    let mut producer = WorkbookWriter::new();
+    if source_order {
+        producer.add_worksheet(data);
+        producer.add_worksheet(summary);
+        producer.add_named_range(
+            NamedRange::new("Rate".to_string(), None).with_formula(vec![0x1e, 1, 0]),
+        );
+        producer.add_named_range(
+            NamedRange::new("Other".to_string(), None).with_formula(vec![0x1e, 2, 0]),
+        );
+    } else {
+        producer.add_worksheet(summary);
+        producer.add_worksheet(data);
+        producer.add_named_range(
+            NamedRange::new("Other".to_string(), None).with_formula(vec![0x1e, 2, 0]),
+        );
+        producer.add_named_range(
+            NamedRange::new("Rate".to_string(), None).with_formula(vec![0x1e, 1, 0]),
+        );
+    }
+    let mut bytes = Cursor::new(Vec::new());
+    producer.save(&mut bytes).expect("dependency producer save");
+    Workbook::new(Cursor::new(bytes.into_inner())).expect("dependency producer reopen")
 }
 
 #[test]
@@ -249,6 +321,192 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         transferred.images[0].description.as_deref(),
         Some("authored one-pixel image")
     );
+
+    let appended = Image::new(
+        GIF_1X1.to_vec(),
+        ImageFormat::Gif,
+        ChartAnchor::new(7, 4, 9, 8),
+    )
+    .expect("valid appended image")
+    .with_description("appended image")
+    .expect("valid appended description");
+    let mut append_edit = transfer_target
+        .edit_workbook_structure()
+        .expect("existing drawing edit");
+    append_edit
+        .insert_image(0, appended)
+        .expect("append to existing drawing");
+    let append_commit = append_edit.commit().expect("append image commit");
+    let append_bytes = append_commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable appended image");
+    WorkbookPatch::from_bytes(&append_bytes, TransferLimits::DEFAULT)
+        .expect("decode appended image patch")
+        .apply(&mut transfer_target)
+        .expect("publish appended image");
+    let appended_drawing = transfer_target.sheet_drawing(0).expect("appended drawing");
+    assert_eq!(appended_drawing.images.len(), 2);
+    assert_eq!(
+        appended_drawing.images[1].description.as_deref(),
+        Some("appended image")
+    );
+}
+
+#[test]
+fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
+    let mut source = formula_dependency_workbook(true);
+    let source_summary = 1;
+    let contextual_ref = Reference::new(0, 0).expect("contextual formula reference");
+    let source_cells = source.cell_values(source_summary).expect("source cells");
+    let contextual = source_cells
+        .cell(contextual_ref)
+        .expect("unique contextual formula")
+        .expect("contextual formula");
+    let contextual_formula = contextual.formula().expect("formula payload");
+    let source_xti =
+        Parser::with_extra(contextual_formula.tokens(), contextual_formula.ancillary())
+            .parse()
+            .expect("parse contextual formula")
+            .into_iter()
+            .find_map(|token| match token {
+                Token::CellRef3d { sheet_index, .. } => Some(sheet_index),
+                _ => None,
+            })
+            .expect("Data XTI");
+    let (table_tokens, table_extra) = Token::TableReference(TableReference {
+        sheet_index: source_xti,
+        row_type: Some(TableRowType::Data),
+        columns: Some(TableColumns::One(1)),
+        square_bracket_space: false,
+        comma_space: false,
+        data_type: TableDataType::Reference,
+        invalid: false,
+        list_index: Some(3),
+        external: None,
+    })
+    .to_extended_binary()
+    .expect("structured-reference encoding");
+    let table_formula_ref = Reference::new(0, 1).expect("table formula reference");
+    let rich_ref = Reference::new(0, 2).expect("rich resource reference");
+    let rich_style = AuthoredStyle {
+        font: Font {
+            name: "Aptos".to_string(),
+            size: 11.0,
+            bold: true,
+            ..Font::default()
+        },
+        number_format: Some("0.00".to_string()),
+        ..AuthoredStyle::default()
+    };
+    let rich = SharedString {
+        text: "resource-bearing transfer".to_string(),
+        runs: vec![SharedStringRun {
+            character_index: 0,
+            font_id: u16::MAX,
+        }],
+        phonetic: None,
+    };
+    let mut source_edit = source.edit_workbook_structure().expect("source root edit");
+    source_edit
+        .insert_formula(
+            source_summary,
+            table_formula_ref,
+            Value::FormulaNumberCache(42.5),
+            CellFormula::new(0, table_tokens, table_extra).expect("table cell formula"),
+            &rich_style,
+        )
+        .expect("table formula authoring");
+    source_edit
+        .insert_rich_string(source_summary, rich_ref, rich, &rich_style)
+        .expect("rich resource authoring");
+    let source_commit = source_edit.commit().expect("source dependency commit");
+    source
+        .apply_workbook_structure(&source_commit)
+        .expect("publish source dependencies");
+
+    let mut target = formula_dependency_workbook(false);
+    let name_target_ref = Reference::new(4, 0).expect("name target");
+    let table_target_ref = Reference::new(4, 1).expect("table target");
+    let rich_target_ref = Reference::new(4, 2).expect("rich target");
+    let mut transfer = target.edit_workbook_structure().expect("transfer edit");
+    transfer
+        .transfer_cell(&source, source_summary, contextual_ref, 0, name_target_ref)
+        .expect("name and sheet dependency remap");
+    transfer
+        .transfer_cell(
+            &source,
+            source_summary,
+            table_formula_ref,
+            0,
+            table_target_ref,
+        )
+        .expect("table dependency remap");
+    transfer
+        .transfer_cell(&source, source_summary, rich_ref, 0, rich_target_ref)
+        .expect("rich style dependency transfer");
+    let commit = transfer.commit().expect("dependency transfer commit");
+    let durable = commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable dependency patch");
+    let patch = WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
+        .expect("decode dependency patch");
+    patch.apply(&mut target).expect("publish dependency patch");
+
+    let cells = target.cell_values(0).expect("target cells");
+    let name_formula = cells
+        .cell(name_target_ref)
+        .expect("unique name target")
+        .expect("name target")
+        .formula()
+        .expect("name target formula");
+    let name_tokens = Parser::with_extra(name_formula.tokens(), name_formula.ancillary())
+        .parse()
+        .expect("parse remapped name formula");
+    assert!(
+        name_tokens
+            .iter()
+            .any(|token| matches!(token, Token::Name(2)))
+    );
+    let table_formula = cells
+        .cell(table_target_ref)
+        .expect("unique table target")
+        .expect("table target")
+        .formula()
+        .expect("table target formula");
+    let table_tokens = Parser::with_extra(table_formula.tokens(), table_formula.ancillary())
+        .parse()
+        .expect("parse remapped table formula");
+    assert!(table_tokens.iter().any(|token| {
+        matches!(
+            token,
+            Token::TableReference(TableReference {
+                list_index: Some(9),
+                ..
+            })
+        )
+    }));
+    assert!(matches!(
+        cells
+            .cell(rich_target_ref)
+            .expect("unique rich target")
+            .expect("rich target")
+            .value(),
+        Value::RichString(_)
+    ));
+    let mut bytes = Cursor::new(Vec::new());
+    target.save(&mut bytes).expect("save dependency target");
+    let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen dependencies");
+    assert_eq!(
+        reopened
+            .cell_values(0)
+            .expect("reopened dependency cells")
+            .cells()
+            .len(),
+        4
+    );
+    assert_eq!(reopened.tables()[0].table_id(), 9);
 }
 
 #[test]

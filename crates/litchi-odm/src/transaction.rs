@@ -14,8 +14,8 @@ use std::{
 use crate::{Master, link::Selector};
 
 pub use crate::edit_ops::{
-    ActiveContentPolicy, ResourceChange, ResourceSpec, SectionChange, SectionSpec, SecurityPolicy,
-    StyleChange, StyleSpec, SubdocumentSpec,
+    ActiveContentPolicy, GeneratedIndexChange, ResourceChange, ResourceSpec, SectionChange,
+    SectionSpec, SecurityPolicy, StyleChange, StyleSpec, SubdocumentSpec,
 };
 
 const MAX_PACKAGE_BYTES: usize = 256 * 1024 * 1024;
@@ -83,6 +83,7 @@ pub struct Edit<'source> {
     links: BTreeMap<usize, String>,
     metadata: Option<litchi_core::Metadata>,
     sections: Vec<SectionChange>,
+    generated_indexes: Vec<GeneratedIndexChange>,
     styles: Vec<StyleChange>,
     resources: BTreeMap<String, ResourceChange>,
     policy: SecurityPolicy,
@@ -102,6 +103,7 @@ impl<'source> Edit<'source> {
             links: BTreeMap::new(),
             metadata: None,
             sections: Vec::new(),
+            generated_indexes: Vec::new(),
             styles: Vec::new(),
             resources: BTreeMap::new(),
             policy,
@@ -357,6 +359,55 @@ impl<'source> Edit<'source> {
         Ok(self)
     }
 
+    /// Renames one generated index by its direct master-body item position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an absent/unnamed index, duplicate destination
+    /// name, or invalid bounded XML value.
+    pub fn rename_generated_index(
+        &mut self,
+        item: Position,
+        name: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let index = self
+            .source
+            .structure()
+            .generated_indexes()
+            .iter()
+            .find(|index| index.item() == item)
+            .ok_or_else(|| invalid("ODM generated-index selector was not found"))?;
+        let before = index
+            .name()
+            .ok_or_else(|| invalid("ODM generated index has no text:name"))?
+            .to_owned();
+        let after = name.into();
+        crate::edit_ops::validate_value(&after, "ODM generated index name", false)?;
+        if before != after
+            && (self.source.structure().generated_indexes().iter().any(|other| {
+                other.item() != item
+                    && other
+                        .name()
+                        .is_some_and(|candidate| candidate == after.as_str())
+            }) || self.generated_indexes.iter().any(|change| {
+                matches!(change, GeneratedIndexChange::Rename { after: staged, .. } if staged == &after)
+            }))
+        {
+            return Err(invalid("ODM generated-index destination name already exists"));
+        }
+        if self.generated_indexes.iter().any(|change| {
+            matches!(change, GeneratedIndexChange::Rename { item: staged, .. } if *staged == item)
+        }) {
+            return Err(invalid("ODM generated index already has a staged change"));
+        }
+        self.generated_indexes.push(GeneratedIndexChange::Rename {
+            item,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
     /// Removes one section subtree when no modeled local reference targets it.
     ///
     /// # Errors
@@ -603,6 +654,7 @@ impl<'source> Edit<'source> {
         let link_changes = collect_link_changes(self.source, &self.links)?;
         let extended_changed = self.metadata.is_some()
             || !self.sections.is_empty()
+            || !self.generated_indexes.is_empty()
             || !self.styles.is_empty()
             || !self.resources.is_empty();
         if !title_changed && link_changes.is_empty() && !extended_changed {
@@ -630,8 +682,13 @@ impl<'source> Edit<'source> {
             .iter()
             .map(|change| (change.reference, change.after.clone()))
             .collect::<Vec<_>>();
-        let parts =
-            crate::edit_ops::mutate_xml(self.source, &staged_links, &self.sections, &self.styles)?;
+        let parts = crate::edit_ops::mutate_xml(
+            self.source,
+            &staged_links,
+            &self.sections,
+            &self.generated_indexes,
+            &self.styles,
+        )?;
         let mut removed_resources = Vec::new();
         let mut resource_writes = Vec::new();
         removed_resources
@@ -695,7 +752,13 @@ impl<'source> Edit<'source> {
                 ));
             }
         }
-        verify_extended_readback(&snapshot, &self.sections, &self.styles, &self.resources)?;
+        verify_extended_readback(
+            &snapshot,
+            &self.sections,
+            &self.generated_indexes,
+            &self.styles,
+            &self.resources,
+        )?;
         let title = title_changed.then_some(TitleChange {
             before: self.title_before,
             after: self.title_after,
@@ -715,6 +778,7 @@ impl<'source> Edit<'source> {
                     None
                 },
                 sections: self.sections,
+                generated_indexes: self.generated_indexes,
                 styles: self.styles,
                 resources: self.resources.into_values().collect(),
             },
@@ -778,6 +842,7 @@ pub struct ChangeSet {
     links: Vec<LinkChange>,
     metadata: Option<MetadataChange>,
     sections: Vec<SectionChange>,
+    generated_indexes: Vec<GeneratedIndexChange>,
     styles: Vec<StyleChange>,
     resources: Vec<ResourceChange>,
 }
@@ -807,6 +872,12 @@ impl ChangeSet {
         &self.sections
     }
 
+    /// Returns generated-index effects in staging order.
+    #[must_use]
+    pub fn generated_indexes(&self) -> &[GeneratedIndexChange] {
+        &self.generated_indexes
+    }
+
     /// Returns style-catalog effects in staging order.
     #[must_use]
     pub fn styles(&self) -> &[StyleChange] {
@@ -826,6 +897,7 @@ impl ChangeSet {
             && self.links.is_empty()
             && self.metadata.is_none()
             && self.sections.is_empty()
+            && self.generated_indexes.is_empty()
             && self.styles.is_empty()
             && self.resources.is_empty()
     }
@@ -955,7 +1027,12 @@ impl Patch {
         if !conflicts.is_empty() {
             return Err(MergeError::Conflicts(ConflictSet::new(conflicts)));
         }
-        let mut edit = source.edit();
+        let merge_policy = if source.security().active_content().is_empty() {
+            SecurityPolicy::default()
+        } else {
+            SecurityPolicy::default().with_active_content(ActiveContentPolicy::PreserveInert)
+        };
+        let mut edit = source.edit_with_policy(merge_policy);
         stage_changes(&mut edit, &self.changes).map_err(MergeError::Invalid)?;
         stage_changes(&mut edit, &other.changes).map_err(MergeError::Invalid)?;
         edit.commit()
@@ -1047,6 +1124,10 @@ pub enum Conflict {
     Section(Position),
     /// Both patches create divergent effects at one section destination name.
     SectionName(String),
+    /// Both patches divergently write one generated index.
+    GeneratedIndex(Position),
+    /// Both patches rename generated indexes to the same identity.
+    GeneratedIndexName(String),
     /// Both patches write one style identity.
     Style(String),
     /// Both patches write one package resource path.
@@ -1605,6 +1686,7 @@ fn simple_metadata_equal(left: &litchi_core::Metadata, right: &litchi_core::Meta
 fn verify_extended_readback(
     snapshot: &Master,
     sections: &[SectionChange],
+    generated_indexes: &[GeneratedIndexChange],
     styles: &[StyleChange],
     resources: &BTreeMap<String, ResourceChange>,
 ) -> Result<()> {
@@ -1650,6 +1732,22 @@ fn verify_extended_readback(
                     .any(|node| node.name() == before)
                 {
                     return Err(invalid("ODM removed section failed semantic readback"));
+                }
+            },
+        }
+    }
+    for change in generated_indexes {
+        match change {
+            GeneratedIndexChange::Rename { item, after, .. } => {
+                let actual = snapshot
+                    .structure()
+                    .generated_indexes()
+                    .iter()
+                    .find(|index| index.item() == *item)
+                    .and_then(crate::structure::GeneratedIndex::name)
+                    .ok_or_else(|| invalid("ODM generated index failed semantic readback"))?;
+                if actual != after {
+                    return Err(invalid("ODM generated-index rename readback differs"));
                 }
             },
         }
@@ -1781,6 +1879,21 @@ fn inverse_changes(changes: &ChangeSet) -> ChangeSet {
                 SectionChange::Add(_) | SectionChange::Remove { .. } => None,
             })
             .collect(),
+        generated_indexes: changes
+            .generated_indexes
+            .iter()
+            .map(|change| match change {
+                GeneratedIndexChange::Rename {
+                    item,
+                    before,
+                    after,
+                } => GeneratedIndexChange::Rename {
+                    item: *item,
+                    before: after.clone(),
+                    after: before.clone(),
+                },
+            })
+            .collect(),
         styles: changes
             .styles
             .iter()
@@ -1820,6 +1933,11 @@ fn find_conflicts(
         .min(right.links.len())
         .saturating_add(6)
         .saturating_add(left.sections.len().saturating_mul(right.sections.len()))
+        .saturating_add(
+            left.generated_indexes
+                .len()
+                .saturating_mul(right.generated_indexes.len()),
+        )
         .saturating_add(left.styles.len().saturating_mul(right.styles.len()))
         .saturating_add(left.resources.len().saturating_mul(right.resources.len()));
     conflicts
@@ -1868,6 +1986,27 @@ fn find_conflicts(
                 && left_change != right_change
             {
                 conflicts.push(Conflict::SectionName(left_name.to_owned()));
+            }
+        }
+    }
+    for left_change in &left.generated_indexes {
+        for right_change in &right.generated_indexes {
+            let (
+                GeneratedIndexChange::Rename {
+                    item: left_item,
+                    after: left_after,
+                    ..
+                },
+                GeneratedIndexChange::Rename {
+                    item: right_item,
+                    after: right_after,
+                    ..
+                },
+            ) = (left_change, right_change);
+            if left_item == right_item && left_change != right_change {
+                conflicts.push(Conflict::GeneratedIndex(*left_item));
+            } else if left_item != right_item && left_after == right_after {
+                conflicts.push(Conflict::GeneratedIndexName(left_after.clone()));
             }
         }
     }
@@ -2013,6 +2152,16 @@ fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
     }
     for link in &changes.links {
         edit.set_link(link.reference, link.after.clone())?;
+    }
+    for generated_index in &changes.generated_indexes {
+        if edit.generated_indexes.contains(generated_index) {
+            continue;
+        }
+        match generated_index {
+            GeneratedIndexChange::Rename { item, after, .. } => {
+                edit.rename_generated_index(*item, after.clone())?;
+            },
+        }
     }
     // Style additions/renames must be visible before strict section staging:
     // an added section may reference a style imported by the same patch.

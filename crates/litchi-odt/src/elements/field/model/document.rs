@@ -265,7 +265,11 @@ impl Field {
                     .element
                     .get_attribute("text:formula")
                     .map(str::to_owned),
-                value: parse_calculated_value(self, true)?.expect("required calculated value"),
+                value: parse_calculated_value(self, true)?.ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "text:variable-set requires a calculated value".to_string(),
+                    )
+                })?,
                 display: self
                     .element
                     .get_attribute("text:display")

@@ -8,9 +8,10 @@ use litchi_ods::{
     Builder, Cell, CellValue, Row, Sheet, Spreadsheet,
     document::{
         BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, Collision,
-        Drawing, DrawingFrame, EncryptionWritePolicy, FormControl, History, JoinFailure,
-        NumberStyleNode, Resource, RichRun, RichText, SecurityWritePolicy, SignatureWritePolicy,
-        Snapshot, StyleGraph, TextProperties, TextStyleNode,
+        Drawing, DrawingFrame, DrawingGeometry, DrawingGeometryKind, EncryptionWritePolicy,
+        FormControl, FormControlKind, FormEvent, History, JoinFailure, NumberStyleNode, Resource,
+        RichFormControl, RichRun, RichText, SecurityCapability, SecurityWritePolicy,
+        SignatureWritePolicy, Snapshot, StyleGraph, TextProperties, TextStyleNode,
     },
     model::{
         conditional_format::{Condition, Format},
@@ -75,6 +76,222 @@ fn deep_style_graph() -> StyleGraph {
             },
         ],
     }
+}
+
+#[test]
+fn automatic_style_replace_remove_and_package_resolution_are_durable() -> Result<()> {
+    let source = compact_source()?;
+    let snapshot = Snapshot::from_bytes(source)?;
+    let security = snapshot.security_capabilities()?;
+    assert_eq!(security.decrypt, SecurityCapability::NotApplicable);
+    assert_eq!(security.reencrypt, SecurityCapability::NotApplicable);
+    assert_eq!(security.sign, SecurityCapability::RefusedUnsupported);
+    let mut create = snapshot.edit();
+    create.put_style_graph(&deep_style_graph())?;
+    let created = create.commit()?;
+    let effective = created.snapshot().effective_cell_style("MoneyInput")?;
+    assert_eq!(
+        effective.lineage,
+        vec!["BaseInput".to_string(), "MoneyInput".to_string()]
+    );
+    assert_eq!(effective.data_style.as_deref(), Some("Money2"));
+    assert_eq!(effective.cell.background.as_deref(), Some("#fff4cc"));
+    let names = ["Money2", "StrongRun", "BaseInput", "MoneyInput"]
+        .map(str::to_string)
+        .to_vec();
+    let mut referenced = created.snapshot().edit();
+    referenced.set_cell_style("Data", 0, 0, "MoneyInput")?;
+    let referenced_before = referenced.as_bytes().to_vec();
+    assert!(referenced.remove_automatic_styles(&names).is_err());
+    assert_eq!(referenced.as_bytes(), referenced_before);
+
+    let mut replacement = deep_style_graph();
+    replacement.cell_styles[1].cell.background = Some("#cceeff".to_string());
+    replacement.cell_styles[1].text.bold = Some(true);
+    let mut replace = created.snapshot().edit();
+    replace.replace_style_graph(&replacement)?;
+    let replaced = replace.commit()?;
+    let effective = replaced.snapshot().effective_cell_style("MoneyInput")?;
+    assert_eq!(effective.cell.background.as_deref(), Some("#cceeff"));
+    assert_eq!(effective.text.bold, Some(true));
+    assert_eq!(
+        replaced
+            .patch()
+            .inverse()
+            .apply(replaced.snapshot())?
+            .snapshot()
+            .as_bytes(),
+        created.snapshot().as_bytes()
+    );
+
+    let mut remove = replaced.snapshot().edit();
+    remove.remove_automatic_styles(&names)?;
+    let removed = remove.commit()?;
+    let reopened = Spreadsheet::from_bytes(removed.snapshot().as_bytes().to_vec())?;
+    for name in names {
+        assert!(
+            !reopened
+                .content_xml()
+                .contains(&format!("style:name=\"{name}\""))
+        );
+    }
+    assert!(
+        removed
+            .snapshot()
+            .effective_cell_style("MoneyInput")
+            .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn package_style_resolution_crosses_common_and_automatic_parts() -> Result<()> {
+    let content = br##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.3"><office:automatic-styles><style:style style:name="AutoChild" style:family="table-cell" style:parent-style-name="CommonBase"><style:table-cell-properties fo:background-color="#ccffee" fo:text-align="end"/></style:style></office:automatic-styles><office:body><office:spreadsheet><table:table table:name="Data"><table:table-row><table:table-cell office:value-type="string"><text:p>seed</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"##;
+    let styles = br##"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.3"><office:styles><style:style style:name="CommonBase" style:family="table-cell"><style:table-cell-properties fo:background-color="#ffeecc"/><style:text-properties fo:font-weight="bold"/></style:style><style:style style:name="AutoChild" style:family="table-cell"><style:table-cell-properties fo:background-color="#000000"/></style:style></office:styles></office:document-styles>"##;
+    let package = support::raw_package(&[
+        ("content.xml", content, "text/xml"),
+        ("styles.xml", styles, "text/xml"),
+    ]);
+    let snapshot = Snapshot::from_bytes(package)?;
+    let effective = snapshot.effective_cell_style("AutoChild")?;
+    assert_eq!(
+        effective.lineage,
+        vec!["CommonBase".to_string(), "AutoChild".to_string()]
+    );
+    assert_eq!(effective.cell.background.as_deref(), Some("#ccffee"));
+    assert_eq!(effective.cell.horizontal_align.as_deref(), Some("end"));
+    assert_eq!(effective.text.bold, Some(true));
+    Ok(())
+}
+
+#[test]
+fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
+    let source = compact_source()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.set_rich_form_controls_with_resources(
+        &[
+            RichFormControl {
+                id: "choice".to_string(),
+                label: "Choice".to_string(),
+                kind: FormControlKind::Radio,
+                linked_cell: Some("Data.A1".to_string()),
+                source_range: None,
+                image_path: None,
+                events: vec![FormEvent {
+                    event_name: "dom:click".to_string(),
+                    macro_name: "application:ReviewChoice".to_string(),
+                }],
+            },
+            RichFormControl {
+                id: "date".to_string(),
+                label: "Date".to_string(),
+                kind: FormControlKind::Date,
+                linked_cell: None,
+                source_range: None,
+                image_path: None,
+                events: Vec::new(),
+            },
+            RichFormControl {
+                id: "choices".to_string(),
+                label: "Choices".to_string(),
+                kind: FormControlKind::ComboBox,
+                linked_cell: None,
+                source_range: Some("Data.A1:A1".to_string()),
+                image_path: None,
+                events: Vec::new(),
+            },
+            RichFormControl {
+                id: "preview".to_string(),
+                label: "Preview".to_string(),
+                kind: FormControlKind::Image,
+                linked_cell: None,
+                source_range: None,
+                image_path: None,
+                events: Vec::new(),
+            },
+            RichFormControl {
+                id: "time".to_string(),
+                label: "Time".to_string(),
+                kind: FormControlKind::Time,
+                linked_cell: None,
+                source_range: None,
+                image_path: None,
+                events: Vec::new(),
+            },
+        ],
+        Vec::new(),
+        Collision::Reject,
+    )?;
+    edit.put_drawing_geometry(
+        "Data",
+        &DrawingGeometry {
+            name: "Callout".to_string(),
+            kind: DrawingGeometryKind::Rectangle,
+            text: Some(RichText::new(vec![vec![RichRun::Text(
+                "Review".to_string(),
+            )]])?),
+            x_cm: 1.0,
+            y_cm: 1.5,
+            width_cm: 4.0,
+            height_cm: 2.0,
+            z_index: 3,
+        },
+    )?;
+    edit.put_drawing_geometry(
+        "Data",
+        &DrawingGeometry {
+            name: "Focus".to_string(),
+            kind: DrawingGeometryKind::Ellipse,
+            text: None,
+            x_cm: 6.0,
+            y_cm: 1.5,
+            width_cm: 2.0,
+            height_cm: 2.0,
+            z_index: 4,
+        },
+    )?;
+    edit.put_drawing_geometry(
+        "Data",
+        &DrawingGeometry {
+            name: "Connector".to_string(),
+            kind: DrawingGeometryKind::Line,
+            text: None,
+            x_cm: 4.0,
+            y_cm: 2.5,
+            width_cm: 2.0,
+            height_cm: 0.5,
+            z_index: 5,
+        },
+    )?;
+    let commit = edit.commit()?;
+    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    for expected in [
+        "<form:radio",
+        "<form:date",
+        "<form:combobox",
+        "<form:image",
+        "<form:time",
+        "script:event-name=\"dom:click\"",
+        "script:macro-name=\"application:ReviewChoice\"",
+        "<draw:rect",
+        "<draw:ellipse",
+        "<draw:line",
+        "draw:name=\"Callout\"",
+        "<text:p>Review</text:p>",
+    ] {
+        assert!(reopened.content_xml().contains(expected));
+    }
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())?
+            .snapshot()
+            .as_bytes(),
+        source
+    );
+    Ok(())
 }
 
 #[test]

@@ -625,8 +625,10 @@ pub fn parse_section_style_properties(xml: &[u8]) -> Result<SectionStyleProperti
                     let rank = child_rank(&namespace, local.as_ref())?;
                     check_child(rank, &mut last_rank, &mut seen)?;
                     if rank == 1 {
-                        properties.as_mut().expect("state").background_image =
-                            Some(parse_background(&reader, version, &start)?);
+                        properties
+                            .as_mut()
+                            .ok_or_else(|| invalid("missing section properties state"))?
+                            .background_image = Some(parse_background(&reader, version, &start)?);
                         background_depth = Some(depth);
                     }
                 }
@@ -649,8 +651,10 @@ pub fn parse_section_style_properties(xml: &[u8]) -> Result<SectionStyleProperti
                     let rank = child_rank(&namespace, local.as_ref())?;
                     check_child(rank, &mut last_rank, &mut seen)?;
                     if rank == 1 {
-                        properties.as_mut().expect("state").background_image =
-                            Some(parse_background(&reader, version, &start)?);
+                        properties
+                            .as_mut()
+                            .ok_or_else(|| invalid("missing section properties state"))?
+                            .background_image = Some(parse_background(&reader, version, &start)?);
                     }
                 }
             },

@@ -497,9 +497,10 @@ impl Edit {
     /// regions are refused rather than partially copied. An exact same-sheet,
     /// same-range transfer is a semantic no-op. Copying between distinct
     /// worksheets also clones selected one-/two-cell DrawingML anchors and
-    /// their picture-image leaves into collision-free package parts. Existing
-    /// target drawings, non-picture dependencies, and drawing-bearing moves are
-    /// atomically refused rather than partially transferred.
+    /// their closed image or relationship-free classic-chart leaves into
+    /// collision-free package parts. Existing target drawings, unsupported
+    /// dependency graphs, and drawing-bearing moves are atomically refused
+    /// rather than partially transferred.
     ///
     /// # Errors
     ///

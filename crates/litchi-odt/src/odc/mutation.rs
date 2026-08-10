@@ -388,7 +388,9 @@ fn scan_plot(xml: &str) -> Result<PlotScan> {
                     .as_ref()
                     .is_some_and(|(_, value, _, _)| *value == depth)
                 {
-                    let (_, _, item_start, value) = active.take().expect("active chart item");
+                    let (_, _, item_start, value) = active
+                        .take()
+                        .ok_or_else(|| make_error("missing completed chart item"))?;
                     match value {
                         AxisOrSeries::Axis(mut value) => {
                             value.span = Span {

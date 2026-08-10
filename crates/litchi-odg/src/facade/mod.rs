@@ -8,8 +8,9 @@ pub use crate::package::{
     ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
     DurablePatch, GeometryChange, History, HistoryLimits, JoinedEdits, LayerChange, Lineage,
     MergePlan, NameChange, PageNameChange, PageStyleChange, Patch, PathChange, PreparedEdit,
-    ResourceChange, SecurityStatus, SecurityWritePolicy, ShapeTransfer, Snapshot, StructureChange,
-    StyleChange, TextChange, Transaction, TransferControl, TransferResource, TransferStyle,
+    ResourceChange, SecurityCapabilities, SecurityStatus, SecurityWritePolicy, ShapeTransfer,
+    Snapshot, StructureChange, StyleChange, TextChange, Transaction, TransferControl,
+    TransferResource, TransferStyle, TransferStyleResource,
 };
 
 /// Immutable source-owning drawing facade.
@@ -132,6 +133,32 @@ impl Drawing {
         self.package.security()
     }
 
+    /// Returns the supported password and signature lifecycle for this source.
+    #[must_use]
+    pub fn security_capabilities(&self) -> SecurityCapabilities {
+        self.package.security_capabilities()
+    }
+
+    /// Reads inert document and macro signature metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when signature XML cannot be decoded safely.
+    pub fn digital_signatures(&self) -> Result<litchi_odf_common::signature::DigitalSignatures> {
+        self.package.digital_signatures()
+    }
+
+    /// Verifies signature math without making a certificate trust decision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when signature metadata or referenced bytes cannot be verified.
+    pub fn verify_document_signatures(
+        &self,
+    ) -> Result<Vec<litchi_odf_common::signature::SignatureVerification>> {
+        self.package.verify_document_signatures()
+    }
+
     /// Returns inert script, event, action, link, and embedded-object inventory.
     #[must_use]
     pub fn active_content(&self) -> ActiveContentStatus {
@@ -163,6 +190,12 @@ impl Drawing {
     #[must_use]
     pub fn style_definitions(&self) -> &[crate::style::Style] {
         self.package.style_definitions()
+    }
+
+    /// Returns inert named drawing resources referenced by automatic styles.
+    #[must_use]
+    pub fn style_resources(&self) -> &[crate::style_resource::StyleResource] {
+        self.package.style_resources()
     }
 
     /// Resolves a checked group subtree and its nested flattened descendants.

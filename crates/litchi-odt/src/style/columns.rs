@@ -382,7 +382,10 @@ pub fn parse(xml: &str) -> Result<Vec<Columns>> {
                         columns.child_depth = None;
                     }
                     if columns.depth == stack.len() {
-                        let columns = active.take().expect("active columns checked").value;
+                        let columns = active
+                            .take()
+                            .ok_or_else(|| make_error("missing completed columns element"))?
+                            .value;
                         columns.validate()?;
                         if result.len() >= MAX_COLUMN_GROUPS {
                             return invalid("XML exceeds 65536 style:columns values");
@@ -680,9 +683,12 @@ fn parse_color(value: &str) -> Result<(u8, u8, u8)> {
         .filter(|value| value.len() == 6 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
         .ok_or_else(|| make_error("invalid style:color"))?;
     Ok((
-        u8::from_str_radix(&hex[0..2], 16).expect("hex"),
-        u8::from_str_radix(&hex[2..4], 16).expect("hex"),
-        u8::from_str_radix(&hex[4..6], 16).expect("hex"),
+        u8::from_str_radix(&hex[0..2], 16)
+            .map_err(|error| make_error(format!("invalid red color component: {error}")))?,
+        u8::from_str_radix(&hex[2..4], 16)
+            .map_err(|error| make_error(format!("invalid green color component: {error}")))?,
+        u8::from_str_radix(&hex[4..6], 16)
+            .map_err(|error| make_error(format!("invalid blue color component: {error}")))?,
     ))
 }
 fn validate_length(value: &str) -> Result<()> {
@@ -804,9 +810,16 @@ fn replace_first_columns(xml: &str, replacement: &str) -> Result<String> {
             {
                 return splice_scoped(&wrapped, start, end, replacement, prefix_len, suffix_len);
             },
-            Event::Start(_) if active.is_some() => active.as_mut().expect("active").1 += 1,
+            Event::Start(_) if active.is_some() => {
+                active
+                    .as_mut()
+                    .ok_or_else(|| make_error("missing active columns range"))?
+                    .1 += 1;
+            },
             Event::End(_) if active.is_some() => {
-                let value = active.as_mut().expect("active");
+                let value = active
+                    .as_mut()
+                    .ok_or_else(|| make_error("missing active columns range"))?;
                 value.1 -= 1;
                 if value.1 == 0 {
                     return splice_scoped(

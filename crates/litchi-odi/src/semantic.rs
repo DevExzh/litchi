@@ -29,6 +29,7 @@ pub enum CapabilityState {
 pub struct SecurityCapabilities {
     external_links: CapabilityState,
     package_members: CapabilityState,
+    active_content: CapabilityState,
 }
 
 impl SecurityCapabilities {
@@ -42,6 +43,12 @@ impl SecurityCapabilities {
     #[must_use]
     pub const fn package_members(self) -> CapabilityState {
         self.package_members
+    }
+
+    /// Returns whether operations containing active-content constructs are accepted.
+    #[must_use]
+    pub const fn active_content(self) -> CapabilityState {
+        self.active_content
     }
 }
 
@@ -85,7 +92,18 @@ impl RewriteCapability {
 pub enum PublicationState {
     Ready,
     ConflictRefused,
+    ActiveContentRefused,
     PolicyRefused,
+}
+
+/// Lifecycle state of one exact style name/family dependency.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StyleDependencyState {
+    Absent,
+    Named,
+    Automatic,
+    EquivalentDuplicate,
+    Collision,
 }
 
 /// Security and allocation limits for semantic planning and publication.
@@ -99,6 +117,7 @@ pub struct SecurityPolicy {
     max_map_areas: usize,
     allow_external_links: bool,
     allow_package_members: bool,
+    allow_active_content: bool,
 }
 
 impl SecurityPolicy {
@@ -114,6 +133,7 @@ impl SecurityPolicy {
             max_map_areas: 10_000,
             allow_external_links: false,
             allow_package_members: true,
+            allow_active_content: false,
         }
     }
 
@@ -128,6 +148,13 @@ impl SecurityPolicy {
     #[must_use]
     pub const fn with_package_members(mut self, allow: bool) -> Self {
         self.allow_package_members = allow;
+        self
+    }
+
+    /// Sets whether semantic operations may carry active-content constructs.
+    #[must_use]
+    pub const fn with_active_content(mut self, allow: bool) -> Self {
+        self.allow_active_content = allow;
         self
     }
 
@@ -187,6 +214,11 @@ impl SecurityPolicy {
             } else {
                 CapabilityState::Refused
             },
+            active_content: if self.allow_active_content {
+                CapabilityState::Allowed
+            } else {
+                CapabilityState::Refused
+            },
         }
     }
 }
@@ -202,6 +234,7 @@ impl Default for SecurityPolicy {
             max_map_areas: 100_000,
             allow_external_links: true,
             allow_package_members: true,
+            allow_active_content: true,
         }
     }
 }
@@ -430,6 +463,13 @@ impl SemanticPlan {
     pub fn publication_state(&self, policy: &SecurityPolicy) -> PublicationState {
         if !self.conflicts.is_empty() {
             PublicationState::ConflictRefused
+        } else if !policy.allow_active_content
+            && self
+                .operations
+                .iter()
+                .any(|operation| operation_contains_active_content(operation).unwrap_or(true))
+        {
+            PublicationState::ActiveContentRefused
         } else if validate_operations(&self.operations, policy).is_err() {
             PublicationState::PolicyRefused
         } else {
@@ -864,6 +904,34 @@ fn complete_style_dependency(
 enum StyleContainer {
     Named,
     Automatic,
+}
+
+pub(crate) fn inspect_style_dependency(
+    content_xml: &str,
+    styles_xml: Option<&str>,
+    name: &str,
+    family: &str,
+) -> Result<StyleDependencyState> {
+    let content = scan_style_document(content_xml, name, family)?;
+    let styles = styles_xml
+        .map(|xml| scan_style_document(xml, name, family))
+        .transpose()?;
+    match (
+        content.definition.as_ref(),
+        styles
+            .as_ref()
+            .and_then(|document| document.definition.as_ref()),
+    ) {
+        (None, None) => Ok(StyleDependencyState::Absent),
+        (Some(definition), None) | (None, Some(definition)) => Ok(match definition.container {
+            StyleContainer::Named => StyleDependencyState::Named,
+            StyleContainer::Automatic => StyleDependencyState::Automatic,
+        }),
+        (Some(left), Some(right)) if definitions_match(left, right) => {
+            Ok(StyleDependencyState::EquivalentDuplicate)
+        },
+        (Some(_), Some(_)) => Ok(StyleDependencyState::Collision),
+    }
 }
 
 struct StyleDefinition<'a> {
@@ -1631,6 +1699,9 @@ fn validate_operations(operations: &[SemanticOperation], policy: &SecurityPolicy
         return Err(invalid("ODI semantic operation bytes exceed patch policy"));
     }
     for operation in operations {
+        if !policy.allow_active_content && operation_contains_active_content(operation)? {
+            return Err(invalid("ODI active content is refused by policy"));
+        }
         for value in [operation.before(), operation.after()] {
             match value {
                 SemanticValue::Text(Some(text)) if text.len() > policy.max_text_bytes => {
@@ -1669,6 +1740,22 @@ fn validate_operations(operations: &[SemanticOperation], policy: &SecurityPolicy
         }
     }
     Ok(())
+}
+
+fn operation_contains_active_content(operation: &SemanticOperation) -> Result<bool> {
+    if let OperationKey::Resource(path) = operation.key()
+        && crate::active::is_package_script_member(path)
+        && matches!(operation.after(), SemanticValue::Resource(Some(_)))
+    {
+        return Ok(true);
+    }
+    if let SemanticValue::Xml(Some(xml)) = operation.after()
+        && !crate::active::scan_xml(xml, crate::active::ActiveContentLocation::StylesXml)?
+            .is_empty()
+    {
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 fn operation_size(operation: &SemanticOperation) -> usize {
@@ -1779,4 +1866,75 @@ fn artifact_conflict(kind: ConflictKind) -> Conflict {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
+
+    use super::*;
+
+    const EMPTY: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"/>"#;
+    const NAMED: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:styles><style:style style:name="gr1" style:family="graphic"/></office:styles></office:document-styles>"#;
+    const AUTOMATIC: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:automatic-styles><style:style style:name="gr1" style:family="graphic"/></office:automatic-styles></office:document-styles>"#;
+    const COLLIDING: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:styles><style:style style:name="gr1" style:family="graphic" style:display-name="Other"/></office:styles></office:document-styles>"#;
+    const ACTIVE: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"><office:script script:language="python"/></office:document-styles>"#;
+
+    #[test]
+    fn style_dependency_states_cover_the_exact_cross_part_lifecycle() {
+        assert_eq!(
+            inspect_style_dependency(EMPTY, None, "gr1", "graphic").unwrap(),
+            StyleDependencyState::Absent
+        );
+        assert_eq!(
+            inspect_style_dependency(NAMED, None, "gr1", "graphic").unwrap(),
+            StyleDependencyState::Named
+        );
+        assert_eq!(
+            inspect_style_dependency(AUTOMATIC, None, "gr1", "graphic").unwrap(),
+            StyleDependencyState::Automatic
+        );
+        assert_eq!(
+            inspect_style_dependency(AUTOMATIC, Some(AUTOMATIC), "gr1", "graphic").unwrap(),
+            StyleDependencyState::EquivalentDuplicate
+        );
+        assert_eq!(
+            inspect_style_dependency(NAMED, Some(COLLIDING), "gr1", "graphic").unwrap(),
+            StyleDependencyState::Collision
+        );
+    }
+
+    #[test]
+    fn strict_active_content_lifecycle_refuses_introduction_but_allows_removal() {
+        let introduction = SemanticOperation {
+            key: OperationKey::Styles,
+            before: SemanticValue::Xml(None),
+            after: SemanticValue::Xml(Some(ACTIVE.to_owned())),
+        };
+        let removal = introduction.inverse();
+        let introducing_plan = SemanticPlan {
+            operations: vec![introduction],
+            conflicts: Vec::new(),
+        };
+        let removal_plan = SemanticPlan {
+            operations: vec![removal],
+            conflicts: Vec::new(),
+        };
+        assert_eq!(
+            SecurityPolicy::strict().capabilities().active_content(),
+            CapabilityState::Refused
+        );
+        assert_eq!(
+            introducing_plan.publication_state(&SecurityPolicy::strict()),
+            PublicationState::ActiveContentRefused
+        );
+        assert_eq!(
+            introducing_plan.publication_state(&SecurityPolicy::default()),
+            PublicationState::Ready
+        );
+        assert_eq!(
+            removal_plan.publication_state(&SecurityPolicy::strict()),
+            PublicationState::Ready
+        );
+    }
 }

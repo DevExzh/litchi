@@ -79,6 +79,44 @@ pub enum ChangedWriteDisposition {
     RefusedEncrypted,
 }
 
+/// Publication capability for a cryptographic package lifecycle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CryptographicWriteCapability {
+    /// This crate cannot create the cryptographic artifact.
+    Unavailable,
+    /// An existing artifact can only be retained by an exact no-op.
+    ExactPreservationOnly,
+}
+
+/// Typed closure over all security-relevant write capabilities.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WriteCapabilities {
+    changed: ChangedWriteDisposition,
+    signatures: CryptographicWriteCapability,
+    encryption: CryptographicWriteCapability,
+}
+
+impl WriteCapabilities {
+    /// Returns the disposition for ordinary changed package bytes.
+    #[must_use]
+    pub const fn changed(&self) -> ChangedWriteDisposition {
+        self.changed
+    }
+
+    /// Returns signature creation/update capability.
+    #[must_use]
+    pub const fn signatures(&self) -> CryptographicWriteCapability {
+        self.signatures
+    }
+
+    /// Returns encryption creation/update capability.
+    #[must_use]
+    pub const fn encryption(&self) -> CryptographicWriteCapability {
+        self.encryption
+    }
+}
+
 /// Immutable security state projected when the package is opened.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct State {
@@ -117,6 +155,24 @@ impl State {
             ChangedWriteDisposition::Allowed
         } else {
             ChangedWriteDisposition::RequiresInertActiveContentOptIn
+        }
+    }
+
+    /// Returns the closed signature, encryption, and changed-write capability.
+    #[must_use]
+    pub const fn write_capabilities(&self) -> WriteCapabilities {
+        WriteCapabilities {
+            changed: self.changed_write_disposition(),
+            signatures: if self.signed {
+                CryptographicWriteCapability::ExactPreservationOnly
+            } else {
+                CryptographicWriteCapability::Unavailable
+            },
+            encryption: if self.encrypted {
+                CryptographicWriteCapability::ExactPreservationOnly
+            } else {
+                CryptographicWriteCapability::Unavailable
+            },
         }
     }
 }

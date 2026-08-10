@@ -444,10 +444,10 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "fill-image" {
                         return invalid("unexpected draw:fill-image end element");
                     }
-                    result.images.push(finish_fill(
-                        active.take().expect("active fill image checked"),
-                        &mut inline_total,
-                    )?);
+                    let fill = active
+                        .take()
+                        .ok_or_else(|| make_error("missing completed fill image"))?;
+                    result.images.push(finish_fill(fill, &mut inline_total)?);
                 }
             },
             Event::Text(ref text) if active.is_some() => {
@@ -459,11 +459,10 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                     .and_then(|fill| fill.binary_parent_depth)
                     .is_some()
                 {
-                    append_base64(
-                        active.as_mut().expect("active binary fill image"),
-                        &value,
-                        &mut aggregate,
-                    )?;
+                    let fill = active
+                        .as_mut()
+                        .ok_or_else(|| make_error("missing active binary fill image"))?;
+                    append_base64(fill, &value, &mut aggregate)?;
                 } else if !value.chars().all(char::is_whitespace) {
                     return invalid("draw:fill-image may contain only office:binary-data");
                 }
@@ -477,11 +476,10 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
                 let value = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| make_error(format!("invalid fill-image CDATA: {error}")))?;
-                append_base64(
-                    active.as_mut().expect("active binary fill image"),
-                    &value,
-                    &mut aggregate,
-                )?;
+                let fill = active
+                    .as_mut()
+                    .ok_or_else(|| make_error("missing active binary fill image"))?;
+                append_base64(fill, &value, &mut aggregate)?;
             },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
                 return invalid("draw:fill-image contains unsupported character data");

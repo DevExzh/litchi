@@ -285,13 +285,12 @@ impl WorkbookEdit {
         self.transfer_cell(&donor, sheet, reference, sheet, reference)
     }
 
-    /// Add one dependency-closed embedded image to a worksheet without an
-    /// existing Drawing part.
+    /// Add one dependency-closed embedded image to a worksheet.
     ///
     /// The image payload, DrawingML part, relationships, and binary
-    /// `BrtDrawing` link are replayed as one semantic root operation. Existing
-    /// drawings are refused so unknown anchors and relationship IDs are never
-    /// rewritten speculatively.
+    /// `BrtDrawing` link are replayed as one semantic root operation. For an
+    /// existing standard drawing, the new anchor is inserted before the root
+    /// close while all prior XML bytes, anchors, and relationships are retained.
     pub fn insert_image(&mut self, sheet: usize, image: crate::writer::Image) -> Result<()> {
         let operation = Operation::AddImage {
             sheet,
@@ -901,19 +900,47 @@ fn insert_candidate_cell(
 fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<()> {
     let worksheet_uri = workbook.worksheet_uri(sheet)?;
     let worksheet_source = workbook.package.get_part(&worksheet_uri)?.blob().to_vec();
-    if Records::new(&worksheet_source).any(|item| {
-        item.is_ok_and(|record| {
-            matches!(
-                record.kind(),
-                kind::DRAWING | kind::LEGACY_DRAWING | kind::LEGACY_DRAWING_HF
-            )
-        })
-    }) {
-        return Err(Error::UnsupportedFeature(
-            "image authoring into an existing worksheet drawing is refused".to_string(),
-        ));
+    let mut drawing_rel_id = None;
+    for item in Records::new(&worksheet_source) {
+        let record = item?;
+        if record.kind() == kind::DRAWING {
+            if drawing_rel_id.is_some() {
+                return Err(Error::UnsupportedFeature(
+                    "worksheet contains multiple BrtDrawing records".to_string(),
+                ));
+            }
+            let mut cursor = crate::raw::Cursor::new(record.payload(), "BrtDrawing");
+            drawing_rel_id = Some(cursor.read_wide_string()?);
+        }
     }
     let image = plan.image()?;
+    if let Some(drawing_rel_id) = drawing_rel_id {
+        return append_image(
+            workbook,
+            sheet,
+            &worksheet_uri,
+            &drawing_rel_id,
+            plan,
+            &image,
+        );
+    }
+    if workbook
+        .package
+        .get_part(&worksheet_uri)?
+        .rels()
+        .iter()
+        .any(|relationship| {
+            matches!(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::DRAWING
+                    | litchi_opc::constants::relationship_type::STRICT_DRAWING
+            )
+        })
+    {
+        return Err(Error::UnsupportedFeature(
+            "worksheet has a Drawing relationship without BrtDrawing ownership".to_string(),
+        ));
+    }
     let search_end = u32::try_from(workbook.package.iter_parts().count().saturating_add(1))
         .map_err(|error| {
             Error::InvalidFormat(format!("drawing part search bound exceeds u32: {error}"))
@@ -952,14 +979,7 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         litchi_opc::constants::content_type::OFC_DRAWING.to_string(),
         drawing_xml,
     );
-    let strict = package
-        .iter_parts()
-        .flat_map(|part| part.rels().iter())
-        .any(|relationship| {
-            relationship
-                .reltype()
-                .starts_with("http://purl.oclc.org/ooxml/")
-        });
+    let strict = is_strict(&package);
     drawing_part.rels_mut().add_relationship(
         if strict {
             litchi_opc::constants::relationship_type::STRICT_IMAGE
@@ -1008,6 +1028,109 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         ));
     }
     Ok(())
+}
+
+fn append_image(
+    workbook: &mut Workbook,
+    sheet: usize,
+    worksheet_uri: &PackURI,
+    drawing_rel_id: &str,
+    plan: &ImagePlan,
+    image: &crate::writer::Image,
+) -> Result<()> {
+    let worksheet_part = workbook.package.get_part(worksheet_uri)?;
+    let relationship = worksheet_part.rels().get(drawing_rel_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "BrtDrawing relationship {drawing_rel_id:?} is absent"
+        ))
+    })?;
+    if relationship.is_external()
+        || !matches!(
+            relationship.reltype(),
+            litchi_opc::constants::relationship_type::DRAWING
+                | litchi_opc::constants::relationship_type::STRICT_DRAWING
+        )
+    {
+        return Err(Error::InvalidFormat(
+            "BrtDrawing relationship is external or has the wrong type".to_string(),
+        ));
+    }
+    let drawing_uri = relationship.target_partname()?;
+    let drawing = workbook.sheet_drawing(sheet).ok_or_else(|| {
+        Error::InvalidFormat("BrtDrawing has no decoded DrawingML inventory".to_string())
+    })?;
+    let before_images = drawing.images.len();
+    let object_id = crate::package::drawing_write::next_drawing_object_id(
+        workbook.package.get_part(&drawing_uri)?.blob(),
+    )?;
+    let media_index = free_media_index(&workbook.package, plan.format.extension())?;
+    let media_uri = PackURI::new(format!(
+        "/xl/media/image{media_index}.{}",
+        plan.format.extension()
+    ))?;
+    let strict = is_strict(&workbook.package);
+    let mut package = workbook.package.clone();
+    package.try_add_part(Box::new(BlobPart::new(
+        media_uri,
+        plan.format.content_type().to_string(),
+        plan.data.to_vec(),
+    )))?;
+    let drawing_part = package.get_part_mut(&drawing_uri)?;
+    let image_rel_id = drawing_part.relate_to(
+        &format!("../media/image{media_index}.{}", plan.format.extension()),
+        if strict {
+            litchi_opc::constants::relationship_type::STRICT_IMAGE
+        } else {
+            litchi_opc::constants::relationship_type::IMAGE
+        },
+    );
+    let drawing_xml = crate::package::drawing_write::append_image_anchor(
+        drawing_part.blob(),
+        image,
+        object_id,
+        &image_rel_id,
+    )?;
+    drawing_part.set_blob(drawing_xml);
+    package.unsign();
+    *workbook = Workbook::from_opc_package(package)?;
+    let drawing = workbook.sheet_drawing(sheet).ok_or_else(|| {
+        Error::InvalidFormat("appended worksheet drawing failed semantic readback".to_string())
+    })?;
+    let expected_images = before_images
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormat("drawing image count overflow".to_string()))?;
+    if drawing.images.len() != expected_images
+        || drawing.images.last().map(|value| value.data.as_ref()) != Some(plan.data.as_ref())
+    {
+        return Err(Error::InvalidFormat(
+            "appended image dependency failed semantic readback".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn free_media_index(package: &litchi_opc::OpcPackage, extension: &str) -> Result<u32> {
+    let search_end =
+        u32::try_from(package.iter_parts().count().saturating_add(1)).map_err(|error| {
+            Error::InvalidFormat(format!("media part search bound exceeds u32: {error}"))
+        })?;
+    (1..=search_end)
+        .find(|index| {
+            PackURI::new(format!("/xl/media/image{index}.{extension}"))
+                .is_ok_and(|uri| !package.contains_part(&uri))
+        })
+        .ok_or_else(|| Error::UnsupportedFeature("no image part index remains".to_string()))
+}
+
+fn is_strict(package: &litchi_opc::OpcPackage) -> bool {
+    package
+        .iter_parts()
+        .flat_map(|part| part.rels().iter())
+        .any(|relationship| {
+            relationship
+                .reltype()
+                .starts_with("http://purl.oclc.org/ooxml/")
+        })
 }
 
 fn transfer_cell(
@@ -1078,7 +1201,9 @@ fn transfer_cell(
     let uri = target.worksheet_uri(target_sheet)?;
     let mut edit = super::workbook::read(&package, &uri)?.edit();
     if let Some(formula) = source_cell.formula() {
-        edit.insert_formula(target_reference, style, value, formula.clone())?;
+        let formula =
+            super::formula_transfer::remap(&source, target, source_sheet, target_sheet, formula)?;
+        edit.insert_formula(target_reference, style, value, formula)?;
     } else {
         edit.insert(target_reference, style, value)?;
     }

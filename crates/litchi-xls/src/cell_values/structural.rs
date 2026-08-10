@@ -76,6 +76,11 @@ pub(super) fn apply(
         let sheet = operation_sheet(change);
         by_sheet.entry(sheet).or_default().push(change);
     }
+    for resource in resources {
+        if let super::ResourceChange::FormulaCell { sheet, .. } = resource {
+            by_sheet.entry(*sheet).or_default();
+        }
+    }
     // Rewriting later streams first keeps earlier absolute offsets stable and
     // minimizes the number of BoundSheet position adjustments.
     for (sheet, operations) in by_sheet.into_iter().rev() {
@@ -163,20 +168,28 @@ pub(super) fn certify_shift(source: &super::Snapshot, sheet: usize) -> Result<()
 fn resource_insert(resource: &super::ResourceChange) -> bool {
     match resource {
         super::ResourceChange::SharedString { insert, .. }
-        | super::ResourceChange::ExtendedFormat { insert, .. } => *insert,
+        | super::ResourceChange::RichSharedString { insert, .. }
+        | super::ResourceChange::ExtendedFormat { insert, .. }
+        | super::ResourceChange::FormulaCell { insert, .. } => *insert,
     }
 }
 
 fn apply_resource(workbook: &mut Vec<u8>, resource: &super::ResourceChange) -> Result<()> {
     match resource {
         super::ResourceChange::SharedString { text, insert } => {
-            apply_shared_string_resource(workbook, text, *insert)
+            apply_shared_string_resource(workbook, text, &[], *insert)
         },
+        super::ResourceChange::RichSharedString {
+            text,
+            formatting_runs,
+            insert,
+        } => apply_shared_string_resource(workbook, text, formatting_runs, *insert),
         super::ResourceChange::ExtendedFormat {
             index,
             payload,
             insert,
         } => apply_xf_resource(workbook, *index, payload, *insert),
+        super::ResourceChange::FormulaCell { .. } => Ok(()),
     }
 }
 
@@ -192,7 +205,12 @@ fn workbook_globals(workbook: &[u8]) -> Result<Vec<RawRecord>> {
     Ok(globals)
 }
 
-fn apply_shared_string_resource(workbook: &mut Vec<u8>, text: &str, insert: bool) -> Result<()> {
+fn apply_shared_string_resource(
+    workbook: &mut Vec<u8>,
+    text: &str,
+    formatting_runs: &[crate::records::SharedStringFormatRun],
+    insert: bool,
+) -> Result<()> {
     let globals = workbook_globals(workbook)?;
     if globals.iter().any(|record| record.kind == EXT_SST) {
         return Err(Error::UnsafeEdit(
@@ -215,7 +233,7 @@ fn apply_shared_string_resource(workbook: &mut Vec<u8>, text: &str, insert: bool
         last = record;
     }
     if insert {
-        let records = encode_sst_tail_records(text)?;
+        let records = encode_sst_tail_records(text, formatting_runs)?;
         let total = records
             .iter()
             .try_fold(0_usize, |total, record| total.checked_add(record.len()));
@@ -235,7 +253,7 @@ fn apply_shared_string_resource(workbook: &mut Vec<u8>, text: &str, insert: bool
         workbook[sst.start + 8..sst.start + 12].copy_from_slice(&updated.to_le_bytes());
         return Ok(());
     }
-    let expected = encode_sst_tail_records(text)?;
+    let expected = encode_sst_tail_records(text, formatting_runs)?;
     let authored_count = expected.len();
     let family: Vec<_> = globals[sst_index + 1..]
         .iter()
@@ -273,7 +291,10 @@ fn apply_shared_string_resource(workbook: &mut Vec<u8>, text: &str, insert: bool
     )
 }
 
-fn encode_sst_tail_records(text: &str) -> Result<Vec<Vec<u8>>> {
+fn encode_sst_tail_records(
+    text: &str,
+    formatting_runs: &[crate::records::SharedStringFormatRun],
+) -> Result<Vec<Vec<u8>>> {
     let unit_count = text.encode_utf16().count();
     let count = u16::try_from(unit_count)
         .map_err(|_error| Error::UnsafeEdit("shared string exceeds u16 characters".into()))?;
@@ -291,7 +312,11 @@ fn encode_sst_tail_records(text: &str) -> Result<Vec<Vec<u8>>> {
         .try_reserve(1 + unit_count / 4_111)
         .map_err(|_error| Error::Allocation("retaining continued SST records"))?;
     loop {
-        let prefix = if first { 3 } else { 1 };
+        let prefix = if first {
+            3 + if formatting_runs.is_empty() { 0 } else { 2 }
+        } else {
+            1
+        };
         let capacity = (8_224 - prefix) / width;
         let mut end = units.len().min(offset.saturating_add(capacity));
         if end < units.len()
@@ -305,7 +330,21 @@ fn encode_sst_tail_records(text: &str) -> Result<Vec<Vec<u8>>> {
         if first {
             payload.extend_from_slice(&count.to_le_bytes());
         }
-        payload.push(u8::from(!compressed));
+        payload.push(
+            u8::from(!compressed)
+                | if first && !formatting_runs.is_empty() {
+                    1 << 3
+                } else {
+                    0
+                },
+        );
+        if first && !formatting_runs.is_empty() {
+            payload.extend_from_slice(
+                &u16::try_from(formatting_runs.len())
+                    .map_err(|_error| Error::InvalidData("SST rich-run count exceeds u16".into()))?
+                    .to_le_bytes(),
+            );
+        }
         for unit in &units[offset..end] {
             if compressed {
                 payload.push(u8::try_from(*unit).map_err(|_error| {
@@ -329,6 +368,40 @@ fn encode_sst_tail_records(text: &str) -> Result<Vec<Vec<u8>>> {
         }
         offset = end;
         first = false;
+    }
+    if !formatting_runs.is_empty() {
+        records
+            .try_reserve(1 + formatting_runs.len() / 2_056)
+            .map_err(|_error| Error::Allocation("retaining rich SST Continue records"))?;
+        let mut run_bytes = Vec::new();
+        run_bytes
+            .try_reserve_exact(formatting_runs.len().saturating_mul(4))
+            .map_err(|_error| Error::Allocation("retaining SST formatting runs"))?;
+        for run in formatting_runs {
+            run_bytes.extend_from_slice(&run.character_index.to_le_bytes());
+            run_bytes.extend_from_slice(&run.font_index.to_le_bytes());
+        }
+        let mut offset = 0_usize;
+        while offset < run_bytes.len() {
+            let last = records.last_mut().ok_or_else(|| {
+                Error::InvalidData("SST rich string has no character record".into())
+            })?;
+            let available = 8_228_usize.saturating_sub(last.len());
+            let aligned = available - available % 4;
+            if aligned == 0 {
+                let mut record = Vec::with_capacity(8_228.min(4 + run_bytes.len() - offset));
+                record.extend_from_slice(&CONTINUE.to_le_bytes());
+                record.extend_from_slice(&0_u16.to_le_bytes());
+                records.push(record);
+                continue;
+            }
+            let count = aligned.min(run_bytes.len() - offset);
+            last.extend_from_slice(&run_bytes[offset..offset + count]);
+            let payload_len = u16::try_from(last.len() - 4)
+                .map_err(|_error| Error::InvalidData("SST rich payload exceeds u16".into()))?;
+            last[2..4].copy_from_slice(&payload_len.to_le_bytes());
+            offset += count;
+        }
     }
     Ok(records)
 }
@@ -502,6 +575,7 @@ fn rewrite_worksheet(
     let replacement = rebuild_sheet(
         worksheet,
         start,
+        sheet,
         source,
         operations,
         resources,
@@ -545,6 +619,7 @@ fn certify_workbook_shift(workbook: &[u8]) -> Result<()> {
 fn rebuild_sheet(
     worksheet: &[u8],
     absolute_start: usize,
+    sheet: usize,
     source: &super::Snapshot,
     operations: &[&StructuralChange],
     resources: &[super::ResourceChange],
@@ -615,6 +690,25 @@ fn rebuild_sheet(
                 shift_columns(&mut rows, *start, *count, *insert)?;
             },
             StructuralChange::RenameSheet { .. } => {},
+        }
+    }
+    let mut formula_resources: Vec<_> = resources
+        .iter()
+        .filter(|resource| {
+            matches!(resource, super::ResourceChange::FormulaCell { sheet: owner, .. } if *owner == sheet)
+        })
+        .collect();
+    formula_resources.sort_by_key(|resource| super::resource_target(resource));
+    for resource in formula_resources {
+        if let super::ResourceChange::FormulaCell {
+            sheet: _,
+            reference,
+            style,
+            tokens,
+            insert,
+        } = resource
+        {
+            apply_formula_cell_resource(&mut rows, *reference, *style, tokens, *insert)?;
         }
     }
     patch_row_extents(&mut rows)?;
@@ -980,6 +1074,90 @@ fn apply_cell_change(
     Ok(())
 }
 
+fn apply_formula_cell_resource(
+    rows: &mut BTreeMap<u16, RowData>,
+    reference: Reference,
+    style: StyleIndex,
+    tokens: &[u8],
+    insert: bool,
+) -> Result<()> {
+    let mut found = None;
+    if let Some(row) = rows.get(&reference.row()) {
+        for (index, record) in row.cell_records.iter().enumerate() {
+            if record_contains_reference(record, reference)? && found.replace(index).is_some() {
+                return Err(Error::UnsafeEdit(
+                    "authored Formula target is ambiguous".into(),
+                ));
+            }
+        }
+    }
+    if insert {
+        if found.is_some() {
+            return Err(Error::UnsafeEdit(
+                "authored Formula insertion target is occupied".into(),
+            ));
+        }
+        if let std::collections::btree_map::Entry::Vacant(row) = rows.entry(reference.row()) {
+            let mut row_record = Vec::new();
+            crate::writer::biff::write_row(
+                &mut row_record,
+                u32::from(reference.row()),
+                u16::from(reference.column()),
+                u16::from(reference.column()) + 1,
+                255,
+                false,
+            )?;
+            row.insert(RowData {
+                row_record,
+                cell_records: Vec::new(),
+            });
+        }
+        let mut record = Vec::new();
+        crate::writer::biff::write_formula(
+            &mut record,
+            u32::from(reference.row()),
+            u16::from(reference.column()),
+            style.get(),
+            tokens,
+        )?;
+        rows.get_mut(&reference.row())
+            .ok_or_else(|| Error::InvalidData("authored Formula ROW disappeared".into()))?
+            .cell_records
+            .push(record);
+        return Ok(());
+    }
+    let index =
+        found.ok_or_else(|| Error::UnsafeEdit("authored Formula target is absent".into()))?;
+    let row = rows
+        .get_mut(&reference.row())
+        .ok_or_else(|| Error::InvalidData("authored Formula ROW disappeared".into()))?;
+    let record = &row.cell_records[index];
+    let mut expected = Vec::new();
+    crate::writer::biff::write_formula(
+        &mut expected,
+        u32::from(reference.row()),
+        u16::from(reference.column()),
+        style.get(),
+        tokens,
+    )?;
+    if record.as_slice() != expected.as_slice() {
+        return Err(Error::UnsafeEdit(
+            "authored Formula inverse state is stale".into(),
+        ));
+    }
+    if row
+        .cell_records
+        .get(index.saturating_add(1))
+        .is_some_and(|next| record_kind(next).is_ok_and(|kind| matches!(kind, STRING | CONTINUE)))
+    {
+        return Err(Error::UnsafeEdit(
+            "authored Formula inverse refuses a string-cache owner group".into(),
+        ));
+    }
+    row.cell_records.remove(index);
+    Ok(())
+}
+
 fn remove_cell_record(
     records: &mut Vec<Vec<u8>>,
     index: usize,
@@ -1003,10 +1181,21 @@ fn remove_cell_record(
     let item = usize::from(target.checked_sub(first).ok_or_else(|| {
         Error::UnsafeEdit("packed deletion target precedes its MulRk range".into())
     })?);
-    if item >= count || item != 0 && item + 1 != count {
+    if item >= count {
         return Err(Error::UnsafeEdit(
-            "only an edge member of a MulRk range can be deleted losslessly".into(),
+            "packed deletion target exceeds its MulRk range".into(),
         ));
+    }
+    if item != 0 && item + 1 != count {
+        let (_, _, items) = decode_rk_items(record)?;
+        let right_first = target
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidData("MulRk split column overflow".into()))?;
+        let left = encode_rk_segment(reference.row(), first, &items[..item])?;
+        let right = encode_rk_segment(reference.row(), right_first, &items[item + 1..])?;
+        records[index] = left;
+        records.insert(index + 1, right);
+        return Ok(());
     }
     if count == 2 {
         let remaining = usize::from(item == 0);
@@ -1066,7 +1255,7 @@ fn insert_packed_rk(
         .get_mut(&reference.row())
         .ok_or_else(|| Error::UnsafeEdit("MulRk inverse has no adjacent ROW".into()))?;
     let target = u16::from(reference.column());
-    let mut candidate = None;
+    let mut candidates = Vec::new();
     for (index, record) in row.cell_records.iter().enumerate() {
         let kind = record_kind(record)?;
         let adjacent = if kind == MUL_RK {
@@ -1079,13 +1268,56 @@ fn insert_packed_rk(
         } else {
             false
         };
-        if adjacent && candidate.replace(index).is_some() {
-            return Err(Error::UnsafeEdit(
-                "MulRk inverse has ambiguous adjacent packed records".into(),
-            ));
+        if adjacent {
+            candidates
+                .try_reserve(1)
+                .map_err(|_error| Error::Allocation("retaining adjacent packed records"))?;
+            candidates.push(index);
         }
     }
-    let index = candidate.ok_or_else(|| {
+    if candidates.len() == 2 {
+        let left_index = candidates[0];
+        let right_index = candidates[1];
+        let (left_row, left_first, mut left_items) =
+            decode_rk_items(&row.cell_records[left_index])?;
+        let (right_row, right_first, right_items) =
+            decode_rk_items(&row.cell_records[right_index])?;
+        if left_row != reference.row() || right_row != reference.row() {
+            return Err(Error::UnsafeEdit(
+                "MulRk inverse adjacent records belong to another row".into(),
+            ));
+        }
+        let left_last =
+            left_first
+                .checked_add(u16::try_from(left_items.len().saturating_sub(1)).map_err(
+                    |_error| Error::InvalidData("packed inverse span exceeds u16".into()),
+                )?)
+                .ok_or_else(|| Error::InvalidData("packed inverse span overflows".into()))?;
+        if left_last.checked_add(1) != Some(target) || target.checked_add(1) != Some(right_first) {
+            return Err(Error::UnsafeEdit(
+                "MulRk inverse adjacent records do not bracket the restored cell".into(),
+            ));
+        }
+        left_items
+            .try_reserve(
+                right_items
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidData("MulRk merge size overflow".into()))?,
+            )
+            .map_err(|_error| Error::Allocation("merging split MulRk records"))?;
+        left_items.push((state.2.get(), encoded));
+        left_items.extend(right_items);
+        row.cell_records[left_index] = encode_mul_rk(reference.row(), left_first, &left_items)?;
+        row.cell_records.remove(right_index);
+        return Ok(());
+    }
+    if candidates.len() > 2 {
+        return Err(Error::UnsafeEdit(
+            "MulRk inverse has ambiguous adjacent packed records".into(),
+        ));
+    }
+    let index = candidates.first().copied().ok_or_else(|| {
         Error::UnsafeEdit("MulRk inverse cannot find its adjacent packed record".into())
     })?;
     if record_kind(&row.cell_records[index])? == RK {
@@ -1137,6 +1369,11 @@ fn insert_packed_rk(
 }
 
 fn encode_mul_rk(row: u16, first_column: u16, items: &[(u16, u32)]) -> Result<Vec<u8>> {
+    if items.is_empty() {
+        return Err(Error::InvalidData(
+            "MulRk record requires at least one item".into(),
+        ));
+    }
     let item_bytes = items
         .len()
         .checked_mul(6)
@@ -1165,6 +1402,78 @@ fn encode_mul_rk(row: u16, first_column: u16, items: &[(u16, u32)]) -> Result<Ve
     }
     record.extend_from_slice(&last_column.to_le_bytes());
     Ok(record)
+}
+
+fn decode_rk_items(record: &[u8]) -> Result<(u16, u16, Vec<(u16, u32)>)> {
+    let kind = record_kind(record)?;
+    let row = binary::read_u16_le_at(record, 4)?;
+    let first = binary::read_u16_le_at(record, 6)?;
+    if kind == RK {
+        return Ok((
+            row,
+            first,
+            vec![(
+                binary::read_u16_le_at(record, 8)?,
+                binary::read_u32_le_at(record, 10)?,
+            )],
+        ));
+    }
+    if kind != MUL_RK {
+        return Err(Error::InvalidData(
+            "packed RK segment has an unsupported record kind".into(),
+        ));
+    }
+    let payload_len = usize::from(binary::read_u16_le_at(record, 2)?);
+    let item_bytes = payload_len
+        .checked_sub(6)
+        .ok_or_else(|| Error::InvalidData("MulRk segment payload is truncated".into()))?;
+    if item_bytes == 0 || !item_bytes.is_multiple_of(6) {
+        return Err(Error::InvalidData(
+            "MulRk segment item framing is invalid".into(),
+        ));
+    }
+    let count = item_bytes / 6;
+    let encoded_last = binary::read_u16_le_at(record, record.len() - 2)?;
+    let expected_last = first
+        .checked_add(
+            u16::try_from(count - 1)
+                .map_err(|_error| Error::InvalidData("MulRk segment count exceeds u16".into()))?,
+        )
+        .ok_or_else(|| Error::InvalidData("MulRk segment last column overflows".into()))?;
+    if encoded_last != expected_last {
+        return Err(Error::InvalidData(
+            "MulRk segment last column disagrees with its item count".into(),
+        ));
+    }
+    let mut items = Vec::new();
+    items
+        .try_reserve_exact(count)
+        .map_err(|_error| Error::Allocation("retaining MulRk segment items"))?;
+    for item in 0..count {
+        let offset = 8 + item * 6;
+        items.push((
+            binary::read_u16_le_at(record, offset)?,
+            binary::read_u32_le_at(record, offset + 2)?,
+        ));
+    }
+    Ok((row, first, items))
+}
+
+fn encode_rk_segment(row: u16, first_column: u16, items: &[(u16, u32)]) -> Result<Vec<u8>> {
+    match items {
+        [(style, value)] => {
+            let mut record = Vec::with_capacity(14);
+            record.extend_from_slice(&RK.to_le_bytes());
+            record.extend_from_slice(&10_u16.to_le_bytes());
+            record.extend_from_slice(&row.to_le_bytes());
+            record.extend_from_slice(&first_column.to_le_bytes());
+            record.extend_from_slice(&style.to_le_bytes());
+            record.extend_from_slice(&value.to_le_bytes());
+            Ok(record)
+        },
+        [] => Err(Error::InvalidData("packed RK segment is empty".into())),
+        _ => encode_mul_rk(row, first_column, items),
+    }
 }
 
 fn replace_formula_cache(records: &mut Vec<Vec<u8>>, formula: usize, value: &Value) -> Result<()> {
@@ -1630,6 +1939,11 @@ fn replace_range_and_adjust_bounds(
     }
     let threshold = u32::try_from(end)
         .map_err(|_error| Error::InvalidData("Workbook replacement offset exceeds u32".into()))?;
+    let shifted_bounds: Vec<_> = old_bounds
+        .iter()
+        .filter(|bound| bound.position >= threshold)
+        .map(|bound| bound.position)
+        .collect();
     for bound in old_bounds {
         if bound.position < threshold {
             continue;
@@ -1643,6 +1957,61 @@ fn replace_range_and_adjust_bounds(
             .get_mut(record_start + 4..record_start + 8)
             .ok_or_else(|| Error::InvalidData("BoundSheet position field is truncated".into()))?
             .copy_from_slice(&position.to_le_bytes());
+    }
+    for old_position in shifted_bounds {
+        let position = i64::from(old_position)
+            .checked_add(delta)
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| Error::UnsafeEdit("worksheet position adjustment overflows".into()))?;
+        adjust_worksheet_index_offsets(workbook, position, delta)?;
+    }
+    Ok(())
+}
+
+fn adjust_worksheet_index_offsets(
+    workbook: &mut [u8],
+    worksheet_position: u32,
+    delta: i64,
+) -> Result<()> {
+    let worksheet_start = usize::try_from(worksheet_position)
+        .map_err(|_error| Error::InvalidData("worksheet position exceeds usize".into()))?;
+    let records = raw_records(
+        workbook
+            .get(worksheet_start..)
+            .ok_or_else(|| Error::InvalidData("worksheet position is outside Workbook".into()))?,
+    )?;
+    let index = records
+        .iter()
+        .take_while(|record| record.kind != 0x000a)
+        .find(|record| record.kind == INDEX);
+    let Some(index) = index else {
+        return Ok(());
+    };
+    let payload_len = index
+        .end
+        .checked_sub(index.start + 4)
+        .ok_or_else(|| Error::InvalidData("INDEX payload range is invalid".into()))?;
+    if payload_len < 16 || (payload_len - 16) % 4 != 0 {
+        return Err(Error::InvalidData("INDEX payload is malformed".into()));
+    }
+    for relative in (12..payload_len).step_by(4) {
+        let offset = worksheet_start
+            .checked_add(index.start + 4 + relative)
+            .ok_or_else(|| Error::InvalidData("INDEX field offset overflow".into()))?;
+        let before = binary::read_u32_le_at(workbook, offset)?;
+        if before == 0 {
+            continue;
+        }
+        let after = i64::from(before)
+            .checked_add(delta)
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| {
+                Error::UnsafeEdit("INDEX absolute offset adjustment overflows".into())
+            })?;
+        workbook
+            .get_mut(offset..offset + 4)
+            .ok_or_else(|| Error::InvalidData("INDEX absolute offset is truncated".into()))?
+            .copy_from_slice(&after.to_le_bytes());
     }
     Ok(())
 }
@@ -1784,6 +2153,51 @@ fn is_cell_record(kind: u16) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn interior_mulrk_deletion_splits_and_inverse_merges_exactly() {
+        let original = encode_mul_rk(
+            7,
+            2,
+            &[
+                (0, super::super::encode_rk(1.0).unwrap()),
+                (1, super::super::encode_rk(2.0).unwrap()),
+                (2, super::super::encode_rk(3.0).unwrap()),
+                (3, super::super::encode_rk(4.0).unwrap()),
+                (4, super::super::encode_rk(5.0).unwrap()),
+            ],
+        )
+        .unwrap();
+        let reference = Reference::new(7, 4).unwrap();
+        let mut records = vec![original.clone()];
+        remove_cell_record(&mut records, 0, reference).unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(binary::read_u16_le_at(&records[0], 6).unwrap(), 2);
+        assert_eq!(
+            binary::read_u16_le_at(&records[0], records[0].len() - 2).unwrap(),
+            3
+        );
+        assert_eq!(binary::read_u16_le_at(&records[1], 6).unwrap(), 5);
+        assert_eq!(
+            binary::read_u16_le_at(&records[1], records[1].len() - 2).unwrap(),
+            6
+        );
+
+        let mut rows = BTreeMap::from([(
+            7,
+            RowData {
+                row_record: Vec::new(),
+                cell_records: records,
+            },
+        )]);
+        insert_packed_rk(
+            &mut rows,
+            reference,
+            &(Storage::MulRk, Value::Number(3.0), StyleIndex(2)),
+        )
+        .unwrap();
+        assert_eq!(rows[&7].cell_records, [original]);
+    }
 
     #[test]
     fn selection_coordinates_follow_row_insertion_and_inverse_deletion() {

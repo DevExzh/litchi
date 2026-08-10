@@ -28,10 +28,10 @@ pub use facade::{
 };
 pub use flat::{FlatImage, FlatImageCommit, FlatImagePatch, FlatImageTransaction, FrameChange};
 pub use history::{CommittedTransition, History, HistoryArtifact};
-pub use model::{frame, map, resource, source};
+pub use model::{active, frame, map, resource, source};
 pub use semantic::{
     ArtifactKind, CapabilityState, Conflict, ConflictKind, FrameProperty, MetadataProperty,
     OperationKey, PublicationState, ResourceValue, RewriteBlocker, RewriteCapability,
     SecurityCapabilities, SecurityPolicy, SemanticOperation, SemanticPatch, SemanticPlan,
-    SemanticValue,
+    SemanticValue, StyleDependencyState,
 };

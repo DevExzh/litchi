@@ -10,6 +10,7 @@ use crate::model::{ContentSymbol, Element};
 pub enum NumberType {
     Real,
     Integer,
+    ENotation,
     Rational,
     ComplexCartesian,
     ComplexPolar,
@@ -21,6 +22,7 @@ impl NumberType {
         match self {
             Self::Real => "real",
             Self::Integer => "integer",
+            Self::ENotation => "e-notation",
             Self::Rational => "rational",
             Self::ComplexCartesian => "complex-cartesian",
             Self::ComplexPolar => "complex-polar",
@@ -106,17 +108,18 @@ pub fn bound_variable(identifier: Element, degree: Option<Element>) -> Result<El
 
 /// Create a checked Content `MathML` declaration.
 ///
-/// The optional definition must be a function or constructor, as required by
-/// the `MathML` 2 declaration content model.
+/// Both the declared object and its optional value are Content `MathML`
+/// expressions. This permits declarations of identifiers, operators, and
+/// computed values as specified by `MathML` 2.
 ///
 /// # Errors
 ///
-/// Returns an error when `identifier` is not a `ci` token or `definition` is
-/// not an accepted function or constructor.
-pub fn declaration(identifier: Element, definition: Option<Element>) -> Result<Element> {
-    let mut children = vec![identifier];
-    if let Some(value) = definition {
-        children.push(value);
+/// Returns an error when either supplied node is not a Content `MathML`
+/// expression.
+pub fn declaration(object: Element, value: Option<Element>) -> Result<Element> {
+    let mut children = vec![object];
+    if let Some(declared_value) = value {
+        children.push(declared_value);
     }
     checked("declare", children)
 }
@@ -143,6 +146,24 @@ pub fn identifier(text: &str) -> Element {
 /// Returns an error when either endpoint is not a Content `MathML` expression.
 pub fn interval(lower: Element, upper: Element, closure: Closure) -> Result<Element> {
     let mut result = checked("interval", vec![lower, upper])?;
+    result.set_fixed_attribute("closure", closure.as_str());
+    Ok(result)
+}
+
+/// Create a checked generated interval from bound variables and a condition.
+///
+/// # Errors
+///
+/// Returns an error unless at least one checked bound variable precedes one
+/// checked condition qualifier.
+pub fn generated_interval(
+    bound_variables: Vec<Element>,
+    condition: Element,
+    closure: Closure,
+) -> Result<Element> {
+    let mut children = bound_variables;
+    children.push(condition);
+    let mut result = checked("interval", children)?;
     result.set_fixed_attribute("closure", closure.as_str());
     Ok(result)
 }
@@ -177,27 +198,29 @@ pub fn list(children: Vec<Element>) -> Result<Element> {
     checked("list", children)
 }
 
-/// Create a checked matrix from checked row expressions.
+/// Create a checked enumerated or generated matrix.
 ///
 /// # Errors
 ///
-/// Returns an error when any supplied child is not a matrix row.
-pub fn matrix(rows: Vec<Element>) -> Result<Element> {
-    checked("matrix", rows)
+/// Returns an error when enumerated rows are empty or ragged, or when a
+/// generated matrix has invalid qualifiers or content.
+pub fn matrix(children: Vec<Element>) -> Result<Element> {
+    checked("matrix", children)
 }
 
 /// Create a checked matrix row.
 ///
 /// # Errors
 ///
-/// Returns an error when a cell is not a Content `MathML` expression.
+/// Returns an error when the row is empty or a cell is not a Content `MathML`
+/// expression.
 pub fn matrix_row(cells: Vec<Element>) -> Result<Element> {
     checked("matrixrow", cells)
 }
 
 /// Create a checked single-part Content `MathML` number.
 ///
-/// Rational and complex types require [`number_pair`] instead.
+/// E-notation, rational, and complex types require [`number_pair`] instead.
 ///
 /// # Errors
 ///
@@ -209,7 +232,7 @@ pub fn number(text: &str, number_type: NumberType) -> Result<Element> {
     Ok(result)
 }
 
-/// Create a checked rational or complex two-part number.
+/// Create a checked E-notation, rational, or complex two-part number.
 ///
 /// # Errors
 ///

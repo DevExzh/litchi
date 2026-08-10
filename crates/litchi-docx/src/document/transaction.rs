@@ -489,12 +489,38 @@ pub enum Operation {
         /// Text produced by the operation.
         after: String,
     },
+    /// Replace a direct hyperlink inside a nested inline content control.
+    ReplaceNestedContentControlHyperlinkText {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Non-empty direct content-control path.
+        controls: Arc<[Position]>,
+        /// Direct hyperlink position in the deepest `w:sdtContent`.
+        hyperlink: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
     /// Replace one direct paragraph inside a possibly nested block control.
     ReplaceBlockContentControlParagraphText {
         /// Non-empty path starting at a direct-body `w:sdt`.
         controls: Arc<[Position]>,
         /// Direct paragraph position in the deepest `w:sdtContent`.
         paragraph: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
+    /// Replace a direct hyperlink in a path-addressed block-control paragraph.
+    ReplaceBlockContentControlParagraphHyperlinkText {
+        /// Non-empty path starting at a direct-body `w:sdt`.
+        controls: Arc<[Position]>,
+        /// Direct paragraph position in the deepest `w:sdtContent`.
+        paragraph: Position,
+        /// Direct hyperlink position in the selected paragraph.
+        hyperlink: Position,
         /// Text required before applying the operation.
         before: String,
         /// Text produced by the operation.
@@ -534,6 +560,19 @@ pub enum Operation {
         path: Arc<[TableCellAddress]>,
         /// Direct paragraph position in the deepest cell.
         paragraph: Position,
+        /// Text required before applying the operation.
+        before: String,
+        /// Text produced by the operation.
+        after: String,
+    },
+    /// Replace a direct hyperlink in a path-addressed nested-table paragraph.
+    ReplaceNestedCellParagraphHyperlinkText {
+        /// Non-empty body-to-nested-cell path.
+        path: Arc<[TableCellAddress]>,
+        /// Direct paragraph position in the deepest cell.
+        paragraph: Position,
+        /// Direct hyperlink position in the selected paragraph.
+        hyperlink: Position,
         /// Text required before applying the operation.
         before: String,
         /// Text produced by the operation.
@@ -672,6 +711,19 @@ impl Operation {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::ReplaceNestedContentControlHyperlinkText {
+                paragraph,
+                controls,
+                hyperlink,
+                before,
+                after,
+            } => Self::ReplaceNestedContentControlHyperlinkText {
+                paragraph: *paragraph,
+                controls: Arc::clone(controls),
+                hyperlink: *hyperlink,
+                before: after.clone(),
+                after: before.clone(),
+            },
             Self::ReplaceBlockContentControlParagraphText {
                 controls,
                 paragraph,
@@ -680,6 +732,19 @@ impl Operation {
             } => Self::ReplaceBlockContentControlParagraphText {
                 controls: Arc::clone(controls),
                 paragraph: *paragraph,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ReplaceBlockContentControlParagraphHyperlinkText {
+                controls,
+                paragraph,
+                hyperlink,
+                before,
+                after,
+            } => Self::ReplaceBlockContentControlParagraphHyperlinkText {
+                controls: Arc::clone(controls),
+                paragraph: *paragraph,
+                hyperlink: *hyperlink,
                 before: after.clone(),
                 after: before.clone(),
             },
@@ -719,6 +784,19 @@ impl Operation {
             } => Self::ReplaceNestedCellParagraphText {
                 path: Arc::clone(path),
                 paragraph: *paragraph,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ReplaceNestedCellParagraphHyperlinkText {
+                path,
+                paragraph,
+                hyperlink,
+                before,
+                after,
+            } => Self::ReplaceNestedCellParagraphHyperlinkText {
+                path: Arc::clone(path),
+                paragraph: *paragraph,
+                hyperlink: *hyperlink,
                 before: after.clone(),
                 after: before.clone(),
             },
@@ -1207,6 +1285,54 @@ impl Edit {
         )
     }
 
+    /// Replace one direct hyperlink inside the deepest nested inline control.
+    /// Every selector step is a direct child, so the path cannot cross owner
+    /// boundaries or relationship scopes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked path/refusal, resource-limit, or malformed XML error
+    /// without changing the projected snapshot.
+    pub fn replace_nested_content_control_hyperlink_text(
+        &mut self,
+        paragraph: Position,
+        controls: &[Position],
+        hyperlink: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        let path: Arc<[Position]> = controls.into();
+        let content = select_nested_inline_control_content(&self.projected, paragraph, &path)?;
+        let range = select_hyperlink_owner(
+            &self.projected,
+            content,
+            b"sdtContent",
+            hyperlink,
+            paragraph.get(),
+        )?;
+        let readback_path = Arc::clone(&path);
+        self.replace_selected_owner_text(
+            range,
+            b"hyperlink",
+            paragraph.get(),
+            authored_text.into(),
+            move |before, after| Operation::ReplaceNestedContentControlHyperlinkText {
+                paragraph,
+                controls: path,
+                hyperlink,
+                before,
+                after,
+            },
+            move |candidate| {
+                selected_nested_inline_control_hyperlink_text(
+                    candidate,
+                    paragraph,
+                    &readback_path,
+                    hyperlink,
+                )
+            },
+        )
+    }
+
     /// Replace one direct paragraph inside the deepest block content control
     /// reached by a non-empty path. The first position selects a direct-body
     /// `w:sdt`; later positions select a direct nested `w:sdt`.
@@ -1237,6 +1363,49 @@ impl Edit {
             },
             move |candidate| {
                 selected_block_control_paragraph_text(candidate, &readback_path, paragraph)
+            },
+        )
+    }
+
+    /// Replace one direct hyperlink inside a path-addressed block-control
+    /// paragraph without changing its relationship identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked path/refusal, resource-limit, or malformed XML error
+    /// without changing the projected snapshot.
+    pub fn replace_block_content_control_paragraph_hyperlink_text(
+        &mut self,
+        controls: &[Position],
+        paragraph: Position,
+        hyperlink: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        let path: Arc<[Position]> = controls.into();
+        let owner = select_block_control_paragraph(&self.projected, &path, paragraph)?;
+        let error_position = path.first().map_or(0, |position| position.get());
+        let range =
+            select_hyperlink_owner(&self.projected, owner, b"p", hyperlink, error_position)?;
+        let readback_path = Arc::clone(&path);
+        self.replace_selected_owner_text(
+            range,
+            b"hyperlink",
+            error_position,
+            authored_text.into(),
+            move |before, after| Operation::ReplaceBlockContentControlParagraphHyperlinkText {
+                controls: path,
+                paragraph,
+                hyperlink,
+                before,
+                after,
+            },
+            move |candidate| {
+                selected_block_control_paragraph_hyperlink_text(
+                    candidate,
+                    &readback_path,
+                    paragraph,
+                    hyperlink,
+                )
             },
         )
     }
@@ -1420,6 +1589,49 @@ impl Edit {
             },
             move |candidate| {
                 selected_nested_cell_paragraph_text(candidate, &readback_path, paragraph)
+            },
+        )
+    }
+
+    /// Replace one direct hyperlink inside a path-addressed nested-table cell
+    /// paragraph without changing its relationship identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked path/refusal, resource-limit, or malformed XML error
+    /// without changing the projected snapshot.
+    pub fn replace_nested_table_cell_paragraph_hyperlink_text(
+        &mut self,
+        path: &[TableCellAddress],
+        paragraph: Position,
+        hyperlink: Position,
+        authored_text: impl Into<String>,
+    ) -> TransactionResult<&mut Self> {
+        let path_arc: Arc<[TableCellAddress]> = path.into();
+        let owner = select_nested_cell_paragraph(&self.projected, &path_arc, paragraph)?;
+        let error_position = path_arc.first().map_or(0, |address| address.table.get());
+        let range =
+            select_hyperlink_owner(&self.projected, owner, b"p", hyperlink, error_position)?;
+        let readback_path = Arc::clone(&path_arc);
+        self.replace_selected_owner_text(
+            range,
+            b"hyperlink",
+            error_position,
+            authored_text.into(),
+            move |before, after| Operation::ReplaceNestedCellParagraphHyperlinkText {
+                path: path_arc,
+                paragraph,
+                hyperlink,
+                before,
+                after,
+            },
+            move |candidate| {
+                selected_nested_cell_paragraph_hyperlink_text(
+                    candidate,
+                    &readback_path,
+                    paragraph,
+                    hyperlink,
+                )
             },
         )
     }
@@ -1644,6 +1856,29 @@ impl Edit {
                 }
                 self.replace_nested_content_control_text(*paragraph, controls, after.clone())
             },
+            Operation::ReplaceNestedContentControlHyperlinkText {
+                paragraph,
+                controls,
+                hyperlink,
+                before,
+                after,
+            } => {
+                if selected_nested_inline_control_hyperlink_text(
+                    &self.projected,
+                    *paragraph,
+                    controls,
+                    *hyperlink,
+                )? != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_nested_content_control_hyperlink_text(
+                    *paragraph,
+                    controls,
+                    *hyperlink,
+                    after.clone(),
+                )
+            },
             Operation::ReplaceBlockContentControlParagraphText {
                 controls,
                 paragraph,
@@ -1658,6 +1893,29 @@ impl Edit {
                 self.replace_block_content_control_paragraph_text(
                     controls,
                     *paragraph,
+                    after.clone(),
+                )
+            },
+            Operation::ReplaceBlockContentControlParagraphHyperlinkText {
+                controls,
+                paragraph,
+                hyperlink,
+                before,
+                after,
+            } => {
+                if selected_block_control_paragraph_hyperlink_text(
+                    &self.projected,
+                    controls,
+                    *paragraph,
+                    *hyperlink,
+                )? != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_block_content_control_paragraph_hyperlink_text(
+                    controls,
+                    *paragraph,
+                    *hyperlink,
                     after.clone(),
                 )
             },
@@ -1706,6 +1964,29 @@ impl Edit {
                     return Err(TransactionError::SemanticPrecondition);
                 }
                 self.replace_nested_table_cell_paragraph_text(path, *paragraph, after.clone())
+            },
+            Operation::ReplaceNestedCellParagraphHyperlinkText {
+                path,
+                paragraph,
+                hyperlink,
+                before,
+                after,
+            } => {
+                if selected_nested_cell_paragraph_hyperlink_text(
+                    &self.projected,
+                    path,
+                    *paragraph,
+                    *hyperlink,
+                )? != *before
+                {
+                    return Err(TransactionError::SemanticPrecondition);
+                }
+                self.replace_nested_table_cell_paragraph_hyperlink_text(
+                    path,
+                    *paragraph,
+                    *hyperlink,
+                    after.clone(),
+                )
             },
             Operation::InsertParagraph { position, text } => {
                 self.insert_paragraph(*position, text.clone())
@@ -3322,6 +3603,51 @@ fn select_direct_control_content(
     select_single_control_content(snapshot, control_start, control_end, error_position)
 }
 
+fn select_hyperlink_owner(
+    snapshot: &Snapshot,
+    owner: (usize, usize),
+    root_name: &[u8],
+    hyperlink: Position,
+    error_position: usize,
+) -> TransactionResult<(usize, usize)> {
+    let owner_xml = checked_slice(snapshot.xml_bytes(), owner.0, owner.1, "composite owner")?;
+    let hyperlink_range = select_direct_child(
+        owner_xml,
+        root_name,
+        b"hyperlink",
+        hyperlink,
+        Refusal::HyperlinkNotFound,
+    )
+    .map_err(|reason| TransactionError::Refused {
+        position: error_position,
+        reason,
+    })?;
+    Ok((
+        checked_relative_start(owner.0, hyperlink_range)?,
+        checked_relative_end(owner.0, hyperlink_range)?,
+    ))
+}
+
+fn selected_composite_hyperlink_text(
+    snapshot: &Snapshot,
+    owner: (usize, usize),
+    root_name: &[u8],
+    hyperlink: Position,
+    error_position: usize,
+) -> TransactionResult<String> {
+    let (start, end) =
+        select_hyperlink_owner(snapshot, owner, root_name, hyperlink, error_position)?;
+    scan_text_owner(
+        checked_slice(snapshot.xml_bytes(), start, end, "composite hyperlink")?,
+        b"hyperlink",
+    )
+    .map(|scanned| scanned.text)
+    .map_err(|reason| TransactionError::Refused {
+        position: error_position,
+        reason,
+    })
+}
+
 fn select_nested_inline_control_content(
     snapshot: &Snapshot,
     paragraph: Position,
@@ -3369,6 +3695,16 @@ fn selected_nested_inline_control_text(
         position: paragraph.get(),
         reason,
     })
+}
+
+fn selected_nested_inline_control_hyperlink_text(
+    snapshot: &Snapshot,
+    paragraph: Position,
+    controls: &[Position],
+    hyperlink: Position,
+) -> TransactionResult<String> {
+    let owner = select_nested_inline_control_content(snapshot, paragraph, controls)?;
+    selected_composite_hyperlink_text(snapshot, owner, b"sdtContent", hyperlink, paragraph.get())
 }
 
 fn select_block_control_content(
@@ -3446,6 +3782,22 @@ fn selected_block_control_paragraph_text(
         position: controls.first().map_or(0, |position| position.get()),
         reason,
     })
+}
+
+fn selected_block_control_paragraph_hyperlink_text(
+    snapshot: &Snapshot,
+    controls: &[Position],
+    paragraph: Position,
+    hyperlink: Position,
+) -> TransactionResult<String> {
+    let owner = select_block_control_paragraph(snapshot, controls, paragraph)?;
+    selected_composite_hyperlink_text(
+        snapshot,
+        owner,
+        b"p",
+        hyperlink,
+        controls.first().map_or(0, |position| position.get()),
+    )
 }
 
 fn select_nested_cell<'a>(
@@ -3540,6 +3892,22 @@ fn selected_nested_cell_paragraph_text(
         position: path.first().map_or(0, |address| address.table.get()),
         reason,
     })
+}
+
+fn selected_nested_cell_paragraph_hyperlink_text(
+    snapshot: &Snapshot,
+    path: &[TableCellAddress],
+    paragraph: Position,
+    hyperlink: Position,
+) -> TransactionResult<String> {
+    let owner = select_nested_cell_paragraph(snapshot, path, paragraph)?;
+    selected_composite_hyperlink_text(
+        snapshot,
+        owner,
+        b"p",
+        hyperlink,
+        path.first().map_or(0, |address| address.table.get()),
+    )
 }
 
 fn selected_hyperlink_text(
@@ -4594,5 +4962,108 @@ mod tests {
         assert!(history.undo());
         assert_eq!(history.current().xml_bytes(), source.xml_bytes());
         assert!(history.redo());
+    }
+
+    #[test]
+    fn composite_nested_hyperlinks_preserve_relationship_ownership() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><w:body><w:p><w:sdt><w:sdtPr><w:tag w:val=\"outer-inline-link\"/></w:sdtPr><w:sdtContent><w:sdt><w:sdtPr><w:tag w:val=\"inner-inline-link\"/></w:sdtPr><w:sdtContent><w:hyperlink r:id=\"inlineRel\" w:tooltip=\"inline tip\"><w:r><w:rPr><w:u/></w:rPr><w:t>inline link</w:t></w:r></w:hyperlink></w:sdtContent></w:sdt></w:sdtContent></w:sdt></w:p><w:sdt><w:sdtPr><w:alias w:val=\"outer-block-link\"/></w:sdtPr><w:sdtContent><w:sdt><w:sdtPr><w:alias w:val=\"inner-block-link\"/></w:sdtPr><w:sdtContent><w:p><w:hyperlink r:id=\"blockRel\" w:tooltip=\"block tip\"><w:r><w:t>block link</w:t></w:r></w:hyperlink></w:p></w:sdtContent></w:sdt></w:sdtContent></w:sdt><w:tbl><w:tr><w:tc><w:p><w:r><w:t>outer</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:hyperlink r:id=\"tableRel\" w:tooltip=\"table tip\"><w:r><w:rPr><w:i/></w:rPr><w:t>table link</w:t></w:r></w:hyperlink></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let controls = [Position::new(0), Position::new(0)];
+        let table_path = [
+            TableCellAddress::new(Position::new(0), Position::new(0), Position::new(0)),
+            TableCellAddress::new(Position::new(0), Position::new(0), Position::new(0)),
+        ];
+        let mut edit = source.edit();
+        edit.replace_nested_content_control_hyperlink_text(
+            Position::new(0),
+            &controls,
+            Position::new(0),
+            "inline changed",
+        )
+        .unwrap()
+        .replace_block_content_control_paragraph_hyperlink_text(
+            &controls,
+            Position::new(0),
+            Position::new(0),
+            "block changed",
+        )
+        .unwrap()
+        .replace_nested_table_cell_paragraph_hyperlink_text(
+            &table_path,
+            Position::new(0),
+            Position::new(0),
+            "table changed",
+        )
+        .unwrap();
+        let commit = edit.commit().unwrap();
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        for retained in [
+            "r:id=\"inlineRel\"",
+            "w:tooltip=\"inline tip\"",
+            "<w:rPr><w:u/></w:rPr>",
+            "r:id=\"blockRel\"",
+            "w:tooltip=\"block tip\"",
+            "r:id=\"tableRel\"",
+            "w:tooltip=\"table tip\"",
+            "<w:rPr><w:i/></w:rPr>",
+            "<w:t>inline changed</w:t>",
+            "<w:t>block changed</w:t>",
+            "<w:t>table changed</w:t>",
+        ] {
+            assert!(xml.contains(retained), "missing retained XML: {retained}");
+        }
+
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let applied = source.apply_durable(&durable).unwrap();
+        assert_eq!(applied.xml_bytes(), commit.snapshot().xml_bytes());
+        assert_eq!(
+            applied
+                .apply_durable(&durable.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let limits = CompositionLimits::new(8, 8, 32, 8);
+        let mut wide = source.edit();
+        assert!(
+            wide.replace_nested_content_control_text(
+                Position::new(0),
+                &controls,
+                "cannot flatten hyperlink",
+            )
+            .is_err()
+        );
+        assert_eq!(wide.projected().xml_bytes(), source.xml_bytes());
+        let mut left_edit = source.edit();
+        left_edit
+            .replace_nested_content_control_hyperlink_text(
+                Position::new(0),
+                &controls,
+                Position::new(0),
+                "left",
+            )
+            .unwrap();
+        let mut right_edit = source.edit();
+        right_edit
+            .replace_nested_table_cell_paragraph_hyperlink_text(
+                &table_path,
+                Position::new(0),
+                Position::new(0),
+                "right",
+            )
+            .unwrap();
+        let mut composition = source.compose(limits);
+        composition
+            .join(left_edit.prepare(limits, "left").unwrap())
+            .unwrap()
+            .join(right_edit.prepare(limits, "right").unwrap())
+            .unwrap();
+        assert_eq!(composition.commit().unwrap().patch().operations().len(), 2);
     }
 }

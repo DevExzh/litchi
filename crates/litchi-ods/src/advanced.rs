@@ -25,10 +25,12 @@ use crate::{Cell, CellValue, Row, Sheet, package::Package};
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const NUMBER: &str = "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0";
 const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const XLINK: &str = "http://www.w3.org/1999/xlink";
 const FORM: &str = "urn:oasis:names:tc:opendocument:xmlns:form:1.0";
 const SCRIPT: &str = "urn:oasis:names:tc:opendocument:xmlns:script:1.0";
+const DOM: &str = "http://www.w3.org/2001/xml-events";
 const FO: &str = "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const CALCEXT: &str = "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0";
 const CONTENT_PATH: &str = "content.xml";
@@ -331,8 +333,13 @@ pub struct BoundFormControl {
 pub enum FormControlKind {
     Button,
     CheckBox,
+    Radio,
     ListBox,
+    ComboBox,
     Text,
+    Image,
+    Date,
+    Time,
 }
 
 /// One inert form event binding. Macro targets are retained but never executed.
@@ -384,6 +391,28 @@ pub struct DrawingTextBox {
 pub struct DrawingGroup {
     pub name: String,
     pub children: Vec<DrawingTextBox>,
+}
+
+/// Supported inert drawing geometry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DrawingGeometryKind {
+    Rectangle,
+    Ellipse,
+    Line,
+}
+
+/// One finite positioned geometry with optional rich text.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawingGeometry {
+    pub name: String,
+    pub kind: DrawingGeometryKind,
+    pub text: Option<RichText>,
+    pub x_cm: f64,
+    pub y_cm: f64,
+    pub width_cm: f64,
+    pub height_cm: f64,
+    pub z_index: u32,
 }
 
 /// A package-backed chart object and its compact chart `content.xml` dependency.
@@ -658,6 +687,46 @@ pub(crate) fn put_style_graph(
     insert_automatic_styles(source, &markup, max_output)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StyleNodeKind {
+    Number,
+    Text,
+    Cell,
+}
+
+fn style_graph_nodes(graph: &StyleGraph) -> Result<Vec<(String, StyleNodeKind, String)>> {
+    let _validated = style_graph_markup(graph)?;
+    let mut nodes = Vec::with_capacity(
+        graph
+            .number_styles
+            .len()
+            .saturating_add(graph.text_styles.len())
+            .saturating_add(graph.cell_styles.len()),
+    );
+    for style in &graph.number_styles {
+        nodes.push((
+            style.name.clone(),
+            StyleNodeKind::Number,
+            number_style_markup(style)?,
+        ));
+    }
+    for style in &graph.text_styles {
+        nodes.push((
+            style.name.clone(),
+            StyleNodeKind::Text,
+            text_style_markup(style)?,
+        ));
+    }
+    for style in &graph.cell_styles {
+        nodes.push((
+            style.name.clone(),
+            StyleNodeKind::Cell,
+            cell_style_node_markup(style)?,
+        ));
+    }
+    Ok(nodes)
+}
+
 fn style_graph_markup(graph: &StyleGraph) -> Result<String> {
     let total = graph
         .cell_styles
@@ -740,53 +809,71 @@ fn style_graph_markup(graph: &StyleGraph) -> Result<String> {
     }
     let mut output = String::new();
     for style in &graph.number_styles {
-        write!(
-            output,
-            "<number:number-style xmlns:number=\"urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0\" xmlns:style=\"{STYLE}\" style:name=\"{}\">",
-            escape_xml(&style.name)
-        )
-        .map_err(|_error| invalid_error("ODS number style formatting failed"))?;
-        if let Some(prefix) = &style.prefix {
-            output.push_str("<number:text>");
-            output.push_str(&escape_xml(prefix));
-            output.push_str("</number:text>");
-        }
-        write!(
-            output,
-            "<number:number number:decimal-places=\"{}\" number:min-integer-digits=\"{}\"/>",
-            style.decimal_places, style.min_integer_digits
-        )
-        .map_err(|_error| invalid_error("ODS number style formatting failed"))?;
-        if let Some(suffix) = &style.suffix {
-            output.push_str("<number:text>");
-            output.push_str(&escape_xml(suffix));
-            output.push_str("</number:text>");
-        }
-        output.push_str("</number:number-style>");
+        output.push_str(&number_style_markup(style)?);
     }
     for style in &graph.text_styles {
-        write_style_open(
-            &mut output,
-            &style.name,
-            "text",
-            style.parent.as_deref(),
-            None,
-        )?;
-        write_text_properties(&mut output, &style.text)?;
-        output.push_str("</style:style>");
+        output.push_str(&text_style_markup(style)?);
     }
     for style in &graph.cell_styles {
-        write_style_open(
-            &mut output,
-            &style.name,
-            "table-cell",
-            style.parent.as_deref(),
-            style.data_style.as_deref(),
-        )?;
-        write_cell_properties(&mut output, &style.cell)?;
-        write_text_properties(&mut output, &style.text)?;
-        output.push_str("</style:style>");
+        output.push_str(&cell_style_node_markup(style)?);
     }
+    Ok(output)
+}
+
+fn number_style_markup(style: &NumberStyleNode) -> Result<String> {
+    let mut output = String::new();
+    write!(
+        output,
+        "<number:number-style xmlns:number=\"{NUMBER}\" xmlns:style=\"{STYLE}\" style:name=\"{}\">",
+        escape_xml(&style.name)
+    )
+    .map_err(|_error| invalid_error("ODS number style formatting failed"))?;
+    if let Some(prefix) = &style.prefix {
+        output.push_str("<number:text>");
+        output.push_str(&escape_xml(prefix));
+        output.push_str("</number:text>");
+    }
+    write!(
+        output,
+        "<number:number number:decimal-places=\"{}\" number:min-integer-digits=\"{}\"/>",
+        style.decimal_places, style.min_integer_digits
+    )
+    .map_err(|_error| invalid_error("ODS number style formatting failed"))?;
+    if let Some(suffix) = &style.suffix {
+        output.push_str("<number:text>");
+        output.push_str(&escape_xml(suffix));
+        output.push_str("</number:text>");
+    }
+    output.push_str("</number:number-style>");
+    Ok(output)
+}
+
+fn text_style_markup(style: &TextStyleNode) -> Result<String> {
+    let mut output = String::new();
+    write_style_open(
+        &mut output,
+        &style.name,
+        "text",
+        style.parent.as_deref(),
+        None,
+    )?;
+    write_text_properties(&mut output, &style.text)?;
+    output.push_str("</style:style>");
+    Ok(output)
+}
+
+fn cell_style_node_markup(style: &CellStyleNode) -> Result<String> {
+    let mut output = String::new();
+    write_style_open(
+        &mut output,
+        &style.name,
+        "table-cell",
+        style.parent.as_deref(),
+        style.data_style.as_deref(),
+    )?;
+    write_cell_properties(&mut output, &style.cell)?;
+    write_text_properties(&mut output, &style.text)?;
+    output.push_str("</style:style>");
     Ok(output)
 }
 
@@ -852,6 +939,119 @@ fn merge_text_properties(target: &mut TextProperties, source: &TextProperties) {
     }
 }
 
+pub(crate) fn resolve_package_cell_style(source: &[u8], name: &str) -> Result<EffectiveCellStyle> {
+    validate_token(name, "effective cell style name")?;
+    let package = Package::from_bytes(source.to_vec())?;
+    let mut styles = std::collections::BTreeMap::new();
+    if let Some(xml) = package.styles_xml() {
+        collect_package_cell_styles(xml, &mut styles)?;
+    }
+    collect_package_cell_styles(package.content_xml(), &mut styles)?;
+    let mut lineage = Vec::new();
+    let mut visited = std::collections::BTreeSet::new();
+    let mut current = Some(name);
+    while let Some(selected) = current {
+        if !visited.insert(selected.to_string()) {
+            return invalid("ODS package cell style inheritance is cyclic");
+        }
+        let style = styles.get(selected).ok_or_else(|| {
+            invalid_error(format!("ODS package cell style '{selected}' was not found"))
+        })?;
+        lineage.push(style);
+        current = style.parent.as_deref();
+    }
+    lineage.reverse();
+    let mut effective = EffectiveCellStyle::default();
+    for style in lineage {
+        effective.lineage.push(style.name.clone());
+        if style.data_style.is_some() {
+            effective.data_style.clone_from(&style.data_style);
+        }
+        merge_cell_properties(&mut effective.cell, &style.cell);
+        merge_text_properties(&mut effective.text, &style.text);
+    }
+    Ok(effective)
+}
+
+fn collect_package_cell_styles(
+    xml: &str,
+    styles: &mut std::collections::BTreeMap<String, CellStyleNode>,
+) -> Result<()> {
+    let spans = scan(xml)?;
+    let mut part_names = std::collections::BTreeSet::new();
+    for (index, span) in spans.iter().enumerate() {
+        if !is_element(span, STYLE, "style")
+            || attribute(xml, span, b"style:family")?.as_deref() != Some("table-cell")
+        {
+            continue;
+        }
+        let Some(name) = attribute(xml, span, b"style:name")? else {
+            return invalid("ODS package table-cell style has no name");
+        };
+        if !part_names.insert(name.clone()) {
+            return invalid(format!(
+                "ODS package table-cell style '{name}' is duplicated in one XML part"
+            ));
+        }
+        let mut cell = CellProperties::default();
+        let mut text = TextProperties::default();
+        for child in descendants(&spans, index, STYLE, "table-cell-properties") {
+            cell.background = attribute(xml, &spans[child], b"fo:background-color")?;
+            cell.horizontal_align = attribute(xml, &spans[child], b"fo:text-align")?;
+            cell.vertical_align = attribute(xml, &spans[child], b"style:vertical-align")?;
+            cell.border = attribute(xml, &spans[child], b"fo:border")?;
+            cell.wrap = attribute(xml, &spans[child], b"fo:wrap-option")?.and_then(|value| {
+                match value.as_str() {
+                    "wrap" => Some(true),
+                    "no-wrap" => Some(false),
+                    _ => None,
+                }
+            });
+        }
+        for child in descendants(&spans, index, STYLE, "text-properties") {
+            text.color = attribute(xml, &spans[child], b"fo:color")?;
+            text.font_family = attribute(xml, &spans[child], b"fo:font-family")?;
+            text.font_size_pt = attribute(xml, &spans[child], b"fo:font-size")?
+                .and_then(|value| value.strip_suffix("pt")?.parse::<f64>().ok())
+                .filter(|value| value.is_finite() && *value > 0.0);
+            text.bold = parse_style_switch(
+                attribute(xml, &spans[child], b"fo:font-weight")?.as_deref(),
+                "bold",
+                "normal",
+            );
+            text.italic = parse_style_switch(
+                attribute(xml, &spans[child], b"fo:font-style")?.as_deref(),
+                "italic",
+                "normal",
+            );
+            text.underline = parse_style_switch(
+                attribute(xml, &spans[child], b"style:text-underline-style")?.as_deref(),
+                "solid",
+                "none",
+            );
+        }
+        styles.insert(
+            name.clone(),
+            CellStyleNode {
+                name,
+                parent: attribute(xml, span, b"style:parent-style-name")?,
+                data_style: attribute(xml, span, b"style:data-style-name")?,
+                cell,
+                text,
+            },
+        );
+    }
+    Ok(())
+}
+
+fn parse_style_switch(value: Option<&str>, enabled: &str, disabled: &str) -> Option<bool> {
+    value.and_then(|value| match value {
+        value if value == enabled => Some(true),
+        value if value == disabled => Some(false),
+        _ => None,
+    })
+}
+
 fn insert_automatic_styles(source: &[u8], markup: &str, max_output: usize) -> Result<Vec<u8>> {
     let (xml, spans) = content_spans(source)?;
     let automatic = spans
@@ -898,6 +1098,155 @@ fn insert_automatic_styles(source: &[u8], markup: &str, max_output: usize) -> Re
             max_output,
         )
     }
+}
+
+pub(crate) fn replace_style_graph(
+    source: &[u8],
+    graph: &StyleGraph,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let nodes = style_graph_nodes(graph)?;
+    if nodes.is_empty() {
+        return Ok(source.to_vec());
+    }
+    let (xml, spans) = content_spans(source)?;
+    let automatic = one(&spans, OFFICE, "automatic-styles")?;
+    let mut edits = Vec::with_capacity(nodes.len());
+    for (name, expected_kind, markup) in nodes {
+        let matches = direct_named_styles(&xml, &spans, automatic, &name)?;
+        if matches.len() != 1 {
+            return invalid(format!(
+                "ODS automatic style '{name}' must exist exactly once for replacement"
+            ));
+        }
+        let index = matches[0];
+        if automatic_style_kind(&xml, &spans[index])? != Some(expected_kind) {
+            return invalid(format!(
+                "ODS automatic style '{name}' has a different family"
+            ));
+        }
+        edits.push((spans[index].start..spans[index].end, markup.into_bytes()));
+    }
+    splice_content_edits(source, edits, max_output)
+}
+
+pub(crate) fn remove_automatic_styles(
+    source: &[u8],
+    names: &[String],
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    if names.is_empty() {
+        return Ok(source.to_vec());
+    }
+    let requested = names
+        .iter()
+        .map(String::as_str)
+        .collect::<std::collections::BTreeSet<_>>();
+    if requested.len() != names.len() {
+        return invalid("ODS automatic style removal contains duplicate names");
+    }
+    for name in &requested {
+        validate_token(name, "automatic style removal name")?;
+    }
+    refuse_package_style_references(source, &requested)?;
+    let (xml, spans) = content_spans(source)?;
+    let automatic = one(&spans, OFFICE, "automatic-styles")?;
+    let mut removals = std::collections::BTreeSet::new();
+    for name in &requested {
+        let matches = direct_named_styles(&xml, &spans, automatic, name)?;
+        if matches.len() != 1 {
+            return invalid(format!(
+                "ODS automatic style '{name}' must exist exactly once for removal"
+            ));
+        }
+        removals.insert(matches[0]);
+    }
+    for (index, span) in spans.iter().enumerate() {
+        if removals.contains(&index)
+            || removals
+                .iter()
+                .any(|owner| is_descendant(&spans, index, *owner))
+        {
+            continue;
+        }
+        let opening = &xml[span.start..span.tag_end];
+        for name in &requested {
+            let escaped = escape_xml(name);
+            if opening.contains(&format!("style-name=\"{escaped}\""))
+                || opening.contains(&format!("style-name='{escaped}'"))
+            {
+                return invalid(format!("ODS automatic style '{name}' is still referenced"));
+            }
+        }
+    }
+    let edits = removals
+        .into_iter()
+        .map(|index| (spans[index].start..spans[index].end, Vec::new()))
+        .collect();
+    splice_content_edits(source, edits, max_output)
+}
+
+fn refuse_package_style_references(
+    source: &[u8],
+    requested: &std::collections::BTreeSet<&str>,
+) -> Result<()> {
+    let package = Package::from_bytes(source.to_vec())?;
+    for path in package.package().files()? {
+        let is_inspectable_xml = std::path::Path::new(&path)
+            .extension()
+            .is_some_and(|extension| extension == "xml" || extension == "rdf");
+        if path == CONTENT_PATH || !is_inspectable_xml || !package.package().has_file(&path)? {
+            continue;
+        }
+        let bytes = package.package().get_file(&path)?;
+        let xml = std::str::from_utf8(&bytes).map_err(|_error| {
+            invalid_error(format!(
+                "ODS automatic style removal cannot inspect non-UTF-8 part '{path}'"
+            ))
+        })?;
+        for name in requested {
+            let escaped = escape_xml(name);
+            if xml.contains(&format!("style-name=\"{escaped}\""))
+                || xml.contains(&format!("style-name='{escaped}'"))
+            {
+                return invalid(format!(
+                    "ODS automatic style '{name}' is referenced by retained part '{path}'"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn direct_named_styles(
+    xml: &str,
+    spans: &[Span],
+    automatic: usize,
+    name: &str,
+) -> Result<Vec<usize>> {
+    let mut matches = Vec::new();
+    for (index, span) in spans.iter().enumerate() {
+        if span.parent == Some(automatic)
+            && attribute(xml, span, b"style:name")?.as_deref() == Some(name)
+        {
+            matches.push(index);
+        }
+    }
+    Ok(matches)
+}
+
+fn automatic_style_kind(xml: &str, span: &Span) -> Result<Option<StyleNodeKind>> {
+    if span.namespace.as_deref() == Some(NUMBER) && span.local == "number-style" {
+        return Ok(Some(StyleNodeKind::Number));
+    }
+    if span.namespace.as_deref() != Some(STYLE) || span.local != "style" {
+        return Ok(None);
+    }
+    Ok(match attribute(xml, span, b"style:family")?.as_deref() {
+        Some("text") => Some(StyleNodeKind::Text),
+        Some("table-cell") => Some(StyleNodeKind::Cell),
+        _ => None,
+    })
 }
 
 fn style_names(markup: &str) -> Result<Vec<String>> {
@@ -1137,7 +1486,7 @@ pub(crate) fn put_drawing(
         return invalid("ODS sheet has more than one shapes container");
     }
     if let Some(shapes) = shapes.first().copied()
-        && ["frame", "g"]
+        && ["frame", "g", "rect", "ellipse", "line"]
             .into_iter()
             .flat_map(|local| descendants(&spans, shapes, DRAW, local))
             .any(|index| {
@@ -1266,6 +1615,61 @@ pub(crate) fn put_drawing_group(
     insert_shape_child(source, sheet, &group.name, markup, max_output)
 }
 
+pub(crate) fn put_drawing_geometry(
+    source: &[u8],
+    sheet: &str,
+    geometry: &DrawingGeometry,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    validate_token(&geometry.name, "drawing geometry name")?;
+    if [
+        geometry.x_cm,
+        geometry.y_cm,
+        geometry.width_cm,
+        geometry.height_cm,
+    ]
+    .into_iter()
+    .any(|value| !value.is_finite())
+        || geometry.width_cm <= 0.0
+        || geometry.height_cm <= 0.0
+    {
+        return invalid("ODS drawing geometry is invalid");
+    }
+    let text = geometry
+        .text
+        .as_ref()
+        .map(RichText::markup)
+        .transpose()?
+        .unwrap_or_default();
+    let common = format!(
+        "xmlns:draw=\"{DRAW}\" xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:xlink=\"{XLINK}\" draw:name=\"{}\" draw:z-index=\"{}\"",
+        escape_xml(&geometry.name),
+        geometry.z_index
+    );
+    let markup = match geometry.kind {
+        DrawingGeometryKind::Rectangle => format!(
+            "<draw:rect {common} svg:x=\"{}cm\" svg:y=\"{}cm\" svg:width=\"{}cm\" svg:height=\"{}cm\">{text}</draw:rect>",
+            geometry.x_cm, geometry.y_cm, geometry.width_cm, geometry.height_cm
+        ),
+        DrawingGeometryKind::Ellipse => format!(
+            "<draw:ellipse {common} svg:x=\"{}cm\" svg:y=\"{}cm\" svg:width=\"{}cm\" svg:height=\"{}cm\">{text}</draw:ellipse>",
+            geometry.x_cm, geometry.y_cm, geometry.width_cm, geometry.height_cm
+        ),
+        DrawingGeometryKind::Line => {
+            let x2 = geometry.x_cm + geometry.width_cm;
+            let y2 = geometry.y_cm + geometry.height_cm;
+            if !x2.is_finite() || !y2.is_finite() {
+                return invalid("ODS drawing line endpoint is invalid");
+            }
+            format!(
+                "<draw:line {common} svg:x1=\"{}cm\" svg:y1=\"{}cm\" svg:x2=\"{x2}cm\" svg:y2=\"{y2}cm\">{text}</draw:line>",
+                geometry.x_cm, geometry.y_cm
+            )
+        },
+    };
+    insert_shape_child(source, sheet, &geometry.name, markup, max_output)
+}
+
 fn insert_shape_child(
     source: &[u8],
     sheet: &str,
@@ -1280,7 +1684,7 @@ fn insert_shape_child(
         return invalid("ODS sheet has more than one shapes container");
     }
     if let Some(shapes) = shapes.first().copied()
-        && ["frame", "g"]
+        && ["frame", "g", "rect", "ellipse", "line"]
             .into_iter()
             .flat_map(|local| descendants(&spans, shapes, DRAW, local))
             .any(|index| {
@@ -1465,7 +1869,7 @@ pub(crate) fn set_rich_forms(
     if !controls.is_empty() {
         write!(
             markup,
-            "<office:forms xmlns:office=\"{OFFICE}\" xmlns:form=\"{FORM}\" xmlns:script=\"{SCRIPT}\" xmlns:xlink=\"{XLINK}\"><form:form form:name=\"LitchiForm\">"
+            "<office:forms xmlns:office=\"{OFFICE}\" xmlns:form=\"{FORM}\" xmlns:script=\"{SCRIPT}\" xmlns:dom=\"{DOM}\" xmlns:xlink=\"{XLINK}\"><form:form form:name=\"LitchiForm\">"
         )
         .map_err(|_error| invalid_error("ODS rich form markup formatting failed"))?;
         let mut ids = std::collections::BTreeSet::new();
@@ -1490,8 +1894,13 @@ pub(crate) fn set_rich_forms(
             let element = match control.kind {
                 FormControlKind::Button => "button",
                 FormControlKind::CheckBox => "checkbox",
+                FormControlKind::Radio => "radio",
                 FormControlKind::ListBox => "listbox",
+                FormControlKind::ComboBox => "combobox",
                 FormControlKind::Text => "text",
+                FormControlKind::Image => "image",
+                FormControlKind::Date => "date",
+                FormControlKind::Time => "time",
             };
             write!(
                 markup,
@@ -1694,6 +2103,30 @@ fn splice_content(
     };
     let mut publication = XmlSplicePublication::new(part);
     publication.replace(proof, fragment)?;
+    rebuild_package_with_xml_splices(package.package(), vec![publication], max_output)
+}
+
+fn splice_content_edits(
+    source: &[u8],
+    edits: Vec<(Range<usize>, Vec<u8>)>,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let package = Package::from_bytes(source.to_vec())?;
+    let part = XmlSourcePart::load(package.package(), CONTENT_PATH)?;
+    let mut publication = XmlSplicePublication::new(part.clone());
+    for (range, replacement) in edits {
+        let expected = part
+            .bytes()
+            .get(range.clone())
+            .ok_or_else(|| invalid_error("ODS content splice range is invalid"))?;
+        let proof = part.checked_range(range, expected)?;
+        let fragment = if replacement.is_empty() {
+            AuthoredXmlFragment::deletion()
+        } else {
+            AuthoredXmlFragment::markup(replacement)?
+        };
+        publication.replace(proof, fragment)?;
+    }
     rebuild_package_with_xml_splices(package.package(), vec![publication], max_output)
 }
 

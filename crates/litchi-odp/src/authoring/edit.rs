@@ -59,6 +59,28 @@ impl MergePlan {
     }
 }
 
+/// Mutation policy derived from package encryption and signature state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SecurityPolicy {
+    /// No encrypted entries or package signature parts were detected.
+    Editable,
+    /// Package entries are encrypted and must remain read-only in this editor.
+    EncryptedReadOnly,
+    /// Package signatures would be invalidated by mutation.
+    SignedReadOnly,
+    /// Both encrypted entries and package signatures are present.
+    SignedAndEncryptedReadOnly,
+}
+
+impl SecurityPolicy {
+    /// Return whether source-checked mutation and patch application are allowed.
+    #[must_use]
+    pub const fn is_editable(self) -> bool {
+        matches!(self, Self::Editable)
+    }
+}
+
 /// An immutable presentation package and its parsed slide projection.
 #[derive(Clone)]
 pub struct Snapshot {
@@ -81,7 +103,9 @@ impl Snapshot {
     ///
     /// # Errors
     ///
-    /// Returns an error for an oversized, malformed, encrypted, or non-ODP package.
+    /// Returns an error for an oversized, malformed, or non-ODP package.
+    /// Signed and encrypted packages can be inspected but have a read-only
+    /// [`SecurityPolicy`] and cannot start a transaction.
     pub fn from_bytes(source_bytes: Vec<u8>) -> Result<Self> {
         if source_bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP editing package exceeds the 128 MiB limit");
@@ -126,6 +150,29 @@ impl Snapshot {
         &self.slides
     }
 
+    /// Inspect the package mutation policy without staging an edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained package cannot be reopened.
+    pub fn security_policy(&self) -> Result<SecurityPolicy> {
+        let package = OwnedPackage::from_shared_bytes(Arc::clone(&self.bytes))?;
+        package_security_policy(&package)
+    }
+
+    /// Read arbitrary source-backed story/list, table, and inert form owners.
+    ///
+    /// This remains available for signed read-only snapshots because it never
+    /// stages or publishes a mutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed, ambiguous, or oversized content owners.
+    pub fn rich_content(&self) -> Result<crate::content::Inventory> {
+        let package = OwnedPackage::from_shared_bytes(Arc::clone(&self.bytes))?;
+        crate::content::inventory(&package)
+    }
+
     /// Select a slide by checked zero-based position or exact title.
     ///
     /// # Errors
@@ -143,7 +190,8 @@ impl Snapshot {
     ///
     /// # Errors
     ///
-    /// Returns an error when the exact source package cannot be reparsed for staging.
+    /// Returns an error when the exact source package cannot be reparsed for staging or
+    /// its signature/encryption policy makes it read-only.
     pub fn transaction(&self) -> Result<Transaction> {
         let presentation = Presentation::from_shared_bytes(Arc::clone(&self.bytes))?;
         ensure_editable_source(presentation.owned_package())?;
@@ -590,6 +638,19 @@ impl Transaction {
         Ok(reference)
     }
 
+    /// Read arbitrary source-backed text-box, list, table, and form owners.
+    ///
+    /// Each model retains a compact namespace-complete XML fragment so producer
+    /// attributes and children can be inspected or replaced without flattening.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed, ambiguous, or oversized content owners.
+    pub fn rich_content(&mut self) -> Result<crate::content::Inventory> {
+        let package = OwnedPackage::from_shared_bytes(self.content_bytes()?)?;
+        crate::content::inventory(&package)
+    }
+
     /// Add a named common rich-text box to an exact presentation page.
     ///
     /// The object is inserted as a compact source-backed fragment, so opened
@@ -626,6 +687,24 @@ impl Transaction {
             name: name.to_string(),
             new_name: text_box.name().to_string(),
             xml: text_box.xml()?,
+        })
+    }
+
+    /// Replace an arbitrary source-backed text-box/list story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous source name, collision, or malformed model.
+    pub fn replace_text_box_model(
+        &mut self,
+        name: &str,
+        text_box: &crate::content::TextBoxModel,
+    ) -> Result<()> {
+        self.stage_content(crate::content::Operation::ReplaceObject {
+            kind: crate::content::ObjectKind::TextBox,
+            name: name.to_string(),
+            new_name: text_box.name().to_string(),
+            xml: text_box.xml().to_string(),
         })
     }
 
@@ -670,6 +749,24 @@ impl Transaction {
             name: name.to_string(),
             new_name: table.name().to_string(),
             xml: table.xml()?,
+        })
+    }
+
+    /// Replace an arbitrary source-backed table, including spans, repeats, and formulas.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous source name, collision, or malformed model.
+    pub fn replace_table_model(
+        &mut self,
+        name: &str,
+        table: &crate::content::TableModel,
+    ) -> Result<()> {
+        self.stage_content(crate::content::Operation::ReplaceObject {
+            kind: crate::content::ObjectKind::Table,
+            name: name.to_string(),
+            new_name: table.name().to_string(),
+            xml: table.xml().to_string(),
         })
     }
 
@@ -718,6 +815,24 @@ impl Transaction {
         self.stage_content(crate::content::Operation::ReplaceControl {
             name: name.to_string(),
             control: control.clone(),
+        })
+    }
+
+    /// Replace an arbitrary source-backed form declaration/control pair atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous source identity, collision, or malformed model.
+    pub fn replace_form_control_model(
+        &mut self,
+        name: &str,
+        control: &crate::content::FormControlModel,
+    ) -> Result<()> {
+        self.stage_content(crate::content::Operation::ReplaceControlModel {
+            name: name.to_string(),
+            new_name: control.name().to_string(),
+            declaration_xml: control.declaration_xml().to_string(),
+            visual_xml: control.visual_xml().to_string(),
         })
     }
 
@@ -2064,11 +2179,14 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns an error when `source` is not byte-for-byte identical to the patch source.
+    /// Returns an error when `source` is not byte-for-byte identical to the patch source or
+    /// its signature/encryption policy makes it read-only.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !same_source(&self.before, source) {
             return invalid("stale ODP presentation patch source");
         }
+        let package = OwnedPackage::from_shared_bytes(Arc::clone(&source.bytes))?;
+        ensure_editable_source(&package)?;
         Ok(self.after.clone())
     }
 
@@ -2606,20 +2724,31 @@ fn write_len(output: &mut Vec<u8>, value: usize) -> Result<()> {
 }
 
 fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
+    match package_security_policy(package)? {
+        SecurityPolicy::Editable => Ok(()),
+        SecurityPolicy::EncryptedReadOnly => unsupported(
+            "ODP mutation refuses encrypted package entries; decrypt to a new unsigned package first",
+        ),
+        SecurityPolicy::SignedReadOnly => unsupported(
+            "ODP mutation refuses signed packages because publication would invalidate their signatures",
+        ),
+        SecurityPolicy::SignedAndEncryptedReadOnly => unsupported(
+            "ODP mutation refuses signed packages with encrypted entries; decrypt and remove signatures in a new package first",
+        ),
+    }
+}
+
+fn package_security_policy(package: &OwnedPackage) -> Result<SecurityPolicy> {
     let archive = package.package()?;
-    if archive.manifest().has_encrypted_entries() {
-        return unsupported(
-            "ODP package transactions refuse encrypted package entries; decrypt to a new unsigned package first",
-        );
-    }
-    if archive.has_file("META-INF/documentsignatures.xml")
-        || archive.has_file("META-INF/macrosignatures.xml")
-    {
-        return unsupported(
-            "ODP package transactions refuse signed packages because mutation would invalidate their signatures",
-        );
-    }
-    Ok(())
+    let encrypted = archive.manifest().has_encrypted_entries();
+    let signed = archive.has_file("META-INF/documentsignatures.xml")
+        || archive.has_file("META-INF/macrosignatures.xml");
+    Ok(match (signed, encrypted) {
+        (false, false) => SecurityPolicy::Editable,
+        (false, true) => SecurityPolicy::EncryptedReadOnly,
+        (true, false) => SecurityPolicy::SignedReadOnly,
+        (true, true) => SecurityPolicy::SignedAndEncryptedReadOnly,
+    })
 }
 
 fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snapshot> {

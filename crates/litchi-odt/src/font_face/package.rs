@@ -330,7 +330,9 @@ fn locate_font_face_declarations(
                 let end = reader.buffer_position() as usize;
                 let depth = stack.len();
                 if open_target.is_some_and(|(target_depth, _)| target_depth == depth) {
-                    let (_, start) = open_target.take().expect("target depth was checked");
+                    let (_, start) = open_target.take().ok_or_else(|| {
+                        Error::InvalidFormat("missing font-face target start".to_string())
+                    })?;
                     target = Some(XmlSpan { start, end });
                 }
                 if open_scripts.is_some_and(|scripts_depth| scripts_depth == depth) {
@@ -356,13 +358,12 @@ fn locate_font_face_declarations(
             part.root_name()
         ));
     }
+    let root_open_end = root_open_end.ok_or_else(|| {
+        Error::InvalidFormat("non-empty document root has no opening event".to_string())
+    })?;
     let insertion = match part {
-        Part::Content => scripts_end.unwrap_or_else(|| {
-            root_open_end.expect("non-empty document root has an opening event")
-        }),
-        Part::Styles | Part::Flat => {
-            root_open_end.expect("non-empty document root has an opening event")
-        },
+        Part::Content => scripts_end.unwrap_or(root_open_end),
+        Part::Styles | Part::Flat => root_open_end,
     };
     Ok((declarations, Location { target, insertion }))
 }

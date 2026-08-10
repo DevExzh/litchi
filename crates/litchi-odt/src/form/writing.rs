@@ -396,7 +396,8 @@ fn scan(xml: &str) -> Result<Scan> {
                         })?)
                         .is_some())
                 {
-                    owner = Some(owners.len());
+                    let owner_index = owners.len();
+                    owner = Some(owner_index);
                     owners.push(Owner {
                         site: Site::Paired {
                             open_end: end,
@@ -405,7 +406,7 @@ fn scan(xml: &str) -> Result<Scan> {
                         container: None,
                         property_names: Vec::new(),
                     });
-                    owner_stack.push(owner.unwrap());
+                    owner_stack.push(owner_index);
                 } else if form && local == b"properties" {
                     let owner_index = *owner_stack.last().ok_or_else(|| {
                         Error::InvalidFormat(
@@ -415,7 +416,8 @@ fn scan(xml: &str) -> Result<Scan> {
                     if owners[owner_index].container.is_some() {
                         return invalid("duplicate form:properties container");
                     }
-                    container = Some(containers.len());
+                    let container_index = containers.len();
+                    container = Some(container_index);
                     owners[owner_index].container = container;
                     containers.push(Container {
                         site: Site::Paired {
@@ -425,7 +427,7 @@ fn scan(xml: &str) -> Result<Scan> {
                         full_span: previous..0,
                         count: 0,
                     });
-                    container_stack.push(container.unwrap());
+                    container_stack.push(container_index);
                 } else if form && matches!(local, b"property" | b"list-property") {
                     let owner_index = *owner_stack.last().ok_or_else(|| {
                         Error::InvalidFormat("form property has no owner".to_string())

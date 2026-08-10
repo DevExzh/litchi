@@ -28,7 +28,11 @@ pub(crate) fn add_xml(
         if start_at > end_at {
             return invalid("annotation range end precedes its start");
         }
-        let marker = end_marker(annotation.name().expect("range name validated"));
+        let marker = end_marker(
+            annotation
+                .name()
+                .ok_or_else(|| invalid_error("ranged annotation has no office:name"))?,
+        );
         if start_site.span.start == end_site.span.start {
             insert_child(content, start_site, &format!("{fragment}{marker}"))?
         } else {

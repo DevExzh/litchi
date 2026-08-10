@@ -431,10 +431,15 @@ fn transfer_graph_transition(
             | crate::document::Operation::ReplaceRevisionText { .. }
             | crate::document::Operation::ReplaceContentControlText { .. }
             | crate::document::Operation::ReplaceNestedContentControlText { .. }
+            | crate::document::Operation::ReplaceNestedContentControlHyperlinkText { .. }
             | crate::document::Operation::ReplaceBlockContentControlParagraphText { .. }
+            | crate::document::Operation::ReplaceBlockContentControlParagraphHyperlinkText {
+                ..
+            }
             | crate::document::Operation::ReplaceCellText { .. }
             | crate::document::Operation::ReplaceCellParagraphText { .. }
             | crate::document::Operation::ReplaceNestedCellParagraphText { .. }
+            | crate::document::Operation::ReplaceNestedCellParagraphHyperlinkText { .. }
             | crate::document::Operation::InsertParagraph { .. }
             | crate::document::Operation::RemoveParagraph { .. } => None,
         };

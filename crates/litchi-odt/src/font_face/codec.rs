@@ -18,17 +18,23 @@ use quick_xml::{
 };
 use std::collections::HashSet;
 
+fn namespace_text(namespace: &[u8]) -> Result<&str> {
+    std::str::from_utf8(namespace).map_err(|error| {
+        Error::InvalidFormat(format!("invalid static namespace encoding: {error}"))
+    })
+}
+
 pub(super) fn write_declarations(declarations: &Declarations) -> Result<String> {
     declarations.validate()?;
     let mut output = String::with_capacity(256 + declarations.faces.len() * 128);
     output.push_str("<office:font-face-decls xmlns:office=\"");
-    output.push_str(std::str::from_utf8(OFFICE_NAMESPACE).expect("namespace is UTF-8"));
+    output.push_str(namespace_text(OFFICE_NAMESPACE)?);
     output.push_str("\" xmlns:style=\"");
-    output.push_str(std::str::from_utf8(STYLE_NAMESPACE).expect("namespace is UTF-8"));
+    output.push_str(namespace_text(STYLE_NAMESPACE)?);
     output.push_str("\" xmlns:svg=\"");
-    output.push_str(std::str::from_utf8(SVG_NAMESPACE).expect("namespace is UTF-8"));
+    output.push_str(namespace_text(SVG_NAMESPACE)?);
     output.push_str("\" xmlns:xlink=\"");
-    output.push_str(std::str::from_utf8(XLINK_NAMESPACE).expect("namespace is UTF-8"));
+    output.push_str(namespace_text(XLINK_NAMESPACE)?);
     output.push_str("\">");
     for face in &declarations.faces {
         output.push_str("<style:font-face");
@@ -569,9 +575,11 @@ fn optional_single_svg_attribute(
         return invalid("font source element contains an unsupported attribute");
     }
     validate_value(&attributes[0].2, "SVG font source attribute", true)?;
-    Ok(Some(
-        attributes.into_iter().next().expect("one attribute").2,
-    ))
+    attributes
+        .into_iter()
+        .next()
+        .map(|attribute| Some(attribute.2))
+        .ok_or_else(|| Error::InvalidFormat("missing SVG font source attribute".to_string()))
 }
 
 fn require_empty(

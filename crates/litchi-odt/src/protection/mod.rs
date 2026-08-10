@@ -15,7 +15,9 @@ mod validation;
 mod tests;
 
 pub use model::{Key, Policy};
-pub use transaction::{Commit, Transaction};
+pub use transaction::{
+    Commit, DurablePatch, Field, MergePlan, Patch, Resolution, Transaction, Transfer,
+};
 
 pub(crate) use codec::{parse_flat, parse_package};
 pub(crate) use package::rewrite_owned_package;

@@ -11,6 +11,7 @@
 //! Patches carry deterministic semantic deltas, exact before/after images,
 //! bounded durable transfer, three-way conflict reporting, and undo/redo.
 
+mod formula_transfer;
 mod resources;
 mod root;
 pub mod workbook;

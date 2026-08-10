@@ -22,16 +22,24 @@ pub use facade::{
     Lineage as PackageLineage, MergePlan as PackageMergePlan, NameChange as PackageNameChange,
     PageNameChange as PackagePageNameChange, PageStyleChange as PackagePageStyleChange,
     Patch as PackagePatch, PathChange as PackagePathChange, PreparedEdit as PackagePreparedEdit,
-    ResourceChange as PackageResourceChange, SecurityStatus as PackageSecurityStatus,
-    SecurityWritePolicy as PackageSecurityWritePolicy, ShapeTransfer as PackageShapeTransfer,
-    Snapshot as PackageSnapshot, StructureChange as PackageStructureChange,
-    StyleChange as PackageStyleChange, TextChange as PackageTextChange,
-    Transaction as PackageTransaction, TransferControl as PackageTransferControl,
-    TransferResource as PackageTransferResource, TransferStyle as PackageTransferStyle,
+    ResourceChange as PackageResourceChange, SecurityCapabilities as PackageSecurityCapabilities,
+    SecurityStatus as PackageSecurityStatus, SecurityWritePolicy as PackageSecurityWritePolicy,
+    ShapeTransfer as PackageShapeTransfer, Snapshot as PackageSnapshot,
+    StructureChange as PackageStructureChange, StyleChange as PackageStyleChange,
+    TextChange as PackageTextChange, Transaction as PackageTransaction,
+    TransferControl as PackageTransferControl, TransferResource as PackageTransferResource,
+    TransferStyle as PackageTransferStyle, TransferStyleResource as PackageTransferStyleResource,
 };
 pub use facade::{Builder, Drawing};
 pub use flat::{
     FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,
     TextChange,
 };
-pub use model::{FormControl, form, group, layer, page, resource, shape, style};
+pub use litchi_odf_common::{
+    core::Profile as EncryptionProfile,
+    signature::{
+        CanonicalizationAlgorithm, DigitalSignature, DigitalSignatures, DocumentSigner,
+        SignatureAlgorithm, SignatureValidity, SignatureVerification,
+    },
+};
+pub use model::{FormControl, form, group, layer, page, resource, shape, style, style_resource};

@@ -1282,7 +1282,9 @@ fn scan_xml(xml: &str) -> Result<XmlScan> {
                     .is_some_and(|(open_depth, _)| *open_depth == depth)
                     && kind_local(value.local_name().as_ref())
                 {
-                    let (_, open_start) = index_stack.pop().expect("checked");
+                    let (_, open_start) = index_stack.pop().ok_or_else(|| {
+                        Error::InvalidFormat("missing open text-index span".to_string())
+                    })?;
                     spans.push(Span {
                         start: open_start,
                         end,

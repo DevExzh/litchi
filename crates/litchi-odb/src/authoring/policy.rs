@@ -99,6 +99,29 @@ pub enum EncryptionCapability {
     ExactPreservationOnly,
 }
 
+/// One protected-package operation callers may request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ProtectionOperation {
+    /// Verify signature mathematics without making a trust decision.
+    VerifySignatures,
+    /// Remove signature members invalidated by a changed publication.
+    RemoveInvalidatedSignatures,
+    /// Produce a new package signature.
+    ReSign,
+    /// Produce a newly password-encrypted package.
+    ReEncrypt,
+}
+
+/// Whether one protected-package operation is implemented.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ProtectionSupport {
+    /// The operation is implemented at the ordinary database root.
+    Supported,
+    /// The operation is deliberately unavailable.
+    Unsupported,
+}
+
 impl SignatureCapability {
     /// Whether signature math can be verified without making a trust claim.
     #[must_use]
@@ -201,6 +224,24 @@ impl ProtectionCapabilities {
     #[must_use]
     pub const fn encryption(self) -> EncryptionCapability {
         self.encryption
+    }
+
+    /// Returns explicit support for a protected-package operation.
+    #[must_use]
+    pub const fn support(self, operation: ProtectionOperation) -> ProtectionSupport {
+        let supported = match operation {
+            ProtectionOperation::VerifySignatures => self.signature.can_verify(),
+            ProtectionOperation::RemoveInvalidatedSignatures => {
+                self.signature.can_remove_invalidated()
+            },
+            ProtectionOperation::ReSign => self.signature.can_re_sign(),
+            ProtectionOperation::ReEncrypt => self.encryption.can_re_encrypt(),
+        };
+        if supported {
+            ProtectionSupport::Supported
+        } else {
+            ProtectionSupport::Unsupported
+        }
     }
 
     /// Whether document-signature math can be verified without a trust claim.

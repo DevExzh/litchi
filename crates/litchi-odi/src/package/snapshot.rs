@@ -2,6 +2,7 @@
 
 use crate::{
     FlatImage,
+    active::{ActiveContent, ActiveContentLocation},
     frame::Frame,
     resource::{Edge, Graph, Node, Resource},
 };
@@ -37,6 +38,7 @@ struct State {
     content: FlatImage,
     resources: Vec<Resource>,
     resource_graph: Graph,
+    active_content: Vec<ActiveContent>,
 }
 
 /// An immutable, validated package snapshot.
@@ -56,11 +58,31 @@ impl Snapshot {
         let content = FlatImage::from_content_xml(package.content_xml().as_bytes().to_vec())?;
         let resources = scan_resources(&package)?;
         let resource_graph = build_resource_graph(&package, &resources)?;
+        let mut active_content = content.active_content().to_vec();
+        if let Some(styles_xml) = package.styles_xml() {
+            active_content.extend(crate::active::scan_xml(
+                styles_xml,
+                ActiveContentLocation::StylesXml,
+            )?);
+        }
+        active_content.extend(
+            package
+                .files()?
+                .into_iter()
+                .filter(|path| crate::active::is_package_script_member(path))
+                .map(ActiveContent::package_member),
+        );
+        if active_content.len() > crate::active::MAX_ITEMS {
+            return Err(Error::InvalidFormat(
+                "ODI active-content inventory exceeds the item limit".into(),
+            ));
+        }
         Ok(Self(Arc::new(State {
             package,
             content,
             resources,
             resource_graph,
+            active_content,
         })))
     }
 
@@ -119,6 +141,10 @@ impl Snapshot {
 
     pub(crate) fn resource_graph(&self) -> &Graph {
         &self.0.resource_graph
+    }
+
+    pub(crate) fn active_content(&self) -> &[ActiveContent] {
+        &self.0.active_content
     }
 
     pub(crate) fn resource_bytes(&self, index: usize) -> Result<Option<Vec<u8>>> {

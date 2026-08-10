@@ -197,7 +197,9 @@ pub(crate) fn scan(xml: &str, wanted_paragraph: Option<usize>) -> Result<Scan> {
                     .last()
                     .is_some_and(|(_, field_depth, _)| *field_depth == depth)
                 {
-                    let (start, _, _) = active_fields.pop().expect("checked active field");
+                    let (start, _, _) = active_fields.pop().ok_or_else(|| {
+                        Error::InvalidFormat("missing completed dynamic text field".to_string())
+                    })?;
                     let end = usize::try_from(reader.buffer_position()).map_err(|_| {
                         Error::InvalidFormat(
                             "content.xml byte offset exceeds platform limits".to_string(),
@@ -209,9 +211,9 @@ pub(crate) fn scan(xml: &str, wanted_paragraph: Option<usize>) -> Result<Scan> {
                     .last()
                     .is_some_and(|(_, field_depth)| *field_depth == depth)
                 {
-                    let (start, _) = active_database_fields
-                        .pop()
-                        .expect("checked database field");
+                    let (start, _) = active_database_fields.pop().ok_or_else(|| {
+                        Error::InvalidFormat("missing completed database text field".to_string())
+                    })?;
                     let end = usize::try_from(reader.buffer_position()).map_err(|_| {
                         Error::InvalidFormat(
                             "content.xml byte offset exceeds platform limits".to_string(),

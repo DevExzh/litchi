@@ -691,7 +691,11 @@ pub(super) fn parse_part(
                         containers,
                         &mut temporary,
                     )?;
-                    result.groups.push(temporary.expect("group created").group);
+                    result.groups.push(
+                        temporary
+                            .ok_or_else(|| invalid("missing variable declaration group"))?
+                            .group,
+                    );
                 } else if let Some(kind) = usage_kind(namespace.as_deref(), &local) {
                     record_use(
                         &reader, element, part, kind, &stack, uses, all_uses, aggregate,
@@ -717,9 +721,12 @@ pub(super) fn parse_part(
                     }
                 }
                 if active.as_ref().is_some_and(|group| group.depth == depth) {
-                    result
-                        .groups
-                        .push(active.take().expect("checked group").group);
+                    result.groups.push(
+                        active
+                            .take()
+                            .ok_or_else(|| invalid("missing completed variable declaration group"))?
+                            .group,
+                    );
                 }
                 depth = depth
                     .checked_sub(1)

@@ -31,7 +31,7 @@ impl BookmarkTarget {
 
     pub fn name(&self) -> &str {
         match self {
-            Self::Point(bookmark) => bookmark.name().expect("typed bookmark has text:name"),
+            Self::Point(bookmark) => bookmark.name().unwrap_or_default(),
             Self::Range(range) => &range.name,
         }
     }

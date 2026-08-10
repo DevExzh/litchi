@@ -393,12 +393,15 @@ pub fn parse_page_layout_header_footer_properties(xml: &str) -> Result<Vec<Prope
                         false,
                     ));
                 } else if active.as_ref().is_some_and(|x| depth == x.0 + 1) {
-                    if c.0 != STYLE || c.1 != b"background-image" || active.as_ref().unwrap().2 {
+                    let state = active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing active header/footer properties"))?;
+                    if c.0 != STYLE || c.1 != b"background-image" || state.2 {
                         return Err(bad("invalid header-footer-properties child"));
                     }
                     let image = parse_background(&reader, version, &e, &mut total)?;
-                    active.as_mut().unwrap().1.background_image = Some(image);
-                    active.as_mut().unwrap().2 = true;
+                    state.1.background_image = Some(image);
+                    state.2 = true;
                 }
                 stack.push(c);
             },
@@ -412,18 +415,24 @@ pub fn parse_page_layout_header_footer_properties(xml: &str) -> Result<Vec<Prope
                     let properties = parse_properties(&reader, version, &e, &mut total)?;
                     push_entry(&mut out, &layout, &region, properties)?;
                 } else if active.as_ref().is_some_and(|x| depth == x.0 + 1) {
-                    if c.0 != STYLE || c.1 != b"background-image" || active.as_ref().unwrap().2 {
+                    let state = active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing active header/footer properties"))?;
+                    if c.0 != STYLE || c.1 != b"background-image" || state.2 {
                         return Err(bad("invalid header-footer-properties child"));
                     }
                     let image = parse_background(&reader, version, &e, &mut total)?;
-                    active.as_mut().unwrap().1.background_image = Some(image);
-                    active.as_mut().unwrap().2 = true;
+                    state.1.background_image = Some(image);
+                    state.2 = true;
                 }
             },
             Ok(Event::End(_)) => {
                 let depth = stack.len();
                 if active.as_ref().is_some_and(|x| x.0 == depth) {
-                    let properties = active.take().unwrap().1;
+                    let properties = active
+                        .take()
+                        .ok_or_else(|| bad("missing completed header/footer properties"))?
+                        .1;
                     push_entry(&mut out, &layout, &region, properties)?;
                 }
                 if region.as_ref().is_some_and(|x| x.0 == depth) {
@@ -584,7 +593,9 @@ fn replace_in_wrapper(wrapper: &str, property: &str) -> Result<String> {
         buffer.clear();
     }
     if wrapper.trim_end().ends_with("/>") {
-        let close = wrapper.rfind("/>").unwrap();
+        let close = wrapper
+            .rfind("/>")
+            .ok_or_else(|| bad("invalid empty header/footer wrapper"))?;
         let open = &wrapper[1..]
             .split(|c: char| c.is_ascii_whitespace() || c == '/')
             .next()

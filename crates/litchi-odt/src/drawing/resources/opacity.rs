@@ -397,9 +397,10 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "opacity" {
                         return invalid("unexpected draw:opacity end element");
                     }
-                    result
-                        .opacities
-                        .push(active.take().expect("active opacity checked").value);
+                    let opacity = active
+                        .take()
+                        .ok_or_else(|| make_error("missing completed opacity"))?;
+                    result.opacities.push(opacity.value);
                 }
             },
             Event::Text(ref text) if active.is_some() => {

@@ -382,6 +382,18 @@ pub enum SectionChange {
     Remove { position: Position, before: String },
 }
 
+/// One staged or committed generated-index effect.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum GeneratedIndexChange {
+    /// Renames an existing generated index.
+    Rename {
+        item: Position,
+        before: String,
+        after: String,
+    },
+}
+
 /// One staged or committed style-catalog effect.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -415,6 +427,7 @@ pub(crate) fn mutate_xml(
     source: &Master,
     links: &[(Position, String)],
     sections: &[SectionChange],
+    generated_indexes: &[GeneratedIndexChange],
     styles: &[StyleChange],
 ) -> Result<MutatedParts> {
     let mut content_edits = Vec::new();
@@ -433,6 +446,9 @@ pub(crate) fn mutate_xml(
     }
     for intent in sections {
         stage_section(source, intent, &mut content_edits)?;
+    }
+    for intent in generated_indexes {
+        stage_generated_index(source, intent, &mut content_edits)?;
     }
     let removed_section_spans = removed_section_spans(source, sections)?;
     for intent in styles {
@@ -510,6 +526,36 @@ pub(crate) fn mutate_xml(
         content,
         styles: styles_xml,
     })
+}
+
+fn stage_generated_index(
+    source: &Master,
+    intent: &GeneratedIndexChange,
+    edits: &mut Vec<(Range<usize>, String)>,
+) -> Result<()> {
+    match intent {
+        GeneratedIndexChange::Rename {
+            item,
+            before,
+            after,
+        } => {
+            let index = source
+                .structure()
+                .generated_indexes()
+                .iter()
+                .find(|index| index.item() == *item)
+                .ok_or_else(|| invalid("ODM generated-index selector is stale"))?;
+            if index.name() != Some(before) {
+                return Err(invalid("ODM generated-index identity is stale"));
+            }
+            let span = index
+                .name_span
+                .clone()
+                .ok_or_else(|| invalid("ODM generated index has no addressable text:name"))?;
+            edits.push((span, escape(after)));
+            Ok(())
+        },
+    }
 }
 
 const fn empty_styles_part() -> &'static str {

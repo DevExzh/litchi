@@ -24,6 +24,7 @@ struct State {
     chart_tag: EditableTag,
     plot_tag: EditableTag,
     coordinate_region_tag: Option<EditableTag>,
+    decorative_tags: Vec<(ExactTarget, EditableTag)>,
     series_tags: Vec<EditableTag>,
     root_kind: RootKind,
     limits: crate::Limits,
@@ -167,6 +168,16 @@ impl FlatChart {
                 .coordinate_region_tag
                 .as_ref()
                 .ok_or_else(|| invalid_error("flat ODC coordinate-region selector is missing")),
+            ExactTarget::Title
+            | ExactTarget::Subtitle
+            | ExactTarget::Footer
+            | ExactTarget::Legend => self
+                .0
+                .decorative_tags
+                .iter()
+                .find(|(candidate, _tag)| *candidate == target)
+                .map(|(_target, tag)| tag)
+                .ok_or_else(|| invalid_error("flat ODC decorative selector is missing")),
             ExactTarget::Series(index) => self
                 .0
                 .series_tags
@@ -200,6 +211,14 @@ pub enum ExactTarget {
     PlotArea,
     /// The ODF 1.4 `chart:coordinate-region` inside the plot area.
     CoordinateRegion,
+    /// The root chart title.
+    Title,
+    /// The root chart subtitle.
+    Subtitle,
+    /// The root chart footer.
+    Footer,
+    /// The root chart legend.
+    Legend,
     /// A direct plot-area series selected by zero-based position.
     Series(usize),
 }
@@ -214,9 +233,12 @@ pub enum ExactAttribute {
     X,
     Y,
     CellRangeAddress,
+    CellRange,
     ValuesCellRangeAddress,
     LabelCellAddress,
     AttachedAxis,
+    LegendPosition,
+    LegendAlign,
 }
 
 /// One validated exact-span attribute change.
@@ -803,6 +825,12 @@ pub(crate) fn exact_changes_between(source: &FlatChart, target: &FlatChart) -> V
     let targets = std::iter::once(ExactTarget::Chart)
         .chain(std::iter::once(ExactTarget::PlotArea))
         .chain(std::iter::once(ExactTarget::CoordinateRegion))
+        .chain([
+            ExactTarget::Title,
+            ExactTarget::Subtitle,
+            ExactTarget::Footer,
+            ExactTarget::Legend,
+        ])
         .chain((0..source.0.series_tags.len()).map(ExactTarget::Series));
     let mut changes = Vec::new();
     for exact_target in targets {
@@ -856,6 +884,21 @@ fn validate_exact_pair(target: ExactTarget, attribute: ExactAttribute) -> Result
             attribute,
             ExactAttribute::X | ExactAttribute::Y | ExactAttribute::Width | ExactAttribute::Height
         ),
+        ExactTarget::Title | ExactTarget::Subtitle | ExactTarget::Footer => matches!(
+            attribute,
+            ExactAttribute::StyleName
+                | ExactAttribute::CellRange
+                | ExactAttribute::X
+                | ExactAttribute::Y
+        ),
+        ExactTarget::Legend => matches!(
+            attribute,
+            ExactAttribute::StyleName
+                | ExactAttribute::X
+                | ExactAttribute::Y
+                | ExactAttribute::LegendPosition
+                | ExactAttribute::LegendAlign
+        ),
         ExactTarget::Series(_) => matches!(
             attribute,
             ExactAttribute::Class
@@ -882,6 +925,8 @@ fn exact_attribute(namespace: &ResolveResult<'_>, local: &[u8]) -> Option<ExactA
             b"values-cell-range-address" => Some(ExactAttribute::ValuesCellRangeAddress),
             b"label-cell-address" => Some(ExactAttribute::LabelCellAddress),
             b"attached-axis" => Some(ExactAttribute::AttachedAxis),
+            b"legend-position" => Some(ExactAttribute::LegendPosition),
+            b"legend-align" => Some(ExactAttribute::LegendAlign),
             _ => None,
         }
     } else if resolved(namespace, SVG) {
@@ -892,8 +937,12 @@ fn exact_attribute(namespace: &ResolveResult<'_>, local: &[u8]) -> Option<ExactA
             b"y" => Some(ExactAttribute::Y),
             _ => None,
         }
-    } else if resolved(namespace, TABLE) && local == b"cell-range-address" {
-        Some(ExactAttribute::CellRangeAddress)
+    } else if resolved(namespace, TABLE) {
+        match local {
+            b"cell-range-address" => Some(ExactAttribute::CellRangeAddress),
+            b"cell-range" => Some(ExactAttribute::CellRange),
+            _ => None,
+        }
     } else {
         None
     }
@@ -908,10 +957,42 @@ fn attribute_name(attribute: ExactAttribute) -> (&'static [u8], &'static str) {
         ExactAttribute::X => (SVG, "x"),
         ExactAttribute::Y => (SVG, "y"),
         ExactAttribute::CellRangeAddress => (TABLE, "cell-range-address"),
+        ExactAttribute::CellRange => (TABLE, "cell-range"),
         ExactAttribute::ValuesCellRangeAddress => (CHART, "values-cell-range-address"),
         ExactAttribute::LabelCellAddress => (CHART, "label-cell-address"),
         ExactAttribute::AttachedAxis => (CHART, "attached-axis"),
+        ExactAttribute::LegendPosition => (CHART, "legend-position"),
+        ExactAttribute::LegendAlign => (CHART, "legend-align"),
     }
+}
+
+fn decorative_target(local: &[u8]) -> Option<ExactTarget> {
+    match local {
+        b"title" => Some(ExactTarget::Title),
+        b"subtitle" => Some(ExactTarget::Subtitle),
+        b"footer" => Some(ExactTarget::Footer),
+        b"legend" => Some(ExactTarget::Legend),
+        _ => None,
+    }
+}
+
+fn push_decorative_tag(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    tag: Range<usize>,
+    bytes: &[u8],
+    target: ExactTarget,
+    tags: &mut Vec<(ExactTarget, EditableTag)>,
+    limits: crate::Limits,
+) -> Result<()> {
+    if tags.iter().any(|(candidate, _tag)| *candidate == target) {
+        return Err(invalid_error("flat ODC decorative element is duplicated"));
+    }
+    tags.push((
+        target,
+        record_editable_tag(reader, element, tag, bytes, target, limits)?,
+    ));
+    Ok(())
 }
 
 fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<State> {
@@ -947,6 +1028,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
     let mut chart_tag = None;
     let mut plot_tag = None;
     let mut coordinate_region_tag = None;
+    let mut decorative_tags = Vec::new();
     let mut series_tags = Vec::new();
 
     loop {
@@ -1059,6 +1141,19 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         ExactTarget::Series(index),
                         limits,
                     )?);
+                } else if namespace == NamespaceKind::Chart
+                    && chart_depth == Some(event_depth - 1)
+                    && let Some(target) = decorative_target(local.as_ref())
+                {
+                    push_decorative_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        target,
+                        &mut decorative_tags,
+                        limits,
+                    )?;
                 }
                 depth = event_depth;
             },
@@ -1128,6 +1223,20 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         ExactTarget::CoordinateRegion,
                         limits,
                     )?);
+                }
+                if namespace == NamespaceKind::Chart
+                    && chart_depth == Some(event_depth - 1)
+                    && let Some(target) = decorative_target(local.as_ref())
+                {
+                    push_decorative_tag(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        target,
+                        &mut decorative_tags,
+                        limits,
+                    )?;
                 }
             },
             Event::End(element) => {
@@ -1231,6 +1340,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
         chart_tag: chart_tag.ok_or_else(|| invalid_error("flat ODC chart tag is missing"))?,
         plot_tag: plot_tag.ok_or_else(|| invalid_error("flat ODC plot-area tag is missing"))?,
         coordinate_region_tag,
+        decorative_tags,
         series_tags,
         root_kind,
         limits,

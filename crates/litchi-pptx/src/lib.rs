@@ -127,7 +127,7 @@ pub use comments::{
     update_presentation_comment, update_presentation_comment_author, write_comment_authors,
     write_slide_comments,
 };
-pub use error::{Error, Result};
+pub use error::{Error, Result, ShapeTransferRefusal};
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
 #[cfg(feature = "encryption")]

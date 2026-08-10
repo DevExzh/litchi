@@ -23,15 +23,16 @@ pub use authoring::{
     ActiveContentDisposition, Change, ChangeAction, ChangeKind, Commit, CompositionLimits,
     DependencyDisposition, DurablePatch, Edit, EditPolicy, EncryptionCapability, EncryptionPolicy,
     History, HistoryLimits, JoinError, JoinedEdits, Lineage, MergeChoice, MergePlan,
-    MergePlanError, Patch, PreparedEdit, ProtectionCapabilities, ProtectionStatus,
-    ProtectionTransition, QueryChange, SealedPatch, SignatureCapability, SignaturePolicy,
+    MergePlanError, Patch, PreparedEdit, ProtectionCapabilities, ProtectionOperation,
+    ProtectionStatus, ProtectionSupport, ProtectionTransition, QueryChange, SealedPatch,
+    SignatureCapability, SignaturePolicy,
 };
 pub use facade::{Builder, Database};
 pub use litchi_odf_common::signature::{
     DigitalSignature, DigitalSignatures, SignatureValidity, SignatureVerification,
 };
 pub use model::connection::Connection;
-pub use model::query::Query;
+pub use model::query::{Query, QueryUpdateTarget};
 pub use model::{
     ActiveContentEntry, ActiveContentInventory, ActiveContentKind, Catalog, Column, Component,
     ComponentKind, ComponentLinkKind, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind,

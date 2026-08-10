@@ -35,14 +35,10 @@ fn every_checked_constructor_family_builds_compact_reopenable_mathml() {
     let reopened = Formula::from_bytes(formula.to_bytes()).expect("full package reopen");
     assert_eq!(reopened.root(), &root);
 
-    let bad_identifier = content::number("1", NumberType::Integer).expect("number");
-    assert!(content::declaration(bad_identifier, None).is_err());
-    let bad_definition = content::apply(
-        ContentSymbol::PLUS,
-        vec![content::identifier("x"), content::identifier("y")],
-    )
-    .expect("application");
-    assert!(content::declaration(content::identifier("f"), Some(bad_definition)).is_err());
+    assert!(content::declaration(authoring::identifier("x"), None).is_err());
+    assert!(
+        content::declaration(content::identifier("f"), Some(authoring::identifier("x"))).is_err()
+    );
 }
 
 #[test]
@@ -113,6 +109,9 @@ fn presentation_content_and_annotation_boundaries_are_deterministic() {
         format!(
             r#"<math xmlns="{NS}"><semantics><ci>x</ci><annotation-xml encoding="application/xml"><v:proof xmlns:v="urn:vendor:proof"><apply/></v:proof></annotation-xml></semantics></math>"#
         ),
+        format!(
+            r#"<math xmlns="{NS}"><declare><ci>f</ci><apply><plus/><ci>x</ci><ci>y</ci></apply></declare></math>"#
+        ),
     ];
     let malformed = [
         format!(r#"<math xmlns="{NS}"><mrow><ci>x</ci></mrow></math>"#),
@@ -132,9 +131,7 @@ fn presentation_content_and_annotation_boundaries_are_deterministic() {
             r#"<math xmlns="{NS}"><annotation-xml><v:x xmlns:v="urn:v"/></annotation-xml></math>"#
         ),
         format!(r#"<math xmlns="{NS}"><fn><ci>x</ci><ci>y</ci></fn></math>"#),
-        format!(
-            r#"<math xmlns="{NS}"><declare><ci>f</ci><apply><plus/><ci>x</ci><ci>y</ci></apply></declare></math>"#
-        ),
+        format!(r#"<math xmlns="{NS}"><declare><mi>x</mi></declare></math>"#),
     ];
 
     for xml in valid {
@@ -397,6 +394,7 @@ fn complete_content_corpus() -> Vec<Element> {
         content::symbol_token("vendor:function"),
         content::number("1.5", NumberType::Real).expect("real"),
         content::number("2", NumberType::Integer).expect("integer"),
+        content::number_pair("1", "6", NumberType::ENotation).expect("e-notation"),
         content::number("pi", NumberType::Constant).expect("constant"),
         content::number_pair("1", "3", NumberType::Rational).expect("rational"),
         content::number_pair("1", "2", NumberType::ComplexCartesian).expect("cartesian"),
@@ -457,6 +455,10 @@ fn complete_content_corpus() -> Vec<Element> {
     ] {
         corpus.push(content::interval(integer(), integer(), closure).expect("interval"));
     }
+    corpus.push(
+        content::generated_interval(vec![bound()], condition(), Closure::Closed)
+            .expect("generated interval"),
+    );
     corpus.push(
         content::apply(
             ContentSymbol::ROOT,

@@ -290,9 +290,10 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "marker" {
                         return invalid("unexpected drawing marker end element");
                     }
-                    result
-                        .markers
-                        .push(active.take().expect("active marker checked").value);
+                    let marker = active
+                        .take()
+                        .ok_or_else(|| make_error("missing completed marker"))?;
+                    result.markers.push(marker.value);
                 }
             },
             Event::Text(ref text) if active.is_some() => {

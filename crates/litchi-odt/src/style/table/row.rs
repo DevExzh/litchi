@@ -671,7 +671,7 @@ fn image_attributes(
             return Err(bad("invalid background-image xlink group"));
         }
         BackgroundSource::Link {
-            href: href.unwrap(),
+            href: href.ok_or_else(|| bad("missing background-image xlink:href"))?,
             show_embed: show.is_some(),
             actuate_on_load: actuate.is_some(),
         }
@@ -774,7 +774,11 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             "style:table-row-properties has invalid namespace or parent",
                         ));
                     } else if state.properties_depth.is_some()
-                        && depth == state.properties_depth.unwrap() + 1
+                        && depth
+                            == state
+                                .properties_depth
+                                .ok_or_else(|| bad("missing table-row properties depth"))?
+                                + 1
                         && current.0 == Ns::Style
                         && current.1 == b"background-image"
                     {
@@ -783,15 +787,19 @@ pub fn parse(xml: &str) -> Result<Styles> {
                                 .style
                                 .properties
                                 .as_ref()
-                                .unwrap()
+                                .ok_or_else(|| bad("missing table-row properties"))?
                                 .background_image
                                 .is_some()
                         {
                             return Err(bad("duplicate style:background-image"));
                         }
                         let parsed = image_attributes(&reader, version, &start)?;
-                        state.style.properties.as_mut().unwrap().background_image =
-                            Some(parsed.image);
+                        state
+                            .style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing table-row properties"))?
+                            .background_image = Some(parsed.image);
                         state.image_linked = parsed.linked;
                         state.image_depth = Some(depth);
                     } else if current.1 == b"background-image" {
@@ -799,7 +807,11 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             "style:background-image has invalid namespace or parent",
                         ));
                     } else if state.image_depth.is_some()
-                        && depth == state.image_depth.unwrap() + 1
+                        && depth
+                            == state
+                                .image_depth
+                                .ok_or_else(|| bad("missing background-image depth"))?
+                                + 1
                         && current.0 == Ns::Office
                         && current.1 == b"binary-data"
                     {
@@ -809,7 +821,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         state.binary_depth = Some(depth);
                         state.binary.clear();
                     } else if state.properties_depth.is_some()
-                        && depth > state.properties_depth.unwrap()
+                        && depth
+                            > state
+                                .properties_depth
+                                .ok_or_else(|| bad("missing table-row properties depth"))?
                     {
                         return Err(bad("unexpected table-row property child"));
                     }
@@ -846,7 +861,11 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             "style:table-row-properties has invalid namespace or parent",
                         ));
                     } else if state.properties_depth.is_some()
-                        && depth == state.properties_depth.unwrap() + 1
+                        && depth
+                            == state
+                                .properties_depth
+                                .ok_or_else(|| bad("missing table-row properties depth"))?
+                                + 1
                         && current.0 == Ns::Style
                         && current.1 == b"background-image"
                     {
@@ -854,20 +873,29 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             .style
                             .properties
                             .as_ref()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table-row properties"))?
                             .background_image
                             .is_some()
                         {
                             return Err(bad("duplicate style:background-image"));
                         }
-                        state.style.properties.as_mut().unwrap().background_image =
+                        state
+                            .style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing table-row properties"))?
+                            .background_image =
                             Some(image_attributes(&reader, version, &start)?.image);
                     } else if current.1 == b"background-image" {
                         return Err(bad(
                             "style:background-image has invalid namespace or parent",
                         ));
                     } else if state.image_depth.is_some()
-                        && depth == state.image_depth.unwrap() + 1
+                        && depth
+                            == state
+                                .image_depth
+                                .ok_or_else(|| bad("missing background-image depth"))?
+                                + 1
                         && current.0 == Ns::Office
                         && current.1 == b"binary-data"
                     {
@@ -878,13 +906,16 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             .style
                             .properties
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table-row properties"))?
                             .background_image
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table-row background image"))?
                             .source = BackgroundSource::Embedded(Vec::new());
                     } else if state.properties_depth.is_some()
-                        && depth > state.properties_depth.unwrap()
+                        && depth
+                            > state
+                                .properties_depth
+                                .ok_or_else(|| bad("missing table-row properties depth"))?
                     {
                         return Err(bad("unexpected table-row property child"));
                     }
@@ -929,10 +960,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             .style
                             .properties
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table-row properties"))?
                             .background_image
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table-row background image"))?
                             .source = BackgroundSource::Embedded(data);
                         state.binary_depth = None;
                     }
@@ -944,7 +975,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     }
                 }
                 if active.as_ref().is_some_and(|x| x.depth == depth) {
-                    push_style(&mut out, active.take().unwrap().style, &mut total)?;
+                    let state = active
+                        .take()
+                        .ok_or_else(|| bad("missing active table-row style"))?;
+                    push_style(&mut out, state.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -1122,7 +1156,13 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                         qname: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
                         ..Default::default()
                     };
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    if active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target table-row style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
+                    {
                         return Err(bad("duplicate style:table-row-properties"));
                     }
                 }
@@ -1161,7 +1201,12 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                 } else if depth_target.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"table-row-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                    && active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target table-row style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
                 {
                     return Err(bad("duplicate style:table-row-properties"));
                 }
@@ -1174,7 +1219,10 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                     if spans.properties.as_ref().is_some_and(|s| s.end == 0)
                         && depth_target.is_some_and(|d| depth == d + 1)
                     {
-                        let s = spans.properties.as_mut().unwrap();
+                        let s = spans
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target table-row properties span"))?;
                         s.end_start = begin;
                         s.end = end;
                     }

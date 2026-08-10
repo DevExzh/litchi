@@ -179,7 +179,7 @@ pub fn insert_text_index_mark_xml(
             output
         },
         (ParagraphSite::Empty { start, end, qname }, TextIndexMarkFragments::Point(fragment)) => {
-            expand_empty(xml, *start, *end, qname, &fragment)
+            expand_empty(xml, *start, *end, qname, &fragment)?
         },
         (
             ParagraphSite::Empty { start, end, qname },
@@ -187,7 +187,7 @@ pub fn insert_text_index_mark_xml(
                 start: range_start,
                 end: range_end,
             },
-        ) => expand_empty(xml, *start, *end, qname, &(range_start + &range_end)),
+        ) => expand_empty(xml, *start, *end, qname, &(range_start + &range_end))?,
     };
     validated_marks(&output)?;
     Ok(output)
@@ -865,9 +865,11 @@ fn splice_one(xml: &str, start: usize, end: usize, replacement: &str) -> String 
     output.push_str(&xml[end..]);
     output
 }
-fn expand_empty(xml: &str, start: usize, end: usize, qname: &str, content: &str) -> String {
+fn expand_empty(xml: &str, start: usize, end: usize, qname: &str, content: &str) -> Result<String> {
     let raw = &xml[start..end];
-    let slash = raw.rfind("/>").expect("quick-xml empty element");
+    let slash = raw.rfind("/>").ok_or_else(|| {
+        Error::InvalidFormat("empty paragraph span has no closing delimiter".to_string())
+    })?;
     let mut output = String::with_capacity(xml.len() + content.len() + qname.len() + 3);
     output.push_str(&xml[..start]);
     output.push_str(&raw[..slash]);
@@ -877,7 +879,7 @@ fn expand_empty(xml: &str, start: usize, end: usize, qname: &str, content: &str)
     output.push_str(qname);
     output.push('>');
     output.push_str(&xml[end..]);
-    output
+    Ok(output)
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))

@@ -146,9 +146,15 @@ impl LeaderColor {
             .filter(|hex| hex.len() == 6 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
             .ok_or_else(|| error(format!("invalid style:leader-color '{value}'")))?;
         Ok(Self::Rgb(
-            u8::from_str_radix(&hex[0..2], 16).expect("validated hex"),
-            u8::from_str_radix(&hex[2..4], 16).expect("validated hex"),
-            u8::from_str_radix(&hex[4..6], 16).expect("validated hex"),
+            u8::from_str_radix(&hex[0..2], 16).map_err(|parse_error| {
+                error(format!("invalid red color component: {parse_error}"))
+            })?,
+            u8::from_str_radix(&hex[2..4], 16).map_err(|parse_error| {
+                error(format!("invalid green color component: {parse_error}"))
+            })?,
+            u8::from_str_radix(&hex[4..6], 16).map_err(|parse_error| {
+                error(format!("invalid blue color component: {parse_error}"))
+            })?,
         ))
     }
     fn lexical(self) -> String {
@@ -462,7 +468,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         style.props_depth = None;
                     }
                     if style.depth == stack.len() {
-                        let style = active.take().expect("active checked").value;
+                        let style = active
+                            .take()
+                            .ok_or_else(|| error("missing active paragraph tab-stop style"))?
+                            .value;
                         push_style(&mut result, style)?;
                     }
                 }
@@ -587,7 +596,7 @@ fn start(
             .value
             .tab_stops
             .as_mut()
-            .expect("parent checked")
+            .ok_or_else(|| error("missing parent style:tab-stops element"))?
             .push(stop)?;
         if !empty {
             style.stop_depth = Some(stack.len());

@@ -1,6 +1,6 @@
 //! Concise family entry points.
 
-use litchi_core::{Metadata, Result};
+use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
@@ -131,6 +131,45 @@ impl Database {
         self.package.active_content()
     }
 
+    /// Inventories active-content dependencies inside one local form/report
+    /// package subtree without following external IRIs or activating content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the component selector is absent or ambiguous,
+    /// or when the bounded active-content inventory cannot be decoded.
+    pub fn component_active_content(
+        &self,
+        kind: crate::ComponentKind,
+        name: &str,
+    ) -> Result<crate::ActiveContentInventory> {
+        let catalog = self.catalog()?;
+        let mut matches = catalog
+            .components()
+            .iter()
+            .filter(|component| component.kind() == kind && component.name() == Some(name));
+        let component = matches.next().ok_or_else(|| {
+            Error::InvalidFormat("ODB active-content component does not exist".to_string())
+        })?;
+        if matches.next().is_some() {
+            return Err(Error::InvalidFormat(
+                "ODB active-content component selector is ambiguous".to_string(),
+            ));
+        }
+        if component.link_kind() != crate::ComponentLinkKind::LocalPackage {
+            return Ok(crate::ActiveContentInventory::new(Vec::new()));
+        }
+        let prefix = format!("{}/", component.href().unwrap_or("").trim_end_matches('/'));
+        let entries = self
+            .active_content()?
+            .entries()
+            .iter()
+            .filter(|entry| entry.package_path().starts_with(&prefix))
+            .cloned()
+            .collect();
+        Ok(crate::ActiveContentInventory::new(entries))
+    }
+
     /// Inventories signatures and manifest-declared encryption without
     /// validating, decrypting, or executing protected content.
     ///
@@ -149,6 +188,42 @@ impl Database {
     #[must_use]
     pub const fn protection_capabilities(&self) -> crate::ProtectionCapabilities {
         crate::ProtectionCapabilities::odb()
+    }
+
+    /// Returns explicit support for one protected-package operation.
+    #[must_use]
+    pub const fn protection_support(
+        &self,
+        operation: crate::ProtectionOperation,
+    ) -> crate::ProtectionSupport {
+        self.protection_capabilities().support(operation)
+    }
+
+    /// Enforces the root protection boundary before a workflow gathers
+    /// credentials or signing material.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unsupported`] for re-signing and re-encryption. No
+    /// package bytes are changed and no credential is requested.
+    pub fn require_protection_operation(
+        &self,
+        operation: crate::ProtectionOperation,
+    ) -> Result<()> {
+        if self.protection_support(operation) == crate::ProtectionSupport::Supported {
+            return Ok(());
+        }
+        let name = match operation {
+            crate::ProtectionOperation::ReSign => "re-signing",
+            crate::ProtectionOperation::ReEncrypt => "re-encryption",
+            crate::ProtectionOperation::VerifySignatures => "signature verification",
+            crate::ProtectionOperation::RemoveInvalidatedSignatures => {
+                "invalidated-signature removal"
+            },
+        };
+        Err(Error::Unsupported(format!(
+            "ODB protected-package operation '{name}' is not supported"
+        )))
     }
 
     /// Reads inert document and macro signature metadata without verifying it

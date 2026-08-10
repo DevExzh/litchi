@@ -27,15 +27,21 @@ enum NamespaceKind {
     Other,
 }
 
+fn namespace_text(namespace: &[u8]) -> Result<&str> {
+    std::str::from_utf8(namespace).map_err(|error| {
+        Error::InvalidFormat(format!("invalid static namespace encoding: {error}"))
+    })
+}
+
 impl Configuration {
     /// Serialize a namespace-complete notes configuration element.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(512);
         output.push_str("<text:notes-configuration xmlns:text=\"");
-        output.push_str(std::str::from_utf8(TEXT_NAMESPACE).expect("namespace is UTF-8"));
+        output.push_str(namespace_text(TEXT_NAMESPACE)?);
         output.push_str("\" xmlns:style=\"");
-        output.push_str(std::str::from_utf8(STYLE_NAMESPACE).expect("namespace is UTF-8"));
+        output.push_str(namespace_text(STYLE_NAMESPACE)?);
         output.push('"');
         write_attr(
             &mut output,
@@ -515,7 +521,9 @@ fn locate_configuration(xml: &str, note_class: Class) -> Result<(Option<XmlSpan>
                 let start = event_start(xml, end)?;
                 let depth = stack.len();
                 if open_target.is_some_and(|(target_depth, _)| target_depth == depth) {
-                    let (_, target_start) = open_target.take().expect("target depth checked");
+                    let (_, target_start) = open_target.take().ok_or_else(|| {
+                        Error::InvalidFormat("missing notes-configuration target start".to_string())
+                    })?;
                     target = Some(XmlSpan {
                         start: target_start,
                         end,

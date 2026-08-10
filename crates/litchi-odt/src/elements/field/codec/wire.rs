@@ -751,7 +751,12 @@ pub(in crate::elements::field) fn parse_database_fields(xml: &str) -> Result<Vec
                     field.connection_depth = None;
                 }
                 if active.as_ref().is_some_and(|field| field.depth == depth) {
-                    let field = active.take().expect("checked database field").field;
+                    let field = active
+                        .take()
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("missing completed database field".to_string())
+                        })?
+                        .field;
                     fields.push(validate_database_field(field)?);
                 }
                 stack.pop().ok_or_else(|| {
@@ -766,7 +771,9 @@ pub(in crate::elements::field) fn parse_database_fields(xml: &str) -> Result<Vec
                     Error::InvalidFormat(format!("invalid database field text: {error}"))
                 })?;
                 append_database_text(
-                    active.as_mut().expect("checked field"),
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active database field".to_string())
+                    })?,
                     &value,
                     &mut aggregate,
                 )?;
@@ -776,7 +783,9 @@ pub(in crate::elements::field) fn parse_database_fields(xml: &str) -> Result<Vec
                     Error::InvalidFormat(format!("invalid database field CDATA: {error}"))
                 })?;
                 append_database_text(
-                    active.as_mut().expect("checked field"),
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active database field".to_string())
+                    })?,
                     &value,
                     &mut aggregate,
                 )?;
@@ -787,7 +796,9 @@ pub(in crate::elements::field) fn parse_database_fields(xml: &str) -> Result<Vec
                 })?;
                 let value = resolve_database_reference(name)?;
                 append_database_text(
-                    active.as_mut().expect("checked field"),
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active database field".to_string())
+                    })?,
                     &value,
                     &mut aggregate,
                 )?;
@@ -895,7 +906,9 @@ pub(in crate::elements::field) fn parse_drop_down_fields(
                     if field.label_depth == Some(depth) {
                         field.label_depth = None;
                     } else if field.depth == depth {
-                        let field = active.take().expect("checked drop-down field");
+                        let field = active.take().ok_or_else(|| {
+                            Error::InvalidFormat("missing completed drop-down field".to_string())
+                        })?;
                         fields.push(finish_drop_down_field(field)?);
                     }
                 }
@@ -911,7 +924,9 @@ pub(in crate::elements::field) fn parse_drop_down_fields(
                     Error::InvalidFormat(format!("invalid drop-down field text: {error}"))
                 })?;
                 append_drop_down_text(
-                    active.as_mut().expect("checked drop-down field"),
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active drop-down field".to_string())
+                    })?,
                     depth,
                     &value,
                 )?;
@@ -921,7 +936,9 @@ pub(in crate::elements::field) fn parse_drop_down_fields(
                     Error::InvalidFormat(format!("invalid drop-down field CDATA: {error}"))
                 })?;
                 append_drop_down_text(
-                    active.as_mut().expect("checked drop-down field"),
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active drop-down field".to_string())
+                    })?,
                     depth,
                     &value,
                 )?;
@@ -929,7 +946,9 @@ pub(in crate::elements::field) fn parse_drop_down_fields(
             Event::GeneralRef(ref reference) if active.is_some() => {
                 let value = decode_reference(reference, "drop-down field")?;
                 append_drop_down_text(
-                    active.as_mut().expect("checked drop-down field"),
+                    active.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("missing active drop-down field".to_string())
+                    })?,
                     depth,
                     &value,
                 )?;

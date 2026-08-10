@@ -6,11 +6,13 @@ use litchi_odf_common::{
     core::{OwnedPackage, PackageWriter},
 };
 use litchi_odg::{
-    Drawing, FormControl, PackageActiveContentWritePolicy, PackageDurablePatch, PackageMergePlan,
-    PackageSecurityWritePolicy,
+    Builder, DocumentSigner, Drawing, EncryptionProfile, FormControl,
+    PackageActiveContentWritePolicy, PackageDurablePatch, PackageMergePlan,
+    PackageSecurityWritePolicy, SignatureAlgorithm, SignatureValidity,
     page::Page,
     shape::{Shape, ShapeKind},
     style::Style,
+    style_resource::{StyleResource, StyleResourceKind},
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -440,6 +442,110 @@ fn active_content_is_inventoried_preserved_or_explicitly_refused() {
             )
             .is_err()
     );
+
+    let safe = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let external_fill = StyleResource::new(StyleResourceKind::FillImage, "external-fill")
+        .with_attribute("xlink:href", "https://example.invalid/fill.png")
+        .with_attribute("xlink:type", "simple");
+    let mut target_refused =
+        safe.edit_with_active_content_policy(PackageActiveContentWritePolicy::Refuse);
+    target_refused.put_style_resource(&external_fill).unwrap();
+    assert!(target_refused.commit().is_err());
+    let mut target_preserved = safe.edit();
+    target_preserved.put_style_resource(&external_fill).unwrap();
+    let target_commit = target_preserved.commit().unwrap();
+    assert_eq!(
+        target_commit.snapshot().active_content().external_links(),
+        1
+    );
+    assert!(
+        target_commit
+            .snapshot()
+            .content_xml()
+            .contains("https://example.invalid/fill.png")
+    );
+}
+
+#[test]
+fn advanced_named_style_resources_are_dependency_checked_and_durable() {
+    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let mut edit = source.edit();
+    edit.put_style_resource(
+        &StyleResource::new(StyleResourceKind::Gradient, "advanced-gradient")
+            .with_attribute("draw:style", "linear")
+            .with_attribute("draw:start-color", "#112233")
+            .with_attribute("draw:end-color", "#ddeeff"),
+    )
+    .unwrap();
+    edit.put_style(
+        &Style::new("advanced-style", "graphic")
+            .with_property("draw:fill", "gradient")
+            .with_property("draw:fill-gradient-name", "advanced-gradient"),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.snapshot().style_resources().iter().any(|resource| {
+        resource.kind() == StyleResourceKind::Gradient && resource.name() == "advanced-gradient"
+    }));
+    let mut blocked = commit.snapshot().edit();
+    assert!(
+        blocked
+            .remove_style_resource(StyleResourceKind::Gradient, "advanced-gradient")
+            .is_err()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .durable()
+            .unwrap()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn fresh_password_and_signing_lifecycle_is_explicit_and_verifiable() {
+    const RSA_KEY: &[u8] =
+        include_bytes!("../../litchi-odf-common/tests/fixtures/signatures/rsa-key.pk8");
+    const RSA_CERT: &[u8] =
+        include_bytes!("../../litchi-odf-common/tests/fixtures/signatures/rsa-cert.der");
+    let signer = DocumentSigner::from_pkcs8_der(
+        SignatureAlgorithm::RsaSha256,
+        RSA_KEY,
+        vec![RSA_CERT.to_vec()],
+        "2026-08-10T12:00:00Z",
+    )
+    .unwrap();
+    let bytes = Builder::new()
+        .build_encrypted_and_signed("drawing-password", EncryptionProfile::compatible(), signer)
+        .unwrap();
+    assert!(Drawing::from_bytes_with_password(bytes.clone(), "wrong-password").is_err());
+    let drawing = Drawing::from_bytes_with_password(bytes, "drawing-password").unwrap();
+    assert!(drawing.security().is_encrypted());
+    assert!(drawing.security().is_signed());
+    let capabilities = drawing.security_capabilities();
+    assert_eq!(capabilities.source(), drawing.security());
+    assert!(capabilities.can_open_with_password());
+    assert!(capabilities.can_encrypt_new());
+    assert!(!capabilities.can_reencrypt_existing());
+    assert!(capabilities.can_verify_signatures());
+    assert!(capabilities.can_sign_new());
+    assert!(!capabilities.can_resign_existing());
+    assert!(capabilities.can_remove_invalidated_signatures());
+    assert_eq!(
+        drawing
+            .digital_signatures()
+            .unwrap()
+            .document_signatures
+            .len(),
+        1
+    );
+    let verification = drawing.verify_document_signatures().unwrap();
+    assert_eq!(verification.len(), 1);
+    assert_eq!(verification[0].validity, SignatureValidity::Valid);
 }
 
 #[test]

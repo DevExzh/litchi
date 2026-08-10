@@ -106,12 +106,6 @@
     clippy::wildcard_imports,
     reason = "legacy ODT API shape and naming are compatibility constraints; these style-only lints are quarantined while correctness lints remain reported"
 )]
-#![warn(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "legacy guarded accesses are now visible at their owning modules; migrated transaction and package mutation boundaries deny both lints"
-)]
-
 pub use litchi_odf_common::core;
 pub use litchi_odf_common::{constants, coordinates, datatype, namespace};
 

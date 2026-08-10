@@ -611,11 +611,22 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                         && current.0 == Ns::Presentation
                         && current.1 == b"sound"
                     {
-                        if value.style.properties.as_ref().unwrap().sound.is_some() {
+                        if value
+                            .style
+                            .properties
+                            .as_ref()
+                            .ok_or_else(|| bad("missing drawing-page properties"))?
+                            .sound
+                            .is_some()
+                        {
                             return Err(bad("duplicate presentation:sound"));
                         }
-                        value.style.properties.as_mut().unwrap().sound =
-                            Some(parse_sound(&reader, version, &start)?);
+                        value
+                            .style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing drawing-page properties"))?
+                            .sound = Some(parse_sound(&reader, version, &start)?);
                         value.sound_depth = Some(depth);
                     } else if value.properties_depth.is_some_and(|p| depth > p) {
                         return Err(bad("unexpected style:drawing-page-properties child"));
@@ -657,11 +668,22 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                         && current.0 == Ns::Presentation
                         && current.1 == b"sound"
                     {
-                        if value.style.properties.as_ref().unwrap().sound.is_some() {
+                        if value
+                            .style
+                            .properties
+                            .as_ref()
+                            .ok_or_else(|| bad("missing drawing-page properties"))?
+                            .sound
+                            .is_some()
+                        {
                             return Err(bad("duplicate presentation:sound"));
                         }
-                        value.style.properties.as_mut().unwrap().sound =
-                            Some(parse_sound(&reader, version, &start)?);
+                        value
+                            .style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing drawing-page properties"))?
+                            .sound = Some(parse_sound(&reader, version, &start)?);
                     } else if value.properties_depth.is_some_and(|p| depth > p) {
                         return Err(bad("unexpected style:drawing-page-properties child"));
                     }
@@ -698,7 +720,10 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                     }
                 }
                 if active.as_ref().is_some_and(|value| value.depth == depth) {
-                    push_style(&mut out, active.take().unwrap().style, &mut total)?;
+                    let value = active
+                        .take()
+                        .ok_or_else(|| bad("missing active drawing-page style"))?;
+                    push_style(&mut out, value.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -807,7 +832,13 @@ pub fn set_drawing_page_style_properties_xml(xml: &str, requested: &Style) -> Re
                         qname: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
                         ..Default::default()
                     };
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    if active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target drawing-page style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
+                    {
                         return Err(bad("duplicate style:drawing-page-properties"));
                     }
                 }
@@ -847,7 +878,12 @@ pub fn set_drawing_page_style_properties_xml(xml: &str, requested: &Style) -> Re
                 } else if target_depth.is_some_and(|value| depth == value + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"drawing-page-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                    && active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target drawing-page style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
                 {
                     return Err(bad("duplicate style:drawing-page-properties"));
                 }
@@ -860,7 +896,10 @@ pub fn set_drawing_page_style_properties_xml(xml: &str, requested: &Style) -> Re
                     if spans.properties.as_ref().is_some_and(|span| span.end == 0)
                         && target_depth.is_some_and(|value| depth == value + 1)
                     {
-                        let span = spans.properties.as_mut().unwrap();
+                        let span = spans
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target drawing-page properties span"))?;
                         span.end_start = begin;
                         span.end = end;
                     }

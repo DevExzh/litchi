@@ -7,10 +7,48 @@ use thiserror::Error;
 /// Result of a PPTX operation.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Stable classification for a shape-transfer refusal that would otherwise
+/// publish a lossy or dangling shape graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ShapeTransferRefusal {
+    /// The selector names a grouped child instead of its transferable top-level owner.
+    NestedShape,
+    /// A `p:contentPart` has no common non-visual identity to return or remap.
+    ContentPart,
+    /// The selected closure contains an extension shape unknown to this release.
+    UnknownExtensionShape,
+    /// A known common shape lacks its required non-visual identity.
+    MissingIdentity,
+    /// A connector endpoint does not resolve to a transferable shape on the source slide.
+    UnresolvedConnectorEndpoint,
+}
+
+impl std::fmt::Display for ShapeTransferRefusal {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::NestedShape => "nested shape selection",
+            Self::ContentPart => "content-part shape",
+            Self::UnknownExtensionShape => "unknown extension shape",
+            Self::MissingIdentity => "missing non-visual identity",
+            Self::UnresolvedConnectorEndpoint => "unresolved connector endpoint",
+        })
+    }
+}
+
 /// Failure to decode or encode a `PresentationML` capability.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// A common-shape transfer was classified and refused before publication.
+    #[error("unsupported PresentationML shape transfer ({kind}): {detail}")]
+    ShapeTransfer {
+        /// Machine-readable refusal family.
+        kind: ShapeTransferRefusal,
+        /// Bounded human-readable source context.
+        detail: String,
+    },
+
     /// Filesystem access or atomic output replacement failed.
     #[error("PPTX I/O error: {0}")]
     Io(#[from] std::io::Error),

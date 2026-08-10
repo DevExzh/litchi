@@ -1139,6 +1139,45 @@ impl Edit<'_> {
     ) -> Result<()> {
         let reference = self.resource_after(resource)?;
         let path = embedded_path(reference.href())?.to_owned();
+        let prefix = format!("{path}/");
+        let is_directory = reference.kind() != crate::resource::Kind::Image
+            && (self
+                .source
+                .files()?
+                .iter()
+                .any(|member| member.starts_with(&prefix))
+                || self
+                    .payload_changes
+                    .iter()
+                    .any(|change| change.path.starts_with(&prefix) && change.after.is_some()));
+        if is_directory {
+            return Err(Error::InvalidFormat(
+                "OTH directory-backed object payload requires member mutation".to_string(),
+            ));
+        }
+        self.stage_payload(path, media_type.into(), Some(bytes))
+    }
+
+    /// Replaces or creates one member below a directory-backed embedded object.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an image, external reference, unsafe member path,
+    /// invalid selector, or invalid payload.
+    pub fn set_resource_payload_member(
+        &mut self,
+        resource: Position,
+        member: &str,
+        media_type: impl Into<String>,
+        bytes: Vec<u8>,
+    ) -> Result<()> {
+        let reference = self.resource_after(resource)?;
+        if reference.kind() == crate::resource::Kind::Image {
+            return Err(Error::InvalidFormat(
+                "OTH image payloads do not have nested members".to_string(),
+            ));
+        }
+        let path = resource_member_path(reference, member)?;
         self.stage_payload(path, media_type.into(), Some(bytes))
     }
 
@@ -1149,7 +1188,70 @@ impl Edit<'_> {
     /// Returns an error for an invalid selector, external reference, or unsafe path.
     pub fn remove_resource_payload(&mut self, resource: Position) -> Result<()> {
         let reference = self.resource_after(resource)?;
-        let path = embedded_path(reference.href())?.to_owned();
+        let root = embedded_path(reference.href())?.to_owned();
+        let prefix = format!("{root}/");
+        let mut members = self
+            .source
+            .files()?
+            .into_iter()
+            .filter(|path| path == &root || path.starts_with(&prefix))
+            .map(|path| {
+                let media_type = self
+                    .source
+                    .package
+                    .member_media_type(&path)?
+                    .unwrap_or_else(|| "application/octet-stream".to_string());
+                Ok((path, media_type))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        for change in &self.payload_changes {
+            if change.after.is_some()
+                && (change.path == root || change.path.starts_with(&prefix))
+                && !members
+                    .iter()
+                    .any(|(path, _media_type)| path == &change.path)
+            {
+                members.push((change.path.clone(), change.media_type.clone()));
+            }
+        }
+        if members.is_empty() {
+            return Err(Error::InvalidFormat(
+                "OTH embedded resource payload is absent".to_string(),
+            ));
+        }
+        for (path, media_type) in members {
+            self.stage_payload(path, media_type, None)?;
+        }
+        Ok(())
+    }
+
+    /// Removes one member below a directory-backed embedded object.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an image, external reference, unsafe member path,
+    /// or invalid selector.
+    pub fn remove_resource_payload_member(
+        &mut self,
+        resource: Position,
+        member: &str,
+    ) -> Result<()> {
+        let reference = self.resource_after(resource)?;
+        if reference.kind() == crate::resource::Kind::Image {
+            return Err(Error::InvalidFormat(
+                "OTH image payloads do not have nested members".to_string(),
+            ));
+        }
+        let path = resource_member_path(reference, member)?;
+        let staged = self
+            .payload_changes
+            .iter()
+            .any(|change| change.path == path && change.after.is_some());
+        if !staged && self.source.package.member(&path)?.is_none() {
+            return Err(Error::InvalidFormat(
+                "OTH embedded object payload member is absent".to_string(),
+            ));
+        }
         let media_type = self
             .source
             .package
@@ -2089,19 +2191,23 @@ impl Patch {
         let source = Template::from_bytes(read_wire_bytes(bytes, &mut cursor)?.to_vec())?;
         let target = Template::from_bytes(read_wire_bytes(bytes, &mut cursor)?.to_vec())?;
         let appended_xml = read_wire_string(bytes, &mut cursor)?;
-        if !appended_xml.is_empty() {
+        let appended_list_count = if appended_xml.is_empty() {
+            0
+        } else {
             let wrapped = format!(
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:form=\"urn:oasis:names:tc:opendocument:xmlns:form:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><office:body><office:text>{appended_xml}</office:text></office:body></office:document-content>"
             );
             crate::codec::validate_authored(&wrapped)?;
-        }
+            crate::codec::project(&wrapped)?.lists.len()
+        };
         let changes = read_paragraph_changes(bytes, &mut cursor, &source, &target)?;
         let heading_changes = read_heading_changes(bytes, &mut cursor, &source, &target)?;
         let inline_changes = read_inline_changes(bytes, &mut cursor, &source, &target)?;
         let forms_change = read_forms_change(bytes, &mut cursor, &source, &target)?;
         let resource_changes = read_resource_changes(bytes, &mut cursor, &source, &target)?;
         let payload_changes = read_payload_changes(bytes, &mut cursor, &source, &target)?;
-        let list_changes = read_list_changes(bytes, &mut cursor, &source, &target)?;
+        let list_changes =
+            read_list_changes(bytes, &mut cursor, &source, &target, appended_list_count)?;
         let metadata = read_wire_part_change(bytes, &mut cursor)?;
         let styles = read_wire_part_change(bytes, &mut cursor)?;
         validate_part_change(&metadata, source.meta_xml(), target.meta_xml(), "metadata")?;
@@ -2810,6 +2916,31 @@ fn validate_resource_readback(
             ));
         }
     }
+    if !payloads.is_empty() {
+        validate_embedded_dependencies(snapshot)?;
+    }
+    Ok(())
+}
+
+fn validate_embedded_dependencies(snapshot: &Template) -> Result<()> {
+    let files = snapshot.files()?;
+    for resource in snapshot
+        .package
+        .resources()
+        .iter()
+        .filter(|resource| resource.is_embedded())
+    {
+        let root = embedded_path(resource.href())?;
+        let prefix = format!("{root}/");
+        if !files
+            .iter()
+            .any(|path| path == root || path.starts_with(&prefix))
+        {
+            return Err(Error::InvalidFormat(
+                "OTH resource payload edit would leave a dangling embedded reference".to_string(),
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -2828,6 +2959,12 @@ fn embedded_path(href: &str) -> Result<&str> {
         ));
     }
     Ok(path)
+}
+
+fn resource_member_path(resource: &crate::resource::Resource, member: &str) -> Result<String> {
+    let root = embedded_path(resource.href())?;
+    let member_path = embedded_path(member)?;
+    Ok(format!("{root}/{member_path}"))
 }
 
 fn list_paragraph_count(list: &crate::list::List) -> usize {
@@ -2976,6 +3113,11 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
         .filter_map(|change| change.after.as_ref())
         .map(list_paragraph_count)
         .fold(0_usize, usize::saturating_add);
+    let inserted_resource_blocks = edit
+        .resource_changes
+        .iter()
+        .filter(|change| change.before.is_none() && change.after.is_some())
+        .count();
     let expected_order_len = edit
         .source
         .package
@@ -2983,7 +3125,8 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
         .len()
         .saturating_sub(replaced_block_count)
         .saturating_add(replacement_block_count)
-        .saturating_add(appended_block_count);
+        .saturating_add(appended_block_count)
+        .saturating_add(inserted_resource_blocks);
     if snapshot.package.order().len() != expected_order_len {
         return Err(Error::InvalidFormat(
             "OTH structural edit failed block-order readback".to_string(),
@@ -3634,6 +3777,9 @@ fn read_payload_changes(
         }
         changes.push(change);
     }
+    if !changes.is_empty() {
+        validate_embedded_dependencies(target)?;
+    }
     Ok(changes)
 }
 
@@ -3732,6 +3878,7 @@ fn read_list_changes(
     cursor: &mut usize,
     source: &Template,
     target: &Template,
+    appended_list_count: usize,
 ) -> Result<Vec<ListChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count
@@ -3812,6 +3959,7 @@ fn read_list_changes(
             .len()
             .saturating_sub(removed)
             .saturating_add(inserted)
+            .saturating_add(appended_list_count)
     {
         return Err(Error::InvalidFormat(
             "OTH durable list changes fail structural target readback".to_string(),

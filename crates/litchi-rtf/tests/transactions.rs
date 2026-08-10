@@ -492,6 +492,103 @@ fn retained_destinations_are_multi_operation_durable_and_reversible() {
 }
 
 #[test]
+fn note_and_annotation_text_are_durable_historical_mergeable_and_reopen() {
+    let source = Document::parse(
+        r"{\rtf1\ansi A{\footnote\chftn Old note}B{\*\atnid AM}{\*\atnauthor Ada}\chatn{\*\annotation Old comment}C}",
+    )
+    .unwrap();
+    let mut edit = source.edit();
+    edit.set_note_text(0, "Updated note").unwrap();
+    edit.set_annotation_text(0, "Updated comment").unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().notes()[0].content, "Updated note");
+    assert_eq!(commit.snapshot().annotations()[0].text, "Updated comment");
+    assert_eq!(commit.snapshot().text(), source.text());
+
+    let bytes = commit.snapshot().to_bytes().unwrap();
+    let serialized = String::from_utf8_lossy(&bytes);
+    assert!(serialized.contains("\\footnote"));
+    assert!(serialized.contains("\\annotation"));
+    assert!(serialized.contains("\\atnauthor"));
+    let reopened = Document::from_bytes(&bytes).unwrap();
+    assert_eq!(reopened.notes()[0].content, "Updated note");
+    assert!(reopened.notes()[0].is_footnote);
+    assert_eq!(reopened.annotations()[0].text, "Updated comment");
+    assert_eq!(reopened.annotations()[0].author, "Ada");
+    assert!(!reopened.annotations()[0].has_reference);
+
+    let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
+    let applied = source.apply_durable(&durable).unwrap();
+    assert_eq!(applied.to_bytes().unwrap(), bytes);
+    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    assert_eq!(restored.notes()[0].content, "Old note");
+    assert_eq!(restored.annotations()[0].text, "Old comment");
+
+    let mut history = History::new(source.clone(), HistoryLimits::new(2, 1024 * 1024));
+    history.record_commit(&commit).unwrap();
+    assert!(history.undo());
+    assert_eq!(history.current().annotations()[0].text, "Old comment");
+    assert!(history.redo());
+    assert_eq!(history.current().notes()[0].content, "Updated note");
+
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut note_edit = source.edit();
+    note_edit.set_note_text(0, "Merged note").unwrap();
+    let mut annotation_edit = source.edit();
+    annotation_edit
+        .set_annotation_text(0, "Merged comment")
+        .unwrap();
+    let mut left = Composition::new(&source, limits);
+    left.join(note_edit.into_sub_edit("note", limits).unwrap())
+        .unwrap();
+    let mut right = Composition::new(&source, limits);
+    right
+        .join(annotation_edit.into_sub_edit("annotation", limits).unwrap())
+        .unwrap();
+    let merge = MergePlan::new(left, right).unwrap();
+    assert!(merge.conflicts().is_empty());
+    let merged = merge.finish().unwrap().commit().unwrap();
+    assert_eq!(merged.snapshot().notes()[0].content, "Merged note");
+    assert_eq!(merged.snapshot().annotations()[0].text, "Merged comment");
+
+    let mut first_note = source.edit();
+    first_note.set_note_text(0, "First branch").unwrap();
+    let mut second_note = source.edit();
+    second_note.set_note_text(0, "Second branch").unwrap();
+    let mut left = Composition::new(&source, limits);
+    left.join(first_note.into_sub_edit("first-note", limits).unwrap())
+        .unwrap();
+    let mut right = Composition::new(&source, limits);
+    right
+        .join(second_note.into_sub_edit("second-note", limits).unwrap())
+        .unwrap();
+    assert_eq!(MergePlan::new(left, right).unwrap().conflicts().len(), 1);
+}
+
+#[test]
+fn note_and_annotation_edits_refuse_positioned_or_opaque_dependencies() {
+    let active_note = Document::parse(
+        r"{\rtf1 A{\footnote\chftn before{\field{\*\fldinst INCLUDETEXT external}{\fldrslt cached}}after}B}",
+    )
+    .unwrap();
+    let mut active_edit = active_note.edit();
+    assert!(matches!(
+        active_edit.set_note_text(0, "replacement"),
+        Err(Error::UnsupportedSource(_))
+    ));
+
+    let opaque_annotation = Document::parse(
+        r"{\rtf1{\*\vendor retained}A{\*\atnid AM}{\*\atnauthor Ada}\chatn{\*\annotation Old comment}B}",
+    )
+    .unwrap();
+    let exact = opaque_annotation.to_bytes().unwrap();
+    let mut edit = opaque_annotation.edit();
+    edit.set_annotation_text(0, "replacement").unwrap();
+    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    assert_eq!(opaque_annotation.to_bytes().unwrap(), exact);
+}
+
+#[test]
 fn destination_edit_refuses_unknown_syntax_without_mutating_source() {
     let source =
         Document::parse(r"{\rtf1\ansi{\*\vendor retained}\trowd\cellx1000\intbl A\cell\row}")

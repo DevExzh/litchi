@@ -78,7 +78,9 @@ pub(crate) fn parse_text_indexes(xml: &str) -> Result<Vec<TextIndex>> {
                         index
                             .stack
                             .last_mut()
-                            .expect("active index stack")
+                            .ok_or_else(|| {
+                                Error::InvalidFormat("missing active text-index node".to_string())
+                            })?
                             .content
                             .push(TextIndexContent::Element(node.clone()));
                     }
@@ -118,7 +120,9 @@ pub(crate) fn parse_text_indexes(xml: &str) -> Result<Vec<TextIndex>> {
                     Error::InvalidFormat("text-index XML stack underflow".to_string())
                 })?;
                 for position in (0..active.len()).rev() {
-                    let node = active[position].stack.pop().expect("active index stack");
+                    let node = active[position].stack.pop().ok_or_else(|| {
+                        Error::InvalidFormat("missing completed text-index node".to_string())
+                    })?;
                     if let Some(parent) = active[position].stack.last_mut() {
                         parent.content.push(TextIndexContent::Element(node));
                     } else {
@@ -246,7 +250,10 @@ fn resolved_namespace(namespace: &ResolveResult<'_>, context: &str) -> Result<Op
 
 fn append_index_text(active: &mut [ActiveIndex], value: &str) -> Result<()> {
     for index in active {
-        let element = index.stack.last_mut().expect("active index stack");
+        let element = index
+            .stack
+            .last_mut()
+            .ok_or_else(|| Error::InvalidFormat("missing active text-index node".to_string()))?;
         if let Some(TextIndexContent::Text(text)) = element.content.last_mut() {
             append_checked(text, value)?;
         } else {

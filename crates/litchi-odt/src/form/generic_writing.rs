@@ -562,12 +562,13 @@ fn scan(xml: &str) -> Result<Scan> {
                     if forms.len() >= MAX_FORMS {
                         return invalid("too many forms");
                     }
-                    form = Some(forms.len());
+                    let form_index = forms.len();
+                    form = Some(form_index);
                     forms.push(FormLocation {
                         site: Site::Paired { close_start: 0 },
                         controls: Vec::new(),
                     });
-                    form_stack.push(form.unwrap());
+                    form_stack.push(form_index);
                 } else if is_target(namespace.as_deref(), local.as_slice()) {
                     if stack.iter().any(|open| open.control.is_some()) {
                         return invalid("generic form controls cannot be nested");
@@ -964,7 +965,9 @@ fn validate_name(label: &str, value: &str) -> Result<()> {
 fn validate_xml_id(value: &str) -> Result<()> {
     validate_name("generic form control xml:id", value)?;
     let mut chars = value.chars();
-    let first = chars.next().unwrap();
+    let Some(first) = chars.next() else {
+        return invalid("generic form control xml:id cannot be empty");
+    };
     if !(first == '_' || first.is_ascii_alphabetic())
         || !chars.all(|ch| ch == '_' || ch == '-' || ch == '.' || ch.is_ascii_alphanumeric())
     {

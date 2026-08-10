@@ -425,7 +425,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             "style:table-column-properties has invalid namespace or parent",
                         ));
                     } else if state.properties_depth.is_some()
-                        && depth > state.properties_depth.unwrap()
+                        && depth
+                            > state
+                                .properties_depth
+                                .ok_or_else(|| bad("missing table-column properties depth"))?
                     {
                         return Err(bad("unexpected table-column property child"));
                     }
@@ -462,7 +465,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             "style:table-column-properties has invalid namespace or parent",
                         ));
                     } else if state.properties_depth.is_some()
-                        && depth > state.properties_depth.unwrap()
+                        && depth
+                            > state
+                                .properties_depth
+                                .ok_or_else(|| bad("missing table-column properties depth"))?
                     {
                         return Err(bad("unexpected table-column property child"));
                     }
@@ -494,7 +500,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     state.properties_depth = None;
                 }
                 if active.as_ref().is_some_and(|x| x.depth == depth) {
-                    push_style(&mut out, active.take().unwrap().style, &mut total)?;
+                    let state = active
+                        .take()
+                        .ok_or_else(|| bad("missing active table-column style"))?;
+                    push_style(&mut out, state.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -603,7 +612,13 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                         qname: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
                         ..Default::default()
                     };
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    if active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target table-column style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
+                    {
                         return Err(bad("duplicate style:table-column-properties"));
                     }
                 }
@@ -642,7 +657,12 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                 } else if depth_target.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"table-column-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                    && active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target table-column style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
                 {
                     return Err(bad("duplicate style:table-column-properties"));
                 }
@@ -655,7 +675,10 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                     if spans.properties.as_ref().is_some_and(|s| s.end == 0)
                         && depth_target.is_some_and(|d| depth == d + 1)
                     {
-                        let s = spans.properties.as_mut().unwrap();
+                        let s = spans
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target table-column properties span"))?;
                         s.end_start = begin;
                         s.end = end;
                     }

@@ -50,17 +50,18 @@ CHPX FKPs, shifts the modeled CP/PLCF closure, updates FIB story counts, and
 fully reopens the CFB and DOC before publication. Source-checked in-memory and
 blob-backed durable semantic patches, disjoint composition, three-way planning,
 text and embedded-resource transfer, and bounded undo/redo history use the same
-operation model. A second bounded transfer slice accepts a canonical singleton
-native inline or floating picture: the marker CHPX and exact PICF/Data block
-move together, while floating pictures additionally regenerate their exclusive
-`PlcfSpaMom` and `DggInfo` graph. This slice participates in exact in-memory
-inverse/history and three-way planning; its durable wire vocabulary is not yet
-exposed.
+operation model. A second bounded transfer slice accepts canonical native
+inline or floating pictures: it proves every main-story marker, sequential
+shape ID, PICF/Data block, SPA anchor, and the complete shared Dgg/BStore graph,
+then re-homes the selected picture as a collision-free singleton. Marker CHPX,
+PICF/Data, and floating `PlcfSpaMom`/`DggInfo` are regenerated together. The
+slice participates in exact in-memory inverse/history, three-way planning, and
+blob-backed durable replay/inversion.
 Structural table edits, field delimiters or nesting, destructive revision
 dispositions, auxiliary-story length changes, mixed formatting, and unmodeled
-CP dependencies are typed refusals. Shared BLIP stores, multiple pictures,
-groups, textboxes, noncanonical scaling/cropping, producer extensions,
-delay-loaded BLIPs, auxiliary-story pictures, receiver shape-ID collisions,
+CP dependencies are typed refusals. Noncanonical or reordered shared BLIP
+stores, groups, textboxes, scaling/cropping, producer extensions, delay-loaded
+BLIPs, auxiliary-story pictures, receiver shape-ID collisions,
 producer-defined object characters, and other active controls have specific
 dependency refusals. Selection uses the
 format-neutral, zero-based

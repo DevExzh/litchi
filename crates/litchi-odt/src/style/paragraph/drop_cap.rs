@@ -545,7 +545,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     state.open_cap = None;
                 }
                 if active.as_ref().is_some_and(|state| state.depth == depth) {
-                    push_style(&mut styles, active.take().unwrap().style, &mut total)?;
+                    let state = active
+                        .take()
+                        .ok_or_else(|| bad("missing active paragraph drop-cap style"))?;
+                    push_style(&mut styles, state.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -695,13 +698,24 @@ pub(crate) fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                         && current.0 == KnownNamespace::Style
                         && current.1 == b"paragraph-properties"
                     {
-                        if active.as_mut().unwrap().props.replace(span).is_some() {
+                        if active
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph drop-cap style"))?
+                            .props
+                            .replace(span)
+                            .is_some()
+                        {
                             return Err(bad("duplicate style:paragraph-properties"));
                         }
                     } else if depth == sd + 2
                         && current.0 == KnownNamespace::Style
                         && current.1 == b"drop-cap"
-                        && active.as_mut().unwrap().cap.replace(span).is_some()
+                        && active
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph drop-cap style"))?
+                            .cap
+                            .replace(span)
+                            .is_some()
                     {
                         return Err(bad("duplicate style:drop-cap"));
                     }
@@ -743,13 +757,24 @@ pub(crate) fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                         && current.0 == KnownNamespace::Style
                         && current.1 == b"paragraph-properties"
                     {
-                        if active.as_mut().unwrap().props.replace(span).is_some() {
+                        if active
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph drop-cap style"))?
+                            .props
+                            .replace(span)
+                            .is_some()
+                        {
                             return Err(bad("duplicate style:paragraph-properties"));
                         }
                     } else if depth == sd + 2
                         && current.0 == KnownNamespace::Style
                         && current.1 == b"drop-cap"
-                        && active.as_mut().unwrap().cap.replace(span).is_some()
+                        && active
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph drop-cap style"))?
+                            .cap
+                            .replace(span)
+                            .is_some()
                     {
                         return Err(bad("duplicate style:drop-cap"));
                     }
@@ -761,16 +786,28 @@ pub(crate) fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                 let depth = stack.len();
                 if let Some(spans) = active.as_mut() {
                     if spans.cap.as_ref().is_some_and(|s| s.end == 0)
-                        && depth == active_depth.unwrap() + 2
+                        && depth
+                            == active_depth
+                                .ok_or_else(|| bad("missing target paragraph drop-cap depth"))?
+                                + 2
                     {
-                        let s = spans.cap.as_mut().unwrap();
+                        let s = spans
+                            .cap
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph drop-cap span"))?;
                         s.end_start = begin;
                         s.end = end;
                     }
                     if spans.props.as_ref().is_some_and(|s| s.end == 0)
-                        && depth == active_depth.unwrap() + 1
+                        && depth
+                            == active_depth
+                                .ok_or_else(|| bad("missing target paragraph drop-cap depth"))?
+                                + 1
                     {
-                        let s = spans.props.as_mut().unwrap();
+                        let s = spans
+                            .props
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph properties span"))?;
                         s.end_start = begin;
                         s.end = end;
                     }

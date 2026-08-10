@@ -763,14 +763,18 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                             .style
                             .properties
                             .as_ref()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing chart properties"))?
                             .symbol_image
                             .is_some()
                         {
                             return Err(bad("duplicate chart:symbol-image"));
                         }
-                        value.style.properties.as_mut().unwrap().symbol_image =
-                            Some(symbol_image(&reader, version, &start)?);
+                        value
+                            .style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing chart properties"))?
+                            .symbol_image = Some(symbol_image(&reader, version, &start)?);
                         value.symbol_depth = Some(depth);
                     } else if value.property_depth.is_some_and(|p| depth == p + 1)
                         && current.0 == Ns::Chart
@@ -781,7 +785,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                                 .style
                                 .properties
                                 .as_ref()
-                                .unwrap()
+                                .ok_or_else(|| bad("missing chart properties"))?
                                 .label_separator
                                 .is_some()
                         {
@@ -849,14 +853,18 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                             .style
                             .properties
                             .as_ref()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing chart properties"))?
                             .symbol_image
                             .is_some()
                         {
                             return Err(bad("duplicate chart:symbol-image"));
                         }
-                        value.style.properties.as_mut().unwrap().symbol_image =
-                            Some(symbol_image(&reader, version, &start)?);
+                        value
+                            .style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing chart properties"))?
+                            .symbol_image = Some(symbol_image(&reader, version, &start)?);
                     } else if value.property_depth.is_some_and(|p| depth == p + 1)
                         && current.0 == Ns::Chart
                         && current.1 == b"label-separator"
@@ -870,13 +878,18 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                             .style
                             .properties
                             .as_ref()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing chart properties"))?
                             .label_separator
                             .is_some()
                         {
                             return Err(bad("duplicate text:p in chart:label-separator"));
                         }
-                        value.style.properties.as_mut().unwrap().label_separator =
+                        value
+                            .style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing chart properties"))?
+                            .label_separator =
                             Some(LabelSeparator::from_paragraph_xml(&xml[begin..end])?);
                     } else if value.property_depth.is_some_and(|p| depth > p) {
                         return Err(bad("unexpected style:chart-properties child"));
@@ -908,8 +921,16 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                 let depth = stack.len();
                 if let Some(value) = active.as_mut() {
                     if value.paragraph_depth == Some(depth) {
-                        let begin = value.paragraph_start.take().unwrap();
-                        value.style.properties.as_mut().unwrap().label_separator =
+                        let begin = value
+                            .paragraph_start
+                            .take()
+                            .ok_or_else(|| bad("missing chart label separator start"))?;
+                        value
+                            .style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing chart properties"))?
+                            .label_separator =
                             Some(LabelSeparator::from_paragraph_xml(&xml[begin..end])?);
                         value.paragraph_depth = None;
                     }
@@ -921,7 +942,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                             .style
                             .properties
                             .as_ref()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing chart properties"))?
                             .label_separator
                             .is_none()
                         {
@@ -930,12 +951,20 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                         value.label_depth = None;
                     }
                     if value.property_depth == Some(depth) {
-                        value.style.properties.as_ref().unwrap().validate()?;
+                        value
+                            .style
+                            .properties
+                            .as_ref()
+                            .ok_or_else(|| bad("missing chart properties"))?
+                            .validate()?;
                         value.property_depth = None;
                     }
                 }
                 if active.as_ref().is_some_and(|value| value.depth == depth) {
-                    push(&mut out, active.take().unwrap().style, &mut total)?;
+                    let value = active
+                        .take()
+                        .ok_or_else(|| bad("missing active chart style"))?;
+                    push(&mut out, value.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -1036,7 +1065,13 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &StyleRecord) -> Res
                         qname: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
                         ..Default::default()
                     };
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    if active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target chart style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
+                    {
                         return Err(bad("duplicate style:chart-properties"));
                     }
                 }
@@ -1075,7 +1110,12 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &StyleRecord) -> Res
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"chart-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                    && active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target chart style"))?
+                        .properties
+                        .replace(span)
+                        .is_some()
                 {
                     return Err(bad("duplicate style:chart-properties"));
                 }
@@ -1088,7 +1128,10 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &StyleRecord) -> Res
                     if spans.properties.as_ref().is_some_and(|s| s.end == 0)
                         && target_depth.is_some_and(|d| depth == d + 1)
                     {
-                        let span = spans.properties.as_mut().unwrap();
+                        let span = spans
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target chart properties span"))?;
                         span.end_start = begin;
                         span.end = end;
                     }

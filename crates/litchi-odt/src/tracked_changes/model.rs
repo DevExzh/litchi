@@ -120,7 +120,9 @@ fn validate_policy(value: &TrackedChanges) -> Result<()> {
 pub(super) fn validate_ncname(value: &str, context: &str) -> Result<()> {
     validate_value(value, context, false)?;
     let mut characters = value.chars();
-    let first = characters.next().expect("non-empty value validated");
+    let Some(first) = characters.next() else {
+        return invalid(format!("{context} must not be empty"));
+    };
     if !(first == '_' || first.is_alphabetic())
         || characters.any(|character| {
             !(character == '_'

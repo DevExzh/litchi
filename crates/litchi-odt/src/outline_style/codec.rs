@@ -28,6 +28,11 @@ use super::{
     namespace_kind,
 };
 
+fn namespace_text(namespace: &[u8]) -> Result<&str> {
+    std::str::from_utf8(namespace)
+        .map_err(|error| invalid_error(format!("invalid static namespace encoding: {error}")))
+}
+
 impl Style {
     /// Serialize this style with complete namespace declarations.
     pub fn to_xml(&self) -> Result<String> {
@@ -35,13 +40,13 @@ impl Style {
         let extension_namespaces = collect_extension_namespaces(self);
         let mut output = String::with_capacity(1_024);
         output.push_str("<text:outline-style xmlns:text=\"");
-        output.push_str(std::str::from_utf8(TEXT).expect("namespace is UTF-8"));
+        output.push_str(namespace_text(TEXT)?);
         output.push_str("\" xmlns:style=\"");
-        output.push_str(std::str::from_utf8(STYLE).expect("namespace is UTF-8"));
+        output.push_str(namespace_text(STYLE)?);
         output.push_str("\" xmlns:fo=\"");
-        output.push_str(std::str::from_utf8(FO).expect("namespace is UTF-8"));
+        output.push_str(namespace_text(FO)?);
         output.push_str("\" xmlns:office=\"");
-        output.push_str(std::str::from_utf8(OFFICE).expect("namespace is UTF-8"));
+        output.push_str(namespace_text(OFFICE)?);
         output.push('"');
         for (index, namespace) in extension_namespaces.iter().enumerate() {
             output.push_str(&format!(" xmlns:ext{index}=\"{}\"", escape_xml(namespace)));
@@ -371,17 +376,20 @@ pub fn parse_outline_styles(xml: &str) -> Result<Styles> {
                 {
                     properties
                         .as_mut()
-                        .expect("properties exist")
+                        .ok_or_else(|| invalid_error("missing outline properties state"))?
                         .alignment_depth = None;
                 }
                 if properties
                     .as_ref()
                     .is_some_and(|active| active.depth == depth)
                 {
-                    let completed = properties.take().expect("properties exist").value;
+                    let completed = properties
+                        .take()
+                        .ok_or_else(|| invalid_error("missing completed outline properties"))?
+                        .value;
                     level
                         .as_mut()
-                        .expect("outline level owns properties")
+                        .ok_or_else(|| invalid_error("outline properties have no level"))?
                         .value
                         .list_level_properties = Some(completed);
                 }
@@ -389,13 +397,20 @@ pub fn parse_outline_styles(xml: &str) -> Result<Styles> {
                     text_properties_depth = None;
                 }
                 if level.as_ref().is_some_and(|active| active.depth == depth) {
-                    finish_level(&mut outline, level.take().expect("level exists"))?;
+                    finish_level(
+                        &mut outline,
+                        level
+                            .take()
+                            .ok_or_else(|| invalid_error("missing completed outline level"))?,
+                    )?;
                 }
                 if outline.as_ref().is_some_and(|active| active.depth == depth) {
                     finish_outline(
                         &mut styles,
                         &mut names,
-                        outline.take().expect("outline exists"),
+                        outline
+                            .take()
+                            .ok_or_else(|| invalid_error("missing completed outline style"))?,
                     )?;
                 }
                 stack.pop();
@@ -685,12 +700,16 @@ fn scan_outline_spans(xml: &str, name: &str) -> Result<(XmlSpan, Option<XmlSpan>
                 let begin = event_start(xml, end)?;
                 let depth = stack.len();
                 if styles.as_ref().is_some_and(|span| span.depth == depth) {
-                    let span = styles.as_mut().expect("styles span exists");
+                    let span = styles
+                        .as_mut()
+                        .ok_or_else(|| invalid_error("missing styles span"))?;
                     span.end_start = begin;
                     span.end = end;
                 }
                 if target.as_ref().is_some_and(|span| span.depth == depth) {
-                    let span = target.as_mut().expect("target span exists");
+                    let span = target
+                        .as_mut()
+                        .ok_or_else(|| invalid_error("missing target outline span"))?;
                     span.end_start = begin;
                     span.end = end;
                 }
@@ -809,7 +828,10 @@ fn handle_start(
         return invalid("style:text-properties must be empty");
     }
 
-    let outline_depth = outline.as_ref().expect("outline exists").depth;
+    let outline_depth = outline
+        .as_ref()
+        .ok_or_else(|| invalid_error("outline level has no parent style"))?
+        .depth;
     if level.is_none() {
         if depth != outline_depth + 1
             || current.0 != NamespaceKind::Text
@@ -820,7 +842,7 @@ fn handle_start(
         let value = parse_level(reader, version, start, total_attribute_bytes)?;
         if !outline
             .as_mut()
-            .expect("outline exists")
+            .ok_or_else(|| invalid_error("outline level has no parent style"))?
             .levels
             .insert(value.level)
         {
@@ -839,7 +861,9 @@ fn handle_start(
         return Ok(());
     }
 
-    let active_level = level.as_mut().expect("level exists");
+    let active_level = level
+        .as_mut()
+        .ok_or_else(|| invalid_error("missing active outline level"))?;
     if depth != active_level.depth + 1 {
         return invalid("outline level has invalid nested content");
     }
@@ -1058,7 +1082,7 @@ fn finish_level(outline: &mut Option<ActiveOutline>, level: ActiveLevel) -> Resu
     }
     outline
         .as_mut()
-        .expect("outline owns level")
+        .ok_or_else(|| invalid_error("outline properties have no level"))?
         .value
         .levels
         .push(level.value);

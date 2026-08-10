@@ -97,3 +97,21 @@ fn subtree_removal_checks_incoming_references_to_descendants() {
     edit.remove_section(Position::new(0)).unwrap();
     assert!(edit.commit().is_err());
 }
+
+#[test]
+fn generated_indexes_require_unique_addressable_names() {
+    let missing = COMPACT_CONTENT.replace(
+        r#"<text:section text:name="A"/>"#,
+        r#"<text:table-of-content/>"#,
+    );
+    assert!(Master::from_bytes(raw_package(&missing)).is_err());
+
+    let duplicate = COMPACT_CONTENT.replace(
+        r#"<text:section text:name="A"/>"#,
+        concat!(
+            r#"<text:table-of-content text:name="Index"/>"#,
+            r#"<text:alphabetical-index text:name="Index"/>"#,
+        ),
+    );
+    assert!(Master::from_bytes(raw_package(&duplicate)).is_err());
+}

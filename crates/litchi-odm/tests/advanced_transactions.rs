@@ -604,12 +604,70 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
         litchi_odm::security::ChangedWriteDisposition::RequiresInertActiveContentOptIn
     );
 
+    let policy = SecurityPolicy::strict().with_active_content(ActiveContentPolicy::PreserveInert);
+    let mut index_edit = master.edit_with_policy(policy);
+    index_edit
+        .rename_generated_index(Position::new(1), "Renamed Contents")
+        .unwrap();
+    let index_commit = index_edit.commit().unwrap();
+    let renamed = index_commit.snapshot();
+    assert_eq!(
+        renamed.structure().generated_indexes()[0].name(),
+        Some("Renamed Contents")
+    );
+    assert_eq!(index_commit.patch().changes().generated_indexes().len(), 1);
+    assert_eq!(
+        index_commit
+            .patch()
+            .inverse()
+            .apply(renamed)
+            .unwrap()
+            .as_bytes(),
+        master.as_bytes()
+    );
+    let durable = index_commit.patch().durable().unwrap();
+    assert_eq!(
+        durable.apply(&master).unwrap().as_bytes(),
+        renamed.as_bytes()
+    );
+    let mut history = master.history(HistoryLimits::new(2, u64::MAX));
+    history.record(&index_commit).unwrap();
+    assert!(history.undo());
+    assert_eq!(history.current().as_bytes(), master.as_bytes());
+    assert!(history.redo());
+    assert_eq!(history.current().as_bytes(), renamed.as_bytes());
+    let mut title_edit = master.edit_with_policy(policy);
+    title_edit.set_title("Index merge").unwrap();
+    let title_commit = title_edit.commit().unwrap();
+    let merged = index_commit
+        .patch()
+        .merge(title_commit.patch())
+        .unwrap()
+        .apply(&master)
+        .unwrap();
+    assert_eq!(merged.title(), Some("Index merge"));
+    assert_eq!(
+        merged.structure().generated_indexes()[0].name(),
+        Some("Renamed Contents")
+    );
+    let mut competing_edit = master.edit_with_policy(policy);
+    competing_edit
+        .rename_generated_index(Position::new(1), "Competing Contents")
+        .unwrap();
+    let competing = competing_edit.commit().unwrap();
+    let conflict = index_commit
+        .patch()
+        .plan_three_way(competing.patch())
+        .unwrap();
+    assert!(conflict.conflicts().conflicts().iter().any(
+        |conflict| matches!(conflict, Conflict::GeneratedIndex(item) if *item == Position::new(1))
+    ));
+
     let no_op = master.edit().commit().unwrap();
     assert_eq!(no_op.snapshot().as_bytes(), master.as_bytes());
     let mut refused = master.edit();
     refused.set_title("refused").unwrap();
     assert!(refused.commit().is_err());
-    let policy = SecurityPolicy::strict().with_active_content(ActiveContentPolicy::PreserveInert);
     let mut preserved = master.edit_with_policy(policy);
     preserved.set_title("preserved inertly").unwrap();
     let changed = preserved.commit().unwrap().into_snapshot();
@@ -641,11 +699,13 @@ fn collision_safe_transfer_renames_complete_style_and_resource_closures_atomical
         r#"</office:automatic-styles><office:body><office:text><text:p>destination</text:p></office:text></office:body></office:document-content>"#,
     );
     let source = master_from_parts(source_content, STYLES, b"source chapter");
+    let source_before = source.as_bytes().to_vec();
     let destination = master_from_parts(destination_content, STYLES, b"occupied chapter");
     let mut edit = destination.edit();
     edit.transfer_linked_section(&source, Position::new(0), "Imported", "Chapters/a.odt")
         .unwrap();
     let commit = edit.commit().unwrap();
+    assert_eq!(source.as_bytes(), source_before);
     let changed = commit.snapshot();
     let imported = changed
         .section_tree()
@@ -739,6 +799,7 @@ fn styles_owned_transfer_creates_a_compact_styles_part_when_absent() {
         r#"</office:document-content>"#,
     );
     let source = master_from_parts(source_content, source_styles, b"source chapter");
+    let source_before = source.as_bytes().to_vec();
     let destination = master_without_styles(destination_content, b"occupied chapter");
     assert!(destination.styles_xml().is_none());
 
@@ -751,6 +812,7 @@ fn styles_owned_transfer_creates_a_compact_styles_part_when_absent() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
+    assert_eq!(source.as_bytes(), source_before);
     let changed = commit.snapshot();
     let styles = changed.styles_xml().unwrap();
     assert!(!styles.contains('\n'));

@@ -27,8 +27,9 @@ use crate::package::Package;
 
 pub use crate::advanced::{
     BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, Drawing, DrawingFrame,
-    DrawingGroup, DrawingTextBox, EffectiveCellStyle, FormControl, FormControlKind, FormEvent,
-    NumberStyleNode, RichFormControl, RichRun, RichText, StyleGraph, TextProperties, TextStyleNode,
+    DrawingGeometry, DrawingGeometryKind, DrawingGroup, DrawingTextBox, EffectiveCellStyle,
+    FormControl, FormControlKind, FormEvent, NumberStyleNode, RichFormControl, RichRun, RichText,
+    StyleGraph, TextProperties, TextStyleNode,
 };
 
 const FORMAT: &str = "litchi.ods.document";
@@ -256,6 +257,18 @@ impl Snapshot {
         })
     }
 
+    /// Resolve inherited cell-style properties across `styles.xml` and content automatic styles.
+    ///
+    /// Content automatic styles take precedence over same-named common styles. Unsupported
+    /// property vocabulary remains inert while the supported cell/text projection is resolved.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/cyclic style or malformed package XML.
+    pub fn effective_cell_style(&self, name: &str) -> Result<EffectiveCellStyle> {
+        crate::advanced::resolve_package_cell_style(self.source.as_ref(), name)
+    }
+
     /// Begin one clone-staged unified package transaction.
     #[must_use]
     pub fn edit(&self) -> Edit {
@@ -361,6 +374,11 @@ pub enum EncryptionWritePolicy {
     /// Reject changes to encrypted source members; no password is inferred or retained.
     #[default]
     Refuse,
+    /// Require password-backed decrypt/re-encrypt publication.
+    ///
+    /// The current unified ODS root exposes this intent explicitly but refuses it because it has
+    /// no credential-bearing writer capability.
+    DecryptAndReencrypt,
 }
 
 /// Caller-selected security disposition for changed package publication.
@@ -797,6 +815,38 @@ impl Edit {
         self.stage_spliced("style-graph.put", "automatic-styles", bytes)
     }
 
+    /// Replace every same-family automatic style named by a closed graph.
+    ///
+    /// Unrelated automatic styles and formatting outside checked splice ranges remain exact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid graph, absent/duplicate/mismatched nodes, bounds, or splice
+    /// failure.
+    pub fn replace_style_graph(&mut self, graph: &StyleGraph) -> Result<()> {
+        let bytes = crate::advanced::replace_style_graph(
+            &self.candidate,
+            graph,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("style-graph.replace", "automatic-styles", bytes)
+    }
+
+    /// Remove exact automatic-style names when no retained XML node references them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for duplicates, absent styles, retained references, bounds, or splice
+    /// failure.
+    pub fn remove_automatic_styles(&mut self, names: &[String]) -> Result<()> {
+        let bytes = crate::advanced::remove_automatic_styles(
+            &self.candidate,
+            names,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("style-graph.remove", "automatic-styles", bytes)
+    }
+
     /// Atomically add a style dependency graph and apply rich text to one cell.
     ///
     /// # Errors
@@ -1038,6 +1088,22 @@ impl Edit {
             self.before.limits.package_bytes,
         )?;
         self.stage_spliced("drawing-group.put", &group.name, bytes)
+    }
+
+    /// Add a finite positioned rectangle, ellipse, or line with optional rich text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid identity, duplicate names, geometry, rich text, bounds, or
+    /// splice failure.
+    pub fn put_drawing_geometry(&mut self, sheet: &str, geometry: &DrawingGeometry) -> Result<()> {
+        let bytes = crate::advanced::put_drawing_geometry(
+            &self.candidate,
+            sheet,
+            geometry,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("drawing-geometry.put", &geometry.name, bytes)
     }
 
     /// Atomically add a package-backed chart drawing and compact chart content dependency.
@@ -2142,12 +2208,15 @@ fn known_operation(operation: &str) -> bool {
             | "sheet.remove"
             | "style.put"
             | "style-graph.put"
+            | "style-graph.replace"
+            | "style-graph.remove"
             | "conditional-format.edit"
             | "sparkline.edit"
             | "drawing.put"
             | "drawing.remove"
             | "drawing-frame.put"
             | "drawing-group.put"
+            | "drawing-geometry.put"
             | "chart-object.put"
             | "form.edit"
             | "form.bindings"
@@ -2245,10 +2314,15 @@ fn refuse_referenced_removal(package: &Package, path: &str) -> Result<()> {
 fn enforce_security_policy(snapshot: &Snapshot, policy: SecurityWritePolicy) -> Result<()> {
     let package = Package::from_bytes(snapshot.source.as_ref().to_vec())?;
     let reader = package.package().package()?;
-    if reader.manifest().has_encrypted_entries()
-        && matches!(policy.encryption, EncryptionWritePolicy::Refuse)
-    {
-        return invalid("changed unified ODS transactions refuse encrypted package members");
+    if reader.manifest().has_encrypted_entries() {
+        return match policy.encryption {
+            EncryptionWritePolicy::Refuse => {
+                invalid("changed unified ODS transactions refuse encrypted package members")
+            },
+            EncryptionWritePolicy::DecryptAndReencrypt => invalid(
+                "ODS decrypt/re-encrypt publication requires an unavailable credential capability",
+            ),
+        };
     }
     if (reader.has_file(DOCUMENT_SIGNATURE_PATH) || reader.has_file(MACRO_SIGNATURE_PATH))
         && matches!(policy.signatures, SignatureWritePolicy::Refuse)

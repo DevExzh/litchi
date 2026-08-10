@@ -22,9 +22,12 @@ fn record_range_boundary(
     {
         return;
     }
+    let Some(frame) = stack.last() else {
+        return;
+    };
     let boundary = RangeBoundary {
         offset,
-        container_id: stack.last().unwrap().id,
+        container_id: frame.id,
         ruby_epoch,
     };
     if boundaries.len() <= stack.len() {

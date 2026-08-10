@@ -19,6 +19,8 @@ const META: &str = r#"<?xml version="1.0"?><office:document-meta xmlns:office="u
 const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:styles><style:style style:name="gr2" style:family="graphic"/></office:styles></office:document-styles>"#;
 
 const NORMATIVE_SYNTHETIC: &[u8] = include_bytes!("fixtures/odf-1.4-normative-synthetic.fodi");
+const ODFDOM_ORIGINAL: &[u8] = include_bytes!("fixtures/odfdom-0.13.0-original.odi");
+const ODFDOM_CHANGED: &[u8] = include_bytes!("fixtures/odfdom-0.13.0-changed.odi");
 
 fn flat() -> FlatImage {
     FlatImage::from_bytes(FLAT.as_bytes().to_vec()).unwrap()
@@ -146,6 +148,30 @@ fn checked_in_normative_synthetic_fodi_is_explicitly_non_producer_evidence() {
     assert_eq!(image.frame().unwrap().name(), Some("Synthetic"));
     assert_eq!(image.frame().unwrap().image_map().unwrap().areas().len(), 2);
     assert_eq!(image.as_bytes(), NORMATIVE_SYNTHETIC);
+}
+
+#[test]
+fn checked_in_odfdom_producer_round_trip_is_genuine_odi_evidence() {
+    let original = Image::from_bytes(ODFDOM_ORIGINAL.to_vec()).unwrap();
+    let changed = Image::from_bytes(ODFDOM_CHANGED.to_vec()).unwrap();
+    assert_eq!(
+        original.frame().unwrap().name(),
+        Some("ODFDOM-0.13.0-Original")
+    );
+    assert_eq!(
+        changed.frame().unwrap().name(),
+        Some("ODFDOM-0.13.0-Changed")
+    );
+    assert!(matches!(
+        original.frame().unwrap().source(),
+        Source::Embedded(_)
+    ));
+    assert!(matches!(
+        changed.frame().unwrap().source(),
+        Source::Embedded(_)
+    ));
+    assert_eq!(original.as_bytes(), ODFDOM_ORIGINAL);
+    assert_eq!(changed.as_bytes(), ODFDOM_CHANGED);
 }
 
 #[test]

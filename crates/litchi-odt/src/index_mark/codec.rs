@@ -131,7 +131,9 @@ pub(crate) fn parse_text_index_marks(xml: &str) -> Result<Vec<TextIndexMark>> {
                     .as_ref()
                     .is_some_and(|active| active.depth == 1)
                 {
-                    let active = bibliography.take().expect("checked bibliography mark");
+                    let active = bibliography.take().ok_or_else(|| {
+                        Error::InvalidFormat("missing completed bibliography mark".to_string())
+                    })?;
                     marks.push((active.order, active.mark));
                 } else if let Some(active) = bibliography.as_mut() {
                     active.depth = active.depth.checked_sub(1).ok_or_else(|| {

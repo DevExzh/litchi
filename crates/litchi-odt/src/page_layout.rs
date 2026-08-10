@@ -211,7 +211,9 @@ fn scan_page_layouts(
                 push_layout(&mut layouts, layout)?;
             },
             Event::Start(element) if active.is_some() => {
-                let builder = active.as_mut().expect("checked page layout");
+                let builder = active.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active page layout".to_string())
+                })?;
                 let direct_child = builder.depth == 1;
                 if let Some(child) = builder.child.as_mut() {
                     child.depth += 1;
@@ -235,7 +237,9 @@ fn scan_page_layouts(
                 builder.depth += 1;
             },
             Event::Empty(element) if active.is_some() => {
-                let builder = active.as_mut().expect("checked page layout");
+                let builder = active.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active page layout".to_string())
+                })?;
                 if builder.depth == 1
                     && builder.child.is_none()
                     && style_element
@@ -256,13 +260,17 @@ fn scan_page_layouts(
                 }
             },
             Event::End(element) if active.is_some() => {
-                let builder = active.as_mut().expect("checked page layout");
+                let builder = active.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active page layout".to_string())
+                })?;
                 if let Some(child) = builder.child.as_mut() {
                     child.depth = child.depth.checked_sub(1).ok_or_else(|| {
                         Error::InvalidFormat("invalid page-layout child nesting".to_string())
                     })?;
                     if child.depth == 0 {
-                        let child = builder.child.take().expect("checked page-layout child");
+                        let child = builder.child.take().ok_or_else(|| {
+                            Error::InvalidFormat("missing completed page-layout child".to_string())
+                        })?;
                         store_child(
                             &mut builder.layout,
                             child.kind,
@@ -280,7 +288,9 @@ fn scan_page_layouts(
                             "malformed page-layout element".to_string(),
                         ));
                     }
-                    let mut finished = active.take().expect("checked page layout");
+                    let mut finished = active.take().ok_or_else(|| {
+                        Error::InvalidFormat("missing completed page layout".to_string())
+                    })?;
                     finished.layout.xml = xml[finished.start..event_end].to_string();
                     push_layout(&mut layouts, finished.layout)?;
                 }
@@ -368,9 +378,18 @@ fn find_page_layout(xml: &str, expected_name: &str) -> Result<Option<(usize, usi
             {
                 return Ok(Some((event_start, event_end)));
             },
-            Event::Start(_) if active.is_some() => active.as_mut().unwrap().1 += 1,
+            Event::Start(_) if active.is_some() => {
+                active
+                    .as_mut()
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("missing active page-layout range".to_string())
+                    })?
+                    .1 += 1;
+            },
             Event::End(_) if active.is_some() => {
-                let current = active.as_mut().unwrap();
+                let current = active.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("missing active page-layout range".to_string())
+                })?;
                 current.1 = current.1.checked_sub(1).ok_or_else(|| {
                     Error::InvalidFormat("invalid page-layout nesting".to_string())
                 })?;

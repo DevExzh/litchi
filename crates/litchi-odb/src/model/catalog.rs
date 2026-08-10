@@ -3,7 +3,7 @@
 use super::{
     component::{Component, ComponentKind},
     connection::Connection,
-    query::Query,
+    query::{Query, QueryUpdateTarget},
     table::{
         Column, ColumnSchema, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind,
         ReferentialAction, Relation, Table, TableKind,
@@ -276,6 +276,9 @@ enum Element {
     Column,
     ColumnDefinition,
     Query,
+    FilterStatement,
+    OrderStatement,
+    UpdateTable,
     Forms,
     Reports,
     ComponentCollection,
@@ -515,6 +518,9 @@ fn start(
         | Element::Column
         | Element::ColumnDefinition
         | Element::Query
+        | Element::FilterStatement
+        | Element::OrderStatement
+        | Element::UpdateTable
         | Element::Keys
         | Element::Key
         | Element::KeyColumns
@@ -582,6 +588,9 @@ fn start(
             | Element::Column
             | Element::ColumnDefinition
             | Element::Query
+            | Element::FilterStatement
+            | Element::OrderStatement
+            | Element::UpdateTable
             | Element::Forms
             | Element::Reports
             | Element::ComponentCollection
@@ -663,6 +672,44 @@ fn start(
         && (table.is_some() || query.is_some())
     {
         add_column(reader, element, table, query, catalog, columns, limits)?;
+    }
+    if in_database && matches!(kind, Element::FilterStatement | Element::OrderStatement) {
+        let command = required_db_attr(reader, element, b"command", limits)?;
+        match (table, query, kind) {
+            (Some(index), None, Element::FilterStatement) => catalog
+                .tables
+                .get_mut(index)
+                .ok_or_else(|| invalid("ODB filter table owner is out of bounds"))?
+                .set_filter_statement(command)?,
+            (Some(index), None, Element::OrderStatement) => catalog
+                .tables
+                .get_mut(index)
+                .ok_or_else(|| invalid("ODB order table owner is out of bounds"))?
+                .set_order_statement(command)?,
+            (None, Some(index), Element::FilterStatement) => catalog
+                .queries
+                .get_mut(index)
+                .ok_or_else(|| invalid("ODB filter query owner is out of bounds"))?
+                .set_filter_statement(command)?,
+            (None, Some(index), Element::OrderStatement) => catalog
+                .queries
+                .get_mut(index)
+                .ok_or_else(|| invalid("ODB order query owner is out of bounds"))?
+                .set_order_statement(command)?,
+            _ => return Err(invalid("ODB statement owner is ambiguous")),
+        }
+    }
+    if in_database && kind == Element::UpdateTable {
+        let index = query.ok_or_else(|| invalid("ODB update-table has no query owner"))?;
+        catalog
+            .queries
+            .get_mut(index)
+            .ok_or_else(|| invalid("ODB update-table query owner is out of bounds"))?
+            .set_update_target(QueryUpdateTarget::parsed(
+                required_db_attr(reader, element, b"name", limits)?,
+                optional_db_attr(reader, element, b"schema-name", limits)?,
+                optional_db_attr(reader, element, b"catalog-name", limits)?,
+            ))?;
     }
     if in_database && kind == Element::Component {
         ensure_capacity(*components, limits.max_components, "component declarations")?;
@@ -881,6 +928,13 @@ fn classify(parent: Option<Frame>, namespace: NamespaceKind, local: &[u8]) -> El
             Element::Columns
         },
         (Some(Element::Columns), _, true, b"column") => Element::Column,
+        (Some(Element::TableRepresentation | Element::Query), _, true, b"filter-statement") => {
+            Element::FilterStatement
+        },
+        (Some(Element::TableRepresentation | Element::Query), _, true, b"order-statement") => {
+            Element::OrderStatement
+        },
+        (Some(Element::Query), _, true, b"update-table") => Element::UpdateTable,
         (Some(Element::Database), _, true, b"schema-definition") => Element::SchemaDefinition,
         (Some(Element::SchemaDefinition), _, true, b"table-definitions") => {
             Element::TableDefinitions
@@ -931,6 +985,9 @@ fn is_catalog_node(namespace: NamespaceKind, local: &[u8]) -> bool {
                 | b"queries"
                 | b"query-collection"
                 | b"query"
+                | b"filter-statement"
+                | b"order-statement"
+                | b"update-table"
                 | b"table-representations"
                 | b"table-representation"
                 | b"columns"

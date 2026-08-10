@@ -661,12 +661,13 @@ fn scan(xml: &str) -> Result<Scan> {
                     if forms.len() >= MAX_FORMS {
                         return invalid("too many forms");
                     }
-                    form = Some(forms.len());
+                    let form_index = forms.len();
+                    form = Some(form_index);
                     forms.push(FormLocation {
                         site: Site::Paired { close_start: 0 },
                         controls: Vec::new(),
                     });
-                    form_stack.push(form.unwrap());
+                    form_stack.push(form_index);
                 } else if namespace.as_deref() == Some(FORM)
                     && matches!(local.as_slice(), b"combobox" | b"listbox")
                 {
@@ -1203,7 +1204,9 @@ fn validate_name(label: &str, v: &str) -> Result<()> {
 fn validate_xml_id(v: &str) -> Result<()> {
     validate_name("selection control xml:id", v)?;
     let mut chars = v.chars();
-    let first = chars.next().unwrap();
+    let Some(first) = chars.next() else {
+        return invalid("selection control xml:id cannot be empty");
+    };
     if !(first == '_' || first.is_ascii_alphabetic())
         || !chars.all(|c| c == '_' || c == '-' || c == '.' || c.is_ascii_alphanumeric())
     {

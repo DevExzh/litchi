@@ -4854,6 +4854,40 @@ impl<'a> RtfDocument<'a> {
         &self.annotations
     }
 
+    pub(crate) fn set_annotation_text(
+        &mut self,
+        index: usize,
+        text: Cow<'a, str>,
+    ) -> RtfResult<()> {
+        let mut candidate = self.annotations.get(index).cloned().ok_or_else(|| {
+            RtfError::MalformedDocument("RTF annotation index is outside the store".to_string())
+        })?;
+        candidate.text = text;
+        candidate.validate()?;
+        let aggregate =
+            self.annotations
+                .iter()
+                .enumerate()
+                .try_fold(0usize, |size, (position, annotation)| {
+                    size.checked_add(if position == index {
+                        candidate.text_bytes()?
+                    } else {
+                        annotation.text_bytes()?
+                    })
+                });
+        if aggregate
+            .is_none_or(|size| size > super::super::annotation::MAX_ANNOTATION_TEXT_TOTAL_BYTES)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF annotation aggregate text limit exceeded".to_string(),
+            ));
+        }
+        *self.annotations.get_mut(index).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF annotation index is outside the store".to_string())
+        })? = candidate;
+        Ok(())
+    }
+
     /// Append an inert comment annotation after validating its body range.
     ///
     /// # Errors
@@ -5272,6 +5306,38 @@ impl<'a> RtfDocument<'a> {
     #[must_use]
     pub fn notes(&self) -> &[super::super::section::Note<'_>] {
         &self.notes
+    }
+
+    pub(crate) fn set_note_content(
+        &mut self,
+        index: usize,
+        content: Cow<'a, str>,
+    ) -> RtfResult<()> {
+        let mut candidate = self.notes.get(index).cloned().ok_or_else(|| {
+            RtfError::MalformedDocument("RTF note index is outside the store".to_string())
+        })?;
+        candidate.content = content;
+        candidate.validate()?;
+        let aggregate = self
+            .notes
+            .iter()
+            .enumerate()
+            .try_fold(0usize, |size, (position, note)| {
+                size.checked_add(if position == index {
+                    candidate.text_bytes()?
+                } else {
+                    note.text_bytes()?
+                })
+            });
+        if aggregate.is_none_or(|size| size > super::super::section::MAX_NOTE_TEXT_TOTAL_BYTES) {
+            return Err(RtfError::MalformedDocument(
+                "RTF note aggregate text exceeds the safety limit".to_string(),
+            ));
+        }
+        *self.notes.get_mut(index).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF note index is outside the store".to_string())
+        })? = candidate;
+        Ok(())
     }
 
     /// Append a validated footnote or endnote at a UTF-8 main-story boundary.

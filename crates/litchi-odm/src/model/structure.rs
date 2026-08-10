@@ -1,6 +1,7 @@
 //! Ordered master-body structure semantics.
 
 use litchi_core::Position;
+use std::ops::Range;
 
 /// A generated master-document index kind.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,6 +37,7 @@ pub struct GeneratedIndex {
     pub(crate) kind: IndexKind,
     pub(crate) name: Option<String>,
     pub(crate) xml_id: Option<String>,
+    pub(crate) name_span: Option<Range<usize>>,
 }
 
 impl GeneratedIndex {

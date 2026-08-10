@@ -70,7 +70,8 @@ pub(crate) fn validate_element(element: &Element) -> Result<()> {
         "apply" => validate_application(element),
         "reln" => validate_relation(element),
         "ci" | "cn" | "csymbol" => validate_content_token(element),
-        "interval" | "piece" => validate_exact_content_expressions(element, 2),
+        "interval" => validate_interval(element),
+        "piece" => validate_exact_content_expressions(element, 2),
         "condition" => validate_condition(element),
         "degree"
         | "domainofapplication"
@@ -85,7 +86,7 @@ pub(crate) fn validate_element(element: &Element) -> Result<()> {
         "bvar" => validate_bound_variable(element),
         "declare" => validate_declare(element),
         "list" | "set" => validate_list_or_set(element),
-        "matrixrow" => validate_content_expression_sequence(element),
+        "matrixrow" => validate_matrix_row(element),
         "vector" => validate_vector(element),
         "matrix" => validate_matrix(element),
         local_name if is_content_symbol(local_name) => validate_empty(element),
@@ -160,7 +161,16 @@ fn validate_attributes(element: &Element) -> Result<()> {
                 ],
             ),
             "rowalign" => value_list(value, &["top", "bottom", "center", "baseline", "axis"]),
-            "rowspan" | "columnspan" | "selection" | "base" => is_positive_integer(value),
+            "rowspan" | "columnspan" | "selection" => is_positive_integer(value),
+            "base" => {
+                if element.local_name() == "cn" {
+                    value
+                        .parse::<u8>()
+                        .is_ok_and(|base| (2..=36).contains(&base))
+                } else {
+                    is_positive_integer(value)
+                }
+            },
             "index" | "nargs" => is_nonnegative_integer(value),
             "occurrence" => value_in(value, &["prefix", "infix", "function-model"]),
             "closure" => value_in(value, &["open", "closed", "open-closed", "closed-open"]),
@@ -439,7 +449,7 @@ fn validate_content_token(element: &Element) -> Result<()> {
         let kind = element.attribute(None, "type").unwrap_or("real");
         let expected = usize::from(matches!(
             kind,
-            "rational" | "complex-cartesian" | "complex-polar"
+            "e-notation" | "rational" | "complex-cartesian" | "complex-polar"
         ));
         if separators != expected {
             return Err(invalid(format!(
@@ -453,18 +463,12 @@ fn validate_content_token(element: &Element) -> Result<()> {
 fn validate_declare(element: &Element) -> Result<()> {
     validate_no_character_data(element)?;
     let children: Vec<_> = element.children().collect();
-    let valid_head = children.first().is_some_and(|child| {
-        child.namespace_uri() == Some(MATHML_NAMESPACE) && child.local_name() == "ci"
-    });
-    let valid_tail = children.get(1).is_none_or(|child| {
-        child.namespace_uri() == Some(MATHML_NAMESPACE)
-            && (child.local_name() == "fn" || is_constructor(child.local_name()))
-    });
-    if matches!(children.len(), 1 | 2) && valid_head && valid_tail {
+    if matches!(children.len(), 1 | 2) && children.iter().all(|child| is_content_expression(child))
+    {
         Ok(())
     } else {
         Err(invalid(
-            "MathML declare requires ci and an optional fn or constructor",
+            "MathML declare requires one content object and an optional content value",
         ))
     }
 }
@@ -474,12 +478,34 @@ fn validate_condition(element: &Element) -> Result<()> {
     let children: Vec<_> = element.children().collect();
     if children.len() == 1
         && children[0].namespace_uri() == Some(MATHML_NAMESPACE)
-        && matches!(children[0].local_name(), "apply" | "reln" | "set")
+        && matches!(
+            children[0].local_name(),
+            "apply" | "reln" | "set" | "true" | "false"
+        )
     {
         Ok(())
     } else {
         Err(invalid(
-            "MathML condition requires one apply, reln, or set child",
+            "MathML condition requires one predicate expression",
+        ))
+    }
+}
+
+fn validate_interval(element: &Element) -> Result<()> {
+    validate_no_character_data(element)?;
+    let children: Vec<_> = element.children().collect();
+    if children.len() == 2 && children.iter().all(|child| is_content_expression(child)) {
+        return Ok(());
+    }
+    let bound_end = consume_bound_variables(&children, 0);
+    if bound_end > 0
+        && children.len() == bound_end.saturating_add(1)
+        && is_named(children.get(bound_end).copied(), "condition")
+    {
+        Ok(())
+    } else {
+        Err(invalid(
+            "MathML interval requires two endpoints or bound variables followed by one condition",
         ))
     }
 }
@@ -535,6 +561,9 @@ fn validate_list_or_set(element: &Element) -> Result<()> {
 fn validate_vector(element: &Element) -> Result<()> {
     validate_no_character_data(element)?;
     let children: Vec<_> = element.children().collect();
+    if children.is_empty() {
+        return Err(invalid("MathML vector requires at least one entry"));
+    }
     if children.iter().all(|child| is_content_expression(child)) {
         return Ok(());
     }
@@ -579,6 +608,9 @@ fn validate_application(element: &Element) -> Result<()> {
     }
     let name = operator.local_name();
     let arguments = &children[1..];
+    if matches!(name, "curl" | "divergence" | "grad" | "laplacian") {
+        return validate_bound_application(name, arguments, false);
+    }
     if is_relation_operator(name) {
         return validate_relation_arguments(name, arguments);
     }
@@ -622,11 +654,31 @@ fn validate_matrix(element: &Element) -> Result<()> {
     if children.iter().all(|child| {
         child.namespace_uri() == Some(MATHML_NAMESPACE) && child.local_name() == "matrixrow"
     }) {
+        let Some(first) = children.first() else {
+            return Err(invalid(
+                "MathML enumerated matrix requires at least one row",
+            ));
+        };
+        let width = first.children().count();
+        if width == 0 || children.iter().any(|row| row.children().count() != width) {
+            return Err(invalid(
+                "MathML enumerated matrix rows must be nonempty and rectangular",
+            ));
+        }
         return Ok(());
     }
     let mut index = consume_bound_variables(&children, 0);
     index = consume_domain_qualifier(&children, index);
     validate_single_trailing_argument("matrix", &children, index)
+}
+
+fn validate_matrix_row(element: &Element) -> Result<()> {
+    validate_content_expression_sequence(element)?;
+    if element.children().next().is_some() {
+        Ok(())
+    } else {
+        Err(invalid("MathML matrixrow requires at least one cell"))
+    }
 }
 
 fn validate_relation(element: &Element) -> Result<()> {
@@ -859,21 +911,6 @@ fn is_content_expression(element: &Element) -> bool {
             | "set"
             | "vector"
     ) || is_content_symbol(element.local_name())
-}
-
-fn is_constructor(local_name: &str) -> bool {
-    matches!(
-        local_name,
-        "interval"
-            | "list"
-            | "matrix"
-            | "matrixrow"
-            | "otherwise"
-            | "piece"
-            | "piecewise"
-            | "set"
-            | "vector"
-    )
 }
 
 fn is_identifier_token(element: &Element) -> bool {
@@ -1235,6 +1272,7 @@ fn validate_type_attribute(local_name: &str, value: &str) -> bool {
             &[
                 "integer",
                 "real",
+                "e-notation",
                 "rational",
                 "complex-cartesian",
                 "complex-polar",

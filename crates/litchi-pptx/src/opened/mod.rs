@@ -1,10 +1,11 @@
 //! Atomic semantic transactions over an opened presentation.
 //!
 //! One immutable root composes slide/text/notes edits with common, grouped, and
-//! connector shape transfer; picture-part creation/removal; ordinary charts,
-//! media, table styles, legacy/modern comments and typed extensions;
-//! master/layout authoring; and dependency relationship transfer. Publication
-//! uses an exact finite OPC resource patch.
+//! endpoint-closed connector shape transfer; picture-part creation/removal;
+//! ordinary charts, media, table styles, legacy/modern comments and typed
+//! extensions; master/layout authoring; and dependency relationship transfer.
+//! Publication uses an exact finite OPC resource patch and classifies shape
+//! transfer refusals before mutation.
 
 mod model;
 mod patch;

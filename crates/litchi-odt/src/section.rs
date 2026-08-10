@@ -100,7 +100,7 @@ impl Section {
     /// Serialize a complete canonical `text:section` with inert plain-text content.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
-        let mut output = section_opening(self);
+        let mut output = section_opening(self)?;
         output.push('>');
         write_source(&mut output, self);
         for paragraph in self.content.split('\n') {
@@ -139,7 +139,7 @@ pub fn update_section_xml(xml: &str, name: &str, replacement: &Section) -> Resul
     replacement.validate()?;
     let site = &scan.sections[index];
     let replacement_xml = if let Some(close) = &site.close {
-        let mut value = section_opening(replacement);
+        let mut value = section_opening(replacement)?;
         value.push('>');
         write_source(&mut value, replacement);
         value.push_str(&xml[site.content_start..close.start]);
@@ -219,7 +219,7 @@ pub fn wrap_section_xml(
             return invalid("section ranges must be nested or disjoint, not crossing");
         }
     }
-    let mut opening = section_opening(section);
+    let mut opening = section_opening(section)?;
     opening.push('>');
     write_source(&mut opening, section);
     let output = apply(
@@ -259,7 +259,7 @@ fn compatible_blocks(start: &Block, end: &Block) -> Result<()> {
     }
 }
 
-fn section_opening(section: &Section) -> String {
+fn section_opening(section: &Section) -> Result<String> {
     let mut output = String::from(
         "<text:section xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"",
     );
@@ -287,11 +287,13 @@ fn section_opening(section: &Section) -> String {
             attr(
                 &mut output,
                 "text:condition",
-                section.condition.as_deref().expect("validated condition"),
+                section.condition.as_deref().ok_or_else(|| {
+                    Error::InvalidFormat("conditional section has no condition".to_string())
+                })?,
             );
         },
     }
-    output
+    Ok(output)
 }
 
 fn write_source(output: &mut String, section: &Section) {
@@ -468,7 +470,9 @@ fn scan(xml: &str) -> Result<Scan> {
                 {
                     open_sections
                         .last_mut()
-                        .expect("checked section")
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("section source has no parent section".to_string())
+                        })?
                         .content_start = span.end;
                 }
                 if tracked_depth.is_none()
@@ -767,7 +771,9 @@ fn validate_uri(value: &str, label: &str) -> Result<()> {
 fn validate_ncname(value: &str, label: &str) -> Result<()> {
     validate_text(value, label, false)?;
     let mut chars = value.chars();
-    let first = chars.next().expect("validated nonempty");
+    let Some(first) = chars.next() else {
+        return invalid(format!("{label} must not be empty"));
+    };
     if !(first == '_' || first.is_alphabetic())
         || chars.any(|c| !(c == '_' || c == '-' || c == '.' || c.is_alphanumeric()))
     {

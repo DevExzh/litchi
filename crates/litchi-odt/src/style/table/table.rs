@@ -692,7 +692,7 @@ fn image(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<Image
             return Err(bad("invalid background-image link group"));
         }
         BackgroundSource::Link {
-            href: href.unwrap(),
+            href: href.ok_or_else(|| bad("missing background-image xlink:href"))?,
             show_embed: show.is_some(),
             actuate_on_load: actuate.is_some(),
         }
@@ -794,14 +794,18 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         if s.style
                             .properties
                             .as_ref()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table properties"))?
                             .background_image
                             .is_some()
                         {
                             return Err(bad("duplicate style:background-image"));
                         }
                         let i = image(&r, ver, &e)?;
-                        s.style.properties.as_mut().unwrap().background_image = Some(i.value);
+                        s.style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing table properties"))?
+                            .background_image = Some(i.value);
                         s.linked = i.linked;
                         s.id = Some(d);
                     } else if c.1 == b"background-image" {
@@ -852,14 +856,17 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         if s.style
                             .properties
                             .as_ref()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table properties"))?
                             .background_image
                             .is_some()
                         {
                             return Err(bad("duplicate style:background-image"));
                         }
-                        s.style.properties.as_mut().unwrap().background_image =
-                            Some(image(&r, ver, &e)?.value);
+                        s.style
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing table properties"))?
+                            .background_image = Some(image(&r, ver, &e)?.value);
                     } else if c.1 == b"background-image" {
                         return Err(bad("background-image has invalid namespace or parent"));
                     } else if s.id.is_some_and(|i| d == i + 1)
@@ -872,10 +879,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         s.style
                             .properties
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table properties"))?
                             .background_image
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table background image"))?
                             .source = BackgroundSource::Embedded(Vec::new());
                     } else if s.pd.is_some_and(|p| d > p) {
                         return Err(bad("unexpected table-properties child"));
@@ -916,10 +923,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         s.style
                             .properties
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table properties"))?
                             .background_image
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing table background image"))?
                             .source = BackgroundSource::Embedded(data);
                         s.bd = None;
                     }
@@ -931,7 +938,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     }
                 }
                 if active.as_ref().is_some_and(|x| x.depth == d) {
-                    push(&mut out, active.take().unwrap().style, &mut total)?;
+                    let state = active
+                        .take()
+                        .ok_or_else(|| bad("missing active table style"))?;
+                    push(&mut out, state.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -1084,7 +1094,13 @@ pub fn set_xml(xml: &str, want: &Style) -> Result<String> {
                         qname: String::from_utf8_lossy(e.name().as_ref()).into_owned(),
                         ..Default::default()
                     };
-                    if active.as_mut().unwrap().properties.replace(s).is_some() {
+                    if active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target table style"))?
+                        .properties
+                        .replace(s)
+                        .is_some()
+                    {
                         return Err(bad("duplicate style:table-properties"));
                     }
                 }
@@ -1122,7 +1138,12 @@ pub fn set_xml(xml: &str, want: &Style) -> Result<String> {
                 } else if td.is_some_and(|x| d == x + 1)
                     && c.0 == Ns::S
                     && c.1 == b"table-properties"
-                    && active.as_mut().unwrap().properties.replace(s).is_some()
+                    && active
+                        .as_mut()
+                        .ok_or_else(|| bad("missing target table style"))?
+                        .properties
+                        .replace(s)
+                        .is_some()
                 {
                     return Err(bad("duplicate style:table-properties"));
                 }
@@ -1135,7 +1156,10 @@ pub fn set_xml(xml: &str, want: &Style) -> Result<String> {
                     if s.properties.as_ref().is_some_and(|x| x.end == 0)
                         && td.is_some_and(|x| d == x + 1)
                     {
-                        let x = s.properties.as_mut().unwrap();
+                        let x = s
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target table properties span"))?;
                         x.end_start = begin;
                         x.end = end;
                     }

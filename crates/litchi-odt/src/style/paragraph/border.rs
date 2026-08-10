@@ -610,7 +610,7 @@ fn image_attributes(
             return Err(bad("invalid background-image xlink group"));
         }
         BackgroundSource::Link {
-            href: href.unwrap(),
+            href: href.ok_or_else(|| bad("missing background-image xlink:href"))?,
             show_embed: show.is_some(),
             actuate_on_load: actuate.is_some(),
         }
@@ -664,11 +664,11 @@ struct Active {
     image_linked: bool,
 }
 impl Active {
-    fn properties_mut(&mut self) -> &mut Properties {
+    fn properties_mut(&mut self) -> Result<&mut Properties> {
         self.style
             .properties
             .as_mut()
-            .expect("properties depth implies properties")
+            .ok_or_else(|| bad("missing paragraph border properties"))
     }
 }
 
@@ -727,21 +727,29 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         state.style.properties = Some(border_properties(&reader, version, &start)?);
                         state.properties_depth = Some(depth);
                     } else if state.properties_depth.is_some()
-                        && depth == state.properties_depth.unwrap() + 1
+                        && depth
+                            == state
+                                .properties_depth
+                                .ok_or_else(|| bad("missing paragraph properties depth"))?
+                                + 1
                         && current.0 == Ns::Style
                         && current.1 == b"background-image"
                     {
                         if state.image_depth.is_some()
-                            || state.properties_mut().background_image.is_some()
+                            || state.properties_mut()?.background_image.is_some()
                         {
                             return Err(bad("duplicate style:background-image"));
                         }
                         let parsed = image_attributes(&reader, version, &start)?;
-                        state.properties_mut().background_image = Some(parsed.image);
+                        state.properties_mut()?.background_image = Some(parsed.image);
                         state.image_linked = parsed.linked;
                         state.image_depth = Some(depth);
                     } else if state.image_depth.is_some()
-                        && depth == state.image_depth.unwrap() + 1
+                        && depth
+                            == state
+                                .image_depth
+                                .ok_or_else(|| bad("missing background-image depth"))?
+                                + 1
                         && current.0 == Ns::Office
                         && current.1 == b"binary-data"
                     {
@@ -777,17 +785,25 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         state.seen_properties = true;
                         state.style.properties = Some(border_properties(&reader, version, &start)?);
                     } else if state.properties_depth.is_some()
-                        && depth == state.properties_depth.unwrap() + 1
+                        && depth
+                            == state
+                                .properties_depth
+                                .ok_or_else(|| bad("missing paragraph properties depth"))?
+                                + 1
                         && current.0 == Ns::Style
                         && current.1 == b"background-image"
                     {
-                        if state.properties_mut().background_image.is_some() {
+                        if state.properties_mut()?.background_image.is_some() {
                             return Err(bad("duplicate style:background-image"));
                         }
-                        state.properties_mut().background_image =
+                        state.properties_mut()?.background_image =
                             Some(image_attributes(&reader, version, &start)?.image);
                     } else if state.image_depth.is_some()
-                        && depth == state.image_depth.unwrap() + 1
+                        && depth
+                            == state
+                                .image_depth
+                                .ok_or_else(|| bad("missing background-image depth"))?
+                                + 1
                         && current.0 == Ns::Office
                         && current.1 == b"binary-data"
                     {
@@ -795,10 +811,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             return Err(bad("linked background image cannot contain binary data"));
                         }
                         state
-                            .properties_mut()
+                            .properties_mut()?
                             .background_image
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing paragraph background image"))?
                             .source = BackgroundSource::Embedded(Vec::new());
                     }
                 }
@@ -831,10 +847,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     if state.binary_depth == Some(depth) {
                         let data = base64_decode(&state.binary)?;
                         state
-                            .properties_mut()
+                            .properties_mut()?
                             .background_image
                             .as_mut()
-                            .unwrap()
+                            .ok_or_else(|| bad("missing paragraph background image"))?
                             .source = BackgroundSource::Embedded(data);
                         state.binary_depth = None;
                     }
@@ -846,7 +862,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     }
                 }
                 if active.as_ref().is_some_and(|state| state.depth == depth) {
-                    push_style(&mut styles, active.take().unwrap().style, &mut total)?;
+                    let state = active
+                        .take()
+                        .ok_or_else(|| bad("missing active paragraph border style"))?;
+                    push_style(&mut styles, state.style, &mut total)?;
                 }
                 stack.pop();
             },
@@ -1006,7 +1025,13 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                             missing_ns: missing_ns_decls(&reader),
                             ..Default::default()
                         };
-                        if active.as_mut().unwrap().properties.replace(span).is_some() {
+                        if active
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph border style"))?
+                            .properties
+                            .replace(span)
+                            .is_some()
+                        {
                             return Err(bad("duplicate style:paragraph-properties"));
                         }
                     } else if depth == target + 2
@@ -1018,7 +1043,13 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                             qname: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
                             ..Default::default()
                         };
-                        if active.as_mut().unwrap().image.replace(span).is_some() {
+                        if active
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph border style"))?
+                            .image
+                            .replace(span)
+                            .is_some()
+                        {
                             return Err(bad("duplicate style:background-image"));
                         }
                     }
@@ -1062,13 +1093,24 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                             missing_ns: missing_ns_decls(&reader),
                             ..span
                         };
-                        if active.as_mut().unwrap().properties.replace(span).is_some() {
+                        if active
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph border style"))?
+                            .properties
+                            .replace(span)
+                            .is_some()
+                        {
                             return Err(bad("duplicate style:paragraph-properties"));
                         }
                     } else if depth == target + 2
                         && current.0 == Ns::Style
                         && current.1 == b"background-image"
-                        && active.as_mut().unwrap().image.replace(span).is_some()
+                        && active
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph border style"))?
+                            .image
+                            .replace(span)
+                            .is_some()
                     {
                         return Err(bad("duplicate style:background-image"));
                     }
@@ -1082,7 +1124,10 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                     if spans.image.as_ref().is_some_and(|span| span.end == 0)
                         && depth_target.is_some_and(|target| depth == target + 2)
                     {
-                        let span = spans.image.as_mut().unwrap();
+                        let span = spans
+                            .image
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target background-image span"))?;
                         span.end_start = begin;
                         span.end = end;
                     }
@@ -1092,7 +1137,11 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                         .is_some_and(|span| span.end_start == 0)
                         && depth_target.is_some_and(|target| depth == target + 1)
                     {
-                        spans.properties.as_mut().unwrap().end_start = begin;
+                        spans
+                            .properties
+                            .as_mut()
+                            .ok_or_else(|| bad("missing target paragraph properties span"))?
+                            .end_start = begin;
                     }
                     if depth_target == Some(depth) {
                         spans.style.end_start = begin;
@@ -1161,7 +1210,11 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     if requested.properties.is_none() {
         return Ok(xml.to_owned());
     }
-    let fragment = requested.properties.as_ref().unwrap().to_xml_fragment()?;
+    let fragment = requested
+        .properties
+        .as_ref()
+        .ok_or_else(|| bad("missing requested paragraph border properties"))?
+        .to_xml_fragment()?;
     if spans.style.empty {
         return expand_span(xml, &spans.style, &fragment);
     }

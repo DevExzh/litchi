@@ -108,6 +108,29 @@ impl Image {
         self.package.resource_graph()
     }
 
+    /// Returns inert XML active-content constructs and script-container members.
+    ///
+    /// Values are inventoried only; no script, event, macro, DDE target, or
+    /// package member is loaded or activated.
+    #[must_use]
+    pub fn active_content(&self) -> &[crate::active::ActiveContent] {
+        self.package.active_content()
+    }
+
+    /// Classifies one style name/family dependency across content and styles.
+    pub fn style_dependency_state(
+        &self,
+        name: &str,
+        family: &str,
+    ) -> Result<crate::StyleDependencyState> {
+        crate::semantic::inspect_style_dependency(
+            self.content_xml(),
+            self.styles_xml(),
+            name,
+            family,
+        )
+    }
+
     /// Reads one inventoried package-local image resource.
     ///
     /// # Errors

@@ -8,6 +8,7 @@ use crate::model::{
     resource::Resource,
     shape::{Properties as ShapeProperties, Shape, ShapeKind},
     style::Style,
+    style_resource::{StyleResource, StyleResourceKind},
 };
 use litchi_core::{
     BlobBundle, BlobLimits, CompositionLimits, DiagnosticFingerprint, Error, History,
@@ -28,7 +29,14 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{collections::BTreeMap, fmt::Write as _, fs, ops::Range, path::Path, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Write as _,
+    fs,
+    ops::Range,
+    path::Path,
+    sync::Arc,
+};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.graphics";
 pub(crate) const TEMPLATE_MIMETYPE: &str = "application/vnd.oasis.opendocument.graphics-template";
@@ -49,6 +57,7 @@ const MAX_DEPTH: usize = 256;
 const MAX_PAGES: usize = 16_384;
 const MAX_LAYERS: usize = 16_384;
 const MAX_FORM_CONTROLS: usize = 65_536;
+const MAX_STYLE_RESOURCES: usize = 65_536;
 const MAX_TRANSFER_RESOURCES: usize = 4_096;
 const MAX_GROUP_EDITS: usize = 4_096;
 const MAX_SHAPES: usize = 1_000_000;
@@ -84,6 +93,7 @@ struct State {
     resources: Vec<Resource>,
     form_controls: Vec<FormControl>,
     styles: Vec<Style>,
+    style_resources: Vec<StyleResource>,
     active_content: ActiveContentStatus,
 }
 
@@ -92,6 +102,71 @@ struct State {
 pub struct SecurityStatus {
     signed: bool,
     encrypted: bool,
+}
+
+/// Stable capability contract for the supported ODG password and signature lifecycle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SecurityCapabilities {
+    source: SecurityStatus,
+    supported: u8,
+}
+
+impl SecurityCapabilities {
+    const OPEN_WITH_PASSWORD: u8 = 1 << 0;
+    const ENCRYPT_NEW: u8 = 1 << 1;
+    const REENCRYPT_EXISTING: u8 = 1 << 2;
+    const VERIFY_SIGNATURES: u8 = 1 << 3;
+    const SIGN_NEW: u8 = 1 << 4;
+    const RESIGN_EXISTING: u8 = 1 << 5;
+    const REMOVE_INVALIDATED_SIGNATURES: u8 = 1 << 6;
+
+    /// Source protection inventory used when planning a lifecycle transition.
+    #[must_use]
+    pub const fn source(self) -> SecurityStatus {
+        self.source
+    }
+
+    /// Whether password-encrypted drawings can be opened for inert inspection.
+    #[must_use]
+    pub const fn can_open_with_password(self) -> bool {
+        self.supported & Self::OPEN_WITH_PASSWORD != 0
+    }
+
+    /// Whether a fresh drawing can be authored with password encryption.
+    #[must_use]
+    pub const fn can_encrypt_new(self) -> bool {
+        self.supported & Self::ENCRYPT_NEW != 0
+    }
+
+    /// Whether an existing encrypted snapshot can be changed and re-encrypted.
+    #[must_use]
+    pub const fn can_reencrypt_existing(self) -> bool {
+        self.supported & Self::REENCRYPT_EXISTING != 0
+    }
+
+    /// Whether inert signature metadata and trust-neutral signature math are available.
+    #[must_use]
+    pub const fn can_verify_signatures(self) -> bool {
+        self.supported & Self::VERIFY_SIGNATURES != 0
+    }
+
+    /// Whether a fresh drawing can be authored with a document signature.
+    #[must_use]
+    pub const fn can_sign_new(self) -> bool {
+        self.supported & Self::SIGN_NEW != 0
+    }
+
+    /// Whether an existing changed snapshot can be re-signed transactionally.
+    #[must_use]
+    pub const fn can_resign_existing(self) -> bool {
+        self.supported & Self::RESIGN_EXISTING != 0
+    }
+
+    /// Whether invalidated signature members can be deliberately removed.
+    #[must_use]
+    pub const fn can_remove_invalidated_signatures(self) -> bool {
+        self.supported & Self::REMOVE_INVALIDATED_SIGNATURES != 0
+    }
 }
 
 /// Explicit mutation policy for protected drawing packages.
@@ -306,6 +381,23 @@ impl Snapshot {
         styles
             .dedup_by(|left, right| left.name() == right.name() && left.family() == right.family());
         let active_content = scan_active_content(package.content_xml(), package.styles_xml())?;
+        let mut style_resources = parse_style_resources(package.content_xml())?
+            .into_iter()
+            .map(|definition| definition.resource)
+            .collect::<Vec<_>>();
+        if let Some(styles_xml) = package.styles_xml() {
+            style_resources.extend(
+                parse_style_resources(styles_xml)?
+                    .into_iter()
+                    .map(|definition| definition.resource),
+            );
+        }
+        style_resources.sort_unstable_by(|left, right| {
+            left.kind()
+                .cmp(&right.kind())
+                .then_with(|| left.name().cmp(right.name()))
+        });
+        style_resources.dedup();
         Ok(Self(Arc::new(State {
             package,
             mimetype,
@@ -313,6 +405,7 @@ impl Snapshot {
             pages: parsed.pages,
             form_controls: parsed.form_controls,
             styles,
+            style_resources,
             active_content,
             layers,
             resources,
@@ -395,6 +488,39 @@ impl Snapshot {
         self.0.security
     }
 
+    /// Returns the stable supported password and signature lifecycle.
+    #[must_use]
+    pub fn security_capabilities(&self) -> SecurityCapabilities {
+        SecurityCapabilities {
+            source: self.0.security,
+            supported: SecurityCapabilities::OPEN_WITH_PASSWORD
+                | SecurityCapabilities::ENCRYPT_NEW
+                | SecurityCapabilities::VERIFY_SIGNATURES
+                | SecurityCapabilities::SIGN_NEW
+                | SecurityCapabilities::REMOVE_INVALIDATED_SIGNATURES,
+        }
+    }
+
+    /// Reads inert document and macro signature metadata without executing content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when signature XML cannot be decoded safely.
+    pub fn digital_signatures(&self) -> Result<litchi_odf_common::signature::DigitalSignatures> {
+        self.0.package.package().digital_signatures()
+    }
+
+    /// Verifies document-signature math without making a certificate trust decision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when signature metadata or referenced bytes cannot be verified.
+    pub fn verify_document_signatures(
+        &self,
+    ) -> Result<Vec<litchi_odf_common::signature::SignatureVerification>> {
+        self.0.package.package().verify_document_signatures()
+    }
+
     /// Returns an inert, non-executing active-content inventory.
     #[must_use]
     pub fn active_content(&self) -> ActiveContentStatus {
@@ -426,6 +552,12 @@ impl Snapshot {
     #[must_use]
     pub fn style_definitions(&self) -> &[Style] {
         &self.0.styles
+    }
+
+    /// Returns inert named gradients, hatches, fill images, markers, opacity, and stroke dashes.
+    #[must_use]
+    pub fn style_resources(&self) -> &[StyleResource] {
+        &self.0.style_resources
     }
 
     /// Resolves one group root to its complete flattened nested descendant closure.
@@ -575,10 +707,9 @@ impl Snapshot {
     ///
     /// # Errors
     ///
-    /// Returns an error for invalid selectors, noncompact source XML, unreadable resources, or
-    /// unresolved source dependencies.
+    /// Returns an error for invalid selectors, noncompact referenced fragments, unreadable
+    /// resources, or unresolved source dependencies.
     pub fn prepare_shape_transfer(&self, page: usize, shape: usize) -> Result<ShapeTransfer> {
-        ensure_compact_rewrite_source(self)?;
         let parsed = parse_content(self.content_xml())?;
         let selected_page = parsed.pages.get(page).ok_or_else(|| {
             Error::InvalidFormat("ODG transfer page selector is out of bounds".into())
@@ -594,6 +725,7 @@ impl Snapshot {
             .get(span.clone())
             .ok_or_else(|| Error::InvalidFormat("ODG transfer shape span is invalid".into()))?
             .to_owned();
+        compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
         let dependency_shapes = selected_page
             .shapes()
             .iter()
@@ -630,6 +762,7 @@ impl Snapshot {
         controls.sort_unstable();
         controls.dedup();
         let mut style_definitions = BTreeMap::new();
+        let mut required_style_resources = BTreeSet::new();
         while let Some(style_name) = required_styles.pop() {
             if style_definitions.contains_key(&style_name) {
                 continue;
@@ -639,8 +772,17 @@ impl Snapshot {
                     "ODG transfer source has unresolved style '{style_name}'"
                 ))
             })?;
+            compact_xml::validate(definition.xml.as_bytes()).map_err(Error::from)?;
             if let Some(parent) = style_parent_name(&definition.xml)? {
                 required_styles.push(parent);
+            }
+            for (path, value) in definition.style.properties() {
+                let Some((_owner, attribute_name)) = path.rsplit_once('/') else {
+                    continue;
+                };
+                if let Some(kind) = style_resource_reference_kind(attribute_name) {
+                    required_style_resources.insert((kind, value.clone()));
+                }
             }
             style_definitions.insert(
                 style_name.clone(),
@@ -653,6 +795,22 @@ impl Snapshot {
             );
         }
         let styles = style_definitions.keys().cloned().collect::<Vec<_>>();
+        let mut style_resources = BTreeMap::new();
+        for (kind, value) in required_style_resources {
+            let definition = find_style_resource(self, kind, &value)?.ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "ODG transfer source has unresolved named style resource '{value}'"
+                ))
+            })?;
+            compact_xml::validate(definition.xml.as_bytes()).map_err(Error::from)?;
+            style_resources.insert(
+                (kind, value),
+                TransferStyleResource {
+                    resource: definition.resource,
+                    xml: definition.xml,
+                },
+            );
+        }
         for control in &controls {
             if !self
                 .form_controls()
@@ -666,6 +824,11 @@ impl Snapshot {
         }
         let dependency_xml = std::iter::once(xml.as_str())
             .chain(style_definitions.values().map(|style| style.xml.as_str()))
+            .chain(
+                style_resources
+                    .values()
+                    .map(|resource| resource.xml.as_str()),
+            )
             .collect::<String>();
         let mut resources = Vec::new();
         let mut resource_bytes = 0usize;
@@ -719,9 +882,11 @@ impl Snapshot {
                         .ok_or_else(|| {
                             Error::InvalidFormat("ODG transfer form-control span is missing".into())
                         })?;
+                let control_xml = self.content_xml()[control_span.clone()].to_owned();
+                compact_xml::validate(control_xml.as_bytes()).map_err(Error::from)?;
                 Ok(TransferControl {
                     control: parsed.form_controls[position].clone(),
-                    xml: self.content_xml()[control_span.clone()].to_owned(),
+                    xml: control_xml,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -732,6 +897,7 @@ impl Snapshot {
             layers,
             styles,
             style_definitions: style_definitions.into_values().collect(),
+            style_resources: style_resources.into_values().collect(),
             controls,
             control_definitions,
             resources,
@@ -1653,6 +1819,99 @@ impl Transaction {
         Ok(removed)
     }
 
+    /// Adds or replaces one content-owned named drawing resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid attributes, ambiguous names, external ownership, or limits.
+    pub fn put_style_resource(&mut self, resource: &StyleResource) -> Result<()> {
+        let xml = serialize_style_resource(resource)?;
+        let matches = parse_style_resources(&self.content)?
+            .into_iter()
+            .filter(|definition| {
+                definition.resource.kind() == resource.kind()
+                    && definition.resource.name() == resource.name()
+            })
+            .collect::<Vec<_>>();
+        if matches.len() > 1 {
+            return invalid("ODG named style-resource selector is ambiguous");
+        }
+        let externally_owned = self
+            .source
+            .styles_xml()
+            .map(|styles| declares_style_resource_xml(styles, resource.kind(), resource.name()))
+            .transpose()?
+            .unwrap_or_default();
+        let (content, change) = if let Some(existing) = matches.first() {
+            if existing.resource == *resource {
+                return Ok(());
+            }
+            (
+                replace_xml(&self.content, &existing.span, &xml)?,
+                StructureChange::StyleResourceReplaced {
+                    kind: resource.kind(),
+                    name: resource.name().to_owned(),
+                },
+            )
+        } else {
+            if externally_owned {
+                return Err(Error::Unsupported(
+                    "ODG named resource owned by styles.xml cannot be shadowed".into(),
+                ));
+            }
+            (
+                insert_automatic_style(&self.content, &xml)?,
+                StructureChange::StyleResourceInserted {
+                    kind: resource.kind(),
+                    name: resource.name().to_owned(),
+                },
+            )
+        };
+        self.invalidate_content_splices();
+        self.content = content;
+        parse_style_resources(&self.content)?;
+        self.changes.push(Change::Structure(change));
+        Ok(())
+    }
+
+    /// Removes one content-owned named drawing resource after dependency checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for missing/ambiguous ownership or a live style dependency.
+    pub fn remove_style_resource(
+        &mut self,
+        kind: StyleResourceKind,
+        name: &str,
+    ) -> Result<StyleResource> {
+        let matches = parse_style_resources(&self.content)?
+            .into_iter()
+            .filter(|definition| {
+                definition.resource.kind() == kind && definition.resource.name() == name
+            })
+            .collect::<Vec<_>>();
+        let [existing] = matches.as_slice() else {
+            return invalid("ODG content named style-resource selector is missing or ambiguous");
+        };
+        for reference in style_resource_reference_locals(kind) {
+            if xml_has_attribute(&self.content, DRAW, reference, name)? {
+                return Err(Error::Unsupported(
+                    "ODG named style-resource removal is blocked by a live dependency".into(),
+                ));
+            }
+        }
+        let content = remove_xml(&self.content, &existing.span)?;
+        let removed = existing.resource.clone();
+        self.invalidate_content_splices();
+        self.content = content;
+        self.changes
+            .push(Change::Structure(StructureChange::StyleResourceRemoved {
+                kind,
+                name: name.to_owned(),
+            }));
+        Ok(removed)
+    }
+
     /// Appends an empty structural group to a page.
     ///
     /// # Errors
@@ -1810,6 +2069,74 @@ impl Transaction {
             }
         }
 
+        let mut destination_style_resources = parse_style_resources(&self.content)?;
+        if let Some(styles) = self.source.styles_xml() {
+            destination_style_resources.extend(parse_style_resources(styles)?);
+        }
+        let mut reserved_resource_names = destination_style_resources
+            .iter()
+            .map(|definition| definition.resource.name().to_owned())
+            .collect::<Vec<_>>();
+        let mut style_resource_remaps = BTreeMap::new();
+        for transferred in &transfer.style_resources {
+            let kind = transferred.resource.kind();
+            let source_name = transferred.resource.name();
+            let resource_dependency_remapped = resource_remaps
+                .keys()
+                .any(|href| transfer_xml_references(&transferred.xml, href));
+            let collision = destination_style_resources.iter().find(|definition| {
+                definition.resource.kind() == kind && definition.resource.name() == source_name
+            });
+            let destination_name = if collision.is_some_and(|definition| {
+                definition.xml != transferred.xml || resource_dependency_remapped
+            }) {
+                unique_collision_name(
+                    source_name,
+                    transferred.xml.as_bytes(),
+                    &reserved_resource_names,
+                )
+            } else {
+                source_name.to_owned()
+            };
+            reserved_resource_names.push(destination_name.clone());
+            style_resource_remaps.insert((kind, source_name.to_owned()), destination_name.clone());
+            let already_present = !resource_dependency_remapped
+                && destination_style_resources.iter().any(|definition| {
+                    definition.resource.kind() == kind
+                        && definition.resource.name() == destination_name
+                        && definition.xml == transferred.xml
+                });
+            if already_present {
+                continue;
+            }
+            let mut resource_xml = rewrite_qualified_attribute_values(
+                &transferred.xml,
+                &[b"draw:name"],
+                source_name,
+                &destination_name,
+            )?;
+            for (before, after) in &resource_remaps {
+                resource_xml = rewrite_qualified_attribute_values(
+                    &resource_xml,
+                    &[b"xlink:href"],
+                    before,
+                    after,
+                )?;
+            }
+            resource_xml = ensure_transfer_namespaces(
+                &resource_xml,
+                &[("draw", DRAW), ("svg", SVG), ("xlink", XLINK)],
+            )?;
+            let content = insert_automatic_style(&self.content, &resource_xml)?;
+            self.invalidate_content_splices();
+            self.content = content;
+            self.changes
+                .push(Change::Structure(StructureChange::StyleResourceInserted {
+                    kind,
+                    name: destination_name,
+                }));
+        }
+
         let mut destination_styles = parse_style_definitions(&self.content)?;
         if let Some(styles) = self.source.styles_xml() {
             destination_styles.extend(parse_style_definitions(styles)?);
@@ -1820,11 +2147,31 @@ impl Transaction {
             .collect::<Vec<_>>();
         let mut style_remaps = BTreeMap::new();
         for transferred in &transfer.style_definitions {
+            let mut dependency_probe = transferred.xml.clone();
+            for (before, after) in &resource_remaps {
+                dependency_probe = rewrite_qualified_attribute_values(
+                    &dependency_probe,
+                    &[b"xlink:href"],
+                    before,
+                    after,
+                )?;
+            }
+            for ((kind, before), after) in &style_resource_remaps {
+                dependency_probe = rewrite_qualified_attribute_values(
+                    &dependency_probe,
+                    style_resource_qualified_references(*kind),
+                    before,
+                    after,
+                )?;
+            }
+            let dependency_remapped = dependency_probe != transferred.xml;
             let collision = destination_styles
                 .iter()
                 .find(|definition| definition.style.name() == transferred.name);
             let destination_name = if collision.is_some_and(|definition| {
-                definition.xml != transferred.xml || definition.style.family() != transferred.family
+                definition.xml != transferred.xml
+                    || definition.style.family() != transferred.family
+                    || dependency_remapped
             }) {
                 unique_collision_name(
                     &transferred.name,
@@ -1864,6 +2211,14 @@ impl Transaction {
                     after,
                 )?;
             }
+            for ((kind, before), after) in &style_resource_remaps {
+                style_xml = rewrite_qualified_attribute_values(
+                    &style_xml,
+                    style_resource_qualified_references(*kind),
+                    before,
+                    after,
+                )?;
+            }
             style_xml = ensure_transfer_namespaces(
                 &style_xml,
                 &[("style", STYLE), ("draw", DRAW), ("svg", SVG), ("fo", FO)],
@@ -1880,6 +2235,14 @@ impl Transaction {
             transfer_xml = rewrite_qualified_attribute_values(
                 &transfer_xml,
                 &[b"draw:style-name", b"draw:text-style-name"],
+                before,
+                after,
+            )?;
+        }
+        for ((kind, before), after) in &style_resource_remaps {
+            transfer_xml = rewrite_qualified_attribute_values(
+                &transfer_xml,
+                style_resource_qualified_references(*kind),
                 before,
                 after,
             )?;
@@ -2406,6 +2769,14 @@ impl Transaction {
         }
         enforce_security_policy(&self.source, self.security_policy)?;
         enforce_active_content_policy(&self.source, self.active_content_policy)?;
+        let target_active_content = scan_active_content(&self.content, self.source.styles_xml())?;
+        if self.active_content_policy == ActiveContentWritePolicy::Refuse
+            && target_active_content.is_present()
+        {
+            return Err(Error::Unsupported(
+                "ODG active-content write policy refuses the staged inventory".into(),
+            ));
+        }
         let replacements = self
             .resource_edits
             .iter()
@@ -2825,6 +3196,18 @@ pub enum StructureChange {
     StyleReplaced {
         name: String,
     },
+    StyleResourceInserted {
+        kind: StyleResourceKind,
+        name: String,
+    },
+    StyleResourceRemoved {
+        kind: StyleResourceKind,
+        name: String,
+    },
+    StyleResourceReplaced {
+        kind: StyleResourceKind,
+        name: String,
+    },
 }
 
 /// One package-local resource replacement or removal.
@@ -3181,6 +3564,7 @@ pub struct ShapeTransfer {
     layers: Vec<Layer>,
     styles: Vec<String>,
     style_definitions: Vec<TransferStyle>,
+    style_resources: Vec<TransferStyleResource>,
     controls: Vec<String>,
     control_definitions: Vec<TransferControl>,
     resources: Vec<TransferResource>,
@@ -3209,6 +3593,12 @@ impl ShapeTransfer {
     #[must_use]
     pub fn style_definitions(&self) -> &[TransferStyle] {
         &self.style_definitions
+    }
+
+    /// Exact named gradient/hatch/fill/marker/opacity/dash closure in stable order.
+    #[must_use]
+    pub fn style_resources(&self) -> &[TransferStyleResource] {
+        &self.style_resources
     }
 
     /// Required inert form-control identifiers in stable order.
@@ -3250,6 +3640,21 @@ pub struct TransferStyle {
     family: String,
     parent: Option<String>,
     xml: String,
+}
+
+/// One exact compact named drawing resource retained by a transfer plan.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TransferStyleResource {
+    resource: StyleResource,
+    xml: String,
+}
+
+impl TransferStyleResource {
+    /// Typed inert source resource.
+    #[must_use]
+    pub const fn resource(&self) -> &StyleResource {
+        &self.resource
+    }
 }
 
 impl TransferStyle {
@@ -3623,6 +4028,7 @@ fn apply_durable_patch(
             } else {
                 Snapshot::from_bytes(blob.to_vec())?
             };
+            enforce_active_content_policy(&current, active_content_policy)?;
             continue;
         }
         let mut edit = current.edit_with_policies(security_policy, active_content_policy);
@@ -4727,6 +5133,218 @@ struct ParsedStyleDefinition {
     span: Range<usize>,
 }
 
+#[derive(Clone)]
+struct ParsedStyleResource {
+    resource: StyleResource,
+    xml: String,
+    span: Range<usize>,
+}
+
+struct ActiveStyleResource {
+    depth: usize,
+    start: usize,
+    resource: StyleResource,
+}
+
+fn parse_style_resources(xml: &str) -> Result<Vec<ParsedStyleResource>> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    let mut active = Vec::new();
+    let mut definitions = Vec::new();
+    loop {
+        let start = position(&reader)?;
+        let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG named style-resource XML: {error}"))
+        })?;
+        let namespace = classify(&resolved_namespace);
+        let end = position(&reader)?;
+        match event {
+            Event::Start(element) => {
+                depth = checked_xml_depth(depth)?;
+                if namespace == NamespaceKind::Draw
+                    && let Some(kind) = style_resource_kind(element.local_name().as_ref())
+                {
+                    if definitions.len().saturating_add(active.len()) >= MAX_STYLE_RESOURCES {
+                        return invalid("ODG named style-resource count exceeds the limit");
+                    }
+                    let name = required_attribute(
+                        &reader,
+                        &element,
+                        DRAW,
+                        b"name",
+                        "named style resource",
+                    )?;
+                    let attributes =
+                        arbitrary_attributes(&reader, &element, &[(DRAW, b"name".as_slice())])?;
+                    active.push(ActiveStyleResource {
+                        depth,
+                        start,
+                        resource: StyleResource::parsed(kind, name, attributes),
+                    });
+                }
+            },
+            Event::Empty(element) => {
+                if namespace == NamespaceKind::Draw
+                    && let Some(kind) = style_resource_kind(element.local_name().as_ref())
+                {
+                    if definitions.len().saturating_add(active.len()) >= MAX_STYLE_RESOURCES {
+                        return invalid("ODG named style-resource count exceeds the limit");
+                    }
+                    let name = required_attribute(
+                        &reader,
+                        &element,
+                        DRAW,
+                        b"name",
+                        "named style resource",
+                    )?;
+                    definitions.push(ParsedStyleResource {
+                        resource: StyleResource::parsed(
+                            kind,
+                            name,
+                            arbitrary_attributes(&reader, &element, &[(DRAW, b"name".as_slice())])?,
+                        ),
+                        xml: xml[start..end].to_owned(),
+                        span: start..end,
+                    });
+                }
+            },
+            Event::End(element) => {
+                if namespace == NamespaceKind::Draw
+                    && style_resource_kind(element.local_name().as_ref()).is_some()
+                    && active
+                        .last()
+                        .is_some_and(|resource| resource.depth == depth)
+                {
+                    let completed_resource = active.pop().ok_or_else(|| {
+                        Error::InvalidFormat("ODG named style-resource span is missing".into())
+                    })?;
+                    definitions.push(ParsedStyleResource {
+                        resource: completed_resource.resource,
+                        xml: xml[completed_resource.start..end].to_owned(),
+                        span: completed_resource.start..end,
+                    });
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODG named style-resource depth underflow".into())
+                })?;
+            },
+            Event::DocType(_) => return invalid("DTD XML is prohibited in ODG style resources"),
+            Event::GeneralRef(reference) => {
+                reference_value(&reference)?;
+            },
+            Event::Eof => break,
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+        }
+    }
+    if depth != 0 || !active.is_empty() {
+        return invalid("ODG named style-resource XML is incomplete");
+    }
+    Ok(definitions)
+}
+
+fn style_resource_kind(local: &[u8]) -> Option<StyleResourceKind> {
+    match local {
+        b"gradient" => Some(StyleResourceKind::Gradient),
+        b"hatch" => Some(StyleResourceKind::Hatch),
+        b"fill-image" => Some(StyleResourceKind::FillImage),
+        b"marker" => Some(StyleResourceKind::Marker),
+        b"opacity" => Some(StyleResourceKind::Opacity),
+        b"stroke-dash" => Some(StyleResourceKind::StrokeDash),
+        _ => None,
+    }
+}
+
+fn style_resource_reference_locals(kind: StyleResourceKind) -> &'static [&'static [u8]] {
+    const GRADIENT: &[&[u8]] = &[b"fill-gradient-name"];
+    const HATCH: &[&[u8]] = &[b"fill-hatch-name"];
+    const FILL_IMAGE: &[&[u8]] = &[b"fill-image-name"];
+    const MARKER: &[&[u8]] = &[b"marker-start", b"marker-end"];
+    const OPACITY: &[&[u8]] = &[b"opacity-name"];
+    const STROKE_DASH: &[&[u8]] = &[b"stroke-dash"];
+    match kind {
+        StyleResourceKind::Gradient => GRADIENT,
+        StyleResourceKind::Hatch => HATCH,
+        StyleResourceKind::FillImage => FILL_IMAGE,
+        StyleResourceKind::Marker => MARKER,
+        StyleResourceKind::Opacity => OPACITY,
+        StyleResourceKind::StrokeDash => STROKE_DASH,
+    }
+}
+
+fn style_resource_qualified_references(kind: StyleResourceKind) -> &'static [&'static [u8]] {
+    const GRADIENT: &[&[u8]] = &[b"draw:fill-gradient-name"];
+    const HATCH: &[&[u8]] = &[b"draw:fill-hatch-name"];
+    const FILL_IMAGE: &[&[u8]] = &[b"draw:fill-image-name"];
+    const MARKER: &[&[u8]] = &[b"draw:marker-start", b"draw:marker-end"];
+    const OPACITY: &[&[u8]] = &[b"draw:opacity-name"];
+    const STROKE_DASH: &[&[u8]] = &[b"draw:stroke-dash"];
+    match kind {
+        StyleResourceKind::Gradient => GRADIENT,
+        StyleResourceKind::Hatch => HATCH,
+        StyleResourceKind::FillImage => FILL_IMAGE,
+        StyleResourceKind::Marker => MARKER,
+        StyleResourceKind::Opacity => OPACITY,
+        StyleResourceKind::StrokeDash => STROKE_DASH,
+    }
+}
+
+fn style_resource_reference_kind(attribute: &str) -> Option<StyleResourceKind> {
+    match attribute {
+        "draw:fill-gradient-name" => Some(StyleResourceKind::Gradient),
+        "draw:fill-hatch-name" => Some(StyleResourceKind::Hatch),
+        "draw:fill-image-name" => Some(StyleResourceKind::FillImage),
+        "draw:marker-start" | "draw:marker-end" => Some(StyleResourceKind::Marker),
+        "draw:opacity-name" => Some(StyleResourceKind::Opacity),
+        "draw:stroke-dash" => Some(StyleResourceKind::StrokeDash),
+        _ => None,
+    }
+}
+
+fn declares_style_resource_xml(xml: &str, kind: StyleResourceKind, name: &str) -> Result<bool> {
+    parse_style_resources(xml).map(|definitions| {
+        definitions.iter().any(|definition| {
+            definition.resource.kind() == kind && definition.resource.name() == name
+        })
+    })
+}
+
+fn find_style_resource(
+    snapshot: &Snapshot,
+    kind: StyleResourceKind,
+    name: &str,
+) -> Result<Option<ParsedStyleResource>> {
+    let mut matches = parse_style_resources(snapshot.content_xml())?
+        .into_iter()
+        .filter(|definition| {
+            definition.resource.kind() == kind && definition.resource.name() == name
+        })
+        .collect::<Vec<_>>();
+    if matches.len() > 1 {
+        return invalid("ODG named style-resource definition is ambiguous");
+    }
+    if let Some(definition) = matches.pop() {
+        return Ok(Some(definition));
+    }
+    if let Some(styles) = snapshot.styles_xml() {
+        let mut style_matches = parse_style_resources(styles)?
+            .into_iter()
+            .filter(|definition| {
+                definition.resource.kind() == kind && definition.resource.name() == name
+            })
+            .collect::<Vec<_>>();
+        if style_matches.len() > 1 {
+            return invalid("ODG named style-resource definition is ambiguous");
+        }
+        return Ok(style_matches.pop());
+    }
+    Ok(None)
+}
+
 struct ActiveStyleDefinition {
     depth: usize,
     start: usize,
@@ -5367,6 +5985,10 @@ fn serialize_form_control(control: &FormControl) -> Result<String> {
     push_attribute(&mut xml, "form:name", control.name())?;
     for (name, value) in control.attributes() {
         validate_xml_qualified_name(name, "ODG form-control attribute")?;
+        let prefix = name.split_once(':').map(|(prefix, _local)| prefix);
+        if !matches!(prefix, Some("form" | "xlink")) {
+            return invalid("ODG form-control attribute namespace is unsupported");
+        }
         if matches!(name.as_str(), "form:id" | "form:name") {
             return invalid("ODG form-control arbitrary attributes duplicate identity");
         }
@@ -5418,6 +6040,31 @@ fn serialize_style(style: &Style) -> Result<String> {
     Ok(xml)
 }
 
+fn serialize_style_resource(resource: &StyleResource) -> Result<String> {
+    validate_bounded_value(resource.name(), "ODG named style-resource name")?;
+    let mut xml = format!(
+        "<draw:{} xmlns:draw=\"{}\" xmlns:xlink=\"{}\" xmlns:svg=\"{}\"",
+        resource.kind().element(),
+        std::str::from_utf8(DRAW).unwrap_or_default(),
+        std::str::from_utf8(XLINK).unwrap_or_default(),
+        std::str::from_utf8(SVG).unwrap_or_default(),
+    );
+    push_attribute(&mut xml, "draw:name", Some(resource.name()))?;
+    for (name, value) in resource.attributes() {
+        validate_xml_qualified_name(name, "ODG named style-resource attribute")?;
+        if name == "draw:name" {
+            return invalid("ODG named style-resource attributes duplicate identity");
+        }
+        let prefix = name.split_once(':').map(|(prefix, _local)| prefix);
+        if !matches!(prefix, Some("draw" | "svg" | "xlink")) {
+            return invalid("ODG named style-resource attribute namespace is unsupported");
+        }
+        push_attribute(&mut xml, name, Some(value))?;
+    }
+    xml.push_str("/>");
+    Ok(xml)
+}
+
 fn validate_style_property_owner(value: &str) -> Result<()> {
     let Some((prefix, local)) = value.split_once(':') else {
         return invalid("ODG style property owner requires a qualified name");
@@ -5454,7 +6101,7 @@ fn validate_xml_qualified_name(value: &str, context: &str) -> Result<()> {
     let Some((prefix, local)) = value.split_once(':') else {
         return invalid(format!("{context} requires a qualified name"));
     };
-    if !matches!(prefix, "form" | "xlink") {
+    if !matches!(prefix, "form" | "xlink" | "draw" | "svg") {
         return invalid(format!("{context} uses an unsupported namespace prefix"));
     }
     validate_xml_local_name(local, context)
@@ -5984,6 +6631,24 @@ fn inverse_change(change: &Change) -> Change {
             },
             StructureChange::StyleReplaced { name } => {
                 StructureChange::StyleReplaced { name: name.clone() }
+            },
+            StructureChange::StyleResourceInserted { kind, name } => {
+                StructureChange::StyleResourceRemoved {
+                    kind: *kind,
+                    name: name.clone(),
+                }
+            },
+            StructureChange::StyleResourceRemoved { kind, name } => {
+                StructureChange::StyleResourceInserted {
+                    kind: *kind,
+                    name: name.clone(),
+                }
+            },
+            StructureChange::StyleResourceReplaced { kind, name } => {
+                StructureChange::StyleResourceReplaced {
+                    kind: *kind,
+                    name: name.clone(),
+                }
             },
         }),
     }

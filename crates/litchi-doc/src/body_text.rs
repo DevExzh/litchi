@@ -196,8 +196,8 @@ pub enum DrawingDependency {
     InlinePictureOrObjectPreview,
     /// `0x0008`: floating shape/picture with `PlcfSpa` and drawing-group edges.
     FloatingOfficeArt,
-    /// A picture graph uses sharing, grouping, textboxes, producer extensions,
-    /// noncanonical PICF transforms, or an external/delay-loaded BLIP.
+    /// A picture graph uses noncanonical/reordered sharing, grouping,
+    /// textboxes, producer extensions, PICF transforms, or a delayed BLIP.
     UnsupportedPictureGraph,
     /// The receiver already owns picture/shape identifiers or a BLIP store.
     PictureGraphCollision,
@@ -765,6 +765,10 @@ impl Snapshot {
                 )?;
                 continue;
             }
+            if operation.op == "picture.set" {
+                apply_durable_picture(&mut edit, operation, patch.blobs(), &mut used_blobs)?;
+                continue;
+            }
             let target = parse_durable_target(&operation.target)?;
             match operation.op.as_str() {
                 "text.set" | "body-text.set" => {
@@ -881,14 +885,14 @@ impl Snapshot {
         })
     }
 
-    /// Plans transfer of one canonical singleton inline or floating picture
-    /// graph into a non-empty inert main-story placeholder.
+    /// Plans transfer of one canonical inline or floating picture into a
+    /// non-empty inert main-story placeholder.
     ///
     /// The bounded closure owns the marker CHPX, exact PICF/Data block, and,
-    /// for floating pictures, the singleton `PlcfSpaMom` and `DggInfo` graph.
-    /// Shared BLIP stores, groups, textboxes, producer extensions, delay-loaded
-    /// images, auxiliary stories, and receivers with any existing drawing
-    /// graph are refused explicitly.
+    /// for floating pictures, a re-homed singleton `PlcfSpaMom` and `DggInfo`.
+    /// Multi-picture donors are accepted after their complete shared graph is
+    /// proved canonical. Groups, textboxes, producer extensions, delay-loaded
+    /// images, auxiliary stories, and occupied receivers are refused.
     pub fn plan_picture_transfer_from(
         &self,
         donor: &Self,
@@ -1155,13 +1159,13 @@ impl Edit {
             }));
         }
         let span = resolve_target(&self.editor, target)?;
-        if span.start_cp == span.end_cp || has_structural_content(&span.text) {
-            return Err(Error::Refused(Refusal::StructuralContent));
-        }
         if drawing_dependency(&span.text).is_some() {
             return Err(Error::Refused(Refusal::DrawingDependency {
                 dependency: DrawingDependency::PictureGraphCollision,
             }));
+        }
+        if span.start_cp == span.end_cp || has_structural_content(&span.text) {
+            return Err(Error::Refused(Refusal::StructuralContent));
         }
         if text_revision_intersects(&self.editor, span.start_cp, span.end_cp)? {
             return Err(Error::Refused(Refusal::TrackedText));
@@ -1192,14 +1196,63 @@ impl Edit {
             return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
         }
         let before = PictureSlot::Text(span.text);
-        self.editor
+        let installed = self
+            .editor
             .replace_with_picture_graph(span.start_cp, span.end_cp, &graph)
             .map_err(Error::Invalid)?;
+        if graph.data_offset.is_some() && installed != graph {
+            return Err(Error::Conflict);
+        }
         self.replacement_units = self.replacement_units.saturating_add(actual);
         self.changes.push(Change::Picture {
             target,
             before,
-            after: PictureSlot::Graph(graph),
+            after: PictureSlot::Graph(installed),
+        });
+        Ok(())
+    }
+
+    fn restore_picture_text(
+        &mut self,
+        target: TextTarget,
+        graph: crate::tracked_revision::PictureGraph,
+        replacement: String,
+    ) -> Result<()> {
+        if target_story(target) != Story::Main {
+            return Err(Error::Refused(Refusal::DrawingDependency {
+                dependency: DrawingDependency::AuxiliaryStoryPicture,
+            }));
+        }
+        let span = resolve_target(&self.editor, target)?;
+        let expected_marker = if graph.floating {
+            "\u{0008}"
+        } else {
+            "\u{0001}"
+        };
+        if span.text != expected_marker {
+            return Err(Error::Conflict);
+        }
+        if has_structural_content(&replacement) {
+            return Err(Error::Refused(
+                Refusal::ReplacementContainsStructuralContent,
+            ));
+        }
+        let actual = replacement.encode_utf16().count();
+        self.ensure_replacement_capacity(actual)?;
+        self.ensure_operation_capacity()?;
+        if actual != 1
+            && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
+        {
+            return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
+        }
+        self.editor
+            .replace_picture_graph_with_text(span.start_cp, span.end_cp, &graph, &replacement)
+            .map_err(Error::Invalid)?;
+        self.replacement_units = self.replacement_units.saturating_add(actual);
+        self.changes.push(Change::Picture {
+            target,
+            before: PictureSlot::Graph(graph),
+            after: PictureSlot::Text(replacement),
         });
         Ok(())
     }
@@ -2175,7 +2228,7 @@ pub struct EmbeddedTransferPlan {
     options: crate::embedded_object::WriteOptions,
 }
 
-/// Canonical singleton inline/floating picture closure prepared for one exact
+/// Canonical re-homed inline/floating picture closure prepared for one exact
 /// receiver artifact.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PictureTransferPlan {
@@ -2366,10 +2419,20 @@ fn durable_operation(
                 embedded_options_value(after.as_ref(), blobs)?,
             )
         },
-        Change::Picture { .. } => {
-            return Err(PatchError::InvalidText {
-                field: "picture graph durable operation",
-            });
+        Change::Picture {
+            target,
+            before,
+            after,
+        } => {
+            preconditions.insert(
+                "picture_slot".to_string(),
+                picture_slot_value(before, blobs)?,
+            );
+            (
+                "picture.set".to_string(),
+                durable_target(*target),
+                picture_slot_value(after, blobs)?,
+            )
         },
     };
     PatchOperation::new(limits, op, target, preconditions, value)
@@ -2387,6 +2450,56 @@ fn embedded_options_value(
     let mut value = serde_json::Map::new();
     value.insert("compound_blob".to_string(), compound.into());
     value.insert("preview_blob".to_string(), preview.into());
+    Ok(serde_json::Value::Object(value))
+}
+
+fn picture_slot_value(
+    slot: &PictureSlot,
+    blobs: &mut BlobBundle,
+) -> std::result::Result<serde_json::Value, PatchError> {
+    let mut value = serde_json::Map::new();
+    match slot {
+        PictureSlot::Text(text) => {
+            value.insert("kind".to_string(), "text".into());
+            value.insert("text".to_string(), text.clone().into());
+        },
+        PictureSlot::Graph(graph) => {
+            let formatting = graph
+                .replaced_grpprl
+                .as_deref()
+                .ok_or(PatchError::InvalidText {
+                    field: "picture displaced formatting",
+                })?;
+            let data_offset = graph.data_offset.ok_or(PatchError::InvalidText {
+                field: "picture Data offset",
+            })?;
+            value.insert("kind".to_string(), "graph".into());
+            value.insert("floating".to_string(), graph.floating.into());
+            value.insert(
+                "picture_blob".to_string(),
+                blobs.insert(&graph.picture_block)?.as_hex().into(),
+            );
+            let spa_blob = if let Some(spa) = graph.spa {
+                blobs.insert(spa.to_bytes())?.as_hex().into()
+            } else {
+                serde_json::Value::Null
+            };
+            value.insert("spa_blob".to_string(), spa_blob);
+            value.insert(
+                "dgg_blob".to_string(),
+                if graph.dgg_info.is_empty() {
+                    serde_json::Value::Null
+                } else {
+                    blobs.insert(&graph.dgg_info)?.as_hex().into()
+                },
+            );
+            value.insert(
+                "format_blob".to_string(),
+                blobs.insert(formatting)?.as_hex().into(),
+            );
+            value.insert("data_offset".to_string(), data_offset.into());
+        },
+    }
     Ok(serde_json::Value::Object(value))
 }
 
@@ -2445,17 +2558,111 @@ fn required_blob(
         .get(key)
         .and_then(serde_json::Value::as_str)
         .filter(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
-        .ok_or_else(|| invalid_durable_patch("embedded blob reference is invalid"))?;
+        .ok_or_else(|| invalid_durable_patch("blob reference is invalid"))?;
     let blob_id = blobs
         .ids()
         .find(|candidate| candidate.as_hex() == id)
-        .ok_or_else(|| invalid_durable_patch("embedded blob is missing"))?;
+        .ok_or_else(|| invalid_durable_patch("referenced blob is missing"))?;
     let bytes = blobs
         .get(blob_id)
-        .ok_or_else(|| invalid_durable_patch("embedded blob is missing"))?
+        .ok_or_else(|| invalid_durable_patch("referenced blob is missing"))?
         .to_vec();
     used_blobs.insert(id.to_string());
     Ok(bytes)
+}
+
+fn parse_picture_slot(
+    value: &serde_json::Value,
+    blobs: &BlobBundle,
+    used_blobs: &mut BTreeSet<String>,
+) -> Result<PictureSlot> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| invalid_durable_patch("picture slot is not an object"))?;
+    match object.get("kind").and_then(serde_json::Value::as_str) {
+        Some("text") if object.len() == 2 => object
+            .get("text")
+            .and_then(serde_json::Value::as_str)
+            .map(|text| PictureSlot::Text(text.to_string()))
+            .ok_or_else(|| invalid_durable_patch("picture text slot is invalid")),
+        Some("graph") if object.len() == 7 => {
+            let floating = object
+                .get("floating")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| invalid_durable_patch("picture floating flag is invalid"))?;
+            let picture_block = required_blob(object, "picture_blob", blobs, used_blobs)?;
+            let dgg_info = if object
+                .get("dgg_blob")
+                .is_some_and(serde_json::Value::is_null)
+            {
+                Vec::new()
+            } else {
+                required_blob(object, "dgg_blob", blobs, used_blobs)?
+            };
+            let spa = if object
+                .get("spa_blob")
+                .is_some_and(serde_json::Value::is_null)
+            {
+                None
+            } else {
+                let bytes = required_blob(object, "spa_blob", blobs, used_blobs)?;
+                if bytes.len() != crate::parts::spa::SPA_LEN {
+                    return Err(invalid_durable_patch("picture SPA blob length is invalid"));
+                }
+                let spa = crate::parts::spa::Spa::parse(&bytes)
+                    .map_err(|error| invalid_durable_patch(&error.to_string()))?;
+                if spa.to_bytes().as_slice() != bytes.as_slice() {
+                    return Err(invalid_durable_patch("picture SPA blob is noncanonical"));
+                }
+                Some(spa)
+            };
+            let formatting = required_blob(object, "format_blob", blobs, used_blobs)?;
+            if formatting.len() > 255 {
+                return Err(invalid_durable_patch(
+                    "picture formatting blob exceeds CHPX limit",
+                ));
+            }
+            let replaced_grpprl = Some(formatting);
+            let data_offset = Some(required_u32(object, "data_offset")?);
+            if floating != spa.is_some() || floating == dgg_info.is_empty() {
+                return Err(invalid_durable_patch(
+                    "picture graph SPA/Dgg closure is inconsistent",
+                ));
+            }
+            let graph = crate::tracked_revision::PictureGraph {
+                floating,
+                picture_block,
+                spa,
+                dgg_info,
+                replaced_grpprl,
+                data_offset,
+            };
+            graph
+                .validate_rehomed()
+                .map_err(|error| invalid_durable_patch(&error.to_string()))?;
+            Ok(PictureSlot::Graph(graph))
+        },
+        _ => Err(invalid_durable_patch("picture slot fields are invalid")),
+    }
+}
+
+fn apply_durable_picture(
+    edit: &mut Edit,
+    operation: &PatchOperation,
+    blobs: &BlobBundle,
+    used_blobs: &mut BTreeSet<String>,
+) -> Result<()> {
+    let target = parse_durable_target(&operation.target)?;
+    let expected = parse_picture_slot(
+        operation
+            .preconditions
+            .get("picture_slot")
+            .ok_or_else(|| invalid_durable_patch("picture slot precondition is missing"))?,
+        blobs,
+        used_blobs,
+    )?;
+    let value = parse_picture_slot(&operation.value, blobs, used_blobs)?;
+    set_picture_slot(edit, target, expected, value)
 }
 
 fn optional_bool_value(value: Option<bool>) -> serde_json::Value {
@@ -2783,10 +2990,32 @@ fn apply_change_after(edit: &mut Edit, change: &Change) -> Result<()> {
                 }
                 edit.install_picture(*target, graph.clone())
             },
-            _ => Err(Error::Refused(Refusal::TransferDependency {
-                dependency: "picture removal/replacement",
-            })),
+            (PictureSlot::Graph(graph), PictureSlot::Text(text)) => {
+                edit.restore_picture_text(*target, graph.clone(), text.clone())
+            },
+            _ => Err(invalid_durable_patch("invalid picture slot transition")),
         },
+    }
+}
+
+fn set_picture_slot(
+    edit: &mut Edit,
+    target: TextTarget,
+    expected: PictureSlot,
+    value: PictureSlot,
+) -> Result<()> {
+    match (&expected, &value) {
+        (PictureSlot::Text(text), PictureSlot::Graph(graph)) => {
+            let actual = resolve_target(&edit.editor, target)?;
+            if actual.text != text.as_str() {
+                return Err(Error::Conflict);
+            }
+            edit.install_picture(target, graph.clone())
+        },
+        (PictureSlot::Graph(graph), PictureSlot::Text(text)) => {
+            edit.restore_picture_text(target, graph.clone(), text.clone())
+        },
+        _ => Err(invalid_durable_patch("invalid picture slot transition")),
     }
 }
 
@@ -3399,6 +3628,28 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("picture DOC");
+        output.into_inner()
+    }
+
+    fn formatted_picture_receiver_doc() -> Vec<u8> {
+        let mut writer = Writer::new();
+        writer
+            .add_paragraph_runs(
+                vec![(
+                    "placeholder".to_string(),
+                    CharacterFormatting {
+                        bold: Some(true),
+                        ..CharacterFormatting::default()
+                    },
+                )],
+                ParagraphFormatting::default(),
+            )
+            .expect("formatted placeholder");
+        writer.add_paragraph("other").expect("second paragraph");
+        let mut output = Cursor::new(Vec::new());
+        writer
+            .write_to(&mut output)
+            .expect("formatted receiver DOC");
         output.into_inner()
     }
 
@@ -4137,7 +4388,7 @@ mod tests {
     fn canonical_inline_and_floating_picture_graphs_transfer_and_reopen() {
         for floating in [false, true] {
             let donor = Snapshot::parse(&picture_doc(floating)).expect("picture donor");
-            let receiver = Snapshot::parse(&doc(&["placeholder", "other"])).expect("receiver");
+            let receiver = Snapshot::parse(&formatted_picture_receiver_doc()).expect("receiver");
             let plan = receiver
                 .plan_picture_transfer_from(
                     &donor,
@@ -4173,6 +4424,35 @@ mod tests {
                     .expect("exact picture inverse"),
                 receiver
             );
+            let durable = commit
+                .patch()
+                .to_durable(resource_patch_limits())
+                .expect("picture durable patch");
+            let replay = receiver
+                .apply_durable(&durable)
+                .expect("picture durable replay and reopen");
+            assert_eq!(&replay, commit.snapshot());
+            let durable_restored = replay
+                .apply_durable(&durable.inverse())
+                .expect("picture durable inverse and reopen");
+            assert_eq!(
+                durable_restored.paragraphs(Projection::All).unwrap()[0].text(),
+                "placeholder"
+            );
+            let mut restored_package =
+                crate::Package::from_reader(Cursor::new(durable_restored.finish()))
+                    .expect("durable inverse CFB");
+            assert_eq!(
+                restored_package
+                    .document()
+                    .expect("durable inverse DOC")
+                    .paragraphs()
+                    .expect("durable inverse paragraphs")[0]
+                    .runs()
+                    .expect("durable inverse runs")[0]
+                    .bold(),
+                Some(true)
+            );
 
             let mut right = receiver.edit().expect("disjoint text edit");
             right
@@ -4201,7 +4481,7 @@ mod tests {
     }
 
     #[test]
-    fn picture_transfer_refuses_receiver_graph_collision_and_shared_donor_graph() {
+    fn picture_transfer_refuses_receiver_collision_and_rehomes_multi_picture_graphs() {
         let singleton = Snapshot::parse(&picture_doc(false)).expect("singleton donor");
         let receiver_with_picture =
             Snapshot::parse(&picture_doc(false)).expect("occupied receiver");
@@ -4226,21 +4506,49 @@ mod tests {
             .insert_picture(Picture::new(bytes.clone()).expect("first picture"))
             .expect("first picture run");
         writer
-            .insert_picture(Picture::new(bytes).expect("second picture"))
+            .insert_floating_picture(
+                Picture::new(bytes.clone()).expect("first floating picture"),
+                FloatingPosition::new(100, 200),
+            )
+            .expect("first floating picture run");
+        writer
+            .insert_picture(Picture::new(bytes.clone()).expect("second picture"))
             .expect("second picture run");
+        writer
+            .insert_floating_picture(
+                Picture::new(bytes).expect("second floating picture"),
+                FloatingPosition::new(300, 400),
+            )
+            .expect("second floating picture run");
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("shared donor DOC");
-        let shared = Snapshot::parse(&output.into_inner()).expect("shared donor");
-        let empty = Snapshot::parse(&doc(&["placeholder"])).expect("empty receiver");
-        assert!(matches!(
-            empty.plan_picture_transfer_from(
-                &shared,
-                TextTarget::body_paragraph(Position::new(0)),
-                TextTarget::body_paragraph(Position::new(0)),
-            ),
-            Err(Error::Refused(Refusal::DrawingDependency {
-                dependency: DrawingDependency::UnsupportedPictureGraph
-            }))
-        ));
+        writer
+            .write_to(&mut output)
+            .expect("multi-picture donor DOC");
+        let shared = Snapshot::parse(&output.into_inner()).expect("shared-store donor");
+        for (position, floating) in [(Position::new(2), false), (Position::new(3), true)] {
+            let empty = Snapshot::parse(&doc(&["placeholder"])).expect("empty receiver");
+            let plan = empty
+                .plan_picture_transfer_from(
+                    &shared,
+                    TextTarget::body_paragraph(position),
+                    TextTarget::body_paragraph(Position::new(0)),
+                )
+                .expect("selected graph is safely re-homed from shared donor");
+            assert_eq!(plan.is_floating(), floating);
+            let mut edit = empty.edit().expect("multi-picture transfer edit");
+            edit.apply_picture_transfer(&plan)
+                .expect("re-home selected picture");
+            let commit = edit.commit().expect("re-homed picture fully reopens");
+            let durable = commit
+                .patch()
+                .to_durable(resource_patch_limits())
+                .expect("re-homed picture durable patch");
+            assert_eq!(
+                &empty
+                    .apply_durable(&durable)
+                    .expect("re-homed picture durable replay"),
+                commit.snapshot()
+            );
+        }
     }
 }

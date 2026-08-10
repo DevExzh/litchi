@@ -2,10 +2,11 @@
 //!
 //! Operations resolve against one immutable semantic body. Disjoint UTF-8
 //! spans and paragraph-alignment facets compose in one atomic commit. The
-//! safe closure deliberately excludes body-anchored opaque syntax, tables,
-//! positioned content, and mixed formatting whose dependent ranges cannot be
-//! updated losslessly yet. Header destinations and all bytes outside the
-//! rewritten root-body span remain exact.
+//! exact-body closure deliberately excludes body-anchored opaque syntax,
+//! tables, positioned content, and mixed formatting whose dependent ranges
+//! cannot be updated losslessly yet. Canonical retained-story edits cover
+//! checked table cells, headers/footers, comments, and notes while refusing
+//! unknown destinations and dependent positioned content.
 
 use crate::{Alignment, Document, HeaderFooterType, RtfError, RtfWriter, TableCellPath};
 use bumpalo::Bump;
@@ -364,6 +365,16 @@ enum Operation {
         before: String,
         after: String,
     },
+    AnnotationText {
+        index: usize,
+        before: String,
+        after: String,
+    },
+    NoteText {
+        index: usize,
+        before: String,
+        after: String,
+    },
     RootTransfer {
         vocabulary: &'static str,
         effect: String,
@@ -377,7 +388,9 @@ impl Operation {
         match self {
             Self::Text { after, .. }
             | Self::TableCellText { after, .. }
-            | Self::HeaderFooterText { after, .. } => after.len(),
+            | Self::HeaderFooterText { after, .. }
+            | Self::AnnotationText { after, .. }
+            | Self::NoteText { after, .. } => after.len(),
             Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
             Self::RootTransfer { after, .. } => after.len(),
             Self::Alignment { .. } | Self::Bold { .. } => 0,
@@ -399,6 +412,8 @@ impl Operation {
             Self::InsertParagraph { .. } => vec!["body:structure".to_string()],
             Self::TableCellText { path, .. } => vec![table_cell_effect(path)],
             Self::HeaderFooterText { target, .. } => vec![header_footer_effect(*target)],
+            Self::AnnotationText { index, .. } => vec![annotation_effect(*index)],
+            Self::NoteText { index, .. } => vec![note_effect(*index)],
             Self::RootTransfer { effect, .. } => vec![effect.clone()],
         }
     }
@@ -411,6 +426,8 @@ impl Operation {
             Self::Alignment { .. }
             | Self::TableCellText { .. }
             | Self::HeaderFooterText { .. }
+            | Self::AnnotationText { .. }
+            | Self::NoteText { .. }
             | Self::RootTransfer { .. } => None,
         }
     }
@@ -422,7 +439,11 @@ impl Operation {
     const fn is_destination(&self) -> bool {
         matches!(
             self,
-            Self::TableCellText { .. } | Self::HeaderFooterText { .. } | Self::RootTransfer { .. }
+            Self::TableCellText { .. }
+                | Self::HeaderFooterText { .. }
+                | Self::AnnotationText { .. }
+                | Self::NoteText { .. }
+                | Self::RootTransfer { .. }
         )
     }
 
@@ -821,6 +842,86 @@ impl Edit {
         Ok(self)
     }
 
+    /// Stages replacement of one retained comment body.
+    ///
+    /// The comment's range identity, author metadata, and body anchor are
+    /// preserved. Positioned drawings or fields are refused because replacing
+    /// the complete text could stale their offsets.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid index, dependent story content,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_annotation_text(
+        &mut self,
+        index: usize,
+        input: impl Into<String>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = input.into();
+        let annotation = annotation(&self.source, index)?;
+        if !annotation.shapes.is_empty()
+            || !annotation.shape_groups.is_empty()
+            || !annotation.story_events.is_empty()
+        {
+            return Err(Error::UnsupportedSource(
+                "annotation text has dependent positioned content",
+            ));
+        }
+        let mut candidate = annotation.clone();
+        candidate.text = Cow::Owned(after.clone());
+        candidate.validate()?;
+        let before = annotation.text.to_string();
+        let effect = annotation_effect(index);
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::AnnotationText {
+            index,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
+    /// Stages replacement of one retained footnote or endnote body.
+    ///
+    /// The note kind, reference mark, formatting, and main-story anchor are
+    /// preserved. Positioned drawings or fields are refused because replacing
+    /// the complete text could stale their offsets.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid index, dependent story content,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_note_text(
+        &mut self,
+        index: usize,
+        input: impl Into<String>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = input.into();
+        let note = note(&self.source, index)?;
+        if !note.shapes.is_empty() || !note.shape_groups.is_empty() || !note.story_events.is_empty()
+        {
+            return Err(Error::UnsupportedSource(
+                "note text has dependent positioned content",
+            ));
+        }
+        let mut candidate = note.clone();
+        candidate.content = Cow::Owned(after.clone());
+        candidate.validate()?;
+        let before = note.content.to_string();
+        let effect = note_effect(index);
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::NoteText {
+            index,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
     fn ensure_body_compatible(&self) -> Result<(), Error> {
         if self.operations.iter().any(Operation::is_destination) {
             return Err(Error::BodyDestinationConflict);
@@ -939,7 +1040,10 @@ impl Edit {
                     property_operation = true;
                 },
                 Operation::Text { .. } | Operation::InsertParagraph { .. } => {},
-                Operation::TableCellText { .. } | Operation::HeaderFooterText { .. } => {
+                Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. } => {
                     return Err(Error::BodyDestinationConflict);
                 },
                 Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
@@ -1069,6 +1173,12 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
                 let paragraph = model_header_footer_paragraph_mut(&mut model, *target)?;
                 paragraph.text = Cow::Owned(after.clone());
             },
+            Operation::AnnotationText { index, after, .. } => {
+                model.set_annotation_text(*index, Cow::Owned(after.clone()))?;
+            },
+            Operation::NoteText { index, after, .. } => {
+                model.set_note_content(*index, Cow::Owned(after.clone()))?;
+            },
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::Bold { .. }
@@ -1113,6 +1223,20 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
                 if actual != after {
                     return Err(Error::UnsupportedSource(
                         "header/footer text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::AnnotationText { index, after, .. } => {
+                if annotation(&snapshot, *index)?.text != after.as_str() {
+                    return Err(Error::UnsupportedSource(
+                        "annotation text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::NoteText { index, after, .. } => {
+                if note(&snapshot, *index)?.content != after.as_str() {
+                    return Err(Error::UnsupportedSource(
+                        "note text did not survive RTF validation",
                     ));
                 }
             },
@@ -1216,6 +1340,20 @@ fn header_footer(
         .ok_or(Error::DestinationOutOfRange("header/footer"))
 }
 
+fn annotation(source: &Snapshot, index: usize) -> Result<&crate::Annotation<'_>, Error> {
+    source
+        .annotations()
+        .get(index)
+        .ok_or(Error::DestinationOutOfRange("annotation"))
+}
+
+fn note(source: &Snapshot, index: usize) -> Result<&crate::Note<'_>, Error> {
+    source
+        .notes()
+        .get(index)
+        .ok_or(Error::DestinationOutOfRange("note"))
+}
+
 fn model_header_footer_paragraph_mut<'a>(
     model: &'a mut crate::document::RtfDocument<'static>,
     target: HeaderFooterParagraph,
@@ -1257,6 +1395,14 @@ fn header_footer_effect(target: HeaderFooterParagraph) -> String {
         header_footer_kind_name(target.kind),
         target.paragraph
     )
+}
+
+fn annotation_effect(index: usize) -> String {
+    format!("body:annotation:{index}:text")
+}
+
+fn note_effect(index: usize) -> String {
+    format!("body:note:{index}:text")
 }
 
 const fn header_footer_kind_name(kind: HeaderFooterType) -> &'static str {
@@ -1333,20 +1479,22 @@ fn project_text(
     let mut text_operations = operations
         .iter()
         .enumerate()
-        .filter_map(|(index, operation)| match operation {
+        .filter_map(|(operation_index, operation)| match operation {
             Operation::Text {
                 span,
                 after,
                 before: _,
                 structural: _,
-            } => Some((index, *span, after.as_str(), false)),
+            } => Some((operation_index, *span, after.as_str(), false)),
             Operation::InsertParagraph { span, text, .. } => {
-                Some((index, *span, text.as_str(), true))
+                Some((operation_index, *span, text.as_str(), true))
             },
             Operation::Alignment { .. }
             | Operation::Bold { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -1439,6 +1587,8 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::InsertParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -1482,6 +1632,8 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::InsertParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -1544,6 +1696,8 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::Bold { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -1946,6 +2100,16 @@ enum Change {
         before: String,
         after: String,
     },
+    AnnotationText {
+        index: usize,
+        before: String,
+        after: String,
+    },
+    NoteText {
+        index: usize,
+        before: String,
+        after: String,
+    },
     RootTransfer {
         vocabulary: &'static str,
         effect: String,
@@ -2019,6 +2183,24 @@ impl Change {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::AnnotationText {
+                index,
+                before,
+                after,
+            } => Self::AnnotationText {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::NoteText {
+                index,
+                before,
+                after,
+            } => Self::NoteText {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
             Self::RootTransfer {
                 vocabulary,
                 effect,
@@ -2041,7 +2223,7 @@ fn semantic_changes(
     operations
         .iter()
         .enumerate()
-        .filter_map(|(index, operation)| match operation {
+        .filter_map(|(operation_index, operation)| match operation {
             Operation::Text {
                 span,
                 before,
@@ -2051,7 +2233,7 @@ fn semantic_changes(
                 projected_spans
                     .iter()
                     .find_map(|(projected_index, projected)| {
-                        (*projected_index == index).then_some(Change::Text {
+                        (*projected_index == operation_index).then_some(Change::Text {
                             span: *span,
                             after_span: *projected,
                             before: before.clone(),
@@ -2085,7 +2267,7 @@ fn semantic_changes(
             } => projected_spans
                 .iter()
                 .find_map(|(projected_index, projected)| {
-                    (*projected_index == index).then_some(Change::InsertParagraph {
+                    (*projected_index == operation_index).then_some(Change::InsertParagraph {
                         position: *position,
                         span: *span,
                         after_span: *projected,
@@ -2111,6 +2293,24 @@ fn semantic_changes(
                 before: before.clone(),
                 after: after.clone(),
             }),
+            Operation::AnnotationText {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::AnnotationText {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::NoteText {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::NoteText {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
             Operation::RootTransfer {
                 vocabulary,
                 effect,
@@ -2127,6 +2327,8 @@ fn semantic_changes(
             | Operation::Bold { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
             | Operation::RootTransfer { .. } => None,
         })
         .collect()
@@ -2334,6 +2536,34 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Change::AnnotationText {
+            index,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "annotation-text.replace",
+                annotation_effect(*index),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
+        Change::NoteText {
+            index,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "note-text.replace",
+                note_effect(*index),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
         Change::RootTransfer {
             vocabulary,
             effect,
@@ -2509,6 +2739,40 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("header/footer text value must be a string".to_string())
                 })?;
                 edit.set_header_footer_text(target, replacement)?;
+            },
+            "annotation-text.replace" => {
+                let index = parse_annotation_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing annotation text precondition".to_string())
+                    })?;
+                if annotation(source, index)?.text != expected {
+                    return Err(Error::StalePrecondition("annotation text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("annotation text value must be a string".to_string())
+                })?;
+                edit.set_annotation_text(index, replacement)?;
+            },
+            "note-text.replace" => {
+                let index = parse_note_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing note text precondition".to_string())
+                    })?;
+                if note(source, index)?.content != expected {
+                    return Err(Error::StalePrecondition("note text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("note text value must be a string".to_string())
+                })?;
+                edit.set_note_text(index, replacement)?;
             },
             vocabulary if is_root_transfer_vocabulary(vocabulary) => {
                 let expected_feature = operation
@@ -2704,6 +2968,26 @@ fn parse_header_footer_target(target: &str) -> Result<HeaderFooterParagraph, Err
         ));
     }
     Ok(HeaderFooterParagraph::new(section, kind, paragraph))
+}
+
+fn parse_annotation_target(target: &str) -> Result<usize, Error> {
+    parse_indexed_story_target(target, "annotation")
+}
+
+fn parse_note_target(target: &str) -> Result<usize, Error> {
+    parse_indexed_story_target(target, "note")
+}
+
+fn parse_indexed_story_target(target: &str, owner: &'static str) -> Result<usize, Error> {
+    let mut parts = target.split(':');
+    if parts.next() != Some("body") || parts.next() != Some(owner) {
+        return Err(Error::DurablePatch(format!("invalid {owner} text target")));
+    }
+    let index = parse_target_position(parts.next(), "story position")?;
+    if parts.next() != Some("text") || parts.next().is_some() {
+        return Err(Error::DurablePatch(format!("invalid {owner} text target")));
+    }
+    Ok(index)
 }
 
 fn parse_target_position(value: Option<&str>, name: &'static str) -> Result<usize, Error> {

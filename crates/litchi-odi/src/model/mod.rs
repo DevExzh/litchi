@@ -1,5 +1,6 @@
 //! Immutable semantic values for this document family.
 
+pub mod active;
 pub mod frame;
 pub mod map;
 pub mod resource;

@@ -513,12 +513,13 @@ fn scan(xml: &str) -> Result<Scan> {
                     if forms.len() >= MAX_FORMS {
                         return invalid("too many forms");
                     }
-                    form = Some(forms.len());
+                    let form_index = forms.len();
+                    form = Some(form_index);
                     forms.push(FormLocation {
                         site: Site::Paired { close_start: 0 },
                         controls: Vec::new(),
                     });
-                    form_stack.push(form.unwrap());
+                    form_stack.push(form_index);
                 } else if namespace.as_deref() == Some(FORM) && local == b"grid" {
                     if stack.iter().any(|open| open.control.is_some()) {
                         return invalid("grid controls cannot be nested");
@@ -800,15 +801,28 @@ fn parse_grid_fragment(raw: &str) -> Result<GridControl> {
                 if let Some((kind, start, capture_depth)) = capture {
                     if depth + 1 == capture_depth {
                         let control = GridColumnControl::new(kind, &xml[start..end])?;
-                        column.as_mut().unwrap().add_control(control)?;
+                        column
+                            .as_mut()
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "captured grid control has no column".to_string(),
+                                )
+                            })?
+                            .add_control(control)?;
                         capture = None;
                     }
                 } else if skip_depth == Some(depth + 1) {
                     skip_depth = None;
                 } else if depth == 1 && column.is_some() {
-                    let completed = column.take().unwrap();
+                    let completed = column.take().ok_or_else(|| {
+                        Error::InvalidFormat("missing completed grid column".to_string())
+                    })?;
                     validate_column(&completed)?;
-                    grid.as_mut().unwrap().add_column(completed)?;
+                    grid.as_mut()
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("grid column has no parent grid".to_string())
+                        })?
+                        .add_column(completed)?;
                 }
             },
             Event::Text(ref text) if capture.is_none() && skip_depth.is_none() => {
@@ -1018,7 +1032,9 @@ fn validate_name(label: &str, value: &str) -> Result<()> {
 fn validate_xml_id(value: &str) -> Result<()> {
     validate_name("grid control xml:id", value)?;
     let mut chars = value.chars();
-    let first = chars.next().unwrap();
+    let Some(first) = chars.next() else {
+        return invalid("grid control xml:id cannot be empty");
+    };
     if !(first == '_' || first.is_ascii_alphabetic())
         || !chars.all(|ch| ch == '_' || ch == '-' || ch == '.' || ch.is_ascii_alphanumeric())
     {

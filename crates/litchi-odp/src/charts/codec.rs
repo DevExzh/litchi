@@ -35,6 +35,7 @@ const MAX_DEPTH: usize = 512;
 pub(crate) struct PageSpan {
     pub(crate) index: usize,
     pub(crate) name: Option<String>,
+    pub(crate) start: usize,
     pub(crate) end: usize,
 }
 
@@ -591,6 +592,7 @@ pub(crate) fn locate_pages(xml: &str) -> Result<Vec<PageSpan>> {
         depth: usize,
         index: usize,
         name: Option<String>,
+        start: usize,
     }
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
@@ -643,6 +645,7 @@ pub(crate) fn locate_pages(xml: &str) -> Result<Vec<PageSpan>> {
                     depth,
                     index: pages.len(),
                     name,
+                    start,
                 });
                 depth = checked_depth(depth)?;
             },
@@ -662,6 +665,7 @@ pub(crate) fn locate_pages(xml: &str) -> Result<Vec<PageSpan>> {
                     pages.push(PageSpan {
                         index: page.index,
                         name: page.name,
+                        start: page.start,
                         end: start,
                     });
                 }

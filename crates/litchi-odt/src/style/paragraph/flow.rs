@@ -430,7 +430,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
             Ok(Event::End(_)) => {
                 let d = stack.len();
                 if active.as_ref().is_some_and(|x| x.0 == d) {
-                    let s = active.take().unwrap().1;
+                    let s = active
+                        .take()
+                        .ok_or_else(|| bad("missing active paragraph flow style"))?
+                        .1;
                     total += s.to_xml_fragment()?.len();
                     if out.len() >= MAX_STYLES || total > MAX_TOTAL {
                         return Err(bad("too many paragraph flow styles"));

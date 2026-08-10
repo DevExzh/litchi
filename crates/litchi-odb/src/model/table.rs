@@ -596,6 +596,8 @@ pub struct Table {
     columns: Vec<Column>,
     keys: Vec<Key>,
     indices: Vec<Index>,
+    filter_statement: Option<String>,
+    order_statement: Option<String>,
 }
 
 impl Table {
@@ -626,6 +628,20 @@ impl Table {
         self
     }
 
+    /// Sets the inert filter command for a table presentation.
+    #[must_use]
+    pub fn with_filter_statement(mut self, value: impl Into<String>) -> Self {
+        self.filter_statement = Some(value.into());
+        self
+    }
+
+    /// Sets the inert ordering command for a table presentation.
+    #[must_use]
+    pub fn with_order_statement(mut self, value: impl Into<String>) -> Self {
+        self.order_statement = Some(value.into());
+        self
+    }
+
     pub(crate) fn parsed(name: String, kind: TableKind) -> Self {
         Self {
             name,
@@ -633,6 +649,8 @@ impl Table {
             columns: Vec::new(),
             keys: Vec::new(),
             indices: Vec::new(),
+            filter_statement: None,
+            order_statement: None,
         }
     }
 
@@ -667,6 +685,14 @@ impl Table {
             })?;
         self.indices.push(index);
         Ok(())
+    }
+
+    pub(crate) fn set_filter_statement(&mut self, value: String) -> Result<()> {
+        set_statement(&mut self.filter_statement, value, "filter")
+    }
+
+    pub(crate) fn set_order_statement(&mut self, value: String) -> Result<()> {
+        set_statement(&mut self.order_statement, value, "order")
     }
 
     pub(crate) fn keys_mut(&mut self) -> &mut [Key] {
@@ -706,4 +732,25 @@ impl Table {
     pub fn indices(&self) -> &[Index] {
         &self.indices
     }
+
+    /// Returns the inert filter command, if declared.
+    #[must_use]
+    pub fn filter_statement(&self) -> Option<&str> {
+        self.filter_statement.as_deref()
+    }
+
+    /// Returns the inert ordering command, if declared.
+    #[must_use]
+    pub fn order_statement(&self) -> Option<&str> {
+        self.order_statement.as_deref()
+    }
+}
+
+fn set_statement(target: &mut Option<String>, value: String, kind: &str) -> Result<()> {
+    if target.replace(value).is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "ODB table contains duplicate {kind} statements"
+        )));
+    }
+    Ok(())
 }

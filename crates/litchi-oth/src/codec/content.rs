@@ -205,6 +205,21 @@ pub(crate) fn compact_for_publication(xml: &str) -> Result<String> {
                 }
             },
             Event::Text(text)
+                if text_block_depth > 0
+                    && !preserve_stack.last().copied().unwrap_or(false)
+                    && !text.as_ref().is_empty()
+                    && text.as_ref().iter().all(|byte| *byte == b' ') =>
+            {
+                let count = text.as_ref().len();
+                output.push_str("<text:s");
+                if count > 1 {
+                    output.push_str(" text:c=\"");
+                    output.push_str(&count.to_string());
+                    output.push('"');
+                }
+                output.push_str("/>");
+            },
+            Event::Text(text)
                 if !preserve_stack.last().copied().unwrap_or(false)
                     && text.as_ref().iter().all(u8::is_ascii_whitespace)
                     && text

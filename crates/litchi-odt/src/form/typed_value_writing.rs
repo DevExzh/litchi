@@ -699,12 +699,13 @@ fn scan(xml: &str) -> Result<Scan> {
                     if forms.len() >= MAX_FORMS {
                         return invalid("too many forms");
                     }
-                    form = Some(forms.len());
+                    let form_index = forms.len();
+                    form = Some(form_index);
                     forms.push(FormLocation {
                         site: Site::Paired { close_start: 0 },
                         controls: Vec::new(),
                     });
-                    form_stack.push(form.unwrap());
+                    form_stack.push(form_index);
                 } else if namespace.as_deref() == Some(FORM)
                     && TypedValueControlKind::from_local(&local).is_some()
                 {
@@ -714,11 +715,10 @@ fn scan(xml: &str) -> Result<Scan> {
                     let owner = *form_stack.last().ok_or_else(|| {
                         Error::InvalidFormat("typed-value control has no form owner".to_string())
                     })?;
-                    let parsed = parse_control(
-                        &reader,
-                        element,
-                        TypedValueControlKind::from_local(&local).unwrap(),
-                    )?;
+                    let kind = TypedValueControlKind::from_local(&local).ok_or_else(|| {
+                        Error::InvalidFormat("invalid typed-value control kind".to_string())
+                    })?;
+                    let parsed = parse_control(&reader, element, kind)?;
                     aggregate = aggregate.saturating_add(control_size(&parsed));
                     if aggregate > MAX_AGGREGATE {
                         return invalid("typed-value control strings exceed 16 MiB");
@@ -774,11 +774,10 @@ fn scan(xml: &str) -> Result<Scan> {
                     let owner = *form_stack.last().ok_or_else(|| {
                         Error::InvalidFormat("typed-value control has no form owner".to_string())
                     })?;
-                    let parsed = parse_control(
-                        &reader,
-                        element,
-                        TypedValueControlKind::from_local(&local).unwrap(),
-                    )?;
+                    let kind = TypedValueControlKind::from_local(&local).ok_or_else(|| {
+                        Error::InvalidFormat("invalid typed-value control kind".to_string())
+                    })?;
+                    let parsed = parse_control(&reader, element, kind)?;
                     aggregate = aggregate.saturating_add(control_size(&parsed));
                     if aggregate > MAX_AGGREGATE {
                         return invalid("typed-value control strings exceed 16 MiB");
@@ -1173,7 +1172,9 @@ fn validate_name(label: &str, value: &str) -> Result<()> {
 fn validate_xml_id(value: &str) -> Result<()> {
     validate_name("typed-value control xml:id", value)?;
     let mut chars = value.chars();
-    let first = chars.next().unwrap();
+    let Some(first) = chars.next() else {
+        return invalid("typed-value control xml:id cannot be empty");
+    };
     if !(first == '_' || first.is_ascii_alphabetic())
         || !chars.all(|ch| ch == '_' || ch == '-' || ch == '.' || ch.is_ascii_alphanumeric())
     {

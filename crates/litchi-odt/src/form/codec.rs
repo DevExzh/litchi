@@ -232,7 +232,9 @@ fn parse_part(xml: &str, part: Part, result: &mut Forms, limits: &mut Limits) ->
                         if namespace.as_deref() != Some(OFFICE) || local != "event-listeners" {
                             return Err(err("invalid office:event-listeners end element"));
                         }
-                        let completed = event_listeners.take().expect("active event listeners");
+                        let completed = event_listeners
+                            .take()
+                            .ok_or_else(|| err("missing completed office:event-listeners"))?;
                         result.event_listeners.extend(completed.listeners);
                         depth = depth
                             .checked_sub(1)
@@ -260,7 +262,12 @@ fn parse_part(xml: &str, part: Part, result: &mut Forms, limits: &mut Limits) ->
                     if !builders.is_empty() {
                         return Err(err("unclosed form declaration"));
                     }
-                    result.groups.push(group.take().expect("active group").1);
+                    result.groups.push(
+                        group
+                            .take()
+                            .ok_or_else(|| err("missing completed form group"))?
+                            .1,
+                    );
                 }
                 if scopes.last().is_some_and(|scope| scope.0 == depth) {
                     scopes.pop();

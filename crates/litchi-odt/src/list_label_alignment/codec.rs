@@ -182,7 +182,9 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     level = Some((depth, number, false, false));
                     continue;
                 }
-                if let Some((level_depth, _, properties_seen, alignment_seen)) = level.as_mut() {
+                if let Some((level_depth, level_number, properties_seen, alignment_seen)) =
+                    level.as_mut()
+                {
                     if depth == *level_depth + 1
                         && current.0 == Namespace::Style
                         && current.1 == b"list-level-properties"
@@ -213,12 +215,11 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         }
                         *alignment_seen = true;
                         let alignment = parse_alignment(&reader, version, &element_start)?;
-                        let style = Style::new_in(
-                            list.as_ref().unwrap().2,
-                            list.as_ref().unwrap().1.clone(),
-                            level.as_ref().unwrap().1,
-                            alignment,
-                        )?;
+                        let (_, list_name, kind, _) = list
+                            .as_ref()
+                            .ok_or_else(|| bad("list-level alignment has no parent list"))?;
+                        let style =
+                            Style::new_in(*kind, list_name.clone(), *level_number, alignment)?;
                         total +=
                             style.list_style_name.len() + style.alignment.to_xml_fragment()?.len();
                         if entries.len() >= MAX_ENTRIES || total > MAX_TOTAL {
@@ -238,7 +239,9 @@ pub fn parse(xml: &str) -> Result<Styles> {
             Ok(Event::Empty(element_empty)) => {
                 let current = element(&reader, element_empty.name());
                 let depth = stack.len() + 1;
-                if let Some((level_depth, _, properties_seen, alignment_seen)) = level.as_mut() {
+                if let Some((level_depth, level_number, properties_seen, alignment_seen)) =
+                    level.as_mut()
+                {
                     if depth == *level_depth + 1
                         && current.0 == Namespace::Style
                         && current.1 == b"list-level-properties"
@@ -260,12 +263,11 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         }
                         *alignment_seen = true;
                         let alignment = parse_alignment(&reader, version, &element_empty)?;
-                        let style = Style::new_in(
-                            list.as_ref().unwrap().2,
-                            list.as_ref().unwrap().1.clone(),
-                            level.as_ref().unwrap().1,
-                            alignment,
-                        )?;
+                        let (_, list_name, kind, _) = list
+                            .as_ref()
+                            .ok_or_else(|| bad("list-level alignment has no parent list"))?;
+                        let style =
+                            Style::new_in(*kind, list_name.clone(), *level_number, alignment)?;
                         total +=
                             style.list_style_name.len() + style.alignment.to_xml_fragment()?.len();
                         if entries.len() >= MAX_ENTRIES || total > MAX_TOTAL {

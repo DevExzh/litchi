@@ -204,7 +204,9 @@ pub(super) fn parse_part(xml: &str, part: ContentValidationPart) -> Result<Conte
             match event {
                 Event::Start(ref element) => {
                     write_capture(
-                        capture.as_mut().expect("checked"),
+                        capture
+                            .as_mut()
+                            .ok_or_else(|| make_error("missing validation capture state"))?,
                         Event::Start(element.to_owned()),
                     )?;
                     let local = decode(element.local_name().as_ref(), "element name")?;
@@ -216,12 +218,16 @@ pub(super) fn parse_part(xml: &str, part: ContentValidationPart) -> Result<Conte
                     }
                 },
                 Event::Empty(ref element) => write_capture(
-                    capture.as_mut().expect("checked"),
+                    capture
+                        .as_mut()
+                        .ok_or_else(|| make_error("missing validation capture state"))?,
                     Event::Empty(element.to_owned()),
                 )?,
                 Event::End(ref element) => {
                     write_capture(
-                        capture.as_mut().expect("checked"),
+                        capture
+                            .as_mut()
+                            .ok_or_else(|| make_error("missing validation capture state"))?,
                         Event::End(element.to_owned()),
                     )?;
                     let local = decode(element.local_name().as_ref(), "element name")?;
@@ -237,38 +243,55 @@ pub(super) fn parse_part(xml: &str, part: ContentValidationPart) -> Result<Conte
                 },
                 Event::Text(ref value) => {
                     append_capture_text(
-                        capture.as_mut().expect("checked"),
+                        capture
+                            .as_mut()
+                            .ok_or_else(|| make_error("missing validation capture state"))?,
                         &value.decode().map_err(|error| {
                             make_error(format!("invalid validation paragraph text: {error}"))
                         })?,
                     )?;
                     write_capture(
-                        capture.as_mut().expect("checked"),
+                        capture
+                            .as_mut()
+                            .ok_or_else(|| make_error("missing validation capture state"))?,
                         Event::Text(value.to_owned()),
                     )?;
                 },
                 Event::CData(ref value) => {
                     append_capture_text(
-                        capture.as_mut().expect("checked"),
+                        capture
+                            .as_mut()
+                            .ok_or_else(|| make_error("missing validation capture state"))?,
                         &value.decode().map_err(|error| {
                             make_error(format!("invalid validation paragraph CDATA: {error}"))
                         })?,
                     )?;
                     write_capture(
-                        capture.as_mut().expect("checked"),
+                        capture
+                            .as_mut()
+                            .ok_or_else(|| make_error("missing validation capture state"))?,
                         Event::CData(value.to_owned()),
                     )?;
                 },
                 Event::GeneralRef(ref value) => {
                     let text = resolve_reference(value)?;
-                    append_capture_text(capture.as_mut().expect("checked"), &text)?;
+                    append_capture_text(
+                        capture
+                            .as_mut()
+                            .ok_or_else(|| make_error("missing validation capture state"))?,
+                        &text,
+                    )?;
                     write_capture(
-                        capture.as_mut().expect("checked"),
+                        capture
+                            .as_mut()
+                            .ok_or_else(|| make_error("missing validation capture state"))?,
                         Event::GeneralRef(value.to_owned()),
                     )?;
                 },
                 Event::Comment(ref value) => write_capture(
-                    capture.as_mut().expect("checked"),
+                    capture
+                        .as_mut()
+                        .ok_or_else(|| make_error("missing validation capture state"))?,
                     Event::Comment(value.to_owned()),
                 )?,
                 Event::PI(_) | Event::DocType(_) => {
@@ -279,7 +302,9 @@ pub(super) fn parse_part(xml: &str, part: ContentValidationPart) -> Result<Conte
             }
             if completed {
                 finish_capture(
-                    capture.take().expect("checked"),
+                    capture
+                        .take()
+                        .ok_or_else(|| make_error("missing completed validation capture"))?,
                     message.as_mut(),
                     validation.as_mut(),
                 )?;
@@ -381,7 +406,9 @@ pub(super) fn parse_part(xml: &str, part: ContentValidationPart) -> Result<Conte
                     .as_ref()
                     .is_some_and(|value| value.parent_depth == stack.len())
                 {
-                    let value = message.take().expect("checked");
+                    let value = message
+                        .take()
+                        .ok_or_else(|| make_error("missing completed validation message"))?;
                     assign_message(
                         validation
                             .as_mut()
@@ -393,9 +420,12 @@ pub(super) fn parse_part(xml: &str, part: ContentValidationPart) -> Result<Conte
                     .as_ref()
                     .is_some_and(|value| value.parent_depth == stack.len())
                 {
-                    result
-                        .validations
-                        .push(validation.take().expect("checked").value);
+                    result.validations.push(
+                        validation
+                            .take()
+                            .ok_or_else(|| make_error("missing completed validation"))?
+                            .value,
+                    );
                     if result.validations.len() > MAX_VALIDATIONS {
                         return invalid(format!(
                             "document exceeds {MAX_VALIDATIONS} content validations"
@@ -410,7 +440,12 @@ pub(super) fn parse_part(xml: &str, part: ContentValidationPart) -> Result<Conte
                     .as_ref()
                     .is_some_and(|value| value.parent_depth == stack.len())
                 {
-                    if container.take().expect("checked").count == 0 {
+                    if container
+                        .take()
+                        .ok_or_else(|| make_error("missing completed validation container"))?
+                        .count
+                        == 0
+                    {
                         return invalid(
                             "table:content-validations requires at least one validation",
                         );

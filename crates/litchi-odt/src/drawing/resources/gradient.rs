@@ -639,9 +639,10 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
                     if !is_gradient(frame.namespace, &frame.local) {
                         return invalid("unexpected drawing gradient end element");
                     }
-                    result
-                        .gradients
-                        .push(active.take().expect("active gradient checked").value);
+                    let gradient = active
+                        .take()
+                        .ok_or_else(|| make_error("missing completed gradient"))?;
+                    result.gradients.push(gradient.value);
                 }
             },
             Event::Text(ref text) if active.is_some() => {
@@ -1196,7 +1197,9 @@ fn validate_decimal(value: &str, complete: &str) -> Result<()> {
         return invalid(format!("invalid decimal '{complete}'"));
     }
     let mut parts = value.split('.');
-    let integer = parts.next().expect("split always yields one value");
+    let Some(integer) = parts.next() else {
+        return invalid(format!("invalid decimal '{complete}'"));
+    };
     let fraction = parts.next();
     if parts.next().is_some()
         || !integer.bytes().all(|byte| byte.is_ascii_digit())

@@ -1,6 +1,6 @@
 //! Typed semantic models for generated `OpenDocument` text indexes.
 
-use crate::elements::xml::TEXT_NAMESPACE;
+const TEXT_NAMESPACE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 
 /// The seven generated-index families defined by `OpenDocument` Text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,35 +112,27 @@ impl TextIndex {
 
     pub fn name(&self) -> &str {
         self.root
-            .attribute(
-                Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ASCII namespace")),
-                "name",
-            )
-            .expect("validated index name")
+            .attribute(Some(TEXT_NAMESPACE_STR), "name")
+            .unwrap_or_default()
     }
 
     pub fn protected(&self) -> bool {
         matches!(
-            self.root.attribute(
-                Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ASCII namespace")),
-                "protected"
-            ),
+            self.root.attribute(Some(TEXT_NAMESPACE_STR), "protected"),
             Some("true" | "1")
         )
     }
 
     pub fn source(&self) -> Option<&TextIndexElement> {
         self.root.child_elements().find(|element| {
-            element.namespace_uri()
-                == Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ASCII namespace"))
+            element.namespace_uri() == Some(TEXT_NAMESPACE_STR)
                 && element.local_name().ends_with("-source")
         })
     }
 
     pub fn body(&self) -> Option<&TextIndexElement> {
         self.root.child_elements().find(|element| {
-            element.namespace_uri()
-                == Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ASCII namespace"))
+            element.namespace_uri() == Some(TEXT_NAMESPACE_STR)
                 && element.local_name() == "index-body"
         })
     }

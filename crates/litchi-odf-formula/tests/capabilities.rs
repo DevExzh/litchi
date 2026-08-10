@@ -40,6 +40,13 @@ fn checked_in_libreoffice_mathml_samples_validate() {
         include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/color.mml"),
         include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf103430.mml"),
         include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf103500.mml"),
+        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/hadd.mml"),
+        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/maj.mml"),
+        include_str!(
+            "../../../3rdparty/libreoffice-core/starmath/qa/extras/data/ns-prefix-math.mml"
+        ),
+        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf137008.mml"),
+        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf99556-1.mml"),
     ];
     for sample in samples {
         let root = codec::parse(sample).expect("checked-in MathML fixture");
@@ -139,6 +146,9 @@ fn content_mathml_schema_corpus_has_checked_structure_and_values() {
             r#"<math xmlns="{NS}"><declare><ci>basis</ci><vector><cn>1</cn><cn>0</cn></vector></declare><lambda><bvar><ci>x</ci><degree><cn>2</cn></degree></bvar><domainofapplication><integers/></domainofapplication><apply><power/><ci>x</ci><cn>2</cn></apply></lambda></math>"#
         ),
         format!(
+            r#"<math xmlns="{NS}"><declare><plus/></declare><declare><ci>x</ci><cn>1</cn></declare></math>"#
+        ),
+        format!(
             r#"<math xmlns="{NS}"><piecewise><piece><cn>1</cn><true/></piece><otherwise><cn>0</cn></otherwise></piecewise></math>"#
         ),
         format!(
@@ -183,8 +193,6 @@ fn content_mathml_schema_corpus_has_checked_structure_and_values() {
         ),
         format!(r#"<math xmlns="{NS}"><matrix><matrixrow/><ci>x</ci></matrix></math>"#),
         format!(r#"<math xmlns="{NS}"><matrix><matrixrow><mi>x</mi></matrixrow></matrix></math>"#),
-        format!(r#"<math xmlns="{NS}"><declare><cn>1</cn></declare></math>"#),
-        format!(r#"<math xmlns="{NS}"><declare><ci>x</ci><cn>1</cn></declare></math>"#),
         format!(r#"<math xmlns="{NS}"><ci>x</ci><declare><ci>y</ci></declare></math>"#),
         format!(r#"<math xmlns="{NS}"><declare occurrence="2"><ci>x</ci></declare></math>"#),
         format!(r#"<math xmlns="{NS}"><declare nargs="-1"><ci>x</ci></declare></math>"#),

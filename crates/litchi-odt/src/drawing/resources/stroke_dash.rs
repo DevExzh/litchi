@@ -315,9 +315,10 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "stroke-dash" {
                         return invalid("unexpected drawing stroke-dash end element");
                     }
-                    result
-                        .dashes
-                        .push(active.take().expect("active stroke dash checked").value);
+                    let dash = active
+                        .take()
+                        .ok_or_else(|| make_error("missing completed stroke dash"))?;
+                    result.dashes.push(dash.value);
                 }
             },
             Event::Text(ref text) if active.is_some() => {
