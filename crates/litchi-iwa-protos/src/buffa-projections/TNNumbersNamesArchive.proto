@@ -1,0 +1,29 @@
+// Wire-only Buffa projection derived from these canonical IWA declarations:
+//
+// - `TNArchives.proto`: `TN.SheetArchive.name`, field 1, and the required
+//   `TN.FormBasedSheetArchive.super` inheritance envelope, field 1;
+// - `TSTArchives.proto`: `TST.TableModelArchive.table_id`, field 1, and
+//   `table_name`, field 8.
+//
+// Form-based sheets expose their name only through the required sheet
+// envelope. This projection intentionally contains neither the sheet's
+// drawable repetition nor any table-model metadata beyond the two required
+// names. Pivot-owner data remains outside this read-only closure: it is a
+// changed-write dependency, not a routed name source. Caller-owned IWA bytes
+// remain authoritative.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message NumbersSheetArchive {
+  required string name = 1;
+}
+
+message NumbersFormBasedSheetArchive {
+  required .LitchiIwaProjection.NumbersSheetArchive super = 1;
+}
+
+message NumbersTableModelArchive {
+  required string table_id = 1;
+  required string table_name = 8;
+}

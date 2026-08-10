@@ -997,3 +997,46 @@ patch encoding. ADR 0003's versioned deterministic serialization, semantic
 operations and read/write sets, composition, three-way merge, and bounded
 history remain deferred rather than implied by `inverse` or exact patch
 application.
+
+## 2026-08-10 amendment: focused Numbers names semantic surface
+
+This amendment supersedes direct host rename methods and raw-ID examples. The
+canonical focused vocabulary is
+`litchi_numbers::names::{Edit, Patch, Commit, Diagnostics, Error, InvalidReason,
+LimitKind, Path}`. Root aliases, glob re-exports, and prefixed transaction names
+such as `Name*`, `Names*`, `SheetName*`, and `TableName*` are not part of the
+surface. `Package::{edit_names, apply_names}` are the package entry points;
+existing `Package::document()` projection supplies readback rather than a
+second names getter.
+
+`edit_names()` is infallible and `O(1)`. Consuming
+`Edit::{rename_sheet, rename_table}` methods accept semantic sheet/table
+selectors and exact UTF-8 names; they expose no native object identifier,
+component/member name, generated message, raw field, source bytes, or retained
+artifact accessor. Names must be nonempty and NUL-free. `Path` is a
+content-free checked position path. Errors, diagnostics, patch `Debug`, and
+public patch accessors redact authored names and lower-layer details.
+
+All selectors resolve against the immutable base snapshot, and each selected
+semantic owner may occur only once. Commit validates the simultaneous final
+batch under one workbook-wide sheet namespace and one table namespace per
+owning sheet, so a swap or collision-away batch is valid without introducing
+order-dependent selection. Invalid names, duplicate targets, final-name
+collisions, source ambiguity, selected table locks, rooted volatile
+sheet/table-name dependencies, rooted pivot ownership, limits, verification
+failures, and exact-source patch conflicts remain typed semantic errors.
+
+The focused surface uses Preserve policy. It supports unambiguous canonical
+and alternate legacy flat ownership encodings without promotion; a changed
+physical legacy nested-`Index.zip` source is `UnsupportedSource`, while reads
+and exact no-ops remain exact. Changed publication removes existing root
+previews but preserves `Index`/`ViewState` and unrelated package content. The
+patch is an exact-source reversible process-local value that privately holds
+two full artifacts, not a serialized or durable editing protocol; callers
+publish through the existing bounded package writer.
+
+`NumbersEditor::{rename_sheet, rename_table}`, their direct mutation tests, and
+`examples/rename_numbers_items.rs` are retired without aliases or shims. The
+private `rename_table_in_package` helper remains solely for cross-format Pages
+and Keynote table creation/edit flows. That internal dependency does not
+authorize public raw-ID naming entry points or weaken this deletion gate.

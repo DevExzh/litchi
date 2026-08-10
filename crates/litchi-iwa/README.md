@@ -1101,7 +1101,6 @@ let pivot_categories = numbers.pivot_categories()?;
 // `FormulaExpression::pivot_category` when editing a pivot value formula.
 assert!(pivot_categories.iter().all(|category| category.label.is_some()));
 numbers.resize_table(table.object_id, 30, 10)?;
-numbers.rename_table(table.object_id, "Inventory")?;
 let original_sheet_id = numbers.sheets()?[0].object_id;
 let copied_sheet = numbers.duplicate_sheet(original_sheet_id)?;
 numbers.remove_sheet(copied_sheet.object_id)?;
@@ -1434,9 +1433,54 @@ assert_eq!(
 let restored = commit
     .package()
     .apply_table_lock(&commit.patch().inverse())?;
-assert_eq!(restored.package().source_bytes(), package.source_bytes());
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+### Numbers sheet and table names use the focused package transaction
+
+Sheet and table names are no longer `NumbersEditor` raw-ID operations. Use
+`litchi_numbers::names::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`
+through an immutable `Package`. Both selectors resolve against the original
+snapshot, so a sheet and one of its tables can be renamed atomically without
+re-resolving the table through the new sheet name.
+
+```rust,no_run
+use litchi_numbers::{Package, SheetSelector, TableSelector};
+
+let package = Package::open("input.numbers")?;
+let sheet = SheetSelector::name("Summary");
+let table = TableSelector::name("Revenue");
+let commit = package
+    .edit_names()
+    .rename_sheet(sheet, "Planning")?
+    .rename_table(sheet, table, "Quarterly revenue")?
+    .commit()?;
+
+let restored = commit
+    .package()
+    .apply_names(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Changed batches preserve selected name-owner records, validate the complete
+candidate, and delete the root `preview.jpg`, `preview-micro.jpg`, and
+`preview-web.jpg` members when present. A semantic no-op retains the exact
+source; read-only legacy nested-`Index.zip` input can likewise remain
+preserved, but a changed names transaction returns
+`litchi_numbers::names::Error::UnsupportedSource` rather than normalizing it
+through the migration host. See `litchi-numbers/examples/edit_names.rs` for a
+distinct-output workflow that streams with `Package::write_to` through a
+synchronized sibling temporary file and no-clobber publication.
 
 Existing Keynote title, body, and speaker-notes storage is owned by the focused
 `litchi-keynote` package. Ordinary users must use these APIs rather than the
@@ -1565,8 +1609,7 @@ their last local property is reset. The
 `create_iwork_table_layouts` example creates and verifies all three formats
 from scratch.
 
-Numbers sheet names (including nested form-based sheets), table names, and
-required table-model dimensions are patched at the protobuf wire level.
+Numbers table-model dimensions are patched at the protobuf wire level.
 Unrecognized Apple fields retain their bytes and position, while duplicate
 singular fields fail transactionally. Header rows, header columns, footer rows,
 freeze toggles, and print-time repeating-header toggles expose their native

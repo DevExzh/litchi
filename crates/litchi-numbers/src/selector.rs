@@ -1,6 +1,6 @@
 //! Human-readable and checked positional selectors for Numbers objects.
 
-/// Selects one sheet by its exact visible name or checked zero-based catalog
+/// Selects one sheet by its exact visible name or checked zero-based document
 /// position without allocating for the selector itself.
 #[allow(
     clippy::module_name_repetitions,
@@ -10,7 +10,7 @@
 pub enum SheetSelector<'a> {
     /// Select by the exact name shown by Numbers.
     Name(&'a str),
-    /// Select by zero-based position in the editor's sheet catalog.
+    /// Select by zero-based position in stable document order.
     Index(usize),
 }
 
@@ -40,8 +40,8 @@ impl From<usize> for SheetSelector<'_> {
     }
 }
 
-/// Selects one table by its exact visible name or checked zero-based catalog
-/// position without allocating for the selector itself.
+/// Selects one table by its exact visible name or checked zero-based position
+/// within a sheet without allocating for the selector itself.
 #[allow(
     clippy::module_name_repetitions,
     reason = "The public selector names intentionally identify their selected Numbers object."
@@ -50,7 +50,7 @@ impl From<usize> for SheetSelector<'_> {
 pub enum TableSelector<'a> {
     /// Select by the exact name shown by Numbers.
     Name(&'a str),
-    /// Select by zero-based position in the editor's table catalog.
+    /// Select by zero-based position in stable sheet table order.
     Index(usize),
 }
 
@@ -71,6 +71,12 @@ impl<'a> TableSelector<'a> {
 impl<'a> From<&'a str> for TableSelector<'a> {
     fn from(name: &'a str) -> Self {
         Self::name(name)
+    }
+}
+
+impl From<usize> for TableSelector<'_> {
+    fn from(index: usize) -> Self {
+        Self::index(index)
     }
 }
 
@@ -101,8 +107,10 @@ mod tests {
         let sheet: SheetSelector<'_> = "Summary".into();
         let sheet_index: SheetSelector<'_> = 1.into();
         let table: TableSelector<'_> = "Revenue".into();
+        let table_index: TableSelector<'_> = 2.into();
         assert_eq!(sheet, SheetSelector::Name("Summary"));
         assert_eq!(sheet_index, SheetSelector::Index(1));
         assert_eq!(table, TableSelector::Name("Revenue"));
+        assert_eq!(table_index, TableSelector::Index(2));
     }
 }

@@ -8635,3 +8635,149 @@ history; and a library-owned atomic durable filesystem replacement.
 `write_to` closes raw-source exposure for output but does not flush, sync,
 rename, or make a destination durable. A full sanitizer-backed fuzz campaign
 remains explicit verification work.
+
+## 2026-08-10 amendment: Numbers sheet/table names cutover
+
+Numbers names now migrate as one immutable, final-state batch. The public
+surface is `names::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` plus
+semantic `Path` and `InvalidReason`, reached through infallible
+`Package::edit_names` and exact `Package::apply_names`. `edit_names` is `O(1)`
+and allocates nothing; each consuming `rename_sheet` or `rename_table` resolves
+its selectors against the same immutable base, so later stages never depend on
+an earlier staged spelling. The final batch permits swaps and collision-away
+renames but rejects a repeated target, duplicate sheet name, or duplicate table
+name within one sheet atomically.
+
+No public method/type signature contains a native ID, component/member name,
+archive/IWA/generated/Prost/Buffa/wire type, or raw source slice. The root
+facade is `litchi::numbers::names`; flat aliases and globs are ratcheted out.
+`Package::source_bytes` is crate-private. Exact output uses
+`Package::write_to`, including its partial-sink byte-offset diagnostics; the
+caller owns flush, sync, and durable filesystem publication.
+
+Changed publication proves this rooted graph:
+
+1. `Index/Document.iwa`, object 1, contains one selected TN document whose
+   repeated field-1 references exactly match the rooted sheet sequence;
+2. each reference is nonzero/local, declared exactly once in aggregate
+   metadata and optionally once at matching path `[1]`, and resolves to exactly
+   one `TN.SheetArchive` or `TN.FormBasedSheetArchive` message;
+3. ordinary field 1 or forced form `super` field 1 owns the sheet name;
+4. the selected sheet's drawable reference at `[2]`, or form path `[1, 2]`,
+   resolves to one canonical type-6000 or legacy type-6003 TableInfo;
+5. TableInfo's required local field-2 reference, with matching exact metadata,
+   resolves to one canonical type-6001 or accepted legacy type-6000
+   TableModel; and
+6. TableModel required field 1 supplies identity while required field 8 owns
+   the selected display name.
+
+The changed plan also proves every selected model has exactly one rooted
+TableInfo owner among all rooted sheet drawables. Competing rooted owners,
+ambiguous canonical/legacy messages, external/zero/dangling references,
+metadata contradictions, selected merge/diff state, noncanonical framing, or
+semantic/native name disagreement fail closed. Detached/unselected native
+objects remain opaque and are preserved.
+
+Strict raw preflight precedes and is cross-checked with private Buffa lazy
+projection for sheet, nested FormBasedSheet `super`, and TableModel identity
+plus display name. The values are borrowed rather than allocated. Generated
+provenance is exactly five files/82,641 bytes with aggregate SHA-256
+`944b7637fd6bf0eb895174b1e9229aa9eb9c393e05c666a86dd2843792eefe3e`;
+raw records, not Buffa, remain the mutation and unknown-field authority.
+
+Changed-only safety refuses:
+
+- a table rename whose selected TableInfo lock state is `Locked`;
+- any table rename while any rooted table model has a pivot owner, because the
+  vertical cannot update pivot naming dependencies; and
+- any changed name when a rooted calculation-engine formula owner has nonempty
+  volatile sheet/table-name cells.
+
+A sheet-only rename remains supported when a table is locked. The conservative
+pivot traversal is native Θ(T²), but the transaction overcharges and checks a
+`WireWork` ceiling before any changed-only native scan. All touched operations
+are sorted by component; each component is parsed and rewritten once, so one
+batch publishes all names or none. Full reopen checks final semantic names and
+exact locality.
+
+Changed publication deletes each existing root `preview.jpg`,
+`preview-micro.jpg`, and `preview-web.jpg` entry, reporting zero to three
+deletions separately from touched components. It deliberately preserves
+`Index/ViewState.iwa` and every unrelated package record, object, message,
+metadata field, and unknown byte. A semantic no-op shares the original source,
+keeps previews and ViewState, reports zero work, and bypasses changed-only
+framing/cache/protection/dependency checks, reassembly, and reopen.
+
+The patch privately retains exact source/target artifacts and the resolved
+operation plan. Apply rejects stale/replayed/tampered/cross-artifact state,
+then reopens the stored target and repeats semantic/locality checks; inverse is
+`O(1)` to construct and restores the complete exact source, including previews.
+It remains a process-local patch, not a durable serialized operation log.
+
+Compatibility is explicit:
+
+| Source/model | Read/no-op | Changed batch |
+| --- | --- | --- |
+| canonical Sheet/FormBasedSheet and canonical rooted TableInfo/TableModel | supported, exact | supported |
+| accepted legacy type-6003 TableInfo/type-6000 TableModel | supported, exact | supported when unambiguous |
+| nested legacy physical package | supported, exact | `names::Error::UnsupportedSource` |
+
+The host migration map is:
+
+- `NumbersEditor::rename_sheet(native_id, name)` becomes
+  `package.edit_names().rename_sheet(semantic_selector, name)?.commit()?`;
+- `NumbersEditor::rename_table(native_id, name)` becomes the corresponding
+  semantic sheet/table selector stage; and
+- multiple names should be staged on one edit and committed once, then later
+  work must begin from `commit.package()` or `commit.into_package()`.
+
+The two host methods, their direct mutation/compatibility tests, and
+`litchi-iwa/examples/rename_numbers_items.rs` are deleted rather than shimmed.
+The focused `edit_names` example provides combined selection, inverse checking,
+`write_to`, and synced sibling-temporary/no-clobber output. The private
+`rename_attached_table_in_package` helper remains for Numbers sheet
+duplication, while its `rename_table_in_package` wrapper remains because Pages
+and Keynote attached-table workflows still consume it; no public Numbers
+editor mutation survives.
+
+Final deterministic evidence passes 10/10 focused integration tests, 105/105
+Numbers library tests, the 1/1 umbrella facade test with `--features numbers`,
+89/89 boundary regressions, both live Numbers names/host audits,
+`litchi-numbers --all-targets` checking, `litchi-iwa --lib` checking, and
+strict rustdoc. Host `litchi-iwa --all-targets` is not claimed because
+unrelated examples remain red. The stable fuzz target builds and its
+control-flow smoke ran eight bounded cases with expected
+missing-sanitizer-symbol warnings. This is not sanitizer execution; an ASan
+campaign remains open.
+
+The native writer gate used Apple Numbers 14.4 (7043.0.93). The ordinary,
+unlocked source SHA-256 was
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`;
+the Rust Unicode candidate was
+`22f8bc21223317318ec23ec764b8998af77a2c7800c68cbe88351abdb26b6e56`,
+and public inverse application restored the exact source. Numbers opened it
+without warning/repair/recovery/conversion, showed sheet `Líneas 你好 🧪`, table
+`表 Café №42`, the exact B2 text marker, and B3 numeric value 42. The table was
+selectable/editable and the rename succeeded. Save As, close, and exact-path
+reopen preserved the names/data and produced SHA-256
+`e1803b0568454a345f7962c5b4c72e8cb3d78adb2c87d5db1e6c58288a9413c4`;
+Numbers regenerated all three root previews. Focused equal restaging, no-op
+apply, and inverse over the native artifact were all byte-exact at that hash.
+
+A separate native protection oracle at SHA-256
+`eb2e29c97c415c1b61ed1f8fe766e7211ed386c825c32dec056b72c9398d3e09`
+reported `Locked` and `Locked items cannot be edited` in Numbers accessibility
+state. Its cells were disabled, Unlock was enabled, and invoking Edit table
+title produced no name change. That independently confirms the protection
+state for the focused rule: table rename refuses, sheet-only rename remains
+admissible.
+
+This vertical changes no manifest edge. Ordered debt 015
+(`litchi-iwa -> litchi-numbers`) therefore remains, and the inventory stays 64
+packages, 235 internal dependency declarations, and 14 ordered debts.
+Remaining debt includes the preflight-bounded native Θ(T²) pivot traversal, aggregate
+transaction peak-memory/total-work accounting, complete fallible-allocation
+proof, stable versioned patch serialization with semantic operations,
+read/write sets, composition, merge, and bounded history, and library-owned
+atomic durable filesystem replacement. Patches retain both complete artifacts
+in memory; `write_to` is streaming, not durable publication.

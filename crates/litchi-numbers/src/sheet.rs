@@ -1,5 +1,7 @@
 //! Dependency-free Numbers sheet semantics.
 
+use std::collections::HashSet;
+
 use super::selector::TableSelector;
 use super::table::{Error, InsertError, InsertResult, Table};
 
@@ -42,6 +44,44 @@ impl Sheet {
             index,
             tables: Box::new([]),
         }
+    }
+
+    /// Build one immutable sheet from tables in their native order.
+    ///
+    /// Unlike repeatedly calling [`Builder::push_table`], this validates all
+    /// names through one fallibly allocated index. Native adapters use this
+    /// bulk boundary after decoding a complete sheet, so large valid sheets
+    /// do not repeatedly rescan their already-admitted table names.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::DuplicateTableName`] when two tables have the same
+    /// exact name, or [`Error::Allocation`] when the temporary name index
+    /// cannot be reserved.
+    pub fn try_from_tables(
+        name: impl Into<String>,
+        index: usize,
+        tables: Vec<Table>,
+    ) -> std::result::Result<Self, Error> {
+        let mut names = HashSet::new();
+        names
+            .try_reserve(tables.len())
+            .map_err(|_allocation| Error::Allocation {
+                resource: "sheet table-name index",
+                amount: tables.len(),
+            })?;
+        for table in &tables {
+            if !names.insert(table.name()) {
+                return Err(Error::DuplicateTableName {
+                    name: table.name().to_owned(),
+                });
+            }
+        }
+        Ok(Self {
+            name: name.into().into_boxed_str(),
+            index,
+            tables: tables.into_boxed_slice(),
+        })
     }
 
     /// Creates a mutable builder for a sheet.
@@ -293,5 +333,39 @@ mod tests {
                 .name(),
             "First"
         );
+    }
+
+    #[test]
+    fn bulk_construction_checks_names_once_and_preserves_order() {
+        let first = TableBuilder::new("First", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("first table should be valid: {error}"));
+        let second = TableBuilder::new("Second", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("second table should be valid: {error}"));
+        let sheet = Sheet::try_from_tables("Sheet", 3, vec![first, second])
+            .unwrap_or_else(|error| panic!("bulk sheet should be valid: {error}"));
+        assert_eq!(sheet.index(), 3);
+        assert_eq!(
+            sheet.tables().map(Table::name).collect::<Vec<_>>(),
+            ["First", "Second"]
+        );
+
+        let duplicate = TableBuilder::new("First", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("duplicate table should be valid: {error}"));
+        assert!(matches!(
+            Sheet::try_from_tables(
+                "Sheet",
+                0,
+                vec![
+                    TableBuilder::new("First", Dimensions::new(1, 1))
+                        .finish()
+                        .unwrap_or_else(|error| panic!("first table should be valid: {error}")),
+                    duplicate,
+                ],
+            ),
+            Err(Error::DuplicateTableName { name }) if name == "First"
+        ));
     }
 }

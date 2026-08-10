@@ -19,6 +19,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
@@ -54,6 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         proto_directory,
         buffa_projection_directory,
     )?;
+    enforce_numbers_names_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_info_projection_provenance(proto_directory, buffa_projection_directory)?;
@@ -164,6 +166,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_table_info_projection_budget(&buffa_table_info_out_directory)?;
+
+    // Numbers name reads need only the direct sheet name, the form-sheet
+    // inheritance envelope, and the table model's identity/display strings.
+    // Keep repeated drawable and model metadata outside generated code; the
+    // strict borrowed codec owns all traversal and resource limits.
+    let buffa_numbers_names_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-names");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TNNumbersNamesArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_numbers_names_out_directory)
+        .include_file("iwa_numbers_names_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_numbers_names_projection_budget(&buffa_numbers_names_out_directory)?;
 
     // Keynote's show reader projects only scalar settings, required direct
     // references, and presentation size. The repeated slide tree is routed by
@@ -493,6 +516,81 @@ required .LitchiIwaProjection.TableModelReference table_model = 2;\n\
     {
         return Err(
             "derived Numbers TableInfo projection drifted from TST.TableInfoArchive.super/tableModel, TSD.DrawableArchive.locked, or TSP.Reference.identifier; it may have exceeded its 1 KiB source budget, introduced generated repeated storage, or added production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_numbers_names_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TN_SHEET_NAME: &str = "required string name = 1;";
+    const TN_FORM_SHEET_SUPER: &str = "required .TN.SheetArchive super = 1;";
+    const TST_TABLE_MODEL_FIELDS: [&str; 2] = [
+        "required string table_id = 1;",
+        "required string table_name = 8;",
+    ];
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message NumbersSheetArchive {\n\
+required string name = 1;\n\
+}\n\
+message NumbersFormBasedSheetArchive {\n\
+required .LitchiIwaProjection.NumbersSheetArchive super = 1;\n\
+}\n\
+message NumbersTableModelArchive {\n\
+required string table_id = 1;\n\
+required string table_name = 8;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 5] = [
+        "const SHEET_NAME_FIELD: u32 = 1;",
+        "const FORM_SHEET_SUPER_FIELD: u32 = 1;",
+        "const TABLE_MODEL_ID_FIELD: u32 = 1;",
+        "const TABLE_MODEL_NAME_FIELD: u32 = 8;",
+        "const MAX_RECURSION: u32 = 64;",
+    ];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_numbers_names_generated {",
+        "\"/buffa-numbers-names/iwa_numbers_names_buffa_protos.rs\"",
+    ];
+
+    let numbers = fs::read_to_string(proto_directory.join("TNArchives.proto"))?;
+    let tables = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("TNNumbersNamesArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let codec = fs::read_to_string("src/numbers_names_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if numbers.matches(TN_SHEET_NAME).count() != 1
+        || numbers.matches(TN_FORM_SHEET_SUPER).count() != 1
+        || !TST_TABLE_MODEL_FIELDS
+            .iter()
+            .all(|declaration| tables.matches(declaration).count() == 1)
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| codec.matches(declaration).count() == 1)
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Numbers names projection/codec drifted from TN sheet/form or TST table-model fields, exceeded its 2 KiB source budget, exposed generated code, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
     }
@@ -1202,6 +1300,50 @@ fn enforce_table_info_projection_budget(directory: &Path) -> Result<(), Box<dyn 
     {
         return Err(format!(
             "Numbers TableInfo/lock projection generated {files} files/{bytes} bytes/{generated_repeated_view_mentions} RepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_names_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // Buffa 0.9.1 emits 82,641 bytes for the three singular name shells.
+    // Leave only a narrow generator/formatter allowance so another schema
+    // closure cannot enter this read-only projection unnoticed.
+    const MAX_GENERATED_BYTES: u64 = 84 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut generated_repeated_views = 0usize;
+    let mut generated_lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        generated_repeated_views = generated_repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        generated_lazy_repeated_views = generated_lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || generated_repeated_views != 0
+        || generated_lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "Numbers names projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

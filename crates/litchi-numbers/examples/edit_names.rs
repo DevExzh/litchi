@@ -1,8 +1,4 @@
-//! Lock or unlock one existing Numbers table without exposing native internals.
-//!
-//! Each requested artifact is published independently through a sibling
-//! temporary file without clobbering an existing path. If optional inverse
-//! publication fails after the main output succeeds, the main output remains.
+//! Rename one Numbers sheet and one of its tables in one atomic transaction.
 
 #![allow(
     clippy::print_stdout,
@@ -17,9 +13,9 @@ use std::path::{Path, PathBuf};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 use tempfile::NamedTempFile;
 
-const USAGE: &str = "usage: edit_table_lock <input.numbers> <output.numbers> \\
-                     <index:N|name:NAME> <index:N|name:NAME> <lock|unlock> \\
-                     [--inverse PATH]";
+const USAGE: &str = "usage: edit_names <input.numbers> <output.numbers> \\
+                     <index:N|name:NAME> <index:N|name:NAME> \\
+                     <sheet-name> <table-name> [--inverse PATH]";
 
 enum Selector {
     Index(usize),
@@ -48,7 +44,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let output = PathBuf::from(required_argument(&mut arguments, "missing output path")?);
     let sheet = parse_selector(required_text(&mut arguments, "missing sheet selector")?)?;
     let table = parse_selector(required_text(&mut arguments, "missing table selector")?)?;
-    let operation = required_text(&mut arguments, "missing lock operation")?;
+    let sheet_name = required_text(&mut arguments, "missing replacement sheet name")?;
+    let table_name = required_text(&mut arguments, "missing replacement table name")?;
     let inverse_output = parse_inverse_output(&mut arguments)?;
 
     if input == output {
@@ -64,21 +61,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let package = Package::open(&input)?;
-    let mut edit = package.edit_table_lock(sheet.sheet_selector(), table.table_selector())?;
-    match operation.as_str() {
-        "lock" => {
-            edit.lock();
-        },
-        "unlock" => {
-            edit.unlock();
-        },
-        _ => return Err(invalid_input("lock operation must be lock or unlock")),
-    }
+    let edit = package
+        .edit_names()
+        .rename_sheet(sheet.sheet_selector(), &sheet_name)?
+        .rename_table(sheet.sheet_selector(), table.table_selector(), &table_name)?;
     let commit = edit.commit()?;
 
     let inverse = inverse_output
         .as_ref()
-        .map(|_| commit.package().apply_table_lock(&commit.patch().inverse()))
+        .map(|_| commit.package().apply_names(&commit.patch().inverse()))
         .transpose()?;
     if let Some(restored) = inverse.as_ref() {
         if exact_bytes(restored.package())? != exact_bytes(&package)? {
@@ -94,9 +85,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "table lock: changed={}, touched_components={}",
+        "names: changed={}, renamed_operations={}, touched_components={}, deleted_previews={}",
         commit.diagnostics().changed(),
+        commit.diagnostics().operations(),
         commit.diagnostics().touched_components(),
+        commit.diagnostics().deleted_previews(),
     );
     Ok(())
 }
@@ -114,7 +107,7 @@ fn required_text(
 ) -> Result<String, Box<dyn Error>> {
     required_argument(arguments, message)?
         .into_string()
-        .map_err(|_| invalid_input("selector and operation arguments must be valid UTF-8"))
+        .map_err(|_| invalid_input("selectors and replacement names must be valid UTF-8"))
 }
 
 fn parse_selector(value: String) -> Result<Selector, Box<dyn Error>> {

@@ -179,7 +179,15 @@ fn exercise_transaction(package: &Package, data: &[u8]) {
             .unwrap_or_else(|error| panic!("restored table lock must be readable: {error}")),
         before,
     );
-    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(exact_bytes(restored.package()), exact_bytes(package));
+}
+
+fn exact_bytes(package: &Package) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    package
+        .write_to(&mut bytes)
+        .unwrap_or_else(|error| panic!("writing a package into Vec must succeed: {error}"));
+    bytes
 }
 
 fn exercise_redacted_selector_errors(package: &Package) {

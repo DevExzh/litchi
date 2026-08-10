@@ -1575,6 +1575,572 @@ class BoundaryPolicyTests(unittest.TestCase):
                 boundaries.audit_iwa_numbers_table_lock_source_topology(root), []
             )
 
+    def test_retired_iwa_numbers_names_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_NAMES_METHODS,
+            ("rename_sheet", "rename_table"),
+        )
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_SEMANTIC_WORKBOOK_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor/semantic/workbook.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_NAMES_EXAMPLE,
+            Path("crates/litchi-iwa/examples/rename_numbers_items.rs"),
+        )
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_README,
+            Path("crates/litchi-iwa/README.md"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_NAMES_CANONICAL_TYPES,
+            ("Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_NAMES_OPTIONAL_TYPES,
+            ("Path", "InvalidReason"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_NAMES_FLAT_ALIAS_PREFIXES,
+            ("Name", "Names", "SheetName", "TableName"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_NAMES_SHORT_NAMES,
+            frozenset(
+                {
+                    "Edit",
+                    "Patch",
+                    "Commit",
+                    "Diagnostics",
+                    "Error",
+                    "LimitKind",
+                    "Path",
+                    "InvalidReason",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_NAMES_FLAT_ALIASES,
+            frozenset(
+                prefix + suffix
+                for prefix in ("Name", "Names", "SheetName", "TableName")
+                for suffix in (
+                    "Edit",
+                    "Patch",
+                    "Commit",
+                    "Diagnostics",
+                    "Error",
+                    "LimitKind",
+                    "Path",
+                    "InvalidReason",
+                )
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_NAMES_PHYSICAL_TYPES,
+            frozenset(
+                {
+                    "Archive",
+                    "ComponentCatalog",
+                    "EntryEdit",
+                    "RawMessage",
+                    "Resolved",
+                    "SnappyStream",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_NAMES_WIRE_TYPES,
+            frozenset(
+                {
+                    "WireDescent",
+                    "WireError",
+                    "WireLimits",
+                    "WireResourceLimit",
+                    "WireView",
+                }
+            ),
+        )
+
+    def test_retired_iwa_numbers_names_host_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            nested = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "legacy/names.rs"
+            nested.parent.mkdir(parents=True)
+            nested.write_text(
+                "pub(in crate::numbers) async unsafe fn rename_table() {}\n",
+                encoding="utf-8",
+            )
+            workbook = root / boundaries.IWA_NUMBERS_SEMANTIC_WORKBOOK_SOURCE
+            workbook.parent.mkdir(parents=True, exist_ok=True)
+            workbook.write_text("fn r#rename_sheet() {}\n", encoding="utf-8")
+            example = root / boundaries.RETIRED_IWA_NUMBERS_NAMES_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text("// retired example returned\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_names_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Numbers names method rename_sheet: "
+                        "crates/litchi-iwa/src/numbers/editor/semantic/workbook.rs:1",
+                        "retired litchi-iwa Numbers names method rename_table: "
+                        "crates/litchi-iwa/src/numbers/legacy/names.rs:1",
+                        "retired litchi-iwa Numbers names example returned: "
+                        "crates/litchi-iwa/examples/rename_numbers_items.rs",
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_numbers_names_readme_calls_and_example_references(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_NUMBERS_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "\n".join(
+                    [
+                        "let sheet = numbers",
+                        "    .",
+                        "    r#rename_sheet",
+                        "    (",
+                        "numbers_editor.r#rename_table(",
+                        "crate::numbers::NumbersEditor",
+                        "    ::",
+                        "    rename_sheet(",
+                        "r#NumbersEditor::r#rename_table(",
+                        "Run `rename_numbers_items`.",
+                        "cargo run --example rename_numbers_items.rs",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_names_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Numbers names README call "
+                        "rename_sheet: crates/litchi-iwa/README.md:3",
+                        "retired litchi-iwa Numbers names README call "
+                        "rename_table: crates/litchi-iwa/README.md:5",
+                        "retired litchi-iwa Numbers names README call "
+                        "rename_sheet: crates/litchi-iwa/README.md:8",
+                        "retired litchi-iwa Numbers names README call "
+                        "rename_table: crates/litchi-iwa/README.md:9",
+                        "retired litchi-iwa Numbers names README example reference "
+                        "rename_numbers_items: crates/litchi-iwa/README.md:10",
+                        "retired litchi-iwa Numbers names README example reference "
+                        "rename_numbers_items: crates/litchi-iwa/README.md:11",
+                    ]
+                ),
+            )
+
+    def test_iwa_numbers_names_policy_ignores_trivia_near_names_and_other_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "legacy/names_old.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "\n".join(
+                    [
+                        "// pub fn rename_sheet() {}",
+                        'const NOTE: &str = "fn rename_table() {}";',
+                        "/* fn rename_sheet() {}",
+                        "   /* fn rename_table() {} */",
+                        "   fn rename_sheet() {} */",
+                        'const RAW_NOTE: &str = r###"fn rename_table() {}"###;',
+                        "pub fn rename_sheet_snapshot() {}",
+                        "pub fn rename_tables() {}",
+                        "pub fn legacy_rename_sheet() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_NUMBERS_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "\n".join(
+                    [
+                        "The rename_sheet and rename_table names are retired.",
+                        "Use `rename_sheet` rather than `.rename_sheet`.",
+                        "rename_sheet(",
+                        "rename_table(",
+                        "numbers.rename_sheet_snapshot(",
+                        "numbers_editor.rename_tables(",
+                        "Package::edit_names(",
+                        "package.edit_names(",
+                        "builder.sheet_name(",
+                        "builder.table_name(",
+                        "rename_numbers_item",
+                        "rename_numbers_items_old.rs",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            declarations = "pub fn rename_sheet() {}\npub fn rename_table() {}\n"
+            for relative in (
+                Path("crates/litchi-numbers/src/names.rs"),
+                Path("crates/litchi-iwa/src/pages/editor/tables/semantic.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_tables/semantic.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(declarations, encoding="utf-8")
+            non_rust = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "names.txt"
+            non_rust.write_text(declarations, encoding="utf-8")
+            near_example = (
+                root
+                / boundaries.RETIRED_IWA_NUMBERS_NAMES_EXAMPLE.with_name(
+                    "rename_numbers_items_old.rs"
+                )
+            )
+            near_example.parent.mkdir(parents=True, exist_ok=True)
+            near_example.write_text("// near example\n", encoding="utf-8")
+            for relative in (
+                Path("README.md"),
+                Path("crates/litchi-numbers/README.md"),
+            ):
+                other = root / relative
+                other.parent.mkdir(parents=True, exist_ok=True)
+                other.write_text(
+                    "numbers.rename_sheet(\nrename_numbers_items\n",
+                    encoding="utf-8",
+                )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_names_source_topology(root), []
+            )
+
+    def test_focused_numbers_names_public_api_rejects_physical_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path for path in boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "pub fn names(r#source_bytes: &[u8], r#object_id: u64, "
+                        "archive_name: &str, component_name: &str, member_name: &str, "
+                        "entry_name: &str) -> "
+                        "(DocumentArchive, IWorkPackage, SourceCatalog) {}",
+                        "pub type Edit = buffa::DocumentArchiveView;",
+                        "impl prost::Message for names::Patch {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub type Edit = Archive;",
+                        "pub type Patch = ComponentCatalog;",
+                        "pub type Commit = EntryEdit;",
+                        "pub type Diagnostics = litchi_iwa_core::RawMessage;",
+                        "pub type Error = Resolved;",
+                        "pub type LimitKind = SnappyStream;",
+                        "pub type Path = wire::WireDescent;",
+                        "pub type InvalidReason = wire::WireError;",
+                        "pub type NamesWireLimits = WireLimits;",
+                        "pub type NamesWireResource = WireResourceLimit;",
+                        "pub type NamesWireView = WireView;",
+                        "pub type NamesNative = NativeObject;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub fn edit_names(value: litchi_iwa_protos::GeneratedName) "
+                "-> names::Patch {}\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub fn apply_names(value: prost_types::MessageInfo) "
+                "-> names::Commit {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_names_facade_source_topology(root)
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-numbers names public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "physical package name archive_name",
+                "physical package name component_name",
+                "physical package name member_name",
+                "physical package name entry_name",
+                "archive/IWA type DocumentArchive",
+                "archive/IWA type IWorkPackage",
+                "archive/IWA type SourceCatalog",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type Archive",
+                "archive/IWA type ComponentCatalog",
+                "archive/IWA type EntryEdit",
+                "archive/IWA type litchi_iwa_core",
+                "archive/IWA type RawMessage",
+                "archive/IWA type Resolved",
+                "archive/IWA type SnappyStream",
+                "wire type wire",
+                "wire type WireDescent",
+                "wire type WireError",
+                "wire type WireLimits",
+                "wire type WireResourceLimit",
+                "wire type WireView",
+                "native object NativeObject",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedName",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+            )
+            self.assertEqual(len(violations), 33)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused Numbers names leak: {fragment}",
+                    )
+
+    def test_focused_numbers_names_api_ignores_nested_private_and_other_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path for path in boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            private_aliases = [
+                (
+                    "struct" if index % 2 == 0 else "pub(crate) struct"
+                )
+                + f" {name};"
+                for index, name in enumerate(sorted(boundaries.NUMBERS_NAMES_FLAT_ALIASES))
+            ]
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "// pub type NameEdit = DocumentArchive;",
+                        'const NOTE: &str = "pub struct NamesPatch;";',
+                        "/* pub type SheetNameCommit = buffa::DocumentArchiveView; */",
+                        *[f"pub struct {name};" for name in boundaries.NUMBERS_NAMES_CANONICAL_TYPES],
+                        *[f"pub struct {name};" for name in boundaries.NUMBERS_NAMES_OPTIONAL_TYPES],
+                        "pub struct NamesSnapshot;",
+                        "pub struct NameEditor;",
+                        "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                        "-> SourceBytes { todo!() }",
+                        "pub(crate) fn restricted(archive: DocumentArchive) {}",
+                        *private_aliases,
+                        "impl NameEdit {}",
+                        "impl prost::Message for Unrelated {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub fn edit_names(edit: Edit) -> Result<Commit, Error> { todo!() }\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+            )
+            restricted_roots = "\n".join(
+                (
+                    "use" if index % 2 == 0 else "pub(crate) use"
+                )
+                + f" crate::names::{name};"
+                for index, name in enumerate(sorted(boundaries.NUMBERS_NAMES_SHORT_NAMES))
+            )
+            safe_exports = (
+                "pub mod names;\n"
+                "// pub use crate::names::{Edit, Patch};\n"
+                'const NOTE: &str = "pub use crate::names::*;";\n'
+                "pub fn edit_names(edit: names::Edit) "
+                "-> Result<names::Commit, names::Error> { todo!() }\n"
+                + restricted_roots
+                + "\npub(crate) use crate::names::*;\n"
+                "pub use crate::render::{Edit, Patch, Commit, Diagnostics, Error, "
+                "LimitKind, Path, InvalidReason};\n"
+                "pub use crate::render::*;\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+            )
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            package_export.write_text(
+                safe_exports.replace("pub mod names;\n", "")
+                + "// pub mod names;\n"
+                + 'const MODULE_NOTE: &str = "pub mod names;";\n'
+                + 'const RAW_MODULE_NOTE: &str = r#"pub mod r#names {}"#;\n'
+                + "/* pub mod r#names {} */\n"
+                + "mod names;\n"
+                + "pub(crate) mod r#names;\n"
+                + "pub(super) mod names {}\n"
+                + "pub(in crate) mod names;\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.NUMBERS_SOURCE_ROOT / "table.rs"
+            nonfocused.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(boundaries.NUMBERS_NAMES_FLAT_ALIASES)
+                )
+                + "\npub fn names(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/names.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(boundaries.NUMBERS_NAMES_FLAT_ALIASES)
+                )
+                + "\npub use crate::names::{Edit, Patch, Commit, Diagnostics, Error, "
+                "LimitKind, Path, InvalidReason};\n"
+                "pub fn names(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_facade_source_topology(root), []
+            )
+
+    def test_focused_numbers_names_public_api_rejects_all_flat_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sources = tuple(
+                root / path
+                for path in (
+                    boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+                    + boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+                )
+            )
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            relative_sources = (
+                boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+                + boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+            )
+            for index, name in enumerate(sorted(boundaries.NUMBERS_NAMES_FLAT_ALIASES)):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                if source_index == 0:
+                    declaration = f"pub struct {name};"
+                elif source_index == 1:
+                    declaration = f"pub type {name} = Edit;"
+                elif source_index == 2:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                else:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-numbers names public API retains flat alias "
+                    f"{name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_numbers_names_exports_reject_root_aliases_and_globs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export = (
+                root / path for path in boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            lib_export.write_text(
+                "pub use crate::names::{Edit, Patch as Patch, Path, InvalidReason};\n"
+                "pub type Commit = crate::names::Commit;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::names::{Diagnostics, Error, LimitKind};\n"
+                "pub use crate::names::*;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_facade_source_topology(root),
+                sorted(
+                    [
+                        *[
+                            "focused litchi-numbers names public API retains root "
+                            f"alias {name}: crates/litchi-numbers/src/lib.rs:1"
+                            for name in ("Edit", "Patch", "Path", "InvalidReason")
+                        ],
+                        "focused litchi-numbers names public API retains root alias "
+                        "Commit: crates/litchi-numbers/src/lib.rs:2",
+                        *[
+                            "focused litchi-numbers names public API retains root "
+                            f"alias {name}: crates/litchi-numbers/src/package.rs:1"
+                            for name in ("Diagnostics", "Error", "LimitKind")
+                        ],
+                        "focused litchi-numbers names public API retains root aliases "
+                        "via names glob: crates/litchi-numbers/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_numbers_names_rejects_duplicate_public_package_module(
+        self,
+    ) -> None:
+        for declaration in (
+            "pub mod names;",
+            "pub mod r#names;",
+            "pub mod names {}",
+            "pub\nmod\nr#names\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    package_export = (
+                        root / boundaries.NUMBERS_NAMES_EXPORT_SOURCES[1]
+                    )
+                    package_export.parent.mkdir(parents=True)
+                    package_export.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_names_facade_source_topology(root),
+                        [
+                            "focused litchi-numbers names public API exposes "
+                            "duplicate package::names module: "
+                            "crates/litchi-numbers/src/package.rs:1"
+                        ],
+                    )
+
     def test_retired_iwa_pages_page_layout_method_inventory_is_exact(self) -> None:
         self.assertEqual(
             boundaries.RETIRED_IWA_PAGES_PAGE_LAYOUT_METHODS,

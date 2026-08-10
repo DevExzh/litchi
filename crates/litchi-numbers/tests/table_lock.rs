@@ -41,6 +41,19 @@ const ABSENT_TABLE_NAME: &str = "收入 📊";
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+trait ExactPackageBytes {
+    fn exact_bytes(&self) -> &'static [u8];
+}
+
+impl ExactPackageBytes for Package {
+    fn exact_bytes(&self) -> &'static [u8] {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts every package byte");
+        Box::leak(bytes.into_boxed_slice())
+    }
+}
+
 struct FailsAfter {
     maximum: usize,
     bytes: Vec<u8>,
@@ -653,7 +666,7 @@ fn missing_selectors_are_typed_and_duplicate_names_fail_ingress() -> TestResult 
 fn exact_noops_share_source_bytes_and_preserve_absent_vs_explicit_false() -> TestResult {
     let bytes = synthetic_package()?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let absent_payload = message_payload(&bytes, ABSENT_INFO, TABLE_INFO_MESSAGE_TYPE)?;
     let false_payload = message_payload(&bytes, FALSE_INFO, TABLE_INFO_MESSAGE_TYPE)?;
 
@@ -672,10 +685,10 @@ fn exact_noops_share_source_bytes_and_preserve_absent_vs_explicit_false() -> Tes
         assert!(!commit.diagnostics().changed());
         assert_eq!(commit.diagnostics().touched_components(), 0);
         assert!(!commit.diagnostics().full_reparse_performed());
-        assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+        assert_eq!(commit.package().exact_bytes(), source_snapshot);
         let replay = package.apply_table_lock(commit.patch())?;
         assert!(replay.patch().is_noop());
-        assert_eq!(replay.package().source_bytes().as_ptr(), source_pointer);
+        assert_eq!(replay.package().exact_bytes(), source_snapshot);
     }
 
     let absent = package
@@ -684,14 +697,14 @@ fn exact_noops_share_source_bytes_and_preserve_absent_vs_explicit_false() -> Tes
     assert!(absent.patch().is_noop());
     assert_eq!(
         message_payload(
-            absent.package().source_bytes(),
+            absent.package().exact_bytes(),
             ABSENT_INFO,
             TABLE_INFO_MESSAGE_TYPE
         )?,
         absent_payload
     );
     assert_eq!(
-        message_payload(package.source_bytes(), FALSE_INFO, TABLE_INFO_MESSAGE_TYPE)?,
+        message_payload(package.exact_bytes(), FALSE_INFO, TABLE_INFO_MESSAGE_TYPE)?,
         false_payload
     );
     Ok(())
@@ -701,7 +714,7 @@ fn exact_noops_share_source_bytes_and_preserve_absent_vs_explicit_false() -> Tes
 fn changed_lock_preserves_locality_unknowns_headers_and_exact_inverse() -> TestResult {
     let bytes = synthetic_package()?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let source_payload = message_payload(&bytes, ABSENT_INFO, TABLE_INFO_MESSAGE_TYPE)?;
     let source_before = message_payload(&bytes, ABSENT_INFO, 777)?;
     let source_after = message_payload(&bytes, ABSENT_INFO, 778)?;
@@ -734,21 +747,21 @@ fn changed_lock_preserves_locality_unknowns_headers_and_exact_inverse() -> TestR
         commit.package().table_lock("Other sheet", "Other table")?,
         LockState::Unlocked
     );
-    assert_only_tables_component_changed(&bytes, commit.package().source_bytes())?;
+    assert_only_tables_component_changed(&bytes, commit.package().exact_bytes())?;
     assert_eq!(
-        message_payload(commit.package().source_bytes(), ABSENT_INFO, 777)?,
+        message_payload(commit.package().exact_bytes(), ABSENT_INFO, 777)?,
         source_before
     );
     assert_eq!(
-        message_payload(commit.package().source_bytes(), ABSENT_INFO, 778)?,
+        message_payload(commit.package().exact_bytes(), ABSENT_INFO, 778)?,
         source_after
     );
     assert_eq!(
-        message_payload(commit.package().source_bytes(), NON_TABLE_DRAWABLE, 99_999)?,
+        message_payload(commit.package().exact_bytes(), NON_TABLE_DRAWABLE, 99_999)?,
         source_non_table
     );
     let target_payload = message_payload(
-        commit.package().source_bytes(),
+        commit.package().exact_bytes(),
         ABSENT_INFO,
         TABLE_INFO_MESSAGE_TYPE,
     )?;
@@ -772,25 +785,25 @@ fn changed_lock_preserves_locality_unknowns_headers_and_exact_inverse() -> TestR
     );
     assert_eq!(
         raw_fields(
-            &object_header(commit.package().source_bytes(), ABSENT_INFO)?,
+            &object_header(commit.package().exact_bytes(), ABSENT_INFO)?,
             99
         )?,
         raw_fields(&source_header, 99)?
     );
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.exact_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
 
     let applied = package.apply_table_lock(commit.patch())?;
     assert_eq!(
-        applied.package().source_bytes(),
-        commit.package().source_bytes()
+        applied.package().exact_bytes(),
+        commit.package().exact_bytes()
     );
     let inverse = commit.patch().inverse();
     assert_eq!(inverse.before(), LockState::Locked);
     assert_eq!(inverse.after(), LockState::Unlocked);
     assert_eq!(inverse.inverse(), commit.patch().clone());
     let restored = commit.package().apply_table_lock(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(restored.package().exact_bytes(), bytes);
     Ok(())
 }
 
@@ -812,7 +825,7 @@ fn unlock_method_changes_true_and_inverse_restores_explicit_true() -> TestResult
             .package()
             .apply_table_lock(&commit.patch().inverse())?
             .package()
-            .source_bytes(),
+            .exact_bytes(),
         bytes
     );
     Ok(())
@@ -863,15 +876,15 @@ fn flat_legacy_table_info_edits_preserve_presence_locality_and_exact_inverse() -
             LockState::Locked
         );
         message_payload(
-            changed.package().source_bytes(),
+            changed.package().exact_bytes(),
             identifier,
             LEGACY_TABLE_INFO_MESSAGE_TYPE,
         )?;
-        assert_only_tables_component_changed(&bytes, changed.package().source_bytes())?;
+        assert_only_tables_component_changed(&bytes, changed.package().exact_bytes())?;
         let restored = changed
             .package()
             .apply_table_lock(&changed.patch().inverse())?;
-        assert_eq!(restored.package().source_bytes(), bytes);
+        assert_eq!(restored.package().exact_bytes(), bytes);
     }
 
     let dual = rewrite_component(&base, TABLES_MEMBER, |archive| {
@@ -1017,7 +1030,7 @@ fn malformed_selected_and_rooted_aliases_fail_closed_while_detached_refs_are_pre
     let mut edit = package.edit_table_lock(FIRST_SHEET_NAME, ABSENT_TABLE_NAME)?;
     edit.lock();
     assert!(matches!(edit.commit(), Err(TableLockError::InvalidSource)));
-    assert_eq!(package.source_bytes(), missing_metadata);
+    assert_eq!(package.exact_bytes(), missing_metadata);
 
     let package = Package::from_bytes(&detached_payload_alias)?;
     let semantics = package.sheets().to_vec();
@@ -1033,10 +1046,10 @@ fn malformed_selected_and_rooted_aliases_fail_closed_while_detached_refs_are_pre
     );
     assert_eq!(changed.package().sheets(), semantics.as_slice());
     assert_eq!(
-        component_stream(changed.package().source_bytes(), DOCUMENT_MEMBER)?,
+        component_stream(changed.package().exact_bytes(), DOCUMENT_MEMBER)?,
         document_component
     );
-    assert_eq!(package.source_bytes(), detached_payload_alias);
+    assert_eq!(package.exact_bytes(), detached_payload_alias);
     Ok(())
 }
 
@@ -1061,13 +1074,13 @@ fn rooted_form_based_sheet_nested_reference_path_can_change_and_invert() -> Test
         LockState::Locked
     );
     assert_eq!(
-        component_stream(changed.package().source_bytes(), DOCUMENT_MEMBER)?,
+        component_stream(changed.package().exact_bytes(), DOCUMENT_MEMBER)?,
         component_stream(&bytes, DOCUMENT_MEMBER)?
     );
     let restored = changed
         .package()
         .apply_table_lock(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(restored.package().exact_bytes(), bytes);
     Ok(())
 }
 
@@ -1095,7 +1108,7 @@ fn noncanonical_frames_and_merge_diff_metadata_are_never_normalized() -> TestRes
         let mut edit = package.edit_table_lock(FIRST_SHEET_NAME, ABSENT_TABLE_NAME)?;
         edit.lock();
         assert!(matches!(edit.commit(), Err(TableLockError::InvalidSource)));
-        assert_eq!(package.source_bytes(), adversarial);
+        assert_eq!(package.exact_bytes(), adversarial);
     }
     Ok(())
 }
@@ -1114,7 +1127,7 @@ fn legacy_nested_index_reads_and_noops_but_refuses_changed_publication() -> Test
     noop.unlock();
     let noop = noop.commit()?;
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().source_bytes(), legacy);
+    assert_eq!(noop.package().exact_bytes(), legacy);
 
     let mut changed = package.edit_table_lock(FIRST_SHEET_NAME, ABSENT_TABLE_NAME)?;
     changed.lock();
@@ -1122,7 +1135,7 @@ fn legacy_nested_index_reads_and_noops_but_refuses_changed_publication() -> Test
         changed.commit(),
         Err(TableLockError::UnsupportedSource)
     ));
-    assert_eq!(package.source_bytes(), legacy);
+    assert_eq!(package.exact_bytes(), legacy);
     Ok(())
 }
 
@@ -1136,7 +1149,7 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
         let mut edit = package.edit_table_lock(FIRST_SHEET_NAME, ABSENT_TABLE_NAME)?;
         edit.lock();
         let changed = edit.commit()?;
-        if changed.package().source_bytes().len() > bytes.len() {
+        if changed.package().exact_bytes().len() > bytes.len() {
             growth_fixture = Some(bytes);
             break;
         }
@@ -1156,7 +1169,7 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
         Err(error) => return Err(error.into()),
         Ok(_commit) => return Err(io::Error::other("output limit was not enforced").into()),
     }
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     Ok(())
 }
 
@@ -1164,7 +1177,7 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
 fn public_transactions_are_send_sync_and_concurrent_readers_are_deterministic() -> TestResult {
     let bytes = synthetic_package()?;
     let package = Arc::new(Package::from_bytes(&bytes)?);
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_snapshot = package.exact_bytes();
     let mut handles = Vec::new();
     for index in 0..8 {
         let package = Arc::clone(&package);
@@ -1189,8 +1202,8 @@ fn public_transactions_are_send_sync_and_concurrent_readers_are_deterministic() 
             }
         );
     }
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.exact_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), source_snapshot);
     assert_send_sync(package.as_ref());
     assert_type_send_sync::<TableLockEdit<'static>>();
     assert_type_send_sync::<TableLockCommit>();
@@ -1266,11 +1279,11 @@ fn checked_native_fixture_lock_preserves_semantics_and_has_exact_inverse() -> Te
     assert_eq!(changed.diagnostics().touched_components(), 1);
     assert!(changed.diagnostics().full_reparse_performed());
     assert_eq!(changed.package().sheets(), semantic_before.as_slice());
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     let mut written = Vec::new();
     changed.package().write_to(&mut written)?;
-    assert_eq!(written, changed.package().source_bytes());
-    let fail_after = changed.package().source_bytes().len() / 2;
+    assert_eq!(written, changed.package().exact_bytes());
+    let fail_after = changed.package().exact_bytes().len() / 2;
     let mut failing = FailsAfter {
         maximum: fail_after,
         bytes: Vec::new(),
@@ -1280,17 +1293,14 @@ fn checked_native_fixture_lock_preserves_semantics_and_has_exact_inverse() -> Te
         .write_to(&mut failing)
         .expect_err("injected sink must fail after its checked prefix");
     assert_eq!(write_error.bytes_written(), fail_after);
-    assert_eq!(
-        failing.bytes,
-        changed.package().source_bytes()[..fail_after]
-    );
+    assert_eq!(failing.bytes, changed.package().exact_bytes()[..fail_after]);
     assert_eq!(write_error.io_error().kind(), io::ErrorKind::Other);
     assert_eq!(write_error.into_io_error().kind(), io::ErrorKind::Other);
 
     let restored = changed
         .package()
         .apply_table_lock(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(restored.package().exact_bytes(), bytes);
     assert_eq!(restored.package().sheets(), semantic_before.as_slice());
     Ok(())
 }

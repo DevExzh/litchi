@@ -422,6 +422,29 @@ mod buffa_pages_body_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for Numbers sheet, form, and table names.
+#[doc(hidden)]
+mod buffa_numbers_names_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        clippy::all,
+        clippy::allow_attributes_without_reason,
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        non_snake_case,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated projection is private to this crate."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-names/iwa_numbers_names_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for Keynote slide transitions.
 ///
 /// It contains only the nested transition attributes and slide-node transition
@@ -526,6 +549,11 @@ pub mod pages_page_layout_codec;
 /// private and caller-owned raw bytes stay authoritative.
 #[doc(hidden)]
 pub mod pages_document_settings_codec;
+
+/// Internal strict Numbers names projection. Generated types remain private
+/// and all decoded names borrow caller-owned source bytes.
+#[doc(hidden)]
+pub mod numbers_names_codec;
 
 /// Internal Keynote slide-transition projection implemented by a private
 /// Buffa lazy-view sidecar. Generated types remain inaccessible downstream.

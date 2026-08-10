@@ -193,6 +193,87 @@ KEYNOTE_SHOW_OWNER_PATH = re.compile(
     r"[ \t\r\n]*::"
 )
 IWA_NUMBERS_SOURCE_ROOT = Path("crates/litchi-iwa/src/numbers")
+IWA_NUMBERS_SEMANTIC_WORKBOOK_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "workbook.rs"
+)
+RETIRED_IWA_NUMBERS_NAMES_METHODS = ("rename_sheet", "rename_table")
+RETIRED_IWA_NUMBERS_NAMES_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_NAMES_METHODS
+)
+RETIRED_IWA_NUMBERS_NAMES_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/rename_numbers_items.rs"
+)
+IWA_NUMBERS_README = Path("crates/litchi-iwa/README.md")
+NUMBERS_NAMES_IMPLEMENTATION_SOURCES = (
+    Path("crates/litchi-numbers/src/names.rs"),
+    Path("crates/litchi-numbers/src/package/names.rs"),
+)
+NUMBERS_NAMES_EXPORT_SOURCES = (
+    Path("crates/litchi-numbers/src/lib.rs"),
+    Path("crates/litchi-numbers/src/package.rs"),
+)
+NUMBERS_NAMES_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+NUMBERS_NAMES_OPTIONAL_TYPES = ("Path", "InvalidReason")
+NUMBERS_NAMES_SHORT_NAMES = frozenset(
+    NUMBERS_NAMES_CANONICAL_TYPES + NUMBERS_NAMES_OPTIONAL_TYPES
+)
+NUMBERS_NAMES_FLAT_ALIAS_PREFIXES = (
+    "Name",
+    "Names",
+    "SheetName",
+    "TableName",
+)
+NUMBERS_NAMES_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in NUMBERS_NAMES_FLAT_ALIAS_PREFIXES
+    for suffix in NUMBERS_NAMES_SHORT_NAMES
+)
+IWA_NUMBERS_README_NAMES_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:numbers|numbers_editor)"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>rename_sheet|rename_table)\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])"
+        r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+        r"(?:r#)?NumbersEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?(?P<method>rename_sheet|rename_table)\b"
+        r"[ \t\r\n]*\("
+    ),
+)
+IWA_NUMBERS_README_NAMES_EXAMPLE = re.compile(
+    r"(?<![A-Za-z0-9_])(?P<example>rename_numbers_items)(?:\.rs)?"
+    r"(?![A-Za-z0-9_])"
+)
+NUMBERS_NAMES_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?names[ \t\r\n]*::"
+)
+PUBLIC_NUMBERS_PACKAGE_NAMES_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?names\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_NAMES_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ComponentCatalog",
+        "EntryEdit",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+    }
+)
+NUMBERS_NAMES_WIRE_TYPES = frozenset(
+    {"WireDescent", "WireError", "WireLimits", "WireResourceLimit", "WireView"}
+)
 IWA_TABLE_LOCK_SOURCE = Path("crates/litchi-iwa/src/table_lock.rs")
 IWA_NUMBERS_TABLE_INFO_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "model.rs"
@@ -1419,6 +1500,50 @@ def _iwork_public_leak(identifier: str) -> str | None:
     return None
 
 
+def _numbers_names_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in the Numbers names API."""
+
+    if identifier in NUMBERS_NAMES_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in NUMBERS_NAMES_WIRE_TYPES:
+        return "wire type"
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _numbers_names_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return NUMBERS_NAMES_OWNER_PATH.search(declaration) is not None or any(
+        identifier in {"apply_names", "edit_names"} for identifier in identifiers
+    )
+
+
+def _is_numbers_names_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(identifiers & NUMBERS_NAMES_FLAT_ALIASES) or (
+        _numbers_names_owner_declaration(declaration)
+    )
+
+
 def _is_numbers_table_lock_public_declaration(
     declaration: str, *, dedicated_source: bool
 ) -> bool:
@@ -1653,6 +1778,163 @@ def audit_keynote_show_settings_facade_source_topology(
                 )
                 violations.append(
                     "focused litchi-keynote show-settings public API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_names_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep retired Numbers naming mutations and examples out of the host."""
+
+    violations: list[str] = []
+    example_path = root / RETIRED_IWA_NUMBERS_NAMES_EXAMPLE
+    if example_path.exists():
+        violations.append(
+            "retired litchi-iwa Numbers names example returned: "
+            + str(RETIRED_IWA_NUMBERS_NAMES_EXAMPLE)
+        )
+
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_NUMBERS_NAMES_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Numbers names method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    readme_path = root / IWA_NUMBERS_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_NUMBERS_README_NAMES_CALLS:
+            for match in pattern.finditer(source):
+                method_offset = match.start("method")
+                line_number = source.count("\n", 0, method_offset) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers names README call "
+                    f"{match.group('method')}: {IWA_NUMBERS_README}:{line_number}"
+                )
+        for match in IWA_NUMBERS_README_NAMES_EXAMPLE.finditer(source):
+            line_number = source.count("\n", 0, match.start("example")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers names README example reference "
+                f"{match.group('example')}: {IWA_NUMBERS_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_names_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Enforce the nested, archive-free Numbers names transaction API."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    export_sources = {
+        root / path
+        for path in NUMBERS_NAMES_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+    package_export = root / NUMBERS_SOURCE_ROOT / "package.rs"
+    if package_export.is_file():
+        package_source = _mask_rust_non_code(
+            package_export.read_text(encoding="utf-8")
+        )
+        for match in PUBLIC_NUMBERS_PACKAGE_NAMES_MODULE.finditer(package_source):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers names public API exposes duplicate "
+                "package::names module: "
+                f"{package_export.relative_to(root)}:{line_number}"
+            )
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_numbers_names_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            owner_declaration = _numbers_names_owner_declaration(declaration)
+            declaration_identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and declaration_identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-numbers names public API retains "
+                    "root aliases via names glob: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in NUMBERS_NAMES_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-numbers names public API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and owner_declaration
+                    and declaration_identifiers[:2]
+                    in (["pub", "type"], ["pub", "use"])
+                    and identifier in NUMBERS_NAMES_SHORT_NAMES
+                ):
+                    violations.append(
+                        "focused litchi-numbers names public API "
+                        f"retains root alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_names_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-numbers names public API exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-numbers names public API exposes "
                     f"raw byte slice {byte_slice}: "
                     f"{path.relative_to(root)}:{byte_slice_line}"
                 )
@@ -2245,6 +2527,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_source_topology()
         + audit_iwa_keynote_show_settings_source_topology()
         + audit_keynote_show_settings_facade_source_topology()
+        + audit_iwa_numbers_names_source_topology()
+        + audit_numbers_names_facade_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
         + audit_iwa_pages_page_layout_source_topology()

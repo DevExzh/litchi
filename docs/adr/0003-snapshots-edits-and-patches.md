@@ -258,3 +258,48 @@ operations, while equality and exact-artifact authorization can read
 It does not yet satisfy ADR 0003's versioned format-independent semantic
 operation model, read/write sets, deterministic JSON/blob serialization,
 composition, three-way merge, or bounded history.
+
+## 2026-08-10 amendment: combined Numbers sheet/table name transactions
+
+This amendment supersedes the host's separate immediate sheet- and table-name
+mutations. `Package::edit_names()` opens one infallible `O(1)` batch against an
+immutable base snapshot. Consuming `names::Edit::{rename_sheet, rename_table}`
+calls resolve exact-name or checked-position selectors against that base, not
+against names staged earlier in the batch, and reject a repeated semantic
+target. `commit` validates one simultaneous final namespace: sheet names are
+unique across the workbook and table names are unique within their owning
+sheet. Consequently swaps and names vacated by the same batch are valid, while
+an unresolved final collision fails atomically without sequential retargeting.
+
+An empty batch or a batch whose selected names all remain equal is an exact
+no-op. It shares the source allocation and skips changed-only ownership,
+dependency, lock, cache-deletion, reassembly, and reopen work. A changed batch
+must prove the rooted Sheet or FormBasedSheet owner and each affected
+TableInfo/TableModel chain. It refuses a selected locked table, a rooted
+nonempty volatile sheet/table-name dependency, and any rooted pivot owner for
+an affected table. Publication rewrites each distinct touched component once,
+removes the zero to three root preview members that exist, then performs a
+retained-limit full reopen and semantic/locality verification. `Index` and
+`ViewState` caches, unrelated entries, objects, messages, and the immutable
+source remain exact.
+
+`names::Patch` is an exact-source-checked, reversible, process-local value. It
+privately retains two complete package artifacts plus its semantic/native plan;
+the public value exposes content-free operation and diagnostic counts, no
+authored names or source bytes. Exact package equality and semantic-before
+checks, not a diagnostic fingerprint, authorize application. A valid inverse
+restores the accepted source artifact byte for byte, including deleted
+previews. This is deliberately not a compact or durable patch: ADR 0003's
+versioned format-independent operation encoding, read/write sets,
+deterministic JSON/blob serialization, composition, three-way merge, bounded
+history, and durable/atomic file publication remain deferred.
+
+Preserve mode accepts unambiguous canonical and alternate legacy flat message
+encodings in place. A physical legacy nested-`Index.zip` source remains
+readable and supports an exact no-op, but a changed batch returns
+`names::Error::UnsupportedSource` rather than normalizing its topology. The
+public host methods `NumbersEditor::{rename_sheet, rename_table}`, their direct
+tests, and the raw-ID `rename_numbers_items` example are deleted rather than
+shimmed. The private cross-format `rename_table_in_package` helper remains for
+Pages and Keynote table creation/edit flows; its retention is not retention of
+the retired public Numbers rename API.

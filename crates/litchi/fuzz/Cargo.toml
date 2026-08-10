@@ -9,9 +9,7 @@ license = "Apache-2.0"
 [package.metadata]
 cargo-fuzz = true
 
-[dependencies]
-libfuzzer-sys = "0.4"
-litchi = { path = "..", default-features = false, features = ["iwork"] }
+[workspace]
 
 [[bin]]
 name = "parse_iwork"
@@ -42,6 +40,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "numbers_names"
+path = "fuzz_targets/numbers_names.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "pages_page_layout"
 path = "fuzz_targets/pages_page_layout.rs"
 test = false
@@ -55,9 +60,11 @@ test = false
 doc = false
 bench = false
 
+[dependencies]
+libfuzzer-sys = "0.4"
+litchi = { path = "..", default-features = false, features = ["iwork"] }
+
 [profile.release]
 debug = 1
 codegen-units = 1
 lto = "thin"
-
-[workspace]

@@ -32,6 +32,14 @@ seed. It covers name and index selectors, exact no-op and changed commits,
 exact-source patch conflicts, inversion, and content-redacted errors without
 writing a package to disk.
 
+`numbers_names` is the focused atomic sheet/table-names target. It offers
+arbitrary bytes to bounded Numbers package ingress and reuses a fixed command
+prefix for no-op, sheet, table, and combined renames against the native
+`basic.numbers` seed. It covers selector staging, Unicode names, typed finite
+limits, content-redacted failures, exact-source patch application and
+conflicts, inversion, and byte-exact restoration through public in-memory
+`write_to` without writing a package to disk.
+
 `pages_page_layout` is the focused Pages document-layout target. It offers
 arbitrary bytes to checked Pages package ingress and reuses them as bounded
 layout commands against the native `basic.pages` seed. It covers public layout
@@ -71,6 +79,11 @@ expanded bytes. Its semantic profile admits at most 4,096 objects, 128 sheets,
 512 tables, 8,192 references, 65,536 materialized cells, and 512 KiB of
 retained text. Fuzzer-derived selector names are limited to 512 input bytes;
 keep `-max_len` at 1 KiB so most work reaches the fixed native seed.
+
+`numbers_names` uses the same finite Numbers physical and semantic profile.
+Fuzzer-derived names are decoded lossily as UTF-8, reject NUL, and consume at
+most 256 input bytes; keep `-max_len` at 1 KiB so malformed ingress and native
+name transactions both receive every input.
 
 `pages_page_layout` accepts at most 256 KiB of source bytes, 128 package
 entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
@@ -145,6 +158,13 @@ Run the focused Numbers target without a checked-in duplicate corpus:
 
 ```sh
 cargo +nightly fuzz run numbers_table_lock -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers names target without a checked-in duplicate corpus:
+
+```sh
+cargo +nightly fuzz run numbers_names -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 

@@ -137,8 +137,11 @@ impl NumbersEditor {
                         TableSelector::name(&cloned.name),
                         SheetSelector::name(&new_sheet_name),
                     )?;
-                    let cloned_index = super::selectors::table_index(&working, cloned.native_id())?;
-                    working.rename_table(TableSelector::index(cloned_index), &table_name)?;
+                    rename_attached_table_in_package(
+                        &mut working.package,
+                        cloned.native_id(),
+                        &table_name,
+                    )?;
                     restore_table_geometry(&mut working.package, model_id, cloned.object_id)?;
                     cloned_drawable_ids
                         .push(find_table_owner(working.package(), cloned.object_id)?.table_info_id);
