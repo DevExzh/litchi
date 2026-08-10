@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest semantic tranche: `d71bede640954e8f202df459559cdf4dd7da4a04`
+Production base for the latest tranche: `5d043f0070d1e5100a1d252b4abfc61262ef413a`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -22,7 +22,7 @@ is still not broad program or CRUD coverage.
 | Change | Current evidence | Scope / limitation |
 |---|---|---|
 | XLSX row-start index | ABBA p50 geomean **-80.499%**, mean geomean **-79.962%**; full scan **+0.03%** mean; first cell **-1.31%** mean | Heap allocations **+17**, RSS **+0.25%**; narrow-range query only |
-| Targeted OPC raw publication | Four-cell ABBA p50 geomean **-84.98%**; few-large/incompressible **-71.70%**; matched cycles **-69.21%** | Peak heap **+37.18%**, one-shot RSS **+22.26%** from retained source/provenance and regenerated-payload copying |
+| Targeted OPC raw publication | Four-cell ABBA p50 geomean **-84.98%**; few-large/incompressible **-71.70%**; matched cycles **-69.21%** | Initial peak heap **+37.18%**, one-shot RSS **+22.26%** from retained source/provenance and a changed-payload copy; the copy is removed by the shared-payload follow-up below |
 | Positional CFB/ZIP and explicit execution | Large-task p50 scaling at 12 CPUs: OPC **4.52x**, CFB **5.93x**; no hidden global Rayon | Many-small tasks regress at high worker counts; default/legacy paths remain serial |
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
 | Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
@@ -37,6 +37,7 @@ is still not broad program or CRUD coverage.
 | ODS row-local publication | Large/medium one-cell edit-save p50 **-9.54% / -7.22%**; allocation calls **-5.85%**, peak heap **-27.18%** | Same-topology modeled rows only; structural edits fall back and touched opaque rows refuse |
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
+| OPC shared changed-Part payload | Few-large compressible targeted save **-20.73%** p50 / **-18.49%** mean; cache misses **-31.12%** | Removes one 4.19 MiB handoff copy; peak heap -3.42%, uninstrumented RSS +0.22% (flat); source retention and local-entry compression buffer remain |
 
 Raw evidence: [`XLSX before A`](results/abba-xlsx-range-before-a.json),
 [`after A`](results/abba-xlsx-range-after-a.json),
@@ -138,6 +139,15 @@ save-only, profile, counter and memory guardrails plus the rejected ODT
 candidate are summarized in
 [`change 0020`](changes/0020-rtf-ascii-transport-batching.md).
 
+The OPC shared-payload evidence is
+[`before A`](results/abba-opc-shared-regeneration-primary-before-a.json),
+[`after A`](results/abba-opc-shared-regeneration-primary-after-a.json),
+[`after B`](results/abba-opc-shared-regeneration-primary-after-b.json), and
+[`before B`](results/abba-opc-shared-regeneration-primary-before-b.json).
+No-op/edge guardrails, allocation attribution, RSS and hardware counters are
+summarized in
+[`change 0021`](changes/0021-opc-shared-regenerated-payload.md).
+
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
 charged to hierarchical `Budget`. Raw ZIP preservation is now integrated for
 owned same-topology OPC mutations; broader source-backed editing is pending.
@@ -156,7 +166,8 @@ See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0017`](changes/0017-doc-batched-stream-publication.md), and
 [`0018`](changes/0018-ods-row-local-publication.md), and
 [`0019`](changes/0019-rtf-parser-state-specialization.md), and
-[`0020`](changes/0020-rtf-ascii-transport-batching.md).
+[`0020`](changes/0020-rtf-ascii-transport-batching.md), and
+[`0021`](changes/0021-opc-shared-regenerated-payload.md).
 
 Consolidated changed-crate tests passed, along with focused changed-crate
 warning-denied Clippy and formatter checks. An umbrella all-feature `litchi`
@@ -171,6 +182,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Workload group | Before | After | Result | Memory result |
 |---|---:|---:|---:|---|
 | Targeted OPC mutation, four synthetic cells | individual rows in record | individual rows in record | **-84.98% p50 geometric mean**; range -58.24% to -96.41% | Few-large/incompressible peak heap +37.18%; one-shot RSS +22.26% |
+| Shared changed-Part handoff, few-large compressible | 1.342 ms | 1.063 ms | **-20.73% p50 / -18.49% mean** | One 4.19 MiB allocation removed; peak heap -3.42%; uninstrumented RSS +0.22% (flat) |
 | Exact owned OPC no-op, 16.78 MB incompressible archive | 211.531 ms | 3.443 ms | -98.37% | Peak heap +22.6%; profiler RSS +25.5% because the compressed source is retained alongside eagerly inflated Parts |
 | Exact owned OPC no-op, six named many-Part/large-Part cells | individual rows in record | individual rows in record | -99.93% p50 geometric mean | Many-small allocation calls -93.7%; large memory tradeoff above |
 | CFB final-root-stream lookup, four 256/2,048-sibling cells | 1.067-7.596 us | 0.451-0.486 us | -84.70% p50 geometric mean | Wide-root peak heap +1.5%; profiler RSS +7.6% for retained exact comparison keys |
@@ -212,6 +224,7 @@ The underlying records are:
 - [`0018-ods-row-local-publication.md`](changes/0018-ods-row-local-publication.md)
 - [`0019-rtf-parser-state-specialization.md`](changes/0019-rtf-parser-state-specialization.md)
 - [`0020-rtf-ascii-transport-batching.md`](changes/0020-rtf-ascii-transport-batching.md)
+- [`0021-opc-shared-regenerated-payload.md`](changes/0021-opc-shared-regenerated-payload.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -240,6 +253,9 @@ the rejected handoff contributes no production or test code.
   Parts. It audits the ordinary publication plan, regenerates only changed
   payload/relationship/content-type closures, and raw-copies unchanged local
   spans and central records, including unknown non-part members.
+- The changed ordinary Part now shares its already-owned immutable logical
+  payload with ZIP regeneration rather than allocating and copying it again.
+  Generated XML and the separate local-entry compression buffer stay owned.
 - Rewritten OPC publication constructs and audits generated XML and stable
   Part order once before emission rather than once for validation and again
   for writing.
@@ -335,8 +351,11 @@ The later RTF parser-state workload reports cycles -10.50%, instructions
 -9.28%, and cache references -8.61%; its profiler removes the former 8.53%
 exclusive state-clone frame. The subsequent RTF transport workload reports
 cycles -11.22%, instructions -18.40%, and branches -14.04%; its per-byte
-`SmallVec::extend` share falls from 15.37% to 2.56% on open.
-Lock-wait evidence remains missing.
+`SmallVec::extend` share falls from 15.37% to 2.56% on open. The OPC
+shared-payload follow-up removes one 4.19 MiB allocation, cuts peak heap 3.42%,
+task clock 21.08%, cycles 19.41% and cache misses 31.12% on its matched
+few-large compressible process. Its uninstrumented RSS is flat. Lock-wait
+evidence remains missing.
 
 ## Remaining highest-impact work
 
@@ -345,8 +364,9 @@ source-backed CRUD: selective open, source versions, finite cache and
 single-flight now exist, but cache bytes are not yet charged to the hierarchical
 budget and broad edit/patch coverage is incomplete. Raw ZIP preservation is
 integrated for eager owned same-topology mutation, but not for source-backed
-editable packages, and its measured retained-source/payload-copy memory cost
-remains to be reduced.
+editable packages. The changed-Part handoff copy is removed; eager retained
+source and the generated-local-entry buffer remain to be attributed and
+reduced independently.
 
 Other high-priority gaps are cold-filesystem and real range-source matrices,
 threshold tuning/contention work beyond the committed explicit scaling curves,

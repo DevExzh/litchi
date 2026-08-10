@@ -299,10 +299,10 @@ fn try_write_preserved<W: Write>(
                 if source_part.blob.as_slice() == part.blob {
                     soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                 } else {
-                    regenerated_action(
+                    regenerated_shared_action(
                         indexed_entry.id(),
                         source_member.name.as_deref(),
-                        part.blob,
+                        package.get_part(partname)?.blob_arc(),
                     )?
                 }
             },
@@ -346,6 +346,35 @@ fn regenerated_action(
     name: Option<&str>,
     bytes: &[u8],
 ) -> Result<soapberry_zip::PreservationAction> {
+    let owned_name = regenerated_name(name)?;
+    let mut data = Vec::new();
+    data.try_reserve_exact(bytes.len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC targeted member payload",
+            source,
+        })?;
+    data.extend_from_slice(bytes);
+    Ok(soapberry_zip::PreservationAction::Regenerate {
+        id,
+        entry: soapberry_zip::RegeneratedEntry::new(owned_name, data)
+            .compression_method(soapberry_zip::CompressionMethod::Deflate),
+    })
+}
+
+fn regenerated_shared_action(
+    id: soapberry_zip::PreservationEntryId,
+    name: Option<&str>,
+    data: std::sync::Arc<Vec<u8>>,
+) -> Result<soapberry_zip::PreservationAction> {
+    let owned_name = regenerated_name(name)?;
+    Ok(soapberry_zip::PreservationAction::Regenerate {
+        id,
+        entry: soapberry_zip::RegeneratedEntry::new_shared(owned_name, data)
+            .compression_method(soapberry_zip::CompressionMethod::Deflate),
+    })
+}
+
+fn regenerated_name(name: Option<&str>) -> Result<String> {
     let Some(name) = name else {
         return Err(crate::OpcError::ZipError(
             "targeted OPC member has no preservable UTF-8 name".to_owned(),
@@ -359,18 +388,7 @@ fn regenerated_action(
             source,
         })?;
     owned_name.push_str(name);
-    let mut data = Vec::new();
-    data.try_reserve_exact(bytes.len())
-        .map_err(|source| crate::OpcError::Allocation {
-            resource: "OPC targeted member payload",
-            source,
-        })?;
-    data.extend_from_slice(bytes);
-    Ok(soapberry_zip::PreservationAction::Regenerate {
-        id,
-        entry: soapberry_zip::RegeneratedEntry::new(owned_name, data)
-            .compression_method(soapberry_zip::CompressionMethod::Deflate),
-    })
+    Ok(owned_name)
 }
 
 /// Package writer that serializes an OPC package to a ZIP file.

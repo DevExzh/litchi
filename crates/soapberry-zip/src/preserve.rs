@@ -11,6 +11,7 @@ use crate::{
 };
 use std::io::Write;
 use std::ops::Range;
+use std::sync::Arc;
 
 const COPY_CHUNK_SIZE: usize = 32 * 1024;
 const CENTRAL_LOCAL_HEADER_OFFSET: Range<usize> = 42..46;
@@ -57,15 +58,42 @@ impl PreservedEntry {
 #[derive(Debug, Clone)]
 pub struct RegeneratedEntry {
     name: String,
-    data: Vec<u8>,
+    data: RegeneratedPayload,
     compression: CompressionMethod,
+}
+
+#[derive(Debug, Clone)]
+enum RegeneratedPayload {
+    Owned(Vec<u8>),
+    Shared(Arc<Vec<u8>>),
+}
+
+impl RegeneratedPayload {
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Owned(data) => data,
+            Self::Shared(data) => data,
+        }
+    }
 }
 
 impl RegeneratedEntry {
     pub fn new(name: impl Into<String>, data: impl Into<Vec<u8>>) -> Self {
         Self {
             name: name.into(),
-            data: data.into(),
+            data: RegeneratedPayload::Owned(data.into()),
+            compression: CompressionMethod::Store,
+        }
+    }
+
+    /// Create a regenerated member that shares an immutable payload.
+    ///
+    /// This is useful when a caller already retains the complete generated
+    /// payload and the ZIP writer only needs to borrow it during publication.
+    pub fn new_shared(name: impl Into<String>, data: Arc<Vec<u8>>) -> Self {
+        Self {
+            name: name.into(),
+            data: RegeneratedPayload::Shared(data),
             compression: CompressionMethod::Store,
         }
     }
@@ -408,7 +436,7 @@ impl PreparedLocal {
 fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
     let mut writer = ZipArchiveWriter::new(Vec::new());
     match entry.compression {
-        CompressionMethod::Store => writer.write_stored_file(&entry.name, &entry.data)?,
+        CompressionMethod::Store => writer.write_stored_file(&entry.name, entry.data.as_slice())?,
         CompressionMethod::Deflate => {
             use flate2::Compression;
             use flate2::write::DeflateEncoder;
@@ -419,7 +447,7 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
                 .start()?;
             let encoder = DeflateEncoder::new(&mut file, Compression::default());
             let mut data_writer = config.wrap(encoder);
-            data_writer.write_all(&entry.data)?;
+            data_writer.write_all(entry.data.as_slice())?;
             let (encoder, descriptor) = data_writer.finish()?;
             encoder.finish()?;
             file.finish(descriptor)?;
@@ -776,6 +804,18 @@ mod tests {
                 b"folder/".to_vec(),
             ]
         );
+    }
+
+    #[test]
+    fn regenerated_entry_can_retain_a_shared_payload() {
+        let data = Arc::new(b"shared generated content".to_vec());
+        let entry = RegeneratedEntry::new_shared("shared.bin", Arc::clone(&data));
+
+        assert_eq!(Arc::strong_count(&data), 2);
+
+        let prepared = generated_entry(&entry).unwrap();
+        assert!(matches!(prepared.local, PreparedLocal::Generated(_)));
+        assert_eq!(Arc::strong_count(&data), 2);
     }
 
     #[test]

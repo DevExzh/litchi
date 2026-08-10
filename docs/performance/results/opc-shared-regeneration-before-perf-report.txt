@@ -1,0 +1,156 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 737  of event 'cycles:P'
+# Event count (approx.): 3546224184
+#
+# Overhead  Command          Shared Object                               Symbol
+# ........  ...............  ..........................................  ...................................................................................................................
+#
+    22.76%  litchi-perf-bef  libc.so.6                                   [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+
+    19.46%  litchi-perf-bef  libc.so.6                                   [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+    16.17%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate
+
+     9.18%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---zlib_rs::deflate::algorithm::medium::deflate_medium
+               |
+               |--0.69%--0xa31762d64616f6c
+               |
+               |--0.69%--0x69686374696c0a31
+               |
+                --0.55%--0x7361622d66726570
+
+     6.99%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+            |
+            ---zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+
+     4.38%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---zlib_rs::deflate::longest_match::longest_match
+
+     3.57%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] zlib_rs::deflate::compare256::avx2::compare256
+            |
+            ---zlib_rs::deflate::compare256::avx2::compare256
+
+     1.77%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9d800f30
+            |
+            ---0xffffffff9d800f30
+               |
+                --0.55%--zlib_rs::deflate::algorithm::medium::deflate_medium
+
+     1.65%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] zlib_rs::deflate::flush_block_only
+            |
+            ---zlib_rs::deflate::flush_block_only
+               0x1eff0f1eff0f1eff
+
+     0.99%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9d6600b7
+            |
+            ---0xffffffff9d6600b7
+               |
+                --0.85%--0xffffffff9c82e7e3
+                          0xffffffff9c82f8db
+                          0xffffffff9c82ff44
+                          0xffffffff9c83021a
+                          0xffffffff9c4d7f29
+                          0xffffffff9d64e923
+                          0xffffffff9d800bc7
+
+     0.82%  litchi-perf-bef  libc.so.6                                   [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+
+     0.75%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] litchi_perf_baseline::payload_bytes
+            |
+            ---litchi_perf_baseline::payload_bytes
+
+     0.68%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] zlib_rs::deflate::compare256::compare256_slice
+            |
+            ---zlib_rs::deflate::compare256::compare256_slice
+
+     0.42%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c8591bf
+     0.28%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c5a56ba
+     0.28%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] sha2::sha256::x86_sha::compress
+     0.28%  git              [unknown]                                   [k] 0xffffffff9c8fba47
+     0.27%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c848383
+     0.27%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] litchi_opc::pkgwriter::PackageWriter::write_to_stream
+     0.27%  rustc            rustup                                      [.] toml::de::parser::parse_document
+     0.27%  rustc            [unknown]                                   [k] 0xffffffff9c7c6082
+     0.27%  git              [unknown]                                   [k] 0xffffffff9c7c79d6
+     0.26%  rustc            [unknown]                                   [k] 0xffffffff9d800ba0
+     0.15%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9d800ba0
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c897818
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c7d6d20
+     0.14%  git              git                                         [.] 0x00000000001b3da3
+     0.14%  git              [unknown]                                   [k] 0xffffffff9cc69fbc
+     0.14%  git              [unknown]                                   [k] 0xffffffff9d6602e0
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9d65f8cb
+     0.14%  rustc            rustup                                      [.] rustup::dist::manifest::Package::get_target
+     0.14%  rustc            rustup                                      [.] toml_parser::decoder::string::decode_basic_string
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c85d917
+     0.14%  rustc            rustup                                      [.] rustup::dist::manifest::_::<impl serde_core::de::Deserialize for rustup::dist::manifest::Manifest>::deserialize
+     0.14%  git              libc.so.6                                   [.] __strncmp_evex
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] litchi_opc::rel::Relationships::to_xml
+     0.14%  rustc            [unknown]                                   [k] 0xffffffff9d5cfb97
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] core::str::iter::SplitInternal<P>::next
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] hashbrown::map::HashMap<K,V,S,A>::get
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c8452c2
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] core::hash::BuildHasher::hash_one
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c8cdac0
+     0.14%  git              git                                         [.] 0x00000000001b3fcc
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c605b8c
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c82e9d2
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9d5cfb97
+     0.14%  litchi-perf-bef  libc.so.6                                   [.] _int_malloc
+     0.14%  rustc            [unknown]                                   [k] 0xffffffff9c538726
+     0.14%  rustc            [unknown]                                   [k] 0xffffffff9d5d0187
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] soapberry_zip::preserve::validate_local_span
+     0.14%  rustc            [unknown]                                   [k] 0xffffffff9c92f576
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9d5cfb9a
+     0.14%  rustc            [unknown]                                   [k] 0xffffffff9c7d8dce
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c648e6d
+     0.14%  rustc            [unknown]                                   [k] 0xffffffff9c648357
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c90b332
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c4c7c46
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] hashbrown::raw::RawTable<T,A>::reserve_rehash
+     0.14%  rustc            libc.so.6                                   [.] __memcmp_evex_movbe
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c556914
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] xml_minifier::audit::package::is_xml_part
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c56d507
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c58a78d
+     0.14%  rustc            [unknown]                                   [k] 0xffffffff9d6600b7
+     0.14%  rustc            [unknown]                                   [k] 0xffffffff9c86e924
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9d415465
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9d5ae0af
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c7a4778
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c7a4704
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] _ZN7zlib_rs7deflate9BitWriter18send_bits_overflow17h7cd345ed93756f3fE.llvm.6877377404663027520
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] hashbrown::raw::RawTable<T,A>::reserve_rehash
+     0.14%  rustc            libc.so.6                                   [.] __cxa_atexit
+     0.14%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c574e33
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] crc32fast::Hasher::new_with_initial
+     0.14%  litchi-perf-bef  litchi-perf-before-opc-shared-regeneration  [.] xml_minifier::audit::check_attribute_layout
+     0.13%  git              git                                         [.] 0x0000000000240bd5
+     0.13%  git              libc.so.6                                   [.] malloc_consolidate
+     0.13%  git              git                                         [.] 0x00000000001ae76d
+     0.13%  git              [unknown]                                   [k] 0xffffffff9c929ddd
+     0.13%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c8f454c
+     0.02%  litchi-perf-bef  [unknown]                                   [k] 0xffffffff9c8481c2
+     0.00%  perf-exec        [unknown]                                   [k] 0xffffffff9c56d4c4
+     0.00%  perf-exec        [unknown]                                   [k] 0xffffffff9c4c7c48
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

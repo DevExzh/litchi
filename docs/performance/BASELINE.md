@@ -334,6 +334,13 @@ remains an incomplete program and CRUD matrix.
   unchanged. See [`0020`](changes/0020-rtf-ascii-transport-batching.md). An
   ODT final-document adoption candidate was reverted because its medium
   one-paragraph read guard regressed 6.33% mean and 17.64% p95.
+- Targeted OPC changed-Part publication now shares the Part's existing
+  immutable payload with the ZIP regeneration layer. Heaptrack removes one
+  4.19 MiB allocation and peak heap falls 3.42%. Few-large compressible save
+  improves 20.73% p50 and 18.49% mean; incompressible and many-small latency is
+  within 3% p50/p95 except a +3.00% many-small p95, and uninstrumented RSS is
+  flat (+0.22%). See
+  [`0021`](changes/0021-opc-shared-regenerated-payload.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
