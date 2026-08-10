@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0022`](changes/0022-zip-generated-local-span-move.md)
+Evidence through: [`change 0023`](changes/0023-odt-full-text-owned-blocks.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -172,6 +172,16 @@ snapshot; changed edit/save and unrelated open guardrails remain within 3%.
 Direct snapshot byte ingress, full changed-package publication/readback, and
 signed/encrypted envelope behavior are unchanged.
 
+ODT full-text extraction now selects a private consuming parser mode: each
+parser-created validated block string moves into its element, then into the
+final text instead of being cloned at both boundaries. Repeated large-corpus
+ABBA improves 3.25% p50 and 4.81% mean; process allocation calls fall 15.48%
+and temporary allocations 45.52%, with peak heap and uninstrumented RSS flat.
+Public structured block/list queries keep their original path and remain near
+neutral. The unchanged open guard moves +3.94% p50/+4.17% mean; its +10.95%
+p99 trigger is retained in change 0023. Repeated semantic scans, source-backed
+reads and changed-member publication remain.
+
 ## Legacy CFB data path
 
 ```text
@@ -314,7 +324,7 @@ pattern elsewhere.
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
 | 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers; child lookup descends the validated tree; native DOC/XLS/PPT semantic baselines, XLS editor reuse and DOC batched publication are accepted. | Attribute the remaining final editor render/owner/public-reader work; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
-| 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable. Same-topology ODS row-local publication now avoids serializing untouched rows. Measured ODT snapshot byte sharing is also accepted. Direct ODS target-package adoption was only -0.44% p50 and was reverted; ODT final-document adoption improved changed save but regressed a common read guard and was also reverted. All accepted paths retain readback and source lineage. | Broader ODF source-backed reads, unchanged ZIP-member publication, differently attributed package-parse reuse, and structural-edit profiles. |
+| 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable. Same-topology ODS row-local publication now avoids serializing untouched rows. ODT snapshot byte sharing and consuming full-text block strings are accepted. Direct ODS target-package adoption was only -0.44% p50 and was reverted; ODT final-document adoption improved changed save but regressed a common read guard and was also reverted. All accepted paths retain readback and source lineage. | Broader ODF source-backed reads, repeated ODT/ODP semantic scans, unchanged ZIP-member publication, differently attributed package-parse reuse, and structural-edit profiles. |
 | 14 | Confirmed for DOCX direct-body batches: repeated full XML rebuild/parse work was removable while retaining ordinary durable operations and complete readback. | Real-producer/extension/security corpora and broader structural/bulk edit semantics. |
 | 15 | Measured and implemented for RTF full-text, text-only edit/save and ordinary parser flush paths: temporary fragment/property vectors, per-character writer calls, unconditional full-state cloning and per-character ASCII transport-buffer extensions were removable. | Extend the accepted native matrix to formatting/media, compressed/code-page, malformed/security, real-producer and broad edit scenarios. |
 
@@ -334,7 +344,7 @@ The order below is provisional until baseline measurements are recorded.
 | 8 | Extend the accepted XLSX row-start index to broader selector and edit matrices. | Sparse range queries after sheet load. | Low-medium | Narrow ranges are accepted; preservation/readback gates and broad CRUD coverage remain unchanged. |
 | 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Implemented for canonical direct-body DOCX batches and PPTX selected-scene reuse; complete source validation and candidate readback remain. See changes 0010 and 0012. |
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
-| 11 | Extend ODF beyond accepted ODS snapshot and row-local reuse: source-backed selectors, newly attributed package-parse work and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Same-topology ODS row splicing is accepted; direct package/final-document adoption candidates were reverted for immateriality or a read regression; structural fallback, exact no-op and full readback must remain. See changes 0011, 0014, 0018, 0019 and 0020. |
+| 11 | Extend ODF beyond accepted ODS snapshot, row-local reuse and ODT full-text ownership: source-backed selectors, repeated scans, newly attributed package-parse work and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Same-topology ODS row splicing and consuming ODT full-text blocks are accepted; direct package/final-document adoption candidates were reverted for immateriality or a read regression; structural fallback, exact no-op and full readback must remain. See changes 0011, 0014, 0018, 0019, 0020 and 0023. |
 | 12 | Extend accepted native RTF work to broader corpora after parser-state and transport batching. | RTF formatted/media, compressed/code-page, malformed/security, real-producer and broad edit paths. | Medium | Existing text matrix, ordinary parser-state clone elimination and ASCII transport batching are accepted; cached text, byte-valued fallback, revisions and native forward-only output contracts remain. See changes 0013, 0019 and 0020. |
 | 13 | Attribute and reduce remaining native XLS/DOC final-publication work. | OLE2 spreadsheet/document edit publication rather than substrate-only insertion. | Medium-high | Editor reuse and DOC stream batching are accepted in changes 0016/0017; exact patches, complete BIFF/CFB or DOC validation and independent public readback remain. |
 | 14 | Share existing ODT transaction bytes when a validated document creates a snapshot. | ODT no-op and changed edit/save. | Low-medium | Implemented with private `Arc` identity proof; no-op p50 -18.51% large, guardrails within 3%. See change 0014. |

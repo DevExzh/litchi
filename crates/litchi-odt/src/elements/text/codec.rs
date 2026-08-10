@@ -6,7 +6,7 @@
 //! semantic [`Block`] model without coupling to parser state or wire details.
 
 use super::model::Block;
-use super::{Heading, Paragraph, parse_text_blocks};
+use super::{Heading, Paragraph, parse_text_blocks, parse_text_blocks_owned};
 use litchi_core::Result;
 
 /// Collection of typed text-element codec operations.
@@ -45,13 +45,14 @@ impl Elements {
     /// text boxes. Tracked-change definitions, note bodies, and ruby
     /// pronunciation runs remain excluded by the decoder.
     pub fn extract_text(xml_content: &str) -> Result<String> {
-        let blocks = Self::parse(xml_content)?;
-        let mut output = String::new();
-        for (index, block) in blocks.iter().enumerate() {
-            if index > 0 {
-                output.push('\n');
-            }
-            output.push_str(&block.text()?);
+        let mut blocks = parse_text_blocks_owned(xml_content)?.into_iter();
+        let Some(first) = blocks.next() else {
+            return Ok(String::new());
+        };
+        let mut output = first.into_text();
+        for block in blocks {
+            output.push('\n');
+            output.push_str(&block.into_text());
         }
         Ok(output)
     }

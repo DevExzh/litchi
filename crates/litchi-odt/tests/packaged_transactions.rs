@@ -145,7 +145,7 @@ fn rdf_transaction_preserves_a_real_producer_package_and_is_reversible() {
     };
 
     let mut edit = source.edit().unwrap();
-    edit.add_rdf_graph(Some("metadata/litchi.rdf"), &[triple.clone()])
+    edit.add_rdf_graph(Some("metadata/litchi.rdf"), std::slice::from_ref(&triple))
         .unwrap();
     let commit = edit.commit().unwrap();
     let after = commit.snapshot().document().unwrap();
@@ -291,7 +291,7 @@ fn residual_semantic_families_share_one_reversible_transaction() {
     };
 
     let mut edit = source.edit().unwrap();
-    edit.add_rdf_graph(Some("metadata/review.rdf"), &[triple.clone()])
+    edit.add_rdf_graph(Some("metadata/review.rdf"), std::slice::from_ref(&triple))
         .unwrap()
         .add_rdf_triple("metadata/review.rdf", &triple)
         .unwrap()
@@ -482,7 +482,7 @@ fn semantic_durable_patch_covers_styles_fields_revisions_rdf_protection_and_scri
             Some("urn:litchi:digest:test"),
         )
         .unwrap()
-        .add_rdf_graph(Some("metadata/durable.rdf"), &[triple.clone()])
+        .add_rdf_graph(Some("metadata/durable.rdf"), std::slice::from_ref(&triple))
         .unwrap()
         .set_protection(&Policy::default().with_read_only(Some(true)))
         .unwrap()
@@ -818,12 +818,15 @@ fn genuine_libreoffice_package_survives_transaction_reopen_and_full_resave() {
         class_id: None,
     };
     let mut edit = snapshot.edit();
-    edit.add_rdf_graph(Some("metadata/litchi-reopen.rdf"), &[triple.clone()])
-        .unwrap()
-        .add_embedded_chart(&chart)
-        .unwrap()
-        .add_embedded_resource(&resource)
-        .unwrap();
+    edit.add_rdf_graph(
+        Some("metadata/litchi-reopen.rdf"),
+        std::slice::from_ref(&triple),
+    )
+    .unwrap()
+    .add_embedded_chart(&chart)
+    .unwrap()
+    .add_embedded_resource(&resource)
+    .unwrap();
     let committed = edit.commit().unwrap();
     let chart_index = match committed.results().get(1) {
         Some(OperationResult::Index(index)) => *index,

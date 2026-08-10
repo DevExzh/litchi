@@ -33,6 +33,13 @@ impl Block {
         }
     }
 
+    pub(crate) fn into_text(self) -> String {
+        match self {
+            Self::Paragraph(paragraph) => paragraph.into_text(),
+            Self::Heading(heading) => heading.into_text(),
+        }
+    }
+
     /// Borrow the paragraph when this block is a paragraph.
     pub const fn as_paragraph(&self) -> Option<&Paragraph> {
         match self {

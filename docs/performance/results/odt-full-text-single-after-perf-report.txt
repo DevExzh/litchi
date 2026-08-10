@@ -1,0 +1,216 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 12K of event 'cycles:P'
+# Event count (approx.): 14452747566
+#
+# Overhead  Symbol                                                                                                                                                                                                                                                                                                                                                      IPC   [IPC Coverage]
+# ........  ..........................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    14.77%  [.] __memmove_avx512_unaligned                                                                                                                                                                                                                                                                                                                              -      -
+            |
+             --4.85%--0x6
+                       |
+                        --2.32%--0x76a7a4e03b20
+
+    11.22%  [.] __memmove_avx512_unaligned_erms                                                                                                                                                                                                                                                                                                                         -      -
+            |
+             --3.48%--realloc
+                       _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.14412726177221223635
+
+    10.29%  [.] __memcmp_evex_movbe                                                                                                                                                                                                                                                                                                                                     -      -
+     7.30%  [.] _ZN10litchi_odt8elements4text32parse_text_blocks_with_ownership17h6b180ade9a02e4a8E.llvm.1592672858479855596                                                                                                                                                                                                                                            -      -
+            |
+             --3.46%--0x6
+                       |
+                        --2.50%--0x76a7a4e03b20
+
+     4.95%  [.] _ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17hefddc37c1231e9d0E.llvm.9340669730304074925                                                                                                                                                                                                                                           -      -
+            |
+             --4.94%--0x6
+                       |
+                        --3.83%--0x76a7a4e03b20
+
+     4.43%  [.] quick_xml::name::NamespaceResolver::resolve_event                                                                                                                                                                                                                                                                                                       -      -
+            |
+             --2.31%--0x6
+
+     3.98%  [.] litchi_odt::elements::text::store_text_block                                                                                                                                                                                                                                                                                                            -      -
+            |
+             --0.72%--0x657361622d667265
+
+     3.63%  [.] _int_malloc                                                                                                                                                                                                                                                                                                                                             -      -
+            |
+             --3.43%--malloc
+                       |
+                       |--1.61%--litchi_odf_common::namespace::QualifiedName::from_string
+                       |          |
+                       |           --1.17%--0x76a7a4e03b20
+                       |                     0x76a7a4e03b60
+                       |                     0x76a7a4e03b50
+                       |                     |
+                       |                      --0.81%--0x76a7a4e03b40
+                       |                                0x76a7a4e03b30
+                       |
+                       |--0.99%--litchi_odt::elements::element::Element::new
+                       |
+                        --0.51%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.14412726177221223635
+
+     3.13%  [.] unlink_chunk.isra.0                                                                                                                                                                                                                                                                                                                                     -      -
+            |
+             --2.83%--malloc_consolidate
+                       |
+                        --2.49%--_int_free_maybe_consolidate
+                                  |
+                                  |--1.72%--cfree@GLIBC_2.2.5
+                                  |          |
+                                  |           --1.37%--litchi_perf_baseline::verify_semantic_odt
+                                  |                     |
+                                  |                      --1.13%--0x657361622d667265
+                                  |
+                                   --0.77%--_int_realloc
+                                             realloc
+                                             _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.14412726177221223635
+
+     2.68%  [.] malloc_consolidate                                                                                                                                                                                                                                                                                                                                      -      -
+            |
+             --2.27%--_int_free_maybe_consolidate
+                       |
+                       |--1.32%--cfree@GLIBC_2.2.5
+                       |          |
+                       |           --0.90%--litchi_perf_baseline::verify_semantic_odt
+                       |                     |
+                       |                      --0.77%--0x657361622d667265
+                       |
+                        --0.95%--_int_realloc
+                                  realloc
+                                  _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.14412726177221223635
+
+     2.35%  [.] litchi_odt::elements::element::Element::new                                                                                                                                                                                                                                                                                                             -      -
+     2.18%  [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral                                                                                                                                                                                                                                                                                          -      -
+            |
+             --2.13%--_RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+                       _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                       _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                       |
+                       |--1.15%--litchi_perf_baseline::verify_semantic_odt
+                       |
+                        --0.97%--<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+
+     1.67%  [k] 0xffffffff9c5a56ba                                                                                                                                                                                                                                                                                                                                      -      -
+            |
+             --1.66%--0xffffffff9c4d7ef8
+                       0xffffffff9d64e923
+                       0xffffffff9d800bc7
+                       |
+                        --1.60%--__memmove_avx512_unaligned_erms
+                                  |
+                                   --1.34%--realloc
+                                             _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.14412726177221223635
+
+     1.48%  [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with                                                                                                                                                                                                                                      -      -
+     1.33%  [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.14412726177221223635                                                                                                                                                                                                                                                      -      -
+     1.22%  [.] quick_xml::name::NamespaceResolver::resolve_prefix                                                                                                                                                                                                                                                                                                      -      -
+     1.14%  [.] malloc                                                                                                                                                                                                                                                                                                                                                  -      -
+     1.07%  [.] _int_free                                                                                                                                                                                                                                                                                                                                               -      -
+            |
+             --1.00%--cfree@GLIBC_2.2.5
+                       |
+                        --0.79%--_ZN4core3ptr59drop_in_place$LT$litchi_odt..elements..element..Element$GT$17h506f7bc354e57ca9E.llvm.3626160876730856649
+                                  0x657361622d667265
+
+     1.03%  [k] 0xffffffff9d6600b7                                                                                                                                                                                                                                                                                                                                      -      -
+            |
+             --0.97%--0xffffffff9c82e7e3
+                       0xffffffff9c82f8db
+                       0xffffffff9c82ff44
+                       0xffffffff9c83021a
+                       0xffffffff9c4d7f29
+                       0xffffffff9d64e923
+                       0xffffffff9d800bc7
+                       |
+                        --0.93%--__memmove_avx512_unaligned_erms
+                                  |
+                                   --0.79%--realloc
+                                             _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.14412726177221223635
+
+     0.97%  [.] litchi_odt::elements::element::Element::into_text_recursive                                                                                                                                                                                                                                                                                             -      -
+     0.95%  [k] 0xffffffff9c848383                                                                                                                                                                                                                                                                                                                                      -      -
+            |
+            ---0xffffffff9c82797f
+               0xffffffff9c8284e0
+               0xffffffff9c8290c6
+               0xffffffff9c829389
+               0xffffffff9c8299c5
+               |
+                --0.94%--0xffffffff9c835a28
+                          0xffffffff9c836b98
+                          |
+                           --0.93%--0xffffffff9c83a981
+                                     0xffffffff9c83aa12
+                                     0xffffffff9c40747b
+                                     0xffffffff9d6485af
+                                     0xffffffff9d800130
+                                     __brk
+                                     __default_morecore@GLIBC_2.2.5
+                                     systrim.constprop.0
+                                     cfree@GLIBC_2.2.5
+                                     litchi_perf_baseline::verify_semantic_odt
+                                     0x657361622d667265
+
+     0.84%  [.] litchi_odt::elements::element::Element::get_text_recursive                                                                                                                                                                                                                                                                                              -      -
+     0.78%  [.] quick_xml::reader::Reader<R>::read_event_impl                                                                                                                                                                                                                                                                                                           -      -
+     0.74%  [k] 0xffffffff9d5cfb97                                                                                                                                                                                                                                                                                                                                      -      -
+            |
+            ---0xffffffff9c85c182
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               |
+                --0.73%--0xffffffff9c897834
+                          0xffffffff9c82e51c
+                          0xffffffff9c82e70c
+                          0xffffffff9c82f8db
+                          0xffffffff9c82ff44
+                          0xffffffff9c83021a
+                          0xffffffff9c4d7f29
+                          0xffffffff9d64e923
+                          0xffffffff9d800bc7
+                          |
+                           --0.70%--__memmove_avx512_unaligned_erms
+                                     |
+                                      --0.60%--realloc
+                                                _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.14412726177221223635
+
+     0.67%  [.] phf::map::Map<K,V>::get_entry                                                                                                                                                                                                                                                                                                                           -      -
+     0.64%  [k] 0xffffffff9d6602e0                                                                                                                                                                                                                                                                                                                                      -      -
+            |
+             --0.63%--0xffffffff9d6601ee
+                       |
+                        --0.50%--0xffffffff9c85a354
+                                  0xffffffff9c85c168
+                                  0xffffffff9c85d999
+                                  0xffffffff9c8974c1
+                                  0xffffffff9c897834
+                                  0xffffffff9c82e51c
+                                  0xffffffff9c82e70c
+                                  0xffffffff9c82f8db
+                                  0xffffffff9c82ff44
+                                  0xffffffff9c83021a
+                                  0xffffffff9c4d7f29
+                                  0xffffffff9d64e923
+                                  0xffffffff9d800bc7
+
+     0.62%  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2                                                                                                                                                                                                                                                                                                -      -
+            |
+            ---quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+
+     0.55%  [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2                                                                                                                                                                                                                                                                                                    -      -
+     0.54%  [.] memchr::arch::x86_64::avx2::memchr::One::find_raw                                                                                                                                                                                                                                                                                                       -      -
+     0.54%  [.] quick_xml::reader::state::ReaderState::emit_end                                                                                                                                                                                                                                                                                                         -      -
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

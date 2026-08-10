@@ -83,6 +83,10 @@ impl Paragraph {
         Ok(self.element.get_text_recursive())
     }
 
+    pub(crate) fn into_text(self) -> String {
+        self.element.into_text_recursive()
+    }
+
     /// Set the text content of the paragraph
     pub fn set_text(&mut self, text: &str) {
         self.element.set_text(text);
@@ -592,6 +596,10 @@ impl Heading {
         Ok(self.element.get_text_recursive())
     }
 
+    pub(crate) fn into_text(self) -> String {
+        self.element.into_text_recursive()
+    }
+
     /// Set the text content of the heading
     pub fn set_text(&mut self, text: &str) {
         self.element.set_text(text);
@@ -915,6 +923,14 @@ struct ActiveTextBlock {
 /// are excluded from the visible flow; they are exposed through their own
 /// dedicated readers instead.
 pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
+    parse_text_blocks_with_ownership(xml_content, false)
+}
+
+pub(crate) fn parse_text_blocks_owned(xml_content: &str) -> Result<Vec<TextBlock>> {
+    parse_text_blocks_with_ownership(xml_content, true)
+}
+
+fn parse_text_blocks_with_ownership(xml_content: &str, own_text: bool) -> Result<Vec<TextBlock>> {
     let mut reader = NsReader::from_str(xml_content);
     let mut buffer = Vec::new();
     let mut blocks: Vec<Option<TextBlock>> = Vec::new();
@@ -995,6 +1011,7 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                         slot,
                         &mut blocks,
                         &mut total_text_bytes,
+                        own_text,
                     )?;
                 } else if let Some(current) = active.last_mut() {
                     append_text_control(&reader, text_namespace, element, &mut current.text)?;
@@ -1052,6 +1069,7 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                             current.slot,
                             &mut blocks,
                             &mut total_text_bytes,
+                            own_text,
                         )?;
                     }
                 }
@@ -1241,6 +1259,7 @@ fn store_text_block(
     slot: usize,
     blocks: &mut [Option<TextBlock>],
     total_text_bytes: &mut usize,
+    own_text: bool,
 ) -> Result<()> {
     *total_text_bytes = total_text_bytes
         .checked_add(text.len())
@@ -1250,7 +1269,11 @@ fn store_text_block(
             "ODF text exceeds {MAX_TEXT_BYTES} bytes"
         )));
     }
-    element.set_text(&text);
+    if own_text {
+        element.set_text_owned(text);
+    } else {
+        element.set_text(&text);
+    }
     let block = match element.tag_name() {
         "text:p" => TextBlock::Paragraph(Paragraph::from_element(element)?),
         "text:h" => TextBlock::Heading(Heading::from_element(element)?),
