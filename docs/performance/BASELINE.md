@@ -318,6 +318,14 @@ remains an incomplete program and CRUD matrix.
   heap falls 27.18%. Structural edits retain full-table fallback and changed
   opaque rows refuse publication. See
   [`0018`](changes/0018-ods-row-local-publication.md).
+- Ordinary RTF body-text flushes now borrow the parser state and copy only the
+  encoding plus block properties; the complete state is cloned only for
+  insertion/deletion metadata. Large open p50 improves 20.09% and large
+  one-edit/save p50 improves 11.54%. The former 8.53% exclusive clone frame is
+  absent after the change; process allocations, peak heap and RSS are flat.
+  See [`0019`](changes/0019-rtf-parser-state-specialization.md). An ODS
+  target-package adoption candidate measured only -0.44% p50 with +0.30% p95
+  and was fully reverted.
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

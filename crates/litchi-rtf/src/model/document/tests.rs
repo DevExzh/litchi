@@ -547,6 +547,38 @@ fn parses_tracked_insertions_and_deletions_with_author_ranges() {
 }
 
 #[test]
+fn text_flush_preserves_common_formatting_and_revision_metadata() {
+    let rtf = r"{\rtf1\ansi\ansicpg1252
+            {\fonttbl{\f0\fnil\cpg1252 Latin;}{\f1\fnil\cpg932 Japanese;}}
+            {\*\revtbl {Unknown;}{Editor;}}
+            \pard\qc\b\f1\'82\'a0
+            {\revised\revauth1 new}
+            {\deleted\revauthdel1 old}}";
+    let doc = RtfDocument::parse(rtf).unwrap();
+
+    assert!(doc.text().contains("あ"));
+    assert!(doc.text().contains("new"));
+    assert!(!doc.text().contains("old"));
+
+    let ordinary = doc
+        .blocks()
+        .iter()
+        .find(|block| block.text().contains("あ"))
+        .unwrap();
+    assert!(ordinary.formatting.bold);
+    assert_eq!(ordinary.formatting.font_ref, 1);
+    assert_eq!(ordinary.paragraph.alignment, Alignment::Center);
+
+    assert_eq!(doc.revisions().len(), 2);
+    assert_eq!(doc.revisions()[0].revision_type, RevisionType::Insertion);
+    assert_eq!(doc.revisions()[0].author, "Editor");
+    assert_eq!(doc.revisions()[0].content, "new");
+    assert_eq!(doc.revisions()[1].revision_type, RevisionType::Deletion);
+    assert_eq!(doc.revisions()[1].author, "Editor");
+    assert_eq!(doc.revisions()[1].content, "old");
+}
+
+#[test]
 fn revision_toggle_boundaries_flush_preceding_text() {
     let doc = RtfDocument::parse(
         r"{\rtf1{\*\revtbl Unknown;}plain \revised\revauth0\revdttm1 changed\revised0 plain}",

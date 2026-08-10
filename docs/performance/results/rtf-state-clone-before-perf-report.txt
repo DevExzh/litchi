@@ -1,0 +1,266 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cycles:P'
+# Event count (approx.): 12449421904
+#
+# Overhead  Command          Shared Object                       Symbol
+# ........  ...............  ..................................  ....................................................................................................................................
+#
+    13.70%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans
+            |
+            ---litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans
+
+    11.84%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+            |
+            ---<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+
+    11.41%  litchi-perf-bef  libc.so.6                           [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |
+                --1.18%--realloc
+                          _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.15143379835271959641
+
+     8.53%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] <litchi_rtf::codec::parser::codec::State as core::clone::Clone>::clone
+            |
+            ---<litchi_rtf::codec::parser::codec::State as core::clone::Clone>::clone
+
+     4.15%  litchi-perf-bef  [unknown]                           [k] 0xffffffff9c5a56ba
+            |
+            ---0xffffffff9c5a56ba
+               0xffffffff9c4d7ef8
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --4.11%--__memmove_avx512_unaligned_erms
+
+     3.71%  litchi-perf-bef  [unknown]                           [k] 0xffffffff9c848383
+            |
+            ---0xffffffff9c848383
+               0xffffffff9c82797f
+               0xffffffff9c8284e0
+               0xffffffff9c8290c6
+               0xffffffff9c829389
+               0xffffffff9c8299c5
+               0xffffffff9c835a28
+               0xffffffff9c836b98
+               0xffffffff9c83a981
+               0xffffffff9c83aa12
+               0xffffffff9c40747b
+               0xffffffff9d6485af
+               0xffffffff9d800130
+               __brk
+               __default_morecore@GLIBC_2.2.5
+               systrim.constprop.0
+               cfree@GLIBC_2.2.5
+               _ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17hf6be803ba74bb7a0E.llvm.310656537280148346
+               |
+                --3.67%--0xcccccccccccccccc
+
+     3.24%  litchi-perf-bef  [unknown]                           [k] 0xffffffff9d6600b7
+            |
+            ---0xffffffff9d6600b7
+               |
+                --3.20%--0xffffffff9c82e7e3
+                          0xffffffff9c82f8db
+                          0xffffffff9c82ff44
+                          0xffffffff9c83021a
+                          0xffffffff9c4d7f29
+                          0xffffffff9d64e923
+                          0xffffffff9d800bc7
+                          |
+                           --3.16%--__memmove_avx512_unaligned_erms
+
+     2.84%  litchi-perf-bef  [unknown]                           [k] 0xffffffff9d5cfb97
+            |
+            ---0xffffffff9d5cfb97
+               0xffffffff9c85c182
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               0xffffffff9c897834
+               0xffffffff9c82e51c
+               0xffffffff9c82e70c
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --2.76%--__memmove_avx512_unaligned_erms
+
+     2.53%  litchi-perf-bef  [unknown]                           [k] 0xffffffff9d6602e0
+            |
+            ---0xffffffff9d6602e0
+               |
+                --2.49%--0xffffffff9d6601ee
+                          |
+                           --2.33%--0xffffffff9c85a354
+                                     0xffffffff9c85c168
+                                     0xffffffff9c85d999
+                                     0xffffffff9c8974c1
+                                     0xffffffff9c897834
+                                     0xffffffff9c82e51c
+                                     0xffffffff9c82e70c
+                                     0xffffffff9c82f8db
+                                     0xffffffff9c82ff44
+                                     0xffffffff9c83021a
+                                     0xffffffff9c4d7f29
+                                     0xffffffff9d64e923
+                                     0xffffffff9d800bc7
+                                     |
+                                      --2.17%--__memmove_avx512_unaligned_erms
+
+     2.25%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] litchi_codepage::Mbcs::decode_lossy
+            |
+            ---litchi_codepage::Mbcs::decode_lossy
+
+     1.97%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] litchi_rtf::codec::writer::codec::output::primitives::<impl litchi_rtf::codec::writer::codec::RtfWriter<W>>::write_text
+            |
+            ---litchi_rtf::codec::writer::codec::output::primitives::<impl litchi_rtf::codec::writer::codec::RtfWriter<W>>::write_text
+
+     1.74%  litchi-perf-bef  libc.so.6                           [.] __memmove_avx512_unaligned
+            |
+            ---__memmove_avx512_unaligned
+
+     1.62%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] litchi_rtf::codec::parser::codec::append_transport_bytes
+            |
+            ---litchi_rtf::codec::parser::codec::append_transport_bytes
+
+     1.58%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] _ZN10litchi_rtf5model8document5model11RtfDocument22plain_body_editability17h6cefad5b554bb400E.llvm.246093751180399729
+            |
+            ---_ZN10litchi_rtf5model8document5model11RtfDocument22plain_body_editability17h6cefad5b554bb400E.llvm.246093751180399729
+
+     1.58%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+            |
+            ---_RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+               |
+                --1.54%--_RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+                          _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                          |
+                           --1.06%--litchi_perf_baseline::verify_semantic_rtf
+                                     <&T as core::fmt::Display>::fmt
+                                     0x6
+                                     0x696c216465746164
+
+     1.46%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] litchi_rtf::codec::lexer::codec::control_word::dispatch::match_control_word
+            |
+            ---litchi_rtf::codec::lexer::codec::control_word::dispatch::match_control_word
+
+     1.42%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] litchi_rtf::edit::encoded_body_text
+            |
+            ---litchi_rtf::edit::encoded_body_text
+
+     1.42%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] litchi_rtf::api::story::validate_boundaries
+            |
+            ---litchi_rtf::api::story::validate_boundaries
+
+     1.18%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] litchi_rtf::api::story::Paragraph::to_text
+            |
+            ---litchi_rtf::api::story::Paragraph::to_text
+               0x2710
+               |
+                --0.59%--0x610e66e024a0
+
+     0.95%  litchi-perf-bef  libc.so.6                           [.] cfree@GLIBC_2.2.5
+            |
+            ---cfree@GLIBC_2.2.5
+               |
+                --0.63%--_ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17hf6be803ba74bb7a0E.llvm.310656537280148346
+                          0xcccccccccccccccc
+
+     0.91%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] _ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17hf6be803ba74bb7a0E.llvm.310656537280148346
+            |
+            ---_ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17hf6be803ba74bb7a0E.llvm.310656537280148346
+               0xcccccccccccccccc
+
+     0.87%  litchi-perf-bef  libc.so.6                           [.] _int_malloc
+            |
+            ---_int_malloc
+               |
+                --0.59%--malloc
+                          |
+                           --0.55%--<alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold
+
+     0.87%  litchi-perf-bef  [unknown]                           [k] 0xffffffff9d5cfb9a
+            |
+            ---0xffffffff9d5cfb9a
+               0xffffffff9c85c182
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               0xffffffff9c897834
+               0xffffffff9c82e51c
+               0xffffffff9c82e70c
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --0.79%--__memmove_avx512_unaligned_erms
+
+     0.59%  litchi-perf-bef  libc.so.6                           [.] _int_free
+            |
+            ---_int_free
+
+     0.59%  litchi-perf-bef  [unknown]                           [k] 0xffffffff9c827cc6
+            |
+            ---0xffffffff9c827cc6
+               0xffffffff9c8284e0
+               0xffffffff9c8290c6
+               0xffffffff9c829389
+               0xffffffff9c8299c5
+               0xffffffff9c835a28
+               0xffffffff9c836b98
+               0xffffffff9c83a981
+               0xffffffff9c83aa12
+               0xffffffff9c40747b
+               0xffffffff9d6485af
+               0xffffffff9d800130
+               __brk
+               __default_morecore@GLIBC_2.2.5
+               systrim.constprop.0
+               cfree@GLIBC_2.2.5
+               _ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17hf6be803ba74bb7a0E.llvm.310656537280148346
+               |
+                --0.55%--0xcccccccccccccccc
+
+     0.55%  litchi-perf-bef  libc.so.6                           [.] malloc_consolidate
+            |
+            ---malloc_consolidate
+               _int_free_maybe_consolidate
+               cfree@GLIBC_2.2.5
+
+     0.55%  litchi-perf-bef  litchi-perf-before-rtf-state-clone  [.] litchi_perf_baseline::verify_semantic_rtf
+            |
+            ---litchi_perf_baseline::verify_semantic_rtf
+               |
+                --0.51%--0x2710
+
+     0.51%  litchi-perf-bef  [unknown]                           [k] 0xffffffff9c7d8dce
+            |
+            ---0xffffffff9c7d8dce
+               0xffffffff9c7d9d5f
+               0xffffffff9c82ea11
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               __memmove_avx512_unaligned_erms
+
+     0.51%  litchi-perf-bef  [unknown]                           [k] 0xffffffff9d65f8cb
+            |
+            ---0xffffffff9d65f8cb
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

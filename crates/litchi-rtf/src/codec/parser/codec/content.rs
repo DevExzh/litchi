@@ -402,31 +402,43 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
-        let state = self.current_state()?.clone();
-
         // Only create blocks for text in the document body
         // Skip text from font tables, color tables, stylesheets, etc.
-        if state.destination == Destination::DocumentBody {
-            let decoded_str = self.effective_text_encoding(&state)?.decode(buffer);
-
-            // Allocate in arena and create block
-            let text = self.arena.alloc_str(&decoded_str);
-            let start = self.body_text_len;
-            if state.revision_type == Some(super::super::super::annotation::RevisionType::Deletion)
-            {
-                self.append_revision_text(&state, text, start, start)?;
+        let (encoding, formatting, paragraph, revision_state) = {
+            let state = self.current_state()?;
+            if state.destination != Destination::DocumentBody {
                 buffer.clear();
                 return Ok(());
             }
-            let block = StyleBlock::new(Cow::Borrowed(text), state.formatting, state.paragraph);
-            self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
-                RtfError::MalformedDocument("RTF body text length overflow".to_string())
-            })?;
-            self.blocks.push(block);
-            if !decoded_str.trim().is_empty() {
-                self.current_state_mut()?.paragraph_content_started = true;
-            }
-            self.append_revision_text(&state, text, start, self.body_text_len)?;
+            (
+                self.effective_text_encoding(state)?,
+                state.formatting,
+                state.paragraph,
+                state.revision_type.map(|_kind| state.clone()),
+            )
+        };
+        let decoded_str = encoding.decode(buffer);
+
+        // Allocate in arena and create block
+        let text = self.arena.alloc_str(&decoded_str);
+        let start = self.body_text_len;
+        if let Some(state) = revision_state.as_ref()
+            && state.revision_type == Some(super::super::super::annotation::RevisionType::Deletion)
+        {
+            self.append_revision_text(state, text, start, start)?;
+            buffer.clear();
+            return Ok(());
+        }
+        let block = StyleBlock::new(Cow::Borrowed(text), formatting, paragraph);
+        self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF body text length overflow".to_string())
+        })?;
+        self.blocks.push(block);
+        if !decoded_str.trim().is_empty() {
+            self.current_state_mut()?.paragraph_content_started = true;
+        }
+        if let Some(state) = revision_state.as_ref() {
+            self.append_revision_text(state, text, start, self.body_text_len)?;
         }
 
         buffer.clear();
