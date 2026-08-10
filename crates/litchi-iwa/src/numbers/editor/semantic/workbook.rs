@@ -52,16 +52,9 @@ impl NumbersEditor {
     }
 
     pub fn tables(&self) -> Result<Vec<NumbersTableInfo>> {
-        let locations = object_locations(&self.package)?;
         let mut tables = table_models(&self.package)?
             .into_iter()
             .map(|descriptor| {
-                let archive_name = locations.get(&descriptor.table_info_id).ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Numbers table drawable {} is missing",
-                        descriptor.table_info_id
-                    ))
-                })?;
                 Ok(NumbersTableInfo {
                     object_id: descriptor.object_id,
                     index: 0,
@@ -70,12 +63,6 @@ impl NumbersEditor {
                     columns: descriptor.model.number_of_columns as usize,
                     appearance: crate::table_appearance::table_appearance(
                         &self.package,
-                        descriptor.object_id,
-                    )?,
-                    lock_state: crate::table_lock::table_lock_state_for_model(
-                        &self.package,
-                        archive_name,
-                        descriptor.table_info_id,
                         descriptor.object_id,
                     )?,
                 })

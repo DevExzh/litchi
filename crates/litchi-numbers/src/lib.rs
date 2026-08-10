@@ -47,7 +47,8 @@ pub use package::{
     PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,
     ResourceError as PackageResourceError, Result as PackageResult, SemanticLimitKind,
     SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
-    SemanticPath as PackageSemanticPath, compatibility_tables_from_bytes,
+    SemanticPath as PackageSemanticPath, TableLockCommit, TableLockDiagnostics, TableLockEdit,
+    TableLockError, TableLockLimitKind, TableLockPatch, compatibility_tables_from_bytes,
     compatibility_tables_from_bytes_with_options,
 };
 pub use selector::{SheetSelector, TableSelector};

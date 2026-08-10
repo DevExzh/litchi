@@ -1179,3 +1179,110 @@ serialization, atomic filesystem publication, whole-Keynote Buffa conversion,
 deep fuzz completion, and complete `litchi-iwa` deletion remain exit gates.
 The current metadata/policy inventory is 64 packages, 235 internal
 declarations, and 14 ordered debts.
+
+## 2026-08-10 amendment: existing Numbers table-lock mutation vertical
+
+Deletion gate 3 advances for the focused mutation of one existing attached
+Numbers table's interactive lock state. The concrete format owner now exposes
+`Package::{table_lock, edit_table_lock, apply_table_lock}` over semantic sheet
+and table selectors plus the archive-free `table::lock::State`. Its edit, commit,
+reversible patch, diagnostics, errors, and limits keep native identities,
+component names, messages, and wire values private.
+
+The format adapter resolves semantic positions through the rooted native
+document and sheet drawable order, accepting exactly one canonical type-6000
+or legacy type-6003 table-info owner. The focused private codec strictly
+preflights the required drawable envelope, optional canonical field-5 lock
+Boolean with presence, and required nonzero model reference under byte, field,
+work, and nesting ceilings. Buffa's borrowed lazy views are forced for both the
+drawable `super.locked` value and table-model reference; their complete
+presence-preserving snapshot must equal preflight. Raw records retain all
+unknown-content and rewrite authority. This is not a Buffa migration of table
+models, tiles, data lists, formulas, or the wider Numbers graph.
+
+This supersedes the 2026-08-08 two-message, opaque-super, five-file/64 KiB
+projection record. The current three-message TableInfo/Drawable/Reference
+closure forces both lock and model lazy values and generates five files
+totaling 83,529 bytes under an 84 KiB cap.
+
+A semantic no-op keeps an absent lock absent and an explicit false explicit,
+shares the source allocation, and performs no reassembly or candidate reopen.
+A changed edit raw-patches only the selected nested scalar, rewrites one IWA
+component, reassembles the exact flat package under retained bounds, and
+reopens the complete Numbers snapshot before selected-state readback. Retained
+fields, messages, unselected object-header metadata, components, and ZIP
+members remain preservation-owned. Competing rooted sheet ownership,
+contradictory selected-owner metadata, noncanonical outer object-length
+prefixes, and selected merge/diff metadata fail closed instead of being
+normalized. Detached/unrooted pseudo-sheet and view-state dependent references
+are not owners for this rooted traversal and remain opaque and preserved.
+Exact-source patches retain complete before/after
+artifacts; changed application reopens the stored target, and inverse
+application restores the exact original bytes. Legacy nested packages admit
+reads and exact no-ops but fail closed for changed publication.
+
+The complete Numbers-specific host read/mutation seam is deleted instead of
+shimmed: direct `table_lock_state`/`set_table_lock_state`, private
+`table_lock_context`, `NumbersTableInfo.lock_state` and its field-population
+branch inside `tables()`, both model-specific shared helpers, and the
+Numbers-only model-ID matching branch.
+All Numbers state readback moves to `Package::table_lock`. The boundary checker
+ratchets five exact function names with a three-under-Numbers plus
+two-under-shared-helper scope and separately rejects the retired
+`NumbersTableInfo.lock_state` field; the field-population and matching-branch removals
+are additionally locked by compilation and compatibility coverage.
+Pages and Keynote still use the generic shared getter/setter and wire codec,
+and the rest of Numbers graph mutation remains deletion work. No manifest edge
+or ordered debt is retired by this vertical.
+
+The new focused example performs semantic lock/unlock selection, no-clobber
+temporary-file publication, and optional exact inverse emission. The former
+cross-iWork example uses the host only to construct the initial Numbers table,
+then routes both Numbers mutation and readback through the focused owner;
+Pages and Keynote remain host-owned in that example.
+
+Two semantic-state tests, nine strict-codec tests, and 15 exact-source
+transaction tests are present in the focused source. They inventory selector,
+presence, preservation, inverse/conflict, legacy, resource, failure-atomic,
+checked-native-fixture, rooted `FormBasedSheet` field path `[1, 2]`, and
+concurrent-read coverage. The focused transaction suite passed 15/15,
+including changed flat legacy type-6003 TableInfo publication with exact
+inverse and partial-sink write accounting.
+The bounded `numbers_table_lock` fuzz target compiles, and all 57 boundary
+policy regressions pass. The full policy command still reports the 14
+pre-existing soapberry-zip/xml-minifier annotations. A Numbers-only fuzz
+package and a sustained sanitizer campaign remain exit gates.
+
+The current writer also passed the Apple Numbers 14.4 (7043.0.93) gate. The
+source SHA-256 is
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`,
+the Rust locked output is
+`eb2e29c97c415c1b61ed1f8fe766e7211ed386c825c32dec056b72c9398d3e09`,
+and inverse application restored the exact source. Numbers opened the locked
+output without warning, showed `Table 1` locked with disabled cells, retained
+the B2 text and B3 value 42, then completed native Save As, close, and reopen.
+The native-resaved SHA-256 is
+`8aa87a3afcb145b66c5c6f4e10645cd1cf658f4b65f0976612ac6d62d4652995`;
+focused reread remained locked and an equal-state transaction was a byte-exact
+no-op at that same hash.
+
+This closes the focused native compatibility gate, not the exit plan's
+resource and publication gates. There is no aggregate peak-memory or total
+transaction-work policy covering both retained patch artifacts, rewrite
+buffers, package hashing, reassembly, and full candidate reopen. A complete
+transitive fallible-allocation proof remains open. The package can write exact
+bytes with exact partial-sink failure accounting, and the example demonstrates
+sibling-temporary no-clobber publication,
+but the library does not yet own atomic durable filesystem save/replacement.
+Durable patch serialization, deeper fuzzing, remaining Numbers graph
+ownership, and final `litchi-iwa` deletion remain exit gates. The process-local
+patch also lacks a versioned semantic operation envelope, read/write sets,
+composition, three-way merge, and bounded history.
+Resource/allocation errors do not yet carry the selected semantic table path,
+and exact source bytes remain ordinary `Package` surface instead of an
+explicit advanced/raw boundary.
+The flattened `TableLock*` transaction names remain migration debt against the
+focused-module short-name rule.
+The archive-free `Table` snapshot does not yet carry lock state, remaining host
+table/cell mutations do not enforce that state by default, and the private
+Numbers locator has not converged on the neutral IWA index owner.

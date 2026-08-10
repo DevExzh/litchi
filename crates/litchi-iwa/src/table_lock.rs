@@ -1,11 +1,9 @@
 //! Wire-preserving lock state for native iWork table drawables.
 
 use crate::archive::RawMessage;
-use crate::protobuf::tst::TableInfoArchive;
 use crate::wire::{parse_wire_fields, patch_varint_field, transform_length_delimited_field};
 use crate::{Error, IWorkPackage, Result};
 use litchi_iwa_common::table::lock::State as TableLockState;
-use prost::Message;
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_DRAWABLE_SUPER_FIELD: u32 = 1;
@@ -18,25 +16,7 @@ pub(crate) fn table_lock_state(
     drawable_object_id: u64,
     application: &str,
 ) -> Result<TableLockState> {
-    let (_, _, message) =
-        table_message(package, archive_name, drawable_object_id, application, None)?;
-    table_lock_state_from_message(&message)
-}
-
-/// Read a Numbers table whose table-info type varies by archive generation.
-pub(crate) fn table_lock_state_for_model(
-    package: &IWorkPackage,
-    archive_name: &str,
-    drawable_object_id: u64,
-    model_object_id: u64,
-) -> Result<TableLockState> {
-    let (_, _, message) = table_message(
-        package,
-        archive_name,
-        drawable_object_id,
-        "Numbers",
-        Some(model_object_id),
-    )?;
+    let (_, _, message) = table_message(package, archive_name, drawable_object_id, application)?;
     table_lock_state_from_message(&message)
 }
 
@@ -60,25 +40,6 @@ pub(crate) fn set_table_lock_state(
         archive_name,
         drawable_object_id,
         application,
-        None,
-        state,
-    )
-}
-
-/// Set a Numbers table whose table-info type varies by archive generation.
-pub(crate) fn set_table_lock_state_for_model(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    drawable_object_id: u64,
-    model_object_id: u64,
-    state: TableLockState,
-) -> Result<()> {
-    set_table_lock_state_inner(
-        package,
-        archive_name,
-        drawable_object_id,
-        "Numbers",
-        Some(model_object_id),
         state,
     )
 }
@@ -88,16 +49,10 @@ fn set_table_lock_state_inner(
     archive_name: &str,
     drawable_object_id: u64,
     application: &str,
-    model_object_id: Option<u64>,
     state: TableLockState,
 ) -> Result<()> {
-    let (message_index, message_type, message) = table_message(
-        package,
-        archive_name,
-        drawable_object_id,
-        application,
-        model_object_id,
-    )?;
+    let (message_index, message_type, message) =
+        table_message(package, archive_name, drawable_object_id, application)?;
     let current = raw_table_lock_state(&message)?;
     if current.unwrap_or(false) == state.is_locked() {
         return Ok(());
@@ -158,7 +113,6 @@ fn table_message(
     archive_name: &str,
     drawable_object_id: u64,
     application: &str,
-    model_object_id: Option<u64>,
 ) -> Result<(usize, u32, Vec<u8>)> {
     let archive = package.archive(archive_name)?;
     let object = archive.object(drawable_object_id).ok_or_else(|| {
@@ -166,14 +120,11 @@ fn table_message(
             "{application} table drawable {drawable_object_id} is missing"
         ))
     })?;
-    let mut messages = object.messages.iter().enumerate().filter(|(_, message)| {
-        if let Some(model_object_id) = model_object_id {
-            TableInfoArchive::decode(message.data.as_slice())
-                .is_ok_and(|info| info.table_model.identifier == model_object_id)
-        } else {
-            message.type_ == TABLE_INFO_MESSAGE_TYPE
-        }
-    });
+    let mut messages = object
+        .messages
+        .iter()
+        .enumerate()
+        .filter(|(_, message)| message.type_ == TABLE_INFO_MESSAGE_TYPE);
     let Some((message_index, message)) = messages.next() else {
         return Err(Error::InvalidFormat(format!(
             "{application} drawable {drawable_object_id} has no table-info payload"

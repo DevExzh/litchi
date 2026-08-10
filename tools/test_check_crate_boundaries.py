@@ -793,6 +793,238 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_iwa_keynote_source_topology(root), [])
 
+    def test_retired_iwa_numbers_table_lock_method_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_LOCK_METHODS,
+            (
+                "table_lock_state",
+                "set_table_lock_state",
+                "table_lock_context",
+                "set_table_lock_state_for_model",
+                "table_lock_state_for_model",
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_INFO_FIELDS,
+            frozenset({"lock_state"}),
+        )
+
+    def test_retired_iwa_numbers_table_lock_methods_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            numbers = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "legacy/table_lock.rs"
+            numbers.parent.mkdir(parents=True)
+            numbers_declarations = [
+                ("table_lock_state", "fn r#table_lock_state() {}"),
+                (
+                    "set_table_lock_state",
+                    "pub(crate) async unsafe fn set_table_lock_state() {}",
+                ),
+                (
+                    "table_lock_context",
+                    'pub(in crate::numbers) const unsafe extern "C" fn '
+                    "table_lock_context() {}",
+                ),
+            ]
+            numbers.write_text(
+                "\n".join(declaration for _, declaration in numbers_declarations)
+                + "\n",
+                encoding="utf-8",
+            )
+            shared = root / boundaries.IWA_TABLE_LOCK_SOURCE
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text(
+                "\n".join(
+                    [
+                        "pub(crate) const fn r#set_table_lock_state_for_model() {}",
+                        'pub unsafe extern "C" fn table_lock_state_for_model() {}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_table_lock_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                sorted(
+                    [
+                        "retired litchi-iwa Numbers table-lock method "
+                        f"{name}: crates/litchi-iwa/src/numbers/legacy/table_lock.rs:"
+                        f"{index}"
+                        for index, (name, _) in enumerate(numbers_declarations, start=1)
+                    ]
+                    + [
+                        "retired litchi-iwa Numbers table-lock method "
+                        "set_table_lock_state_for_model: "
+                        "crates/litchi-iwa/src/table_lock.rs:1",
+                        "retired litchi-iwa Numbers table-lock method "
+                        "table_lock_state_for_model: "
+                        "crates/litchi-iwa/src/table_lock.rs:2"
+                    ]
+                ),
+            )
+
+    def test_iwa_numbers_table_lock_policy_ignores_non_code_and_near_names(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            numbers = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_lock.rs"
+            numbers.parent.mkdir(parents=True)
+            numbers.write_text(
+                "\n".join(
+                    [
+                        "// pub fn table_lock_state() {}",
+                        'const NOTE: &str = "fn set_table_lock_state() {}";',
+                        "/* fn table_lock_context() {}",
+                        "   /* pub fn table_lock_state() {} */",
+                        "   fn set_table_lock_state() {} */",
+                        'const RAW_NOTE: &str = r###"',
+                        "fn table_lock_context() {}",
+                        '"###;',
+                        "pub fn table_lock_state_snapshot() {}",
+                        "pub fn reset_table_lock_state() {}",
+                        "pub fn table_lock_contextual() {}",
+                        "pub fn table_lock_state_for_model() {}",
+                        "pub fn set_table_lock_state_for_model() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            shared = root / boundaries.IWA_TABLE_LOCK_SOURCE
+            shared.write_text(
+                "\n".join(
+                    [
+                        "// fn set_table_lock_state_for_model() {}",
+                        'const NOTE: &str = r#"fn set_table_lock_state_for_model() {}"#;',
+                        "/* fn table_lock_state_for_model() {} */",
+                        'const READ_NOTE: &str = "fn table_lock_state_for_model() {}";',
+                        "pub(crate) fn table_lock_state() {}",
+                        "pub(crate) fn set_table_lock_state() {}",
+                        "fn table_lock_context() {}",
+                        "fn set_table_lock_state_for_models() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_lock_source_topology(root), []
+            )
+
+    def test_retired_iwa_numbers_table_info_lock_state_field_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / boundaries.IWA_NUMBERS_TABLE_INFO_SOURCE
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "\n".join(
+                    [
+                        "pub struct NumbersTableInfo {",
+                        "    pub r#lock_state: LockState,",
+                        "}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_lock_source_topology(root),
+                [
+                    "retired litchi-iwa Numbers table-info field lock_state: "
+                    "crates/litchi-iwa/src/numbers/editor/semantic/model.rs:2"
+                ],
+            )
+
+    def test_iwa_numbers_table_info_field_policy_ignores_nonpublic_and_other_scopes(
+        self,
+    ) -> None:
+        for permitted_field in (
+            "lock_state: LockState,",
+            "pub(crate) lock_state: LockState,",
+            "pub lock_state_snapshot: LockState,",
+        ):
+            with self.subTest(permitted_field=permitted_field):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    path = root / boundaries.IWA_NUMBERS_TABLE_INFO_SOURCE
+                    path.parent.mkdir(parents=True)
+                    path.write_text(
+                        "\n".join(
+                            [
+                                "/* pub struct NumbersTableInfo {",
+                                "    pub lock_state: LockState,",
+                                "} */",
+                                'const NOTE: &str = r#"',
+                                "pub struct NumbersTableInfo {",
+                                "    pub lock_state: LockState,",
+                                "}",
+                                '"#;',
+                                "pub struct OtherNumbersTableInfo {",
+                                "    pub lock_state: LockState,",
+                                "}",
+                                "pub struct NumbersTableInfo {",
+                                f"    {permitted_field}",
+                                "}",
+                            ]
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                    focused = root / "crates/litchi-numbers/src/table.rs"
+                    focused.parent.mkdir(parents=True)
+                    focused.write_text(
+                        "pub struct NumbersTableInfo {\n"
+                        "    pub lock_state: LockState,\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+                    pages = root / "crates/litchi-iwa/src/pages/model.rs"
+                    pages.parent.mkdir(parents=True)
+                    pages.write_text(
+                        "pub struct NumbersTableInfo {\n"
+                        "    pub lock_state: LockState,\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_iwa_numbers_table_lock_source_topology(root),
+                        [],
+                    )
+
+    def test_iwa_numbers_table_lock_policy_ignores_other_owners_and_non_rust_files(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            declarations = "\n".join(
+                f"pub fn {name}() {{}}"
+                for name in boundaries.RETIRED_IWA_NUMBERS_TABLE_LOCK_METHODS
+            ) + "\n"
+            for relative in (
+                Path("crates/litchi-numbers/src/table/lock.rs"),
+                Path("crates/litchi-iwa/src/pages/editor/tables/lock.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_tables/lock.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(declarations, encoding="utf-8")
+            non_rust = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "table_lock.txt"
+            non_rust.parent.mkdir(parents=True)
+            non_rust.write_text(declarations, encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_lock_source_topology(root), []
+            )
+
     def test_legacy_xlsb_sheet_view_names_and_methods_are_forbidden(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

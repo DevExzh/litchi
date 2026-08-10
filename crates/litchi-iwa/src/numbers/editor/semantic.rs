@@ -57,7 +57,6 @@ use litchi_iwa_common::comment::{
     TableCellReply,
 };
 use litchi_iwa_common::table::cell::conditional_highlight::Rule;
-use litchi_iwa_common::table::lock::State as TableLockState;
 use litchi_numbers::cell::data_format::{
     Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
     Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,

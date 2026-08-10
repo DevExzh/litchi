@@ -20,6 +20,8 @@ impl Entry {
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Resolved<'a> {
     pub(super) messages: &'a [RawMessage],
+    pub(super) component_index: usize,
+    pub(super) object_index: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +72,7 @@ impl Index {
                 })
             })?;
 
-        for (component_index, component_entry) in components.catalog.iter().enumerate() {
+        for (component_index, component_entry) in components.catalog().iter().enumerate() {
             let component = u32::try_from(component_index).map_err(|_error| {
                 Error::InvalidFormat("Numbers component count exceeds compact indexing".to_owned())
             })?;
@@ -164,12 +166,14 @@ impl Index {
             Error::InvalidFormat("Numbers object locator is invalid".to_owned())
         })?;
         let object = components
-            .catalog
+            .catalog()
             .get_index(component_index)
             .and_then(|component| component.archive().objects.get(object_index))
             .ok_or_else(|| Error::InvalidFormat("Numbers object locator is invalid".to_owned()))?;
         Ok(Some(Resolved {
             messages: &object.messages,
+            component_index,
+            object_index,
         }))
     }
 }

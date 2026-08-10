@@ -1,12 +1,15 @@
 // Wire-only Buffa projection derived from these canonical IWA declarations:
 //
 // - `TSPMessages.proto`: `TSP.Reference.identifier`, field 1;
-// - `TSTArchives.proto`: `TST.TableInfoArchive.tableModel`, field 2.
+// - `TSDArchives.proto`: `TSD.DrawableArchive.locked`, field 5;
+// - `TSTArchives.proto`: `TST.TableInfoArchive.super`, field 1, and
+//   `tableModel`, field 2.
 //
-// `TableInfoArchive.super` and every other table-info/reference metadata
-// field deliberately remain outside this generated closure. The Numbers
-// adapter preserves caller-owned IWA bytes as authoritative and applies its
-// own strict raw-wire preflight before forcing this borrowed lazy view.
+// Only the required drawable envelope and its optional lock flag join the
+// table-model reference in this generated closure. Every other drawable,
+// table-info, and reference metadata field remains opaque. The Numbers adapter
+// preserves caller-owned IWA bytes as authoritative and applies its own strict
+// raw-wire preflight before forcing this borrowed lazy view.
 syntax = "proto2";
 
 package LitchiIwaProjection;
@@ -15,6 +18,11 @@ message TableModelReference {
   required uint64 identifier = 1;
 }
 
+message DrawableArchive {
+  optional bool locked = 5;
+}
+
 message TableInfoArchive {
+  required .LitchiIwaProjection.DrawableArchive super = 1;
   required .LitchiIwaProjection.TableModelReference table_model = 2;
 }

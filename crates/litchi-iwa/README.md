@@ -1292,6 +1292,40 @@ keynote.save("updated.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+### Numbers table locks use the focused package API
+
+Table-lock reads and edits are no longer `NumbersEditor` raw-ID operations.
+Use a sheet selector and a table selector scoped to that sheet. The package and
+every commit are immutable; start a later edit from `commit.package()`. A patch
+is authorized against the exact source package, and applying its inverse to the
+committed package restores the original source bytes.
+
+```rust,no_run
+use litchi_numbers::table::lock::State as LockState;
+use litchi_numbers::{Package, SheetSelector, TableSelector};
+
+let package = Package::open("input.numbers")?;
+let sheet = SheetSelector::name("Summary");
+let table = TableSelector::name("Revenue");
+
+assert_eq!(package.table_lock(sheet, table)?, LockState::Unlocked);
+
+let mut edit = package.edit_table_lock(sheet, table)?;
+edit.lock();
+let commit = edit.commit()?;
+
+assert_eq!(
+    commit.package().table_lock(sheet, table)?,
+    LockState::Locked,
+);
+
+let restored = commit
+    .package()
+    .apply_table_lock(&commit.patch().inverse())?;
+assert_eq!(restored.package().source_bytes(), package.source_bytes());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 Existing Keynote title, body, and speaker-notes storage is owned by the focused
 `litchi-keynote` package. Ordinary users must use these APIs rather than the
 legacy host's generic storage or raw-ID compatibility paths. They select slides
