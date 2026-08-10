@@ -1564,3 +1564,84 @@ sanitizer-backed fuzz evidence. The boundary unit suite passes 138/138, the
 live slide-number host, placeholder host, and focused audits are clean, and the
 full checker retains only the unchanged 14 dependency-policy baselines. Native
 compatibility and exact inverse are complete.
+
+## 2026-08-11 current-status amendment: focused Keynote soundtrack settings
+
+Keynote soundtrack playback settings now have a direct focused owner at
+`soundtrack::{Mode, Settings, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` and
+`Package::{soundtrack_settings, edit_soundtrack_settings,
+apply_soundtrack_settings}`. The rooted transaction selects Document field 2,
+Show field 17, and one type-21 Soundtrack object with strict reference metadata,
+nonexternal/nonaliasing identifiers, unique messages, non-merge state, and
+bounded component framing. Absence reads `None` and cannot be changed into a
+new soundtrack.
+
+Only optional volume field 1 and mode field 2 are in the semantic delta.
+Volume is finite and in `0.0..=1.0`; known modes have canonical enum variants,
+while truly unknown discriminants round-trip. Field-3 movie-media references
+are streamed by strict raw decoding and matched against message metadata,
+PackageMetadata ownership/counts, safe data locators, and unique `Data/`
+members. The item order, payloads, data-reference metadata, and unknown fields
+remain exact.
+
+A scalar-only Buffa projection is forced and cross-checked after strict raw
+preflight; no repeated generated view or encoder owns field 3 or publication.
+Build provenance is five generated files/27,753 bytes under a 32-KiB cap, zero
+repeated views, and aggregate SHA-256
+`458206e0b57d8ec5ae4c3fc706bf793ccd385ab867b7e92ac30d66ab1858b4d3`.
+Codec reports and transaction work share bounded bytes/fields/nesting/work,
+reference/media, component, compression/output, reassembly, reopen, and exact
+comparison accounting. This policy does not close the remaining shared
+allocation, peak-memory, work-bound, output, patch-serialization, or durable
+save debts.
+
+An exact no-op shares its package, touches nothing, and skips reopen. A change
+rewrites one soundtrack component, reopens once, and permits only canonical
+field-1/field-2 and selected length changes inside that archive, plus the
+corresponding selected ZIP CRC/size/offset bookkeeping. Apply requires exact
+source/target artifacts; inverse is byte-exact. Changed non-exact/legacy
+provenance returns `UnsupportedSource`, while read/no-op compatibility remains.
+
+The settings path is playback-only: previews, ViewState, slides and node
+caches, field-3 items, media/data files and metadata, and unknowns remain exact.
+The IWA soundtrack-item reader and add/insert/replace/move/remove mutations,
+`KeynoteSoundtrackItemInfo`, creation, resource allocation/reclamation, and
+their shared wire helper remain outside this owner.
+
+The native source is 506,640-byte
+`69795554212651b261f5ffd71dd5cf511544f285cab680d724a9de7d3f04b14d`.
+Rust's same-size Loop/0.35 candidate is
+`6367e38a2edeebe6e65b148d0fd2aae555ee219dc1a65c339954047eb533ce1a`;
+only `Index/Document.iwa` changed and its inverse restored the source. Keynote
+opened without warning, showed Loop/0.3499999940395355, retained `ringin`
+00:00:01, and played it. Native Save As produced 506,651-byte
+`e264f4e714b0c44fca420b2c7b43e18f2ed1be99a766d25fe901f68d5f8bc299`.
+The media payload stayed exact at
+`5a08f48c4f86074e14a763d4f19f49ca31196a7a5f52fb48960e76b6f3d3d96b`,
+the slide and three previews were exact, and the normalized post-native restage
+was an exact no-op.
+
+The host cut removes the two direct settings methods, the entire 68-line
+`soundtrack.rs` editor module/source, its settings-only wire patch helper and
+dead decoded-native record field, two whole direct settings tests and their
+exclusive support (157 test lines), and the 29-line mutation example. The
+production delta is +2/-91 lines. The mixed inspector and README use the
+focused Package. Item CRUD, shared soundtrack wire/media code, creation,
+resource lifecycle, the item example, and item tests remain.
+
+Topology remains 64 workspace packages/235 internal declarations/14
+`litchi-iwa` dependency declarations/14 ordered debts. No edge closes and debt
+014 (`litchi-iwa -> litchi-keynote`) remains.
+
+Current verification is 5/5 codec, 1/1 focused scaling unit, 4/4 focused
+settings, 99/99 Keynote library, 10/10 `--features keynote` facade, and 8/8
+doctests. Keynote all-target, strict
+Clippy/rustdoc, example, host, formatting, and diff gates are green. Performance
+review is P0/P1-clean. The test-only `media.rs` gate exercises realistic
+4,096/8,192 metadata/media states through the actual streaming path;
+references double exactly and fields/work/references remain within 2.3x. This
+is resource-accounting evidence without a wall-clock claim. Boundary
+regressions pass 152/152; host and focused audits each report zero diagnostics,
+and the full checker retains only the unchanged 14 baselines: six dev-only
+annotation findings and eight edge classifications.

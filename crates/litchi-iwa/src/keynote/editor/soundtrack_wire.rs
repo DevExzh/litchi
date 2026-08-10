@@ -17,7 +17,6 @@ const VARINT_WIRE_TYPE: u8 = 0;
 
 pub(super) struct SoundtrackRecord<'a> {
     pub(super) id: u64,
-    pub(super) native: kn::Soundtrack,
     pub(super) data: &'a [u8],
 }
 
@@ -42,35 +41,16 @@ pub(super) fn read_soundtrack<'a>(graph: &'a ObjectGraph) -> Result<Option<Sound
         SOUNDTRACK_MESSAGE_TYPE,
         "KN.Soundtrack",
     )?;
+    decode_soundtrack(data)?;
     Ok(Some(SoundtrackRecord {
         id: reference.identifier,
-        native: decode_soundtrack(data)?,
         data,
     }))
 }
 
-pub(super) fn decode_soundtrack(data: &[u8]) -> Result<kn::Soundtrack> {
+fn decode_soundtrack(data: &[u8]) -> Result<kn::Soundtrack> {
     validate_soundtrack_wire(data)?;
     Ok(kn::Soundtrack::decode(data)?)
-}
-
-pub(super) fn patch_soundtrack_wire(
-    original: &[u8],
-    soundtrack: &kn::Soundtrack,
-    settings: &litchi_keynote::soundtrack::Settings,
-) -> Result<Vec<u8>> {
-    let data = patch_fixed64_field(
-        original,
-        VOLUME_FIELD,
-        soundtrack.volume.is_some(),
-        settings.volume().map(f64::to_bits),
-    )?;
-    patch_varint_field(
-        &data,
-        MODE_FIELD,
-        soundtrack.mode.is_some(),
-        settings.mode().map(|mode| i64::from(mode.as_raw()) as u64),
-    )
 }
 
 pub(super) fn soundtrack_media_payloads(data: &[u8]) -> Result<Vec<Vec<u8>>> {

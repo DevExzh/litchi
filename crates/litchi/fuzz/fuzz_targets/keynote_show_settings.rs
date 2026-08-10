@@ -8,6 +8,10 @@ use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
     Limits, Package, ReadError, ReadOptions, Seconds, SemanticLimits,
     show::{Mode, Settings, Size},
+    soundtrack::{
+        Commit as SoundtrackCommit, Error as SoundtrackError, Mode as SoundtrackMode,
+        Settings as SoundtrackSettings,
+    },
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;
@@ -77,6 +81,8 @@ fn native_package() -> &'static Package {
 }
 
 fn exercise_package(package: &Package, data: &[u8]) {
+    exercise_soundtrack_settings(package, data);
+
     let before = match package.show_settings() {
         Ok(settings) => settings,
         Err(error) => {
@@ -119,7 +125,10 @@ fn exercise_package(package: &Package, data: &[u8]) {
         assert!(diagnostics.touched_components() > 0);
     }
     if command == 1 {
-        assert_ne!(before, after, "the playback-only command must change settings");
+        assert_ne!(
+            before, after,
+            "the playback-only command must change settings"
+        );
         assert_eq!(
             diagnostics.deleted_previews(),
             0,
@@ -179,6 +188,200 @@ fn exercise_package(package: &Package, data: &[u8]) {
         before,
     );
     assert_eq!(package_bytes(restored.package()), package_bytes(package));
+}
+
+fn exercise_soundtrack_settings(package: &Package, data: &[u8]) {
+    let before = match package.soundtrack_settings() {
+        Ok(Some(settings)) => settings,
+        Ok(None) => {
+            assert!(matches!(
+                package.edit_soundtrack_settings(),
+                Err(SoundtrackError::SoundtrackNotFound)
+            ));
+            return;
+        },
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    observe_soundtrack_settings(before);
+
+    let after = change_soundtrack_settings(before, data);
+    let edit = match package.edit_soundtrack_settings() {
+        Ok(edit) => edit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    assert_eq!(edit.settings(), before);
+    let commit = match edit.set(after).commit() {
+        Ok(commit) => commit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    publish_soundtrack_and_reverse(package, before, after, commit);
+}
+
+fn change_soundtrack_settings(mut settings: SoundtrackSettings, data: &[u8]) -> SoundtrackSettings {
+    match control(data, 20) % 6 {
+        0 => {},
+        1 => settings
+            .set_volume(Some(distinct_soundtrack_volume(settings.volume(), data)))
+            .unwrap_or_else(|error| unreachable!("bounded soundtrack volume is valid: {error}")),
+        2 => match settings.volume() {
+            Some(_) => settings.set_volume(None).unwrap_or_else(|error| {
+                unreachable!("clearing soundtrack volume is valid: {error}")
+            }),
+            None => settings
+                .set_volume(Some(distinct_soundtrack_volume(None, data)))
+                .unwrap_or_else(|error| {
+                    unreachable!("bounded soundtrack volume is valid: {error}")
+                }),
+        },
+        3 => settings
+            .set_mode(Some(distinct_soundtrack_mode(settings.mode(), data)))
+            .unwrap_or_else(|error| unreachable!("named soundtrack mode is valid: {error}")),
+        4 => match settings.mode() {
+            Some(_) => settings
+                .set_mode(None)
+                .unwrap_or_else(|error| unreachable!("clearing soundtrack mode is valid: {error}")),
+            None => settings
+                .set_mode(Some(distinct_soundtrack_mode(None, data)))
+                .unwrap_or_else(|error| unreachable!("named soundtrack mode is valid: {error}")),
+        },
+        _ => {
+            settings
+                .set_volume(Some(distinct_soundtrack_volume(settings.volume(), data)))
+                .unwrap_or_else(|error| {
+                    unreachable!("bounded soundtrack volume is valid: {error}")
+                });
+            settings
+                .set_mode(Some(distinct_future_soundtrack_mode(settings.mode(), data)))
+                .unwrap_or_else(|error| {
+                    unreachable!("a future soundtrack mode is canonical: {error}")
+                });
+        },
+    }
+    settings
+}
+
+fn distinct_soundtrack_volume(current: Option<f64>, data: &[u8]) -> f64 {
+    let candidate = f64::from(read_u16(data, 22)) / f64::from(u16::MAX);
+    if current == Some(candidate) {
+        if candidate == 1.0 { 0.0 } else { 1.0 }
+    } else {
+        candidate
+    }
+}
+
+fn distinct_soundtrack_mode(current: Option<SoundtrackMode>, data: &[u8]) -> SoundtrackMode {
+    let candidates = [
+        SoundtrackMode::PlayOnce,
+        SoundtrackMode::Loop,
+        SoundtrackMode::DoNotPlay,
+    ];
+    let mut index = usize::from(control(data, 24)) % candidates.len();
+    if current == Some(candidates[index]) {
+        index = (index + 1) % candidates.len();
+    }
+    candidates[index]
+}
+
+fn distinct_future_soundtrack_mode(current: Option<SoundtrackMode>, data: &[u8]) -> SoundtrackMode {
+    let mut raw = i32::from_le_bytes(read_u32(data, 26).to_le_bytes());
+    if (0..=2).contains(&raw) {
+        raw = 3;
+    }
+    if current == Some(SoundtrackMode::Unknown(raw)) {
+        raw = if raw == i32::MAX { -1 } else { raw + 1 };
+        if (0..=2).contains(&raw) {
+            raw = 3;
+        }
+    }
+    SoundtrackMode::Unknown(raw)
+}
+
+fn publish_soundtrack_and_reverse(
+    package: &Package,
+    before: SoundtrackSettings,
+    after: SoundtrackSettings,
+    commit: SoundtrackCommit,
+) {
+    let patch = commit.patch().clone();
+    let diagnostics = commit.diagnostics();
+    assert_eq!(patch.before(), before);
+    assert_eq!(patch.after(), after);
+    assert_eq!(patch.is_noop(), before == after);
+    assert_eq!(diagnostics.changed(), before != after);
+    assert_eq!(diagnostics.full_reparse_performed(), before != after);
+    if before == after {
+        assert_eq!(diagnostics.touched_components(), 0);
+    } else {
+        assert!(diagnostics.touched_components() > 0);
+    }
+    assert_eq!(
+        commit
+            .package()
+            .soundtrack_settings()
+            .unwrap_or_else(|error| panic!(
+                "committed soundtrack settings must be readable: {error}"
+            )),
+        Some(after),
+    );
+    let source_bytes = package_bytes(package);
+    let committed_bytes = package_bytes(commit.package());
+    assert_eq!(patch.is_noop(), source_bytes == committed_bytes);
+    black_box((
+        patch.source_fingerprint(),
+        patch.target_fingerprint(),
+        &patch,
+    ));
+
+    let applied = package
+        .apply_soundtrack_settings(&patch)
+        .unwrap_or_else(|error| panic!("fresh soundtrack patch must apply: {error}"));
+    assert_eq!(package_bytes(applied.package()), committed_bytes);
+    assert_eq!(
+        applied
+            .package()
+            .soundtrack_settings()
+            .unwrap_or_else(|error| panic!(
+                "applied soundtrack settings must be readable: {error}"
+            )),
+        Some(after),
+    );
+
+    let inverse = patch.inverse();
+    assert_eq!(inverse.inverse(), patch);
+    if !patch.is_noop() {
+        match applied.package().apply_soundtrack_settings(&patch) {
+            Err(error) => observe_error(error),
+            Ok(_) => panic!("a changed soundtrack patch must conflict with its target"),
+        }
+        match package.apply_soundtrack_settings(&inverse) {
+            Err(error) => observe_error(error),
+            Ok(_) => panic!("a changed soundtrack inverse must conflict with its source"),
+        }
+    }
+
+    let restored = applied
+        .package()
+        .apply_soundtrack_settings(&inverse)
+        .unwrap_or_else(|error| panic!("fresh soundtrack inverse must apply: {error}"));
+    assert_eq!(package_bytes(restored.package()), source_bytes);
+    assert_eq!(
+        restored
+            .package()
+            .soundtrack_settings()
+            .unwrap_or_else(|error| panic!(
+                "restored soundtrack settings must be readable: {error}"
+            )),
+        Some(before),
+    );
 }
 
 fn change_playback(mut settings: Settings, data: &[u8]) -> Settings {
@@ -248,6 +451,10 @@ fn observe_settings(settings: Settings) {
     ));
 }
 
+fn observe_soundtrack_settings(settings: SoundtrackSettings) {
+    black_box((settings.volume(), settings.mode()));
+}
+
 fn exercise_semantic_validation(data: &[u8]) {
     let raw = i32::from_le_bytes(read_u32(data, 4).to_le_bytes());
     observe_result(Mode::unknown(raw));
@@ -257,6 +464,7 @@ fn exercise_semantic_validation(data: &[u8]) {
     ));
     observe_result(Seconds::new(f64::from_bits(read_u64(data, 16))));
     observe_result(Settings::default().validate());
+    exercise_soundtrack_semantic_validation(data);
     observe_result(SemanticLimits::new(
         0,
         MAX_SLIDES,
@@ -265,6 +473,28 @@ fn exercise_semantic_validation(data: &[u8]) {
         MAX_TEXT_FRAGMENTS,
         MAX_TEXT_BYTES,
     ));
+}
+
+fn exercise_soundtrack_semantic_validation(data: &[u8]) {
+    let raw = i32::from_le_bytes(read_u32(data, 28).to_le_bytes());
+    let mode = SoundtrackMode::from_raw(raw);
+    assert_eq!(mode.as_raw(), raw);
+    black_box(mode.is_canonical());
+
+    let absent = SoundtrackSettings::new(None, None)
+        .unwrap_or_else(|error| unreachable!("absent soundtrack settings are valid: {error}"));
+    assert_eq!((absent.volume(), absent.mode()), (None, None));
+    let future = distinct_future_soundtrack_mode(None, data);
+    let future_settings = SoundtrackSettings::new(Some(0.5), Some(future))
+        .unwrap_or_else(|error| unreachable!("future soundtrack mode is valid: {error}"));
+    assert_eq!(future_settings.mode(), Some(future));
+    observe_result(SoundtrackSettings::new(
+        Some(f64::from_bits(read_u64(data, 32))),
+        Some(SoundtrackMode::Unknown(raw)),
+    ));
+    for known in [0, 1, 2] {
+        assert!(SoundtrackSettings::new(None, Some(SoundtrackMode::Unknown(known))).is_err());
+    }
 }
 
 fn exercise_redacted_malformed_ingress() {

@@ -1,0 +1,10 @@
+// Scalar-only Keynote soundtrack projection. The native movie-media list is
+// intentionally absent: the strict handwritten codec streams it under its
+// caller-selected resource budget.
+syntax = "proto2";
+package LitchiIwaProjection;
+
+message SoundtrackArchive {
+  optional double volume = 1;
+  optional int32 mode = 2 [default = 0];
+}

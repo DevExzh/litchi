@@ -14,6 +14,7 @@ pub(crate) mod slide_placeholder_visibility;
 mod slide_preview;
 mod slide_text;
 pub(crate) mod slide_transition;
+pub(crate) mod soundtrack_settings;
 
 use std::fmt;
 use std::fs::File;

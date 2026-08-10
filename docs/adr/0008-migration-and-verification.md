@@ -9345,3 +9345,123 @@ evidence, not sanitizer-backed fuzzing. Boundary regressions pass 138/138;
 the live slide-number host, placeholder host, and focused audits are clean.
 The full checker retains only the unchanged 14 dependency-policy baselines.
 Exact-artifact and native compatibility verification is complete.
+
+## 2026-08-11 amendment: Keynote soundtrack-settings cutover
+
+The earlier semantic-only migration is superseded for playback-setting reads
+and writes. The canonical direct namespace is now
+`soundtrack::{Mode, Settings, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}`, reached through
+`Package::{soundtrack_settings, edit_soundtrack_settings,
+apply_soundtrack_settings}`. Media items remain deliberately absent from
+`Settings`. `None` from the read means no rooted soundtrack object, whereas
+`Some(Settings::default())` means an object exists with both scalar settings
+absent. Editing the first case fails with `SoundtrackNotFound`; the focused
+transaction never synthesizes a soundtrack or media.
+
+Migration replaces a direct `KeynoteEditor::soundtrack_settings` read with
+`Package::soundtrack_settings`, and a direct settings mutation with
+`Package::edit_soundtrack_settings()?.set(settings).commit()` plus `write_to`.
+`Settings::new`/setters preserve presence and validate finite inclusive volume
+and canonical known modes; future mode discriminants remain lossless.
+`Edit::set` consumes the edit and cannot fail because `Settings` is already
+validated. Patch application is against an exact immutable package snapshot,
+not a long-lived host editor.
+
+Changed preflight proves Document object 1/type 1 field 2 -> unique Show/type 2
+-> Show field 17 -> unique type-21 `KN.Soundtrack`. Both object edges require
+exact aggregate and field-path reference metadata, nonzero/nonexternal
+identifiers, role disjointness, selected-message uniqueness, no merge/diff
+state, and bounded component framing. Only Soundtrack fixed64 field 1 and
+varint field 2 may change. Their absent/present spelling is semantic and is
+rewritten with canonical framing.
+
+Soundtrack field 3 is a retained resource boundary, not an opaque unchecked
+tail. The codec streams every canonical nonzero movie-media data reference and
+cross-checks its order with the selected message's aggregate data references
+and optional exact field-3 metadata. Mutation additionally proves the matching
+PackageMetadata component/data records, selected soundtrack owner/count, safe
+relative data filename, and unique `Data/` entry. The media field records,
+metadata, data file bytes, ordering, and all unknown soundtrack fields remain
+exact.
+
+The focused `KNSoundtrackSettingsArchive.proto` projection covers only the
+two Soundtrack scalar settings; strict traversal validates the Show reference
+separately. Handwritten raw preflight runs before forced/cross-checked Buffa
+lazy views and streams media without a generated repeated collection. No
+generated encoder participates in the rewrite. The deterministic build
+produces five files/27,753 bytes, no repeated views, under 32 KiB, with
+aggregate SHA-256
+`458206e0b57d8ec5ae4c3fc706bf793ccd385ab867b7e92ac30d66ab1858b4d3`.
+This is code-generation provenance; accepted raw records remain authoritative
+for preservation.
+
+The shared budget incorporates codec bytes, fields, work, nesting, media
+reference count, and media payload bytes, then charges rooted/reference
+metadata, PackageMetadata/data-member closure, component framing, output and
+compression, archive reassembly, reopen, and exact candidate comparisons.
+Allocations are fallible and errors remain typed and content-redacted. No
+separate performance closure is inferred from these enforcement paths; shared
+allocation, peak-memory, work-bound, output, durable-save, and process-local
+patch debts remain.
+
+No-op commit/application returns the exact source without component rewrite or
+reopen and reports unchanged diagnostics. A changed commit rewrites the one
+soundtrack component, reassembles, reopens once, and verifies every package
+member plus the selected object/message delta and only its necessary ZIP
+CRC/size/offset bookkeeping. Changed apply exact-authorizes the source and
+retained target before reopening the target. Inverse artifacts
+restore source bytes exactly. Legacy/non-exact provenance remains readable and
+supports exact no-op behavior, but changed mutation intentionally returns
+`UnsupportedSource` rather than normalizing it.
+
+This is a playback-only settings cut. It preserves root previews, slide and
+node caches, ViewState, every slide, field-3 item order, media bytes and
+metadata, and unknown records. It does not retire the separate host soundtrack
+item APIs, `KeynoteSoundtrackItemInfo`, soundtrack creation, data allocation,
+replacement/reclamation, the item example/tests, or the shared wire/media
+helper required by those paths.
+
+The native gate used 506,640-byte Apple-resaved populated source SHA-256
+`69795554212651b261f5ffd71dd5cf511544f285cab680d724a9de7d3f04b14d`.
+The same-size Rust Loop/0.35 candidate was
+`6367e38a2edeebe6e65b148d0fd2aae555ee219dc1a65c339954047eb533ce1a`;
+only `Index/Document.iwa` differed and inverse application exactly restored the
+source. Keynote opened warning-free, showed Loop and volume
+0.3499999940395355, retained `ringin` at 00:00:01, and played it. Native Save
+As produced 506,651-byte
+`e264f4e714b0c44fca420b2c7b43e18f2ed1be99a766d25fe901f68d5f8bc299`.
+The `ringin-9075.m4a` payload stayed exact at
+`5a08f48c4f86074e14a763d4f19f49ca31196a7a5f52fb48960e76b6f3d3d96b`;
+the slide and all three previews were exact, and a focused restage of the
+normalized native setting was a byte-exact no-op.
+
+The completed host migration removes
+`KeynoteEditor::{soundtrack_settings, set_soundtrack_settings}`, the complete
+68-line `keynote/editor/soundtrack.rs` module/source, settings-only
+`patch_soundtrack_wire`, and the retained record's now-dead decoded-native
+field. Production changes by +2/-91 lines. Two whole settings tests plus their
+exclusive import/constants are removed in the 157-line test cut, as is the
+29-line direct mutation example. The mixed inspector and README migrate to
+focused Package reads/transactions. The item CRUD API and module, shared
+wire/media reader and mutation helpers, creation, media lifecycle, item
+example, and item tests remain.
+
+No Cargo edge closes: debt 014 (`litchi-iwa -> litchi-keynote`) remains. The
+inventory is unchanged at 64 workspace packages, 235 internal declarations,
+14 `litchi-iwa` dependency declarations, and 14 ordered debts.
+
+The frozen gates pass 5/5 codec tests, 1/1 focused scaling unit, 4/4 focused
+soundtrack-settings tests, 99/99 Keynote library tests, 10/10 facade tests with
+`--features keynote`, and 8/8 doctests. All-target Keynote checking, strict
+Keynote Clippy/rustdoc,
+focused and retained examples, host checks, formatting, and diff checks pass.
+The performance review is clean at P0/P1. A test-only `media.rs` regression
+routes realistic 4,096- and 8,192-entry metadata/media states through the real
+streaming path; references double exactly and fields/work/references stay at
+or below 2.3x. That is deterministic scaling evidence, not a wall-clock or
+general performance-completion claim. Boundary tests pass 152/152; host and
+focused audits each report zero diagnostics. The full
+checker retains only the unchanged 14 baselines: six dev-only annotation
+findings and eight edge classifications. Native, inverse, no-op, and
+preservation verification is complete.

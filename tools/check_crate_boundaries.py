@@ -192,6 +192,201 @@ KEYNOTE_SHOW_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:show|show_settings)"
     r"[ \t\r\n]*::"
 )
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_METHODS = (
+    "soundtrack_settings",
+    "set_soundtrack_settings",
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_METHODS
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "soundtrack.rs"
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_MODULES = ("soundtrack",)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_keynote_soundtrack.rs"
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_TESTS = (
+    "soundtrack_settings_are_typed_transactional_and_wire_exact",
+    "soundtrack_settings_handle_absent_and_malformed_objects_transactionally",
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_TEST_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_TESTS
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_METHODS = (
+    "patch_soundtrack_wire",
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_METHODS
+)
+IWA_KEYNOTE_SOUNDTRACK_WIRE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "soundtrack_wire.rs"
+)
+IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLER_SOURCES = (
+    Path("crates/litchi-iwa/examples/inspect_keynote_structure.rs"),
+)
+IWA_KEYNOTE_SOUNDTRACK_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(soundtrack)\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:keynote|editor)"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>soundtrack_settings|set_soundtrack_settings)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])"
+        r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?(?P<method>soundtrack_settings|set_soundtrack_settings)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>set_soundtrack_settings)\b[ \t\r\n]*\("
+    ),
+)
+IWA_KEYNOTE_README_SOUNDTRACK_SETTINGS_EXAMPLE = re.compile(
+    r"(?<![A-Za-z0-9_])(?P<example>edit_keynote_soundtrack)"
+    r"(?:\.rs)?(?![A-Za-z0-9_])"
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "soundtrack.rs"
+KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "soundtrack_settings.rs"
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_ROOT = (
+    KEYNOTE_SOURCE_ROOT / "package" / "soundtrack_settings"
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_SOURCES = (
+    KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_ROOT / "media.rs",
+    KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_ROOT / "rewrite.rs",
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_IMPLEMENTATION_SOURCES = (
+    KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE,
+    KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE,
+    *KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_SOURCES,
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_CANONICAL_TYPES = (
+    "Mode",
+    "Settings",
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_SHORT_NAMES = frozenset(
+    KEYNOTE_SOUNDTRACK_SETTINGS_CANONICAL_TYPES
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_PACKAGE_METHODS = (
+    "soundtrack_settings",
+    "edit_soundtrack_settings",
+    "apply_soundtrack_settings",
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES = frozenset(
+    {
+        "Soundtrack",
+        "SoundtrackMode",
+        "SoundtrackSettings",
+        "SoundtrackEdit",
+        "SoundtrackPatch",
+        "SoundtrackCommit",
+        "SoundtrackDiagnostics",
+        "SoundtrackError",
+        "SoundtrackLimitKind",
+        "SoundtrackSettingsEdit",
+        "SoundtrackSettingsPatch",
+        "SoundtrackSettingsCommit",
+        "SoundtrackSettingsDiagnostics",
+        "SoundtrackSettingsError",
+        "SoundtrackSettingsLimitKind",
+    }
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_FORBIDDEN_PUBLIC_MEMBERS = frozenset(
+    {"set_soundtrack_settings"}
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:soundtrack|soundtrack_settings)"
+    r"[ \t\r\n]*::"
+)
+PUBLIC_KEYNOTE_PACKAGE_SOUNDTRACK_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+"
+    r"(?:r#)?soundtrack_settings\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+KEYNOTE_PACKAGE_SOUNDTRACK_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?soundtrack_settings\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_KEYNOTE_SOUNDTRACK_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?soundtrack\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_KEYNOTE_SOUNDTRACK_TRANSACTION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transaction\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "ReferenceSnapshot",
+        "Resolved",
+        "SnappyStream",
+        "SoundtrackRecord",
+        "SoundtrackSnapshot",
+        "SoundtrackSettingsSnapshot",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_TYPES = frozenset(
+    {
+        "DecodeLimitKind",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SOUNDTRACK_SETTINGS_PROTO_ORIGINS = frozenset({"kn", "tsp"})
+KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES = frozenset(
+    {
+        "DataReference",
+        "EmbeddedMediaAsset",
+        "KeynoteSoundtrackItemInfo",
+        "MediaAssetId",
+        "data_reference",
+        "data_references",
+        "media",
+        "media_items",
+        "movie_media",
+        "payload",
+        "payloads",
+    }
+)
 RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHODS = (
     "slide_transition",
     "set_slide_transition",
@@ -2318,6 +2513,50 @@ def _is_keynote_show_settings_public_declaration(
     ) or _keynote_show_owner_declaration(declaration)
 
 
+def _keynote_soundtrack_settings_public_leak(identifier: str) -> str | None:
+    """Classify physical vocabulary in the focused soundtrack-settings API."""
+
+    if identifier in KEYNOTE_SOUNDTRACK_SETTINGS_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_TYPES:
+        return "wire type"
+    if identifier in KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES:
+        return "soundtrack media topology"
+    return _iwork_public_leak(identifier)
+
+
+def _keynote_soundtrack_settings_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_PATH.search(
+        declaration
+    ) is not None or any(
+        identifier in KEYNOTE_SOUNDTRACK_SETTINGS_PACKAGE_METHODS
+        for identifier in identifiers
+    )
+
+
+def _is_keynote_soundtrack_settings_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers
+        & (
+            KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES
+            | KEYNOTE_SOUNDTRACK_SETTINGS_FORBIDDEN_PUBLIC_MEMBERS
+            | {"soundtrack", "soundtrack_settings"}
+        )
+    ) or _keynote_soundtrack_settings_owner_declaration(declaration)
+
+
 def _keynote_slide_transition_public_leak(
     identifier: str, *, semantic_source: bool
 ) -> str | None:
@@ -2623,6 +2862,314 @@ def audit_keynote_show_settings_facade_source_topology(
                 )
                 violations.append(
                     "focused litchi-keynote show-settings public API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_soundtrack_settings_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep retired Keynote soundtrack-setting ownership out of the host."""
+
+    violations: list[str] = []
+    for retired, label in (
+        (RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_SOURCE, "source"),
+        (RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_EXAMPLE, "example"),
+    ):
+        if (root / retired).exists():
+            violations.append(
+                "retired litchi-iwa Keynote soundtrack settings "
+                f"{label} returned: {retired}"
+            )
+
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Keynote soundtrack settings method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    wire_path = root / IWA_KEYNOTE_SOUNDTRACK_WIRE_SOURCE
+    if wire_path.is_file():
+        source = wire_path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name not in RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_METHOD_SET:
+                continue
+            violations.append(
+                "retired litchi-iwa Keynote soundtrack settings wire helper "
+                f"{name}: {IWA_KEYNOTE_SOUNDTRACK_WIRE_SOURCE}:{line_number}"
+            )
+
+    editor_path = root / IWA_KEYNOTE_EDITOR_SOURCE
+    if editor_path.is_file():
+        source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+        for match in IWA_KEYNOTE_SOUNDTRACK_SETTINGS_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start(1)) + 1
+            violations.append(
+                "retired litchi-iwa Keynote soundtrack settings module "
+                f"{match.group(1)}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
+
+    tests_path = root / IWA_KEYNOTE_EDITOR_TEST_SOURCE
+    if tests_path.is_file():
+        source = tests_path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name not in RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_TEST_SET:
+                continue
+            violations.append(
+                "retired litchi-iwa Keynote soundtrack settings test "
+                f"{name}: {IWA_KEYNOTE_EDITOR_TEST_SOURCE}:{line_number}"
+            )
+
+    for caller_source in IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLER_SOURCES:
+        caller_path = root / caller_source
+        if not caller_path.is_file():
+            continue
+        source = _mask_rust_non_code(caller_path.read_text(encoding="utf-8"))
+        for pattern in IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote soundtrack settings caller "
+                    f"{match.group('method')}: {caller_source}:{line_number}"
+                )
+
+    readme_path = root / IWA_KEYNOTE_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote soundtrack settings README call "
+                    f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
+                )
+        for match in IWA_KEYNOTE_README_SOUNDTRACK_SETTINGS_EXAMPLE.finditer(source):
+            line_number = source.count("\n", 0, match.start("example")) + 1
+            violations.append(
+                "retired litchi-iwa Keynote soundtrack settings README example "
+                f"reference {match.group('example')}: "
+                f"{IWA_KEYNOTE_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_soundtrack_settings_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the direct, archive-free Keynote soundtrack-settings API."""
+
+    source_root = root / KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in KEYNOTE_SOUNDTRACK_SETTINGS_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    owner_helper_root = root / KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_ROOT
+    if owner_helper_root.is_dir():
+        dedicated_sources.update(owner_helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    canonical_exports = _rust_canonical_exports(
+        semantic_source, KEYNOTE_SOUNDTRACK_SETTINGS_SHORT_NAMES
+    )
+    for name in KEYNOTE_SOUNDTRACK_SETTINGS_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-keynote soundtrack settings public API is missing "
+            f"canonical soundtrack type {name}: "
+            f"{KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE}"
+        )
+
+    semantic_code = _mask_rust_non_code(semantic_source)
+    for match in PUBLIC_KEYNOTE_SOUNDTRACK_TRANSACTION_MODULE.finditer(semantic_code):
+        line_number = semantic_code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-keynote soundtrack settings public API exposes "
+            "duplicate soundtrack::transaction module: "
+            f"{KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE}:{line_number}"
+        )
+
+    lib_export = root / KEYNOTE_SOURCE_ROOT / "lib.rs"
+    lib_source = (
+        _mask_rust_non_code(lib_export.read_text(encoding="utf-8"))
+        if lib_export.is_file()
+        else ""
+    )
+    if PUBLIC_KEYNOTE_SOUNDTRACK_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-keynote soundtrack settings public API is missing "
+            "canonical root soundtrack module: "
+            f"{KEYNOTE_SOURCE_ROOT / 'lib.rs'}"
+        )
+
+    package_export = root / KEYNOTE_SOURCE_ROOT / "package.rs"
+    if package_export.is_file():
+        package_source = _mask_rust_non_code(
+            package_export.read_text(encoding="utf-8")
+        )
+        if KEYNOTE_PACKAGE_SOUNDTRACK_SETTINGS_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-keynote soundtrack settings public API is missing "
+                "private package owner module: "
+                f"{package_export.relative_to(root)}"
+            )
+        for match in PUBLIC_KEYNOTE_PACKAGE_SOUNDTRACK_SETTINGS_MODULE.finditer(
+            package_source
+        ):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-keynote soundtrack settings public API exposes "
+                "duplicate package::soundtrack_settings module: "
+                f"{package_export.relative_to(root)}:{line_number}"
+            )
+    else:
+        violations.append(
+            "focused litchi-keynote soundtrack settings public API is missing "
+            "private package owner module: "
+            f"{KEYNOTE_SOURCE_ROOT / 'package.rs'}"
+        )
+
+    owner_path = root / KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-keynote soundtrack settings public API is missing "
+            "private package owner source: "
+            f"{KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE}"
+        )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_keynote_soundtrack_settings_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            owner_declaration = _keynote_soundtrack_settings_owner_declaration(
+                declaration
+            )
+            declaration_identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = declaration_identifiers[:2] in (
+                ["pub", "type"],
+                ["pub", "use"],
+            )
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and declaration_identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote soundtrack settings public API "
+                    "retains root aliases via soundtrack glob: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            if (
+                public_declaration
+                and path in export_sources
+                and public_use_or_type
+                and any(
+                    identifier in {"soundtrack", "soundtrack_settings"}
+                    for identifier in declaration_identifiers
+                )
+            ):
+                violations.append(
+                    "focused litchi-keynote soundtrack settings public API exposes "
+                    "public soundtrack owner alias: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if (
+                    public_declaration
+                    and identifier in KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES
+                ):
+                    violations.append(
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and owner_declaration
+                    and public_use_or_type
+                    and identifier in KEYNOTE_SOUNDTRACK_SETTINGS_SHORT_NAMES
+                ):
+                    violations.append(
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"retains root alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and identifier
+                    in KEYNOTE_SOUNDTRACK_SETTINGS_FORBIDDEN_PUBLIC_MEMBERS
+                ):
+                    violations.append(
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"retains host-style public member {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _keynote_soundtrack_settings_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-keynote soundtrack settings public API exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-keynote soundtrack settings public API exposes "
                     f"raw byte slice {byte_slice}: "
                     f"{path.relative_to(root)}:{byte_slice_line}"
                 )
@@ -4246,6 +4793,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_source_topology()
         + audit_iwa_keynote_show_settings_source_topology()
         + audit_keynote_show_settings_facade_source_topology()
+        + audit_iwa_keynote_soundtrack_settings_source_topology()
+        + audit_keynote_soundtrack_settings_facade_source_topology()
         + audit_iwa_keynote_slide_transition_source_topology()
         + audit_keynote_slide_transition_facade_source_topology()
         + audit_iwa_keynote_placeholder_visibility_source_topology()

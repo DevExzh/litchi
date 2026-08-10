@@ -11,6 +11,7 @@ use litchi_iwa_protos::kn::{
 use litchi_iwa_protos::tsd::{ImageArchive, MovieArchive};
 use litchi_iwa_protos::tsp::PackageMetadata;
 use litchi_iwa_protos::tswp::{ShapeInfoArchive, StorageArchive};
+use litchi_keynote::Package as KeynotePackage;
 use prost::Message;
 
 const STORAGELESS_PLACEHOLDER_STORAGE_ID: u64 = 0;
@@ -30,7 +31,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             slide.layout
         );
     }
-    println!("soundtrack settings: {:?}", editor.soundtrack_settings()?);
+    println!(
+        "soundtrack settings: {:?}",
+        KeynotePackage::open(&path)?.soundtrack_settings()?
+    );
     println!("soundtrack items: {:?}", editor.soundtrack_items()?);
     let media_assets = editor.media_assets()?;
     let package = IWorkPackage::open(path)?;

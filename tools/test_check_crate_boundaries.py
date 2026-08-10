@@ -167,6 +167,40 @@ def add_keynote_placeholder_visibility_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_soundtrack_settings_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic_source = (
+        semantic.read_text(encoding="utf-8") if semantic.is_file() else ""
+    )
+    semantic.write_text(
+        semantic_source
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_CANONICAL_TYPES
+        ),
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    if not owner.is_file():
+        owner.write_text("// Private package owner.\n", encoding="utf-8")
+    lib_export = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES[0]
+    lib_source = (
+        lib_export.read_text(encoding="utf-8") if lib_export.is_file() else ""
+    )
+    lib_export.write_text(lib_source + "pub mod soundtrack;\n", encoding="utf-8")
+    package_export = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES[1]
+    package_source = (
+        package_export.read_text(encoding="utf-8")
+        if package_export.is_file()
+        else ""
+    )
+    package_export.write_text(
+        package_source + "mod soundtrack_settings;\n", encoding="utf-8"
+    )
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -1445,6 +1479,1011 @@ class BoundaryPolicyTests(unittest.TestCase):
                     ]
                 ),
             )
+
+    def test_keynote_soundtrack_settings_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_METHODS,
+            ("soundtrack_settings", "set_soundtrack_settings"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/editor/soundtrack.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_MODULES,
+            ("soundtrack",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_EXAMPLE,
+            Path("crates/litchi-iwa/examples/edit_keynote_soundtrack.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_TESTS,
+            (
+                "soundtrack_settings_are_typed_transactional_and_wire_exact",
+                "soundtrack_settings_handle_absent_and_malformed_objects_transactionally",
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_METHODS,
+            ("patch_soundtrack_wire",),
+        )
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_SOUNDTRACK_WIRE_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/editor/soundtrack_wire.rs"),
+        )
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLER_SOURCES,
+            (Path("crates/litchi-iwa/examples/inspect_keynote_structure.rs"),),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE,
+            Path("crates/litchi-keynote/src/soundtrack.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE,
+            Path("crates/litchi-keynote/src/package/soundtrack_settings.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_ROOT,
+            Path("crates/litchi-keynote/src/package/soundtrack_settings"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_SOURCES,
+            (
+                Path(
+                    "crates/litchi-keynote/src/package/soundtrack_settings/media.rs"
+                ),
+                Path(
+                    "crates/litchi-keynote/src/package/soundtrack_settings/rewrite.rs"
+                ),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_IMPLEMENTATION_SOURCES,
+            (
+                Path("crates/litchi-keynote/src/soundtrack.rs"),
+                Path("crates/litchi-keynote/src/package/soundtrack_settings.rs"),
+                Path(
+                    "crates/litchi-keynote/src/package/soundtrack_settings/media.rs"
+                ),
+                Path(
+                    "crates/litchi-keynote/src/package/soundtrack_settings/rewrite.rs"
+                ),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES,
+            (
+                Path("crates/litchi-keynote/src/lib.rs"),
+                Path("crates/litchi-keynote/src/package.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_CANONICAL_TYPES,
+            ("Mode", "Settings", "Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_PACKAGE_METHODS,
+            (
+                "soundtrack_settings",
+                "edit_soundtrack_settings",
+                "apply_soundtrack_settings",
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES,
+            frozenset(
+                {
+                    "Soundtrack",
+                    "SoundtrackMode",
+                    "SoundtrackSettings",
+                    "SoundtrackEdit",
+                    "SoundtrackPatch",
+                    "SoundtrackCommit",
+                    "SoundtrackDiagnostics",
+                    "SoundtrackError",
+                    "SoundtrackLimitKind",
+                    "SoundtrackSettingsEdit",
+                    "SoundtrackSettingsPatch",
+                    "SoundtrackSettingsCommit",
+                    "SoundtrackSettingsDiagnostics",
+                    "SoundtrackSettingsError",
+                    "SoundtrackSettingsLimitKind",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_FORBIDDEN_PUBLIC_MEMBERS,
+            frozenset({"set_soundtrack_settings"}),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES,
+            frozenset(
+                {
+                    "Archive",
+                    "ArchiveObject",
+                    "ComponentCatalog",
+                    "EntryEdit",
+                    "ExactArtifacts",
+                    "IWorkPackage",
+                    "PhysicalSource",
+                    "RawMessage",
+                    "ReferenceSnapshot",
+                    "Resolved",
+                    "SnappyStream",
+                    "SoundtrackRecord",
+                    "SoundtrackSnapshot",
+                    "SoundtrackSettingsSnapshot",
+                    "SourceCatalog",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_TYPES,
+            frozenset(
+                {
+                    "DecodeLimitKind",
+                    "DecodeOptions",
+                    "NestedFieldEdit",
+                    "NestedFieldReplacement",
+                    "WireDescent",
+                    "WireError",
+                    "WireLimits",
+                    "WireResourceLimit",
+                    "WireView",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_PROTO_ORIGINS,
+            frozenset({"kn", "tsp"}),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES,
+            frozenset(
+                {
+                    "DataReference",
+                    "EmbeddedMediaAsset",
+                    "KeynoteSoundtrackItemInfo",
+                    "MediaAssetId",
+                    "data_reference",
+                    "data_references",
+                    "media",
+                    "media_items",
+                    "movie_media",
+                    "payload",
+                    "payloads",
+                }
+            ),
+        )
+
+    def test_retired_iwa_keynote_soundtrack_settings_surface_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retired = root / boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_SOURCE
+            retired.parent.mkdir(parents=True)
+            retired.write_text(
+                "pub fn r#soundtrack_settings() {}\n"
+                "pub fn set_soundtrack_settings() {}\n",
+                encoding="utf-8",
+            )
+            wire = root / boundaries.IWA_KEYNOTE_SOUNDTRACK_WIRE_SOURCE
+            wire.write_text("fn r#patch_soundtrack_wire() {}\n", encoding="utf-8")
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.write_text("pub mod r#soundtrack;\n", encoding="utf-8")
+            tests = root / boundaries.IWA_KEYNOTE_EDITOR_TEST_SOURCE
+            tests.write_text(
+                "fn soundtrack_settings_are_typed_transactional_and_wire_exact() {}\n"
+                "fn soundtrack_settings_handle_absent_and_malformed_objects_transactionally() {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_SETTINGS_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_soundtrack_settings_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote soundtrack settings source returned: "
+                        "crates/litchi-iwa/src/keynote/editor/soundtrack.rs",
+                        "retired litchi-iwa Keynote soundtrack settings example returned: "
+                        "crates/litchi-iwa/examples/edit_keynote_soundtrack.rs",
+                        "retired litchi-iwa Keynote soundtrack settings method "
+                        "soundtrack_settings: crates/litchi-iwa/src/keynote/editor/"
+                        "soundtrack.rs:1",
+                        "retired litchi-iwa Keynote soundtrack settings method "
+                        "set_soundtrack_settings: crates/litchi-iwa/src/keynote/editor/"
+                        "soundtrack.rs:2",
+                        "retired litchi-iwa Keynote soundtrack settings wire helper "
+                        "patch_soundtrack_wire: crates/litchi-iwa/src/keynote/editor/"
+                        "soundtrack_wire.rs:1",
+                        "retired litchi-iwa Keynote soundtrack settings module soundtrack: "
+                        "crates/litchi-iwa/src/keynote/editor.rs:1",
+                        "retired litchi-iwa Keynote soundtrack settings test "
+                        "soundtrack_settings_are_typed_transactional_and_wire_exact: "
+                        "crates/litchi-iwa/src/keynote/editor/tests.rs:1",
+                        "retired litchi-iwa Keynote soundtrack settings test "
+                        "soundtrack_settings_handle_absent_and_malformed_objects_"
+                        "transactionally: crates/litchi-iwa/src/keynote/editor/tests.rs:2",
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_keynote_soundtrack_settings_module_variants(self) -> None:
+        for declaration in (
+            "mod soundtrack;",
+            "pub mod r#soundtrack;",
+            "pub(crate) mod soundtrack {}",
+            "pub(super) mod r#soundtrack {}",
+            "pub(in crate) mod soundtrack;",
+            "pub\nmod\nr#soundtrack\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+                    editor.parent.mkdir(parents=True)
+                    editor.write_text(declaration + "\n", encoding="utf-8")
+                    expected_line = 3 if declaration.startswith("pub\n") else 1
+                    self.assertEqual(
+                        boundaries.audit_iwa_keynote_soundtrack_settings_source_topology(
+                            root
+                        ),
+                        [
+                            "retired litchi-iwa Keynote soundtrack settings module "
+                            "soundtrack: crates/litchi-iwa/src/keynote/editor.rs:"
+                            f"{expected_line}"
+                        ],
+                    )
+
+    def test_retired_iwa_keynote_soundtrack_settings_calls_and_readme_example(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            caller_relative = boundaries.IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLER_SOURCES[0]
+            caller = root / caller_relative
+            caller.parent.mkdir(parents=True)
+            caller.write_text(
+                "keynote.r#soundtrack_settings();\n"
+                "canvas\n    .\n    set_soundtrack_settings(settings);\n"
+                "crate::nested::KeynoteEditor::\n"
+                "    r#soundtrack_settings();\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "editor.soundtrack_settings();\n"
+                "package\n  .set_soundtrack_settings(settings);\n"
+                "edit_keynote_soundtrack\n"
+                "edit_keynote_soundtrack.rs\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_soundtrack_settings_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote soundtrack settings caller "
+                        f"soundtrack_settings: {caller_relative}:1",
+                        "retired litchi-iwa Keynote soundtrack settings caller "
+                        f"set_soundtrack_settings: {caller_relative}:4",
+                        "retired litchi-iwa Keynote soundtrack settings caller "
+                        f"soundtrack_settings: {caller_relative}:6",
+                        "retired litchi-iwa Keynote soundtrack settings README call "
+                        "soundtrack_settings: crates/litchi-iwa/README.md:1",
+                        "retired litchi-iwa Keynote soundtrack settings README call "
+                        "set_soundtrack_settings: crates/litchi-iwa/README.md:3",
+                        "retired litchi-iwa Keynote soundtrack settings README example "
+                        "reference edit_keynote_soundtrack: crates/litchi-iwa/README.md:4",
+                        "retired litchi-iwa Keynote soundtrack settings README example "
+                        "reference edit_keynote_soundtrack: crates/litchi-iwa/README.md:5",
+                    ]
+                ),
+            )
+
+    def test_iwa_keynote_soundtrack_settings_policy_retains_media_item_surfaces(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.parent.mkdir(parents=True)
+            editor.write_text(
+                "// mod soundtrack;\n"
+                'const NOTE: &str = "pub mod soundtrack;";\n'
+                'const RAW: &str = r#"mod r#soundtrack {}"#;\n'
+                "/* outer /* mod soundtrack; */ still comment */\n"
+                "mod soundtrack_wire;\n"
+                "mod soundtrack_items;\n"
+                "pub struct KeynoteSoundtrackItemInfo;\n",
+                encoding="utf-8",
+            )
+            wire = root / boundaries.IWA_KEYNOTE_SOUNDTRACK_WIRE_SOURCE
+            wire.parent.mkdir(parents=True, exist_ok=True)
+            wire.write_text(
+                "// fn patch_soundtrack_wire() {}\n"
+                'const NOTE: &str = "fn patch_soundtrack_wire() {}";\n'
+                "fn decode_soundtrack() {}\n"
+                "fn patch_soundtrack_media_wire() {}\n"
+                "fn replace_soundtrack_media() {}\n",
+                encoding="utf-8",
+            )
+            items = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor/soundtrack_items.rs"
+            items.write_text(
+                "pub fn soundtrack_items() {}\n"
+                "pub fn add_soundtrack_item() {}\n"
+                "pub fn insert_soundtrack_item() {}\n"
+                "pub fn replace_soundtrack_item() {}\n"
+                "pub fn move_soundtrack_item() {}\n"
+                "pub fn remove_soundtrack_item() {}\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.IWA_KEYNOTE_EDITOR_TEST_SOURCE
+            tests.write_text(
+                "// fn soundtrack_settings_are_typed_transactional_and_wire_exact() {}\n"
+                'const TEST_NOTE: &str = "fn soundtrack_settings_handle_absent_and_malformed_objects_transactionally() {}";\n'
+                "fn soundtrack_items_round_trip_exactly() {}\n",
+                encoding="utf-8",
+            )
+            caller = root / boundaries.IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLER_SOURCES[0]
+            caller.parent.mkdir(parents=True)
+            caller.write_text(
+                "// keynote.soundtrack_settings();\n"
+                'const NOTE: &str = "editor.set_soundtrack_settings(settings);";\n'
+                "package.soundtrack_settings();\n"
+                "package.edit_soundtrack_settings();\n"
+                "package.apply_soundtrack_settings(patch);\n",
+                encoding="utf-8",
+            )
+            retained_example = (
+                root / "crates/litchi-iwa/examples/edit_keynote_soundtrack_items.rs"
+            )
+            retained_example.write_text("fn main() {}\n", encoding="utf-8")
+            other_owner = root / "crates/litchi-pages/src/editor.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub fn soundtrack_settings() {}\n"
+                "pub fn set_soundtrack_settings() {}\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "`soundtrack_settings` is retired prose.\n"
+                "set_soundtrack_settings\n"
+                "package.soundtrack_settings()\n"
+                "package.edit_soundtrack_settings()\n"
+                "package.apply_soundtrack_settings(patch)\n"
+                "edit_keynote_soundtrack_items.rs\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_soundtrack_settings_source_topology(root),
+                [],
+            )
+
+    def test_focused_keynote_soundtrack_settings_requires_each_canonical_type(
+        self,
+    ) -> None:
+        for missing in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    semantic = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote soundtrack settings public API "
+                            f"is missing canonical soundtrack type {missing}: "
+                            "crates/litchi-keynote/src/soundtrack.rs"
+                        ],
+                    )
+
+    def test_focused_keynote_soundtrack_settings_requires_root_and_private_owner(
+        self,
+    ) -> None:
+        rejected_root = (
+            "",
+            "mod soundtrack;\n",
+            "pub(crate) mod soundtrack;\n",
+            "pub(super) mod r#soundtrack {}\n",
+            "pub(in crate) mod soundtrack;\n",
+            "// pub mod soundtrack;\n",
+            'const NOTE: &str = "pub mod soundtrack;";\n',
+        )
+        accepted_root = (
+            "pub mod soundtrack;\n",
+            "pub mod r#soundtrack;\n",
+            "pub mod soundtrack {}\n",
+            "pub\nmod\nr#soundtrack\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-keynote soundtrack settings public API is "
+                        "missing canonical root soundtrack module: "
+                        "crates/litchi-keynote/src/lib.rs"
+                    ],
+                )
+                for declaration in rejected_root
+            ],
+            *[(declaration, []) for declaration in accepted_root],
+        ):
+            with self.subTest(scope="root", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    lib_export = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES[0]
+                    lib_export.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        expected,
+                    )
+
+        rejected_owner = (
+            "",
+            "// mod soundtrack_settings;\n",
+            'const NOTE: &str = "mod soundtrack_settings;";\n',
+            "mod soundtrack_setting;\n",
+        )
+        accepted_owner = (
+            "mod soundtrack_settings;\n",
+            "mod r#soundtrack_settings {}\n",
+            "pub(crate) mod soundtrack_settings;\n",
+            "pub(super) mod r#soundtrack_settings {}\n",
+            "pub(in crate)\nmod\nsoundtrack_settings\n;\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-keynote soundtrack settings public API is "
+                        "missing private package owner module: "
+                        "crates/litchi-keynote/src/package.rs"
+                    ],
+                )
+                for declaration in rejected_owner
+            ],
+            *[(declaration, []) for declaration in accepted_owner],
+        ):
+            with self.subTest(scope="owner", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    package_export = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES[1]
+                    package_export.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        expected,
+                    )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+            (root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_settings_facade_source_topology(root),
+                [
+                    "focused litchi-keynote soundtrack settings public API is "
+                    "missing private package owner source: crates/litchi-keynote/"
+                    "src/package/soundtrack_settings.rs"
+                ],
+            )
+
+    def test_focused_keynote_soundtrack_settings_rejects_duplicate_modules(self) -> None:
+        for declaration in (
+            "pub mod transaction;",
+            "pub mod r#transaction;",
+            "pub mod transaction {}",
+            "pub\nmod\nr#transaction\n{}",
+        ):
+            with self.subTest(scope="transaction", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    semantic = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+                    line = semantic.read_text(encoding="utf-8").count("\n") + 1
+                    semantic.write_text(
+                        semantic.read_text(encoding="utf-8") + declaration + "\n",
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote soundtrack settings public API "
+                            "exposes duplicate soundtrack::transaction module: "
+                            f"crates/litchi-keynote/src/soundtrack.rs:{line}"
+                        ],
+                    )
+
+    def test_focused_keynote_soundtrack_settings_rejects_all_flat_aliases_and_host_setter(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_IMPLEMENTATION_SOURCES
+                + boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            for index, name in enumerate(
+                sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES)
+            ):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                if source_index == 0:
+                    declaration = f"pub struct {name};"
+                elif source_index == 1:
+                    declaration = f"pub type {name} = bool;"
+                else:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-keynote soundtrack settings public API retains "
+                    f"flat alias {name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            owner = sources[1]
+            declarations[owner].append("pub fn set_soundtrack_settings() {}")
+            expected.append(
+                "focused litchi-keynote soundtrack settings public API retains "
+                "host-style public member set_soundtrack_settings: "
+                f"{relative_sources[1]}:{len(declarations[owner])}"
+            )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_settings_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_keynote_soundtrack_settings_rejects_root_aliases_glob_and_owner_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            aliases = sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SHORT_NAMES)
+            midpoint = len(aliases) // 2
+            lib_aliases = aliases[:midpoint]
+            package_aliases = aliases[midpoint:]
+            lib_export.write_text(
+                "pub use crate::soundtrack::{" + ", ".join(lib_aliases) + "};\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::soundtrack_settings::{"
+                + ", ".join(package_aliases)
+                + "};\n"
+                "pub use crate::soundtrack::*;\n",
+                encoding="utf-8",
+            )
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_settings_facade_source_topology(root),
+                sorted(
+                    [
+                        *[
+                            "focused litchi-keynote soundtrack settings public API "
+                            f"retains root alias {name}: crates/litchi-keynote/src/lib.rs:1"
+                            for name in lib_aliases
+                        ],
+                        *[
+                            "focused litchi-keynote soundtrack settings public API "
+                            f"retains root alias {name}: crates/litchi-keynote/src/package.rs:1"
+                            for name in package_aliases
+                        ],
+                        "focused litchi-keynote soundtrack settings public API "
+                        "exposes public soundtrack owner alias: "
+                        "crates/litchi-keynote/src/lib.rs:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        "exposes public soundtrack owner alias: "
+                        "crates/litchi-keynote/src/package.rs:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        "exposes public soundtrack owner alias: "
+                        "crates/litchi-keynote/src/package.rs:2",
+                        "focused litchi-keynote soundtrack settings public API "
+                        "retains root aliases via soundtrack glob: "
+                        "crates/litchi-keynote/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_keynote_soundtrack_settings_rejects_public_owner_alias_variants(
+        self,
+    ) -> None:
+        for relative in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES:
+            for declaration in (
+                "pub use crate::soundtrack as audio;",
+                "pub use crate::r#soundtrack_settings as audio;",
+                "pub\nuse\ncrate::soundtrack as audio;",
+                "pub type soundtrack_settings = bool;",
+            ):
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_keynote_soundtrack_settings_canonical_scaffold(root)
+                        path = root / relative
+                        source = path.read_text(encoding="utf-8")
+                        line = source.count("\n") + 1
+                        path.write_text(source + declaration + "\n", encoding="utf-8")
+                        self.assertEqual(
+                            boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                                root
+                            ),
+                            [
+                                "focused litchi-keynote soundtrack settings public "
+                                "API exposes public soundtrack owner alias: "
+                                f"{relative}:{line}"
+                            ],
+                        )
+
+    def test_focused_keynote_soundtrack_settings_rejects_physical_and_media_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn settings(r#source_bytes: &[u8], r#object_id: u64) "
+                "-> DocumentArchive { todo!() }\n"
+                "pub type Projection = buffa::DocumentArchiveView;\n"
+                "impl prost::Message for soundtrack::Settings {}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner_lines = [
+                f"pub type Physical{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES)
+                )
+            ]
+            owner_lines.extend(
+                f"pub type WireLeak{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_TYPES)
+                )
+            )
+            owner_lines.extend(
+                (
+                    f"pub type MediaLeak{index} = {name};"
+                    if name[0].isupper()
+                    else f"pub fn {name}() {{}}"
+                )
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES)
+                )
+            )
+            owner_lines.append(
+                "pub type ProtoProjection = (kn::SoundtrackArchive, "
+                "tsp::ReferenceArchive);"
+            )
+            owner.write_text("\n".join(owner_lines) + "\n", encoding="utf-8")
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub fn edit_soundtrack_settings("
+                "value: litchi_iwa_protos::GeneratedSoundtrack) "
+                "-> soundtrack::Patch { todo!() }\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub fn apply_soundtrack_settings(value: prost_types::MessageInfo) "
+                "-> soundtrack::Commit { todo!() }\n"
+                "pub fn soundtrack_settings() -> SourceBytes { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+
+            violations = boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                root
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-keynote soundtrack settings public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type DocumentArchive",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "protobuf type kn",
+                "protobuf type ProtoProjection",
+                "archive/IWA type SoundtrackArchive",
+                "protobuf type tsp",
+                "archive/IWA type ReferenceArchive",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedSoundtrack",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+                "raw source bytes SourceBytes",
+                *tuple(
+                    f"archive/IWA type {name}"
+                    for name in sorted(
+                        boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES
+                    )
+                ),
+                *tuple(
+                    f"wire type {name}"
+                    for name in sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_TYPES)
+                ),
+                *tuple(
+                    f"soundtrack media topology {name}"
+                    for name in sorted(
+                        boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES
+                    )
+                ),
+            )
+            self.assertEqual(len(violations), 53)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused soundtrack-settings leak: {fragment}",
+                    )
+
+    def test_focused_keynote_soundtrack_settings_recursively_scans_private_helpers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+            nested_relative = (
+                boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_ROOT
+                / "future"
+                / "nested.rs"
+            )
+            nested = root / nested_relative
+            nested.parent.mkdir(parents=True, exist_ok=True)
+            nested.write_text(
+                "pub fn expose(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub type SoundtrackEdit = WireView;\n"
+                "pub fn media_items() {}\n"
+                "impl prost::Message for SoundtrackPatch<RawMessage> {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                root
+            )
+            path = str(nested_relative)
+            self.assertEqual(
+                violations,
+                sorted(
+                    [
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes raw source bytes source_bytes: {path}:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes raw byte slice &[u8]: {path}:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes raw identifier object_id: {path}:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes archive/IWA type ArchiveObject: {path}:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"retains flat alias SoundtrackEdit: {path}:2",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes wire type WireView: {path}:2",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes soundtrack media topology media_items: {path}:3",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes protobuf type prost: {path}:4",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes protobuf type Message: {path}:4",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes archive/IWA type RawMessage: {path}:4",
+                    ]
+                ),
+            )
+
+    def test_focused_keynote_soundtrack_settings_allows_canonical_and_media_item_surfaces(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "// pub type SoundtrackEdit = DocumentArchive;\n"
+                'const NOTE: &str = "pub struct SoundtrackSettingsPatch;";\n'
+                "/* pub fn media_items() -> &[u8] {} */\n"
+                "pub enum PlaybackMode { Off, PlayOnce, Loop, Unknown(i32) }\n"
+                "pub struct PlaybackSettings { pub volume: Option<f64> }\n"
+                "pub fn as_raw(mode: PlaybackMode) -> i32 { todo!() }\n"
+                "pub fn from_raw(value: i32) -> PlaybackMode { todo!() }\n"
+                "pub fn source_fingerprint() -> u64 { 0 }\n"
+                "pub fn soundtrack_item_count() -> usize { 0 }\n"
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub(crate) fn restricted(value: WireView) {}\n"
+                "mod transaction;\n"
+                "pub(crate) mod r#transaction;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            private_aliases = [
+                ("struct" if index % 2 == 0 else "pub(crate) struct")
+                + f" {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES)
+                )
+            ]
+            private_vocabulary = [
+                f"pub(super) type Private{index} = {name};"
+                for index, name in enumerate(
+                    sorted(
+                        boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES
+                        | boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_TYPES
+                        | boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES
+                    )
+                )
+            ]
+            owner.write_text(
+                "\n".join(
+                    [
+                        "pub fn soundtrack_settings() -> soundtrack::Settings { todo!() }",
+                        "pub fn edit_soundtrack_settings() "
+                        "-> soundtrack::Edit { todo!() }",
+                        "pub fn apply_soundtrack_settings(patch: soundtrack::Patch) "
+                        "-> soundtrack::Commit { todo!() }",
+                        *private_aliases,
+                        *private_vocabulary,
+                        "fn set_soundtrack_settings() {}",
+                        "impl SoundtrackEdit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES
+            )
+            private_roots = "\n".join(
+                ("use" if index % 2 == 0 else "pub(crate) use")
+                + f" crate::soundtrack::{name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SHORT_NAMES)
+                )
+            )
+            lib_export.write_text(
+                "// pub use crate::soundtrack::{Mode, Settings};\n"
+                'const GLOB_NOTE: &str = "pub use crate::soundtrack::*;";\n'
+                + private_roots
+                + "\npub(crate) use crate::soundtrack::*;\n"
+                "pub use crate::animation::{Mode, Settings, Edit, Patch, Commit, "
+                "Diagnostics, Error, LimitKind};\n"
+                "pub struct KeynoteSoundtrackItemInfo;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "mod soundtrack_settings;\n"
+                "pub(crate) mod r#soundtrack_settings;\n"
+                "pub(super) use crate::soundtrack::{Mode, Settings};\n"
+                "pub fn soundtrack_items() -> Vec<KeynoteSoundtrackItemInfo> { todo!() }\n",
+                encoding="utf-8",
+            )
+            helper = (
+                root
+                / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_ROOT
+                / "private.rs"
+            )
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub(crate) type SoundtrackPatch = WireView;\n"
+                "pub(super) fn media_items() {}\n"
+                "impl SoundtrackEdit {}\n",
+                encoding="utf-8",
+            )
+            non_rust = helper.with_suffix(".txt")
+            non_rust.write_text(
+                "pub type SoundtrackEdit = ArchiveObject;\n"
+                "pub fn media_items(value: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.KEYNOTE_SOURCE_ROOT / "soundtrack_items.rs"
+            nonfocused.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES)
+                )
+                + "\npub struct KeynoteSoundtrackItemInfo;\n"
+                "pub fn media_items() -> Vec<DataReference> { todo!() }\n"
+                "pub fn set_soundtrack_settings() {}\n"
+                "pub fn item(object_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/soundtrack.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub struct SoundtrackSettings;\n"
+                "pub fn set_soundtrack_settings() {}\n"
+                "pub fn media_items() -> Vec<DataReference> { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_settings_facade_source_topology(root),
+                [],
+            )
+
+        for declaration in (
+            "pub mod soundtrack_settings;",
+            "pub mod r#soundtrack_settings;",
+            "pub mod soundtrack_settings {}",
+            "pub\nmod\nr#soundtrack_settings\n{}",
+        ):
+            with self.subTest(scope="package", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    package_export = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES[1]
+                    package_export.write_text(declaration + "\n", encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote soundtrack settings public API "
+                            "exposes duplicate package::soundtrack_settings module: "
+                            "crates/litchi-keynote/src/package.rs:1"
+                        ],
+                    )
 
     def test_keynote_slide_transition_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(

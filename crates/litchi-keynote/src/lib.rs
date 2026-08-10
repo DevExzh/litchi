@@ -66,6 +66,55 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
+//! # Edit soundtrack playback settings
+//!
+//! Soundtrack playback uses the direct [`soundtrack`] namespace. Reading
+//! `None` means the presentation has no existing soundtrack settings, whereas
+//! `Some(soundtrack::Settings::default())` means settings exist with both
+//! optional playback values absent. The transaction never creates a
+//! soundtrack, and it preserves the existing soundtrack media collection.
+//! Semantic value validation returns [`Error`]; package read/edit/apply
+//! failures use [`soundtrack::Error`].
+//!
+//! An unchanged commit is an exact no-op. A changed commit reopens its
+//! candidate without invalidating rendering previews. The inverse is accepted
+//! only by the exact committed package snapshot and restores the original
+//! package state.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{
+//!     Package,
+//!     soundtrack::{Mode, Settings},
+//! };
+//!
+//! let package = Package::open("input.key")?;
+//! let before = package
+//!     .soundtrack_settings()?
+//!     .ok_or_else(|| io::Error::other("presentation has no soundtrack settings"))?;
+//!
+//! let mut replacement = before;
+//! replacement.set_volume(Some(0.35))?;
+//! replacement.set_mode(Some(Mode::Loop))?;
+//! let commit = package.edit_soundtrack_settings()?.set(replacement).commit()?;
+//! assert_eq!(commit.package().soundtrack_settings()?, Some(replacement));
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_soundtrack_settings(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().soundtrack_settings()?, Some(before));
+//! let mut output = Vec::new();
+//! restored.package().write_to(&mut output)?;
+//! assert!(!output.is_empty());
+//! # let _ = Settings::default();
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! [`Package::write_to`] writes a bounded package to its sink but does not
+//! flush, sync, rename, or otherwise make filesystem publication durable or
+//! atomic.
+//!
 //! # Edit one slide transition
 //!
 //! Read, replace, or clear a modern transition with the same selector-first,
