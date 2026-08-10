@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0010`](changes/0010-docx-pptx-semantic-queries-and-edits.md)
+Evidence through: [`change 0011`](changes/0011-odf-semantic-baseline-and-ods-snapshot.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -125,6 +125,21 @@ These paths have strong preservation and atomicity tests plus generated-text
 timing/allocation evidence. Real-producer, media/dependency, malformed,
 security, copied-byte and cold-source matrices remain missing.
 
+## ODF paths
+
+ODT, ODS and ODP ordinary opens eagerly read and parse their ZIP packages.
+The opt-in public semantic matrix now measures owned open, listing, one object,
+full text, small creation, exact no-op and one supported edit/save across all
+three owners. ODT/ODP repeated semantic queries still rescan complete XML.
+Changed ODF publication still regenerates and compresses package members.
+
+ODS unified snapshot construction previously cloned package bytes and parsed
+the same ODS package twice: once for package/resource validation and again for
+complete `Spreadsheet` readback. It now moves the one validated package into a
+crate-private facade constructor. Large no-op edit/save p50 falls 11.78%; the
+large changed case improves 2.06% because full spreadsheet rewrite/readback
+dominates. Exact source bytes, resource bounds and facade readback remain.
+
 ## Legacy CFB data path
 
 ```text
@@ -195,6 +210,7 @@ pattern elsewhere.
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
 | 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers, and child lookup descends the validated tree by cached exact keys. | Add deep-directory, MiniFAT-heavy, concurrent-read, and real DOC/XLS/PPT scenarios beyond the measured synthetic wide-root and writer corpora. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
+| 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable; implemented without changing readback. | Broader ODF source-backed read and unchanged-member publication profiles. |
 
 ## Ranked work queue
 
@@ -212,7 +228,8 @@ The order below is provisional until baseline measurements are recorded.
 | 8 | Extend the accepted XLSX row-start index to broader selector and edit matrices. | Sparse range queries after sheet load. | Low-medium | Narrow ranges are accepted; preservation/readback gates and broad CRUD coverage remain unchanged. |
 | 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Direct DOCX selection and PPTX selected-scene reuse are accepted; complete source validation and candidate readback remain mandatory. |
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
-| 11 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
+| 11 | Extend ODF beyond the accepted ODS snapshot reuse: source-backed selectors and unchanged-member publication. | ODT/ODS/ODP open/query and changed save. | High | Public semantic baselines now exist; exact no-op and full readback must remain. |
+| 12 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
 
 ## Evidence still missing
 
@@ -229,5 +246,5 @@ changes. Remaining gaps are:
   that the environment reports `perf_event_paranoid=1`; stage-1 remains without
   counters and no claim is generalized from the one measured save workload.
 - Contention evidence beyond the committed explicit-context scaling curves.
-- Format-semantic preservation evidence beyond the generated DOCX/PPTX text
-  slice and native targeted-OPC raw passthrough corpus.
+- Format-semantic preservation evidence beyond the generated
+  DOCX/PPTX/ODT/ODS/ODP slices and native targeted-OPC raw passthrough corpus.

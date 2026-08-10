@@ -55,7 +55,7 @@ impl Spreadsheet {
         Self::from_package(package)
     }
 
-    fn from_package(package: crate::package::Package) -> Result<Self> {
+    pub(crate) fn from_package(package: crate::package::Package) -> Result<Self> {
         let definitions = package.definitions()?;
         let sheets = package.sheets()?;
         let metadata = package.metadata_snapshot()?;

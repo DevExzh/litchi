@@ -177,9 +177,9 @@ impl Snapshot {
     fn from_arc(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
         validate_package_size(source.len(), limits)?;
         let bytes = source.as_ref().to_vec();
-        let package = Package::from_bytes(bytes.clone())?;
+        let package = Package::from_bytes(bytes)?;
         validate_resource_count(&package, limits)?;
-        let _facade = crate::Spreadsheet::from_bytes(bytes)?;
+        let _facade = crate::Spreadsheet::from_package(package)?;
         Ok(Self { source, limits })
     }
 

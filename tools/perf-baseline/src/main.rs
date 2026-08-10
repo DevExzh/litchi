@@ -50,6 +50,9 @@ const LEGACY_WRITER_CORPUS_GENERATOR: &str = "litchi-legacy-writer-v1";
 const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
 const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
+const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
+const SEMANTIC_ODS_CORPUS_GENERATOR: &str = "litchi-ods-semantic-v1";
+const SEMANTIC_ODP_CORPUS_GENERATOR: &str = "litchi-odp-semantic-v1";
 static NEXT_INSTRUMENTED_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -152,6 +155,29 @@ impl SemanticShape {
             Self::Medium => 8,
             Self::Large => 100,
         }
+    }
+
+    const fn ods_sheet_count(self) -> usize {
+        match self {
+            Self::Tiny => 1,
+            Self::Medium | Self::Large => 2,
+        }
+    }
+
+    const fn ods_rows_per_sheet(self) -> usize {
+        match self {
+            Self::Tiny => 8,
+            Self::Medium => 32,
+            Self::Large => 128,
+        }
+    }
+
+    const fn ods_columns_per_sheet(self) -> usize {
+        self.ods_rows_per_sheet()
+    }
+
+    const fn ods_cell_count(self) -> usize {
+        self.ods_sheet_count() * self.ods_rows_per_sheet() * self.ods_columns_per_sheet()
     }
 }
 
@@ -282,6 +308,27 @@ enum Case {
     PptxSemanticNoopEditSave,
     PptxSemanticOneEditSave,
     PptxSemanticOnePercentEditSave,
+    OdtSemanticOpen,
+    OdtSemanticListParagraphs,
+    OdtSemanticOneParagraph,
+    OdtSemanticFullText,
+    OdtSemanticCreateSmall,
+    OdtSemanticNoopEditSave,
+    OdtSemanticOneEditSave,
+    OdsSemanticOpen,
+    OdsSemanticListSheets,
+    OdsSemanticOneCell,
+    OdsSemanticFullCellText,
+    OdsSemanticCreateSmall,
+    OdsSemanticNoopEditSave,
+    OdsSemanticOneEditSave,
+    OdpSemanticOpen,
+    OdpSemanticListSlides,
+    OdpSemanticOneSlide,
+    OdpSemanticFullText,
+    OdpSemanticCreateSmall,
+    OdpSemanticNoopEditSave,
+    OdpSemanticOneEditSave,
 }
 
 impl Case {
@@ -388,6 +435,27 @@ impl Case {
             Self::PptxSemanticNoopEditSave => "pptx_semantic_noop_edit_save",
             Self::PptxSemanticOneEditSave => "pptx_semantic_one_edit_save",
             Self::PptxSemanticOnePercentEditSave => "pptx_semantic_one_percent_edit_save",
+            Self::OdtSemanticOpen => "odt_semantic_open",
+            Self::OdtSemanticListParagraphs => "odt_semantic_list_paragraphs",
+            Self::OdtSemanticOneParagraph => "odt_semantic_one_paragraph",
+            Self::OdtSemanticFullText => "odt_semantic_full_text",
+            Self::OdtSemanticCreateSmall => "odt_semantic_create_small",
+            Self::OdtSemanticNoopEditSave => "odt_semantic_noop_edit_save",
+            Self::OdtSemanticOneEditSave => "odt_semantic_one_edit_save",
+            Self::OdsSemanticOpen => "ods_semantic_open",
+            Self::OdsSemanticListSheets => "ods_semantic_list_sheets",
+            Self::OdsSemanticOneCell => "ods_semantic_one_cell",
+            Self::OdsSemanticFullCellText => "ods_semantic_full_cell_text",
+            Self::OdsSemanticCreateSmall => "ods_semantic_create_small",
+            Self::OdsSemanticNoopEditSave => "ods_semantic_noop_edit_save",
+            Self::OdsSemanticOneEditSave => "ods_semantic_one_edit_save",
+            Self::OdpSemanticOpen => "odp_semantic_open",
+            Self::OdpSemanticListSlides => "odp_semantic_list_slides",
+            Self::OdpSemanticOneSlide => "odp_semantic_one_slide",
+            Self::OdpSemanticFullText => "odp_semantic_full_text",
+            Self::OdpSemanticCreateSmall => "odp_semantic_create_small",
+            Self::OdpSemanticNoopEditSave => "odp_semantic_noop_edit_save",
+            Self::OdpSemanticOneEditSave => "odp_semantic_one_edit_save",
         }
     }
 
@@ -485,10 +553,53 @@ impl Case {
         )
     }
 
+    const fn uses_semantic_odt(self) -> bool {
+        matches!(
+            self,
+            Self::OdtSemanticOpen
+                | Self::OdtSemanticListParagraphs
+                | Self::OdtSemanticOneParagraph
+                | Self::OdtSemanticFullText
+                | Self::OdtSemanticCreateSmall
+                | Self::OdtSemanticNoopEditSave
+                | Self::OdtSemanticOneEditSave
+        )
+    }
+
+    const fn uses_semantic_ods(self) -> bool {
+        matches!(
+            self,
+            Self::OdsSemanticOpen
+                | Self::OdsSemanticListSheets
+                | Self::OdsSemanticOneCell
+                | Self::OdsSemanticFullCellText
+                | Self::OdsSemanticCreateSmall
+                | Self::OdsSemanticNoopEditSave
+                | Self::OdsSemanticOneEditSave
+        )
+    }
+
+    const fn uses_semantic_odp(self) -> bool {
+        matches!(
+            self,
+            Self::OdpSemanticOpen
+                | Self::OdpSemanticListSlides
+                | Self::OdpSemanticOneSlide
+                | Self::OdpSemanticFullText
+                | Self::OdpSemanticCreateSmall
+                | Self::OdpSemanticNoopEditSave
+                | Self::OdpSemanticOneEditSave
+        )
+    }
+
     const fn is_semantic_create_small(self) -> bool {
         matches!(
             self,
-            Self::DocxSemanticCreateSmall | Self::PptxSemanticCreateSmall
+            Self::DocxSemanticCreateSmall
+                | Self::PptxSemanticCreateSmall
+                | Self::OdtSemanticCreateSmall
+                | Self::OdsSemanticCreateSmall
+                | Self::OdpSemanticCreateSmall
         )
     }
 
@@ -1306,6 +1417,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_xlsx()
                     && !case.uses_semantic_docx()
                     && !case.uses_semantic_pptx()
+                    && !case.uses_semantic_odt()
+                    && !case.uses_semantic_ods()
+                    && !case.uses_semantic_odp()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -1390,6 +1504,60 @@ fn main() -> Result<(), Box<dyn Error>> {
             let corpus = build_semantic_pptx_corpus(*shape)?;
             for case in options.cases.iter().filter(|case| {
                 case.uses_semantic_pptx()
+                    && (*shape == SemanticShape::Tiny || !case.is_semantic_create_small())
+            }) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_semantic_odt()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_semantic_odt_corpus(*shape)?;
+            for case in options.cases.iter().filter(|case| {
+                case.uses_semantic_odt()
+                    && (*shape == SemanticShape::Tiny || !case.is_semantic_create_small())
+            }) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_semantic_ods()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_semantic_ods_corpus(*shape)?;
+            for case in options.cases.iter().filter(|case| {
+                case.uses_semantic_ods()
+                    && (*shape == SemanticShape::Tiny || !case.is_semantic_create_small())
+            }) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_semantic_odp()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_semantic_odp_corpus(*shape)?;
+            for case in options.cases.iter().filter(|case| {
+                case.uses_semantic_odp()
                     && (*shape == SemanticShape::Tiny || !case.is_semantic_create_small())
             }) {
                 results.push(run_case_with_config(
@@ -1672,6 +1840,27 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_semantic_noop_edit_save" => Some(Case::PptxSemanticNoopEditSave),
         "pptx_semantic_one_edit_save" => Some(Case::PptxSemanticOneEditSave),
         "pptx_semantic_one_percent_edit_save" => Some(Case::PptxSemanticOnePercentEditSave),
+        "odt_semantic_open" => Some(Case::OdtSemanticOpen),
+        "odt_semantic_list_paragraphs" => Some(Case::OdtSemanticListParagraphs),
+        "odt_semantic_one_paragraph" => Some(Case::OdtSemanticOneParagraph),
+        "odt_semantic_full_text" => Some(Case::OdtSemanticFullText),
+        "odt_semantic_create_small" => Some(Case::OdtSemanticCreateSmall),
+        "odt_semantic_noop_edit_save" => Some(Case::OdtSemanticNoopEditSave),
+        "odt_semantic_one_edit_save" => Some(Case::OdtSemanticOneEditSave),
+        "ods_semantic_open" => Some(Case::OdsSemanticOpen),
+        "ods_semantic_list_sheets" => Some(Case::OdsSemanticListSheets),
+        "ods_semantic_one_cell" => Some(Case::OdsSemanticOneCell),
+        "ods_semantic_full_cell_text" => Some(Case::OdsSemanticFullCellText),
+        "ods_semantic_create_small" => Some(Case::OdsSemanticCreateSmall),
+        "ods_semantic_noop_edit_save" => Some(Case::OdsSemanticNoopEditSave),
+        "ods_semantic_one_edit_save" => Some(Case::OdsSemanticOneEditSave),
+        "odp_semantic_open" => Some(Case::OdpSemanticOpen),
+        "odp_semantic_list_slides" => Some(Case::OdpSemanticListSlides),
+        "odp_semantic_one_slide" => Some(Case::OdpSemanticOneSlide),
+        "odp_semantic_full_text" => Some(Case::OdpSemanticFullText),
+        "odp_semantic_create_small" => Some(Case::OdpSemanticCreateSmall),
+        "odp_semantic_noop_edit_save" => Some(Case::OdpSemanticNoopEditSave),
+        "odp_semantic_one_edit_save" => Some(Case::OdpSemanticOneEditSave),
         _ => None,
     }
 }
@@ -1756,12 +1945,23 @@ fn print_usage() {
                                        pptx_semantic_open,pptx_semantic_list_slides,\n\
                                        pptx_semantic_one_slide,pptx_semantic_full_text,\n\
                                        pptx_semantic_create_small,pptx_semantic_noop_edit_save,\n\
-                                       pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save\n\
+                                       pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,\n\
+                                       odt_semantic_open,odt_semantic_list_paragraphs,\n\
+                                       odt_semantic_one_paragraph,odt_semantic_full_text,\n\
+                                       odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
+                                       odt_semantic_one_edit_save,ods_semantic_open,\n\
+                                       ods_semantic_list_sheets,ods_semantic_one_cell,\n\
+                                       ods_semantic_full_cell_text,ods_semantic_create_small,\n\
+                                       ods_semantic_noop_edit_save,ods_semantic_one_edit_save,\n\
+                                       odp_semantic_open,odp_semantic_list_slides,\n\
+                                       odp_semantic_one_slide,odp_semantic_full_text,\n\
+                                       odp_semantic_create_small,odp_semantic_noop_edit_save,\n\
+                                       odp_semantic_one_edit_save\n\
            --shape LIST                tiny,many-small,few-large,wide-root\n\
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
-           --semantic-shape LIST       tiny,medium,large (only used by opt-in DOCX/PPTX semantic cases)\n\
+           --semantic-shape LIST       tiny,medium,large (only used by opt-in Office semantic cases)\n\
            --range-fixed-latency-us N  Fixed latency per request (default: {DEFAULT_RANGE_FIXED_LATENCY_US})\n\
            --range-request-overhead-us N\n\
                                        Request overhead (default: {DEFAULT_RANGE_REQUEST_OVERHEAD_US})\n\
@@ -2156,6 +2356,203 @@ fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> 
         }
     }
     Ok(package.to_bytes()?)
+}
+
+fn semantic_odt_text(index: usize, updated: bool) -> String {
+    let state = if updated { "updated" } else { "source" };
+    format!("litchi-perf-baseline-odt-semantic-v1-{state}-{index:05}")
+}
+
+fn semantic_ods_sheet_name(index: usize) -> String {
+    format!("Sheet {index}")
+}
+
+fn semantic_ods_text(sheet: usize, row: usize, column: usize, updated: bool) -> String {
+    let state = if updated { "updated" } else { "source" };
+    format!("litchi-perf-baseline-ods-semantic-v1-{state}-{sheet:02}-{row:03}-{column:03}")
+}
+
+fn semantic_odp_title(index: usize, updated: bool) -> String {
+    let state = if updated { "updated" } else { "source" };
+    format!("litchi-perf-baseline-odp-title-v1-{state}-{index:03}")
+}
+
+fn semantic_odp_text(index: usize, updated: bool) -> String {
+    let state = if updated { "updated" } else { "source" };
+    format!("litchi-perf-baseline-odp-body-v1-{state}-{index:03}")
+}
+
+fn semantic_odt_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut builder = litchi_odt::Builder::new();
+    for index in 0..shape.docx_paragraphs() {
+        builder.add_paragraph(&semantic_odt_text(index, false))?;
+    }
+    Ok(builder.build()?)
+}
+
+fn semantic_ods_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut builder = litchi_ods::Builder::new();
+    for sheet_index in 0..shape.ods_sheet_count() {
+        let mut sheet = litchi_ods::Sheet::new(semantic_ods_sheet_name(sheet_index))?;
+        for row in 0..shape.ods_rows_per_sheet() {
+            let mut cells = Vec::with_capacity(shape.ods_columns_per_sheet());
+            for column in 0..shape.ods_columns_per_sheet() {
+                let text = semantic_ods_text(sheet_index, row, column, false);
+                cells.push(litchi_ods::Cell::new(
+                    litchi_ods::CellValue::Text(text.clone()),
+                    text,
+                ));
+            }
+            sheet.rows.push(litchi_ods::Row {
+                cells,
+                style_name: None,
+                default_cell_style_name: None,
+                repeat: std::num::NonZeroUsize::MIN,
+            });
+        }
+        builder.add_sheet(sheet)?;
+    }
+    Ok(builder.build()?)
+}
+
+fn semantic_odp_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut builder = litchi_odp::Builder::new();
+    for index in 0..shape.pptx_slides() {
+        builder.add_slide_with_title(
+            &semantic_odp_title(index, false),
+            &semantic_odp_text(index, false),
+        )?;
+    }
+    // The public ODP builder currently records wall-clock timestamps in
+    // `meta.xml`. Keep its public authored content/style path, but rebuild the
+    // generated package with fixed metadata so a benchmark corpus has one
+    // stable identity across runs and machines.
+    let generated = builder.build()?;
+    let reader = ArchiveReader::new(&generated)?;
+    let content = reader.read("content.xml")?;
+    let styles = reader.read("styles.xml")?;
+    let mut writer = litchi_odp::core::PackageWriter::new();
+    writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
+    writer.add_file("content.xml", &content)?;
+    writer.add_file("styles.xml", &styles)?;
+    writer.add_file(
+        "meta.xml",
+        br#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>litchi-perf-baseline</meta:generator></office:meta></office:document-meta>"#,
+    )?;
+    Ok(writer.finish_to_bytes()?)
+}
+
+fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let archive = semantic_odt_bytes(shape)?;
+    let document = litchi_odt::Document::from_bytes(archive.clone())?;
+    verify_semantic_odt(&document, shape, false)?;
+    let target_payload = semantic_odt_text(0, false).into_bytes();
+    let content_bytes = (0..shape.docx_paragraphs()).try_fold(0usize, |total, index| {
+        total
+            .checked_add(semantic_odt_text(index, false).len())
+            .ok_or("semantic ODT text byte count overflows usize")
+    })?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("odt-semantic-{}", shape.name()),
+            generator: SEMANTIC_ODT_CORPUS_GENERATOR,
+            package_format: "ODT/ODF/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-semantic-text",
+            compression: "deflate",
+            entry_count: shape.docx_paragraphs(),
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: target_payload.len(),
+            uncompressed_payload_bytes: content_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "paragraph:0".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            xlsx: None,
+        },
+        archive,
+        target_name: "paragraph:0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn build_semantic_ods_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let archive = semantic_ods_bytes(shape)?;
+    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(archive.clone())?;
+    verify_semantic_ods(&spreadsheet, shape, false)?;
+    let target_payload = semantic_ods_text(0, 0, 0, false).into_bytes();
+    let content_bytes = (0..shape.ods_sheet_count()).try_fold(0usize, |total, sheet| {
+        (0..shape.ods_rows_per_sheet()).try_fold(total, |total, row| {
+            (0..shape.ods_columns_per_sheet()).try_fold(total, |total, column| {
+                total
+                    .checked_add(semantic_ods_text(sheet, row, column, false).len())
+                    .ok_or("semantic ODS text byte count overflows usize")
+            })
+        })
+    })?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("ods-semantic-{}", shape.name()),
+            generator: SEMANTIC_ODS_CORPUS_GENERATOR,
+            package_format: "ODS/ODF/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-semantic-text",
+            compression: "deflate",
+            entry_count: shape.ods_cell_count(),
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: target_payload.len(),
+            uncompressed_payload_bytes: content_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "Sheet 0!R0C0".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            xlsx: None,
+        },
+        archive,
+        target_name: "Sheet 0!R0C0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn build_semantic_odp_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let archive = semantic_odp_bytes(shape)?;
+    let presentation = litchi_odp::Presentation::from_bytes(archive.clone())?;
+    verify_semantic_odp(&presentation, shape, false)?;
+    let target_payload = semantic_odp_text(0, false).into_bytes();
+    let content_bytes = (0..shape.pptx_slides()).try_fold(0usize, |total, index| {
+        total
+            .checked_add(semantic_odp_title(index, false).len())
+            .and_then(|total| total.checked_add(semantic_odp_text(index, false).len()))
+            .ok_or("semantic ODP text byte count overflows usize")
+    })?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("odp-semantic-{}", shape.name()),
+            generator: SEMANTIC_ODP_CORPUS_GENERATOR,
+            package_format: "ODP/ODF/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-semantic-text",
+            compression: "deflate",
+            entry_count: shape.pptx_slides(),
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: target_payload.len(),
+            uncompressed_payload_bytes: content_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "slide:0".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            xlsx: None,
+        },
+        archive,
+        target_name: "slide:0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
 }
 
 fn build_semantic_pptx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
@@ -2611,6 +3008,33 @@ fn run_case_with_config(
         | Case::PptxSemanticOnePercentEditSave => {
             run_semantic_pptx(case, corpus, warmup_iterations, samples)
         },
+        Case::OdtSemanticOpen
+        | Case::OdtSemanticListParagraphs
+        | Case::OdtSemanticOneParagraph
+        | Case::OdtSemanticFullText
+        | Case::OdtSemanticCreateSmall
+        | Case::OdtSemanticNoopEditSave
+        | Case::OdtSemanticOneEditSave => {
+            run_semantic_odt(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdsSemanticOpen
+        | Case::OdsSemanticListSheets
+        | Case::OdsSemanticOneCell
+        | Case::OdsSemanticFullCellText
+        | Case::OdsSemanticCreateSmall
+        | Case::OdsSemanticNoopEditSave
+        | Case::OdsSemanticOneEditSave => {
+            run_semantic_ods(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdpSemanticOpen
+        | Case::OdpSemanticListSlides
+        | Case::OdpSemanticOneSlide
+        | Case::OdpSemanticFullText
+        | Case::OdpSemanticCreateSmall
+        | Case::OdpSemanticNoopEditSave
+        | Case::OdpSemanticOneEditSave => {
+            run_semantic_odp(case, corpus, warmup_iterations, samples)
+        },
         Case::OpcOpenSessionScaling | Case::CfbBulkReadScaling => {
             Err("scaling case requires an explicit worker count".into())
         },
@@ -2892,6 +3316,164 @@ fn verify_semantic_pptx(
     Ok(())
 }
 
+fn verify_semantic_odt(
+    document: &litchi_odt::Document,
+    shape: SemanticShape,
+    updated: bool,
+) -> Result<(), Box<dyn Error>> {
+    let paragraphs = document.paragraphs()?;
+    if paragraphs.len() != shape.docx_paragraphs() {
+        return Err("semantic ODT paragraph count differs from specification".into());
+    }
+    for (index, paragraph) in paragraphs.iter().enumerate() {
+        let is_updated = updated && index == shape.docx_paragraphs() / 2;
+        if paragraph.text()? != semantic_odt_text(index, is_updated) {
+            return Err("semantic ODT paragraph text differs from specification".into());
+        }
+    }
+    let expected = (0..shape.docx_paragraphs())
+        .map(|index| semantic_odt_text(index, updated && index == shape.docx_paragraphs() / 2))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if document.text()? != expected {
+        return Err("semantic ODT full text differs from paragraph scan".into());
+    }
+    Ok(())
+}
+
+fn semantic_ods_full_cell_text(
+    spreadsheet: &litchi_ods::Spreadsheet,
+    shape: SemanticShape,
+) -> Result<String, Box<dyn Error>> {
+    let mut values = Vec::with_capacity(shape.ods_cell_count());
+    for sheet in 0..shape.ods_sheet_count() {
+        let name = semantic_ods_sheet_name(sheet);
+        for row in 0..shape.ods_rows_per_sheet() {
+            for column in 0..shape.ods_columns_per_sheet() {
+                let cell = spreadsheet
+                    .cell(&name, row, column)
+                    .ok_or("semantic ODS sheet is missing")?;
+                let litchi_ods::CellView::Stored(cell) = cell else {
+                    return Err("semantic ODS cell is missing".into());
+                };
+                values.push(cell.text.clone());
+            }
+        }
+    }
+    Ok(values.join("\n"))
+}
+
+fn expected_semantic_ods_full_cell_text(shape: SemanticShape, updated: bool) -> String {
+    let middle_sheet = shape.ods_sheet_count() / 2;
+    let middle_row = shape.ods_rows_per_sheet() / 2;
+    let middle_column = shape.ods_columns_per_sheet() / 2;
+    let mut values = Vec::with_capacity(shape.ods_cell_count());
+    for sheet in 0..shape.ods_sheet_count() {
+        for row in 0..shape.ods_rows_per_sheet() {
+            for column in 0..shape.ods_columns_per_sheet() {
+                values.push(semantic_ods_text(
+                    sheet,
+                    row,
+                    column,
+                    updated
+                        && sheet == middle_sheet
+                        && row == middle_row
+                        && column == middle_column,
+                ));
+            }
+        }
+    }
+    values.join("\n")
+}
+
+fn verify_semantic_ods(
+    spreadsheet: &litchi_ods::Spreadsheet,
+    shape: SemanticShape,
+    updated: bool,
+) -> Result<(), Box<dyn Error>> {
+    if spreadsheet.sheets().len() != shape.ods_sheet_count() {
+        return Err("semantic ODS sheet count differs from specification".into());
+    }
+    let middle_sheet = shape.ods_sheet_count() / 2;
+    let middle_row = shape.ods_rows_per_sheet() / 2;
+    let middle_column = shape.ods_columns_per_sheet() / 2;
+    for sheet in 0..shape.ods_sheet_count() {
+        let name = semantic_ods_sheet_name(sheet);
+        let sheet_value = spreadsheet
+            .sheet(&name)
+            .ok_or("semantic ODS named sheet is missing")?;
+        if sheet_value.logical_row_count() != shape.ods_rows_per_sheet()
+            || sheet_value.logical_column_count() != shape.ods_columns_per_sheet()
+        {
+            return Err("semantic ODS sheet dimensions differ from specification".into());
+        }
+        for row in 0..shape.ods_rows_per_sheet() {
+            for column in 0..shape.ods_columns_per_sheet() {
+                let is_updated = updated
+                    && sheet == middle_sheet
+                    && row == middle_row
+                    && column == middle_column;
+                let cell = spreadsheet
+                    .cell(&name, row, column)
+                    .ok_or("semantic ODS sheet is missing")?;
+                let litchi_ods::CellView::Stored(cell) = cell else {
+                    return Err("semantic ODS cell is missing".into());
+                };
+                if cell.text != semantic_ods_text(sheet, row, column, is_updated) {
+                    return Err("semantic ODS cell text differs from specification".into());
+                }
+            }
+        }
+    }
+    if semantic_ods_full_cell_text(spreadsheet, shape)?
+        != expected_semantic_ods_full_cell_text(shape, updated)
+    {
+        return Err("semantic ODS full cell text differs from specification".into());
+    }
+    Ok(())
+}
+
+fn verify_semantic_odp(
+    presentation: &litchi_odp::Presentation,
+    shape: SemanticShape,
+    updated: bool,
+) -> Result<(), Box<dyn Error>> {
+    let slides = presentation.slides()?;
+    let expected_slide_count = shape.pptx_slides() + usize::from(updated);
+    if slides.len() != expected_slide_count {
+        return Err("semantic ODP slide count differs from specification".into());
+    }
+    let expected = (0..shape.pptx_slides())
+        .map(|index| {
+            format!(
+                "{}\n{}",
+                semantic_odp_title(index, false),
+                semantic_odp_text(index, false)
+            )
+        })
+        .chain(updated.then(|| {
+            let index = shape.pptx_slides();
+            format!(
+                "{}\n{}",
+                semantic_odp_title(index, true),
+                semantic_odp_text(index, true)
+            )
+        }))
+        .collect::<Vec<_>>();
+    for (index, slide) in slides.iter().enumerate() {
+        let is_added = updated && index == shape.pptx_slides();
+        if slide.title.as_deref() != Some(semantic_odp_title(index, is_added).as_str())
+            || slide.all_text() != expected[index]
+        {
+            return Err("semantic ODP slide differs from specification".into());
+        }
+    }
+    if presentation.text()? != expected.join("\n\n") {
+        return Err("semantic ODP full text differs from slide scan".into());
+    }
+    Ok(())
+}
+
 fn run_semantic_docx(
     case: Case,
     corpus: &Corpus,
@@ -3126,6 +3708,327 @@ fn run_semantic_pptx(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             _ => return Err("non-PPTX semantic case passed to PPTX runner".into()),
+        }
+    }
+    Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_semantic_odt(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let index = shape.docx_paragraphs() / 2;
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        match case {
+            Case::OdtSemanticCreateSmall => {
+                let started = Instant::now();
+                let bytes = semantic_odt_bytes(SemanticShape::Tiny)?;
+                let duration = started.elapsed();
+                let reopened = litchi_odt::Document::from_bytes(bytes.clone())?;
+                verify_semantic_odt(&reopened, SemanticShape::Tiny, false)?;
+                if bytes != corpus.archive && shape == SemanticShape::Tiny {
+                    return Err(
+                        "semantic ODT creation differs from its deterministic corpus".into(),
+                    );
+                }
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdtSemanticOpen => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let document = litchi_odt::Document::from_bytes(owned)?;
+                let duration = started.elapsed();
+                verify_semantic_odt(&document, shape, false)?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdtSemanticListParagraphs => {
+                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let paragraphs = document.paragraphs()?;
+                let duration = started.elapsed();
+                if paragraphs.len() != shape.docx_paragraphs() {
+                    return Err("semantic ODT paragraph list differs from specification".into());
+                }
+                verify_semantic_odt(&document, shape, false)?;
+                std::hint::black_box(paragraphs);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdtSemanticOneParagraph => {
+                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let paragraphs = document.paragraphs()?;
+                let text = paragraphs
+                    .get(index)
+                    .ok_or("semantic ODT selected paragraph is missing")?
+                    .text()?;
+                let duration = started.elapsed();
+                if text != semantic_odt_text(index, false) {
+                    return Err("semantic ODT selected paragraph differs from specification".into());
+                }
+                verify_semantic_odt(&document, shape, false)?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdtSemanticFullText => {
+                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let text = document.text()?;
+                let duration = started.elapsed();
+                verify_semantic_odt(&document, shape, false)?;
+                std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdtSemanticNoopEditSave | Case::OdtSemanticOneEditSave => {
+                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let mut edit = document.edit()?;
+                let updated = matches!(case, Case::OdtSemanticOneEditSave);
+                if updated {
+                    edit.replace_paragraph(Position::new(index), semantic_odt_text(index, true))?;
+                }
+                let commit = edit.commit()?;
+                let bytes = commit.snapshot().as_bytes().to_vec();
+                let duration = started.elapsed();
+                if (bytes != corpus.archive) != updated {
+                    return Err(
+                        "semantic ODT edit/save changed-state differs from specification".into(),
+                    );
+                }
+                let reopened = litchi_odt::Document::from_bytes(bytes.clone())?;
+                verify_semantic_odt(&reopened, shape, updated)?;
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            _ => return Err("non-ODT semantic case passed to ODT runner".into()),
+        }
+    }
+    Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_semantic_ods(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let sheet = shape.ods_sheet_count() / 2;
+    let row = shape.ods_rows_per_sheet() / 2;
+    let column = shape.ods_columns_per_sheet() / 2;
+    let sheet_name = semantic_ods_sheet_name(sheet);
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        match case {
+            Case::OdsSemanticCreateSmall => {
+                let started = Instant::now();
+                let bytes = semantic_ods_bytes(SemanticShape::Tiny)?;
+                let duration = started.elapsed();
+                let reopened = litchi_ods::Spreadsheet::from_bytes(bytes.clone())?;
+                verify_semantic_ods(&reopened, SemanticShape::Tiny, false)?;
+                if bytes != corpus.archive && shape == SemanticShape::Tiny {
+                    return Err(
+                        "semantic ODS creation differs from its deterministic corpus".into(),
+                    );
+                }
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdsSemanticOpen => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(owned)?;
+                let duration = started.elapsed();
+                verify_semantic_ods(&spreadsheet, shape, false)?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdsSemanticListSheets => {
+                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let sheets = spreadsheet.sheets();
+                let duration = started.elapsed();
+                if sheets.len() != shape.ods_sheet_count() {
+                    return Err("semantic ODS sheet list differs from specification".into());
+                }
+                verify_semantic_ods(&spreadsheet, shape, false)?;
+                std::hint::black_box(sheets);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdsSemanticOneCell => {
+                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let cell = spreadsheet
+                    .cell(&sheet_name, row, column)
+                    .ok_or("semantic ODS selected sheet is missing")?;
+                let duration = started.elapsed();
+                let litchi_ods::CellView::Stored(cell) = cell else {
+                    return Err("semantic ODS selected cell is missing".into());
+                };
+                if cell.text != semantic_ods_text(sheet, row, column, false) {
+                    return Err("semantic ODS selected cell differs from specification".into());
+                }
+                verify_semantic_ods(&spreadsheet, shape, false)?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdsSemanticFullCellText => {
+                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let text = semantic_ods_full_cell_text(&spreadsheet, shape)?;
+                let duration = started.elapsed();
+                verify_semantic_ods(&spreadsheet, shape, false)?;
+                std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdsSemanticNoopEditSave | Case::OdsSemanticOneEditSave => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let snapshot = litchi_ods::document::Snapshot::from_bytes(owned)?;
+                let mut edit = snapshot.edit();
+                let updated = matches!(case, Case::OdsSemanticOneEditSave);
+                if updated {
+                    let text = semantic_ods_text(sheet, row, column, true);
+                    edit.worksheets(|worksheets| {
+                        worksheets
+                            .set_cell(
+                                sheet_name.as_str(),
+                                row,
+                                column,
+                                litchi_ods::Cell::new(
+                                    litchi_ods::CellValue::Text(text.clone()),
+                                    text,
+                                ),
+                            )?
+                            .ok_or_else(|| {
+                                litchi_core::Error::InvalidFormat(
+                                    "semantic ODS selected sheet is missing".to_owned(),
+                                )
+                            })?;
+                        Ok(())
+                    })?;
+                }
+                let commit = edit.commit()?;
+                let bytes = commit.snapshot().as_bytes().to_vec();
+                let duration = started.elapsed();
+                if (bytes != corpus.archive) != updated || commit.changed() != updated {
+                    return Err(
+                        "semantic ODS edit/save changed-state differs from specification".into(),
+                    );
+                }
+                let reopened = litchi_ods::Spreadsheet::from_bytes(bytes.clone())?;
+                verify_semantic_ods(&reopened, shape, updated)?;
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            _ => return Err("non-ODS semantic case passed to ODS runner".into()),
+        }
+    }
+    Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_semantic_odp(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let index = shape.pptx_slides() / 2;
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        match case {
+            Case::OdpSemanticCreateSmall => {
+                let started = Instant::now();
+                let bytes = semantic_odp_bytes(SemanticShape::Tiny)?;
+                let duration = started.elapsed();
+                let reopened = litchi_odp::Presentation::from_bytes(bytes.clone())?;
+                verify_semantic_odp(&reopened, SemanticShape::Tiny, false)?;
+                if bytes != corpus.archive && shape == SemanticShape::Tiny {
+                    return Err(
+                        "semantic ODP creation differs from its deterministic corpus".into(),
+                    );
+                }
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdpSemanticOpen => {
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let presentation = litchi_odp::Presentation::from_bytes(owned)?;
+                let duration = started.elapsed();
+                verify_semantic_odp(&presentation, shape, false)?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdpSemanticListSlides => {
+                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let slides = presentation.slides()?;
+                let duration = started.elapsed();
+                if slides.len() != shape.pptx_slides() {
+                    return Err("semantic ODP slide list differs from specification".into());
+                }
+                verify_semantic_odp(&presentation, shape, false)?;
+                std::hint::black_box(slides);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdpSemanticOneSlide => {
+                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let slides = presentation.slides()?;
+                let slide = slides
+                    .get(index)
+                    .ok_or("semantic ODP selected slide is missing")?;
+                let text = slide.all_text();
+                let duration = started.elapsed();
+                let expected = format!(
+                    "{}\n{}",
+                    semantic_odp_title(index, false),
+                    semantic_odp_text(index, false)
+                );
+                if text != expected {
+                    return Err("semantic ODP selected slide differs from specification".into());
+                }
+                verify_semantic_odp(&presentation, shape, false)?;
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdpSemanticFullText => {
+                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let started = Instant::now();
+                let text = presentation.text()?;
+                let duration = started.elapsed();
+                verify_semantic_odp(&presentation, shape, false)?;
+                std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::OdpSemanticNoopEditSave | Case::OdpSemanticOneEditSave => {
+                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let snapshot = presentation.snapshot()?;
+                let started = Instant::now();
+                let mut transaction = snapshot.transaction()?;
+                let updated = matches!(case, Case::OdpSemanticOneEditSave);
+                if updated {
+                    let index = shape.pptx_slides();
+                    transaction.add(
+                        &semantic_odp_title(index, true),
+                        &semantic_odp_text(index, true),
+                    )?;
+                }
+                let commit = transaction.commit()?;
+                let bytes = commit.snapshot().bytes().to_vec();
+                let duration = started.elapsed();
+                if (bytes != corpus.archive) != updated || commit.changed() != updated {
+                    return Err(
+                        "semantic ODP edit/save changed-state differs from specification".into(),
+                    );
+                }
+                let reopened = litchi_odp::Presentation::from_bytes(bytes.clone())?;
+                verify_semantic_odp(&reopened, shape, updated)?;
+                std::hint::black_box(bytes);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            _ => return Err("non-ODP semantic case passed to ODP runner".into()),
         }
     }
     Ok(result(case, corpus, elapsed, None))
@@ -5019,6 +5922,7 @@ mod tests {
         Case, CorpusShape, CountingSink, InstrumentedSource, PayloadKind, RangeSimulationConfig,
         RequestSizeBuckets, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
         XlsxShape, build_cfb_corpus, build_opc_corpus, build_semantic_docx_corpus,
+        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
         build_semantic_pptx_corpus, build_writer_corpus, build_xlsx_corpus, payload_bytes,
         resolve_execution_workers, run_case, run_case_with_config, run_scaling_case,
         simulated_request_delay, statistics,
@@ -5087,6 +5991,39 @@ mod tests {
         assert_eq!(pptx.manifest.entry_count, 12);
         let pptx_result = run_case(Case::PptxSemanticOnePercentEditSave, &pptx, 0, 1).unwrap();
         assert!(pptx_result.sink.is_none());
+    }
+
+    #[test]
+    fn semantic_odf_tiny_corpora_are_deterministic_and_editable() {
+        let odt = build_semantic_odt_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(
+            odt.archive,
+            build_semantic_odt_corpus(SemanticShape::Tiny)
+                .unwrap()
+                .archive
+        );
+        assert_eq!(odt.manifest.entry_count, 24);
+        run_case(Case::OdtSemanticOneEditSave, &odt, 0, 1).unwrap();
+
+        let ods = build_semantic_ods_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(
+            ods.archive,
+            build_semantic_ods_corpus(SemanticShape::Tiny)
+                .unwrap()
+                .archive
+        );
+        assert_eq!(ods.manifest.entry_count, 64);
+        run_case(Case::OdsSemanticOneEditSave, &ods, 0, 1).unwrap();
+
+        let odp = build_semantic_odp_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(
+            odp.archive,
+            build_semantic_odp_corpus(SemanticShape::Tiny)
+                .unwrap()
+                .archive
+        );
+        assert_eq!(odp.manifest.entry_count, 3);
+        run_case(Case::OdpSemanticOneEditSave, &odp, 0, 1).unwrap();
     }
 
     #[test]

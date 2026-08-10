@@ -2,23 +2,23 @@
 
 Date: 2026-08-10
 
-This is a coverage map, not a completion claim. It compares the 60 selectable
+This is a coverage map, not a completion claim. It compares the 81 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
 | Required scenario | Current status | Measured coverage |
 |---|---|---|
 | Open and identify format | Partial | ZIP/OPC/CFB and owned/source-backed XLSX open; no smart-detection handoff case |
-| List semantic children without payloads | Partial | XLSX sheets, including zero-request source-backed listing, and PPTX slides; DOCX section listing remains missing |
-| Query one property or named object | Partial | XLSX first cell, one DOCX paragraph and one PPTX slide; broader properties/images remain missing |
-| Read one cell/paragraph/slide/image/Part | Partial | XLSX cell, DOCX paragraph, PPTX slide and generic OPC Part; semantic image selection remains missing |
-| Scan all cells/paragraphs/slides | Covered for XLSX/DOCX/PPTX synthetic corpora | XLSX full/narrow cell scans, DOCX paragraph enumeration and PPTX slide/text enumeration |
-| Full text extraction | Covered for generated DOCX/PPTX | Complete deterministic text is checked; real-producer/media-heavy corpora remain missing |
+| List semantic children without payloads | Partial | XLSX/ODS sheets, DOCX/ODT paragraphs and PPTX/ODP slides; DOCX section listing remains missing |
+| Query one property or named object | Partial | XLSX/ODS cells, one DOCX/ODT paragraph and one PPTX/ODP slide; broader properties/images remain missing |
+| Read one cell/paragraph/slide/image/Part | Partial | XLSX/ODS cells, DOCX/ODT paragraphs, PPTX/ODP slides and generic OPC Part; semantic image selection remains missing |
+| Scan all cells/paragraphs/slides | Covered for generated OOXML/ODF text corpora | XLSX/ODS cell scans, DOCX/ODT paragraph enumeration and PPTX/ODP slide/text enumeration |
+| Full text extraction | Covered for generated DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; real-producer/media-heavy corpora remain missing |
 | Semantic conversion to sequential sink | Missing | Package serialization exists; semantic export/conversion does not |
-| Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX public authoring; other families remain missing |
+| Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
-| Exact no-op edit and commit | Covered for XLSX/DOCX/PPTX generated corpora | Public semantic transaction plus save/reopen; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for XLSX/DOCX/PPTX generated corpora | Cell, paragraph and shape edit/save/reopen |
+| Exact no-op edit and commit | Covered for generated XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; signed/extension corpora remain missing |
+| One semantic edit and save | Covered for generated XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX generated corpora | Deterministic evenly spaced cell, paragraph and shape changes |
 | Bulk update matching objects | Missing | No semantic end-to-end case |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
@@ -54,10 +54,10 @@ semantic conversion remain.
 7. Validate/security matrix for valid, malformed-within-limits, encrypted,
    macro-enabled, protected and external-link fixtures.
 8. Smart detection versus prepared-source reuse. OOXML smart results retain an
-   adoptable parsed OPC package and focused iWork has an opaque
-   `PreparedSource`; ODF and generic iWork handoff gaps remain.
-9. Add ODF and iWork public semantic open/query/edit/save matrices without
-   using OOXML substrate results as proxy evidence.
+   adoptable parsed OPC package; ODF detection/handoff remains unmeasured.
+9. Broaden ODF beyond generated text/grid/deck cases: 1% and bulk edits,
+   unknown extensions, real producers, media, security and source-backed I/O.
+   iWork is deliberately deferred while the `iwa-*` crates change separately.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

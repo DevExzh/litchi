@@ -12,6 +12,10 @@ on:
       - 'crates/litchi-doc/**'
       - 'crates/litchi-docx/**'
       - 'crates/litchi-opc/**'
+      - 'crates/litchi-odf-common/**'
+      - 'crates/litchi-odp/**'
+      - 'crates/litchi-ods/**'
+      - 'crates/litchi-odt/**'
       - 'crates/litchi-ppt/**'
       - 'crates/litchi-pptx/**'
       - 'crates/litchi-xls/**'
@@ -31,6 +35,10 @@ on:
       - 'crates/litchi-doc/**'
       - 'crates/litchi-docx/**'
       - 'crates/litchi-opc/**'
+      - 'crates/litchi-odf-common/**'
+      - 'crates/litchi-odp/**'
+      - 'crates/litchi-ods/**'
+      - 'crates/litchi-odt/**'
       - 'crates/litchi-ppt/**'
       - 'crates/litchi-pptx/**'
       - 'crates/litchi-xls/**'
@@ -119,6 +127,27 @@ jobs:
               assert item["corpus"]["archive_sha256"]
           PY
 
+      - name: Run ODF semantic smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
+            --semantic-shape tiny \
+            --json target/perf/odf-semantic-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odf-semantic-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 21
+          assert len({item["case"] for item in report["results"]}) == 21
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 1
+              assert item["corpus"]["archive_sha256"]
+          PY
+
   full:
     name: release container matrix
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -178,6 +207,26 @@ jobs:
               assert item["corpus"]["archive_sha256"]
           PY
 
+      - name: Run release ODF semantic matrix
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
+            --semantic-shape tiny,large \
+            --json target/perf/odf-semantic-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odf-semantic-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 39
+          assert len({item["case"] for item in report["results"]}) == 21
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 15
+              assert item["corpus"]["archive_sha256"]
+          PY
+
       - name: Upload performance baseline JSON
         uses: actions/upload-artifact@v4
         with:
@@ -185,5 +234,6 @@ jobs:
           path: |
             target/perf/container-baseline.json
             target/perf/semantic-baseline.json
+            target/perf/odf-semantic-baseline.json
           if-no-files-found: error
           retention-days: 14

@@ -1,25 +1,29 @@
-# OPC, CFB, legacy-writer, XLSX, DOCX, and PPTX performance baseline
+# OPC, CFB, legacy-writer, OOXML, and ODF performance baseline
 
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
-public-API XLSX snapshot/edit/save flows, and opt-in DOCX/PPTX semantic flows.
-It creates every corpus in memory; it also exercises source-backed XLSX catalog
-and worksheet reads over positional I/O. It does not depend on untracked office
-files, network state, randomness, or the system clock. The JSON report contains
-the generator parameters and SHA-256 hashes for the generated container and
-target entry, so a result always identifies its exact input or packaged output.
+public-API XLSX snapshot/edit/save flows, and opt-in DOCX/PPTX/ODT/ODS/ODP
+semantic flows. It creates every corpus in memory; it also exercises
+source-backed XLSX catalog and worksheet reads over positional I/O. It does not
+depend on untracked office files, network state, or randomness. ODP builder
+timestamps are replaced with fixed metadata before measurement. The JSON
+report contains the generator parameters and SHA-256 hashes for the generated
+container and target entry, so a result always identifies its exact input or
+packaged output.
 
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
 
-The DOCX/PPTX semantic matrix is deliberately opt-in. It measures only current
-public APIs and therefore does not change the default 36 cases / 198 records.
+The DOCX/PPTX/ODF semantic matrices are deliberately opt-in. They measure only
+current public APIs and therefore do not change the default 36 cases / 198
+records.
 
 ## Run
 
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
-range cases, two execution-scaling cases and 16 semantic cases are opt-in:
+range cases, two execution-scaling cases, 16 DOCX/PPTX semantic cases and 21
+ODF semantic cases are opt-in, for 81 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -75,6 +79,15 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
   --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
   --json target/perf/semantic-office-smoke.json
+```
+
+Run the complete tiny semantic ODF smoke matrix (21 records):
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 0 --samples 1 --semantic-shape tiny \
+  --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
+  --json target/perf/semantic-odf-smoke.json
 ```
 
 Exercise deterministic high-latency, range-bounded positional I/O without a
@@ -176,6 +189,46 @@ PPTX uses `Package::from_bytes`/`from_vec`, presentation slide/text views,
 opened-presentation transactions, and `to_bytes`. PPTX currently has no public
 writer-sink API, so PPTX save records intentionally leave `sink` as `null`
 rather than claiming unobservable write behavior.
+
+## Opt-in ODF semantic corpus matrix
+
+The ODF cases use the same `--semantic-shape` selection, but each format is
+generated through its public builder and reopened from owned in-memory bytes.
+Creation is timed only for `tiny`; every case validates its public semantic
+projection and every edit/save case reopens the published bytes after timing.
+No filesystem `save(path)` operation is included, so these records measure
+in-memory publication rather than OS/filesystem behavior.
+
+| Shape | ODT paragraphs | ODS sheets × rows × columns | ODP slides |
+|---|---:|---:|---:|
+| `tiny` | 24 | 1 × 8 × 8 | 3 |
+| `medium` | 200 | 2 × 32 × 32 | 12 |
+| `large` | 10,000 | 2 × 128 × 128 | 100 |
+
+Each ODT batch uses `Builder`, `Document::from_bytes`, paragraph enumeration,
+full-text extraction, and the source-bound `Document::edit` transaction.
+`odt_semantic_one_paragraph` necessarily calls the public `paragraphs()` API
+and then selects the middle value because ODT has no public indexed paragraph
+query; it is deliberately not described as a lazy lookup.
+
+Each ODS batch uses `Builder`, `Spreadsheet::from_bytes`, `sheets()`, the
+public logical `cell()` view, a deterministic row-major cell-text aggregate,
+and the unified `document::Snapshot` transaction. ODS snapshot construction is
+inside the timed edit/save interval so these cases expose the package-open cost
+paid by this public editing entry point; the source-byte clone is outside the
+interval. The timed work also includes staging, commit, and published-byte
+observation. `ods_semantic_full_cell_text` is named explicitly because the
+facade exposes cells rather than a single full-text method.
+
+Each ODP batch uses `Builder`, `Presentation::from_bytes`, `slides()`,
+`Presentation::text`, source snapshots, and public presentation transactions.
+Opened source slides are preservation-only under the public rewrite contract,
+so `odp_semantic_one_edit_save` performs the supported single-slide append and
+validates every retained slide plus the addition. The current public ODP
+builder writes wall-clock timestamps in `meta.xml`; the corpus generator
+retains its authored content/style output but repackages it with fixed
+benchmark metadata before measurement, so corpus SHA-256 values stay stable
+across runs.
 
 OPC parts retain their deterministic `benchmark/parts/00000.bin` names, and
 the middle entry remains the fixed `zip_read_one` target. CFB streams are

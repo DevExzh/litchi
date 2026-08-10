@@ -220,10 +220,11 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **60
+The stage-1 records above are retained unchanged. The current harness has **81
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
-simulated-range cases, two opt-in execution-scaling cases and 16 opt-in
-DOCX/PPTX semantic cases. It remains an incomplete program and CRUD matrix.
+simulated-range cases, two opt-in execution-scaling cases, 16 opt-in
+DOCX/PPTX semantic cases, and 21 opt-in ODT/ODS/ODP semantic cases. It remains
+an incomplete program and CRUD matrix.
 
 - The XLSX row-start index is accepted for the narrow-range case: ABBA p50
   geometric mean **-80.499%**, mean geometric mean **-79.962%**; full scan
@@ -269,6 +270,13 @@ DOCX/PPTX semantic cases. It remains an incomplete program and CRUD matrix.
   1% edit/save case 9.37% p50/mean and cuts process allocation calls 11.67%.
   The PPTX one-edit guardrail is neutral. See
   [`0010`](changes/0010-docx-pptx-semantic-queries-and-edits.md).
+- Deterministic ODT/ODS/ODP corpora now cover public open, list, one-object,
+  full-text, small-create, no-op and one-edit/save paths. Reusing the already
+  validated ODS package during snapshot construction improves pooled p50 by
+  **7.45% / 11.78%** for medium/large no-op edit-save and **3.57% / 2.06%**
+  for one-cell edit-save. Full-process allocated bytes fall 1.46% in the
+  medium no-op profile; peak heap is flat. See
+  [`0011`](changes/0011-odf-semantic-baseline-and-ods-snapshot.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
