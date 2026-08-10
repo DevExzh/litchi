@@ -1,3 +1,9 @@
+#![allow(
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check, normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Bounded codecs for Future Record Type headers used by XLSB extensions.
 
 use crate::package::error::{Error, Result};

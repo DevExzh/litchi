@@ -81,7 +81,7 @@ pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
     }
     append_checked(
         &mut appended,
-        &builder.generate_full_record(),
+        &builder.generate_incremental_record(),
         editor.max_output_bytes,
     )?;
 

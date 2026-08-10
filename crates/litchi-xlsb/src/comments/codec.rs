@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation to this codec boundary"
+)]
+
 //! BIFF12 framing and rich-string codec for XLSB comments.
 //!
 //! The record payloads are the `BrtBeginComment`/`BrtCommentText` records

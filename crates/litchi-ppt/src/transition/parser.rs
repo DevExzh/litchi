@@ -62,7 +62,7 @@ pub fn parse_transition(record: &Record) -> Result<TransitionInfo> {
 }
 
 /// Parse transition type from effect type value.
-fn parse_transition_type(effect_type: u16) -> TransitionType {
+pub(super) fn parse_transition_type(effect_type: u16) -> TransitionType {
     match effect_type {
         1 => TransitionType::Blinds,
         2 => TransitionType::Checkerboard,
@@ -114,7 +114,7 @@ fn parse_transition_type(effect_type: u16) -> TransitionType {
 ///
 /// Direction values follow MS-PPT 2.6.6 (`SlideShowSlideInfoAtom`) and are the
 /// exact inverse of `encode_transition_direction` in the writer.
-fn parse_transition_direction(direction: u8, effect_type: u16) -> TransitionDirection {
+pub(super) fn parse_transition_direction(direction: u8, effect_type: u16) -> TransitionDirection {
     match effect_type {
         // Blinds: 0=Vertical, 1=Horizontal
         1 => {
@@ -167,7 +167,7 @@ fn parse_transition_direction(direction: u8, effect_type: u16) -> TransitionDire
 }
 
 /// Parse transition speed from speed value.
-fn parse_transition_speed(speed: u8) -> TransitionSpeed {
+pub(super) fn parse_transition_speed(speed: u8) -> TransitionSpeed {
     match speed {
         0 => TransitionSpeed::Slow,
         2 => TransitionSpeed::Fast,

@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::map_err_ignore,
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, normalization into the module's stable typed public error, an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! BIFF12 formula values and Parse Tree Generator (Ptg) codecs.
 use super::super::model::read_u32_le_at;
 ///

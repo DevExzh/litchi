@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Semantic XLSB formula and Ptg models.
 //!
 //! The names in this module are contextual to `formula`.

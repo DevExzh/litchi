@@ -1,3 +1,8 @@
+#![allow(
+    clippy::expect_used,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check to this codec boundary"
+)]
+
 //! Bounded package graphs owned by standard DrawingML Chart parts.
 //!
 //! XLSB uses the same Chart, chart user-shapes, embedded-package, OLE, and

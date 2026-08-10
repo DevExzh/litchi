@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation to this codec boundary"
+)]
+
 //! Bounded `BrtName` parsing and defined-name formula construction.
 
 use super::model::{Definition, validate_name};

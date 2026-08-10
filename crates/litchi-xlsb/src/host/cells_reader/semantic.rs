@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::expect_used,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, extraction after an immediately preceding structural invariant check to this codec boundary"
+)]
+
 //! Semantic conversions used by the XLSB worksheet cell reader.
 
 use crate::conditional_formatting::{Color, Scale, Value};

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation to this codec boundary"
+)]
+
 //! Serializer for the XLSB External Data Connections part (MS-XLSB 2.1.7.24).
 //!
 //! This is the exact inverse of `parse.rs`: payload layouts, flag bits,

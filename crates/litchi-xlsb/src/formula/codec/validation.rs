@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation to this codec boundary"
+)]
+
 //! Shared formula grammar and bounded-value validation helpers.
 use super::super::function_table::BUILTIN_FUNCTIONS;
 use super::super::model::TableRowType;

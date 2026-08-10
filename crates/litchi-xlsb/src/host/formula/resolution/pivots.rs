@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! PivotTable formula-scope validation and calculated-name resolution.
 
 use crate::package::error::{Error, Result};

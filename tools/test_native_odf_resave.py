@@ -69,6 +69,15 @@ EVIDENCE_SHA256 = {
     "test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx": (
         "fcc8acffad88f5091316f67403c099a4c9eaa372e17927edfee29c35fb132034"
     ),
+    "test-data/poi/test-data/slideshow/45543.ppt": (
+        "218aaac542e5f9b567736407f2631defc65797c6ba2a7818f066e2f93bcfacaf"
+    ),
+    "test-data/office-interop/litchi-changed/45543-transition-litchi.ppt": (
+        "88df2a6cd4bed72ee3f4f0bd224f8246b6388ab860cdf8628ab2057e6a9875b1"
+    ),
+    "test-data/office-interop/libreoffice-resaved/45543-transition-litchi.ppt": (
+        "5ffe19b9e60886a6d2950ccb5ae3fb1bd4ca278f0bafd40b5127575dc93e8d80"
+    ),
     "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf": (
         "1a079582281767c1bf7afa5ef2e63553400cdbc4704aa25d9dbcc34e2c22569d"
     ),
@@ -152,6 +161,9 @@ SUCCESS_LOGS = {
     ),
     "test-data/office-interop/logs/pptx-resave.log": (
         "test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx"
+    ),
+    "test-data/office-interop/logs/ppt-resave.log": (
+        "test-data/office-interop/libreoffice-resaved/45543-transition-litchi.ppt"
     ),
     "test-data/office-interop/logs/rtf-resave.log": (
         "test-data/office-interop/libreoffice-resaved/relsize-litchi.rtf"

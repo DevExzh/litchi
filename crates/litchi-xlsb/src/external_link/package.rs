@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! BIFF12 stream authoring for one XLSB external-link part.
 //!
 //! OPC relationships and part placement remain host concerns. This owner

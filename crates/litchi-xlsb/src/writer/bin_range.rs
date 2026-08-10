@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation to this codec boundary"
+)]
+
 //! Binary range serialization for XLSB writer.
 //!
 //! Provides helpers to serialize cell ranges into the BIFF12 `BinRangeList`

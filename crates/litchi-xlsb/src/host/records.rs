@@ -612,6 +612,12 @@ impl NameRecord {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::float_cmp,
+    reason = "record fixtures intentionally construct exact bounded BIFF12 bit patterns and floating sentinels"
+)]
 mod tests {
     use super::*;
 

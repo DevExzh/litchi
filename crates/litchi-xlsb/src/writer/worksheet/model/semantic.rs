@@ -1,3 +1,8 @@
+#![allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! Mutable XLSB worksheet state and CRUD model.
 
 use crate::comments::Record;

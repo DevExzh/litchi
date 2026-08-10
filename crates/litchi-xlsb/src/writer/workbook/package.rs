@@ -1,3 +1,9 @@
+#![allow(
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check, normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! OPC package assembly for XLSB workbooks.
 
 use super::model::{SheetSlot, WorkbookWriter, XLSB_WORKSHEET_BINARY_INDEX_EMPTY};

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    reason = "test fixture uses bounded literal casts, panic-on-failure extraction, exact floating sentinels, or explicit negative fallback solely to state its assertion"
+)]
+
 //! Synthetic Brt-record stream tests for the Table (ListObject) parser.
 
 use super::model::*;

@@ -6,6 +6,16 @@
 //! ordinary APIs.
 
 #![forbid(unsafe_code)]
+#![deny(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    clippy::wildcard_enum_match_arm,
+    reason = "ordinary and newly authored workbook paths require checked wire conversions, typed error propagation, and explicit variants"
+)]
 #![cfg_attr(
     test,
     allow(
@@ -37,19 +47,6 @@
     clippy::trivially_copy_pass_by_ref,
     clippy::unused_self,
     reason = "retrofitting these API lints would churn public signatures and documentation independently of BIFF12 correctness"
-)]
-// The remaining legacy wire conversions and error collapses require a dedicated
-// codec migration. Newer correctness-sensitive paths override these lints with
-// local `deny` attributes.
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_precision_loss,
-    clippy::cast_sign_loss,
-    clippy::expect_used,
-    clippy::map_err_ignore,
-    clippy::wildcard_enum_match_arm,
-    reason = "legacy BIFF12 codecs retain established fixed-width and error-mapping behavior pending typed codec migration"
 )]
 // These style-only rewrites touch much of the legacy codec and obscure review of
 // semantic changes; keep them local to this crate rather than weakening workspace

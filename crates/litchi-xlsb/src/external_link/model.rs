@@ -1,3 +1,9 @@
+#![allow(
+    clippy::expect_used,
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check, an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! Semantic XLSB external-link values and invariants.
 //!
 //! The names in this module are contextual to the `external_link` owner.

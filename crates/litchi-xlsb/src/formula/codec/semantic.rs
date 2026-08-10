@@ -1,3 +1,9 @@
+#![allow(
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check, normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Formula token-to-text compiler and host-resolution seam.
 use super::super::model::column_index_to_name;
 use super::super::model::*;

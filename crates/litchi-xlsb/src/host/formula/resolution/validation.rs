@@ -1,3 +1,8 @@
+#![allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! Error adaptation at the host/formula boundary.
 
 use crate::package::error::{Error, Result};

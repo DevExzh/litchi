@@ -1,3 +1,10 @@
+#![allow(
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check, normalization into the module's stable typed public error, an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! Semantic and graph validation for XLSB threaded comments.
 
 use std::collections::TryReserveError;

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! Typed worksheet image payloads used by XLSB Drawings parts.
 
 use crate::chart::Anchor;

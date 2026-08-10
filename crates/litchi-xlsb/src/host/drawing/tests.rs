@@ -1,3 +1,8 @@
+#![allow(
+    clippy::expect_used,
+    reason = "test fixture uses bounded literal casts, panic-on-failure extraction, exact floating sentinels, or explicit negative fallback solely to state its assertion"
+)]
+
 //! Tests for the SpreadsheetDrawing XML inventory parser.
 
 use super::*;

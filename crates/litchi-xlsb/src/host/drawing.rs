@@ -1,3 +1,9 @@
+#![allow(
+    clippy::map_err_ignore,
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines normalization into the module's stable typed public error, an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! SpreadsheetDrawing XML inventory for XLSB Drawings parts.
 //!
 //! Per MS-XLSB 2.1.7.23 the Drawings part of an XLSB package is the standard

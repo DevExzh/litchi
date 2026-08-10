@@ -1,3 +1,8 @@
+#![allow(
+    clippy::expect_used,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check to this codec boundary"
+)]
+
 //! Workbook writer state and public configuration API.
 
 use crate::calc::Props;

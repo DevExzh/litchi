@@ -1,3 +1,11 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, extraction after an immediately preceding structural invariant check, normalization into the module's stable typed public error, an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! Structural and feature-level validation for XLSB worksheet records.
 
 use super::model::{CellsReader, Dimensions};

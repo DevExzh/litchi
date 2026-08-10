@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Source-bound worksheet-cell snapshots and structural edits.
 
 use crate::package::error::{Error, Result};
@@ -2824,6 +2829,7 @@ fn storage_error(reference: Reference, expected: &'static str) -> Error {
 #[cfg(test)]
 #[allow(
     clippy::expect_used,
+    clippy::float_cmp,
     reason = "unit fixtures unwrap only values whose validity is the assertion setup"
 )]
 mod tests {

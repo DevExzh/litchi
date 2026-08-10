@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Typed XLSB chart-sheet authoring (MS-XLSB 2.1.7.7).
 
 use crate::chart::Chart;

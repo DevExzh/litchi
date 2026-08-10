@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::map_err_ignore,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Strict BIFF12 codecs for slicer caches and worksheet slicer views.
 
 use super::model::{

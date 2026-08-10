@@ -1,3 +1,16 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::float_cmp,
+        reason = "style codec tests compare exact finite values just decoded from their own wire literals"
+    )
+)]
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation to this codec boundary"
+)]
+
 //! Styles writer for XLSB format
 //!
 //! This module provides functionality to write style information (fonts, fills, borders, etc.)

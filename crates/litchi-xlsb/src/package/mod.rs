@@ -343,6 +343,10 @@ impl From<OpcPackage> for Package {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    reason = "package ingress fixtures use panic-on-failure extraction after constructing exact finite limits"
+)]
 mod tests {
     use std::io::Cursor;
 

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation to this codec boundary"
+)]
+
 //! Data validation binary serialization for XLSB writer.
 //!
 //! Serializes classic `BrtDVal` records and Office 2013 `BrtDVal14` future

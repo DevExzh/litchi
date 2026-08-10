@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation to this codec boundary"
+)]
+
 //! Record-walking parser for the XLSB External Data Connections part
 //! (MS-XLSB 2.1.7.24).
 //!

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Source-bound worksheet snapshots and transactional sparkline edits.
 
 use super::{Error, Groups, Limits, Result, encode_block, parse_block};

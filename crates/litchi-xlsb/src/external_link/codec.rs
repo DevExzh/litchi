@@ -1,3 +1,9 @@
+#![allow(
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check, normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! BIFF12 parsing for XLSB external-link streams.
 //!
 //! This module validates the checked-in `BrtSupBook` record grammar and

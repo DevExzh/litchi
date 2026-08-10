@@ -1,3 +1,8 @@
+#![allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! BIFF12 stream decoding and worksheet feature orchestration.
 
 use super::model::{CellsReader, Dimensions, ParsedFormulaCell};

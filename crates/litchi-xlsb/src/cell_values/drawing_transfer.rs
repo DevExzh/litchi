@@ -1625,6 +1625,10 @@ fn is_strict(package: &litchi_opc::OpcPackage) -> bool {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    reason = "drawing-transfer fixtures use panic-on-failure extraction only after constructing the asserted package invariant"
+)]
 mod tests {
     use super::*;
 

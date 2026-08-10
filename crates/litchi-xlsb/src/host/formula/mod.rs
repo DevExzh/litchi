@@ -59,6 +59,11 @@ use validation::{
 };
 
 #[cfg(test)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::wildcard_enum_match_arm,
+    reason = "formula fixtures use bounded literal token lengths and deliberate negative fallback arms only to state assertions"
+)]
 mod tests {
     use super::*;
 

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! XLSB worksheet-view record adapter.
 //!
 //! This module owns only the BIFF12 wire contract. The format-neutral view

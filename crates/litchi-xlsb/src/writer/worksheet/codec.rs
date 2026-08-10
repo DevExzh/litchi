@@ -1,3 +1,11 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! BIFF12 worksheet record encoding.
 
 use crate::package::error::{Error, Result};

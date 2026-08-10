@@ -1,3 +1,11 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::map_err_ignore,
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, normalization into the module's stable typed public error, an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! Semantic conditional-formatting validation and formula boundary.
 //!
 //! This layer owns source-formula compilation, model invariants, and

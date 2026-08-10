@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Bounded BIFF12 codecs for the shared-workbook owner.
 
 use crate::raw::{Cursor, Kind, Limits, Records, Writer};

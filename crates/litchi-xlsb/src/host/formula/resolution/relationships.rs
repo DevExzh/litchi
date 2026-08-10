@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! XTI, worksheet, and external-workbook relationship resolution.
 
 use crate::package::error::{Error, Result};

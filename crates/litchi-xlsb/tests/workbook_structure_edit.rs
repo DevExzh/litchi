@@ -1,4 +1,10 @@
 #![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_unrelated,
+    clippy::wildcard_enum_match_arm,
+    reason = "test fixture uses bounded literal casts, panic-on-failure extraction, exact floating sentinels, or explicit negative fallback solely to state its assertion"
+)]
+#![allow(
     clippy::expect_used,
     clippy::unwrap_used,
     reason = "integration tests use panic-on-failure assertions"

@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        reason = "snapshot-only test constructors use panic-on-failure extraction for asserted valid fixtures"
+    )
+)]
+
 //! Immutable XLSB XML Maps package snapshots.
 
 use std::ops::Range;

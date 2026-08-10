@@ -1,9 +1,6 @@
 use std::env;
 use std::error::Error;
 use std::fs;
-use std::io;
-#[cfg(feature = "ppt")]
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 #[cfg(any(
@@ -116,8 +113,22 @@ fn fixture(path: &str) -> PathBuf {
         .join(path)
 }
 
-fn missing(message: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::NotFound, message)
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "rtf",
+    feature = "xls",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    feature = "odf",
+    feature = "odb",
+    feature = "odg"
+))]
+fn missing(message: &str) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::NotFound, message)
 }
 
 #[cfg(feature = "doc")]
@@ -265,83 +276,53 @@ fn readback_pptx(input: &Path) -> Result<()> {
 
 #[cfg(feature = "ppt")]
 fn generate_ppt(output: &Path) -> Result<()> {
-    let source = fixture("test-data/poi/test-data/slideshow/text-margins.ppt");
-    let bytes = fs::read(source)?;
-    let snapshot = litchi_ppt::slide_order::Snapshot::from_bytes(bytes.clone())?;
-    let mut package = litchi_ppt::Package::from_reader(Cursor::new(bytes))?;
-    let shape_count = package
-        .presentation()?
-        .slides()?
-        .first()
-        .ok_or_else(|| missing("PPT slide 0 is absent"))?
-        .shapes()?
-        .len();
-    let mut changed = None;
-    for shape in 0..shape_count {
-        let mut edit = snapshot.edit()?;
-        let target = litchi_ppt::text_edit::Target::new(
-            litchi_core::Position::new(0),
-            litchi_core::Position::new(shape),
-        );
-        let Ok(before) = snapshot.shape_anchor(target) else {
-            continue;
-        };
-        let replacement = litchi_ppt::Anchor::full(
-            before.left() + 100,
-            before.top(),
-            before.right() + 100,
-            before.bottom(),
-        )?;
-        if edit.set_shape_anchor(target, replacement).is_ok() {
-            changed = Some(edit.commit()?.snapshot().bytes().to_vec());
-            break;
-        }
+    let source = fixture("test-data/poi/test-data/slideshow/45543.ppt");
+    let snapshot = litchi_ppt::slide_order::Snapshot::from_bytes(fs::read(source)?)?;
+    let position = litchi_core::Position::new(0);
+    let before = snapshot.slide_transition_visual(position)?;
+    if before != ppt_source_transition()? {
+        return Err(format!("PPT source transition mismatch: {before:?}").into());
     }
-    fs::write(
-        output,
-        changed.ok_or_else(|| missing("PPT slide 0 has no safely editable anchored shape"))?,
-    )?;
+    let mut edit = snapshot.edit()?;
+    edit.set_slide_transition_visual(position, ppt_changed_transition()?)?;
+    let commit = edit.commit()?;
+    fs::write(output, commit.snapshot().bytes())?;
     readback_ppt(output)
 }
 
 #[cfg(feature = "ppt")]
 fn readback_ppt(input: &Path) -> Result<()> {
-    let source = fixture("test-data/poi/test-data/slideshow/text-margins.ppt");
-    let source_bytes = fs::read(source)?;
-    let source_snapshot = litchi_ppt::slide_order::Snapshot::from_bytes(source_bytes.clone())?;
-    let mut package = litchi_ppt::Package::from_reader(Cursor::new(source_bytes))?;
-    let shape_count = package
-        .presentation()?
-        .slides()?
-        .first()
-        .ok_or_else(|| missing("PPT source slide 0 is absent"))?
-        .shapes()?
-        .len();
-    let (target, before) = (0..shape_count)
-        .find_map(|shape| {
-            let target = litchi_ppt::text_edit::Target::new(
-                litchi_core::Position::new(0),
-                litchi_core::Position::new(shape),
-            );
-            source_snapshot
-                .shape_anchor(target)
-                .ok()
-                .map(|anchor| (target, anchor))
-        })
-        .ok_or_else(|| missing("PPT source has no anchored shape"))?;
+    let position = litchi_core::Position::new(0);
     let changed = litchi_ppt::slide_order::Snapshot::from_bytes(fs::read(input)?)?;
-    let after = changed.shape_anchor(target)?;
-    if after.left() != before.left() + 100
-        || after.top() != before.top()
-        || after.right() != before.right() + 100
-        || after.bottom() != before.bottom()
-    {
-        return Err(
-            format!("PPT shape anchor mismatch: before={before:?}, after={after:?}").into(),
-        );
+    let visual = changed.slide_transition_visual(position)?;
+    if visual != ppt_changed_transition()? {
+        return Err(format!("PPT transition mismatch: {visual:?}").into());
     }
-    println!("ppt slide[0] first-anchor x-offset=100");
+    println!(
+        "ppt slide[0] transition={:?}; direction={:?}; speed={:?}",
+        visual.transition_type(),
+        visual.direction(),
+        visual.speed()
+    );
     Ok(())
+}
+
+#[cfg(feature = "ppt")]
+fn ppt_source_transition() -> Result<litchi_ppt::slide_order::SlideTransitionVisual> {
+    Ok(litchi_ppt::slide_order::SlideTransitionVisual::new(
+        litchi_ppt::TransitionType::Random,
+        litchi_ppt::TransitionDirection::None,
+        litchi_ppt::TransitionSpeed::Slow,
+    )?)
+}
+
+#[cfg(feature = "ppt")]
+fn ppt_changed_transition() -> Result<litchi_ppt::slide_order::SlideTransitionVisual> {
+    Ok(litchi_ppt::slide_order::SlideTransitionVisual::new(
+        litchi_ppt::TransitionType::Dissolve,
+        litchi_ppt::TransitionDirection::None,
+        litchi_ppt::TransitionSpeed::Medium,
+    )?)
 }
 
 #[cfg(feature = "rtf")]

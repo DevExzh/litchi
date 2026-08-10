@@ -286,6 +286,10 @@ fn validate_column_dependencies(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "XML-map fixtures derive bounded wire counts from short literal vectors"
+)]
 mod tests {
     use super::*;
     use crate::package::table::{Column, Range, Table, Type};

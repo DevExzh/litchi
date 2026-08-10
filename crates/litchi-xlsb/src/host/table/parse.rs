@@ -1,3 +1,8 @@
+#![allow(
+    clippy::map_err_ignore,
+    reason = "legacy module confines normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Record-walking parser for the XLSB Table (ListObject) stream
 //! (MS-XLSB 2.1.7.51).
 //!

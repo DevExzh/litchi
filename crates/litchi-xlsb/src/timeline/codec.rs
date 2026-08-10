@@ -1,3 +1,9 @@
+#![allow(
+    clippy::map_err_ignore,
+    clippy::wildcard_enum_match_arm,
+    reason = "legacy module confines normalization into the module's stable typed public error, an intentional opaque or future-variant fallback to this codec boundary"
+)]
+
 //! Bounded XML codec for XLSB timeline cache and view parts.
 
 use super::model::{Cache, Filter, FilterType, Level, PivotTable, Range, State, View, Views};

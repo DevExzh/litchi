@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::float_cmp,
+        reason = "style-table fixtures compare exact finite values decoded from literal BIFF12 payloads"
+    )
+)]
+
 //! OOXML-facing adapter for the owner XLSB styles model and codec.
 //!
 //! The package-neutral values and Brt* parsing live in litchi_xlsb. This

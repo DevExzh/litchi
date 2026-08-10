@@ -1,0 +1,6 @@
+runtime=LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb
+filter=MS PowerPoint 97
+input=test-data/office-interop/litchi-changed/45543-transition-litchi.ppt
+output=test-data/office-interop/libreoffice-resaved/45543-transition-litchi.ppt
+status=success
+output_sha256=5ffe19b9e60886a6d2950ccb5ae3fb1bd4ca278f0bafd40b5127575dc93e8d80

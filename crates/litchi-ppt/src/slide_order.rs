@@ -104,6 +104,60 @@ impl SlideAdvance {
     }
 }
 
+/// Fixed-width visual transition state from one `SlideShowSlideInfoAtom`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SlideTransitionVisual {
+    transition_type: crate::TransitionType,
+    direction: crate::TransitionDirection,
+    speed: crate::TransitionSpeed,
+    wire: [u8; 3],
+}
+
+impl SlideTransitionVisual {
+    /// Creates a transition state that has an exact legacy PPT wire mapping.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the type/direction combination is not represented
+    /// exactly by the established `SlideShowSlideInfoAtom` mappings.
+    pub fn new(
+        transition_type: crate::TransitionType,
+        direction: crate::TransitionDirection,
+        speed: crate::TransitionSpeed,
+    ) -> Result<Self> {
+        let Some(wire) = crate::transition::encode_visual(transition_type, direction, speed) else {
+            return Err(PackageError::InvalidFormat(
+                "PPT visual transition type/direction combination is not exact".into(),
+            )
+            .into());
+        };
+        Ok(Self {
+            transition_type,
+            direction,
+            speed,
+            wire,
+        })
+    }
+
+    /// Transition effect kind.
+    #[must_use]
+    pub const fn transition_type(self) -> crate::TransitionType {
+        self.transition_type
+    }
+
+    /// Effect direction, when the selected kind has one.
+    #[must_use]
+    pub const fn direction(self) -> crate::TransitionDirection {
+        self.direction
+    }
+
+    /// Effect playback speed.
+    #[must_use]
+    pub const fn speed(self) -> crate::TransitionSpeed {
+        self.speed
+    }
+}
+
 /// A native owner edge that must be closed before a slide can be transferred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TransferDependency {
@@ -176,6 +230,9 @@ pub enum Refusal {
     /// The selected slide does not contain exactly one valid fixed-width
     /// `SlideShowSlideInfoAtom` to mutate without record insertion/removal.
     UnsupportedSlideAdvance { position: Position },
+    /// The selected slide does not contain exactly one canonical fixed-width
+    /// visual transition owner.
+    UnsupportedSlideTransitionVisual { position: Position },
     /// A shape edit selected a slide inserted but not yet published.
     UncommittedSlideDependency,
 }
@@ -213,6 +270,11 @@ impl fmt::Display for Refusal {
             Self::UnsupportedSlideAdvance { position } => write!(
                 formatter,
                 "PPT slide position {} has no unique fixed-width slide-show information atom",
+                position.get()
+            ),
+            Self::UnsupportedSlideTransitionVisual { position } => write!(
+                formatter,
+                "PPT slide position {} has no unique canonical visual transition atom",
                 position.get()
             ),
             Self::UncommittedSlideDependency => formatter
@@ -409,6 +471,17 @@ impl Snapshot {
         inspect_slide_advance(self, position)
     }
 
+    /// Returns one slide's fixed-width visual transition state.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the position is absent or does not own one
+    /// canonical `SlideShowSlideInfoAtom` visual mapping.
+    pub fn slide_transition_visual(&self, position: Position) -> Result<SlideTransitionVisual> {
+        self.require_position(position)?;
+        inspect_slide_transition_visual(self, position)
+    }
+
     /// Returns the checked complete host anchor for one existing shape.
     ///
     /// # Errors
@@ -474,6 +547,7 @@ impl Snapshot {
             structural: Vec::new(),
             visibility_changes: Vec::new(),
             advance_changes: Vec::new(),
+            transition_visual_changes: Vec::new(),
             text_changes: Vec::new(),
             anchor_changes: Vec::new(),
             media_path_changes: Vec::new(),
@@ -611,6 +685,9 @@ impl Snapshot {
                     },
                     "presentation.slide-advance.set" => {
                         apply_durable_slide_advance(&current, &operations[index])?
+                    },
+                    "presentation.slide-transition-visual.set" => {
+                        apply_durable_slide_transition_visual(&current, &operations[index])?
                     },
                     "presentation.external-media-path.set" => {
                         apply_durable_media_path(&current, &operations[index])?
@@ -832,6 +909,35 @@ impl SlideAdvanceChange {
     }
 }
 
+/// One fixed-width replacement of a slide's visual transition fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SlideTransitionVisualChange {
+    target: Position,
+    slide_id: u32,
+    before: SlideTransitionVisual,
+    after: SlideTransitionVisual,
+}
+
+impl SlideTransitionVisualChange {
+    /// Semantic source-order slide target.
+    #[must_use]
+    pub const fn target(self) -> Position {
+        self.target
+    }
+
+    /// Visual transition required before replacement.
+    #[must_use]
+    pub const fn before(self) -> SlideTransitionVisual {
+        self.before
+    }
+
+    /// Replacement visual transition.
+    #[must_use]
+    pub const fn after(self) -> SlideTransitionVisual {
+        self.after
+    }
+}
+
 impl ExternalMediaPlaybackChange {
     /// External-object identifier retained by the replacement.
     #[must_use]
@@ -877,6 +983,7 @@ enum FormattingChange {
     Text(ShapeTextChange),
     Anchor(ShapeAnchorChange),
     SlideAdvance(SlideAdvanceChange),
+    SlideTransitionVisual(SlideTransitionVisualChange),
     MediaPath(ExternalMediaPathChange),
     MediaPlayback(ExternalMediaPlaybackChange),
 }
@@ -1030,6 +1137,7 @@ pub struct Transaction {
     structural: Vec<StructuralChange>,
     visibility_changes: Vec<SlideVisibilityChange>,
     advance_changes: Vec<SlideAdvanceChange>,
+    transition_visual_changes: Vec<SlideTransitionVisualChange>,
     text_changes: Vec<ShapeTextChange>,
     anchor_changes: Vec<ShapeAnchorChange>,
     media_path_changes: Vec<ExternalMediaPathChange>,
@@ -1069,6 +1177,12 @@ impl Transaction {
     #[must_use]
     pub fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
         &self.advance_changes
+    }
+
+    /// Fixed-width visual transition changes staged in call order.
+    #[must_use]
+    pub fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
+        &self.transition_visual_changes
     }
 
     /// Checked shape-text replacements staged in this root transaction.
@@ -1192,6 +1306,47 @@ impl Transaction {
         };
         self.advance_changes.push(change);
         self.formatting.push(FormattingChange::SlideAdvance(change));
+        Ok(())
+    }
+
+    /// Replaces one existing slide's visual transition kind, direction, and speed.
+    ///
+    /// Timing, sound reference/state, all transition flags, unused bytes, and
+    /// every other persisted record remain exact.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an absent, ambiguous, malformed, or newly
+    /// inserted visual transition owner.
+    pub fn set_slide_transition_visual(
+        &mut self,
+        position: Position,
+        visual: SlideTransitionVisual,
+    ) -> Result<()> {
+        self.require_position(position)?;
+        let selected = self.document.slides()?[position.get()];
+        let source_position = self
+            .source
+            .document
+            .slides()
+            .iter()
+            .position(|slide| slide.persist_id() == selected.persist_id())
+            .map(Position::new)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let before = self.working.slide_transition_visual(source_position)?;
+        if before == visual {
+            return Ok(());
+        }
+        self.working = replace_slide_transition_visual(&self.working, source_position, visual)?;
+        let change = SlideTransitionVisualChange {
+            target: source_position,
+            slide_id: selected.slide_id(),
+            before,
+            after: visual,
+        };
+        self.transition_visual_changes.push(change);
+        self.formatting
+            .push(FormattingChange::SlideTransitionVisual(change));
         Ok(())
     }
 
@@ -1463,6 +1618,7 @@ impl Transaction {
                 structural: self.structural,
                 visibility_changes: self.visibility_changes,
                 advance_changes: self.advance_changes,
+                transition_visual_changes: self.transition_visual_changes,
                 text_changes: self.text_changes,
                 anchor_changes: self.anchor_changes,
                 media_path_changes: self.media_path_changes,
@@ -1525,6 +1681,7 @@ impl Transaction {
             structural: self.structural,
             visibility_changes: self.visibility_changes,
             advance_changes: self.advance_changes,
+            transition_visual_changes: self.transition_visual_changes,
             text_changes: self.text_changes,
             anchor_changes: self.anchor_changes,
             media_path_changes: self.media_path_changes,
@@ -1591,6 +1748,7 @@ pub struct Patch {
     structural: Vec<StructuralChange>,
     visibility_changes: Vec<SlideVisibilityChange>,
     advance_changes: Vec<SlideAdvanceChange>,
+    transition_visual_changes: Vec<SlideTransitionVisualChange>,
     text_changes: Vec<ShapeTextChange>,
     anchor_changes: Vec<ShapeAnchorChange>,
     media_path_changes: Vec<ExternalMediaPathChange>,
@@ -1618,6 +1776,12 @@ impl Patch {
     #[must_use]
     pub fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
         &self.advance_changes
+    }
+
+    /// Visual transition replacements composed into this root patch.
+    #[must_use]
+    pub fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
+        &self.transition_visual_changes
     }
 
     /// Shape-text replacements composed into this root patch.
@@ -1720,6 +1884,17 @@ impl Patch {
                     after: change.before,
                 })
                 .collect(),
+            transition_visual_changes: self
+                .transition_visual_changes
+                .iter()
+                .rev()
+                .map(|change| SlideTransitionVisualChange {
+                    target: change.target,
+                    slide_id: change.slide_id,
+                    before: change.after,
+                    after: change.before,
+                })
+                .collect(),
             text_changes: self
                 .text_changes
                 .iter()
@@ -1785,6 +1960,14 @@ impl Patch {
                             slide_id: advance_change.slide_id,
                             before: advance_change.after,
                             after: advance_change.before,
+                        })
+                    },
+                    FormattingChange::SlideTransitionVisual(visual_change) => {
+                        FormattingChange::SlideTransitionVisual(SlideTransitionVisualChange {
+                            target: visual_change.target,
+                            slide_id: visual_change.slide_id,
+                            before: visual_change.after,
+                            after: visual_change.before,
                         })
                     },
                     FormattingChange::MediaPath(media_change) => {
@@ -1873,6 +2056,20 @@ impl Patch {
                         advance_change.target,
                         advance_change.after,
                         advance_change.before,
+                    )?,
+                ),
+                FormattingChange::SlideTransitionVisual(visual_change) => ReversibleOperation::new(
+                    durable_slide_transition_visual_operation(
+                        limits,
+                        visual_change.target,
+                        visual_change.before,
+                        visual_change.after,
+                    )?,
+                    durable_slide_transition_visual_operation(
+                        limits,
+                        visual_change.target,
+                        visual_change.after,
+                        visual_change.before,
                     )?,
                 ),
                 FormattingChange::MediaPath(media_change) => ReversibleOperation::new(
@@ -2333,6 +2530,59 @@ fn parse_slide_advance_value(value: &serde_json::Value) -> Result<SlideAdvance> 
     SlideAdvance::new(manual, automatic, delay_ms)
 }
 
+fn durable_slide_transition_visual_operation(
+    limits: litchi_core::patch::PatchLimits,
+    target: Position,
+    before: SlideTransitionVisual,
+    after: SlideTransitionVisual,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let preconditions = BTreeMap::from([(
+        "transition_visual_sha256".to_string(),
+        serde_json::Value::String(artifact_hash(&transition_visual_bytes(before))),
+    )]);
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "presentation.slide-transition-visual.set",
+        format!("slide:{}", target.get()),
+        preconditions,
+        transition_visual_value(after),
+    )
+}
+
+fn transition_visual_bytes(visual: SlideTransitionVisual) -> [u8; 3] {
+    visual.wire
+}
+
+fn transition_visual_value(visual: SlideTransitionVisual) -> serde_json::Value {
+    let [effect_direction, effect_type, speed] = transition_visual_bytes(visual);
+    serde_json::json!({
+        "effect_direction": effect_direction,
+        "effect_type": effect_type,
+        "speed": speed,
+    })
+}
+
+fn parse_transition_visual_value(value: &serde_json::Value) -> Result<SlideTransitionVisual> {
+    let object = value
+        .as_object()
+        .filter(|object| object.len() == 3)
+        .ok_or_else(|| invalid_durable_patch("transition-visual value must have three fields"))?;
+    let field = |name| {
+        object
+            .get(name)
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|number| u8::try_from(number).ok())
+            .ok_or_else(|| invalid_durable_patch("transition-visual field is invalid"))
+    };
+    let bytes = [
+        field("effect_direction")?,
+        field("effect_type")?,
+        field("speed")?,
+    ];
+    slide_transition_visual_from_bytes(bytes)
+        .ok_or_else(|| invalid_durable_patch("transition-visual mapping is noncanonical"))
+}
+
 fn durable_media_path_operation(
     limits: litchi_core::patch::PatchLimits,
     id: u32,
@@ -2468,6 +2718,7 @@ fn is_formatting_operation(operation: &str) -> bool {
         "presentation.shape-text.set"
             | "presentation.shape-anchor.set"
             | "presentation.slide-advance.set"
+            | "presentation.slide-transition-visual.set"
             | "presentation.external-media-path.set"
             | "presentation.external-media-playback.set"
     )
@@ -2653,6 +2904,35 @@ fn apply_durable_slide_advance(
         snapshot,
         target,
         parse_slide_advance_value(&operation.value)?,
+    )
+}
+
+fn apply_durable_slide_transition_visual(
+    snapshot: &Snapshot,
+    operation: &litchi_core::patch::PatchOperation,
+) -> Result<Snapshot> {
+    if operation.preconditions.len() != 1 {
+        return Err(invalid_durable_patch(
+            "slide-transition-visual operation has unexpected preconditions",
+        ));
+    }
+    let target = parse_target(&operation.target)?;
+    let expected = operation
+        .preconditions
+        .get("transition_visual_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_durable_patch("missing transition-visual precondition"))?;
+    let current = snapshot.slide_transition_visual(target)?;
+    if artifact_hash(&transition_visual_bytes(current)) != expected {
+        return Err(PackageError::InvalidFormat(
+            "PPT durable transition-visual semantic precondition does not match".into(),
+        )
+        .into());
+    }
+    replace_slide_transition_visual(
+        snapshot,
+        target,
+        parse_transition_visual_value(&operation.value)?,
     )
 }
 
@@ -3071,6 +3351,155 @@ fn replace_slide_advance(
     {
         return Err(PackageError::Corrupted(
             "PPT slide advance replacement did not round-trip exactly".into(),
+        )
+        .into());
+    }
+    Ok(published)
+}
+
+fn slide_transition_visual_from_bytes(bytes: [u8; 3]) -> Option<SlideTransitionVisual> {
+    let (transition_type, direction, speed) = crate::transition::decode_visual(bytes)?;
+    Some(SlideTransitionVisual {
+        transition_type,
+        direction,
+        speed,
+        wire: bytes,
+    })
+}
+
+fn inspect_slide_transition_visual(
+    snapshot: &Snapshot,
+    position: Position,
+) -> Result<SlideTransitionVisual> {
+    let slide = snapshot
+        .document
+        .slides()
+        .get(position.get())
+        .copied()
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
+    let bytes = persisted_record(snapshot, slide.persist_id())?;
+    let (root, consumed) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits)?;
+    if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
+        return Err(PackageError::Corrupted(
+            "PPT visual transition owner is not one complete SlideContainer".into(),
+        )
+        .into());
+    }
+    parse_slide_transition_visual_atom(
+        unique_slide_transition_visual_atom(&root, position)?,
+        position,
+    )
+}
+
+fn unique_slide_transition_visual_atom(
+    root: &crate::Record,
+    position: Position,
+) -> Result<&crate::Record> {
+    let mut atoms = root
+        .children
+        .iter()
+        .filter(|child| child.record_type == crate::RecordType::SSSlideInfoAtom);
+    let atom = atoms
+        .next()
+        .ok_or(Error::Refused(Refusal::UnsupportedSlideTransitionVisual {
+            position,
+        }))?;
+    if atoms.next().is_some() {
+        return Err(Error::Refused(Refusal::UnsupportedSlideTransitionVisual {
+            position,
+        }));
+    }
+    Ok(atom)
+}
+
+fn parse_slide_transition_visual_atom(
+    atom: &crate::Record,
+    position: Position,
+) -> Result<SlideTransitionVisual> {
+    if atom.version != 0 || atom.instance != 0 || !atom.children.is_empty() || atom.data.len() != 16
+    {
+        return Err(Error::Refused(Refusal::UnsupportedSlideTransitionVisual {
+            position,
+        }));
+    }
+    slide_transition_visual_from_bytes([atom.data[8], atom.data[9], atom.data[12]]).ok_or(
+        Error::Refused(Refusal::UnsupportedSlideTransitionVisual { position }),
+    )
+}
+
+fn replace_slide_transition_visual(
+    snapshot: &Snapshot,
+    position: Position,
+    replacement: SlideTransitionVisual,
+) -> Result<Snapshot> {
+    let slide = snapshot
+        .document
+        .slides()
+        .get(position.get())
+        .copied()
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
+    let source_record = persisted_record(snapshot, slide.persist_id())?;
+    let (mut root, consumed) =
+        crate::Record::parse_with_limits(&source_record, 0, snapshot.limits)?;
+    if consumed != source_record.len() || root.record_type != crate::RecordType::Slide {
+        return Err(PackageError::Corrupted(
+            "PPT visual transition owner is not one complete SlideContainer".into(),
+        )
+        .into());
+    }
+    if encode_record(&root)? != source_record {
+        return Err(PackageError::Corrupted(
+            "PPT visual transition source record is not byte-exactly re-encodable".into(),
+        )
+        .into());
+    }
+    let atom_index = {
+        let _current = parse_slide_transition_visual_atom(
+            unique_slide_transition_visual_atom(&root, position)?,
+            position,
+        )?;
+        root.children
+            .iter()
+            .position(|child| child.record_type == crate::RecordType::SSSlideInfoAtom)
+            .ok_or(Error::Refused(Refusal::UnsupportedSlideTransitionVisual {
+                position,
+            }))?
+    };
+    let atom = &mut root.children[atom_index];
+    let before = atom.data.clone();
+    let [effect_direction, effect_type, speed] = transition_visual_bytes(replacement);
+    atom.data[8] = effect_direction;
+    atom.data[9] = effect_type;
+    atom.data[12] = speed;
+    if atom.data[..8] != before[..8]
+        || atom.data[10..12] != before[10..12]
+        || atom.data[13..16] != before[13..16]
+    {
+        return Err(PackageError::Corrupted(
+            "PPT visual transition rewrite changed timing, sound, flags, or unused fields".into(),
+        )
+        .into());
+    }
+    let rewritten_record = encode_record(&root)?;
+    if rewritten_record.len() != source_record.len() {
+        return Err(PackageError::Corrupted(
+            "PPT fixed-width visual transition rewrite changed record length".into(),
+        )
+        .into());
+    }
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        snapshot.bytes.clone(),
+        snapshot.limits.max_package_bytes,
+    )?;
+    editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
+    let bytes = editor.finish()?;
+    crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
+    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    if published.document != snapshot.document
+        || published.slide_transition_visual(position)? != replacement
+    {
+        return Err(PackageError::Corrupted(
+            "PPT visual transition replacement did not round-trip exactly".into(),
         )
         .into());
     }
@@ -4298,6 +4727,9 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
     for change in &patch.advance_changes {
         effects.insert(format!("slide-id:{}/advance", change.slide_id));
     }
+    for change in &patch.transition_visual_changes {
+        effects.insert(format!("slide-id:{}/transition-visual", change.slide_id));
+    }
     for change in &patch.text_changes {
         effects.insert(format!(
             "slide:{}/shape:{}/text",
@@ -5130,14 +5562,14 @@ mod tests {
             receiver
         );
 
-        let mut left = receiver.edit().unwrap();
-        left.insert_transfer(Position::new(0), &plan).unwrap();
-        let left = left.commit().unwrap();
-        let mut right = receiver.edit().unwrap();
-        right.insert_transfer(Position::new(1), &plan).unwrap();
-        let right = right.commit().unwrap();
+        let mut left_edit = receiver.edit().unwrap();
+        left_edit.insert_transfer(Position::new(0), &plan).unwrap();
+        let left_commit = left_edit.commit().unwrap();
+        let mut right_edit = receiver.edit().unwrap();
+        right_edit.insert_transfer(Position::new(1), &plan).unwrap();
+        let right_commit = right_edit.commit().unwrap();
         let merge = receiver
-            .plan_three_way(left.patch(), right.patch())
+            .plan_three_way(left_commit.patch(), right_commit.patch())
             .unwrap();
         assert!(
             merge
@@ -5314,19 +5746,23 @@ mod tests {
             source.slide_count()
         );
 
-        let mut left = source.edit().unwrap();
-        left.set_slide_hidden(Position::new(0), !original).unwrap();
-        let left = left.commit().unwrap();
-        let mut right = source.edit().unwrap();
-        right.set_slide_hidden(Position::new(0), !original).unwrap();
-        let right = right.commit().unwrap();
+        let mut left_edit = source.edit().unwrap();
+        left_edit
+            .set_slide_hidden(Position::new(0), !original)
+            .unwrap();
+        let left_commit = left_edit.commit().unwrap();
+        let mut right_edit = source.edit().unwrap();
+        right_edit
+            .set_slide_hidden(Position::new(0), !original)
+            .unwrap();
+        let right_commit = right_edit.commit().unwrap();
         let expected_conflict = format!(
             "slide-id:{}/hidden",
-            left.patch().slide_visibility_changes()[0].slide_id
+            left_commit.patch().slide_visibility_changes()[0].slide_id
         );
         assert_eq!(
             source
-                .plan_three_way(left.patch(), right.patch())
+                .plan_three_way(left_commit.patch(), right_commit.patch())
                 .unwrap()
                 .conflicts()[0]
                 .target(),
@@ -5429,14 +5865,14 @@ mod tests {
         assert!(history.redo());
         assert_eq!(history.current(), commit.snapshot());
 
-        let mut competing = source.edit().unwrap();
-        competing
+        let mut competing_edit = source.edit().unwrap();
+        competing_edit
             .set_slide_advance(position, SlideAdvance::both(3_500).unwrap())
             .unwrap();
-        let competing = competing.commit().unwrap();
+        let competing_commit = competing_edit.commit().unwrap();
         assert!(
             source
-                .plan_three_way(commit.patch(), competing.patch())
+                .plan_three_way(commit.patch(), competing_commit.patch())
                 .unwrap()
                 .conflicts()
                 .iter()

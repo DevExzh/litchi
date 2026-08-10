@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::expect_used,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, extraction after an immediately preceding structural invariant check to this codec boundary"
+)]
+
 //! Package-facing workbook resolution and merged-cell mutation.
 
 use super::super::model::Workbook;

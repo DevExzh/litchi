@@ -1,3 +1,8 @@
+#![allow(
+    clippy::expect_used,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check to this codec boundary"
+)]
+
 //! BIFF12 parser, canonical encoder, and linear source patcher.
 
 use std::collections::{HashMap, HashSet};

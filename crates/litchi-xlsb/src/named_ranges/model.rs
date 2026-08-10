@@ -1,3 +1,8 @@
+#![allow(
+    clippy::expect_used,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check to this codec boundary"
+)]
+
 //! Semantic XLSB defined-name values.
 
 use super::{Error, Result};

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::float_cmp,
+    reason = "test fixture uses bounded literal casts, panic-on-failure extraction, exact floating sentinels, or explicit negative fallback solely to state its assertion"
+)]
+
 //! Focused formula codec round-trip and bounded-input tests.
 
 use super::super::model::{

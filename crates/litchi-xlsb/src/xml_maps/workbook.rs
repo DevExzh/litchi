@@ -1,3 +1,11 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        reason = "workbook XML-map tests use panic-on-failure extraction for asserted transaction outcomes"
+    )
+)]
+
 //! Workbook facade for read-only XLSB XML Maps snapshots.
 
 use litchi_opc::PackURI;

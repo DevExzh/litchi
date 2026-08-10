@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_wrap,
+    clippy::map_err_ignore,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Binary Ptg stream parser.
 //!
 //! This layer decodes token bytes and ancillary `RgbExtra` payloads into the

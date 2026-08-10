@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_wrap,
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, extraction after an immediately preceding structural invariant check, normalization into the module's stable typed public error to this codec boundary"
+)]
+
 //! Typed workbook, external-link, PivotTable, and table record codecs.
 
 use super::super::model::Workbook;

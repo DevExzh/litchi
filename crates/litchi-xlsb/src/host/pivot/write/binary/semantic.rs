@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::expect_used,
+    reason = "legacy module confines validated BIFF12 field narrowing or exact signed-bit reinterpretation, extraction after an immediately preceding structural invariant check to this codec boundary"
+)]
+
 //! Binary serializer for the XLSB PivotCache definition stream (MS-XLSB 2.1.7.38).
 //!
 //! This is the exact inverse of `parse.rs`: record order, payload layouts,

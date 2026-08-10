@@ -63,7 +63,7 @@ pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
 /// These are the crate's established `SlideShowSlideInfoAtom` effect values,
 /// shared with `parse_transition_type` in the reader so authored files
 /// round-trip through this crate unchanged.
-fn encode_transition_type(transition_type: TransitionType) -> u8 {
+pub(super) fn encode_transition_type(transition_type: TransitionType) -> u8 {
     match transition_type {
         TransitionType::None => 0,
         TransitionType::Blinds => 1,
@@ -115,7 +115,7 @@ fn encode_transition_type(transition_type: TransitionType) -> u8 {
 ///
 /// Direction values follow MS-PPT 2.6.6 (`SlideShowSlideInfoAtom`) and are the
 /// exact inverse of `parse_transition_direction` in the reader.
-fn encode_transition_direction(
+pub(super) fn encode_transition_direction(
     direction: TransitionDirection,
     transition_type: TransitionType,
 ) -> u8 {
@@ -257,7 +257,7 @@ fn encode_transition_direction(
 }
 
 /// Encode transition speed.
-fn encode_transition_speed(speed: TransitionSpeed) -> u8 {
+pub(super) fn encode_transition_speed(speed: TransitionSpeed) -> u8 {
     match speed {
         TransitionSpeed::Slow => 0,
         TransitionSpeed::Medium => 1,

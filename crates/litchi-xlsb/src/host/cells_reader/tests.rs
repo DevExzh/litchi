@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::float_cmp,
+    reason = "test fixture uses bounded literal casts, panic-on-failure extraction, exact floating sentinels, or explicit negative fallback solely to state its assertion"
+)]
+
 use super::CellsReader;
 use crate::conditional_formatting::{
     AxisPosition14, Bar14, Color, Formatting, IconSet14, RecordKind, Rule, RuleMetadata, RuleType,
