@@ -470,6 +470,12 @@ NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES = (
     NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE,
     NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE,
     NUMBERS_TABLE_HEADER_SETTINGS_OWNER_SOURCE,
+    Path("crates/litchi-numbers/src/package/table_headers/api.rs"),
+    Path("crates/litchi-numbers/src/package/table_headers/dependencies.rs"),
+    Path("crates/litchi-numbers/src/package/table_headers/error.rs"),
+    Path("crates/litchi-numbers/src/package/table_headers/ownership.rs"),
+    Path("crates/litchi-numbers/src/package/table_headers/resolve.rs"),
+    Path("crates/litchi-numbers/src/package/table_headers/rewrite.rs"),
 )
 NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES = (
     Path("crates/litchi-numbers/src/lib.rs"),

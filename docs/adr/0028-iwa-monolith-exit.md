@@ -1799,6 +1799,13 @@ package handoffs. The `table_headers` module/source, wire codec, attached
 helpers, package bridge, row/column/sort callers, and Pages/Keynote owners
 remain; this is not module deletion.
 
+The focused replacement's private package code is now separated into `api`,
+`dependencies`, `error`, `ownership`, `resolve`, and `rewrite` modules, each
+under 600 lines. This changes neither the canonical public namespace nor the
+host-retirement boundary. Category-owner group metadata is traversed once and
+then resolved, giving a bounded linear declaration proof instead of an
+`O(groups * references)` rescan.
+
 Rooted canonical/legacy roles remain supported when unambiguous, while changed
 nested legacy physical packages return `UnsupportedSource`. Locked reads and
 no-ops remain valid; changed edits refuse and invalidate root previews. No
@@ -1823,8 +1830,8 @@ HeaderNameMgr stayed exact. A native off-to-on control produced
 Native Save regenerated equivalent ViewState with different IDs, so this is
 compatibility evidence, not raw ViewState equality.
 
-The exit gate passes 6/6 focused tests with default features and 6/6 without,
-4/4 codec tests, 2/2 facade tests with `--features numbers`, and 113/113
+The exit gate passes 8/8 focused tests with default features and 8/8 without,
+4/4 codec tests, 2/2 facade tests with `--features numbers`, and 114/114
 boundary regressions. `cargo check -p litchi-numbers --all-targets`,
 formatting, diff, warning-denied no-dependency rustdoc, and doctests (one compile-fail pass, one
 ignored example) are green. Strict Clippy reports no new header-file finding;
@@ -1838,6 +1845,13 @@ produced candidate
 `a8b88d21806b547a5265c60662610f68f524173cac1ca4252d368596c8ef8d2a`,
 diagnosing changed=true, one touched component, and three deleted previews.
 No native UI open of that Rust candidate is claimed.
+
+A separate post-split freeze-row-only candidate, SHA-256
+`c938d74bcf04be692097488af838f5105a8470e337eafa06fdc8b94b36231d6a`,
+opened through Computer Use in Numbers 14.4 without repair or warning. Table 1
+remained 22 by 7; header columns/rows/footer rows were 1/1/0; Freeze Header Rows
+was unselected; and B2/B3 retained the fixture text and 42. Its inverse matched
+the pristine source bytes exactly.
 
 Exit debt remains in aggregate memory/work and complete fallible allocation,
 process-local full-artifact patches without stable semantic serialization/

@@ -201,6 +201,29 @@ pub(crate) fn append_reference_field(
     Ok(())
 }
 
+pub(crate) fn append_selected_model_raw(package: &[u8], raw: &[u8]) -> FixtureResult<Vec<u8>> {
+    rewrite_tables(package, |archive| {
+        let model = archive
+            .object_mut(TABLE_MODEL)
+            .ok_or_else(|| io::Error::other("synthetic table model is missing"))?;
+        let index = model
+            .messages
+            .iter()
+            .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+            .ok_or_else(|| io::Error::other("synthetic table-model message is missing"))?;
+        let mut data = model.messages[index].data.clone();
+        data.extend_from_slice(raw);
+        model.replace_message_preserving_header(
+            index,
+            RawMessage {
+                type_: TABLE_MODEL_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
 pub(crate) fn category_owner_object(references: &[u64]) -> FixtureResult<ArchiveObject> {
     let mut object = object(
         CATEGORY_OWNER,

@@ -2128,6 +2128,15 @@ row/column/sort callers, and Pages/Keynote owners all remain. This is public
 Numbers header-settings host retirement, not module or shared table-structure
 deletion.
 
+The retained focused owner is no longer a single implementation file. Its
+private package implementation is split into `api`, `dependencies`, `error`,
+`ownership`, `resolve`, and `rewrite` modules; the public
+`table::headers::transaction` namespace and `Package` entry points do not
+change. Each file is under 600 lines. Category-owner group declarations are
+indexed and validated once, so their aggregate and optional field-reference
+proof is `O(aggregate references + field references + groups)` rather than a
+per-group metadata rescan.
+
 Compatibility is intentionally narrower than the retired setter. Rooted
 canonical and legacy TableInfo/TableModel roles are resolved through the graph;
 changed legacy nested physical packages return `UnsupportedSource` rather than
@@ -2157,10 +2166,10 @@ Both native saves regenerated equivalent ViewState topology/payload with newly
 allocated IDs, so this supports focused raw ViewState preservation but does
 not claim byte-equal native Save output.
 
-The focused transaction suite passes 6/6 with default features and 6/6 with
+The focused transaction suite passes 8/8 with default features and 8/8 with
 `--no-default-features`; the filtered codec suite passes 4/4. Numbers
 `cargo check -p litchi-numbers --all-targets`, 2/2 root-facade tests with
-`--features numbers`, 113/113 boundary regressions, formatting, and diff checks
+`--features numbers`, 114/114 boundary regressions, formatting, and diff checks
 pass. The
 `cargo test -p litchi-numbers --doc` gate reports one passing compile-fail case
 and one ignored example, and warning-denied no-dependency rustdoc passes.
@@ -2182,6 +2191,13 @@ to `a8b88d21806b547a5265c60662610f68f524173cac1ca4252d368596c8ef8d2a`,
 reported `changed=true`, `touched_components=1`, and three deleted previews;
 its inverse restored the exact source hash. This is artifact/locality evidence,
 not a claim that the Rust candidate was opened in Numbers.
+
+A post-split freeze-row-only candidate, SHA-256
+`c938d74bcf04be692097488af838f5105a8470e337eafa06fdc8b94b36231d6a`,
+was opened through Computer Use in Numbers 14.4 without a repair or warning.
+The UI reported Table 1 as 22 by 7 with header columns/rows/footer rows 1/1/0,
+showed Freeze Header Rows unselected, and retained B2 text plus B3 value 42.
+Its generated inverse was byte-identical to the pristine source.
 
 Remaining debt includes aggregate transaction peak-memory/total-work and
 complete fallible-allocation accounting, process-local complete-artifact

@@ -9003,6 +9003,14 @@ examples use focused `Package` handoffs. The `table_headers` module/source,
 wire codec, attached read/set helpers, package bridge, row/column/sort callers,
 and Pages/Keynote owners deliberately remain.
 
+The focused implementation is physically divided into private `api`,
+`dependencies`, `error`, `ownership`, `resolve`, and `rewrite` modules, all
+under 600 lines, without changing public names or package visibility.
+Category-owner group-reference declarations are collected and checked in one
+fallible linear pass before group resolution. The required exactly-once
+aggregate declaration and optional unique `[1]` field-path proof therefore do
+not regress to quadratic per-identifier rescans.
+
 Rooted canonical and accepted legacy TableInfo/TableModel roles remain
 supported when unambiguous. Nested legacy physical packages keep exact reads
 and no-ops, but changed publication returns `UnsupportedSource`. Locked reads
@@ -9038,9 +9046,9 @@ payload while assigning different IDs. This is compatible with the focused
 writer preserving raw `Index/ViewState.iwa`; it is not evidence that native
 Save churn is byte-exact.
 
-Executed evidence passes 6/6 focused `table_headers` tests and the same 6/6
+Executed evidence passes 8/8 focused `table_headers` tests and the same 8/8
 with `--no-default-features`, 4/4 filtered codec tests, 2/2 root-facade tests
-with `--features numbers` (one headers and one names), and 113/113 boundary
+with `--features numbers` (one headers and one names), and 114/114 boundary
 regressions. `cargo check -p litchi-numbers --all-targets`, formatting, and
 diff checks pass. `cargo test -p litchi-numbers --doc` has one passing
 compile-fail test and one ignored example; warning-denied
@@ -9063,6 +9071,14 @@ the Rust changed artifact is
 Diagnostics reported changed=true, one touched component, and three deleted
 root previews. This establishes exact artifact/locality behavior but does not
 claim a native UI open of that Rust artifact.
+
+After the private module split, a separate freeze-row-only Rust candidate with
+SHA-256
+`c938d74bcf04be692097488af838f5105a8470e337eafa06fdc8b94b36231d6a`
+opened in Numbers 14.4 through Computer Use without repair or warning. The app
+reported Table 1 as 22 rows by 7 columns, header/footer counts 1/1/0, an
+unselected Freeze Header Rows menu item, B2's fixture text, and B3 value 42.
+The exact inverse matched the pristine source hash.
 
 Remaining debt is aggregate transaction peak-memory/total-work and complete
 fallible-allocation accounting, process-local complete-artifact patches without
