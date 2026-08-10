@@ -48,14 +48,17 @@ Current work shape:
 - `OpcPackage` retains every inflated Part. XML Parts also participate in a
   second source-XML map. Part lookup has an exact hash-map fast path and a
   linear ASCII-case-insensitive fallback.
-- Exact unchanged owned OPC output reuses the complete source archive. After
-  any mutable API, output still has no per-entry source descriptor or
-  compressed range and therefore regenerates/recompresses every Part.
+- Exact unchanged owned OPC output reuses the complete source archive. Owned,
+  same-topology mutation now retains private provenance and raw-copies every
+  semantically unchanged ZIP member; topology changes, borrowed ingress, and
+  unsupported ZIP layouts still use the complete rewrite.
 - `PackageWriter` previously reconstructed generated XML and Part order during
   emission. The measured `PublicationPlan` change now constructs, audits, and
   reuses that state once. It reduced allocation calls by 37.0% in the profiled
   256-Part save and mean latency by 5.49% in the 2,048-Part compressible save;
-  full-Part recompression remains unchanged.
+  full-Part recompression remains unchanged on the fallback path. Targeted raw
+  publication separately improves p50 by 58-96% across the synthetic cells,
+  while retained-source peak heap rises 37%; see change 0008.
 
 ## XLSX selective read and edit path
 
@@ -137,7 +140,8 @@ Read + Seek
 Confirmed source facts:
 
 - `SharedOleFile` provides positional CFB access and explicit bounded bulk
-  operations. Broader concurrent CFB scaling measurements remain missing.
+  operations. Four 4 MiB streams reach 5.93x p50 at 12 visible CPUs, while 256
+  1 KiB streams regress at high worker counts; thresholds remain essential.
 - Open eagerly materializes FAT, directory, MiniFAT, and allocation topology,
   while ordinary large stream payloads remain lazy.
 - MiniFAT now parses directly into its final `Vec<u32>`; FAT/DIFAT/MiniFAT use
@@ -171,12 +175,12 @@ pattern elsewhere.
 
 | # | Source-audit disposition | Measurement needed |
 |---:|---|---|
-| 1 | Refined: legacy OPC path and `Read` ingress slurp the source; source-backed ingress is positional. | Cold/range-source bytes, syscalls, latency and RSS across both modes. |
+| 1 | Refined: legacy OPC path and `Read` ingress slurp the source; source-backed ingress is positional. | Cold-filesystem bytes, syscalls, latency and RSS across both modes; deterministic range-source distributions now exist. |
 | 2 | Confirmed: ordinary OPC open inflates every admitted Part. | Open/list/one-object scaling against total uncompressed bytes and member count. |
 | 3 | Superseded for source-backed OPC: finite weighted LRU, per-entry single-flight and content-free diagnostics exist; legacy eager open does not use that cache. | Cache bytes are not yet charged to the hierarchical Budget; add contention and retention measurements. |
-| 4 | Superseded: ordinary OPC open is serial and explicit eager open has a local bounded session. | Serial fraction and 1/2/4/8/core scaling under the explicit context. |
+| 4 | Measured: ordinary OPC open is serial and explicit eager open has a local bounded session. Six large ZIP tasks reach 4.52x p50 at 12 CPUs; small tasks regress. | Broader real-package scaling and threshold tuning. |
 | 5 | Confirmed: stored entries are CRC-checked then copied. | Stored-media one-Part read and package-open copied-byte/RSS deltas. |
-| 6 | Refined by measurement: an exact unchanged owned OPC save copies the validated source archive; borrowed-source and mutation-touched saves still regenerate/recompress every Part. | Extend no-op and 1%-update save coverage to real media-heavy documents and per-entry passthrough once source descriptors exist. |
+| 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; borrowed/topology-changing/unsupported sources rewrite fully. | Real media-heavy 1% updates, source-backed editable publication, and reducing the measured retained-source/payload-copy memory cost. |
 | 7 | Confirmed structurally: duplicate indexes, boxed Parts, source-XML map, and linear fallback exist. | Allocation profiles, type sizes, cache counters and repeated noncanonical lookup. |
 | 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet. | Broader source-backed selectors, edits and real workbook matrices. |
 | 9 | Confirmed structurally: small XLSX edits scan/rebuild/reparse the complete touched sheet and repackage all Parts. | First/middle/last cell, 1% updates, and commit-versus-save separation. |
@@ -191,10 +195,10 @@ The order below is provisional until baseline measurements are recorded.
 | Rank | Candidate | Expected CRUD reach | Risk | ADR fit |
 |---:|---|---|---|---|
 | 1 | Extend source-backed OPC from selective reads to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets the measured exact-source peak-memory cost. | High | Positional source/descriptors are implemented; cache Budget charging and CRUD coverage remain. |
-| 2 | Integrate raw-copy unchanged ZIP entries into OPC publication. | No-op and targeted OOXML save, especially media-heavy packages. | High | Soapberry primitive is tested; OPC must preserve ZIP64/descriptors/metadata and sequential output. |
-| 3 | Measure explicit bounded sessions and complete remaining I/O budget policy. | Large multi-Part open/save/validation. | Medium-high | `ExecutionContext`/local session foundation implemented; no hidden Rayon path remains. |
+| 2 | Extend targeted OPC preservation to source-backed editable packages and remove regenerated-payload copies. | Targeted OOXML save, especially media-heavy packages; reduces current peak-memory tradeoff. | High | Owned same-topology path is accepted; topology fallback and framing preservation are tested. |
+| 3 | Tune explicit bounded-session thresholds and complete remaining I/O budget policy. | Large multi-Part open/save/validation. | Medium-high | 1/2/4/8/12 evidence exists; large tasks scale, small tasks regress; no hidden Rayon path remains. |
 | 4 | Build one validated OPC publication plan and reuse its generated XML and Part order during emission. | Every rewritten OPC save. | Low-medium | Implemented; see `changes/0001-opc-publication-plan.md`. |
-| 5 | Exact owned-source OPC no-op publication. | Owned DOCX/PPTX/XLSX open/read/no-op save. | Medium | Implemented; see `changes/0004-opc-exact-owned-source.md`. Mutation still performs a full rewrite. |
+| 5 | Exact owned-source OPC no-op publication. | Owned DOCX/PPTX/XLSX open/read/no-op save. | Medium | Implemented; same-topology mutations now use targeted preservation. See changes 0004 and 0008. |
 | 6 | Move already-owned XLS/PPT writer buffers into `OleWriter`. | Legacy fresh creation and some rebuilds. | Low | Implemented for XLS/PPT; DOC rejected by measurement. See `changes/0003-legacy-owned-stream-handoff.md`. |
 | 7 | Use validated cached CFB sibling-tree descent and reusable sector buffers. | Legacy stream-heavy open/rebuild workflows. | Medium | Implemented; see `changes/0002-cfb-lookup-and-sector-buffers.md`. |
 | 8 | Extend the accepted XLSX row-start index to broader selector and edit matrices. | Sparse range queries after sheet load. | Low-medium | Narrow ranges are accepted; preservation/readback gates and broad CRUD coverage remain unchanged. |
@@ -211,11 +215,11 @@ temporary allocation count, peak heap, and peak RSS for the implemented
 changes. Remaining gaps are:
 
 - Reproducible cold-cache distributions on a controlled host.
-- Decompressed and recompressed byte observers, plus positional range-read
-  distributions once OPC/CFB accept a positional source.
-- Hardware-counter evidence. The stage-1 capture host reported
-  `perf_event_paranoid=4`; the same environment later reported `1`, but no
-  controlled counter rerun is committed yet, so no cycles/IPC/cache claim is
-  made from that external policy change.
-- Contention evidence and explicit-context scaling curves.
-- Native correctness evidence for any future physical package passthrough.
+- Decompressed and recompressed byte observers. Positional range-request
+  distributions now exist for OPC and XLSX, but not yet for every format/source.
+- Broad hardware-counter evidence. A matched targeted-OPC run is committed now
+  that the environment reports `perf_event_paranoid=1`; stage-1 remains without
+  counters and no claim is generalized from the one measured save workload.
+- Contention evidence beyond the committed explicit-context scaling curves.
+- Format-semantic preservation evidence beyond the native targeted-OPC raw
+  passthrough corpus.

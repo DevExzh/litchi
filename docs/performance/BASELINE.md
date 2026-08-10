@@ -220,10 +220,10 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **36
-cases and 198 default records**, including positional CFB/OPC coverage and four
-XLSX source-backed cases. It remains a substrate/selective-open harness, not a
-complete program or CRUD matrix.
+The stage-1 records above are retained unchanged. The current harness has **44
+selectable cases**: 36 default cases and 198 default records, plus six opt-in
+simulated-range cases and two opt-in execution-scaling cases. It remains a
+substrate/selective-open harness, not a complete program or CRUD matrix.
 
 - The XLSX row-start index is accepted for the narrow-range case: ABBA p50
   geometric mean **-80.499%**, mean geometric mean **-79.962%**; full scan
@@ -251,13 +251,24 @@ complete program or CRUD matrix.
   the selected worksheet member, with zero unselected worksheet read calls.
   These are overlap counts, not materialization counts. See
   [`xlsx-source-positional.json`](results/xlsx-source-positional.json).
+- Targeted same-topology OPC publication now raw-copies unchanged ZIP members.
+  Four-cell pooled ABBA p50 improves **58.24% to 96.41%** (geometric mean
+  **84.98%**); few-large/incompressible falls from 216.299 to 61.206 ms. The
+  same process profile cuts cycles **69.21%**, but retained source/provenance
+  raises peak heap **37.18%** and one-shot RSS **22.26%**. See
+  [`0008`](changes/0008-targeted-opc-preservation.md).
+- The deterministic high-latency source records logical and physical request
+  distributions, proves zero timed XLSX list requests, and proves zero
+  unselected-sheet overlap. Explicit local-pool scaling reaches 4.52x p50 for
+  six large OPC tasks and 5.93x for four large CFB streams at 12 visible CPUs;
+  sub-kilobyte many-task cases are overhead dominated. See
+  [`0009`](changes/0009-range-source-and-scaling.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
-[`0007`](changes/0007-source-backed-opc-and-facades.md). Raw ZIP preservation
-is implemented/tested in soapberry only; OPC integration and measurement remain
-pending. Source cache bytes are bounded by `SourceCacheLimits`, but are not yet
-charged to the hierarchical `Budget`.
+[`0007`](changes/0007-source-backed-opc-and-facades.md). Source cache bytes are
+bounded by `SourceCacheLimits`, but are not yet charged to the hierarchical
+`Budget`.
 
 Consolidated changed-crate tests and focused changed-crate formatter and
 warning-denied Clippy gates passed. The attempted umbrella all-feature `litchi`

@@ -2,9 +2,9 @@
 
 Date: 2026-08-10
 Branch: `feat/office-format-completeness`
-Production base: `2665d572b78f0b3efd9ecfc4bd1fda09f8786ae3`
+Production base for this tranche: `d6bd13c9043737885ad27fa9d6207f4c30c1addd`
 
-This report closes the first measured implementation tranche. It is not a
+This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
 complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
@@ -13,15 +13,17 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **36 cases and 198 default records**, including positional CFB
-and OPC paths plus four XLSX source-backed cases. It is still not broad program
-or CRUD coverage.
+harness contains **44 selectable cases**: 36 default cases and 198 default
+records, plus six opt-in simulated-range cases and two opt-in scaling cases. It
+is still not broad program or CRUD coverage.
 
 | Change | Current evidence | Scope / limitation |
 |---|---|---|
 | XLSX row-start index | ABBA p50 geomean **-80.499%**, mean geomean **-79.962%**; full scan **+0.03%** mean; first cell **-1.31%** mean | Heap allocations **+17**, RSS **+0.25%**; narrow-range query only |
-| Positional CFB/ZIP and explicit execution | `SharedOleFile`, bounded CFB bulk, one-index ZIP/opaque `EntryId`, local `ParallelReadSession`, `ExecutionContext`/`OpenSession`; no hidden global Rayon | Correctness/boundedness accepted; no aggregate latency/throughput result yet |
+| Targeted OPC raw publication | Four-cell ABBA p50 geomean **-84.98%**; few-large/incompressible **-71.70%**; matched cycles **-69.21%** | Peak heap **+37.18%**, one-shot RSS **+22.26%** from retained source/provenance and regenerated-payload copying |
+| Positional CFB/ZIP and explicit execution | Large-task p50 scaling at 12 CPUs: OPC **4.52x**, CFB **5.93x**; no hidden global Rayon | Many-small tasks regress at high worker counts; default/legacy paths remain serial |
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
+| Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
 
 Raw evidence: [`XLSX before A`](results/abba-xlsx-range-before-a.json),
 [`after A`](results/abba-xlsx-range-after-a.json),
@@ -38,11 +40,13 @@ selected worksheet member (zero unselected worksheet read calls). These are
 physical-overlap counts, not materialization counts.
 
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
-charged to hierarchical `Budget`. Raw ZIP preservation is implemented/tested
-in soapberry, while OPC integration and performance evidence remain pending.
+charged to hierarchical `Budget`. Raw ZIP preservation is now integrated for
+owned same-topology OPC mutations; broader source-backed editing is pending.
 See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
-[`0007`](changes/0007-source-backed-opc-and-facades.md).
+[`0007`](changes/0007-source-backed-opc-and-facades.md),
+[`0008`](changes/0008-targeted-opc-preservation.md), and
+[`0009`](changes/0009-range-source-and-scaling.md).
 
 Consolidated changed-crate tests passed, along with focused changed-crate
 warning-denied Clippy and formatter checks. An umbrella all-feature `litchi`
@@ -56,6 +60,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 
 | Workload group | Before | After | Result | Memory result |
 |---|---:|---:|---:|---|
+| Targeted OPC mutation, four synthetic cells | individual rows in record | individual rows in record | **-84.98% p50 geometric mean**; range -58.24% to -96.41% | Few-large/incompressible peak heap +37.18%; one-shot RSS +22.26% |
 | Exact owned OPC no-op, 16.78 MB incompressible archive | 211.531 ms | 3.443 ms | -98.37% | Peak heap +22.6%; profiler RSS +25.5% because the compressed source is retained alongside eagerly inflated Parts |
 | Exact owned OPC no-op, six named many-Part/large-Part cells | individual rows in record | individual rows in record | -99.93% p50 geometric mean | Many-small allocation calls -93.7%; large memory tradeoff above |
 | CFB final-root-stream lookup, four 256/2,048-sibling cells | 1.067-7.596 us | 0.451-0.486 us | -84.70% p50 geometric mean | Wide-root peak heap +1.5%; profiler RSS +7.6% for retained exact comparison keys |
@@ -70,11 +75,14 @@ The underlying records are:
 - [`0002-cfb-lookup-and-sector-buffers.md`](changes/0002-cfb-lookup-and-sector-buffers.md)
 - [`0003-legacy-owned-stream-handoff.md`](changes/0003-legacy-owned-stream-handoff.md)
 - [`0004-opc-exact-owned-source.md`](changes/0004-opc-exact-owned-source.md)
+- [`0008-targeted-opc-preservation.md`](changes/0008-targeted-opc-preservation.md)
+- [`0009-range-source-and-scaling.md`](changes/0009-range-source-and-scaling.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
-p50 regression. The current mutated OPC path is neutral on incompressible data
-and about 3.6% faster on the fixed-CPU compressible guardrail; hashes and sink
-byte/write summaries match. These rejected and guardrail results are retained
+p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
+incompressible data; targeted raw publication supersedes it only for the
+strictly proved same-topology owned-source case. Fallback still uses that
+validated full rewrite. Rejected, fallback and memory results are retained
 rather than hidden in an aggregate.
 
 ## Work removed
@@ -83,6 +91,10 @@ rather than hidden in an aggregate.
   reconstructs ZIP records, or recompresses logical Parts. It copies the
   complete validated source to the caller's sequential sink in writes bounded
   to 64 KiB and verifies complete output in the benchmark.
+- Targeted same-topology OPC publication no longer recompresses unchanged
+  Parts. It audits the ordinary publication plan, regenerates only changed
+  payload/relationship/content-type closures, and raw-copies unchanged local
+  spans and central records, including unknown non-part members.
 - Rewritten OPC publication constructs and audits generated XML and stable
   Part order once before emission rather than once for validation and again
   for writing.
@@ -94,19 +106,20 @@ rather than hidden in an aggregate.
   CFB without a second payload copy. DOC deliberately retains its measured
   faster exact-sized copy.
 
-No unsafe code, ambient I/O, dependency edge, executor, public archive type,
-or synchronization primitive was introduced. Exact-source authorization is
+No unsafe code, ambient I/O, dependency edge, public archive type, or global
+synchronization primitive was introduced. Exact-source authorization is
 revoked conservatively on every mutable OPC entry point, including failed and
-semantic no-op calls. Borrowed ingress and all mutation-touched packages use
-the fully validated rewrite path.
+semantic no-op calls. Borrowed ingress, topology-changing edits, and unsupported
+ZIP layouts use the fully validated rewrite path before any sink output.
 
 ## Evidence and verification
 
-The standalone harness provides 36 selectable cases and a 198-record default
+The standalone harness provides 44 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 and public DOC/XLS/PPT writer corpora. It records p50/p95/p99, raw samples,
 mean, sample deviation, Student's-t 95% mean interval, corpus/output hashes,
-environment, and bounded sequential-write behavior. CI runs a non-gating
+environment, bounded sequential-write behavior, deterministic logical/physical
+range distributions, and exact execution tasks/bytes. CI runs a non-gating
 deterministic smoke check and a scheduled/manual release matrix.
 
 The current local evidence includes consolidated changed-crate tests with
@@ -126,10 +139,11 @@ manifest or dependency edge. These pre-existing gate failures are not counted
 as passing verification.
 
 During the stage-1 capture, hardware counters were unavailable because that
-host had `perf_event_paranoid=4`. Heaptrack supplied allocation and peak-memory
-evidence; `strace` supplied a process-level fallback but could not reliably
-attribute global Rayon/runtime calls to individual timed intervals. No stage-1
-cycles, IPC, branch, cache-miss, or lock-wait claim is made.
+host had `perf_event_paranoid=4`. The later targeted-OPC capture ran after the
+environment reported `1`: matched process counters show cycles -69.21% and
+instructions -69.85% for that one save cell. No counter claim is retroactively
+made for stage 1 or generalized to other workloads; lock-wait evidence remains
+missing.
 
 ## Remaining highest-impact work
 
@@ -137,14 +151,17 @@ The largest remaining limitation is the incomplete migration from eager OPC to
 source-backed CRUD: selective open, source versions, finite cache and
 single-flight now exist, but cache bytes are not yet charged to the hierarchical
 budget and broad edit/patch coverage is incomplete. Raw ZIP preservation is
-available at the soapberry layer, but targeted OPC publication has not yet
-integrated or measured it.
+integrated for eager owned same-topology mutation, but not for source-backed
+editable packages, and its measured retained-source/payload-copy memory cost
+remains to be reduced.
 
-Other high-priority gaps are scaling evidence for the implemented explicit
-bounded execution context and positional CFB reads, cold-filesystem and
-simulated range-source matrices, and broad format-semantic CRUD coverage
+Other high-priority gaps are cold-filesystem and real range-source matrices,
+threshold tuning/contention work beyond the committed explicit scaling curves,
+and broad format-semantic CRUD coverage
 (selective queries, 1% edits, dependency-copy, merge/split, patching, repair,
 security, malformed and real-producer corpora).
+The scenario-by-scenario gap map and next case queue are in
+[`CRUD_COVERAGE.md`](CRUD_COVERAGE.md).
 The ranked source-level queue and path maps are maintained in
 [`HOTSPOTS.md`](HOTSPOTS.md), and architectural gates are in
 [`ADR_COMPLIANCE.md`](ADR_COMPLIANCE.md).

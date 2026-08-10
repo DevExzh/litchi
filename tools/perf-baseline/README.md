@@ -14,8 +14,9 @@ production dependency graphs.
 
 ## Run
 
-Run the complete default matrix (36 selectable cases; 198 result records: 144
-substrate records, nine writer records, and 45 XLSX records):
+Run the complete default matrix (36 default cases; 198 result records: 144
+substrate records, nine writer records, and 45 XLSX records). The six simulated
+range cases and two execution-scaling cases are opt-in:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -62,6 +63,31 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 \
   --case xlsx_source_open,xlsx_source_list_sheets,xlsx_source_first_cell,xlsx_source_narrow_column_range_scan \
   --xlsx-shape tiny --json -
+```
+
+Exercise deterministic high-latency, range-bounded positional I/O without a
+network. Every upstream logical read is split into physical requests no larger
+than the selected maximum:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 0 --samples 1 --shape tiny --payload compressible \
+  --xlsx-shape tiny \
+  --case opc_range_source_open,opc_range_source_open_main_read,xlsx_range_source_open,xlsx_range_source_list_sheets,xlsx_range_source_first_cell,xlsx_range_source_narrow_column_range_scan \
+  --range-fixed-latency-us 100 --range-request-overhead-us 25 \
+  --range-bandwidth-bytes-per-sec 52428800 \
+  --range-max-physical-bytes 4096 --json target/perf/range-source.json
+```
+
+Collect explicit worker scaling points. Counts are capped to visible available
+parallelism, deduplicated, and emitted in ascending order; this avoids
+oversubscription in pinned CI containers:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 --shape many-small --payload incompressible \
+  --case opc_open_session_scaling,cfb_bulk_read_scaling \
+  --workers 1,2,4,8,available --json target/perf/execution-scaling.json
 ```
 
 ## Corpus matrix
@@ -211,6 +237,22 @@ remain distinguishable.
 - `xlsx_source_narrow_column_range_scan`: cold-read and verify every address
   and value in `B1:B<rows>` through the source-backed public API, with the same
   second-sheet deferral proof.
+- `opc_range_source_open` / `opc_range_source_open_main_read`: repeat the OPC
+  structural-open and open-plus-main-Part flows through the deterministic
+  latency/bandwidth/range simulator. The structural case requires a fresh main
+  read to add physical requests after timing.
+- `xlsx_range_source_open`, `xlsx_range_source_list_sheets`,
+  `xlsx_range_source_first_cell`, and
+  `xlsx_range_source_narrow_column_range_scan`: repeat the corresponding
+  source-backed XLSX flows through the simulator. Listing must issue zero timed
+  logical or physical requests; selected reads must leave every exact
+  unselected worksheet compressed range untouched and pass a fresh second-sheet
+  deferral probe.
+- `opc_open_session_scaling`: eager-open every ZIP member with a caller-sized
+  `OpenSession` local pool, then verify every generated OPC Part.
+- `cfb_bulk_read_scaling`: use `SharedOleFile::bulk_read` with a caller-sized
+  local pool, prewarmed outside timing, and verify every stream in input order.
+  Neither scaling case uses the global Rayon pool.
 
 For both CFB stream-insertion cases, payload generation/cloning and writer
 construction happen before timing, while writer and source destruction happen
@@ -272,7 +314,12 @@ deterministic ~1% update count, and `source_members`: the workbook, worksheet,
 shared-string, and style ZIP member names whose exact compressed ranges feed
 the positional counters. Existing non-XLSX corpus records keep it null.
 
-The eleven positional cases add a `source` object; older cases omit it. Its
+`configuration.range_simulation` records fixed latency, request overhead,
+bandwidth, and maximum physical range. `configuration.execution_workers`
+records the resolved, capped, deduplicated scaling points in deterministic
+ascending order.
+
+The seventeen positional cases add a `source` object; older cases omit it. Its
 arrays contain one value for every measured iteration and record `read_calls`,
 `read_bytes`, compressed ordinary-OPC-payload range overlap, and
 `max_in_flight_reads`. OPC cases also record semantic
@@ -282,6 +329,11 @@ adjacent compressed payload bytes without decompressing or caching that Part.
 Accordingly, `opc_source_open` may report overlap while still reporting zero
 materializations; its post-timing cold access proves the distinction.
 
+Simulated-range records additionally contain `source.simulation`: per-sample
+logical read calls/bytes, physical request count/bytes, sorted physical request
+sizes, and fixed request-size buckets. Request delays are computed only from
+the recorded configuration; no ambient network or clock-derived input is used.
+
 Positional XLSX records additionally contain `source.xlsx` arrays for physical
 overlap with the workbook, selected worksheet, all unselected worksheets,
 shared strings, and styles compressed member ranges. These overlap counters
@@ -290,6 +342,12 @@ semantic materialization counters. No XLSX materialization count is emitted,
 because the production API does not directly expose one. Instead, each case
 enforces its semantic deferral claim with a fresh post-timing worksheet access
 that must add I/O for that worksheet's exact compressed member range.
+
+Scaling records contain `execution.worker_count`, `logical_tasks`, and
+`logical_bytes`. One result is emitted per resolved worker count, in ascending
+order. Those fields and the elapsed samples are sufficient to compute
+throughput, speedup, scaling efficiency, and an Amdahl serial-fraction estimate
+outside the harness.
 
 ## External profiling
 
@@ -323,5 +381,5 @@ denied, run the binary directly (or use `samply`/`cargo flamegraph` if present)
 rather than changing system policy merely to complete a smoke run.
 
 Timing is only a first baseline. It intentionally does not claim peak RSS,
-allocation counts, CPU utilization, lock contention, cache misses, or scaling;
-those need dedicated ADR-0005 instrumentation and a controlled runner.
+allocation counts, CPU utilization, lock contention, or cache misses; those
+need dedicated instrumentation and a controlled runner.

@@ -1,0 +1,21 @@
+Profile: heaptrack-raw-opc-after.gz.zst
+Binary: target/perf/raw_opc_after_9a1562920f
+Binary SHA-256: 9a1562920f35d856ad3399b46f0f12f4f1c723ae046ebca8009135f995457320
+Command: --warmup 0 --samples 1 --case opc_mutated_save --shape few-large --payload incompressible
+
+total runtime: 0.444000s
+calls to allocation functions: 878
+temporary memory allocations: 168
+peak heap memory consumption: 122.49M
+peak RSS (including heaptrack overhead): 124.89M
+total memory leaked: 1.78K
+
+Relevant peak attribution:
+- 17.07M in preservation output Vec growth.
+- 4.19M in litchi_opc::pkgwriter::regenerated_action payload copying.
+- 4.20M in soapberry_zip::preserve::generated_entry compression/output.
+- 33.63M is the benchmark CountingSink budget reserved before timing and is
+  matched by the before workload's same sink policy.
+
+Generated with heaptrack and summarized with:
+heaptrack_print -p 0 -a 0 -T 0

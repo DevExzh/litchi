@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "d6bd13c9043737885ad27fa9d6207f4c30c1addd",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 12,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1"
+  },
+  "configuration": {
+    "samples_per_case": 1,
+    "warmup_iterations_per_case": 0,
+    "cases": [
+      "opc_mutated_save"
+    ],
+    "corpus_shapes": [
+      "few-large"
+    ],
+    "payload_kinds": [
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ]
+  },
+  "results": [
+    {
+      "case": "opc_mutated_save",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783632,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          215006734
+        ],
+        "min": 215006734,
+        "p50": 215006734,
+        "p95": 215006734,
+        "p99": 215006734,
+        "max": 215006734,
+        "mean": 215006734.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 215006734.0,
+          "upper": 215006734.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 16783632,
+        "write_calls": 557,
+        "largest_write": 32768
+      }
+    }
+  ]
+}

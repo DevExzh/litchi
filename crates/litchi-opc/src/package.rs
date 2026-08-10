@@ -38,6 +38,37 @@ pub enum FontEmbedding {
     Subset,
 }
 
+#[derive(Debug)]
+pub(crate) struct PreservationProvenance {
+    pub(crate) members: Vec<SourceMember>,
+    pub(crate) parts: HashMap<PackURI, SourcePart>,
+    pub(crate) package_relationships_xml: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct SourceMember {
+    pub(crate) name: Option<String>,
+    pub(crate) kind: SourceMemberKind,
+}
+
+#[derive(Debug)]
+pub(crate) enum SourceMemberKind {
+    ContentTypes,
+    PackageRelationships,
+    Part(PackURI),
+    PartRelationships(PackURI),
+    Unknown,
+}
+
+#[derive(Debug)]
+pub(crate) struct SourcePart {
+    pub(crate) content_type: String,
+    pub(crate) blob: Arc<Vec<u8>>,
+    pub(crate) relationships_xml: String,
+    pub(crate) member_present: bool,
+    pub(crate) relationships_member_present: bool,
+}
+
 /// Main API class for working with OPC packages.
 ///
 /// `OpcPackage` represents an Open Packaging Convention package in memory,
@@ -60,8 +91,14 @@ pub struct OpcPackage {
     /// Exact XML payloads materialized from the opened source package.
     source_xml_parts: HashMap<PackURI, Arc<Vec<u8>>>,
 
-    /// Authorized owned source archive, until any mutable API is entered.
-    exact_source: Option<Arc<Vec<u8>>>,
+    /// Owned source archive retained for exact and targeted publication.
+    source_archive: Option<Arc<Vec<u8>>>,
+
+    /// Clone-local authorization for exact whole-source publication.
+    exact_source_authorized: bool,
+
+    /// Source identity used to prove safe targeted publication.
+    preservation: Option<Arc<PreservationProvenance>>,
 
     /// ZIP items the reader found but did not model as parts
     non_part_members: Vec<NonPartMember>,
@@ -76,7 +113,9 @@ impl std::fmt::Debug for OpcPackage {
             .field("rels", &self.rels)
             .field("parts_count", &self.parts.len())
             .field("source_xml_parts_count", &self.source_xml_parts.len())
-            .field("has_exact_source", &self.exact_source.is_some())
+            .field("has_owned_source", &self.source_archive.is_some())
+            .field("exact_source_authorized", &self.exact_source_authorized)
+            .field("has_preservation_provenance", &self.preservation.is_some())
             .field("non_part_members", &self.non_part_members)
             .field("save_options", &self.save_options)
             .finish()
@@ -91,7 +130,9 @@ impl OpcPackage {
             rels: Relationships::new(PACKAGE_URI.to_string()),
             parts: HashMap::new(),
             source_xml_parts: HashMap::new(),
-            exact_source: None,
+            source_archive: None,
+            exact_source_authorized: false,
+            preservation: None,
             non_part_members: Vec::new(),
             save_options: SaveOptions::default(),
         }
@@ -787,11 +828,20 @@ impl OpcPackage {
     }
 
     pub(crate) fn exact_source(&self) -> Option<&[u8]> {
-        self.exact_source.as_deref().map(Vec::as_slice)
+        self.exact_source_authorized
+            .then(|| self.source_archive.as_deref().map(Vec::as_slice))
+            .flatten()
+    }
+
+    pub(crate) fn preservation_source(&self) -> Option<(&[u8], &PreservationProvenance)> {
+        self.source_archive
+            .as_deref()
+            .map(Vec::as_slice)
+            .zip(self.preservation.as_deref())
     }
 
     fn revoke_exact_source(&mut self) {
-        self.exact_source = None;
+        self.exact_source_authorized = false;
     }
 
     fn from_owned_phys_reader(owned_reader: OwnedPhysPkgReader) -> Result<Self> {
@@ -800,7 +850,7 @@ impl OpcPackage {
             let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
             Self::unmarshal(pkg_reader)?
         };
-        package.exact_source = Some(Arc::new(owned_reader.into_inner()));
+        package.authorize_owned_source(owned_reader.into_inner());
         Ok(package)
     }
 
@@ -830,8 +880,16 @@ impl OpcPackage {
             let pkg_reader = PackageReader::from_phys_reader_with_session(&phys_reader, session)?;
             Self::unmarshal(pkg_reader)?
         };
-        package.exact_source = Some(Arc::new(owned_reader.into_inner()));
+        package.authorize_owned_source(owned_reader.into_inner());
         Ok(package)
+    }
+
+    fn authorize_owned_source(&mut self, source: Vec<u8>) {
+        let source = Arc::new(source);
+        self.preservation =
+            PreservationProvenance::from_package(source.as_slice(), self).map(Arc::new);
+        self.source_archive = Some(source);
+        self.exact_source_authorized = true;
     }
 }
 
@@ -839,6 +897,157 @@ impl Default for OpcPackage {
     fn default() -> Self {
         Self::new()
     }
+}
+
+impl PreservationProvenance {
+    fn from_package(source: &[u8], package: &OpcPackage) -> Option<Self> {
+        let archive = soapberry_zip::ZipArchive::from_slice(source).ok()?;
+        let entry_count = usize::try_from(archive.entries_hint()).ok()?;
+        if entry_count > u16::MAX as usize {
+            return None;
+        }
+
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
+            .ok()?;
+        buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0_u8);
+        let indexed = archive.clone().into_zip_archive();
+        soapberry_zip::PreservationIndex::new(&indexed, &mut buffer).ok()?;
+
+        let mut parts = HashMap::new();
+        parts.try_reserve(package.part_count()).ok()?;
+        let mut part_members = HashMap::new();
+        part_members.try_reserve(package.part_count()).ok()?;
+        let mut relationship_members = HashMap::new();
+        relationship_members
+            .try_reserve(package.part_count())
+            .ok()?;
+        for part in package.iter_parts() {
+            let partname = part.partname().clone();
+            let member_name = try_owned_string(part.partname().membername())?;
+            if part_members.insert(member_name, partname.clone()).is_some() {
+                return None;
+            }
+            let relationships_uri = part.partname().rels_uri().ok()?;
+            if relationship_members
+                .insert(
+                    try_owned_string(relationships_uri.membername())?,
+                    partname.clone(),
+                )
+                .is_some()
+            {
+                return None;
+            }
+            parts.insert(
+                partname,
+                SourcePart {
+                    content_type: try_owned_string(part.content_type())?,
+                    blob: part.blob_arc(),
+                    relationships_xml: part.rels().to_xml(),
+                    member_present: false,
+                    relationships_member_present: false,
+                },
+            );
+        }
+
+        let package_uri = PackURI::new(PACKAGE_URI).ok()?;
+        let package_relationships_name = package_uri.rels_uri().ok()?.membername().to_owned();
+        let mut content_types_present = false;
+        let mut package_relationships_present = false;
+        let mut seen_names = HashSet::new();
+        seen_names.try_reserve(entry_count).ok()?;
+        let mut members = Vec::new();
+        members.try_reserve_exact(entry_count).ok()?;
+        for entry in archive.entries() {
+            let entry = entry.ok()?;
+            let raw_name = entry.file_path();
+            let raw_name = raw_name.as_ref();
+            if !seen_names.insert(try_owned_bytes(raw_name)?) {
+                return None;
+            }
+            let Ok(name) = std::str::from_utf8(raw_name) else {
+                members.push(SourceMember {
+                    name: None,
+                    kind: SourceMemberKind::Unknown,
+                });
+                continue;
+            };
+
+            let (stored_name, kind) = if name.eq_ignore_ascii_case("[Content_Types].xml") {
+                if content_types_present {
+                    return None;
+                }
+                content_types_present = true;
+                (
+                    Some(try_owned_string(name)?),
+                    SourceMemberKind::ContentTypes,
+                )
+            } else if name == package_relationships_name {
+                if package_relationships_present {
+                    return None;
+                }
+                package_relationships_present = true;
+                (
+                    Some(try_owned_string(name)?),
+                    SourceMemberKind::PackageRelationships,
+                )
+            } else if let Some(partname) = part_members.get(name) {
+                let part = parts.get_mut(partname)?;
+                if part.member_present {
+                    return None;
+                }
+                part.member_present = true;
+                (
+                    Some(try_owned_string(name)?),
+                    SourceMemberKind::Part(partname.clone()),
+                )
+            } else if let Some(partname) = relationship_members.get(name) {
+                let part = parts.get_mut(partname)?;
+                if part.relationships_member_present {
+                    return None;
+                }
+                part.relationships_member_present = true;
+                (
+                    Some(try_owned_string(name)?),
+                    SourceMemberKind::PartRelationships(partname.clone()),
+                )
+            } else {
+                (None, SourceMemberKind::Unknown)
+            };
+            members.push(SourceMember {
+                name: stored_name,
+                kind,
+            });
+        }
+
+        if members.len() != entry_count
+            || !content_types_present
+            || parts.values().any(|part| !part.member_present)
+        {
+            return None;
+        }
+
+        Some(Self {
+            members,
+            parts,
+            package_relationships_xml: package.rels().to_xml(),
+        })
+    }
+}
+
+fn try_owned_string(value: &str) -> Option<String> {
+    let mut owned = String::new();
+    owned.try_reserve_exact(value.len()).ok()?;
+    owned.push_str(value);
+    Some(owned)
+}
+
+fn try_owned_bytes(value: &[u8]) -> Option<Vec<u8>> {
+    let mut owned = Vec::new();
+    owned.try_reserve_exact(value.len()).ok()?;
+    owned.extend_from_slice(value);
+    Some(owned)
 }
 
 fn targets_any(relationship: &crate::Relationship, infrastructure: &HashSet<PackURI>) -> bool {
@@ -994,17 +1203,19 @@ mod tests {
         let mut clone = package.clone();
 
         assert!(Arc::ptr_eq(
-            package.exact_source.as_ref().expect("source authorized"),
+            package.source_archive.as_ref().expect("source authorized"),
             clone
-                .exact_source
+                .source_archive
                 .as_ref()
                 .expect("clone source authorized")
         ));
 
         let unchanged_options = clone.save_options().clone();
         clone.set_save_options(unchanged_options);
-        assert!(clone.exact_source.is_none());
-        assert!(package.exact_source.is_some());
+        assert!(!clone.exact_source_authorized);
+        assert!(clone.source_archive.is_some());
+        assert!(clone.preservation.is_some());
+        assert!(package.exact_source_authorized);
     }
 
     #[test]
@@ -1015,11 +1226,11 @@ mod tests {
 
         let mut package = base.clone();
         assert!(package.get_part_mut(&missing).is_err());
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
 
         let mut package = base.clone();
         assert!(!package.remove_part(&missing));
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
 
         let mut package = base.clone();
         let duplicate = package.main_document_part().unwrap().partname().clone();
@@ -1029,11 +1240,11 @@ mod tests {
             Vec::new(),
         )));
         assert!(error.is_err());
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
 
         let mut package = base.clone();
         package.unsign();
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
     }
 
     #[test]
@@ -1044,27 +1255,27 @@ mod tests {
         let mut package = base.clone();
         let options = package.save_options().clone();
         package.set_save_options(options);
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
 
         let mut package = base.clone();
         package.with_fonts(FontEmbedding::None);
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
 
         let mut package = base.clone();
         let _relationships = package.rels_mut();
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
 
         let mut package = base.clone();
         let _relationships = package.relationships_mut();
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
 
         let mut package = base.clone();
         package.relate_to("word/document.xml", relationship_type::OFFICE_DOCUMENT);
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
 
         let mut package = base;
         package.relate_to_external("https://example.com", "urn:example");
-        assert!(package.exact_source.is_none());
+        assert!(!package.exact_source_authorized);
     }
 
     #[test]

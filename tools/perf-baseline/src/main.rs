@@ -7,24 +7,28 @@
 #![forbid(unsafe_code)]
 
 use std::{
+    collections::BTreeSet,
     error::Error,
     fs::{self, File},
     io::{self, Cursor, Write},
+    num::{NonZeroU64, NonZeroUsize},
     ops::Range,
     path::PathBuf,
     process::Command,
     sync::{
-        Arc, Barrier,
+        Arc, Barrier, Mutex,
         atomic::{AtomicU64, Ordering},
     },
     time::{Duration, Instant},
 };
 
 use litchi_cfb::{OleFile, OleWriter, SharedOleFile, SharedOleFileLimits};
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, SourceVersion,
+};
 use litchi_opc::{
-    BlobPart, OpcPackage, PackURI, PackageWriter, SourceBackedPackage, SourceCacheLimits,
-    TargetMode, constants::relationship_type,
+    BlobPart, OpcPackage, OpenSession, PackURI, PackageWriter, ReadLimits, SourceBackedPackage,
+    SourceCacheLimits, TargetMode, constants::relationship_type,
 };
 use litchi_xlsx::{Cell as XlsxCell, SourceBackedWorkbook, Value as XlsxValue, Workbook};
 use serde::Serialize;
@@ -34,6 +38,10 @@ use soapberry_zip::office::ArchiveReader;
 const SCHEMA_VERSION: u32 = 1;
 const DEFAULT_SAMPLES: usize = 15;
 const DEFAULT_WARMUP_ITERATIONS: usize = 3;
+const DEFAULT_RANGE_FIXED_LATENCY_US: u64 = 100;
+const DEFAULT_RANGE_REQUEST_OVERHEAD_US: u64 = 25;
+const DEFAULT_RANGE_BANDWIDTH_BYTES_PER_SECOND: u64 = 50 * 1024 * 1024;
+const DEFAULT_RANGE_MAX_PHYSICAL_BYTES: usize = 4 * 1024;
 const CONTENT_TYPE: &str = "application/octet-stream";
 const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
 const CFB_CORPUS_GENERATOR: &str = "litchi-cfb-synthetic-v1";
@@ -202,10 +210,18 @@ enum Case {
     XlsxSourceListSheets,
     XlsxSourceFirstCell,
     XlsxSourceNarrowColumnRangeScan,
+    OpcRangeSourceOpen,
+    OpcRangeSourceOpenMainRead,
+    XlsxRangeSourceOpen,
+    XlsxRangeSourceListSheets,
+    XlsxRangeSourceFirstCell,
+    XlsxRangeSourceNarrowColumnRangeScan,
+    OpcOpenSessionScaling,
+    CfbBulkReadScaling,
 }
 
 impl Case {
-    const ALL: [Self; 36] = [
+    const DEFAULT: [Self; 36] = [
         Self::ZipIndex,
         Self::ZipReadOne,
         Self::OpcOpen,
@@ -282,6 +298,16 @@ impl Case {
             Self::XlsxSourceListSheets => "xlsx_source_list_sheets",
             Self::XlsxSourceFirstCell => "xlsx_source_first_cell",
             Self::XlsxSourceNarrowColumnRangeScan => "xlsx_source_narrow_column_range_scan",
+            Self::OpcRangeSourceOpen => "opc_range_source_open",
+            Self::OpcRangeSourceOpenMainRead => "opc_range_source_open_main_read",
+            Self::XlsxRangeSourceOpen => "xlsx_range_source_open",
+            Self::XlsxRangeSourceListSheets => "xlsx_range_source_list_sheets",
+            Self::XlsxRangeSourceFirstCell => "xlsx_range_source_first_cell",
+            Self::XlsxRangeSourceNarrowColumnRangeScan => {
+                "xlsx_range_source_narrow_column_range_scan"
+            },
+            Self::OpcOpenSessionScaling => "opc_open_session_scaling",
+            Self::CfbBulkReadScaling => "cfb_bulk_read_scaling",
         }
     }
 
@@ -296,6 +322,7 @@ impl Case {
                 | Self::CfbSharedOpen
                 | Self::CfbSharedReadOne
                 | Self::CfbSharedConcurrentReads
+                | Self::CfbBulkReadScaling
         )
     }
 
@@ -312,6 +339,9 @@ impl Case {
                 | Self::OpcSourceOpenMainRead
                 | Self::OpcSourceCachedMainRead
                 | Self::OpcSourceConcurrentSamePart
+                | Self::OpcRangeSourceOpen
+                | Self::OpcRangeSourceOpenMainRead
+                | Self::OpcOpenSessionScaling
         )
     }
 
@@ -340,7 +370,34 @@ impl Case {
                 | Self::XlsxSourceListSheets
                 | Self::XlsxSourceFirstCell
                 | Self::XlsxSourceNarrowColumnRangeScan
+                | Self::XlsxRangeSourceOpen
+                | Self::XlsxRangeSourceListSheets
+                | Self::XlsxRangeSourceFirstCell
+                | Self::XlsxRangeSourceNarrowColumnRangeScan
         )
+    }
+
+    const fn is_scaling(self) -> bool {
+        matches!(self, Self::OpcOpenSessionScaling | Self::CfbBulkReadScaling)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+struct RangeSimulationConfig {
+    fixed_latency_us: u64,
+    request_overhead_us: u64,
+    bandwidth_bytes_per_second: u64,
+    max_physical_range_bytes: usize,
+}
+
+impl Default for RangeSimulationConfig {
+    fn default() -> Self {
+        Self {
+            fixed_latency_us: DEFAULT_RANGE_FIXED_LATENCY_US,
+            request_overhead_us: DEFAULT_RANGE_REQUEST_OVERHEAD_US,
+            bandwidth_bytes_per_second: DEFAULT_RANGE_BANDWIDTH_BYTES_PER_SECOND,
+            max_physical_range_bytes: DEFAULT_RANGE_MAX_PHYSICAL_BYTES,
+        }
     }
 }
 
@@ -353,6 +410,8 @@ struct Options {
     payloads: Vec<PayloadKind>,
     writer_shapes: Vec<WriterShape>,
     xlsx_shapes: Vec<XlsxShape>,
+    range_simulation: RangeSimulationConfig,
+    execution_workers: Vec<usize>,
     output: Option<PathBuf>,
 }
 
@@ -419,6 +478,8 @@ struct Configuration {
     payload_kinds: Vec<&'static str>,
     writer_shapes: Vec<&'static str>,
     xlsx_shapes: Vec<&'static str>,
+    range_simulation: RangeSimulationConfig,
+    execution_workers: Vec<usize>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -466,6 +527,15 @@ struct CaseResult {
     sink: Option<SinkSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     source: Option<SourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    execution: Option<ExecutionSummary>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+struct ExecutionSummary {
+    worker_count: usize,
+    logical_tasks: usize,
+    logical_bytes: u64,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -479,6 +549,27 @@ struct SourceSummary {
     ordinary_payload_materializations: Option<Vec<u64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx: Option<XlsxSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    simulation: Option<RangeSimulationSummary>,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct RangeSimulationSummary {
+    logical_read_calls: Vec<u64>,
+    logical_read_bytes: Vec<u64>,
+    physical_request_count: Vec<u64>,
+    physical_request_bytes: Vec<u64>,
+    physical_request_sizes: Vec<Vec<u64>>,
+    physical_request_size_buckets: Vec<RequestSizeBuckets>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+struct RequestSizeBuckets {
+    bytes_1_to_512: u64,
+    bytes_513_to_4096: u64,
+    bytes_4097_to_16384: u64,
+    bytes_16385_to_65536: u64,
+    bytes_over_65536: u64,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -552,6 +643,27 @@ struct InstrumentedSource {
     xlsx_unselected_worksheets: AtomicRangeCounter,
     xlsx_shared_strings: AtomicRangeCounter,
     xlsx_styles: AtomicRangeCounter,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct RangeSimulationSnapshot {
+    logical_read_calls: u64,
+    logical_read_bytes: u64,
+    physical_request_count: u64,
+    physical_request_bytes: u64,
+    physical_request_sizes: Vec<u64>,
+    physical_request_size_buckets: RequestSizeBuckets,
+}
+
+#[derive(Debug)]
+struct SimulatedRangeSource {
+    backing: Arc<InstrumentedSource>,
+    config: RangeSimulationConfig,
+    logical_read_calls: AtomicU64,
+    logical_read_bytes: AtomicU64,
+    physical_request_count: AtomicU64,
+    physical_request_bytes: AtomicU64,
+    physical_request_sizes: Mutex<Vec<u64>>,
 }
 
 #[derive(Serialize)]
@@ -810,6 +922,121 @@ impl ReadAt for InstrumentedSource {
     }
 }
 
+impl RequestSizeBuckets {
+    fn observe(&mut self, bytes: u64) {
+        match bytes {
+            0 => {},
+            1..=512 => self.bytes_1_to_512 += 1,
+            513..=4096 => self.bytes_513_to_4096 += 1,
+            4097..=16384 => self.bytes_4097_to_16384 += 1,
+            16385..=65536 => self.bytes_16385_to_65536 += 1,
+            _ => self.bytes_over_65536 += 1,
+        }
+    }
+}
+
+fn simulated_request_delay(config: RangeSimulationConfig, bytes: usize) -> Duration {
+    let base_nanos = u128::from(
+        config
+            .fixed_latency_us
+            .saturating_add(config.request_overhead_us),
+    ) * 1_000;
+    let transfer_nanos = (bytes as u128)
+        .saturating_mul(1_000_000_000)
+        .div_ceil(u128::from(config.bandwidth_bytes_per_second));
+    let nanos = base_nanos
+        .saturating_add(transfer_nanos)
+        .min(u128::from(u64::MAX));
+    Duration::from_nanos(nanos as u64)
+}
+
+impl SimulatedRangeSource {
+    fn new(backing: Arc<InstrumentedSource>, config: RangeSimulationConfig) -> Self {
+        Self {
+            backing,
+            config,
+            logical_read_calls: AtomicU64::new(0),
+            logical_read_bytes: AtomicU64::new(0),
+            physical_request_count: AtomicU64::new(0),
+            physical_request_bytes: AtomicU64::new(0),
+            physical_request_sizes: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn snapshot(&self) -> io::Result<RangeSimulationSnapshot> {
+        let mut sizes = self
+            .physical_request_sizes
+            .lock()
+            .map_err(|_error| io::Error::other("range simulator request sizes are poisoned"))?
+            .clone();
+        sizes.sort_unstable();
+        let mut buckets = RequestSizeBuckets::default();
+        for &size in &sizes {
+            buckets.observe(size);
+        }
+        Ok(RangeSimulationSnapshot {
+            logical_read_calls: self.logical_read_calls.load(Ordering::SeqCst),
+            logical_read_bytes: self.logical_read_bytes.load(Ordering::SeqCst),
+            physical_request_count: self.physical_request_count.load(Ordering::SeqCst),
+            physical_request_bytes: self.physical_request_bytes.load(Ordering::SeqCst),
+            physical_request_sizes: sizes,
+            physical_request_size_buckets: buckets,
+        })
+    }
+
+    fn reset(&self) -> io::Result<()> {
+        self.logical_read_calls.store(0, Ordering::SeqCst);
+        self.logical_read_bytes.store(0, Ordering::SeqCst);
+        self.physical_request_count.store(0, Ordering::SeqCst);
+        self.physical_request_bytes.store(0, Ordering::SeqCst);
+        self.physical_request_sizes
+            .lock()
+            .map_err(|_error| io::Error::other("range simulator request sizes are poisoned"))?
+            .clear();
+        self.backing.reset();
+        Ok(())
+    }
+}
+
+impl ReadAt for SimulatedRangeSource {
+    fn len(&self) -> io::Result<u64> {
+        self.backing.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        self.logical_read_calls.fetch_add(1, Ordering::SeqCst);
+        let mut total = 0usize;
+        while total < output.len() {
+            let requested = (output.len() - total).min(self.config.max_physical_range_bytes);
+            std::thread::sleep(simulated_request_delay(self.config, requested));
+            let physical_offset = offset.saturating_add(u64::try_from(total).unwrap_or(u64::MAX));
+            let read = self
+                .backing
+                .read_at(physical_offset, &mut output[total..total + requested])?;
+            let read_u64 = u64::try_from(read)
+                .map_err(|_error| io::Error::other("physical request size does not fit u64"))?;
+            self.physical_request_count.fetch_add(1, Ordering::SeqCst);
+            self.physical_request_bytes
+                .fetch_add(read_u64, Ordering::SeqCst);
+            self.physical_request_sizes
+                .lock()
+                .map_err(|_error| io::Error::other("range simulator request sizes are poisoned"))?
+                .push(read_u64);
+            total += read;
+            if read < requested {
+                break;
+            }
+        }
+        self.logical_read_bytes
+            .fetch_add(u64::try_from(total).unwrap_or(u64::MAX), Ordering::SeqCst);
+        Ok(total)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.backing.version()
+    }
+}
+
 struct InFlightReadGuard<'counter> {
     counter: &'counter AtomicU64,
 }
@@ -872,6 +1099,26 @@ impl SourceSummary {
             .styles_read_bytes
             .push(snapshot.xlsx.styles.read_bytes);
     }
+
+    fn record_simulation(&mut self, snapshot: RangeSimulationSnapshot) {
+        let summary = self
+            .simulation
+            .get_or_insert_with(RangeSimulationSummary::default);
+        summary.logical_read_calls.push(snapshot.logical_read_calls);
+        summary.logical_read_bytes.push(snapshot.logical_read_bytes);
+        summary
+            .physical_request_count
+            .push(snapshot.physical_request_count);
+        summary
+            .physical_request_bytes
+            .push(snapshot.physical_request_bytes);
+        summary
+            .physical_request_sizes
+            .push(snapshot.physical_request_sizes);
+        summary
+            .physical_request_size_buckets
+            .push(snapshot.physical_request_size_buckets);
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -906,12 +1153,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                         .as_ref()
                         .ok_or("OPC case has no generated OPC corpus")?
                 };
-                results.push(run_case(
-                    *case,
-                    corpus,
-                    options.warmup_iterations,
-                    options.samples,
-                )?);
+                if case.is_scaling() {
+                    for &workers in &options.execution_workers {
+                        results.push(run_scaling_case(
+                            *case,
+                            corpus,
+                            options.warmup_iterations,
+                            options.samples,
+                            workers,
+                        )?);
+                    }
+                } else {
+                    results.push(run_case_with_config(
+                        *case,
+                        corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                        options.range_simulation,
+                    )?);
+                }
             }
         }
     }
@@ -919,11 +1179,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     for shape in &options.writer_shapes {
         for case in options.cases.iter().filter(|case| case.is_fresh_writer()) {
             let corpus = build_writer_corpus(*case, *shape)?;
-            results.push(run_case(
+            results.push(run_case_with_config(
                 *case,
                 &corpus,
                 options.warmup_iterations,
                 options.samples,
+                options.range_simulation,
             )?);
         }
     }
@@ -932,11 +1193,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         for shape in &options.xlsx_shapes {
             let corpus = build_xlsx_corpus(*shape)?;
             for case in options.cases.iter().filter(|case| case.uses_xlsx()) {
-                results.push(run_case(
+                results.push(run_case_with_config(
                     *case,
                     &corpus,
                     options.warmup_iterations,
                     options.samples,
+                    options.range_simulation,
                 )?);
             }
         }
@@ -972,6 +1234,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .iter()
                 .map(|shape| shape.name())
                 .collect(),
+            range_simulation: options.range_simulation,
+            execution_workers: options.execution_workers,
         },
         results,
     };
@@ -982,11 +1246,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut samples = DEFAULT_SAMPLES;
     let mut warmup_iterations = DEFAULT_WARMUP_ITERATIONS;
-    let mut cases = Case::ALL.to_vec();
+    let mut cases = Case::DEFAULT.to_vec();
     let mut shapes = CorpusShape::ALL.to_vec();
     let mut payloads = PayloadKind::ALL.to_vec();
     let mut writer_shapes = WriterShape::ALL.to_vec();
     let mut xlsx_shapes = XlsxShape::ALL.to_vec();
+    let mut range_simulation = RangeSimulationConfig::default();
+    let mut execution_workers = default_execution_workers()?;
     let mut output = None;
     let mut arguments = std::env::args().skip(1);
 
@@ -1019,6 +1285,28 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
             "--xlsx-shape" => {
                 xlsx_shapes = parse_selection(arguments.next(), "--xlsx-shape", parse_xlsx_shape)?;
             },
+            "--range-fixed-latency-us" => {
+                range_simulation.fixed_latency_us =
+                    parse_u64_option(arguments.next(), "--range-fixed-latency-us", true)?;
+            },
+            "--range-request-overhead-us" => {
+                range_simulation.request_overhead_us =
+                    parse_u64_option(arguments.next(), "--range-request-overhead-us", true)?;
+            },
+            "--range-bandwidth-bytes-per-sec" => {
+                range_simulation.bandwidth_bytes_per_second =
+                    parse_u64_option(arguments.next(), "--range-bandwidth-bytes-per-sec", false)?;
+            },
+            "--range-max-physical-bytes" => {
+                range_simulation.max_physical_range_bytes = usize::try_from(parse_u64_option(
+                    arguments.next(),
+                    "--range-max-physical-bytes",
+                    false,
+                )?)?;
+            },
+            "--workers" => {
+                execution_workers = parse_execution_workers(arguments.next())?;
+            },
             "--json" => {
                 let value = arguments.next().ok_or("--json requires PATH or -")?;
                 if value != "-" {
@@ -1041,8 +1329,57 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         payloads,
         writer_shapes,
         xlsx_shapes,
+        range_simulation,
+        execution_workers,
         output,
     })
+}
+
+fn parse_u64_option(
+    value: Option<String>,
+    option: &str,
+    allow_zero: bool,
+) -> Result<u64, Box<dyn Error>> {
+    let value = value.ok_or_else(|| format!("{option} requires an integer"))?;
+    let parsed = value.parse::<u64>()?;
+    if !allow_zero && parsed == 0 {
+        return Err(format!("{option} must be greater than zero").into());
+    }
+    Ok(parsed)
+}
+
+fn default_execution_workers() -> Result<Vec<usize>, Box<dyn Error>> {
+    resolve_execution_workers(["1", "2", "4", "8", "available"])
+}
+
+fn parse_execution_workers(value: Option<String>) -> Result<Vec<usize>, Box<dyn Error>> {
+    let value = value.ok_or("--workers requires a comma-separated list")?;
+    if value.is_empty() {
+        return Err("--workers selection must not be empty".into());
+    }
+    resolve_execution_workers(value.split(','))
+}
+
+fn resolve_execution_workers<'a>(
+    values: impl IntoIterator<Item = &'a str>,
+) -> Result<Vec<usize>, Box<dyn Error>> {
+    let available = std::thread::available_parallelism().map_or(1, NonZeroUsize::get);
+    let mut workers = BTreeSet::new();
+    for value in values {
+        let requested = if value == "available" {
+            available
+        } else {
+            value.parse::<usize>()?
+        };
+        if requested == 0 {
+            return Err("worker counts must be greater than zero".into());
+        }
+        workers.insert(requested.min(available));
+    }
+    if workers.is_empty() {
+        return Err("worker selection must not be empty".into());
+    }
+    Ok(workers.into_iter().collect())
 }
 
 fn parse_selection<T>(
@@ -1099,6 +1436,16 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_list_sheets" => Some(Case::XlsxSourceListSheets),
         "xlsx_source_first_cell" => Some(Case::XlsxSourceFirstCell),
         "xlsx_source_narrow_column_range_scan" => Some(Case::XlsxSourceNarrowColumnRangeScan),
+        "opc_range_source_open" => Some(Case::OpcRangeSourceOpen),
+        "opc_range_source_open_main_read" => Some(Case::OpcRangeSourceOpenMainRead),
+        "xlsx_range_source_open" => Some(Case::XlsxRangeSourceOpen),
+        "xlsx_range_source_list_sheets" => Some(Case::XlsxRangeSourceListSheets),
+        "xlsx_range_source_first_cell" => Some(Case::XlsxRangeSourceFirstCell),
+        "xlsx_range_source_narrow_column_range_scan" => {
+            Some(Case::XlsxRangeSourceNarrowColumnRangeScan)
+        },
+        "opc_open_session_scaling" => Some(Case::OpcOpenSessionScaling),
+        "cfb_bulk_read_scaling" => Some(Case::CfbBulkReadScaling),
         _ => None,
     }
 }
@@ -1161,11 +1508,24 @@ fn print_usage() {
                                        xlsx_one_percent_commit,xlsx_one_percent_commit_save,\n\
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
                                        xlsx_source_first_cell,\n\
-                                       xlsx_source_narrow_column_range_scan\n\
+                                       xlsx_source_narrow_column_range_scan,\n\
+                                       opc_range_source_open,opc_range_source_open_main_read,\n\
+                                       xlsx_range_source_open,xlsx_range_source_list_sheets,\n\
+                                       xlsx_range_source_first_cell,\n\
+                                       xlsx_range_source_narrow_column_range_scan,\n\
+                                       opc_open_session_scaling,cfb_bulk_read_scaling\n\
            --shape LIST                tiny,many-small,few-large,wide-root\n\
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
+           --range-fixed-latency-us N  Fixed latency per request (default: {DEFAULT_RANGE_FIXED_LATENCY_US})\n\
+           --range-request-overhead-us N\n\
+                                       Request overhead (default: {DEFAULT_RANGE_REQUEST_OVERHEAD_US})\n\
+           --range-bandwidth-bytes-per-sec N\n\
+                                       Bandwidth (default: {DEFAULT_RANGE_BANDWIDTH_BYTES_PER_SECOND})\n\
+           --range-max-physical-bytes N\n\
+                                       Maximum physical range (default: {DEFAULT_RANGE_MAX_PHYSICAL_BYTES})\n\
+           --workers LIST              Scaling workers: 1,2,4,8,available (capped/deduped)\n\
            --json PATH                 Write JSON to PATH; use - or omit for stdout\n\
            --help                      Show this help"
     );
@@ -1744,11 +2104,28 @@ fn payload_bytes(kind: PayloadKind, index: usize, length: usize) -> Vec<u8> {
     bytes
 }
 
+#[cfg(test)]
 fn run_case(
     case: Case,
     corpus: &Corpus,
     warmup_iterations: usize,
     samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    run_case_with_config(
+        case,
+        corpus,
+        warmup_iterations,
+        samples,
+        RangeSimulationConfig::default(),
+    )
+}
+
+fn run_case_with_config(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    range_simulation: RangeSimulationConfig,
 ) -> Result<CaseResult, Box<dyn Error>> {
     match case {
         Case::ZipIndex => run_zip_index(corpus, warmup_iterations, samples),
@@ -1809,7 +2186,227 @@ fn run_case(
         Case::XlsxSourceNarrowColumnRangeScan => {
             run_xlsx_source_narrow_column_range_scan(corpus, warmup_iterations, samples)
         },
+        Case::OpcRangeSourceOpen => {
+            run_opc_range_source_open(corpus, warmup_iterations, samples, range_simulation, false)
+        },
+        Case::OpcRangeSourceOpenMainRead => {
+            run_opc_range_source_open(corpus, warmup_iterations, samples, range_simulation, true)
+        },
+        Case::XlsxRangeSourceOpen => {
+            run_xlsx_range_source_open(corpus, warmup_iterations, samples, range_simulation)
+        },
+        Case::XlsxRangeSourceListSheets => {
+            run_xlsx_range_source_list_sheets(corpus, warmup_iterations, samples, range_simulation)
+        },
+        Case::XlsxRangeSourceFirstCell => {
+            run_xlsx_range_source_first_cell(corpus, warmup_iterations, samples, range_simulation)
+        },
+        Case::XlsxRangeSourceNarrowColumnRangeScan => {
+            run_xlsx_range_source_narrow_column_range_scan(
+                corpus,
+                warmup_iterations,
+                samples,
+                range_simulation,
+            )
+        },
+        Case::OpcOpenSessionScaling | Case::CfbBulkReadScaling => {
+            Err("scaling case requires an explicit worker count".into())
+        },
     }
+}
+
+fn execution_context(
+    workers: usize,
+    tasks: usize,
+    in_flight_bytes: u64,
+    input_bytes: u64,
+    work_bytes: u64,
+) -> Result<ExecutionContext, Box<dyn Error>> {
+    let workers = NonZeroUsize::new(workers).ok_or("worker count must be nonzero")?;
+    let max_tasks = NonZeroUsize::new(tasks.max(workers.get()))
+        .ok_or("execution task count must be nonzero")?;
+    let max_bytes =
+        NonZeroU64::new(in_flight_bytes.max(1)).ok_or("execution byte bound must be nonzero")?;
+    let limits = ExecutionLimits::new(workers, max_tasks, max_bytes, 0)?;
+    let memory = in_flight_bytes
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("execution memory budget overflows u64")?;
+    let input = input_bytes
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("execution input budget overflows u64")?;
+    let work = work_bytes
+        .checked_mul(3)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("execution work budget overflows u64")?;
+    let objects = u64::try_from(tasks)?
+        .checked_mul(4)
+        .and_then(|value| value.checked_add(1_024))
+        .ok_or("execution object budget overflows u64")?;
+    let (_cancellation, token) = CancellationSource::pair();
+    Ok(ExecutionContext::new(
+        Budget::root(
+            "litchi-perf-scaling",
+            Limits::new(memory, input, 64 * 1024, objects, 1_024, work),
+        ),
+        token,
+        limits,
+    ))
+}
+
+fn zip_logical_work(bytes: &[u8]) -> Result<(usize, u64), Box<dyn Error>> {
+    let archive = ArchiveReader::new(bytes)?;
+    let names = archive.file_names().map(str::to_owned).collect::<Vec<_>>();
+    let mut logical_bytes = 0u64;
+    for name in &names {
+        logical_bytes = logical_bytes
+            .checked_add(u64::try_from(archive.read(name)?.len())?)
+            .ok_or("ZIP logical work bytes overflow u64")?;
+    }
+    Ok((names.len(), logical_bytes))
+}
+
+fn run_scaling_case(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    workers: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    match case {
+        Case::OpcOpenSessionScaling => {
+            run_opc_open_session_scaling(corpus, warmup_iterations, samples, workers)
+        },
+        Case::CfbBulkReadScaling => {
+            run_cfb_bulk_read_scaling(corpus, warmup_iterations, samples, workers)
+        },
+        _ => Err("non-scaling case passed to scaling runner".into()),
+    }
+}
+
+fn run_opc_open_session_scaling(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    workers: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let (logical_tasks, logical_bytes) = zip_logical_work(&corpus.archive)?;
+    let input_bytes = u64::try_from(corpus.archive.len())?;
+    let kind = corpus_payload_kind(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let context = execution_context(
+            workers,
+            logical_tasks,
+            logical_bytes,
+            input_bytes,
+            logical_bytes,
+        )?;
+        let session = OpenSession::new(context)?;
+        let started = Instant::now();
+        let package = session.from_bytes(&corpus.archive, ReadLimits::default())?;
+        let duration = started.elapsed();
+        verify_opc_scaling_package(&package, corpus, kind)?;
+        std::hint::black_box(&package);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result_with_execution(
+        Case::OpcOpenSessionScaling,
+        corpus,
+        elapsed,
+        ExecutionSummary {
+            worker_count: workers,
+            logical_tasks,
+            logical_bytes,
+        },
+    ))
+}
+
+fn verify_opc_scaling_package(
+    package: &OpcPackage,
+    corpus: &Corpus,
+    kind: PayloadKind,
+) -> Result<(), Box<dyn Error>> {
+    if package.iter_parts().count() != corpus.manifest.entry_count {
+        return Err("explicit OPC open session part count differs from manifest".into());
+    }
+    for index in 0..corpus.manifest.entry_count {
+        let uri = PackURI::new(format!("/{}", entry_name(index)))?;
+        if package.get_part(&uri)?.blob() != payload_bytes(kind, index, corpus.manifest.entry_bytes)
+        {
+            return Err(
+                format!("explicit OPC open session part {index} differs from corpus").into(),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn run_cfb_bulk_read_scaling(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    workers: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let logical_tasks = corpus.manifest.entry_count;
+    let logical_bytes = u64::try_from(corpus.manifest.uncompressed_payload_bytes)?;
+    let input_bytes = u64::try_from(corpus.archive.len())?;
+    let names = (0..logical_tasks).map(cfb_entry_name).collect::<Vec<_>>();
+    let path_storage = names
+        .iter()
+        .map(|name| vec![name.as_str()])
+        .collect::<Vec<_>>();
+    let paths = path_storage.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    let kind = corpus_payload_kind(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = cfb_instrumented_source(corpus);
+        let ole = SharedOleFile::open_with_limits(source.clone(), cfb_shared_limits(corpus)?)?;
+        let context = execution_context(
+            workers,
+            logical_tasks,
+            logical_bytes,
+            input_bytes,
+            logical_bytes,
+        )?;
+        let session = ole.bulk_read(context);
+        let preload = session.read_streams(&paths)?;
+        verify_cfb_bulk_outputs(&preload, corpus, kind)?;
+        source.reset();
+        let started = Instant::now();
+        let outputs = session.read_streams(&paths)?;
+        let duration = started.elapsed();
+        verify_cfb_bulk_outputs(&outputs, corpus, kind)?;
+        std::hint::black_box(&outputs);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result_with_execution(
+        Case::CfbBulkReadScaling,
+        corpus,
+        elapsed,
+        ExecutionSummary {
+            worker_count: workers,
+            logical_tasks,
+            logical_bytes,
+        },
+    ))
+}
+
+fn verify_cfb_bulk_outputs(
+    outputs: &[Vec<u8>],
+    corpus: &Corpus,
+    kind: PayloadKind,
+) -> Result<(), Box<dyn Error>> {
+    if outputs.len() != corpus.manifest.entry_count {
+        return Err("CFB bulk read output count differs from manifest".into());
+    }
+    for (index, output) in outputs.iter().enumerate() {
+        if *output != payload_bytes(kind, index, corpus.manifest.entry_bytes) {
+            return Err(format!("CFB bulk read output {index} differs from corpus").into());
+        }
+    }
+    Ok(())
 }
 
 fn xlsx_spec(corpus: &Corpus) -> Result<&XlsxCorpus, Box<dyn Error>> {
@@ -2213,6 +2810,232 @@ fn run_xlsx_source_narrow_column_range_scan(
     ))
 }
 
+fn verify_unselected_xlsx_ranges_untouched(
+    snapshot: SourceSnapshot,
+    context: &str,
+) -> Result<(), Box<dyn Error>> {
+    if snapshot.xlsx.unselected_worksheets != RangeSnapshot::default() {
+        return Err(format!("{context} touched an unselected worksheet range").into());
+    }
+    Ok(())
+}
+
+fn run_xlsx_range_source_open(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    config: RangeSimulationConfig,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summary = SourceSummary::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let backing = xlsx_instrumented_source(corpus)?;
+        let source = simulated_source(backing.clone(), config);
+        let started = Instant::now();
+        let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+        let duration = started.elapsed();
+        if workbook.len() != spec.sheet_count {
+            return Err(
+                "simulated source-backed XLSX sheet count differs from specification".into(),
+            );
+        }
+        let metrics = backing.snapshot();
+        let simulation = source.snapshot()?;
+        verify_simulation_snapshot(&simulation, config, "simulated XLSX source open")?;
+        verify_unselected_xlsx_ranges_untouched(metrics, "simulated XLSX source open")?;
+
+        let first = workbook
+            .sheet("Sheet1")?
+            .ok_or("simulated source-backed XLSX first sheet is missing")?;
+        verify_xlsx_source_cell(&first, "A1", 0)?;
+        if backing.snapshot().xlsx.selected_worksheet.read_calls
+            <= metrics.xlsx.selected_worksheet.read_calls
+        {
+            return Err("simulated XLSX open had already materialized the first sheet".into());
+        }
+
+        if iteration >= warmup_iterations {
+            summary.record_xlsx(metrics);
+            summary.record_simulation(simulation);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result_with_source(
+        Case::XlsxRangeSourceOpen,
+        corpus,
+        elapsed,
+        summary,
+    ))
+}
+
+fn run_xlsx_range_source_list_sheets(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    config: RangeSimulationConfig,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let expected = (0..spec.sheet_count)
+        .map(xlsx_sheet_name)
+        .collect::<Vec<_>>();
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summary = SourceSummary::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let backing = xlsx_instrumented_source(corpus)?;
+        let source = simulated_source(backing.clone(), config);
+        let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+        source.reset()?;
+        let started = Instant::now();
+        let names = workbook
+            .sheets()
+            .map(|sheet| sheet.name().to_owned())
+            .collect::<Vec<_>>();
+        let duration = started.elapsed();
+        if names != expected {
+            return Err("simulated source-backed XLSX listing differs from specification".into());
+        }
+        let metrics = backing.snapshot();
+        let simulation = source.snapshot()?;
+        if metrics != SourceSnapshot::default() || simulation != RangeSimulationSnapshot::default()
+        {
+            return Err("simulated XLSX listing performed a timed source request".into());
+        }
+
+        let first = workbook
+            .sheet("Sheet1")?
+            .ok_or("simulated source-backed XLSX first sheet is missing")?;
+        verify_xlsx_source_cell(&first, "A1", 0)?;
+        if source.snapshot()?.physical_request_count == 0
+            || backing.snapshot().xlsx.selected_worksheet.read_calls == 0
+        {
+            return Err("simulated XLSX listing had already materialized the first sheet".into());
+        }
+
+        if iteration >= warmup_iterations {
+            summary.record_xlsx(metrics);
+            summary.record_simulation(simulation);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result_with_source(
+        Case::XlsxRangeSourceListSheets,
+        corpus,
+        elapsed,
+        summary,
+    ))
+}
+
+fn run_xlsx_range_source_first_cell(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    config: RangeSimulationConfig,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summary = SourceSummary::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let backing = xlsx_instrumented_source(corpus)?;
+        let source = simulated_source(backing.clone(), config);
+        let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+        let first = workbook
+            .sheet("Sheet1")?
+            .ok_or("simulated source-backed XLSX first sheet is missing")?;
+        source.reset()?;
+        let started = Instant::now();
+        let cell = first.cell("A1")?;
+        let duration = started.elapsed();
+        if !xlsx_source_cell_has_value(cell.stored(), 0) {
+            return Err("simulated source-backed XLSX first cell differs from expectation".into());
+        }
+        let metrics = backing.snapshot();
+        let simulation = source.snapshot()?;
+        verify_simulation_snapshot(&simulation, config, "simulated XLSX first-cell read")?;
+        if metrics.xlsx.selected_worksheet.read_calls == 0 {
+            return Err(
+                "simulated XLSX first-cell read touched no selected worksheet range".into(),
+            );
+        }
+        verify_unselected_xlsx_ranges_untouched(metrics, "simulated XLSX first-cell read")?;
+        prove_xlsx_unselected_sheet_deferred(&workbook, &backing, metrics, spec)?;
+
+        if iteration >= warmup_iterations {
+            summary.record_xlsx(metrics);
+            summary.record_simulation(simulation);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result_with_source(
+        Case::XlsxRangeSourceFirstCell,
+        corpus,
+        elapsed,
+        summary,
+    ))
+}
+
+fn run_xlsx_range_source_narrow_column_range_scan(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    config: RangeSimulationConfig,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let range = format!("B1:B{}", spec.row_count);
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summary = SourceSummary::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let backing = xlsx_instrumented_source(corpus)?;
+        let source = simulated_source(backing.clone(), config);
+        let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+        let first = workbook
+            .sheet("Sheet1")?
+            .ok_or("simulated source-backed XLSX first sheet is missing")?;
+        source.reset()?;
+        let started = Instant::now();
+        let cells = first.cells(range.as_str())?;
+        let duration = started.elapsed();
+        if cells.len() != spec.row_count {
+            return Err("simulated XLSX narrow range count differs from specification".into());
+        }
+        for (row, cell) in cells.iter().enumerate() {
+            let expected_address = xlsx_address(row, 1)?;
+            let expected_value = xlsx_value(XlsxCoordinate {
+                sheet: 0,
+                row,
+                column: 1,
+            });
+            if cell.address.to_string() != expected_address
+                || !xlsx_source_cell_has_value(Some(&cell.cell), expected_value)
+            {
+                return Err(
+                    "simulated XLSX narrow range contents differ from specification".into(),
+                );
+            }
+        }
+        let metrics = backing.snapshot();
+        let simulation = source.snapshot()?;
+        verify_simulation_snapshot(&simulation, config, "simulated XLSX narrow range")?;
+        if metrics.xlsx.selected_worksheet.read_calls == 0 {
+            return Err("simulated XLSX narrow range touched no selected worksheet range".into());
+        }
+        verify_unselected_xlsx_ranges_untouched(metrics, "simulated XLSX narrow range")?;
+        prove_xlsx_unselected_sheet_deferred(&workbook, &backing, metrics, spec)?;
+
+        if iteration >= warmup_iterations {
+            summary.record_xlsx(metrics);
+            summary.record_simulation(simulation);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result_with_source(
+        Case::XlsxRangeSourceNarrowColumnRangeScan,
+        corpus,
+        elapsed,
+        summary,
+    ))
+}
+
 fn run_xlsx_noop_commit(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -2550,6 +3373,94 @@ fn opc_instrumented_source(
         )),
         target_range,
     ))
+}
+
+fn simulated_source(
+    backing: Arc<InstrumentedSource>,
+    config: RangeSimulationConfig,
+) -> Arc<SimulatedRangeSource> {
+    Arc::new(SimulatedRangeSource::new(backing, config))
+}
+
+fn verify_simulation_snapshot(
+    snapshot: &RangeSimulationSnapshot,
+    config: RangeSimulationConfig,
+    context: &str,
+) -> Result<(), Box<dyn Error>> {
+    if snapshot.logical_read_calls == 0
+        || snapshot.logical_read_bytes == 0
+        || snapshot.physical_request_count == 0
+        || snapshot.physical_request_bytes == 0
+    {
+        return Err(format!("{context} performed no simulated source I/O").into());
+    }
+    if snapshot.logical_read_bytes != snapshot.physical_request_bytes {
+        return Err(format!("{context} logical and physical byte totals differ").into());
+    }
+    if snapshot.physical_request_count != u64::try_from(snapshot.physical_request_sizes.len())?
+        || snapshot
+            .physical_request_sizes
+            .iter()
+            .any(|&bytes| bytes == 0 || bytes > config.max_physical_range_bytes as u64)
+    {
+        return Err(format!("{context} physical request distribution is invalid").into());
+    }
+    Ok(())
+}
+
+fn run_opc_range_source_open(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    config: RangeSimulationConfig,
+    read_main: bool,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let case = if read_main {
+        Case::OpcRangeSourceOpenMainRead
+    } else {
+        Case::OpcRangeSourceOpen
+    };
+    let cache_limits = opc_source_cache_limits(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (backing, _target_range) = opc_instrumented_source(corpus)?;
+        let source = simulated_source(backing.clone(), config);
+        let started = Instant::now();
+        let package =
+            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        if package.iter_parts().count() != corpus.manifest.entry_count {
+            return Err("simulated OPC source open part count differs from manifest".into());
+        }
+        if read_main {
+            std::hint::black_box(verify_opc_main_payload(&package, corpus)?);
+        }
+        let duration = started.elapsed();
+        let metrics = backing.snapshot();
+        let simulation = source.snapshot()?;
+        verify_simulation_snapshot(&simulation, config, "simulated OPC source open")?;
+
+        if !read_main {
+            let before_proof = source.snapshot()?;
+            std::hint::black_box(verify_opc_main_payload(&package, corpus)?);
+            let after_proof = source.snapshot()?;
+            if after_proof.physical_request_count <= before_proof.physical_request_count
+                || backing.snapshot().ordinary_payload_read_calls
+                    <= metrics.ordinary_payload_read_calls
+            {
+                return Err(
+                    "simulated OPC structural open had already materialized the main part".into(),
+                );
+            }
+        }
+
+        if iteration >= warmup_iterations {
+            source_summary.record_opc(metrics, u64::from(read_main));
+            source_summary.record_simulation(simulation);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result_with_source(case, corpus, elapsed, source_summary))
 }
 
 fn verify_opc_main_payload(
@@ -3161,6 +4072,7 @@ fn result(case: Case, corpus: &Corpus, elapsed: Vec<u64>, sink: Option<SinkSumma
         elapsed_ns: statistics(elapsed),
         sink,
         source: None,
+        execution: None,
     }
 }
 
@@ -3176,6 +4088,23 @@ fn result_with_source(
         elapsed_ns: statistics(elapsed),
         sink: None,
         source: Some(source),
+        execution: None,
+    }
+}
+
+fn result_with_execution(
+    case: Case,
+    corpus: &Corpus,
+    elapsed: Vec<u64>,
+    execution: ExecutionSummary,
+) -> CaseResult {
+    CaseResult {
+        case: case.name(),
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: None,
+        source: None,
+        execution: Some(execution),
     }
 }
 
@@ -3374,12 +4303,16 @@ fn write_report(report: &Report, output: Option<&PathBuf>) -> Result<(), Box<dyn
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Write, sync::Arc};
+    use std::{io::Write, sync::Arc, time::Duration};
+
+    use litchi_core::ReadAt;
 
     use super::{
-        Case, CorpusShape, CountingSink, InstrumentedSource, PayloadKind, SourceBackedPackage,
-        WriterShape, XlsxShape, build_cfb_corpus, build_opc_corpus, build_writer_corpus,
-        build_xlsx_corpus, payload_bytes, run_case, statistics,
+        Case, CorpusShape, CountingSink, InstrumentedSource, PayloadKind, RangeSimulationConfig,
+        RequestSizeBuckets, SimulatedRangeSource, SourceBackedPackage, WriterShape, XlsxShape,
+        build_cfb_corpus, build_opc_corpus, build_writer_corpus, build_xlsx_corpus, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config, run_scaling_case,
+        simulated_request_delay, statistics,
     };
 
     #[test]
@@ -3409,16 +4342,16 @@ mod tests {
 
     #[test]
     fn default_matrix_case_and_result_counts_are_stable() {
-        assert_eq!(Case::ALL.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 36);
         assert_eq!(
-            Case::ALL
+            Case::DEFAULT
                 .iter()
                 .filter(|case| case.uses_synthetic_opc())
                 .count(),
             10
         );
         assert_eq!(
-            Case::ALL
+            Case::DEFAULT
                 .iter()
                 .filter(|case| case.uses_synthetic_cfb())
                 .count(),
@@ -3531,7 +4464,7 @@ mod tests {
         assert_eq!(xlsx.source_members.shared_strings, None);
         assert_eq!(xlsx.source_members.styles.as_deref(), Some("xl/styles.xml"));
 
-        for case in Case::ALL.into_iter().filter(|case| case.uses_xlsx()) {
+        for case in Case::DEFAULT.into_iter().filter(|case| case.uses_xlsx()) {
             let measured = run_case(case, &first, 0, 1).unwrap();
             assert_eq!(measured.case, case.name());
             assert_eq!(measured.elapsed_ns.samples.len(), 1);
@@ -3689,6 +4622,143 @@ mod tests {
         assert!((measured.standard_deviation - 1.581_138_830_084_189_8).abs() < f64::EPSILON);
         assert!(measured.confidence_interval_95.lower < measured.mean);
         assert!(measured.confidence_interval_95.upper > measured.mean);
+    }
+
+    #[test]
+    fn range_simulator_delay_arithmetic_is_exact() {
+        let config = RangeSimulationConfig {
+            fixed_latency_us: 10,
+            request_overhead_us: 5,
+            bandwidth_bytes_per_second: 1_000,
+            max_physical_range_bytes: 4_096,
+        };
+
+        assert_eq!(
+            simulated_request_delay(config, 1_000),
+            Duration::from_micros(1_000_015)
+        );
+        assert_eq!(
+            simulated_request_delay(config, 1),
+            Duration::from_micros(1_015)
+        );
+    }
+
+    #[test]
+    fn range_simulator_chunks_and_reports_a_deterministic_distribution() {
+        let bytes = (0..10_000).map(|index| index as u8).collect::<Vec<_>>();
+        let backing = Arc::new(InstrumentedSource::new(bytes.clone(), Vec::new()));
+        let config = RangeSimulationConfig {
+            fixed_latency_us: 0,
+            request_overhead_us: 0,
+            bandwidth_bytes_per_second: 1_000_000_000,
+            max_physical_range_bytes: 4_096,
+        };
+        let source = SimulatedRangeSource::new(backing, config);
+
+        let mut output = vec![0; bytes.len()];
+        assert_eq!(source.read_at(0, &mut output).unwrap(), bytes.len());
+        assert_eq!(output, bytes);
+        let first = source.snapshot().unwrap();
+        assert_eq!(first.logical_read_calls, 1);
+        assert_eq!(first.logical_read_bytes, 10_000);
+        assert_eq!(first.physical_request_count, 3);
+        assert_eq!(first.physical_request_bytes, 10_000);
+        assert_eq!(first.physical_request_sizes, vec![1_808, 4_096, 4_096]);
+        assert_eq!(
+            first.physical_request_size_buckets,
+            RequestSizeBuckets {
+                bytes_513_to_4096: 3,
+                ..RequestSizeBuckets::default()
+            }
+        );
+
+        source.reset().unwrap();
+        assert_eq!(source.read_at(0, &mut output).unwrap(), bytes.len());
+        assert_eq!(source.snapshot().unwrap(), first);
+    }
+
+    #[test]
+    fn range_source_cases_emit_physical_metrics_and_preserve_xlsx_deferral() {
+        let config = RangeSimulationConfig {
+            fixed_latency_us: 0,
+            request_overhead_us: 0,
+            bandwidth_bytes_per_second: 1_000_000_000,
+            max_physical_range_bytes: 512,
+        };
+        let opc = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        for case in [Case::OpcRangeSourceOpen, Case::OpcRangeSourceOpenMainRead] {
+            let measured = run_case_with_config(case, &opc, 0, 1, config).unwrap();
+            let simulation = measured.source.unwrap().simulation.unwrap();
+            assert_eq!(simulation.logical_read_calls.len(), 1);
+            assert!(simulation.physical_request_count[0] > 0);
+            assert!(
+                simulation.physical_request_sizes[0]
+                    .iter()
+                    .all(|&bytes| bytes <= 512)
+            );
+        }
+
+        let xlsx = build_xlsx_corpus(XlsxShape::Tiny).unwrap();
+        for case in [
+            Case::XlsxRangeSourceOpen,
+            Case::XlsxRangeSourceListSheets,
+            Case::XlsxRangeSourceFirstCell,
+            Case::XlsxRangeSourceNarrowColumnRangeScan,
+        ] {
+            let measured = run_case_with_config(case, &xlsx, 0, 1, config).unwrap();
+            let source = measured.source.unwrap();
+            let simulation = source.simulation.unwrap();
+            assert_eq!(simulation.logical_read_calls.len(), 1);
+            assert_eq!(
+                source.xlsx.unwrap().unselected_worksheet_read_calls,
+                vec![0]
+            );
+            if case == Case::XlsxRangeSourceListSheets {
+                assert_eq!(simulation.logical_read_calls, vec![0]);
+                assert_eq!(simulation.physical_request_count, vec![0]);
+            } else {
+                assert!(simulation.physical_request_count[0] > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn execution_worker_selection_is_capped_deduplicated_and_sorted() {
+        let selected = resolve_execution_workers(["8", "1", "available", "2", "2"]).unwrap();
+        let available = std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
+
+        assert!(!selected.is_empty());
+        assert!(selected.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(selected.iter().all(|&workers| workers <= available));
+        assert_eq!(
+            selected,
+            resolve_execution_workers(["8", "1", "available", "2", "2"]).unwrap()
+        );
+    }
+
+    #[test]
+    fn explicit_scaling_cases_record_exact_work_units() {
+        let opc = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        let cfb = build_cfb_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        let results = [
+            run_scaling_case(Case::OpcOpenSessionScaling, &opc, 0, 1, 1).unwrap(),
+            run_scaling_case(Case::CfbBulkReadScaling, &cfb, 0, 1, 1).unwrap(),
+        ];
+
+        assert_eq!(results[0].execution.unwrap().worker_count, 1);
+        assert_eq!(
+            results[0].execution.unwrap().logical_tasks,
+            opc.manifest.archive_member_count
+        );
+        assert_eq!(results[1].execution.unwrap().worker_count, 1);
+        assert_eq!(
+            results[1].execution.unwrap().logical_tasks,
+            cfb.manifest.entry_count
+        );
+        assert_eq!(
+            results[1].execution.unwrap().logical_bytes,
+            cfb.manifest.uncompressed_payload_bytes as u64
+        );
     }
 
     #[test]

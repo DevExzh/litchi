@@ -1,0 +1,18 @@
+Profile: heaptrack-raw-opc-before.gz.zst
+Binary: target/perf/raw_opc_before_d6bd13c90
+Binary SHA-256: f0ecff68ad8a63a2f11f91360579ce0008170c0a6d16890cdd12ff7adebcbcb5
+Command: --warmup 0 --samples 1 --case opc_mutated_save --shape few-large --payload incompressible
+
+total runtime: 0.759000s
+calls to allocation functions: 737
+temporary memory allocations: 123
+peak heap memory consumption: 89.29M
+peak RSS (including heaptrack overhead): 100.13M
+total memory leaked: 1.78K
+
+Relevant peak attribution:
+- 17.09M in the full-rewrite Deflate/PhysPkgWriter/PackageWriter::to_bytes path.
+- 34.19M combined RawVec growth attribution across 66 calls.
+
+Generated with heaptrack and summarized with:
+heaptrack_print -p 0 -a 0 -T 0
