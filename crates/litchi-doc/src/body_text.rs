@@ -3600,13 +3600,15 @@ mod tests {
     use crate::writer::{
         CharacterFormatting, FloatingPosition, ParagraphFormatting, Picture, TextRevision, Writer,
     };
-    use litchi_cfb::OleWriter;
+    use litchi_cfb::{OleFile, OleWriter};
     use litchi_core::Position;
     use litchi_core::patch::{
         BlobLimits, CompositionLimits, HistoryLimits, Patch, PatchLimits, Reversible,
         SubEditJoinFailure,
     };
+    use litchi_ole_common::object::{Editor as PackageEditor, Targets};
     use std::io::Cursor;
+    use std::sync::Arc;
 
     fn doc(paragraphs: &[&str]) -> Vec<u8> {
         let mut writer = Writer::new();
@@ -3623,6 +3625,16 @@ mod tests {
             .write_to(&mut output)
             .expect("fixture DOC must serialize");
         output.into_inner()
+    }
+
+    fn doc_with_opaque_stream(paragraphs: &[&str]) -> Vec<u8> {
+        let mut package =
+            PackageEditor::open(doc(paragraphs), Targets::default(), Limits::default())
+                .expect("fixture package should open");
+        package
+            .add_stream(vec!["OpaqueVendorData".to_string()], b"untouched".to_vec())
+            .expect("opaque stream should be admitted");
+        package.finish().expect("fixture package should finish")
     }
 
     fn picture_doc(floating: bool) -> Vec<u8> {
@@ -3789,6 +3801,74 @@ mod tests {
 
         let other = Snapshot::open(doc(&["other"]), Limits::default()).expect("other source");
         assert!(matches!(commit.patch().apply(&other), Err(Error::Conflict)));
+    }
+
+    #[test]
+    fn empty_and_same_text_commits_share_exact_source_allocations() {
+        let source =
+            Snapshot::from_bytes(doc(&["alpha", "bravo"])).expect("owned source should open");
+        let source_bytes = source.bytes_shared();
+
+        let empty = source.edit().expect("empty edit").commit().expect("no-op");
+        assert!(!empty.changed());
+        assert!(empty.patch().is_noop());
+        assert_eq!(empty.patch().changes().len(), 0);
+        assert!(Arc::ptr_eq(&source_bytes, &empty.snapshot().bytes_shared()));
+        let applied = empty.patch().apply(&source).expect("no-op patch applies");
+        assert!(Arc::ptr_eq(&source_bytes, &applied.bytes_shared()));
+        let restored = empty
+            .patch()
+            .inverse()
+            .apply(&applied)
+            .expect("no-op inverse applies");
+        assert!(Arc::ptr_eq(&source_bytes, &restored.bytes_shared()));
+
+        let mut same_text = source.edit().expect("same-text edit");
+        same_text
+            .replace_paragraph(Position::new(0), "alpha")
+            .expect("same text is accepted");
+        let same_text = same_text.commit().expect("same-text no-op");
+        assert!(!same_text.changed());
+        assert_eq!(same_text.patch().changes().len(), 0);
+        assert!(Arc::ptr_eq(
+            &source_bytes,
+            &same_text.snapshot().bytes_shared()
+        ));
+    }
+
+    #[test]
+    fn paragraph_commit_preserves_every_unmodeled_stream_payload() {
+        let source = Snapshot::from_bytes(doc_with_opaque_stream(&["alpha", "bravo"]))
+            .expect("source with opaque stream should open");
+        let mut edit = source.edit().expect("edit should open");
+        edit.replace_paragraph(Position::new(0), "alpha expanded")
+            .expect("paragraph replacement should stage");
+        let commit = edit.commit().expect("changed package should reopen");
+
+        let mut before =
+            OleFile::open(Cursor::new(source.bytes())).expect("source CFB should open");
+        let mut after =
+            OleFile::open(Cursor::new(commit.snapshot().bytes())).expect("changed CFB should open");
+        let before_paths = before.list_streams();
+        assert_eq!(after.list_streams(), before_paths);
+        for path in before_paths {
+            if matches!(
+                path.last().map(String::as_str),
+                Some("WordDocument" | "0Table" | "1Table")
+            ) {
+                continue;
+            }
+            let path = path.iter().map(String::as_str).collect::<Vec<_>>();
+            assert_eq!(
+                before
+                    .open_stream(&path)
+                    .expect("source stream should read"),
+                after
+                    .open_stream(&path)
+                    .expect("changed stream should read"),
+                "unmodeled stream payload changed at {path:?}"
+            );
+        }
     }
 
     #[test]

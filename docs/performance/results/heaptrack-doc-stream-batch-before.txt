@@ -1,0 +1,19 @@
+Profile: /tmp/doc-stream-batch-before.heaptrack.zst
+Binary: /tmp/litchi-perf-before-doc-4c4e81a87
+Binary SHA-256: edb3a8100249e7e17ec761e149b5bd77e8ba6061d6168b4e34ebaa041db45b05
+Command: --warmup 2 --samples 20 --case doc_semantic_one_edit_save --writer-shape large
+
+total runtime: 0.596000s
+calls to allocation functions: 1173837
+temporary memory allocations: 668178
+peak heap memory consumption: 4.38M
+peak RSS (including heaptrack overhead): 15.90M
+total memory leaked: 544B
+
+Filtering allocation stacks through
+litchi_ole_common::object::editor::Editor::commit_candidate reported 3565
+calls at the leading RawVec growth site.
+
+Generated with heaptrack and summarized with:
+heaptrack_print -p 0 -a 0 -T 0
+heaptrack_print -p 0 -a -T 0 -n 8 --filter-bt-function litchi_ole_common::object::editor::Editor::commit_candidate

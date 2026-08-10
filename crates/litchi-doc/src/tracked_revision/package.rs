@@ -25,6 +25,8 @@ use crate::sprm_operations::{
 };
 use crate::writer::ChpxFkpBuilder;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+use smallvec::SmallVec;
+use std::sync::Arc;
 
 /// Exact, deliberately narrow picture dependency closure shared with the
 /// ordinary body transaction. The wire blocks are accepted only after they
@@ -2607,23 +2609,30 @@ impl RevisionEditor {
     }
 
     fn commit(&mut self) -> Result<()> {
-        self.package
-            .put_stream(&self.word_path, self.word.clone())
-            .map_err(PackageError::from)?;
-        self.package
-            .put_stream(&self.table_path, self.table.clone())
-            .map_err(PackageError::from)?;
+        let mut replacements: SmallVec<[(&[String], Arc<[u8]>); 3]> = SmallVec::new();
+        replacements.push((
+            self.word_path.as_slice(),
+            Arc::<[u8]>::from(self.word.clone()),
+        ));
+        replacements.push((
+            self.table_path.as_slice(),
+            Arc::<[u8]>::from(self.table.clone()),
+        ));
         if self.data_changed {
             if self.package.stream(&self.data_path).is_some() {
-                self.package
-                    .put_stream(&self.data_path, self.data.clone())
-                    .map_err(PackageError::from)?;
+                replacements.push((
+                    self.data_path.as_slice(),
+                    Arc::<[u8]>::from(self.data.clone()),
+                ));
             } else {
                 self.package
                     .add_stream(self.data_path.clone(), self.data.clone())
                     .map_err(PackageError::from)?;
             }
         }
+        self.package
+            .put_streams_shared(replacements)
+            .map_err(PackageError::from)?;
         self.changed = true;
         Ok(())
     }

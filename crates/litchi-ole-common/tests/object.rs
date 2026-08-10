@@ -353,6 +353,86 @@ fn shared_stream_replacement_reuses_validated_allocation() {
 }
 
 #[test]
+fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let word_path = vec!["WordDocument".to_string()];
+    let preview_path = vec![
+        "ObjectPool".to_string(),
+        "_42".to_string(),
+        "\u{3}PRINT".to_string(),
+    ];
+    let word: Arc<[u8]> = Arc::from(&b"batched word stream"[..]);
+    let preview: Arc<[u8]> = Arc::from(&b"batched preview stream"[..]);
+    let mut noop = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("no-op editor should open");
+    let original_word = noop
+        .stream_shared(&word_path)
+        .expect("original WordDocument should be available");
+    noop.put_streams_shared([(word_path.as_slice(), Arc::clone(&original_word))])
+        .expect("identical batch should be a no-op");
+    assert!(!noop.is_changed());
+    assert!(Arc::ptr_eq(
+        &original_word,
+        &noop
+            .stream_shared(&word_path)
+            .expect("no-op WordDocument should remain available")
+    ));
+    assert_eq!(noop.finish().expect("no-op batch stays exact"), original);
+
+    let mut sequential = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("sequential editor should open");
+    sequential
+        .put_stream_shared(&word_path, Arc::clone(&word))
+        .expect("first sequential stream should commit");
+    sequential
+        .put_stream_shared(&preview_path, Arc::clone(&preview))
+        .expect("second sequential stream should commit");
+    let sequential = sequential
+        .finish()
+        .expect("sequential editor should finish");
+
+    let mut editor = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("editor should open");
+    editor
+        .put_streams_shared([
+            (word_path.as_slice(), Arc::clone(&word)),
+            (preview_path.as_slice(), Arc::clone(&preview)),
+        ])
+        .expect("stream batch should commit");
+    assert!(Arc::ptr_eq(
+        &word,
+        &editor
+            .stream_shared(&word_path)
+            .expect("WordDocument should remain available")
+    ));
+    assert!(Arc::ptr_eq(
+        &preview,
+        &editor
+            .stream_shared(&preview_path)
+            .expect("preview should remain available")
+    ));
+    assert_eq!(
+        editor.finish().expect("batched editor should finish"),
+        sequential
+    );
+
+    let missing_path = vec!["missing".to_string()];
+    let mut failed = Editor::open(original.clone(), selected, Limits::default())
+        .expect("second editor should open");
+    assert!(
+        failed
+            .put_streams_shared([
+                (word_path.as_slice(), Arc::clone(&word)),
+                (missing_path.as_slice(), Arc::clone(&preview)),
+            ])
+            .is_err()
+    );
+    assert!(!failed.is_changed());
+    assert_eq!(failed.finish().expect("failed batch stays exact"), original);
+}
+
+#[test]
 fn add_and_remove_use_explicit_targets() {
     let original = doc_with_object(&[0, 0, 0, 0]);
     let mut editor = Editor::open(

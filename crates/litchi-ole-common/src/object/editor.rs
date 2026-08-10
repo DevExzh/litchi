@@ -204,6 +204,45 @@ impl Editor {
         Ok(())
     }
 
+    /// Replaces existing streams in one failure-atomic CFB publication.
+    ///
+    /// Replacements are applied in iterator order to one isolated candidate.
+    /// Repeated paths therefore retain the last supplied value. The candidate
+    /// is rendered, reopened, and published only once after every replacement
+    /// has passed the configured stream and package bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the batch exceeds the package stream-count bound,
+    /// a stream is missing or oversized, or the final rendered package fails
+    /// validation. Failure leaves this editor unchanged.
+    pub fn put_streams_shared<'a>(
+        &mut self,
+        replacements: impl IntoIterator<Item = (&'a [String], Arc<[u8]>)>,
+    ) -> Result<(), OleError> {
+        let mut candidate = None;
+        for (index, (path, data)) in replacements.into_iter().enumerate() {
+            if index >= self.limits.max_streams {
+                return Err(OleError::InvalidFormat(
+                    "stream replacement batch exceeds package stream-count limit".into(),
+                ));
+            }
+            if candidate
+                .as_ref()
+                .map_or_else(|| self.stream(path), |editor: &Self| editor.stream(path))
+                .is_some_and(|current| current == data.as_ref())
+            {
+                continue;
+            }
+            let candidate = candidate.get_or_insert_with(|| self.clone());
+            candidate.package.put_stream(path, data, self.limits)?;
+        }
+        if let Some(candidate) = candidate {
+            *self = candidate.commit_candidate()?;
+        }
+        Ok(())
+    }
+
     /// Adds an opaque package stream below an existing CFB storage.
     ///
     /// # Errors
