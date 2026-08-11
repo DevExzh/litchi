@@ -1,0 +1,23 @@
+--- control: litchi_ods::facade::Spreadsheet::cell
++++ candidate: litchi_ods::facade::Spreadsheet::cell
+@@ -31,7 +31,7 @@
+ mov    0x8(%r15,%r14,1),%rdi
+ mov    %rbx,%rsi
+ mov    %rbp,%rdx
+-call   *0xe5e808(%rip)        # <bcmp@GLIBC_2.2.5>
++call   *0xe5f418(%rip)        # <bcmp@GLIBC_2.2.5>
+ test   %eax,%eax
+ jne    <_ZN10litchi_ods6facade11Spreadsheet4cell17hc84e07cc6ceaf792E+0x50>
+ mov    0x20(%rsp),%rbx
+@@ -211,9 +211,9 @@
+ mov    %rax,%rdx
+ mov    $0x1,%eax
+ jmp    <_ZN10litchi_ods6facade11Spreadsheet4cell17hc84e07cc6ceaf792E+0x153>
+-lea    0xe27afa(%rip),%rdx        # <anon.e92f270c3d8622b9348df62cdb62289f.111.llvm.11498457496735407577+0x90>
++lea    0xe286ca(%rip),%rdx        # <anon.e92f270c3d8622b9348df62cdb62289f.111.llvm.11498457496735407577+0x90>
+ mov    %r12,%rdi
+-call   *0xe5e511(%rip)        # <_DYNAMIC+0x320>
++call   *0xe5f121(%rip)        # <_DYNAMIC+0x320>
+ Disassembly of section .init:
+ Disassembly of section .fini:
+ Disassembly of section .plt:

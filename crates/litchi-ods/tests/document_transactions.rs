@@ -130,6 +130,32 @@ fn formula_patch(snapshot: &Snapshot, formula: &str) -> Result<litchi_ods::docum
 }
 
 #[test]
+fn worksheet_noop_publishes_a_canonical_reversible_exact_patch() -> Result<()> {
+    let source = source()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.worksheets(|_worksheets| Ok(()))?;
+
+    let commit = edit.commit()?;
+    assert!(!commit.changed());
+    assert_eq!(commit.snapshot().as_bytes(), source);
+    assert!(commit.patch().operations().is_empty());
+
+    let wire = commit.patch().to_deterministic_json()?;
+    assert_eq!(wire, commit.patch().inverse().to_deterministic_json()?);
+    let decoded = litchi_ods::document::Patch::from_deterministic_json(&wire, snapshot.limits())?;
+    assert!(!decoded.changed());
+    assert!(decoded.operations().is_empty());
+    assert_eq!(decoded.to_deterministic_json()?, wire);
+    assert_eq!(decoded.apply(&snapshot)?.snapshot().as_bytes(), source);
+    assert_eq!(
+        decoded.inverse().apply(&snapshot)?.snapshot().as_bytes(),
+        source
+    );
+    Ok(())
+}
+
+#[test]
 fn join_is_deterministic_and_three_way_conflicts_are_explicit() -> Result<()> {
     let snapshot = Snapshot::from_bytes(source()?)?;
     let left = formula_patch(&snapshot, "of:=1")?;

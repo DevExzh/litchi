@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "0e31859fbb67f69dc4b0b48ad7e5eff75d9044bb",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1"
+  },
+  "configuration": {
+    "samples_per_case": 20,
+    "warmup_iterations_per_case": 0,
+    "cases": [
+      "ods_semantic_noop_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "semantic_shapes": [
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ]
+  },
+  "results": [
+    {
+      "case": "ods_semantic_noop_edit_save",
+      "corpus": {
+        "name": "ods-semantic-large",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 32768,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 1769472,
+        "archive_bytes": 98892,
+        "archive_sha256": "7f0c43561602aedac7c5e91915f55b3515371d327ae69ac7fc0fe42b655db3f2",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          49625530,
+          50042384,
+          50246096,
+          50270658,
+          50305687,
+          50389713,
+          50404643,
+          50409400,
+          50567848,
+          50680763,
+          50756398,
+          51234817,
+          51598938,
+          52169716,
+          52750276,
+          52779996,
+          52877290,
+          53111773,
+          53646191,
+          53809235
+        ],
+        "min": 49625530,
+        "p50": 50718580,
+        "p95": 53646191,
+        "p99": 53809235,
+        "max": 53809235,
+        "mean": 51383867.599999994,
+        "standard_deviation": 1332925.0239687741,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 50760046.65554776,
+          "upper": 52007688.54445223
+        }
+      },
+      "sink": null
+    }
+  ]
+}
