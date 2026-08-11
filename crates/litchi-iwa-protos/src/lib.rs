@@ -353,6 +353,48 @@ mod buffa_numbers_table_title_generated {
     ));
 }
 
+/// Private lazy-view roots for Numbers table-cell storage envelopes.
+#[doc(hidden)]
+mod buffa_numbers_table_cell_storage_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-table-cell-storage/iwa_numbers_table_cell_storage_buffa_protos.rs"
+    ));
+}
+
+/// Private lazy-view roots for Numbers formula dependency envelopes.
+#[doc(hidden)]
+mod buffa_numbers_table_cell_dependency_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-table-cell-dependency/iwa_numbers_table_cell_dependency_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for `TST.TableInfoArchive.table_model`.
 ///
 /// The required drawable base archive and all unselected table metadata remain
@@ -690,6 +732,14 @@ pub mod numbers_table_header_settings_codec;
 /// private and caller-owned source bytes remain the rewrite authority.
 #[doc(hidden)]
 pub mod numbers_table_title_codec;
+
+/// Strict generated-free Numbers table-cell storage projection.
+#[doc(hidden)]
+pub mod numbers_table_cell_storage_codec;
+
+/// Strict generated-free Numbers table-cell dependency/cache projection.
+#[doc(hidden)]
+pub mod numbers_table_cell_dependency_codec;
 
 /// Internal Keynote slide-transition projection implemented by a private
 /// Buffa lazy-view sidecar. Generated types remain inaccessible downstream.

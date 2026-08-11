@@ -1,0 +1,69 @@
+// Read-only dependency/cache projections for a Numbers scalar-cell mutation.
+// Repeated dependency records are streamed by the strict generated-free codec;
+// Buffa observes only bounded scalar and singular-envelope roots.
+syntax = "proto2";
+package LitchiIwaTableCellDependencyProjection;
+
+message CalculationEngineArchive {
+  optional bool base_date_1904 = 1;
+  required bytes dependency_tracker = 2;
+  optional bytes named_reference_manager = 3;
+  optional bytes remote_data_store = 12;
+  optional bytes header_name_manager = 14;
+  optional bytes refs_to_dirty = 15;
+}
+
+message DependencyTrackerArchive {
+  optional bytes owner_id_map = 3;
+  optional uint64 number_of_formulas = 5;
+}
+
+message FormulaOwnerDependenciesArchive {
+  required bytes formula_owner_uid = 1;
+  required uint32 internal_formula_owner_id = 2;
+  optional uint32 owner_kind = 3;
+  optional bytes cell_dependencies = 4;
+  optional bytes range_dependencies = 5;
+  optional bytes volatile_dependencies = 6;
+  optional bytes spanning_column_dependencies = 7;
+  optional bytes spanning_row_dependencies = 8;
+  optional bytes whole_owner_dependencies = 9;
+  optional bytes cell_errors = 10;
+  optional bytes formula_owner = 11;
+  optional bytes base_owner_uid = 12;
+  optional bytes tiled_cell_dependencies = 13;
+  optional bytes uuid_references = 14;
+  optional bytes tiled_range_dependencies = 15;
+  optional bytes spill_range_sizes = 16;
+}
+
+message CellRecordArchive {
+  required uint32 column = 1;
+  required uint32 row = 2;
+  optional uint64 dirty_self_plus_precedents_count = 3;
+  optional bool is_in_a_cycle = 4;
+  optional bool has_calculated_precedents = 5;
+  optional bytes expanded_edges = 6;
+}
+
+message CellRecordTileArchive {
+  required uint32 internal_owner_id = 1;
+  required uint32 tile_column_begin = 2;
+  required uint32 tile_row_begin = 3;
+}
+
+message RangeBackDependencyArchive {
+  required uint32 cell_coord_row = 1;
+  required uint32 cell_coord_column = 2;
+  optional bytes range_reference = 3;
+  optional bytes internal_range_reference = 4;
+}
+
+message RangePrecedentsTileArchive {
+  required uint32 to_owner_id = 1;
+}
+
+message FromToRangeArchive {
+  required bytes from_coord = 1;
+  required bytes refers_to_rect = 2;
+}
