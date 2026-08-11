@@ -23,11 +23,11 @@ default 36 cases / 198 records.
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one low-level source-overlay save
-case, one source-backed DOCX semantic publication case, one XLSX commit/read
-attribution case,
+case, one source-backed DOCX semantic publication case, one eager media-rich
+PPTX source-edit control, one XLSX commit/read attribution case,
 four opaque-heavy common OLE2 stage/edit-save cases, 20 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, seven RTF semantic cases, and 25 ODF semantic cases
-are opt-in, for 119 selectable cases in total:
+are opt-in, for 120 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -94,6 +94,22 @@ public migration through `SourceBackedPackage::into_opc_package`, one semantic
 paragraph transaction, and sequential publication. Complete DOCX readback,
 media and topology checks, patch/inverse/stale checks, and output hashing stay
 outside timing.
+
+Measure the media-rich PPTX source-backed semantic-edit control:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 --case pptx_source_backed_one_edit_save \
+  --json target/perf/pptx-source-edit.json
+```
+
+The fixed corpus has 200 slides, eight deterministic text boxes per slide, and
+eight deterministic incompressible 2 MiB inert PNG media parts. This opt-in
+control times positional open, the eager public migration through
+`SourceBackedPackage::into_opc_package`, one opened-presentation shape edit,
+and `to_bytes` publication into a bounded sequential sink. Full PPTX semantic
+readback plus exact Part topology, relationships, content types, unselected
+payload/media, source/output hashes, and source/sink checks remain untimed.
 
 For just the end-to-end legacy writer packaging runs:
 
@@ -444,6 +460,13 @@ remain distinguishable.
   reports one semantic Part materialization per sample;
   complete paragraph/media/topology and reversible-patch checks remain
   untimed.
+- `pptx_source_backed_one_edit_save`: on a fixed 200-slide PPTX with eight text
+  boxes per slide and eight incompressible 2 MiB inert PNG parts, time
+  positional open, eager `SourceBackedPackage::into_opc_package` migration,
+  one opened-presentation shape transaction, and `to_bytes` publication through
+  a bounded sequential sink. The path reports every eager ordinary Part
+  materialization per sample; full PPTX readback and exact topology,
+  relationship, content-type, unselected-Part, and media checks remain untimed.
 - `cfb_open`: parse the complete generated container into `litchi_cfb::OleFile`.
 - `cfb_list_streams`: enumerate and materialize all stream paths from an
   already-open CFB container.
@@ -719,6 +742,12 @@ distributions, and `ordinary_payload_materializations`. Its value is exactly
 one per sample: the raw main document is loaded for semantic selection while
 the eight media payloads and every other unselected member remain physically
 source-backed through publication.
+
+`pptx_source_backed_one_edit_save` also emits deterministic `output_sha256`,
+source/sink distributions, and `ordinary_payload_materializations`. Its value
+is exactly the corpus `entry_count` per sample because the current eager
+`into_opc_package` control materializes every ordinary Part before the opened
+PPTX transaction; no opaque physical members are included in this corpus.
 
 ## External profiling
 
