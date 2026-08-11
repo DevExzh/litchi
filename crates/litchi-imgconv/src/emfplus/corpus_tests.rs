@@ -101,7 +101,7 @@ struct CorpusCoverage {
 
 fn corpus_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/emfio/qa/cppunit/emf/data")
+        .join("../../test-data/libreoffice-core/emfio/qa/cppunit/emf/data")
 }
 
 fn read_fixture(name: &str) -> Vec<u8> {

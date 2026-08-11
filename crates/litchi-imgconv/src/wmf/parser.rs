@@ -667,7 +667,7 @@ mod tests {
         assert!(
             WmfParser::new(include_bytes!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../../3rdparty/libreoffice-core/vcl/qa/cppunit/data/roundtrip.wmf"
+                "/../../test-data/libreoffice-core/vcl/qa/cppunit/data/roundtrip.wmf"
             )))
             .is_err()
         );

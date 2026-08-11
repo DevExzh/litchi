@@ -21,10 +21,10 @@ const FIXTURE_LIMITS: Limits = Limits {
     max_total_source_bytes: 32 * 1024,
 };
 
-const WORD: &[u8] = include_bytes!("../../../3rdparty/poi/test-data/document/SimpleMacro.vba");
-const EXCEL: &[u8] = include_bytes!("../../../3rdparty/poi/test-data/spreadsheet/SimpleMacro.vba");
+const WORD: &[u8] = include_bytes!("../../../test-data/poi/test-data/document/SimpleMacro.vba");
+const EXCEL: &[u8] = include_bytes!("../../../test-data/poi/test-data/spreadsheet/SimpleMacro.vba");
 const POWERPOINT: &[u8] =
-    include_bytes!("../../../3rdparty/poi/test-data/slideshow/SimpleMacro.vba");
+    include_bytes!("../../../test-data/poi/test-data/slideshow/SimpleMacro.vba");
 
 #[test]
 fn real_word_vba_source_is_bounded_and_lossless() {

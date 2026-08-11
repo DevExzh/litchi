@@ -35,18 +35,18 @@ fn mathml_two_content_arity_and_value_domains_are_enforced() {
 #[test]
 fn checked_in_libreoffice_mathml_samples_validate() {
     let samples = [
-        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/simple.mml"),
-        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/mspace.mml"),
-        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/color.mml"),
-        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf103430.mml"),
-        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf103500.mml"),
-        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/hadd.mml"),
-        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/maj.mml"),
+        include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/simple.mml"),
+        include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/mspace.mml"),
+        include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/color.mml"),
+        include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf103430.mml"),
+        include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf103500.mml"),
+        include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/hadd.mml"),
+        include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/maj.mml"),
         include_str!(
-            "../../../3rdparty/libreoffice-core/starmath/qa/extras/data/ns-prefix-math.mml"
+            "../../../test-data/libreoffice-core/starmath/qa/extras/data/ns-prefix-math.mml"
         ),
-        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf137008.mml"),
-        include_str!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf99556-1.mml"),
+        include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf137008.mml"),
+        include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf99556-1.mml"),
     ];
     for sample in samples {
         let root = codec::parse(sample).expect("checked-in MathML fixture");

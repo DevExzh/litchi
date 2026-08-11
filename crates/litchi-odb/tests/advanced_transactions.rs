@@ -326,7 +326,7 @@ fn every_authored_fragment_family_rejects_invalid_raw_scalar_or_markup() {
 )]
 fn signed_real_odb_is_inventoried_and_changed_publication_is_refused() {
     let database = Database::from_bytes(Vec::from(include_bytes!(
-        "../../../3rdparty/libreoffice-core/xmlsecurity/qa/unit/signing/data/odb_signed_macros.odb"
+        "../../../test-data/libreoffice-core/xmlsecurity/qa/unit/signing/data/odb_signed_macros.odb"
     )))
     .unwrap();
     assert!(database.protection_status().unwrap().is_signed());
@@ -975,7 +975,7 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
 )]
 fn genuine_base_report_inventory_final_scopes_formatted_payload_transfer() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb");
+        .join("../../test-data/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb");
     let donor = Database::open(path).unwrap();
     let dependencies = donor
         .component_dependencies(ComponentKind::Report, "BasicFields")
@@ -1390,9 +1390,9 @@ fn multiple_genuine_libreoffice_base_packages_survive_changed_full_reopen() {
     use litchi_odf_common::core::OwnedPackage;
 
     let fixtures = [
-        "../../3rdparty/libreoffice-core/extras/source/database/biblio.odb",
-        "../../3rdparty/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb",
-        "../../3rdparty/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb",
+        "../../test-data/libreoffice-core/extras/source/database/biblio.odb",
+        "../../test-data/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb",
+        "../../test-data/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb",
     ];
     for (index, relative) in fixtures.into_iter().enumerate() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(relative);

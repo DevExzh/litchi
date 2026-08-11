@@ -94,7 +94,7 @@ fn transaction_preserves_auxiliary_members() {
 #[test]
 fn changed_libreoffice_formula_reopens_with_non_content_members_exact() {
     let bytes =
-        include_bytes!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf151842.odf");
+        include_bytes!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf151842.odf");
     let source = Formula::from_bytes(bytes.to_vec()).expect("LibreOffice source");
     let original = OwnedPackage::from_bytes(bytes.to_vec()).expect("raw source package");
     let mut token_edit = source.edit();
@@ -230,9 +230,9 @@ fn checked_limit_builders_reject_zero_and_hard_ceiling_overflow() {
 fn libreoffice_formula_fixtures_open_and_remain_byte_exact() {
     let fixtures: [&[u8]; 2] = [
         include_bytes!(
-            "../../../3rdparty/libreoffice-core/starmath/qa/cppunit/data/font-styles.odf"
+            "../../../test-data/odf/native-resave/source/font-styles.odf"
         ),
-        include_bytes!("../../../3rdparty/libreoffice-core/starmath/qa/extras/data/tdf151842.odf"),
+        include_bytes!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf151842.odf"),
     ];
 
     for bytes in fixtures {

@@ -164,7 +164,7 @@ fn arbitrary_byte_stream_fuzz_corpus_is_panic_free_and_repeatable() {
 #[test]
 fn second_changed_libreoffice_package_reopens_with_auxiliary_payloads_exact() {
     let bytes = include_bytes!(
-        "../../../3rdparty/libreoffice-core/starmath/qa/cppunit/data/font-styles.odf"
+        "../../../test-data/odf/native-resave/source/font-styles.odf"
     );
     let source = Formula::from_bytes(bytes.to_vec()).expect("LibreOffice source");
     let original = OwnedPackage::from_bytes(bytes.to_vec()).expect("raw source package");

@@ -55,7 +55,7 @@ fn real_libreoffice_schema_exposes_columns_without_connecting() {
 #[test]
 fn real_libreoffice_reports_are_typed_inert_components() {
     let database = Database::from_bytes(Vec::from(include_bytes!(
-        "../../../3rdparty/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb"
+        "../../../test-data/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb"
     )))
     .unwrap();
     let catalog = database.catalog().unwrap();
