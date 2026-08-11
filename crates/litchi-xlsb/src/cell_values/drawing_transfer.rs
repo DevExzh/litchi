@@ -1936,7 +1936,7 @@ mod tests {
     fn missing_and_non_hyperlink_shape_relationships_are_precise_refusals() {
         let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
-            .join("3rdparty/poi/test-data/spreadsheet/testVarious.xlsb");
+            .join("test-data/poi/test-data/spreadsheet/testVarious.xlsb");
         let source = Workbook::new(std::fs::File::open(fixture).expect("drawing fixture"))
             .expect("drawing workbook");
         let target_plan = empty_target_plan();

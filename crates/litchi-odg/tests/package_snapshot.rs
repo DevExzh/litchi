@@ -12,34 +12,34 @@ const CONTENT: &str =
     include_str!("../../../test-data/odf/odg/drawing-style-resources-content.xml");
 const STYLES: &str = include_str!("../../../test-data/odf/odg/drawing-style-resources-styles.xml");
 const LIBREOFFICE_ODG: &[u8] = include_bytes!(
-    "../../../3rdparty/libreoffice-core/xmlsecurity/doc/OpenDocumentSignatures-Workflow.odg"
+    "../../../test-data/libreoffice-core/xmlsecurity/doc/OpenDocumentSignatures-Workflow.odg"
 );
 const REAL_DRAW_CORPUS: &[(&str, &[u8])] = &[
     (
         "blank",
-        include_bytes!("../../../3rdparty/libreoffice-core/desktop/qa/data/BlankDrawDocument.odg"),
+        include_bytes!("../../../test-data/libreoffice-core/desktop/qa/data/BlankDrawDocument.odg"),
     ),
     (
         "three-page",
-        include_bytes!("../../../3rdparty/libreoffice-core/desktop/qa/data/3page.odg"),
+        include_bytes!("../../../test-data/libreoffice-core/desktop/qa/data/3page.odg"),
     ),
     (
         "transparent-fill",
         include_bytes!(
-            "../../../3rdparty/libreoffice-core/filter/qa/unit/data/semi-transparent-fill.odg"
+            "../../../test-data/libreoffice-core/filter/qa/unit/data/semi-transparent-fill.odg"
         ),
     ),
     (
         "fit-frame-text",
-        include_bytes!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/odg/FitToFrameText.odg"),
+        include_bytes!("../../../test-data/libreoffice-core/sd/qa/unit/data/odg/FitToFrameText.odg"),
     ),
     (
         "fontwork",
-        include_bytes!("../../../3rdparty/libreoffice-core/svx/qa/unit/data/FontWork.odg"),
+        include_bytes!("../../../test-data/libreoffice-core/svx/qa/unit/data/FontWork.odg"),
     ),
     (
         "complex-groups",
-        include_bytes!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/odg/rhbz1870501.odg"),
+        include_bytes!("../../../test-data/odf/native-resave/source/rhbz1870501.odg"),
     ),
 ];
 

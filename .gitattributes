@@ -10,6 +10,7 @@
 *.docx binary
 *.xlsx binary
 *.xlsb binary
+*.vba binary
 
 # OpenDocument
 *.odt binary

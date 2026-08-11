@@ -264,7 +264,7 @@ fn malformed_section_and_style_semantics_are_rejected() {
 #[test]
 fn original_libreoffice_odm_ingests_edits_and_reopens_without_repacking() {
     let original = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm"
+        "../../../test-data/libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm"
     );
     let master = Master::from_bytes(original.to_vec()).unwrap();
     assert_eq!(master.as_bytes(), original);

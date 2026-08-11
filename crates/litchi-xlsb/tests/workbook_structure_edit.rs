@@ -721,7 +721,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
 fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
     let source = Workbook::new(
         File::open(fixture(
-            "3rdparty/poi/test-data/spreadsheet/testVarious.xlsb",
+            "test-data/poi/test-data/spreadsheet/testVarious.xlsb",
         ))
         .expect("genuine hyperlink-shape fixture"),
     )
@@ -784,10 +784,10 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
 #[test]
 fn checked_in_unique_standard_drawing_corpus_transfers_every_anchor() {
     let corpus = [
-        "3rdparty/libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb",
-        "3rdparty/libreoffice-core/sc/qa/unit/data/xlsb/universal-content.xlsb",
-        "3rdparty/poi/test-data/spreadsheet/WithTextBox.xlsb",
-        "3rdparty/poi/test-data/spreadsheet/testVarious.xlsb",
+        "test-data/libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb",
+        "test-data/ooxml/xlsb/universal-content.xlsb",
+        "test-data/poi/test-data/spreadsheet/WithTextBox.xlsb",
+        "test-data/poi/test-data/spreadsheet/testVarious.xlsb",
     ];
     let mut transferred = 0usize;
     for relative in corpus {

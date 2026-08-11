@@ -12,7 +12,7 @@ use litchi_odm::{
 };
 
 const WRITER_ODM: &[u8] =
-    include_bytes!("../../../3rdparty/libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm");
+    include_bytes!("../../../test-data/libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm");
 
 fn authored_items() -> Vec<BodyItemSpec> {
     vec![
