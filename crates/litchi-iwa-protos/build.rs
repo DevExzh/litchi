@@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_title_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
@@ -75,6 +76,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         proto_directory,
         buffa_projection_directory,
     )?;
+    enforce_table_title_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_info_projection_provenance(proto_directory, buffa_projection_directory)?;
@@ -243,6 +245,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_table_header_settings_projection_budget(&buffa_table_header_settings_out_directory)?;
+
+    let buffa_table_title_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-title");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableTitleSettingsArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_table_title_out_directory)
+        .include_file("iwa_numbers_table_title_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_table_title_projection_budget(&buffa_table_title_out_directory)?;
 
     // Keynote's show reader projects only scalar settings, required direct
     // references, and presentation size. The repeated slide tree is routed by
@@ -846,6 +865,90 @@ optional bool repeating_header_columns_enabled = 32;\n\
             "derived Numbers table-header settings projection/codec drifted from TST.TableModelArchive scalar fields, exceeded its 1 KiB source budget, exposed generated code, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
+    }
+    Ok(())
+}
+
+fn enforce_table_title_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const TST_FIELDS: [&str; 5] = [
+        "optional bool table_name_enabled = 22;",
+        "optional .TSP.Reference table_name_style = 30;",
+        "optional double table_name_height = 33;",
+        "optional .TSP.Reference table_name_shape_style = 36;",
+        "optional bool table_name_border_enabled = 37;",
+    ];
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message TableTitleSettingsArchive {\n\
+optional bool table_name_enabled = 22;\n\
+optional fixed64 table_name_height_bits = 33;\n\
+optional bool table_name_border_enabled = 37;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 14] = [
+        "const TABLE_NAME_ENABLED_FIELD: u32 = 22;",
+        "const TABLE_NAME_STYLE_FIELD: u32 = 30;",
+        "const TABLE_NAME_HEIGHT_FIELD: u32 = 33;",
+        "const TABLE_NAME_SHAPE_STYLE_FIELD: u32 = 36;",
+        "const TABLE_NAME_BORDER_ENABLED_FIELD: u32 = 37;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;",
+        "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
+        "const MAX_RECURSION: u32 = 64;",
+        "const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;",
+        "const MIN_SIGN_EXTENDED_I32: u64 = 0xffff_ffff_8000_0000;",
+        "pub fn decode_table_title_settings(",
+        "pub fn decode_table_title_settings_with_report(",
+        "reference_projection::NumbersSheetReferenceArchiveLazyView<'_>",
+    ];
+    const PRIVATE_DECLARATIONS: [&str; 4] = [
+        "#[doc(hidden)]\nmod buffa_numbers_table_title_generated {",
+        "\"/buffa-numbers-table-title/iwa_numbers_table_title_buffa_protos.rs\"",
+        "pub mod numbers_table_title_codec;",
+        "mod buffa_numbers_sheet_order_generated {",
+    ];
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let canonical = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTableTitleSettingsArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let codec = fs::read_to_string("src/numbers_table_title_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if tsp.matches(TSP_REFERENCE).count() != 1
+        || !TST_FIELDS
+            .iter()
+            .all(|field| canonical.matches(field).count() == 1)
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 1024
+        || projection_schema.contains("repeated ")
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || !PRIVATE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || production_codec
+            .contains("buffa_numbers_sheet_order_generated::LitchiIwaProjection as projection")
+        || production_codec.contains("RepeatedView")
+        || production_codec.contains("LazyRepeatedView")
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err("Numbers table-title projection/codec drifted from the exact TST/TSP scalar routes, lost its private generated boundary or shared reference lazy view, introduced generated repeated storage, or added Prost/production encoding".into());
     }
     Ok(())
 }
@@ -1802,6 +1905,70 @@ fn enforce_table_header_settings_projection_budget(directory: &Path) -> Result<(
     {
         return Err(format!(
             "Numbers table-header settings projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_table_title_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: [&str; 5] = [
+        "LitchiIwaProjection.mod.rs",
+        "TSTTableTitleSettingsArchive.__lazy_view.rs",
+        "TSTTableTitleSettingsArchive.__view.rs",
+        "TSTTableTitleSettingsArchive.rs",
+        "iwa_numbers_table_title_buffa_protos.rs",
+    ];
+    // Buffa 0.9.1 emits 32,332 bytes for the three scalar fields. Keep less
+    // than 1.5 KiB of formatter/generator headroom; the digest below detects
+    // even a within-cap change.
+    const MAX_GENERATED_BYTES: u64 = 33 * 1024;
+    const EXPECTED_DIGEST: &str =
+        "56cfd70666ffa6079175bdab0a63a4ddd055099edf3c771ed3ad8b3051596ee1";
+
+    let mut entries = fs::read_dir(directory)?
+        .map(|result| result.map(|entry| (entry.file_name(), entry.path(), entry.file_type())))
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut names = Vec::new();
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut digest = Sha256::new();
+    for (file_name, path, file_type_result) in entries {
+        if !file_type_result?.is_file() {
+            continue;
+        }
+        let name = file_name
+            .into_string()
+            .map_err(|_name| "Numbers table-title generated a non-UTF-8 filename")?;
+        let generated = fs::read(&path)?;
+        let text = std::str::from_utf8(&generated)?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("Numbers table-title generated byte count overflow")?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("Numbers table-title repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("Numbers table-title lazy-repeated-view count overflow")?;
+        digest.update(generated);
+        names.push(name);
+    }
+    let aggregate_digest = digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if names.as_slice() != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+        || aggregate_digest != EXPECTED_DIGEST
+    {
+        return Err(format!(
+            "Numbers table-title projection generated {names:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected {EXPECTED_FILES:?}, at most {MAX_GENERATED_BYTES} bytes, zero repeated views, and digest {EXPECTED_DIGEST}"
         )
         .into());
     }

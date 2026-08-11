@@ -23,15 +23,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(sheet_index)
         .ok_or("sheet index is out of bounds")?;
     let source = editor
-        .sheet_charts(sheet.object_id)?
+        .sheet_charts(sheet.id())?
         .into_iter()
         .nth(chart_index)
         .ok_or("chart index is out of bounds")?;
-    let duplicate = editor.duplicate_sheet_chart(sheet.object_id, source.drawable_object_id)?;
+    let duplicate = editor.duplicate_sheet_chart(sheet.id(), source.drawable_object_id)?;
     editor.save(output)?;
     println!(
         "sheet={} drawable={} source={} rows={} columns={}",
-        sheet.object_id,
+        sheet.id(),
         duplicate.drawable_object_id,
         source.drawable_object_id,
         duplicate.data.row_names().len(),

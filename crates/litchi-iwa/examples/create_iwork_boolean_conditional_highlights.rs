@@ -40,7 +40,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Booleans")
         .table_dimensions(2, 3)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     editor.set_cell(table_id, BOOLEAN_ROW, TRUE_COLUMN, CellValue::Boolean(true))?;
     editor.set_cell(
         table_id,

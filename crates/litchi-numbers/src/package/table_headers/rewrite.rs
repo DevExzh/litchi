@@ -236,7 +236,10 @@ pub(super) fn rewrite(
     Ok((candidate, retained_payload))
 }
 
-pub(super) fn clone_selected_payload(source: &Package, target: Target) -> Result<Arc<[u8]>, Error> {
+pub(in crate::package) fn clone_selected_payload(
+    source: &Package,
+    target: Target,
+) -> Result<Arc<[u8]>, Error> {
     let payload = selected_payload(source, target)?;
     let mut retained = Vec::new();
     retained
@@ -252,7 +255,10 @@ pub(super) fn clone_selected_payload(source: &Package, target: Target) -> Result
     Ok(retained.into())
 }
 
-pub(super) fn selected_payload(source: &Package, target: Target) -> Result<&[u8], Error> {
+pub(in crate::package) fn selected_payload(
+    source: &Package,
+    target: Target,
+) -> Result<&[u8], Error> {
     source
         .state
         .components
@@ -266,7 +272,17 @@ pub(super) fn selected_payload(source: &Package, target: Target) -> Result<&[u8]
         })
 }
 
-pub(super) fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<&'static str>, Error> {
+pub(in crate::package) fn root_preview_deletions(
+    source: &SourceCatalog,
+) -> Result<Vec<&'static str>, Error> {
+    let mut counts = [0usize; ROOT_PREVIEWS.len()];
+    for entry in source.package().iter() {
+        if let Some(index) = ROOT_PREVIEWS.iter().position(|name| *name == entry.name()) {
+            counts[index] = counts[index].checked_add(1).ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
+        }
+    }
     let mut previews = Vec::new();
     previews
         .try_reserve_exact(ROOT_PREVIEWS.len())
@@ -274,13 +290,8 @@ pub(super) fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<&'sta
             amount: ROOT_PREVIEWS.len(),
             path: Path::Package,
         })?;
-    for name in ROOT_PREVIEWS {
-        match source
-            .package()
-            .iter()
-            .filter(|entry| entry.name() == name)
-            .count()
-        {
+    for (name, count) in ROOT_PREVIEWS.into_iter().zip(counts) {
+        match count {
             0 => {},
             1 => previews.push(name),
             _ => {
@@ -293,7 +304,7 @@ pub(super) fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<&'sta
     Ok(previews)
 }
 
-pub(super) fn verify_exact_locality(
+pub(in crate::package) fn verify_exact_locality(
     source: &Package,
     candidate: &Package,
     target: Target,
@@ -528,7 +539,7 @@ fn message_info_preserved_except_length(
         && source.diff_read_version == candidate.diff_read_version
 }
 
-pub(super) fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
+pub(in crate::package) fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
     package
         .state
         .components
@@ -536,7 +547,7 @@ pub(super) fn physical_source(package: &Package) -> Result<&SourceCatalog, Error
         .ok_or(Error::UnsupportedSource)
 }
 
-pub(super) fn preflight_transaction_work(
+pub(in crate::package) fn preflight_transaction_work(
     source: &Package,
     retained_target: Option<&[u8]>,
 ) -> Result<(), Error> {

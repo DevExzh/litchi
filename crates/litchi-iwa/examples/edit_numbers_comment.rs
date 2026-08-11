@@ -26,13 +26,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut editor = NumbersEditor::open(&input)?;
     let tables = editor.tables()?;
-    let table_id = table_selector.parse::<u64>().ok().or_else(|| {
-        tables
-            .iter()
-            .find(|table| table.name == table_selector)
-            .map(|table| table.object_id)
-    });
-    let table_id = table_id.ok_or("table selector did not match a Numbers table")?;
+    let table = table_selector
+        .parse::<u64>()
+        .ok()
+        .and_then(|id| tables.iter().find(|table| table.id() == id))
+        .or_else(|| tables.iter().find(|table| table.name == table_selector));
+    let table_id = table
+        .ok_or("table selector did not match a Numbers table")?
+        .id();
 
     if replacement == "--clear" {
         editor.clear_cell_comment(table_id, row, column)?;

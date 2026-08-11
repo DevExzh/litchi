@@ -56,84 +56,84 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let numbers = NumbersEditor::open(output.join("table-layouts.numbers"))?;
     let numbers_table = numbers.tables()?.remove(0);
     assert_eq!(
-        numbers.table_cell_text_alignment(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_alignment(numbers_table.id(), ROW, COLUMN)?,
         Alignment::Center
     );
     assert_eq!(
-        numbers.table_cell_text_style(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_style(numbers_table.id(), ROW, COLUMN)?,
         numbers_text_style()?
     );
     assert_eq!(
-        numbers.table_cell_text_font(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_font(numbers_table.id(), ROW, COLUMN)?,
         numbers_text_font()?
     );
     assert_eq!(
-        numbers.table_cell_text_color(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_color(numbers_table.id(), ROW, COLUMN)?,
         numbers_text_color()?
     );
     assert_eq!(
-        numbers.table_cell_text_decorations(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_decorations(numbers_table.id(), ROW, COLUMN)?,
         numbers_text_decorations()
     );
     assert_eq!(
-        numbers.table_cell_text_baseline_shift(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_baseline_shift(numbers_table.id(), ROW, COLUMN)?,
         numbers_baseline_shift()?
     );
     assert_eq!(
-        numbers.table_cell_text_capitalization(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_capitalization(numbers_table.id(), ROW, COLUMN)?,
         TextCapitalization::AllCaps
     );
     assert_eq!(
-        numbers.table_cell_text_character_spacing(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_character_spacing(numbers_table.id(), ROW, COLUMN)?,
         numbers_character_spacing()?
     );
     assert_eq!(
-        numbers.table_cell_text_ligatures(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_ligatures(numbers_table.id(), ROW, COLUMN)?,
         TextLigatures::RequiredOnly
     );
     assert_eq!(
-        numbers.table_cell_text_background(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_background(numbers_table.id(), ROW, COLUMN)?,
         numbers_text_background()?
     );
     assert_eq!(
-        numbers.table_cell_text_outline(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_outline(numbers_table.id(), ROW, COLUMN)?,
         Outline::standard()
     );
     assert_eq!(
-        numbers.table_cell_text_script(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_script(numbers_table.id(), ROW, COLUMN)?,
         TextScript::Superscript
     );
     assert_eq!(
-        numbers.table_cell_text_shadow(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_text_shadow(numbers_table.id(), ROW, COLUMN)?,
         Shadow::standard()
     );
     assert_eq!(
-        numbers.table_cell_paragraph_line_spacing(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_paragraph_line_spacing(numbers_table.id(), ROW, COLUMN)?,
         numbers_paragraph_line_spacing()
     );
     assert_eq!(
-        numbers.table_cell_paragraph_spacing(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_paragraph_spacing(numbers_table.id(), ROW, COLUMN)?,
         numbers_paragraph_spacing()?
     );
     assert_eq!(
-        numbers.table_cell_paragraph_indents(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_paragraph_indents(numbers_table.id(), ROW, COLUMN)?,
         numbers_paragraph_indents()?
     );
     assert_eq!(
-        numbers.table_cell_paragraph_tab_stops(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_paragraph_tab_stops(numbers_table.id(), ROW, COLUMN)?,
         numbers_paragraph_tab_stops()?
     );
     assert_eq!(
-        numbers.table_cell_paragraph_lists(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_paragraph_lists(numbers_table.id(), ROW, COLUMN)?,
         mixed_paragraph_lists()?
     );
     assert_eq!(
-        numbers.table_cell_paragraph_list_levels(numbers_table.object_id, ROW, COLUMN)?,
+        numbers.table_cell_paragraph_list_levels(numbers_table.id(), ROW, COLUMN)?,
         nested_paragraph_levels()?
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_numbering(
-            numbers_table.object_id,
+            numbers_table.id(),
             ROW,
             COLUMN,
             numbered_paragraph_start()?,
@@ -142,7 +142,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_number_format(
-            numbers_table.object_id,
+            numbers_table.id(),
             ROW,
             COLUMN,
             numbered_paragraph_start()?,
@@ -151,7 +151,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_number_tiering(
-            numbers_table.object_id,
+            numbers_table.id(),
             ROW,
             COLUMN,
             numbered_paragraph_start()?,
@@ -160,7 +160,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_number_scale(
-            numbers_table.object_id,
+            numbers_table.id(),
             ROW,
             COLUMN,
             numbered_paragraph_start()?,
@@ -169,7 +169,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_bullet(
-            numbers_table.object_id,
+            numbers_table.id(),
             ROW,
             COLUMN,
             bullet_paragraph_start()?,
@@ -178,7 +178,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_bullet_geometry(
-            numbers_table.object_id,
+            numbers_table.id(),
             ROW,
             COLUMN,
             bullet_paragraph_start()?,
@@ -187,7 +187,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_indentation(
-            numbers_table.object_id,
+            numbers_table.id(),
             ROW,
             COLUMN,
             bullet_paragraph_start()?,
@@ -196,7 +196,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_label_color(
-            numbers_table.object_id,
+            numbers_table.id(),
             ROW,
             COLUMN,
             bullet_paragraph_start()?,
@@ -587,14 +587,17 @@ fn nested_paragraph_levels() -> Result<Vec<ParagraphListLevelPlacement>, litchi_
 
 fn numbered_paragraph_start() -> Result<TextPosition, litchi_iwa::Error> {
     TextPosition::from_utf16_index(32)
+        .map_err(|error| litchi_iwa::Error::InvalidFormat(error.to_string()))
 }
 
 fn bullet_paragraph_start() -> Result<TextPosition, litchi_iwa::Error> {
     TextPosition::from_utf16_index(13)
+        .map_err(|error| litchi_iwa::Error::InvalidFormat(error.to_string()))
 }
 
 fn custom_bullet() -> Result<ParagraphListBullet, litchi_iwa::Error> {
     ParagraphListBullet::new("➡")
+        .map_err(|error| litchi_iwa::Error::InvalidFormat(error.to_string()))
 }
 
 fn custom_bullet_geometry() -> Result<ParagraphListBulletGeometry, litchi_iwa::Error> {
@@ -634,6 +637,7 @@ fn custom_number_format() -> ParagraphListNumberFormat {
 
 fn custom_number_scale() -> Result<ParagraphListNumberScale, litchi_iwa::Error> {
     ParagraphListNumberScale::from_percent(135.0)
+        .map_err(|error| litchi_iwa::Error::InvalidFormat(error.to_string()))
 }
 
 fn numbers_text_style() -> Result<TextStyle, litchi_iwa::Error> {
@@ -912,7 +916,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Layouts")
         .table_dimensions(3, 3)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     editor.set_cell(table_id, ROW, COLUMN, CellValue::Text(CELL_TEXT.to_owned()))?;
     editor.set_table_cell_layout(table_id, ROW, COLUMN, layout(VerticalAlignment::Middle)?)?;
     editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, Alignment::Center)?;

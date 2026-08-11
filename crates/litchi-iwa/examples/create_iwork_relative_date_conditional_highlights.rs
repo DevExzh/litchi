@@ -34,15 +34,15 @@ fn date_cases() -> Result<[(CellValue, Rule); 3], Box<dyn std::error::Error>> {
     let style = Style::new(Some(fill), None, true)?;
     Ok([
         (
-            CellValue::Date(today - SECONDS_PER_DAY + midday),
+            CellValue::date(today - SECONDS_PER_DAY + midday)?,
             Rule::new(Condition::DateIsYesterday, style),
         ),
         (
-            CellValue::Date(today + midday),
+            CellValue::date(today + midday)?,
             Rule::new(Condition::DateIsToday, style),
         ),
         (
-            CellValue::Date(today + SECONDS_PER_DAY + midday),
+            CellValue::date(today + SECONDS_PER_DAY + midday)?,
             Rule::new(Condition::DateIsTomorrow, style),
         ),
     ])
@@ -63,7 +63,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Relative dates")
         .table_dimensions(2, 4)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     let cases = date_cases()?;
     for (offset, (value, rule)) in cases.iter().enumerate() {
         let column = FIRST_DATE_COLUMN + offset;

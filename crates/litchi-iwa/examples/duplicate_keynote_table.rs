@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             KeynoteTableCellUpdate::new(0, 0, KeynoteTableCellValue::Text("Category".to_owned())),
             KeynoteTableCellUpdate::new(0, 1, KeynoteTableCellValue::Text("Cost".to_owned())),
             KeynoteTableCellUpdate::new(1, 0, KeynoteTableCellValue::Text("Travel".to_owned())),
-            KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::Number(125.0)),
+            KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::number(125.0)?),
         ],
     )?;
     editor.set_slide_table_formula(
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 FormulaExpression::Number(25.0),
             ],
         ),
-        FormulaCachedValue::Number(125.0),
+        FormulaCachedValue::number(125.0)?,
     )?;
 
     let copy = editor.duplicate_slide_table(0, source.drawable_object_id)?;

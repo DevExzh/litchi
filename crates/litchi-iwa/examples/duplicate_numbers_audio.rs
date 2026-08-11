@@ -23,15 +23,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(sheet_index)
         .ok_or("sheet index is out of bounds")?;
     let source = editor
-        .sheet_audio(sheet.object_id)?
+        .sheet_audio(sheet.id())?
         .into_iter()
         .nth(audio_index)
         .ok_or("sheet audio index is out of bounds")?;
-    let created = editor.duplicate_sheet_audio(sheet.object_id, source.drawable_object_id)?;
+    let created = editor.duplicate_sheet_audio(sheet.id(), source.drawable_object_id)?;
     editor.save(output)?;
     println!(
         "sheet={} drawable={} source={} audio={}",
-        sheet.object_id,
+        sheet.id(),
         created.drawable_object_id,
         source.drawable_object_id,
         created.audio_data_identifier,

@@ -4,6 +4,7 @@ use litchi_iwa::numbers::{
     NumbersDocumentBuilder, NumbersTableSortColumnIndex, NumbersTableSortDirection,
     NumbersTableSortOrder, NumbersTableSortRule,
 };
+use litchi_numbers::TableSelector;
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,7 +15,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Cities")
         .table_dimensions(5, 2)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor
+        .tables()?
+        .first()
+        .ok_or("the document has no tables")?
+        .id();
+    let table = TableSelector::index(0);
     editor.set_cells(
         table_id,
         [
@@ -31,13 +37,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
     )?;
     editor.set_table_sort_order(
-        table_id,
+        table,
         NumbersTableSortOrder::new([NumbersTableSortRule::new(
             NumbersTableSortColumnIndex::new(0)?,
             NumbersTableSortDirection::Ascending,
         )])?,
     )?;
-    if !editor.apply_table_sort_order(table_id)? {
+    if !editor.apply_table_sort_order(table)? {
         return Err("expected the source table to be reordered".into());
     }
     editor.save(output)?;

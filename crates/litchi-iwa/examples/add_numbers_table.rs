@@ -3,6 +3,7 @@
 use std::env;
 
 use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::SheetSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -16,16 +17,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let columns = arguments.next().ok_or("missing column count")?.parse()?;
 
     let mut editor = NumbersEditor::open(input)?;
-    let sheet_id = editor
-        .sheets()?
-        .get(sheet_index)
-        .ok_or("sheet index is out of range")?
-        .object_id;
-    let table = editor.add_empty_table(sheet_id, &name, rows, columns)?;
+    let table = editor.add_empty_table(SheetSelector::index(sheet_index), &name, rows, columns)?;
     editor.save(output)?;
     println!(
         "created table {} ({:?}) with {} rows and {} columns",
-        table.object_id, table.name, table.rows, table.columns
+        table.id(),
+        table.name,
+        table.rows,
+        table.columns
     );
     Ok(())
 }

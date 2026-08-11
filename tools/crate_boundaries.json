@@ -154,7 +154,8 @@
     ],
     "litchi-odc": [
       "litchi-core",
-      "litchi-odf-common"
+      "litchi-odf-common",
+      "soapberry-zip"
     ],
     "litchi-odf": [
       "litchi-odb",
@@ -256,6 +257,7 @@
       "litchi-vba"
     ],
     "litchi-pptx": [
+      "litchi-core",
       "litchi-crypto",
       "litchi-drawingml",
       "litchi-fonts",
@@ -338,6 +340,10 @@
     {
       "dependent": "litchi-iwa-structured",
       "dependency": "litchi-iwa-text"
+    },
+    {
+      "dependent": "litchi-odc",
+      "dependency": "soapberry-zip"
     },
     {
       "dependent": "litchi-sign",

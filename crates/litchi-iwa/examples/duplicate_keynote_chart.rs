@@ -3,6 +3,7 @@
 use std::env;
 
 use litchi_iwa::keynote::KeynoteEditor;
+use litchi_keynote::ChartSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -22,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .nth(chart_index)
         .ok_or("chart index is out of bounds")?;
-    let duplicate = editor.duplicate_slide_chart(slide_index, source.drawable_object_id)?;
+    let duplicate = editor.duplicate_slide_chart(slide_index, ChartSelector::index(chart_index))?;
     editor.save(output)?;
     println!(
         "slide={} drawable={} source={} rows={} columns={}",

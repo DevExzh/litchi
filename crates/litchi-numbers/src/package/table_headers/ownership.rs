@@ -11,7 +11,24 @@ use super::resolve::{
 };
 use super::{Error, LimitKind, Path, Target};
 
-pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> Result<(), Error> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::package) struct OwnershipReport {
+    pub(in crate::package) work: usize,
+    pub(in crate::package) references: usize,
+    pub(in crate::package) transaction_work: usize,
+}
+
+pub(in crate::package) fn validate_selected_ownership(
+    source: &Package,
+    target: Target,
+) -> Result<(), Error> {
+    validate_selected_ownership_with_report(source, target).map(|_report| ())
+}
+
+pub(in crate::package) fn validate_selected_ownership_with_report(
+    source: &Package,
+    target: Target,
+) -> Result<OwnershipReport, Error> {
     let document_object = source
         .state
         .components
@@ -29,6 +46,9 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
     })?;
     validate_message_metadata(document_object, document_message_index)?;
     let mut wire_work = 0usize;
+    let mut references = 0usize;
+    let mut transaction_work = 0usize;
+    let lookup_work = source.state.index.lookup_work();
     let maximum_work = source.state.options.archive().max_iwa_stream_bytes();
     charge_work(
         &mut wire_work,
@@ -36,6 +56,11 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
         maximum_work,
     )?;
     let sheet_payloads = repeated_length_payloads(&document_message.data, 1)?;
+    references = references
+        .checked_add(sheet_payloads.len())
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?;
     require_local_reference(
         sheet_payloads
             .get(target.sheet_position)
@@ -43,6 +68,10 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
                 path: Path::Package,
             })?,
         target.sheet_identifier,
+    )?;
+    charge_unbounded_work(
+        &mut transaction_work,
+        declared_reference_scan_work(document_object, document_message_index)?.saturating_mul(2),
     )?;
     require_declared_reference(
         document_object,
@@ -96,6 +125,10 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
             });
         },
     };
+    charge_unbounded_work(
+        &mut transaction_work,
+        declared_reference_scan_work(sheet_object, target.sheet_message_index)?.saturating_mul(2),
+    )?;
     require_declared_reference(
         sheet_object,
         target.sheet_message_index,
@@ -133,6 +166,10 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
     require_local_reference(
         singular_length_payload(&info_message.data, 2)?,
         target.model_identifier,
+    )?;
+    charge_unbounded_work(
+        &mut transaction_work,
+        declared_reference_scan_work(info_object, target.info_message_index)?.saturating_mul(2),
     )?;
     require_declared_reference(
         info_object,
@@ -176,6 +213,7 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
                 path: Path::Package,
             });
         }
+        charge_unbounded_work(&mut transaction_work, lookup_work)?;
         let sheet = source
             .state
             .index
@@ -208,6 +246,9 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
         for drawable_payload in
             sheet_drawable_payloads(owner_sheet_message.type_, &owner_sheet_message.data)?
         {
+            references = references.checked_add(1).ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
             charge_work(&mut wire_work, drawable_payload.len(), maximum_work)?;
             let drawable_identifier = local_reference_identifier(drawable_payload)?;
             if drawable_identifier == target.sheet_identifier
@@ -217,6 +258,7 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
                     path: Path::Package,
                 });
             }
+            charge_unbounded_work(&mut transaction_work, lookup_work)?;
             let info = source
                 .state
                 .index
@@ -228,6 +270,9 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
             let Some((_index, message)) = unique_table_info(info)? else {
                 continue;
             };
+            references = references.checked_add(1).ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
             charge_work(
                 &mut wire_work,
                 message.data.len().saturating_mul(4),
@@ -263,6 +308,40 @@ pub(super) fn validate_selected_ownership(source: &Package, target: Target) -> R
             path: Path::Package,
         });
     }
+    Ok(OwnershipReport {
+        work: wire_work,
+        references,
+        transaction_work,
+    })
+}
+
+fn declared_reference_scan_work(
+    object: &litchi_iwa_core::ArchiveObject,
+    message_index: usize,
+) -> Result<usize, Error> {
+    let info =
+        object
+            .archive_info
+            .message_infos
+            .get(message_index)
+            .ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
+    info.field_infos
+        .iter()
+        .try_fold(info.object_references.len(), |work, field| {
+            work.checked_add(1)
+                .and_then(|value| value.checked_add(field.object_references.len()))
+                .ok_or(Error::InvalidSource {
+                    path: Path::Package,
+                })
+        })
+}
+
+fn charge_unbounded_work(total: &mut usize, amount: usize) -> Result<(), Error> {
+    *total = total.checked_add(amount).ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
     Ok(())
 }
 

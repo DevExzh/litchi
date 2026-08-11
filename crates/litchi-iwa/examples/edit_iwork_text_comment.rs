@@ -4,7 +4,7 @@ use std::env;
 
 use litchi_iwa::text::{
     IWorkTextEditor, TextCommentBody, TextCommentId, TextCommentReplyBody, TextCommentReplyId,
-    TextRange,
+    TextRange, TextStorageId,
 };
 use litchi_iwa_text::comment::raw::{comment_id, comment_id_value, reply_id, reply_id_value};
 
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match command.as_str() {
         "list" => {
             let input = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             require_end(arguments)?;
             let editor = IWorkTextEditor::open(input)?;
             for comment in editor.text_comments(storage_id)? {
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "add" => {
             let input = arguments.next().ok_or(USAGE)?;
             let output = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let range = parse_range(&mut arguments)?;
             let body = TextCommentBody::try_from(arguments.next().ok_or(USAGE)?)?;
             require_end(arguments)?;
@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "update" => {
             let input = arguments.next().ok_or(USAGE)?;
             let output = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let comment_id = comment_id(parse_u64(arguments.next(), "comment-id")?)?;
             let range = parse_range(&mut arguments)?;
             let body = TextCommentBody::try_from(arguments.next().ok_or(USAGE)?)?;
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "remove" => {
             let input = arguments.next().ok_or(USAGE)?;
             let output = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let comment_id = comment_id(parse_u64(arguments.next(), "comment-id")?)?;
             require_end(arguments)?;
             let mut editor = IWorkTextEditor::open(input)?;
@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "list-replies" => {
             let input = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let comment_id = parse_comment_id(arguments.next())?;
             require_end(arguments)?;
             let editor = IWorkTextEditor::open(input)?;
@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "add-reply" => {
             let input = arguments.next().ok_or(USAGE)?;
             let output = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let comment_id = parse_comment_id(arguments.next())?;
             let body = TextCommentReplyBody::try_from(arguments.next().ok_or(USAGE)?)?;
             require_end(arguments)?;
@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "update-reply" => {
             let input = arguments.next().ok_or(USAGE)?;
             let output = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let comment_id = parse_comment_id(arguments.next())?;
             let reply_id = parse_reply_id(arguments.next())?;
             let body = TextCommentReplyBody::try_from(arguments.next().ok_or(USAGE)?)?;
@@ -109,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "remove-reply" => {
             let input = arguments.next().ok_or(USAGE)?;
             let output = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let comment_id = parse_comment_id(arguments.next())?;
             let reply_id = parse_reply_id(arguments.next())?;
             require_end(arguments)?;
@@ -133,6 +133,15 @@ fn parse_range(
 }
 
 fn parse_u64(value: Option<String>, label: &str) -> Result<u64, Box<dyn std::error::Error>> {
+    value
+        .ok_or_else(|| USAGE.into())
+        .and_then(|value| value.parse().map_err(|_| format!("invalid {label}").into()))
+}
+
+fn parse_storage_id(
+    value: Option<String>,
+    label: &str,
+) -> Result<TextStorageId, Box<dyn std::error::Error>> {
     value
         .ok_or_else(|| USAGE.into())
         .and_then(|value| value.parse().map_err(|_| format!("invalid {label}").into()))

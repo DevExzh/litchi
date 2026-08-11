@@ -9,6 +9,7 @@ use litchi::numbers::{
     Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
     TableSelector,
     sheet::order::{Commit as SheetOrderCommit, Error as SheetOrderError},
+    table::title::{Error as TitleError, Path as TitlePath, Settings as TitleSettings},
 };
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
@@ -27,6 +28,8 @@ const MAX_FORMULA_WORK: usize = 8 * 1024;
 const MAX_FORMULA_DEPTH: usize = 32;
 const MAX_NAME_BYTES: usize = 256;
 const PRIVATE_SELECTOR: &str = "__litchi_private_numbers_name_selector_6d1a__";
+const PRIVATE_TITLE_SHEET: &str = "__litchi_private_title_sheet_6d1a__";
+const PRIVATE_TITLE_TABLE: &str = "__litchi_private_title_table_6d1a__";
 const PRIVATE_MALFORMED_INPUT: &[u8] = b"__litchi_private_numbers_name_input_6d1a__";
 const UNICODE_NAME: &str = "Líneas 你好 🧪";
 const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/numbers/basic.numbers");
@@ -84,11 +87,17 @@ fn native_package() -> &'static Package {
             "native Numbers names fuzz seed must have a table"
         );
         package
+            .table_title_settings(SheetSelector::index(0), TableSelector::index(0))
+            .unwrap_or_else(|error| {
+                panic!("native Numbers names fuzz seed must expose a table title: {error}")
+            });
+        package
     })
 }
 
 fn exercise_package(package: &Package, data: &[u8]) {
     exercise_sheet_order(package, data);
+    exercise_table_title(package, data);
 
     let Some(sheet) = package.document().sheets().first() else {
         return;
@@ -200,6 +209,204 @@ fn exercise_package(package: &Package, data: &[u8]) {
         &table_after,
     );
     assert_eq!(package_bytes(restored.package()), package_bytes(package));
+}
+
+fn exercise_table_title(package: &Package, data: &[u8]) {
+    observe_result(package.table_title_settings(
+        SheetSelector::index(usize::from(read_u16(data, 3))),
+        TableSelector::index(usize::from(read_u16(data, 5))),
+    ));
+    if let Some(sheet) = package.document().sheets().first() {
+        if let Some(table) = sheet.tables().next() {
+            observe_result(package.table_title_settings(
+                SheetSelector::name(sheet.name()),
+                TableSelector::name(table.name()),
+            ));
+        }
+    }
+    exercise_title_selector_errors(package);
+    exercise_title_presence(data);
+
+    let sheet = SheetSelector::index(0);
+    let table = TableSelector::index(0);
+    let before = match package.table_title_settings(sheet, table) {
+        Ok(settings) => settings,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    observe_title_settings(before);
+
+    // A transaction that preserves both optional-field presences must retain
+    // the exact source package and publish no touched components.
+    let no_op = match package.edit_table_title(sheet, table) {
+        Ok(edit) => edit.set(before),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    assert_eq!(no_op.path(), TitlePath::Table { sheet: 0, table: 0 });
+    assert_eq!(no_op.settings(), before);
+    let no_op_commit = match no_op.commit() {
+        Ok(commit) => commit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    let no_op_patch = no_op_commit.patch().clone();
+    let no_op_diagnostics = no_op_commit.diagnostics();
+    assert!(no_op_patch.is_noop());
+    assert_eq!(no_op_patch.path(), TitlePath::Table { sheet: 0, table: 0 });
+    assert_eq!(no_op_patch.before(), before);
+    assert_eq!(no_op_patch.after(), before);
+    assert!(!no_op_diagnostics.changed());
+    assert_eq!(no_op_diagnostics.touched_components(), 0);
+    assert_eq!(no_op_diagnostics.deleted_previews(), 0);
+    assert!(!no_op_diagnostics.full_reparse_performed());
+    let source_bytes = package_bytes(package);
+    assert_eq!(package_bytes(no_op_commit.package()), source_bytes);
+    let no_op_applied = package
+        .apply_table_title(&no_op_patch)
+        .unwrap_or_else(|error| panic!("fresh no-op table-title patch must apply: {error}"));
+    assert_eq!(package_bytes(no_op_applied.package()), source_bytes);
+    assert_eq!(no_op_patch.inverse().inverse(), no_op_patch);
+    black_box((&no_op_patch, no_op_diagnostics));
+
+    let after = changed_title_settings(before, data);
+    assert_ne!(after, before);
+    let edit = match package.edit_table_title(sheet, table) {
+        Ok(edit) => edit.set(after),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    assert_eq!(edit.path(), TitlePath::Table { sheet: 0, table: 0 });
+    assert_eq!(edit.settings(), after);
+    let commit = match edit.commit() {
+        // A supported exact profile reaches apply/inverse/conflict checks.
+        Ok(commit) => commit,
+        // Other valid Numbers inputs may be intentionally outside the focused
+        // producer profile; still retain this bounded public-API error path.
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    let patch = commit.patch().clone();
+    let diagnostics = commit.diagnostics();
+    assert!(!patch.is_noop());
+    assert_eq!(patch.path(), TitlePath::Table { sheet: 0, table: 0 });
+    assert_eq!(patch.before(), before);
+    assert_eq!(patch.after(), after);
+    assert!(diagnostics.changed());
+    assert_eq!(diagnostics.touched_components(), 1);
+    assert!(diagnostics.deleted_previews() <= 3);
+    assert!(diagnostics.full_reparse_performed());
+    assert_eq!(
+        commit
+            .package()
+            .table_title_settings(sheet, table)
+            .unwrap_or_else(|error| panic!("committed table title must be readable: {error}")),
+        after,
+    );
+    let committed_bytes = package_bytes(commit.package());
+    assert_ne!(committed_bytes, source_bytes);
+    black_box((&patch, diagnostics));
+
+    let applied = package
+        .apply_table_title(&patch)
+        .unwrap_or_else(|error| panic!("fresh table-title patch must apply: {error}"));
+    assert_eq!(package_bytes(applied.package()), committed_bytes);
+    assert_eq!(
+        applied
+            .package()
+            .table_title_settings(sheet, table)
+            .unwrap_or_else(|error| panic!("applied table title must be readable: {error}")),
+        after,
+    );
+
+    let inverse = patch.inverse();
+    assert_eq!(inverse.inverse(), patch);
+    assert!(matches!(
+        applied.package().apply_table_title(&patch),
+        Err(TitleError::PatchConflict)
+    ));
+    assert!(matches!(
+        package.apply_table_title(&inverse),
+        Err(TitleError::PatchConflict)
+    ));
+    let restored = applied
+        .package()
+        .apply_table_title(&inverse)
+        .unwrap_or_else(|error| panic!("fresh table-title inverse must apply: {error}"));
+    assert_eq!(package_bytes(restored.package()), source_bytes);
+    assert_eq!(
+        restored
+            .package()
+            .table_title_settings(sheet, table)
+            .unwrap_or_else(|error| panic!("restored table title must be readable: {error}")),
+        before,
+    );
+}
+
+fn changed_title_settings(before: TitleSettings, data: &[u8]) -> TitleSettings {
+    let values = [None, Some(false), Some(true)];
+    let candidate = TitleSettings::new(
+        values[usize::from(control(data, 0)) % values.len()],
+        values[usize::from(control(data, 1)) % values.len()],
+    );
+    if candidate != before {
+        candidate
+    } else {
+        TitleSettings::new(Some(!before.is_visible()), before.outlined())
+    }
+}
+
+fn exercise_title_presence(data: &[u8]) {
+    let values = [None, Some(false), Some(true)];
+    let visible = values[usize::from(control(data, 6)) % values.len()];
+    let outlined = values[usize::from(control(data, 7)) % values.len()];
+    let settings = TitleSettings::new(visible, outlined);
+    assert_eq!(settings.visible(), visible);
+    assert_eq!(settings.outlined(), outlined);
+    assert_eq!(settings.is_visible(), visible == Some(true));
+    assert_eq!(settings.is_outlined(), outlined == Some(true));
+    observe_title_settings(settings);
+}
+
+fn observe_title_settings(settings: TitleSettings) {
+    black_box((
+        settings.visible(),
+        settings.outlined(),
+        settings.is_visible(),
+        settings.is_outlined(),
+    ));
+}
+
+fn exercise_title_selector_errors(package: &Package) {
+    assert!(matches!(
+        package.table_title_settings(
+            SheetSelector::index(package.document().sheets().len()),
+            TableSelector::index(0),
+        ),
+        Err(TitleError::SheetNotFound)
+    ));
+    if let Err(error) = package.table_title_settings(
+        SheetSelector::name(PRIVATE_TITLE_SHEET),
+        TableSelector::index(0),
+    ) {
+        observe_redacted(error, PRIVATE_TITLE_SHEET);
+    }
+    if let Err(error) = package.table_title_settings(
+        SheetSelector::index(0),
+        TableSelector::name(PRIVATE_TITLE_TABLE),
+    ) {
+        observe_redacted(error, PRIVATE_TITLE_TABLE);
+    }
 }
 
 fn exercise_sheet_order(package: &Package, data: &[u8]) {

@@ -4,6 +4,7 @@ use litchi_iwa::numbers::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
     FormulaPivotCategoryReference, FormulaUuid, NumbersDocument, NumbersEditor,
 };
+use litchi_numbers::cell::FiniteF64;
 
 fn parse_address(address: &str) -> Result<FormulaCellReference, String> {
     let mut input = address;
@@ -201,8 +202,10 @@ fn parse_operand(argument: &str, table_ids: &[u64]) -> Result<FormulaExpression,
     }
     argument
         .parse::<f64>()
-        .map(FormulaExpression::Number)
-        .map_err(|_| {
+        .ok()
+        .and_then(|value| FiniteF64::new(value).ok())
+        .map(|value| FormulaExpression::Number(value.get()))
+        .ok_or_else(|| {
             format!(
                 "operand must be a number, cell:A1, range:A1:B2, rows:1:2, columns:B:C, table-cell:<index>:A1, table-range:<index>:A1:B2, table-rows:<index>:1:2, table-columns:<index>:B:C, or pivot:<group-by-lower>:<group-by-upper>:<column-lower>:<column-upper>:<group-lower>:<group-upper>:<aggregate-type>:<group-level>: {argument:?}"
             )
@@ -226,10 +229,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let function = &arguments[5];
     let mut editor = NumbersEditor::open(input)?;
     let tables = editor.tables()?;
-    let table_ids = tables
-        .iter()
-        .map(|table| table.object_id)
-        .collect::<Vec<_>>();
+    let table_ids = tables.iter().map(|table| table.id()).collect::<Vec<_>>();
     let table = tables
         .into_iter()
         .nth(table_index)
@@ -238,7 +238,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .map(|argument| parse_operand(argument, &table_ids))
         .collect::<std::result::Result<Vec<_>, _>>()?;
-    let table_id = table.object_id;
+    let table_id = table.id();
     let table_name = table.name;
     let expression = if function == "/" {
         let mut operands = operands.into_iter();

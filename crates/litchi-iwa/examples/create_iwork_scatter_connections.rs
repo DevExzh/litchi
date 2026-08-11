@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut numbers = NumbersDocumentBuilder::new()
         .sheet_name("Scatter Connections")
         .build()?;
-    let sheet_id = numbers.sheets()?[0].object_id;
+    let sheet_id = numbers.sheets()?[0].id();
     let chart = numbers.add_sheet_chart(
         sheet_id,
         Kind::Scatter2d,

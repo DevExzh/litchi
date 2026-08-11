@@ -167,6 +167,85 @@ fn table_header_transaction_reaches_numbers_facade() -> Result<(), Box<dyn std::
 }
 
 #[test]
+fn table_title_transaction_reaches_numbers_facade() -> Result<(), Box<dyn std::error::Error>> {
+    use litchi::numbers::table::title::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Settings,
+    };
+
+    assert_send_sync::<Settings>();
+    assert_send_sync::<Edit<'static>>();
+    assert_send_sync::<Patch>();
+    assert_send_sync::<Commit>();
+    assert_send_sync::<Diagnostics>();
+    assert_send_sync::<Error>();
+    assert_send_sync::<LimitKind>();
+    assert_send_sync::<Path>();
+
+    let package = Package::open(fixture_path())?;
+    let source = package_bytes(&package)?;
+    let sheet = SheetSelector::index(0);
+    let table = TableSelector::index(0);
+    let before = package.table_title_settings(sheet, table)?;
+
+    let edit = package.edit_table_title(sheet, table)?;
+    assert_eq!(edit.path(), Path::Table { sheet: 0, table: 0 });
+    assert_eq!(edit.settings(), before);
+    let edit_debug = format!("{edit:?}");
+    assert!(edit_debug.contains("Table { sheet: 0, table: 0 }"));
+    assert!(!edit_debug.contains("Sheet 1"));
+    assert!(!edit_debug.contains("Table 1"));
+    assert!(!edit_debug.contains(".iwa"));
+
+    let noop = edit.set(before).commit()?;
+    assert_eq!(noop.patch().path(), Path::Table { sheet: 0, table: 0 });
+    assert_eq!(noop.patch().before(), before);
+    assert_eq!(noop.patch().after(), before);
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.diagnostics().touched_components(), 0);
+    assert_eq!(noop.diagnostics().deleted_previews(), 0);
+    assert!(!noop.diagnostics().full_reparse_performed());
+    assert_eq!(package_bytes(noop.package())?, source);
+
+    let patch_debug = format!("{:?}", noop.patch());
+    assert!(patch_debug.contains("Table { sheet: 0, table: 0 }"));
+    assert!(!patch_debug.contains("fingerprint"));
+    assert!(!patch_debug.contains("Sheet 1"));
+    assert!(!patch_debug.contains("Table 1"));
+    assert!(!patch_debug.contains(".iwa"));
+
+    let applied = package.apply_table_title(noop.patch())?;
+    assert!(!applied.diagnostics().changed());
+    assert_eq!(
+        applied.package().table_title_settings(sheet, table)?,
+        before
+    );
+    assert_eq!(package_bytes(applied.package())?, source);
+
+    let inverse = noop.patch().inverse();
+    assert!(inverse.is_noop());
+    let restored = noop.package().apply_table_title(&inverse)?;
+    assert!(!restored.diagnostics().changed());
+    assert_eq!(
+        restored.package().table_title_settings(sheet, table)?,
+        before
+    );
+    assert_eq!(package_bytes(restored.package())?, source);
+
+    let renamed = package
+        .edit_names()
+        .rename_table(sheet, table, "Different exact source")?
+        .commit()?;
+    let conflict = renamed
+        .package()
+        .apply_table_title(noop.patch())
+        .expect_err("a table-title patch must authorize its exact source");
+    assert!(matches!(&conflict, Error::PatchConflict));
+    assert_eq!(format!("{conflict:?}"), "PatchConflict");
+    Ok(())
+}
+
+#[test]
 fn sheet_order_transaction_reaches_numbers_facade() -> Result<(), Box<dyn std::error::Error>> {
     use litchi::numbers::sheet::order::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 

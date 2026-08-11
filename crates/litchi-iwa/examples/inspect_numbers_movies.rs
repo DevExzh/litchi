@@ -10,10 +10,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("usage: inspect_numbers_movies <input.numbers>")?;
     let editor = NumbersEditor::open(input)?;
     for sheet in editor.sheets()? {
-        for (movie_index, movie) in editor.sheet_movies(sheet.object_id)?.iter().enumerate() {
+        for (movie_index, movie) in editor.sheet_movies(sheet.id())?.iter().enumerate() {
             println!(
                 "sheet={} movie_index={movie_index} drawable={} movie_data={} poster_data={} duration={:?} geometry={:?} original_size={:?} natural_size={:?}",
-                sheet.object_id,
+                sheet.id(),
                 movie.drawable_object_id,
                 movie.movie_data_identifier,
                 movie.poster_image_data_identifier,

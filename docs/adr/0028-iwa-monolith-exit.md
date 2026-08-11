@@ -2232,3 +2232,78 @@ six missing dev-only `soapberry-zip` annotations and eight unclassified edges
 (`litchi-iwa -> litchi-keynote`) remains, with topology at 64 workspace
 packages, 235 internal declarations, 14 `litchi-iwa` declarations, and 14
 ordered debts.
+
+## 2026-08-11 amendment: Numbers table-title host exit
+
+The direct Numbers table-title seam moves to
+`table::title::{Settings, Edit, Patch, Commit, Diagnostics, Error, LimitKind,
+Path}` and `Package::{table_title_settings, edit_table_title,
+apply_table_title}`. Semantic sheet/table selectors replace host raw IDs.
+The focused signatures expose no raw source, component, or generated value;
+source bytes remain crate-private and output is through `write_to`. Optional
+field-22 visibility and field-37 outline presence are lossless, and
+consuming `Edit::set` stages a complete value without touching the package.
+
+Changed ownership follows the focused rooted Document -> Sheet/FormBasedSheet
+-> TableInfo -> TableModel chain and exact reference metadata, refuses locked
+tables, and requires canonical nonaliased rendering prerequisites before
+publishing a visible title: finite nonnegative field-33 height, field-30
+paragraph style/type 2022, and field-36 shape style/type 2025. Unsupported
+style or ownership prerequisites fail closed. Changed admission scans
+`Index/ViewState.iwa` and rejects any native type-6284 table-name-selection
+message with `UnsupportedSource`; the transient selection state is an
+unsupported dependency, not a write right. Reads and exact no-ops retain broad
+compatibility. Every other ViewState byte in an accepted changed source remains
+outside the write set and exact.
+
+Strict raw routing validates the three title scalars and the two reused scalar
+references before forcing/cross-checking Buffa views. There is no generated
+encoder or repeated view. The deterministic five-file closure is 32,332 bytes
+under 33 KiB with SHA-256
+`56cfd70666ffa6079175bdab0a63a4ddd055099edf3c771ed3ad8b3051596ee1`;
+codec/protobuf verification is 9/9 and 141/141.
+
+No-op shares exact source and skips native rewrite/reopen. A change rewrites
+only the selected TableModel in `Index/CalculationEngine.iwa`, removes each
+existing canonical root preview (zero to three), and reopens/verifies the exact
+delta. Apply authorizes exact source and target artifacts, conflicts on drift,
+and inverse restores exact source bytes and previews. Accepted ViewState and
+every nonselected component remain exact; changed legacy/non-exact provenance
+is unsupported.
+
+The Numbers 14.4 control resave is 136,204 bytes,
+`25c9fc858ca4fb4f1fedeafb944e96afb81af03a082a41be297ecf6f2542dbdb`;
+the title-hidden resave is 136,273 bytes,
+`ac8a7117ad6256b0da2e6d191b9e64f721b689d71696a89ac0f78bc6aa513a28`.
+Native hiding removes raw field 22 rather than writing false, while field 37
+remains independently presence-sensitive. This oracle does not authorize a
+type-6284 ViewState rewrite; changed admission rejects that transient state.
+
+Rust starts from the 136,357-byte exact source
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`,
+produces the 136,351-byte hidden candidate
+`4c7f6340b6f2675240577c5b59d5c154de24c8a7e763a31257c56a9899a8e40c`,
+and inverses byte-exactly to the source. Numbers 14.4 opened the candidate
+without warning, showed Table Title unchecked, retained its 22-by-7 shape, B2
+fixture marker, and B3 value 42, and preserved those semantics through Save As,
+close, and warning-free exact-URL reopen. The 136,353-byte native resave is
+`5b162f8431f45333f0ae9a8654dfa724794f2ec2b391ea11f6a5eee7822cbb10`.
+
+Final performance review is P0/P1-clean. The real rooted Package path from
+4,096 to 8,192 objects records fields 53,307 -> 108,363 (2.0326x), `WireWork`
+315,936 -> 636,752 (2.0155x), references 16,386 -> 32,770 (exactly `2 + 4N`,
+1.9999x), and `TransactionWork` 9,084,384 -> 18,298,157 (2.0142x), all at or
+below 2.3x. A maximum-minus-one work budget rejects before output. The only P2
+costs are linear selector temporary vectors and redundant decode passes for a
+changed edit; no timing claim is made.
+
+The exact host cut removes two public NumbersEditor methods, 32 production
+lines, 245 direct-test lines, and `edit_numbers_table_title`. The private
+Numbers package helpers and wire path remain because Pages and Keynote still
+use them; their table-title APIs and table CRUD are not claimed by this exit.
+Boundary regressions pass 173/173. Final gates pass 111/111 Numbers library,
+2/2 private table-title, 5/5 public table-title, 9/9 codec, and 141/141 full
+protobuf tests. The full checker retains only 14 unchanged dependency-policy
+baselines. No manifest edge or ordered debt closes: the current inventory is
+64 workspace packages, 237 internal declarations, 14 `litchi-iwa`
+declarations, and 14 ordered debts, including debt 015.

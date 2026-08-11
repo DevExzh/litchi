@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Category".to_owned())),
             PagesTableCellUpdate::new(0, 1, PagesCellValue::Text("Cost".to_owned())),
             PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("Travel".to_owned())),
-            PagesTableCellUpdate::new(1, 1, PagesCellValue::Number(125.0)),
+            PagesTableCellUpdate::new(1, 1, PagesCellValue::number(125.0)?),
         ],
     )?;
     editor.set_table_formula(
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 PagesTableFormulaExpression::Number(25.0),
             ],
         ),
-        PagesTableFormulaCachedValue::Number(125.0),
+        PagesTableFormulaCachedValue::number(125.0)?,
     )?;
 
     let anchor = editor.body_text()?.encode_utf16().count();

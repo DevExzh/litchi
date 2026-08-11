@@ -585,7 +585,7 @@ let mut numbers = NumbersDocumentBuilder::new()
     .sheet_name("Forecast")
     .table_name("Revenue")
     .build()?;
-let sheet_id = numbers.sheets()?[0].object_id;
+let sheet_id = numbers.sheets()?[0].id();
 numbers.add_sheet_text_box(
     sheet_id,
     "Prepared from typed IWA objects",
@@ -607,7 +607,7 @@ use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
 let mut numbers = NumbersDocumentBuilder::new().build()?;
-let sheet_id = numbers.sheets()?[0].object_id;
+let sheet_id = numbers.sheets()?[0].id();
 let shape = numbers.add_sheet_shape(
     sheet_id,
     "A fully editable shape",
@@ -632,7 +632,7 @@ use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
 let mut numbers = NumbersDocumentBuilder::new().build()?;
-let sheet_id = numbers.sheets()?[0].object_id;
+let sheet_id = numbers.sheets()?[0].id();
 let line = numbers.add_sheet_line_with_endpoints(
     sheet_id,
     DrawablePoint { x: 420.0, y: 300.0 },
@@ -667,7 +667,7 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 let image = fs::read("chart.png")?;
 let mut numbers = NumbersDocumentBuilder::new().build()?;
-let sheet_id = numbers.sheets()?[0].object_id;
+let sheet_id = numbers.sheets()?[0].id();
 let source = numbers.add_sheet_image(
     sheet_id,
     "chart.png",
@@ -702,7 +702,7 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
 let mut numbers = NumbersDocumentBuilder::new().build()?;
-let sheet_id = numbers.sheets()?[0].object_id;
+let sheet_id = numbers.sheets()?[0].id();
 let source = numbers.add_sheet_movie(
     sheet_id,
     "demo.mov",
@@ -741,7 +741,7 @@ use litchi_iwa::shapes::DrawablePoint;
 
 let audio = fs::read("interview.aiff")?;
 let mut numbers = NumbersDocumentBuilder::new().build()?;
-let sheet_id = numbers.sheets()?[0].object_id;
+let sheet_id = numbers.sheets()?[0].id();
 let source = numbers.add_sheet_audio(
     sheet_id,
     "interview.aiff",
@@ -1035,7 +1035,6 @@ title, body, or speaker-notes editing: those semantic operations are owned by
 ```rust
 use litchi_iwa::numbers::{
     CellValue, FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
-    Settings as TableTitleSettings,
 };
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
@@ -1050,10 +1049,6 @@ use litchi_iwa::keynote::{
 
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
-numbers.set_table_title_settings(
-    table.id(),
-    TableTitleSettings::new(Some(true), Some(false)),
-)?;
 numbers.set_cell(table.id(), 1, 2, CellValue::Number(42.0))?;
 // Existing rich-text cells use the same call. Their TSWP formatting storage is
 // retained, and shared payloads are isolated with copy-on-write.
@@ -1518,6 +1513,79 @@ rather than normalizing through the retired migration-host path. See
 `litchi-numbers/examples/edit_table_headers.rs` for a distinct-output workflow
 that streams with `Package::write_to` through a synchronized sibling temporary
 file and publishes without clobbering an existing target.
+
+### Numbers table titles use a focused package transaction
+
+Numbers table-title visibility and outline settings are no longer
+`NumbersEditor` raw-ID operations. Use
+`litchi_numbers::table::title::{Settings, Edit, Patch, Commit, Diagnostics,
+Error, LimitKind, Path}` with a sheet selector and a table selector scoped to
+that sheet. `Settings` preserves optional Boolean presence: `None` is absent
+on the wire, whereas `Some(false)` is explicitly stored false.
+Explicit false and outline presence are losslessly tested transaction values;
+they are not native UI-oracle claims.
+
+```rust,no_run
+use litchi_numbers::{
+    Package, SheetSelector, TableSelector,
+    table::title::Settings,
+};
+
+let package = Package::open("input.numbers")?;
+let sheet = SheetSelector::name("Summary");
+let table = TableSelector::name("Revenue");
+let before = package.table_title_settings(sheet, table)?;
+// This is guaranteed to differ without enabling a previously hidden title.
+let settings = if before.visible() == Some(true) {
+    Settings::new(None, before.outlined())
+} else {
+    Settings::new(
+        before.visible(),
+        match before.outlined() {
+            None => Some(false),
+            Some(_) => None,
+        },
+    )
+};
+let commit = package
+    .edit_table_title(sheet, table)?
+    .set(settings)
+    .commit()?;
+assert_eq!(commit.package().table_title_settings(sheet, table)?, settings);
+assert!(commit.diagnostics().changed());
+assert_eq!(commit.diagnostics().touched_components(), 1);
+assert!(commit.diagnostics().deleted_previews() <= 3);
+
+let restored = commit
+    .package()
+    .apply_table_title(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Staging the readback value is an exact no-op. A changed title transaction
+rewrites the affected `CalculationEngine` component, deletes every existing
+canonical root preview, and fully reopens its candidate; the exact-source
+inverse restores the original bytes and previews. Changed publication refuses
+an effectively locked table, so the changed portion of this example requires
+an unlocked supported table. A visible title also requires valid native title
+height plus paragraph-style and shape-style prerequisites, so malformed or
+unsupported style graphs fail rather than being normalized. The native basic
+fixture has all three canonical previews (`3 → 0`, then `0 → 3` on inverse)
+and proves only visible `Some(true)` to absent (hide), plus warning-free open
+and Save As/reopen; it does not assert outline or explicit-false UI results.
+See `litchi-numbers/examples/edit_table_title.rs` for synchronized
+sibling-temporary, distinct-output, no-clobber publication through
+`Package::write_to`.
+
+This transfer is Numbers-only: `PagesEditor::table_title_settings` /
+`set_table_title_settings` and `KeynoteEditor::slide_table_title_settings` /
+`set_slide_table_title_settings` remain migration-host table-title helpers,
+along with their format-specific table CRUD.
 
 ### Numbers sheet and table names use the focused package transaction
 

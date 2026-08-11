@@ -7,7 +7,10 @@ use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
-use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
+use litchi_numbers::{
+    TableSelector,
+    cell::{Update as TableCellUpdate, Value as CellValue},
+};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 3;
@@ -33,11 +36,11 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Hidden Axes")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     editor.set_cells(table_id, table_cells())?;
-    editor.set_table_hidden_axes(table_id, &hidden)?;
+    editor.set_table_hidden_axes(TableSelector::index(0), &hidden)?;
     editor.save(output)?;
-    if NumbersEditor::open(output)?.table_hidden_axes(table_id)? != hidden {
+    if NumbersEditor::open(output)?.table_hidden_axes(TableSelector::index(0))? != hidden {
         return Err("Numbers hidden axes failed reopen validation".into());
     }
     Ok(())

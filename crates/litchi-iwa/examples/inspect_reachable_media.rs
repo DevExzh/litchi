@@ -29,8 +29,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             print_assets("spreadsheet", &editor.media_assets()?);
             for sheet in editor.sheets()? {
                 print_assets(
-                    &format!("sheet[{}] id={}", sheet.index, sheet.object_id),
-                    &editor.sheet_media_assets(sheet.object_id)?,
+                    &format!("sheet[{}] id={}", sheet.index, sheet.id()),
+                    &editor.sheet_media_assets(sheet.id())?,
                 );
             }
         },

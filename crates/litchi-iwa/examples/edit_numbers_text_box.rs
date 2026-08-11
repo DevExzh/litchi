@@ -24,11 +24,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(sheet_index)
         .ok_or("sheet index out of range")?;
     let text_box = editor
-        .sheet_text_boxes(sheet.object_id)?
+        .sheet_text_boxes(sheet.id())?
         .into_iter()
         .nth(text_box_index)
         .ok_or("text-box index out of range")?;
-    editor.set_sheet_text_box_text(sheet.object_id, text_box.drawable_object_id, &replacement)?;
+    editor.set_sheet_text_box_text(sheet.id(), text_box.drawable_object_id, &replacement)?;
     editor.save(output)?;
     println!(
         "sheet={sheet_index} drawable={} storage={} text={replacement:?}",

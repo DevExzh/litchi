@@ -10,10 +10,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("usage: inspect_numbers_audio <input.numbers>")?;
     let editor = NumbersEditor::open(input)?;
     for sheet in editor.sheets()? {
-        for (audio_index, audio) in editor.sheet_audio(sheet.object_id)?.iter().enumerate() {
+        for (audio_index, audio) in editor.sheet_audio(sheet.id())?.iter().enumerate() {
             println!(
                 "sheet={} audio_index={audio_index} drawable={} audio_data={} position={:?} duration={:?}",
-                sheet.object_id,
+                sheet.id(),
                 audio.drawable_object_id,
                 audio.audio_data_identifier,
                 audio.position,

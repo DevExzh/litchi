@@ -3,6 +3,7 @@
 use std::env;
 
 use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -15,12 +16,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let columns: usize = arguments.next().ok_or("missing column count")?.parse()?;
 
     let mut editor = NumbersEditor::open(input)?;
-    let table = editor
+    editor
         .tables()?
         .get(table_index)
-        .cloned()
         .ok_or("table index is out of bounds")?;
-    editor.resize_table(table.object_id, rows, columns)?;
+    editor.resize_table(TableSelector::index(table_index), rows, columns)?;
     editor.save(output)?;
     Ok(())
 }

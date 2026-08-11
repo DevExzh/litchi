@@ -31,15 +31,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn list_numbers(input: &str) -> Result<(), Box<dyn std::error::Error>> {
     let editor = NumbersEditor::open(input)?;
     for sheet in editor.sheets()? {
-        for chart in editor.sheet_charts(sheet.object_id)? {
+        for chart in editor.sheet_charts(sheet.id())? {
             if chart.kind.supports_radar_start_angle() {
                 println!(
                     "Numbers sheet={} chart={} kind={:?} start_angle={}°",
-                    sheet.object_id,
+                    sheet.id(),
                     chart.drawable_object_id,
                     chart.kind,
                     editor
-                        .sheet_chart_radar_start_angle(sheet.object_id, chart.drawable_object_id)?
+                        .sheet_chart_radar_start_angle(sheet.id(), chart.drawable_object_id)?
                         .degrees()
                 );
             }

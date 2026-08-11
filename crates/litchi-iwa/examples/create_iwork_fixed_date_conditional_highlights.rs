@@ -38,19 +38,19 @@ fn date_cases() -> Result<[(CellValue, Rule); 4], Box<dyn std::error::Error>> {
     let style = Style::new(Some(fill), None, true)?;
     Ok([
         (
-            CellValue::Date(exact.apple_seconds() + midday),
+            CellValue::date(exact.apple_seconds() + midday)?,
             Rule::new(Condition::DateIs(exact), style),
         ),
         (
-            CellValue::Date(lower.apple_seconds() + midday),
+            CellValue::date(lower.apple_seconds() + midday)?,
             Rule::new(Condition::DateIsBefore(exact), style),
         ),
         (
-            CellValue::Date(upper.apple_seconds() + midday),
+            CellValue::date(upper.apple_seconds() + midday)?,
             Rule::new(Condition::DateIsAfter(exact), style),
         ),
         (
-            CellValue::Date(exact.apple_seconds() + midday),
+            CellValue::date(exact.apple_seconds() + midday)?,
             Rule::new(Condition::DateIsBetween(range), style),
         ),
     ])
@@ -61,7 +61,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Fixed dates")
         .table_dimensions(2, 5)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     let cases = date_cases()?;
     for (offset, (value, rule)) in cases.iter().enumerate() {
         let column = FIRST_DATE_COLUMN + offset;

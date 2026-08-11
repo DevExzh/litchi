@@ -1,6 +1,7 @@
 use std::env;
 
 use litchi_iwa::numbers::{NumbersDocument, NumbersEditor};
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = env::args().skip(1).collect::<Vec<_>>();
@@ -16,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .nth(table_index)
         .ok_or("table index was not found")?;
-    let created = editor.duplicate_table(source.object_id)?;
+    let created = editor.duplicate_table(TableSelector::index(table_index))?;
     editor.save(&arguments[1])?;
 
     let document = NumbersDocument::open(&arguments[1])?;

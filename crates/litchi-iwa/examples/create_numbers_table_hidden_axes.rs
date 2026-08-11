@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -16,12 +17,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Hidden Axes")
         .table_dimensions(6, 4)
         .build()?;
-    let table = editor.tables()?.remove(0);
-    editor.set_table_hidden_axes(table.object_id, &hidden)?;
+    editor
+        .tables()?
+        .first()
+        .ok_or("the document has no tables")?;
+    let table = TableSelector::index(0);
+    editor.set_table_hidden_axes(table, &hidden)?;
     editor.save(&output)?;
 
     assert_eq!(
-        NumbersEditor::open(output)?.table_hidden_axes(table.object_id)?,
+        NumbersEditor::open(output)?.table_hidden_axes(table)?,
         hidden
     );
     Ok(())

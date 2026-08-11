@@ -41,7 +41,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Checkboxes")
         .table_dimensions(2, 3)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     for (column, value) in [(CHECKED_COLUMN, true), (UNCHECKED_COLUMN, false)] {
         editor.set_cell(table_id, CHECKBOX_ROW, column, CellValue::Boolean(value))?;
         editor.set_table_cell_checkbox_format(table_id, CHECKBOX_ROW, column, Checkbox)?;

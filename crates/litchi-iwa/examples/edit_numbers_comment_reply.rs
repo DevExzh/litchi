@@ -22,15 +22,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let operation = arguments.next().ok_or("missing add, set, or remove")?;
 
     let mut editor = NumbersEditor::open(&input)?;
-    let table_id = table_selector.parse::<u64>().ok().or_else(|| {
-        editor
-            .tables()
-            .ok()?
-            .into_iter()
-            .find(|table| table.name == table_selector)
-            .map(|table| table.object_id)
-    });
-    let table_id = table_id.ok_or("table selector did not match a Numbers table")?;
+    let tables = editor.tables()?;
+    let table = table_selector
+        .parse::<u64>()
+        .ok()
+        .and_then(|id| tables.iter().find(|table| table.id() == id))
+        .or_else(|| tables.iter().find(|table| table.name == table_selector));
+    let table_id = table
+        .ok_or("table selector did not match a Numbers table")?
+        .id();
 
     match operation.as_str() {
         "add" => {

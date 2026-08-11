@@ -1021,3 +1021,134 @@ boundary suite passes 165/165, the live-host and focused audits are empty, and
 the full checker retains only the unchanged 14 baselines: six development-only
 annotations and eight edge classifications. Its sheet-order inventory is the
 private error/resolve/rewrite helper tuple and five source files.
+
+## 2026-08-11 amendment: Numbers table-title exact patches
+
+The focused immutable owner is
+`litchi_numbers::table::title::{Settings, Edit, Patch, Commit, Diagnostics,
+Error, LimitKind, Path}` with
+`Package::{table_title_settings, edit_table_title, apply_table_title}`. A
+semantic sheet selector followed by a sheet-scoped table selector replaces the
+former raw model identifier. `Settings` preserves the independent presence of
+TableModel field 22 (title visibility) and field 37 (title outline): absent,
+explicit false, and true are distinct transaction values. That nine-state Rust
+contract is not a native-oracle claim for explicit false or outline behavior.
+
+An edit is bound to one immutable source snapshot and exposes the selected
+semantic path and staged settings. Consuming `Edit::set(self, Settings) ->
+Self` only replaces the staged value. If it equals the source value, commit
+shares the exact source artifact, reports unchanged with zero touched
+components and previews, and skips all changed-only ownership, rendering, and
+candidate-reopen work. No-op apply and inverse retain the same exact behavior.
+
+A change first requires exact flat package provenance. It reuses the table-
+header owner's rooted Document field-1 -> Sheet or FormBasedSheet drawable ->
+TableInfo field-2 -> TableModel proof, including unique local objects,
+canonical selected messages, exact aggregate and optional FieldInfo reference
+metadata, nonaliased roles, and the effective TableInfo lock. Canonical and
+unambiguous legacy TableInfo/TableModel message types remain readable through
+that shared resolver; a changed nested/non-exact physical source returns
+`UnsupportedSource` under Preserve rather than being normalized. A locked
+selected table returns `TableLocked`. Changed admission also scans every
+message in `Index/ViewState.iwa` and returns `UnsupportedSource` if any message
+has native type 6284, the transient table-title selection state. The scan is
+conservative and package-wide; it does not infer that a type-6284 occurrence
+belongs to the selected table.
+
+When the requested target is effectively visible, changed admission also
+requires the source's field-33 title height to be present, finite, and
+nonnegative. Field-30 paragraph-style and field-36 shape-style references must
+be present, local, distinct from each other and the rooted table roles, occur
+exactly once in aggregate metadata, and use only their exact optional
+FieldInfo paths. They must resolve uniquely to canonical type-2022 paragraph
+style and type-2025 shape style messages with valid required-super framing.
+Missing rendering state returns `UnsupportedDependency`; external, aliased,
+ambiguous, or malformed state is invalid. A hidden requested target does not
+invent or require those rendering dependencies.
+
+The raw writer splices only fields 22 and 37 of the selected TableModel and
+retains each field's requested presence. It rewrites one
+`Index/CalculationEngine.iwa` component, removes every canonical root preview
+present in the source (zero through three), reassembles once, fully reopens the
+candidate, and verifies semantic readback plus exact locality. Field 33, fields
+30/36, all unknown records, MessageInfo and FieldInfo apart from the necessary
+selected payload length, every nonselected object/component, ViewState, table
+data and styles, and unrelated package members remain exact; only derived ZIP
+size, checksum, and offset bookkeeping may differ. Reads and exact semantic
+no-ops do not run the changed-only type-6284 guard, so those operations remain
+broad. For an accepted changed source with no type-6284 message, all other
+ViewState content remains byte-exact.
+
+`Patch` retains the complete exact source and target artifacts, before/after
+settings, selected semantic target, directional preview counts, and bounded
+reopen proof process-locally. Changed apply authorizes the exact source and
+prior semantic value, charges retained target work, completely reopens the
+target, and repeats semantic and locality verification. Drift, replay on a
+byte-different source, or a mismatched direction conflicts. `Patch::inverse`
+swaps the two artifacts and directional proof and restores the accepted source
+byte-for-byte, including deleted previews. Fingerprints are diagnostic rather
+than authorization. The patch has no stable serialization, composition,
+merge, bounded history, or library-owned durable publication;
+`Package::write_to` remains the output boundary.
+
+The private scalar projection is
+`TSTTableTitleSettingsArchive.proto`, containing only fields 22, 33, and 37.
+A strict handwritten pass validates their canonical wire forms and routes the
+field-30/36 `TSP.Reference` payloads through the existing private scalar
+`TNNumbersSheetReferenceArchive` lazy view. Raw caller-owned records remain
+the preservation and rewrite authority; generated production code has no
+encoder, `RepeatedView`, or `LazyRepeatedView`. The deterministic closure is
+five files and 32,332 bytes under 33 KiB with SHA-256
+`56cfd70666ffa6079175bdab0a63a4ddd055099edf3c771ed3ad8b3051596ee1`.
+Typed byte, field, work, nesting, reference, archive, and aggregate transaction
+ceilings apply before publication.
+
+The final performance review found no P0 or P1 issue. A structural gate drives
+the real rooted `Package` transaction path over 4,096 and 8,192 native states.
+Strict fields rise from 53,307 to 108,363 (2.0326 times), wire work from 315,936
+to 636,752 (2.0155 times), references from 16,386 to 32,770, exactly `2 + 4N`
+(1.9999 times), and transaction work from 9,084,384 to 18,298,157 (2.0142
+times). Every measured resource remains below the 2.3 structural ceiling, and
+a maximum-minus-one allowance rejects atomically before output. This is a
+deterministic work gate, not a wall-clock benchmark. The accepted P2 costs are
+bounded linear selector temporary vectors and redundant strict decodes on the
+changed path; neither grants unbounded retention or quadratic work.
+
+The authoritative matched Numbers 14.4 native pair is the 136,204-byte
+control resave SHA-256
+`25c9fc858ca4fb4f1fedeafb944e96afb81af03a082a41be297ecf6f2542dbdb`
+and the 136,273-byte hidden-title artifact SHA-256
+`ac8a7117ad6256b0da2e6d191b9e64f721b689d71696a89ac0f78bc6aa513a28`.
+Their selected native delta establishes only field 22 `Some(true)` to absent.
+The final Rust gate began from the 136,357-byte source SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+Rust produced a 136,351-byte hidden-title artifact SHA-256
+`4c7f6340b6f2675240577c5b59d5c154de24c8a7e763a31257c56a9899a8e40c`,
+and inverse restored the exact source artifact. Numbers 14.4 opened it without
+warning, showed the title checkbox off, retained the 22 by 7 table, `B2`
+marker, and `B3 = 42`, and after native resave and exact-path reopen produced a
+136,353-byte artifact SHA-256
+`5b162f8431f45333f0ae9a8654dfa724794f2ec2b391ea11f6a5eee7822cbb10`
+with the same UI state. Neither gate proves a native explicit-false spelling,
+field-37 outline mutation, or a right to rewrite type-6284 ViewState; the
+focused writer refuses that transient type on changed admission and leaves all
+accepted ViewState exact.
+
+The frozen host cut removes only
+`NumbersEditor::{table_title_settings, set_table_title_settings}`: 32
+production lines, four whole direct tests totaling 245 lines, and the complete
+39-line `edit_numbers_table_title.rs` example. Private
+`table_title_settings_in_package`/`set_table_title_settings_in_package`, their
+wire module, the shared title `Settings`, Pages/Keynote table-title methods and
+tests, and all format-specific table CRUD remain because the two other formats
+still use that cross-format substrate. This is a Numbers direct-owner handoff,
+not retirement of Pages or Keynote title editing.
+
+The frozen gates pass 9/9 focused codec tests, 141/141 protobuf tests, 111/111
+Numbers library tests, 2/2 private transaction tests, and 5/5 public focused
+integration tests. The boundary unit suite passes 173/173; live host and
+focused audits are empty, and the full checker is restored to only the
+unchanged 14 baselines: six development-only annotations and eight edge
+classifications. No edge or debt closes: final topology is 64 workspace
+packages, 237 internal declarations, 14 `litchi-iwa` dependency declarations,
+and 14 ordered debts, including debt 015 (`litchi-iwa -> litchi-numbers`).

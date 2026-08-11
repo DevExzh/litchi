@@ -301,6 +301,69 @@ publication, use `litchi-numbers/examples/edit_sheet_order.rs`, which writes a
 distinct output via `Package::write_to`, a synchronized sibling temporary
 file, and no-clobber publication.
 
+## Focused Numbers table-title edits
+
+With the `numbers` feature enabled, table-title visibility and outline use the
+selector-first `litchi::numbers::table::title` transaction. `Settings` keeps
+native presence: `None` means absent, while `Some(false)` explicitly stores a
+false value. Explicit false and outline presence are losslessly transaction
+tested, but not native UI-oracle claims. Native table IDs are never exposed.
+
+```rust,no_run
+use litchi::numbers::{
+    Package, SheetSelector, TableSelector,
+    table::title::Settings,
+};
+
+let package = Package::open("input.numbers")?;
+let sheet = SheetSelector::name("Summary");
+let table = TableSelector::name("Revenue");
+let before = package.table_title_settings(sheet, table)?;
+// This is guaranteed to differ without enabling a previously hidden title.
+let settings = if before.visible() == Some(true) {
+    Settings::new(None, before.outlined())
+} else {
+    Settings::new(
+        before.visible(),
+        match before.outlined() {
+            None => Some(false),
+            Some(_) => None,
+        },
+    )
+};
+let commit = package
+    .edit_table_title(sheet, table)?
+    .set(settings)
+    .commit()?;
+assert_eq!(commit.package().table_title_settings(sheet, table)?, settings);
+assert!(commit.diagnostics().changed());
+assert_eq!(commit.diagnostics().touched_components(), 1);
+assert!(commit.diagnostics().deleted_previews() <= 3);
+
+let restored = commit
+    .package()
+    .apply_table_title(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+An unchanged value is exact no-op. A changed title updates its one
+`CalculationEngine` component, removes every existing canonical root preview,
+and fully reopens the candidate; its inverse restores the exact source and
+previews. Changed publication refuses an effectively locked table, so the
+changed portion of this example requires an unlocked supported table. A visible
+title also requires the native title-height, paragraph-style, and shape-style
+prerequisites. The native basic fixture has all three canonical previews
+(`3 → 0`, then `0 → 3` on inverse) and proves only visible `Some(true)` to
+absent (hide), warning-free open, and Save As/reopen; it does not assert
+outline or explicit-false UI results. Use
+`litchi-numbers/examples/edit_table_title.rs` for synchronized,
+distinct-output, no-clobber publication via `Package::write_to`.
+
 ## Focused Numbers table-header edits
 
 Enable the `numbers` feature to use the focused immutable Numbers package API

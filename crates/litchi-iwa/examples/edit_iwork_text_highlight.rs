@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::text::{IWorkTextEditor, TextRange};
+use litchi_iwa::text::{IWorkTextEditor, TextRange, TextStorageId};
 use litchi_iwa_text::highlight::raw;
 
 const USAGE: &str = "usage:\n  edit_iwork_text_highlight list <input> <storage-id>\n  edit_iwork_text_highlight add <input> <output> <storage-id> <start> <end>\n  edit_iwork_text_highlight update <input> <output> <storage-id> <highlight-id> <start> <end>\n  edit_iwork_text_highlight remove <input> <output> <storage-id> <highlight-id>";
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match command.as_str() {
         "list" => {
             let input = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             require_end(arguments)?;
             let editor = IWorkTextEditor::open(input)?;
             for highlight in editor.text_highlights(storage_id)? {
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "add" => {
             let input = arguments.next().ok_or(USAGE)?;
             let output = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let range = parse_range(&mut arguments)?;
             require_end(arguments)?;
             let mut editor = IWorkTextEditor::open(input)?;
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "update" => {
             let input = arguments.next().ok_or(USAGE)?;
             let output = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let highlight_id = raw::from_object_id(parse_u64(arguments.next(), "highlight-id")?)?;
             let range = parse_range(&mut arguments)?;
             require_end(arguments)?;
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "remove" => {
             let input = arguments.next().ok_or(USAGE)?;
             let output = arguments.next().ok_or(USAGE)?;
-            let storage_id = parse_u64(arguments.next(), "storage-id")?;
+            let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let highlight_id = raw::from_object_id(parse_u64(arguments.next(), "highlight-id")?)?;
             require_end(arguments)?;
             let mut editor = IWorkTextEditor::open(input)?;
@@ -73,6 +73,15 @@ fn parse_range(
 }
 
 fn parse_u64(value: Option<String>, label: &str) -> Result<u64, Box<dyn std::error::Error>> {
+    value
+        .ok_or_else(|| USAGE.into())
+        .and_then(|value| value.parse().map_err(|_| format!("invalid {label}").into()))
+}
+
+fn parse_storage_id(
+    value: Option<String>,
+    label: &str,
+) -> Result<TextStorageId, Box<dyn std::error::Error>> {
     value
         .ok_or_else(|| USAGE.into())
         .and_then(|value| value.parse().map_err(|_| format!("invalid {label}").into()))

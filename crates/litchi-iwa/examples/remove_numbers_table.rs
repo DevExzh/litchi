@@ -3,6 +3,7 @@
 use std::env;
 
 use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -13,12 +14,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table_index: usize = arguments.next().ok_or("missing table index")?.parse()?;
 
     let mut editor = NumbersEditor::open(input)?;
-    let table = editor
+    editor
         .tables()?
         .get(table_index)
-        .cloned()
         .ok_or("table index is out of bounds")?;
-    editor.remove_table(table.object_id)?;
+    editor.remove_table(TableSelector::index(table_index))?;
     editor.save(output)?;
     Ok(())
 }

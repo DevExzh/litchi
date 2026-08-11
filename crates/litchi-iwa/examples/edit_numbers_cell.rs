@@ -23,10 +23,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let value = match value_type.as_str() {
         "empty" => CellValue::Empty,
         "text" => CellValue::Text(raw_value.ok_or("missing text value")?),
-        "number" => CellValue::Number(raw_value.ok_or("missing number value")?.parse()?),
+        "number" => CellValue::number(raw_value.ok_or("missing number value")?.parse()?)?,
         "boolean" => CellValue::Boolean(raw_value.ok_or("missing boolean value")?.parse()?),
-        "date" => CellValue::Date(raw_value.ok_or("missing date value")?.parse()?),
-        "duration" => CellValue::Duration(raw_value.ok_or("missing duration value")?.parse()?),
+        "date" => CellValue::date(raw_value.ok_or("missing date value")?.parse()?)?,
+        "duration" => CellValue::duration(raw_value.ok_or("missing duration value")?.parse()?)?,
         _ => return Err(format!("unsupported value type {value_type:?}").into()),
     };
 
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table = tables
         .get(table_index)
         .ok_or("table index is out of bounds")?;
-    editor.set_cell(table.object_id, row, column, value)?;
+    editor.set_cell(table.id(), row, column, value)?;
     editor.save(output)?;
     Ok(())
 }

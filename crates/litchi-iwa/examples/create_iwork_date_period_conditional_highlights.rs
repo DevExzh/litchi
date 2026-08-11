@@ -41,11 +41,11 @@ fn date_cases() -> Result<[(CellValue, Rule); 4], Box<dyn std::error::Error>> {
     let one_quarter = Period::new(1, Unit::Quarters)?;
     let fill = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
     let style = Style::new(Some(fill), None, true)?;
-    let case = |date, condition| {
-        (
-            CellValue::Date(date_in_apple_seconds(date) + SECONDS_PER_DAY / 2.0),
+    let case = |date, condition| -> Result<_, litchi_numbers::cell::FiniteF64Error> {
+        Ok((
+            CellValue::date(date_in_apple_seconds(date) + SECONDS_PER_DAY / 2.0)?,
             Rule::new(condition, style),
-        )
+        ))
     };
     Ok([
         case(
@@ -53,25 +53,25 @@ fn date_cases() -> Result<[(CellValue, Rule); 4], Box<dyn std::error::Error>> {
                 .checked_add_days(Days::new(2))
                 .ok_or("date overflow")?,
             Condition::DateIsInNext(two_days),
-        ),
+        )?,
         case(
             today
                 .checked_sub_days(Days::new(14))
                 .ok_or("date overflow")?,
             Condition::DateIsInLast(two_weeks),
-        ),
+        )?,
         case(
             today
                 .checked_add_months(Months::new(1))
                 .ok_or("date overflow")?,
             Condition::DateIsOffsetFromToday(Offset::new(one_month, Direction::FromNow)),
-        ),
+        )?,
         case(
             today
                 .checked_sub_months(Months::new(3))
                 .ok_or("date overflow")?,
             Condition::DateIsOffsetFromToday(Offset::new(one_quarter, Direction::Ago)),
-        ),
+        )?,
     ])
 }
 
@@ -86,7 +86,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Date periods")
         .table_dimensions(2, 5)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     let cases = date_cases()?;
     for (offset, (value, rule)) in cases.iter().enumerate() {
         let column = FIRST_DATE_COLUMN + offset;

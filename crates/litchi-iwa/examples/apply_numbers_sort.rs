@@ -3,6 +3,7 @@
 use litchi_iwa::numbers::{
     NumbersEditor, NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRule,
 };
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = std::env::args().skip(1).collect::<Vec<_>>();
@@ -26,14 +27,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut editor = NumbersEditor::open(input)?;
-    let table_id = editor
+    editor
         .tables()?
         .first()
-        .map(|table| table.object_id)
         .ok_or("the document has no tables")?;
+    let table = TableSelector::index(0);
     if let Some(direction) = direction {
         let current = editor
-            .table_sort_order(table_id)?
+            .table_sort_order(table)?
             .ok_or("the table has no persisted sort order")?;
         let redirected = NumbersTableSortOrder::with_scope(
             current.scope(),
@@ -42,9 +43,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .iter()
                 .map(|rule| NumbersTableSortRule::new(rule.column(), direction)),
         )?;
-        editor.set_table_sort_order(table_id, redirected)?;
+        editor.set_table_sort_order(table, redirected)?;
     }
-    editor.apply_table_sort_order(table_id)?;
+    editor.apply_table_sort_order(table)?;
     editor.save(output)?;
     Ok(())
 }
