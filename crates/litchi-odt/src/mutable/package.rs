@@ -6,7 +6,9 @@ use crate::core::{MetaXmlPatch, PackageWriter, Structure, patch_meta_xml};
 use crate::elements::parser::OrderElement;
 use crate::elements::text::Paragraph;
 use litchi_core::{Result, xml::escape_xml};
-use litchi_odf_common::package::{replace_content_xml, xml_splice_publication};
+use litchi_odf_common::package::{
+    MAX_CONTENT_REPLACEMENT_BYTES, replace_content_xml, xml_splice_publication,
+};
 use std::path::Path;
 
 impl MutableDocument {
@@ -421,6 +423,9 @@ impl MutableDocument {
             generated_content_xml = self.generate_content_xml();
             &generated_content_xml
         };
+        if content_xml.len() > MAX_CONTENT_REPLACEMENT_BYTES {
+            return self.to_bytes();
+        }
         replace_content_xml(source, content_xml)
     }
 

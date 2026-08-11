@@ -101,6 +101,35 @@ fn paragraph_replacement_raw_preserves_unchanged_media_and_metadata() {
     );
 }
 
+#[test]
+fn paragraph_replacement_above_common_raw_limit_uses_existing_rebuild_path() {
+    const PARAGRAPH_COUNT: usize = 16_120;
+    const TARGET: usize = PARAGRAPH_COUNT / 2;
+    let text = "x".repeat(1024);
+    let mut document = MutableDocument::new();
+    for _ in 0..PARAGRAPH_COUNT {
+        document.add_paragraph(&text).unwrap();
+    }
+    let source = Document::from_bytes(document.to_bytes().unwrap()).unwrap();
+    assert!(
+        source.get_file("content.xml").unwrap().len()
+            > litchi_odf_common::package::MAX_CONTENT_REPLACEMENT_BYTES
+    );
+    let snapshot = litchi_odt::transaction::Snapshot::from_document(&source).unwrap();
+
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(TARGET), "fallback replacement")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let reopened = commit.snapshot().document().unwrap();
+    let paragraphs = reopened.paragraphs().unwrap();
+
+    assert_eq!(paragraphs.len(), PARAGRAPH_COUNT);
+    assert_eq!(paragraphs[TARGET].text().unwrap(), "fallback replacement");
+    assert_eq!(paragraphs[TARGET - 1].text().unwrap(), text);
+    assert_eq!(paragraphs[TARGET + 1].text().unwrap(), text);
+}
+
 fn real_producer_source() -> Document {
     let mut writer = PackageWriter::new();
     writer

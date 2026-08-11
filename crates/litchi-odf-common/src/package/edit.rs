@@ -15,7 +15,13 @@ use soapberry_zip::{
     ZipArchive,
 };
 
-const MAX_CONTENT_BYTES: usize = 16 * 1024 * 1024;
+/// Maximum `content.xml` size accepted by the common bounded replacement and
+/// rebuild helpers.
+///
+/// Format owners with a larger established publication envelope may use this
+/// value to select their existing writer fallback before calling these
+/// helpers.
+pub const MAX_CONTENT_REPLACEMENT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_ADDITION_BYTES: usize = 64 * 1024 * 1024;
 const CENTRAL_LOCAL_HEADER_OFFSET: Range<usize> = 42..46;
 
@@ -119,7 +125,7 @@ fn raw_member_is_identical(
 /// Returns an error when the replacement is oversized, invalid XML, or cannot
 /// be published through either the preserving or established rebuild path.
 pub fn replace_content_xml(source: &OwnedPackage, content: &str) -> Result<Vec<u8>> {
-    if content.len() > MAX_CONTENT_BYTES {
+    if content.len() > MAX_CONTENT_REPLACEMENT_BYTES {
         return invalid("outer content.xml exceeds package mutation limit");
     }
     if source.get_file(constants::ODF_CONTENT)? == content.as_bytes() {
@@ -221,7 +227,7 @@ pub fn rebuild_package(
     excluded_paths: impl AsRef<[String]>,
     excluded_prefixes: impl AsRef<[String]>,
 ) -> Result<Vec<u8>> {
-    if content.len() > MAX_CONTENT_BYTES {
+    if content.len() > MAX_CONTENT_REPLACEMENT_BYTES {
         return invalid("outer content.xml exceeds package mutation limit");
     }
 

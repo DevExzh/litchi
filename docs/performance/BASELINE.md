@@ -220,11 +220,11 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **113
+The stage-1 records above are retained unchanged. The current harness has **114
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, one opt-in opaque-heavy common OLE2 publication
-case, 16 opt-in
+case, one opt-in media-rich ODT paragraph-publication case, 16 opt-in
 DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across four
 capability-bounded variants (25 tiny / 44 tiny-plus-large rows), and 24 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
@@ -421,6 +421,14 @@ remains an incomplete program and CRUD matrix.
   rebuild. Pooled edit/save p50 improves 94.44% and p95 94.29%; allocation
   calls move +0.52%, and peak heap/RSS remain flat. See
   [`0034`](changes/0034-odp-unchanged-media-preservation.md).
+- A fixed media-rich ODT case replaces one of 200 paragraphs while preserving
+  eight exact 2 MiB incompressible resources. Content-only paragraph
+  publication now uses the common checked-splice/raw-copy path, while XML over
+  its 16 MiB optimization limit returns to the established ODT rebuild. Pooled
+  edit/save p50 improves 95.58%, mean 95.63%, and p95 95.43%; allocation calls
+  fall 6.71%, peak heap is flat, and RSS improves 0.59%. The ordinary ODT
+  open/no-op/one-edit guards all improve. See
+  [`0035`](changes/0035-odt-content-only-paragraph-publication.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
