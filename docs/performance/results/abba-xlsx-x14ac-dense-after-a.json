@@ -1,0 +1,483 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "9454f49fa573f063ba40eaa341b26faec2e205c7",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1"
+  },
+  "configuration": {
+    "samples_per_case": 50,
+    "warmup_iterations_per_case": 5,
+    "cases": [
+      "xlsx_one_cell_commit",
+      "xlsx_one_cell_commit_first_read",
+      "xlsx_one_percent_commit",
+      "xlsx_one_percent_commit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "dense-wide"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_one_cell_commit",
+      "corpus": {
+        "name": "xlsx-dense-wide",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-wide",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 131072,
+        "archive_member_count": 7,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 524288,
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          167965780,
+          168582238,
+          168692086,
+          168768975,
+          169097226,
+          169302268,
+          169828843,
+          169955874,
+          170171844,
+          170195277,
+          170218936,
+          170272812,
+          170294252,
+          170309714,
+          170311936,
+          170317517,
+          170326947,
+          170351799,
+          170642141,
+          170645896,
+          170684357,
+          170767091,
+          170788941,
+          170898493,
+          171298021,
+          171572569,
+          171661033,
+          171683864,
+          171731589,
+          171743964,
+          172047402,
+          172058269,
+          172196018,
+          172335581,
+          172750310,
+          173145243,
+          173192609,
+          173335183,
+          173467949,
+          173619507,
+          173762962,
+          174000379,
+          174098735,
+          174599494,
+          175058935,
+          175576186,
+          175944915,
+          176071579,
+          176141535,
+          176962164
+        ],
+        "min": 167965780,
+        "p50": 171435295,
+        "p95": 176071579,
+        "p99": 176962164,
+        "max": 176962164,
+        "mean": 171788944.76,
+        "standard_deviation": 2196507.007928411,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 171164704.46174362,
+          "upper": 172413185.05825636
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_one_cell_commit_first_read",
+      "corpus": {
+        "name": "xlsx-dense-wide",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-wide",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 131072,
+        "archive_member_count": 7,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 524288,
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          209216406,
+          212163469,
+          212674432,
+          213148936,
+          213596841,
+          214804415,
+          215074465,
+          215090938,
+          215282112,
+          215293599,
+          215567863,
+          215705414,
+          215711851,
+          216096934,
+          216191213,
+          216263802,
+          216599536,
+          216737924,
+          216769047,
+          216939733,
+          217197776,
+          217309681,
+          217687831,
+          217733171,
+          217968798,
+          218021000,
+          218111033,
+          218177023,
+          218284962,
+          218734620,
+          218813090,
+          218861646,
+          218905544,
+          218989181,
+          219014414,
+          219406807,
+          219410691,
+          219593371,
+          219744260,
+          219782661,
+          220500211,
+          220956640,
+          220968081,
+          221362197,
+          222785292,
+          222794618,
+          223359070,
+          223438224,
+          224571613,
+          225509504
+        ],
+        "min": 209216406,
+        "p50": 217994899,
+        "p95": 223438224,
+        "p99": 225509504,
+        "max": 225509504,
+        "mean": 217938438.8,
+        "standard_deviation": 3240534.823636913,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 217017489.12057006,
+          "upper": 218859388.47942996
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_one_percent_commit",
+      "corpus": {
+        "name": "xlsx-dense-wide",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-wide",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 131072,
+        "archive_member_count": 7,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 524288,
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          340875388,
+          341577630,
+          342001293,
+          342543490,
+          343125653,
+          343261669,
+          344007864,
+          344355014,
+          344445169,
+          344640317,
+          344766298,
+          346107903,
+          346156461,
+          346578209,
+          346656467,
+          346803070,
+          347814579,
+          348352329,
+          348807953,
+          349034348,
+          349379623,
+          349877585,
+          350373974,
+          350425162,
+          350510576,
+          350938291,
+          351435739,
+          351513406,
+          351609747,
+          351962852,
+          352452051,
+          352619518,
+          352743929,
+          352940016,
+          353090947,
+          353289283,
+          353477717,
+          353744466,
+          354740873,
+          355094227,
+          355810470,
+          355982066,
+          356336687,
+          356444347,
+          357965186,
+          358421174,
+          361955881,
+          370344792,
+          384031451,
+          387253524
+        ],
+        "min": 340875388,
+        "p50": 350724433,
+        "p95": 370344792,
+        "p99": 387253524,
+        "max": 387253524,
+        "mean": 351773533.28,
+        "standard_deviation": 8991847.698763866,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 349218078.79290223,
+          "upper": 354328987.7670977
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "corpus": {
+        "name": "xlsx-dense-wide",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-wide",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 131072,
+        "archive_member_count": 7,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 524288,
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          420399747,
+          420535399,
+          421246045,
+          422397789,
+          422399822,
+          422488531,
+          422728375,
+          423201970,
+          423293679,
+          423860566,
+          424059400,
+          424659162,
+          424722397,
+          424920041,
+          425180097,
+          425966109,
+          426625717,
+          426788819,
+          426859547,
+          426969753,
+          426977351,
+          427186507,
+          427665960,
+          427716126,
+          427725003,
+          428129406,
+          428379085,
+          428550586,
+          428668081,
+          429343285,
+          429618482,
+          429995255,
+          430246716,
+          430975552,
+          431670039,
+          431685753,
+          431864831,
+          432667859,
+          432902685,
+          433226183,
+          433991990,
+          435945241,
+          436625848,
+          438848425,
+          438914035,
+          439881808,
+          441430821,
+          444835243,
+          446627065,
+          448032913
+        ],
+        "min": 420399747,
+        "p50": 427927204,
+        "p95": 444835243,
+        "p99": 448032913,
+        "max": 448032913,
+        "mean": 429592621.98,
+        "standard_deviation": 6676271.259345126,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 427695246.9444864,
+          "upper": 431489997.01551366
+        }
+      },
+      "sink": {
+        "accepted_bytes": 388095,
+        "write_calls": 19,
+        "largest_write": 65536
+      }
+    }
+  ]
+}

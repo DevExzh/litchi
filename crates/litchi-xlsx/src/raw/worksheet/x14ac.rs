@@ -201,9 +201,11 @@ fn has_markup_compatibility(content: &[u8]) -> bool {
 }
 
 fn has_descent_attribute(content: &[u8]) -> bool {
-    content
-        .windows(b"dyDescent".len())
-        .any(|window| window == b"dyDescent")
+    may_contain_descent(content)
+}
+
+pub(super) fn may_contain_descent(content: &[u8]) -> bool {
+    memchr::memmem::find(content, b"dyDescent").is_some()
 }
 
 fn has_alternate_content(content: &[u8]) -> bool {

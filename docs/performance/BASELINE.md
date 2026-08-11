@@ -400,6 +400,12 @@ remains an incomplete program and CRUD matrix.
   Unsupported layouts and every unproved member retain established logical
   fallback. See
   [`0031`](changes/0031-ods-unchanged-media-preservation.md).
+- Successful XLSX worksheet reads now skip the narrow x14ac collector when the
+  raw XML contains no `dyDescent` token; rejected inputs rerun the collector so
+  its historical error precedence remains exact. Medium commit and commit/save
+  cells improve about 19-21% p50/mean, cold reads improve about 35%, dense-wide
+  1% commit improves 19.62% p50, allocation calls fall 25.24%, and peak heap is
+  flat. See [`0032`](changes/0032-xlsx-no-extension-scan.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
