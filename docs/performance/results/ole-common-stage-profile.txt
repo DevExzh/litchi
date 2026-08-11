@@ -1,0 +1,24 @@
+Common OLE2 stage attribution profile
+Date: 2026-08-11
+CPU affinity: 2
+Corpus: few-large / incompressible / four unchanged 4 MiB FAT streams plus one 36-byte MiniFAT target
+Baseline binary SHA-256: fe22672f13ba236d6ecc26f8e6e61efff5a2bdc59d71c7cef0dff1ef0ebbc406
+
+Commands:
+perf record -F 999 -g --call-graph dwarf -o /tmp/ole-put-baseline.perf.data -- taskset -c 2 <baseline> --warmup 5 --samples 100 --case ole_common_put_stream_publish --shape few-large --payload incompressible --json /tmp/ole-put-profile.json
+perf record -F 999 -g --call-graph dwarf -o /tmp/ole-e2e-baseline.perf.data -- taskset -c 2 <baseline> --warmup 5 --samples 100 --case ole_common_one_edit_save --shape few-large --payload incompressible --json /tmp/ole-e2e-profile.json
+
+Publication-only profile:
+- 1,648 cycle samples; zero lost samples.
+- libc memmove/memcpy was the largest resolved symbol at 14.80% self.
+- Resolved memcpy call chains included OleWriter::create_stream (4.46%), write_sector_aligned (4.40%), OleFile::open_stream during Package::capture (3.13%), and capture_container (2.14%).
+- libc memcmp was 4.76% self, reached from Editor::commit_candidate while comparing recaptured stream bytes before reusing their allocations.
+- libc memset was 4.03% self, including writer sector padding and recapture paths.
+
+End-to-end profile:
+- 2,152 cycle samples; zero lost samples.
+- libc memmove/memcpy was the largest resolved symbol at 29.58% self.
+- libc memcmp was 6.81% self.
+- libc memset was 6.20% self.
+
+Kernel symbol maps were restricted, so unresolved kernel samples are not assigned to a source function. Percentages are sampled self/call-chain attribution and must not be summed as exclusive stage time. The retained ABBA JSON is the latency authority.

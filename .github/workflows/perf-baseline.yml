@@ -153,7 +153,7 @@ jobs:
           cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
             --warmup 0 \
             --samples 1 \
-            --case ole_common_one_edit_save \
+            --case ole_common_open,ole_common_put_stream_publish,ole_common_finish_render,ole_common_one_edit_save \
             --shape few-large \
             --payload incompressible \
             --json target/perf/ole-common-smoke.json
@@ -163,13 +163,18 @@ jobs:
 
           report = json.loads(Path("target/perf/ole-common-smoke.json").read_text())
           assert report["schema_version"] == 1
-          assert len(report["results"]) == 1
-          result = report["results"][0]
-          assert result["case"] == "ole_common_one_edit_save"
-          assert result["corpus"]["entry_count"] == 5
-          assert result["corpus"]["uncompressed_payload_bytes"] == 16_777_252
-          assert result["corpus"]["archive_sha256"] == "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
-          assert len(result["elapsed_ns"]["samples"]) == 1
+          assert len(report["results"]) == 4
+          assert {result["case"] for result in report["results"]} == {
+              "ole_common_open",
+              "ole_common_put_stream_publish",
+              "ole_common_finish_render",
+              "ole_common_one_edit_save",
+          }
+          for result in report["results"]:
+              assert result["corpus"]["entry_count"] == 5
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_777_252
+              assert result["corpus"]["archive_sha256"] == "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+              assert len(result["elapsed_ns"]["samples"]) == 1
           PY
 
       - name: Run ODP media publication smoke
@@ -370,7 +375,7 @@ jobs:
         run: |
           cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
             --samples 15 \
-            --case ole_common_one_edit_save \
+            --case ole_common_open,ole_common_put_stream_publish,ole_common_finish_render,ole_common_one_edit_save \
             --shape few-large \
             --payload incompressible \
             --json target/perf/ole-common-baseline.json
@@ -380,13 +385,18 @@ jobs:
 
           report = json.loads(Path("target/perf/ole-common-baseline.json").read_text())
           assert report["schema_version"] == 1
-          assert len(report["results"]) == 1
-          result = report["results"][0]
-          assert result["case"] == "ole_common_one_edit_save"
-          assert result["corpus"]["entry_count"] == 5
-          assert result["corpus"]["uncompressed_payload_bytes"] == 16_777_252
-          assert result["corpus"]["archive_sha256"] == "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
-          assert len(result["elapsed_ns"]["samples"]) == 15
+          assert len(report["results"]) == 4
+          assert {result["case"] for result in report["results"]} == {
+              "ole_common_open",
+              "ole_common_put_stream_publish",
+              "ole_common_finish_render",
+              "ole_common_one_edit_save",
+          }
+          for result in report["results"]:
+              assert result["corpus"]["entry_count"] == 5
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_777_252
+              assert result["corpus"]["archive_sha256"] == "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+              assert len(result["elapsed_ns"]["samples"]) == 15
           PY
 
       - name: Run release ODP media publication case

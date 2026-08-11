@@ -13,10 +13,10 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **114 selectable cases**: 36 default cases and 198 default
+harness contains **117 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
-opt-in XLSX commit/read attribution case, one opt-in opaque-heavy common OLE2
-publication case, one opt-in media-rich ODT paragraph-publication case, 16
+opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
+stage/control cases, one opt-in media-rich ODT paragraph-publication case, 16
 opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across
 four capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
@@ -39,7 +39,7 @@ is still not broad program or CRUD coverage.
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
 | Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
-| Common OLE2 publication case and rejected handoffs | Heavy validated-render prototype p50 **-34.06%**; shared-payload prototype **+32.02%** | Both fully reverted: validated-render DOC open **+21.64%**, DOC one-edit/save **+9.08%**; deterministic 4x4 MiB benchmark retained |
+| Common OLE2 publication stages and rejected handoffs | Current open/publication/finish/end-to-end p50: **1.382 / 7.979 / 5.473 / 26.086 ms**; inline recapture prototype end-to-end **-2.61%** p50 | Stages are non-additive; shared-payload, validated-render and inline recapture prototypes are all fully reverted |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
 | Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
@@ -176,6 +176,15 @@ improved the target 34.06% but regressed DOC open 21.64%. The full rationale
 and DOC/XLS guards are in
 [`change 0033`](changes/0033-ole-common-publication-handoffs-rejected.md).
 
+The common OLE2 stage/recapture reports are
+[`before A`](results/abba-ole-recapture-before-a.json),
+[`after A`](results/abba-ole-recapture-after-a.json),
+[`after B`](results/abba-ole-recapture-after-b.json), and
+[`before B`](results/abba-ole-recapture-before-b.json). The stage profile,
+non-additivity finding and fully reverted inline allocation-reuse prototype are
+documented in
+[`change 0036`](changes/0036-ole-common-stage-attribution.md).
+
 The ODS row-local publication evidence is
 [`before A`](results/abba-ods-row-splice-one-edit-before-a.json),
 [`after A`](results/abba-ods-row-splice-one-edit-after-a.json),
@@ -296,6 +305,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Exact owned OPC no-op, six named many-Part/large-Part cells | individual rows in record | individual rows in record | -99.93% p50 geometric mean | Many-small allocation calls -93.7%; large memory tradeoff above |
 | CFB final-root-stream lookup, four 256/2,048-sibling cells | 1.067-7.596 us | 0.451-0.486 us | -84.70% p50 geometric mean | Wide-root peak heap +1.5%; profiler RSS +7.6% for retained exact comparison keys |
 | CFB open, four 256/2,048-stream cells | 141.1-963.1 us | 136.8-974.9 us | -1.42% p50 geometric mean | Allocation calls -6.1% to -8.8%; temporary allocations -20.6% to -27.7% |
+| Rejected common OLE2 inline recapture allocation reuse, 16 MiB opaque streams | 26.086 ms | 25.404 ms | **-2.61% p50 / -2.30% mean** | Fully reverted as immaterial; p95 +0.54%; isolated publication p50 -6.49% but stages are non-additive |
 | OPC rewritten publication, eight named cells | individual rows in record | individual rows in record | -1.65% mean geometric mean; best intended cell -5.49% | Allocation calls -37.0%; peak heap -2.3% |
 | Payload-heavy PPT fresh writer | 6.312 ms | 5.035 ms | -20.23% | Peak heap -12.4%; profiler RSS -12.9% |
 | Payload-heavy XLS fresh writer | 4.126 ms | 4.065 ms | -1.48%, treated as latency-neutral | Peak heap -9.5%; profiler RSS -12.6% |
@@ -359,6 +369,7 @@ The underlying records are:
 - [`0033-ole-common-publication-handoffs-rejected.md`](changes/0033-ole-common-publication-handoffs-rejected.md)
 - [`0034-odp-unchanged-media-preservation.md`](changes/0034-odp-unchanged-media-preservation.md)
 - [`0035-odt-content-only-paragraph-publication.md`](changes/0035-odt-content-only-paragraph-publication.md)
+- [`0036-ole-common-stage-attribution.md`](changes/0036-ole-common-stage-attribution.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -476,7 +487,7 @@ ZIP layouts use the fully validated rewrite path before any sink output.
 
 ## Evidence and verification
 
-The standalone harness provides 114 selectable cases and a 198-record default
+The standalone harness provides 117 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
@@ -576,9 +587,10 @@ text-edit resolver reuse follow-ups.
 Remaining native work requires new attribution inside the retained final
 owner/public-reader validation layers. The rejected XLS terminal-render
 handoff is not a reusable shortcut for those checks. The new opaque-heavy
-common OLE2 case also rejects direct shared writer payloads (+32.02% p50) and
-an editor-wide validated-render cache: its heavy path improved 34.06%, but DOC
-open regressed 21.64% and DOC edit/save 9.08%. ODT full-text block
+common OLE2 case rejects direct shared writer payloads (+32.02% p50), an
+editor-wide validated-render cache, and inline recapture allocation reuse. The
+last improves isolated publication 6.49% p50 but only 2.61% end to end, so it
+too was reverted. ODT full-text block
 ownership is accepted, and repeated ODS facade cell lookup now has a bounded
 lazy index. Compact ODS and content-only ODP/ODT edits now preserve unchanged
 ZIP members, but broader ODF source-backed reads, repeated ODT/ODP semantic scans,

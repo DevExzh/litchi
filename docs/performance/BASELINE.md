@@ -220,12 +220,12 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **114
+The stage-1 records above are retained unchanged. The current harness has **117
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
-commit/read attribution case, one opt-in opaque-heavy common OLE2 publication
-case, one opt-in media-rich ODT paragraph-publication case, 16 opt-in
-DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across four
+commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
+stage/control cases, one opt-in media-rich ODT paragraph-publication case, 16
+opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across four
 capability-bounded variants (25 tiny / 44 tiny-plus-large rows), and 24 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 remains an incomplete program and CRUD matrix.
@@ -429,6 +429,13 @@ remains an incomplete program and CRUD matrix.
   fall 6.71%, peak heap is flat, and RSS improves 0.59%. The ordinary ODT
   open/no-op/one-edit guards all improve. See
   [`0035`](changes/0035-odt-content-only-paragraph-publication.md).
+- The opaque-heavy common OLE2 case now separates editor open, candidate
+  `put_stream` publication, changed `finish` rendering, and the end-to-end
+  control. Current p50 values are 1.382, 7.979, 5.473, and 26.086 ms; the
+  isolated stages are explicitly non-additive. An inline exact recapture
+  allocation-reuse prototype improved candidate publication 6.49% p50 but the
+  end-to-end control only 2.61%, with p95 +0.54%, so it was fully reverted.
+  See [`0036`](changes/0036-ole-common-stage-attribution.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
