@@ -23,9 +23,9 @@ default 36 cases / 198 records.
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one XLSX commit/read attribution case,
-one opaque-heavy common OLE2 edit/save case, 20 native OLE2 semantic cases, 16
+four opaque-heavy common OLE2 stage/edit-save cases, 20 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, seven RTF semantic cases, and 25 ODF semantic cases
-are opt-in, for 114 selectable cases in total:
+are opt-in, for 117 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -53,13 +53,15 @@ MiB regular streams and one tiny edited MiniFAT stream:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
-  --warmup 10 --samples 100 --case ole_common_one_edit_save \
+  --warmup 10 --samples 100 \
+  --case ole_common_open,ole_common_put_stream_publish,ole_common_finish_render,ole_common_one_edit_save \
   --shape few-large --payload incompressible --json target/perf/ole-common.json
 ```
 
-The case times public editor open, one root-stream replacement, validation and
-finish. Exact deterministic output comparison and a complete public CFB reopen
-of all five streams remain outside the timed interval.
+The stage cases separately time public editor open, `put_stream` candidate
+publication, and changed `finish` rendering. The end-to-end case times all
+three. Stage preparation, exact deterministic output comparison and a complete
+public CFB reopen of all five streams remain outside each timed interval.
 
 For just the end-to-end legacy writer packaging runs:
 
