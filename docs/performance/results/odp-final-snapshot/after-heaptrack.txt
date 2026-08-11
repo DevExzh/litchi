@@ -1,0 +1,10 @@
+reading file "/tmp/odp-final-snapshot-after.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/odp-final-snapshot/candidate --warmup 2 --samples 20 --case odp_semantic_one_edit_save --semantic-shape large --json /tmp/odp-final-snapshot-heap-after.json
+finished reading file, now analyzing data:
+
+total runtime: 0.568000s.
+calls to allocation functions: 1007922 (1774510/s)
+temporary memory allocations: 419298 (738200/s)
+peak heap memory consumption: 947.20K
+peak RSS (including heaptrack overhead): 13.46M
+total memory leaked: 1.78K

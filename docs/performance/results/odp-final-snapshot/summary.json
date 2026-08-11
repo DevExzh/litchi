@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "status": "accepted",
+  "production_base": "3cd4ff394ae05d1aa5cfca46e77b535c1e6f3412",
+  "control_binary_sha256": "748ae86dc8d8981c04d95c9228f80b798e7d8677b36bc2fdbc76d146272926db",
+  "candidate_binary_sha256": "48ec19374e8ffd47fa6001cc25fdc451ad68cf93b4e48542474d030436d2bbba",
+  "control_text_sha256": "aa10fd1e073eeac7a419d32bd498d7cc2da8971e0303749b2f1ffa4ba6539c0d",
+  "candidate_text_sha256": "f4f8ef792748780d8107769759a72c1a702a17ab97d43d98f19b776222abaa1b",
+  "environment": {
+    "os": "Linux 6.8.0-101-generic x86_64",
+    "cpu": "AMD EPYC 9575F",
+    "cpu_affinity": 11,
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "perf_event_paranoid": 1
+  },
+  "corpus": {
+    "name": "odp-semantic-large",
+    "generator": "litchi-odp-semantic-v1",
+    "slides": 100,
+    "archive_members": 5,
+    "archive_bytes": 3424,
+    "logical_text_bytes": 8700,
+    "archive_sha256": "afb69ac66dffbc9f3ef19db360161af636abb818bfce689c6f4964fc521778c6"
+  },
+  "primary_protocol": {
+    "accepted_order": ["before-e", "after-e", "after-f", "before-f"],
+    "warmups_per_leg": 100,
+    "samples_per_leg": 1000,
+    "pooled_samples_per_state": 2000,
+    "discarded_legs": ["before-a", "after-a", "after-b", "before-b", "after-c", "before-c", "before-d", "after-d"],
+    "discard_reason": "one or both states exceeded the predeclared five-percent within-state central-metric drift gate"
+  },
+  "primary": {
+    "before_ns": {
+      "p50": 3572775,
+      "mean": 3637946.997,
+      "p95": 3989373,
+      "p99": 4358681,
+      "mean_confidence_interval_95": [3628132.011, 3647761.983]
+    },
+    "after_ns": {
+      "p50": 2417132,
+      "mean": 2440153.192,
+      "p95": 2555322,
+      "p99": 2786120,
+      "mean_confidence_interval_95": [2435362.716, 2444943.668]
+    },
+    "delta_percent": {
+      "p50": -32.3458,
+      "mean": -32.9250,
+      "p95": -35.9468,
+      "p99": -36.0788
+    }
+  },
+  "scaling": {
+    "tiny": {"p50_delta_percent": -21.1412, "mean_delta_percent": -22.7907, "p95_delta_percent": -32.7570},
+    "medium": {"p50_delta_percent": -25.6835, "mean_delta_percent": -26.5974, "p95_delta_percent": -29.1334}
+  },
+  "guards": {
+    "odp_semantic_noop_edit_save": {"p50_delta_percent": -1.5353, "mean_delta_percent": -1.5463, "p95_delta_percent": -2.5040},
+    "odp_semantic_open_repeat": {"p50_delta_percent": -1.6168, "mean_delta_percent": -0.7184, "p95_delta_percent": 2.9983, "p99_delta_percent": 13.5532},
+    "odp_semantic_list_slides_repeat": {"p50_delta_percent": -0.4290, "mean_delta_percent": 0.1190, "p95_delta_percent": -0.4663, "p99_delta_percent": 18.5347},
+    "odp_semantic_one_slide_repeat": {"p50_delta_percent": -0.6904, "mean_delta_percent": -1.2842, "p95_delta_percent": -3.9704, "p99_delta_percent": -11.7136},
+    "odp_semantic_full_text_repeat": {"p50_delta_percent": 0.0912, "mean_delta_percent": 0.2528, "p95_delta_percent": -1.1743, "p99_delta_percent": 0.4125},
+    "odp_media_textbox_edit_save": {"p50_delta_percent": -1.8086, "mean_delta_percent": -1.5924, "p95_delta_percent": -0.6773}
+  },
+  "memory": {
+    "heaptrack_allocation_calls_before": 1210168,
+    "heaptrack_allocation_calls_after": 1007922,
+    "heaptrack_temporary_allocations_before": 510026,
+    "heaptrack_temporary_allocations_after": 419298,
+    "heaptrack_peak_heap_before_kib": 947.20,
+    "heaptrack_peak_heap_after_kib": 947.20,
+    "heaptrack_peak_rss_before_mib": 13.58,
+    "heaptrack_peak_rss_after_mib": 13.46,
+    "heaptrack_leaked_before_kib": 1.78,
+    "heaptrack_leaked_after_kib": 1.78,
+    "gnu_time_max_rss_kib_before": [30848, 30848, 30976, 30848],
+    "gnu_time_max_rss_kib_after": [30848, 30848, 30720, 30848]
+  },
+  "process_wide_perf_stat": {
+    "scope": "mean of two complete 520-iteration processes per state; deterministic corpus construction and untimed full verification included",
+    "before": {"task_clock_ms": 3648.19, "cycles": 17950659710, "instructions": 81460424396, "branches": 19381242928.5},
+    "after": {"task_clock_ms": 3068.72, "cycles": 15170327497.5, "instructions": 68224844190.5, "branches": 16176099741.5},
+    "delta_percent": {"task_clock": -15.88, "cycles": -15.49, "instructions": -16.25, "branches": -16.54},
+    "cpu_migrations": [0, 0, 0, 0]
+  }
+}

@@ -1698,6 +1698,12 @@ impl Transaction {
             .content
             .as_ref()
             .is_some_and(|draft| !draft.operations.is_empty());
+        let slide_only = self.changed
+            && !rdf_changed
+            && !charts_changed
+            && !design_changed
+            && !annotations_changed
+            && !content_changed;
         let mut domains = Vec::new();
         if self.changed {
             domains.push(Domain::Slides);
@@ -1731,12 +1737,15 @@ impl Transaction {
         } else {
             Arc::clone(&self.source.bytes)
         };
-        if self.changed {
-            let slide_candidate = Snapshot::from_shared_bytes(Arc::clone(&bytes))?;
-            if slide_candidate.slides() != self.draft.slides() {
+        let slide_candidate = if self.changed {
+            let candidate = Snapshot::from_shared_bytes(Arc::clone(&bytes))?;
+            if candidate.slides() != self.draft.slides() {
                 return invalid("ODP transaction readback differs from the staged slide model");
             }
-        }
+            Some(candidate)
+        } else {
+            None
+        };
         if let Some(design) = &self.design
             && !design.operations.is_empty()
         {
@@ -1850,7 +1859,14 @@ impl Transaction {
                 );
             }
         }
-        let snapshot = Snapshot::from_owned_package(bytes, reopened)?;
+        let snapshot = match (slide_only, slide_candidate) {
+            (true, Some(candidate)) => {
+                debug_assert!(Arc::ptr_eq(&candidate.bytes, &bytes));
+                candidate
+            },
+            (true, None) => unreachable!("a slide-only ODP commit always has a slide candidate"),
+            (false, _) => Snapshot::from_owned_package(bytes, reopened)?,
+        };
         let patch = Patch {
             before: self.source,
             after: snapshot.clone(),
