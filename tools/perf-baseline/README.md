@@ -79,6 +79,21 @@ relationships and topology, raw-copies every other member, and writes to a
 sequential sink. Payload preparation and complete output verification stay
 outside timing.
 
+Measure the media-rich DOCX source-backed semantic-edit control:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 --case docx_source_backed_one_edit_save \
+  --json target/perf/docx-source-edit.json
+```
+
+The fixed corpus contains 200 paragraphs and eight deterministic
+incompressible 2 MiB PNG payloads. The current control times the required
+public migration through `SourceBackedPackage::into_opc_package`, one semantic
+paragraph transaction, and sequential publication. Complete DOCX readback,
+media and topology checks, patch/inverse/stale checks, and output hashing stay
+outside timing.
+
 For just the end-to-end legacy writer packaging runs:
 
 ```sh
@@ -422,6 +437,12 @@ remain distinguishable.
   type and writing sequential output. Source reads and sink writes are
   reported; exact bytes, every reopened Part, and output digest are verified
   after timing.
+- `docx_source_backed_one_edit_save`: on a fixed 200-paragraph DOCX with eight
+  incompressible 2 MiB images, time positional open, the current all-Part
+  source-backed-to-owned bridge, one paragraph transaction, and sequential
+  save. The control reports 17 semantic Part materializations per sample;
+  complete paragraph/media/topology and reversible-patch checks remain
+  untimed.
 - `cfb_open`: parse the complete generated container into `litchi_cfb::OleFile`.
 - `cfb_list_streams`: enumerate and materialize all stream paths from an
   already-open CFB container.
@@ -691,6 +712,11 @@ while independently identifying the deterministic changed archive. Its
 `ordinary_payload_materializations` value is exactly one per sample: the
 selected original Part is validated, while every unselected member is copied
 physically without semantic materialization.
+
+`docx_source_backed_one_edit_save` also emits `output_sha256`, source/sink
+distributions, and `ordinary_payload_materializations`. The baseline value is
+the complete 17-Part catalog because the only currently available semantic
+route first converts the source-backed package into an eager `OpcPackage`.
 
 ## External profiling
 
