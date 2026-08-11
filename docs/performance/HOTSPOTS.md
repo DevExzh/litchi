@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0049`](changes/0049-odp-indexed-slide-selector.md)
+[`change 0050`](changes/0050-doc-piece-table-physical-index.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -408,7 +408,10 @@ Measured large-corpus priorities:
 2. DOC one-paragraph publication originally measured 1.416 ms p50. Batching
    its ordinary two-stream replacement removes one intermediate CFB
    render/reopen, while complete revision, style/property and independent
-   document readback remain in the accepted 1.348 ms path.
+   document readback remain. A later profile found repeated linear physical
+   PieceTable scans at 36.89% of large-open self cycles. The accepted FC index
+   reduces large open from 790.727 to 348.679 us p50 and the changed edit/save
+   path from 1.379 to 0.950 ms p50 while retaining all FKP/readback validation.
 3. PPT one-shape publication (0.357 ms original p50) retains its complete
    commit and public readback. Root snapshot capture improves from 37.522 to
    34.227 us p50, while the direct text-edit transaction improves from 206.209
@@ -417,6 +420,7 @@ Measured large-corpus priorities:
 See [`change 0015`](changes/0015-native-ole2-semantic-baseline.md),
 [`change 0016`](changes/0016-xls-commit-editor-reuse.md), and
 [`change 0017`](changes/0017-doc-batched-stream-publication.md), and
+[`change 0050`](changes/0050-doc-piece-table-physical-index.md), and
 [`change 0024`](changes/0024-ppt-slide-order-open-reuse.md), and
 [`change 0026`](changes/0026-ppt-text-edit-resolver-reuse.md), and
 [`change 0028`](changes/0028-xls-terminal-render-handoff-rejected.md).
@@ -546,7 +550,7 @@ The order below is provisional until baseline measurements are recorded.
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
 | 11 | Extend ODF beyond accepted ODS snapshot, row-local reuse, ODS/ODP/ODT unchanged-member publication, adaptive cell lookup, ODP indexed-slide retention and ODT byte/full-text/indexed-query/audit/envelope/batch ownership: positional source-backed reads, repeated independent ODP scans, final-result copies, non-text bulk edits, resource-adding/structural publication and real-producer media. | ODT/ODS/ODP open/query and changed save. | High | Same-topology ODS row splicing, compact ODS/ODP/ODT content raw preservation, bounded facade lookup, direct/existing-document ODT snapshot sharing, consuming full-text blocks, indexed paragraph/slide retention, compact-audit/envelope sharing and consecutive paragraph coalescing are accepted; final-document adoption remains reverted for a read regression; structural fallback, exact no-op and full readback remain. See changes 0011, 0014, 0018, 0019, 0020, 0023, 0027, 0031, 0034, 0035, 0038, 0041, 0042, 0045, 0047 and 0049. |
 | 12 | Extend accepted native RTF work beyond the capability-bounded variant matrix after parser-state, transport batching, byte-delimiter scanning and retained ordinary-body ranges. | RTF formatted/media, malformed/security, broader real-producer and broad edit paths. | Medium | Plain, raw CP-1252, LZFu and producer-watermark read/no-op inputs plus a narrow native shape-text chain are covered; only plain generated paragraph editing is timed. Cached text, byte-valued fallback, revisions, candidate readback and native forward-only output contracts remain. See changes 0013, 0019, 0020, 0029, 0040 and 0048. |
-| 13 | Attribute and reduce remaining native XLS/DOC final-publication work. | OLE2 spreadsheet/document edit publication rather than substrate-only insertion. | Medium-high | Editor reuse and DOC stream batching are accepted in changes 0016/0017; PPT root-open reuse is accepted in 0024. XLS terminal-render, shared CFB writer payload, editor-wide validated-render and inline recapture-allocation prototypes are rejected in 0028/0033/0036. The 4x4 MiB common stage/control cases remain; exact patches, complete BIFF/CFB or DOC validation and independent public readback remain. |
+| 13 | Attribute and reduce remaining native XLS/DOC final-publication work. | OLE2 spreadsheet/document edit publication rather than substrate-only insertion. | Medium-high | Editor reuse and DOC stream batching are accepted in changes 0016/0017; DOC physical PieceTable indexing is accepted in 0050; PPT root-open reuse is accepted in 0024. XLS terminal-render, shared CFB writer payload, editor-wide validated-render and inline recapture-allocation prototypes are rejected in 0028/0033/0036. The 4x4 MiB common stage/control cases remain; exact patches, complete BIFF/CFB or DOC validation and independent public readback remain. |
 | 14 | Share existing ODT transaction bytes when a validated document creates a snapshot. | ODT no-op and changed edit/save. | Low-medium | Implemented with private `Arc` identity proof; no-op p50 -18.51% large, guardrails within 3%. See change 0014. |
 | 15 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
 

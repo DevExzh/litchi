@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `84168afab9c6110e3737a677cce85c40326987e5`
+Production base for the latest measured tranche: `473c458ada4c684a5d642b9b907fccac8298504c`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -53,6 +53,7 @@ is still not broad program or CRUD coverage.
 | Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
 | Common OLE2 publication stages and rejected handoffs | Current open/publication/finish/end-to-end p50: **1.382 / 7.979 / 5.473 / 26.086 ms**; inline recapture prototype end-to-end **-2.61%** p50 | Stages are non-additive; shared-payload, validated-render and inline recapture prototypes are all fully reverted |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
+| Native DOC PieceTable physical index | Large open p50 **-55.91%**, mean **-55.78%**; changed edit/save p50 **-31.08%** | Private FC-ordered/prefix-max index only; exact scalar mapping, full FKP validation and strict/public reopens remain; peak heap/RSS flat |
 | Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
 | Bounded XLSX validated-store handoff | Medium one-cell commit + first read p50 **-23.23%**, mean **-23.15%**; allocation calls **-21.01%** | At most 4,096 cells / 1 MiB XML with exact byte and lineage identity; peak heap +4.29%; unrestricted dense-wide candidate rejected at +8.99% peak heap |
@@ -447,6 +448,8 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODT 1% paragraph edit/save, 10,000 paragraphs / 100 replacements | 906.439 ms | 15.615 ms | **-98.28% p50 (58.05x) / -98.27% mean** | One mutable candidate/publication/reopen/audit replaces 100; allocations -96.13%; peak heap and uninstrumented RSS flat; tool-inclusive RSS +9.93% disclosed |
 | Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
+| Native DOC open, 512 paragraphs | 790.727 us | 348.679 us | **-55.91% p50 / -55.78% mean** | Physical PieceTable scan self cycles 36.89% -> 4.17%; allocation calls +0.009%; peak heap and uninstrumented RSS flat |
+| Native DOC one-paragraph edit/save after PieceTable index, 512 paragraphs | 1.379 ms | 0.950 ms | **-31.08% p50 / -31.68% mean** | Same private index accelerates mandatory candidate/public readbacks; patch/inverse and exact output checks unchanged |
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
 | Native PPT direct text edit/save, 144 shapes | 206.209 us | 177.089 us | **-14.12% p50 / -15.39% mean** | Allocation calls -3.53%, temporary allocations -6.05%; peak heap/RSS flat; minor faults +315.43% with zero major faults |
 | XLSX one-cell commit + first read, 4,096 cells | 4.431 ms | 3.402 ms | **-23.23% p50 / -23.15% mean** | Allocation calls -21.01%; peak heap +4.29%; unrestricted dense-wide retention rejected |
@@ -502,6 +505,7 @@ The underlying records are:
 - [`0047-odt-indexed-paragraph-selector.md`](changes/0047-odt-indexed-paragraph-selector.md)
 - [`0048-rtf-retained-body-source-span.md`](changes/0048-rtf-retained-body-source-span.md)
 - [`0049-odp-indexed-slide-selector.md`](changes/0049-odp-indexed-slide-selector.md)
+- [`0050-doc-piece-table-physical-index.md`](changes/0050-doc-piece-table-physical-index.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -726,7 +730,9 @@ and broad format-semantic CRUD coverage beyond the generated text/grid slices
 security, malformed and real-producer corpora, plus broader ODF and RTF
 coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS
 editor-reuse, DOC batched-publication, PPT root-open reuse and direct PPT
-text-edit resolver reuse follow-ups.
+text-edit resolver reuse follow-ups. Native DOC also indexes physical
+PieceTable intervals after a distinct profile attributed 36.89% of large-open
+self cycles to repeated scalar FKP range mapping; full validation remains.
 Remaining native work requires new attribution inside the retained final
 owner/public-reader validation layers. The rejected XLS terminal-render
 handoff is not a reusable shortcut for those checks. The new opaque-heavy

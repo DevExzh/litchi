@@ -1,0 +1,2265 @@
+reading file "/tmp/doc-piece-index-after.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: tools/perf-baseline/target/release/litchi-perf-baseline --warmup 2 --samples 20 --case doc_semantic_open --writer-shape large --json /tmp/doc-piece-index-heap-after.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+360517 calls to allocation functions with 0B peak consumption from
+litchi_doc::sprm::parse_sprms::he6a11bade93c43df
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::parts::styles::semantic::validation::validate_style_sprms::hca9916154d0f0646
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::styles::semantic::resolve::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::resolve_paragraph_style_sprms::ha67b0a09f8827046
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap::parser::_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$::paragraph_style_on_baseline::h129bc837552b11da
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$26cascade_styles_on_baseline17h35537b6941e80391E.llvm.14124248861116201816
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$17from_sprm_context17h27775aab31c3ce1eE.llvm.14124248861116201816
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$26cascade_styles_on_baseline17h35537b6941e80391E.llvm.14124248861116201816
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::codec::parse_chpx::h1cfc32e7ca3c4870
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::codec::parse_papx::h0343e90650365187
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::revisions::h3659e682a840edad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 304197 from 33 other places
+
+160537 calls to allocation functions with 3.63M peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he497b834530d83e3E.llvm.6625129041687464051
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 20.66K peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf4dd138d0fd80111
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::paragraph::model::Paragraph::set_runs::ha3c9e88a9bd6e1eb
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::convert_to_paragraphs::h6935755fbfb3e6fb
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h289132eda853010b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::styles::semantic::resolve::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::resolve_paragraph_style_sprms::ha67b0a09f8827046
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap::parser::_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$::paragraph_style_on_baseline::h129bc837552b11da
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$26cascade_styles_on_baseline17h35537b6941e80391E.llvm.14124248861116201816
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h74c64c139248e17b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::hd71db5bcf8e23ccc
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h74c64c139248e17b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::hd71db5bcf8e23ccc
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::hd084b89e1f8ba7c3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h74c64c139248e17b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::hd71db5bcf8e23ccc
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::hd084b89e1f8ba7c3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 104217 from 103 other places
+
+61160 calls to allocation functions with 0B peak consumption from
+litchi_doc::parts::fkp::PapxFkp::parse::h9a726e1e930f502e
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::codec::parse_papx::h0343e90650365187
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::codec::parse_papx::h0343e90650365187
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 4840 from 10 other places
+
+33792 calls to allocation functions with 11.78K peak consumption from
+litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_text_range::hc0d4ea4deeeef748
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::hae760237239be54f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 11.78K peak consumption from:
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::hae760237239be54f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_runs::h4ba469383b63c1fe
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::hae760237239be54f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+24228 calls to allocation functions with 0B peak consumption from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_perf_baseline::writer_text::h82eb9fc3139f6088
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+512 calls with 0B peak consumption from:
+    litchi_perf_baseline::write_fresh_doc::h9a5112fb51d26ec8
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::build_writer_corpus::h504128517dfeb96e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+396 calls with 0B peak consumption from:
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse_bytes::h441ec3a2fedb28d1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse::hc1aa0722a2ca1c21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+396 calls with 0B peak consumption from:
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse_bytes::h441ec3a2fedb28d1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse::hc1aa0722a2ca1c21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 396 from 1 other places
+
+22528 calls to allocation functions with 0B peak consumption from
+litchi_doc::tracked_revision::codec::parse_papx::h0343e90650365187
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+12064 calls to allocation functions with 0B peak consumption from
+_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.6397653791092742091
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::source_paragraphs::h99ab2f52e14ffbb3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h9228b2dd40d83bc4
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h0ff9459a26c8aa07
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::h98fb8e0d202eb070
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::ha0206774d99bda35
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h752bd7de812aab74
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h35bde3c942fe08c0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::hbad169b11438132d
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader::h1305da2b5430cd31
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::ha0206774d99bda35
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h752bd7de812aab74
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 272 from 6 other places
+
+11286 calls to allocation functions with 181.64K peak consumption from
+litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::convert_to_paragraphs::h6935755fbfb3e6fb
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 181.61K peak consumption from:
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+22 calls with 32B peak consumption from:
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+11264 calls to allocation functions with 0B peak consumption from
+_$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h9ba02d0b133a801d
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.6397653791092742091
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::source_paragraphs::h99ab2f52e14ffbb3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+11264 calls to allocation functions with 32.26K peak consumption from
+litchi_doc::body_text::source_paragraphs::h99ab2f52e14ffbb3
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 calls with 32.26K peak consumption from:
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+
+PEAK MEMORY CONSUMERS
+3.63M peak memory consumed over 160537 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he497b834530d83e3E.llvm.6625129041687464051
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+767.36K consumed over 44 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hb7a8086d9e33a497
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+767.36K consumed over 44 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hb7a8086d9e33a497
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+716.78K consumed over 22 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h9d355c947dac0ed9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::convert_to_paragraphs::h6935755fbfb3e6fb
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+442.37K consumed over 154 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h8f4108d28f225fa3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::hae760237239be54f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+291.84K consumed over 88 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h6fbcd28109121a73
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::hd084b89e1f8ba7c3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 644.63K from 103 other places
+
+524.30K peak memory consumed over 66 calls from
+litchi_doc::parts::text::TextExtractor::new::ha48a9daab422059a
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+262.15K consumed over 22 calls from:
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+262.15K consumed over 22 calls from:
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+451.45K peak memory consumed over 921 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h836e52d404a057c4E.llvm.16124596282650307638
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+189.82K consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hbdba30fdf16bd945
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::writer::core::write_sector_aligned::h69f831c690a38648
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::writer::core::OleWriter::write_to::h35e271b6bd0033c6
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::writer::core::package::package::_$LT$impl$u20$litchi_doc..writer..core..model..state..Writer$GT$::write_to::h8a569c39f02f6a66
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::write_fresh_doc::h9a5112fb51d26ec8
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::build_writer_corpus::h504128517dfeb96e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+81.92K consumed over 1 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h46e1d32ce4ae44c7
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::ha6d6701039581928
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::build_writer_corpus::h504128517dfeb96e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+81.92K consumed over 22 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h3e6e8057b837160a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::hdacee0b8b5ddd65e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+81.92K consumed over 22 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h46e1d32ce4ae44c7
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::ha6d6701039581928
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+4.10K consumed over 22 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h46e1d32ce4ae44c7
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::ha6d6701039581928
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 11.77K from 47 other places
+
+262.15K peak memory consumed over 22 calls from
+litchi_doc::parts::paragraph_extractor::ParagraphExtractor::new::h98250f9455c01b1d
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+262.15K consumed over 22 calls from:
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+195.58K peak memory consumed over 23 calls from
+_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h8b11bda09882c5b9
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+97.79K consumed over 1 calls from:
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+97.79K consumed over 22 calls from:
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+181.64K peak memory consumed over 11286 calls from
+litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::convert_to_paragraphs::h6935755fbfb3e6fb
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+181.61K consumed over 11264 calls from:
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+32B consumed over 22 calls from:
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+163.84K peak memory consumed over 66 calls from
+litchi_doc::parts::fib::FileInformationBlock::parse_at::h227b7d556fd20532
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+81.92K consumed over 22 calls from:
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+81.92K consumed over 22 calls from:
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+97.81K peak memory consumed over 22 calls from
+alloc::sync::Arc$LT$T$C$A$GT$::from_box_in::h84a4840acbe8a0d6
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+97.81K consumed over 22 calls from:
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+73.73K peak memory consumed over 1 calls from
+0x7e12cd2b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+32.86K peak memory consumed over 505 calls from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+32.77K consumed over 22 calls from:
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+36B consumed over 22 calls from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h4c06b9d483f67e05
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h9228b2dd40d83bc4
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h0ff9459a26c8aa07
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::h98fb8e0d202eb070
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+36B consumed over 22 calls from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h4c06b9d483f67e05
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2f7a91a9f1643632
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h470fb7739b32e568
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::ha0c5a0cb1825a05a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+10B consumed over 22 calls from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h4c06b9d483f67e05
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h9228b2dd40d83bc4
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h0ff9459a26c8aa07
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::h98fb8e0d202eb070
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+10B consumed over 22 calls from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h4c06b9d483f67e05
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h2f7a91a9f1643632
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h470fb7739b32e568
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::ha0c5a0cb1825a05a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 0B from 19 other places
+
+
+MOST TEMPORARY ALLOCATIONS
+326725 temporary allocations of 360517 allocations in total (90.63%) from
+litchi_doc::sprm::parse_sprms::he6a11bade93c43df
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 temporary allocations of 11264 allocations in total (100.00%) from:
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$17from_sprm_context17h27775aab31c3ce1eE.llvm.14124248861116201816
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$26cascade_styles_on_baseline17h35537b6941e80391E.llvm.14124248861116201816
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 temporary allocations of 11264 allocations in total (100.00%) from:
+    litchi_doc::parts::styles::semantic::validation::validate_style_sprms::hca9916154d0f0646
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::styles::semantic::resolve::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::resolve_paragraph_style_sprms::ha67b0a09f8827046
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap::parser::_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$::paragraph_style_on_baseline::h129bc837552b11da
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$26cascade_styles_on_baseline17h35537b6941e80391E.llvm.14124248861116201816
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 temporary allocations of 11264 allocations in total (100.00%) from:
+    litchi_doc::parts::styles::semantic::validation::validate_style_sprms::hca9916154d0f0646
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::styles::semantic::resolve::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::resolve_paragraph_style_sprms::ha67b0a09f8827046
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap::parser::_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$::paragraph_style_on_baseline::h129bc837552b11da
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$26cascade_styles_on_baseline17h35537b6941e80391E.llvm.14124248861116201816
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 temporary allocations of 11264 allocations in total (100.00%) from:
+    litchi_doc::parts::pap_bin_table::PapBinTable::expand_data_indirections::h2cb2dc99c52f89fd
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hfb0cf92b08a73db9
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 temporary allocations of 11264 allocations in total (100.00%) from:
+    litchi_doc::tracked_revision::package::RevisionEditor::revisions::h3659e682a840edad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 270.40K from 33 other places
+
+34141 temporary allocations of 160537 allocations in total (21.27%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he497b834530d83e3E.llvm.6625129041687464051
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11176 temporary allocations of 11264 allocations in total (99.22%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h74c64c139248e17b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::hd71db5bcf8e23ccc
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::hd084b89e1f8ba7c3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11176 temporary allocations of 11264 allocations in total (99.22%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h74c64c139248e17b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::hd71db5bcf8e23ccc
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::hd084b89e1f8ba7c3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11176 temporary allocations of 11264 allocations in total (99.22%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h74c64c139248e17b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::hd71db5bcf8e23ccc
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::hd084b89e1f8ba7c3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 temporary allocations of 154 allocations in total (85.71%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4e1cea28fefd2948
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::piece_table::PieceTable::parse::h20e83b0b8f5b98cc
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::codec::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::parse_piece_table::hf1f51734ba467918
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 temporary allocations of 154 allocations in total (85.71%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4e1cea28fefd2948
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::piece_table::PieceTable::parse::h20e83b0b8f5b98cc
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::codec::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::parse_piece_table::hf1f51734ba467918
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 349B from 103 other places
+
+23496 temporary allocations of 24228 allocations in total (96.98%) from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11264 temporary allocations of 11264 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11044 temporary allocations of 11264 allocations in total (98.05%) from:
+    litchi_perf_baseline::writer_text::h82eb9fc3139f6088
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+396 temporary allocations of 396 allocations in total (100.00%) from:
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse_bytes::h441ec3a2fedb28d1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse::hc1aa0722a2ca1c21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+396 temporary allocations of 396 allocations in total (100.00%) from:
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse_bytes::h441ec3a2fedb28d1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse::hc1aa0722a2ca1c21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+396 temporary allocations of 396 allocations in total (100.00%) from:
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse_bytes::h441ec3a2fedb28d1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse::hc1aa0722a2ca1c21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 0B from 1 other places
+
+11044 temporary allocations of 12064 allocations in total (91.55%) from
+_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+11044 temporary allocations of 11264 allocations in total (98.05%) from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.6397653791092742091
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::source_paragraphs::h99ab2f52e14ffbb3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 0B from 6 other places
+
+1778 temporary allocations of 4068 allocations in total (43.71%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h6464526c3ff1b6b8E.llvm.521929143331856660
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 temporary allocations of 198 allocations in total (66.67%) from:
+    litchi_cfb::file::collect_sector_chain::he753e58606d1c572
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h8dc1d4596d44bd7e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::hc031a0fe56767e07
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::codec::capture_container::hbee1afd14dbe9b17
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::codec::Package::capture::h5395956762606514
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 temporary allocations of 198 allocations in total (66.67%) from:
+    litchi_cfb::file::collect_sector_chain::he753e58606d1c572
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h8dc1d4596d44bd7e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::hc031a0fe56767e07
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::codec::capture_container::hbee1afd14dbe9b17
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::codec::Package::capture::h5395956762606514
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+110 temporary allocations of 132 allocations in total (83.33%) from:
+    litchi_cfb::file::collect_sector_chain::he753e58606d1c572
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h26dccfb5dfb3f0c2
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::hf8d53a7aed93b69e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+110 temporary allocations of 132 allocations in total (83.33%) from:
+    litchi_cfb::file::collect_sector_chain::he753e58606d1c572
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h46e1d32ce4ae44c7
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::ha6d6701039581928
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+110 temporary allocations of 132 allocations in total (83.33%) from:
+    litchi_cfb::file::collect_sector_chain::he753e58606d1c572
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h3e6e8057b837160a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::hdacee0b8b5ddd65e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 1.18K from 152 other places
+
+859 temporary allocations of 928 allocations in total (92.56%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hf1e5b2c42be0c259E.llvm.4443385085694271577
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+264 temporary allocations of 286 allocations in total (92.31%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf0c780dbb5cb6151
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::ha1fb2f5313adbb3c
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::new::ha48a9daab422059a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+264 temporary allocations of 286 allocations in total (92.31%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf0c780dbb5cb6151
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::ha1fb2f5313adbb3c
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::new::ha48a9daab422059a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+264 temporary allocations of 286 allocations in total (92.31%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf0c780dbb5cb6151
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::ha1fb2f5313adbb3c
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::new::ha48a9daab422059a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf0c780dbb5cb6151
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::ha1fb2f5313adbb3c
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::new::ha48a9daab422059a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf0c780dbb5cb6151
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::ha1fb2f5313adbb3c
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::text::TextExtractor::new::ha48a9daab422059a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 23B from 5 other places
+
+660 temporary allocations of 1320 allocations in total (50.00%) from
+litchi_doc::parts::fkp::ChpxFkp::parse::hb0887ff4bf726dd9
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 temporary allocations of 132 allocations in total (100.00%) from:
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::hd084b89e1f8ba7c3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hd4fe3b2a05c90f68
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 temporary allocations of 132 allocations in total (100.00%) from:
+    litchi_doc::tracked_revision::codec::parse_chpx::h1cfc32e7ca3c4870
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 temporary allocations of 132 allocations in total (100.00%) from:
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::hd084b89e1f8ba7c3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::hf814f96401473661
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 temporary allocations of 132 allocations in total (100.00%) from:
+    litchi_doc::tracked_revision::codec::parse_chpx::h1cfc32e7ca3c4870
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+132 temporary allocations of 132 allocations in total (100.00%) from:
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::hd084b89e1f8ba7c3
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hcccafd5d9839c01e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 0B from 5 other places
+
+512 temporary allocations of 534 allocations in total (95.88%) from
+litchi_doc::writer::fkp::PapxFkpBuilder::generate_pages::hf8861f04c45534af
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+512 temporary allocations of 512 allocations in total (100.00%) from:
+    litchi_doc::writer::core::package::package::_$LT$impl$u20$litchi_doc..writer..core..model..state..Writer$GT$::build_output_streams_with_data_prefix::hff08e1cf466a6547
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::writer::core::package::package::_$LT$impl$u20$litchi_doc..writer..core..model..state..Writer$GT$::build_ole_writer::hdf3ad556bfeb016e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::writer::core::package::package::_$LT$impl$u20$litchi_doc..writer..core..model..state..Writer$GT$::write_to::h8a569c39f02f6a66
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::write_fresh_doc::h9a5112fb51d26ec8
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::build_writer_corpus::h504128517dfeb96e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+
+176 temporary allocations of 288 allocations in total (61.11%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h0c5eae5ad9258cc3E.llvm.11958359098684752932
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+176 temporary allocations of 198 allocations in total (88.89%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hfe244c11d0431b21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::hae760237239be54f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hd0ab37c10f0f726a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 0B from 2 other places
+
+176 temporary allocations of 1100 allocations in total (16.00%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he38c929dd3d0292bE.llvm.6247495593680743966
+  in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    litchi_cfb::file::try_vec_with_capacity::h8a1e982fe3ac1f2a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::ha0206774d99bda35
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h752bd7de812aab74
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    litchi_cfb::file::try_push::heffdc85b85e79c4f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::ha0206774d99bda35
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h752bd7de812aab74
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    litchi_cfb::file::try_vec_with_capacity::h8a1e982fe3ac1f2a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::ha0206774d99bda35
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h752bd7de812aab74
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    litchi_cfb::file::try_push::heffdc85b85e79c4f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::ha0206774d99bda35
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h752bd7de812aab74
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::open_bounded::h3347d14664281c3b
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::from_bytes::he8d1ef0a20d3ef6f
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+22 temporary allocations of 22 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he31f8ed4739e67b8
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_cfb::file::OleFile$LT$R$GT$::list_directory_entries::hff1c5131df99835a
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::codec::capture_container::hbee1afd14dbe9b17
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::codec::Package::capture::h5395956762606514
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_ole_common::object::editor::Editor::open::h88ff9298c9537fe0
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h5e01444a271cdb08
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_doc::body_text::Snapshot::paragraphs::hba8409a4e7d273ad
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::verify_semantic_doc::h3c6074bd4f90738e
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+    main
+      in /home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline
+  and 66B from 39 other places
+
+
+total runtime: 0.28s.
+calls to allocation functions: 724826 (2570304/s)
+temporary memory allocations: 400098 (1418787/s)
+peak heap memory consumption: 5.67M
+peak RSS (including heaptrack overhead): 17.51M
+total memory leaked: 544B
