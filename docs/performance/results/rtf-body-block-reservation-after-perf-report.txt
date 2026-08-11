@@ -1,0 +1,299 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cycles:P'
+# Event count (approx.): 8123811028
+#
+# Overhead  Command          Shared Object                        Symbol
+# ........  ...............  ...................................  ....................................................................................................................................
+#
+    19.97%  litchi-perf-005  libc.so.6                            [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |
+               |--1.45%--0xcf820f40fa83
+               |
+               |--1.09%--realloc
+               |          _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.10231002685649690958
+               |
+                --0.54%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+
+    14.60%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans
+            |
+            ---litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans
+
+     8.52%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+            |
+            ---_RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+               |
+                --8.16%--_RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+                          _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                          |
+                          |--4.35%--litchi_perf_baseline::verify_semantic_rtf
+                          |          0x657361622d667265
+                          |
+                           --3.81%--<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+
+     7.26%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::api::story::Paragraph::to_text
+            |
+            ---litchi_rtf::api::story::Paragraph::to_text
+               0xe468e77250422150
+
+     4.23%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_perf_baseline::verify_semantic_rtf
+            |
+            ---litchi_perf_baseline::verify_semantic_rtf
+               |
+                --4.11%--0xe468e77250422150
+
+     2.42%  litchi-perf-005  litchi-perf-0055-final-v2            [.] <litchi_rtf::api::story::Paragraph as core::fmt::Display>::fmt
+            |
+            ---<litchi_rtf::api::story::Paragraph as core::fmt::Display>::fmt
+               |
+                --2.18%--0xe468e77250422150
+
+     2.36%  litchi-perf-005  litchi-perf-0055-final-v2            [.] encoding_rs::Encoding::decode_without_bom_handling
+            |
+            ---encoding_rs::Encoding::decode_without_bom_handling
+
+     2.18%  litchi-perf-005  litchi-perf-0055-final-v2            [.] <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+            |
+            ---<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+
+     2.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+            |
+            ---_RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+               |
+               |--0.97%--_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |          |
+               |           --0.73%--<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+               |
+                --0.67%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+
+     1.94%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+            |
+            ---_RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+               |
+                --1.63%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                          |
+                          |--0.85%--litchi_perf_baseline::verify_semantic_rtf
+                          |          0x657361622d667265
+                          |
+                           --0.79%--<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+
+     1.93%  litchi-perf-005  libc.so.6                            [.] __memmove_avx512_unaligned
+            |
+            ---__memmove_avx512_unaligned
+
+     1.88%  litchi-perf-005  libc.so.6                            [.] _int_malloc
+            |
+            ---_int_malloc
+               |
+                --1.39%--malloc
+                          |
+                           --1.33%--<alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold
+
+     1.85%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_codepage::Mbcs::decode_lossy
+            |
+            ---litchi_codepage::Mbcs::decode_lossy
+
+     1.81%  litchi-perf-005  libc.so.6                            [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |
+                --1.69%--0x657361622d667265
+
+     1.69%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::lexer::codec::control_word::dispatch::match_control_word
+            |
+            ---litchi_rtf::codec::lexer::codec::control_word::dispatch::match_control_word
+
+     1.63%  litchi-perf-005  libc.so.6                            [.] unlink_chunk.isra.0
+            |
+            ---unlink_chunk.isra.0
+               |
+                --1.39%--malloc_consolidate
+                          _int_free_maybe_consolidate
+                          cfree@GLIBC_2.2.5
+                          |
+                          |--0.79%--_ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17h50466fe06bf49435E.llvm.5313156570233846561
+                          |          0xcccccccccccccccc
+                          |
+                           --0.60%--litchi_perf_baseline::semantic_rtf_expected_text
+                                     0xe468e77250422150
+
+     1.33%  litchi-perf-005  libc.so.6                            [.] _int_free
+            |
+            ---_int_free
+               |
+                --1.21%--cfree@GLIBC_2.2.5
+                          |
+                           --0.66%--litchi_perf_baseline::semantic_rtf_expected_text
+                                     0xe468e77250422150
+
+     1.33%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::flush_text_buffer
+            |
+            ---litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::flush_text_buffer
+
+     1.22%  litchi-perf-005  libc.so.6                            [.] malloc_consolidate
+            |
+            ---malloc_consolidate
+               _int_free_maybe_consolidate
+               cfree@GLIBC_2.2.5
+               |
+                --0.91%--_ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17h50466fe06bf49435E.llvm.5313156570233846561
+                          0xcccccccccccccccc
+
+     1.21%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+            |
+            ---_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |
+                --0.73%--<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+
+     1.03%  litchi-perf-005  libc.so.6                            [.] cfree@GLIBC_2.2.5
+            |
+            ---cfree@GLIBC_2.2.5
+
+     1.03%  litchi-perf-005  litchi-perf-0055-final-v2            [.] <litchi_rtf::api::story::Paragraphs as core::iter::traits::iterator::Iterator>::next
+            |
+            ---<litchi_rtf::api::story::Paragraphs as core::iter::traits::iterator::Iterator>::next
+               |
+                --0.73%--_ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17ha7b02126ec6e9b53E.llvm.5313156570233846561
+
+     0.97%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+            |
+            ---_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               |
+                --0.91%--_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                          |
+                           --0.55%--<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+
+     0.97%  litchi-perf-005  libc.so.6                            [.] malloc
+            |
+            ---malloc
+               |
+                --0.67%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.10231002685649690958
+                          0xe1ffc7894818498b
+
+     0.91%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::parse_content
+            |
+            ---litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::parse_content
+
+     0.91%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::api::story::validate_boundaries
+            |
+            ---litchi_rtf::api::story::validate_boundaries
+
+     0.74%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::parser::codec::api::<impl litchi_rtf::codec::parser::codec::Parser>::parse
+            |
+            ---litchi_rtf::codec::parser::codec::api::<impl litchi_rtf::codec::parser::codec::Parser>::parse
+
+     0.67%  litchi-perf-005  litchi-perf-0055-final-v2            [.] <alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold
+            |
+            ---<alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold
+
+     0.61%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::parser::codec::append_transport_bytes
+            |
+            ---litchi_rtf::codec::parser::codec::append_transport_bytes
+
+     0.60%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::dispatch_content_control
+            |
+            ---litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::dispatch_content_control
+
+     0.60%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::lexer::codec::scanner::control::<impl litchi_rtf::codec::lexer::codec::lexer::Lexer>::parse_numeric_parameter
+            |
+            ---litchi_rtf::codec::lexer::codec::scanner::control::<impl litchi_rtf::codec::lexer::codec::lexer::Lexer>::parse_numeric_parameter
+
+     0.60%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str.llvm.6873020422838262853
+            |
+            ---_RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str.llvm.6873020422838262853
+               0xe1ffc7894818498b
+
+     0.54%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::model::document::model::RtfDocument::text
+            |
+            ---litchi_rtf::model::document::model::RtfDocument::text
+
+     0.54%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::effective_text_encoding
+            |
+            ---litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::effective_text_encoding
+
+     0.48%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.10231002685649690958
+     0.36%  litchi-perf-005  litchi-perf-0055-final-v2            [.] core::str::<impl str>::trim_matches
+     0.36%  litchi-perf-005  litchi-perf-0055-final-v2            [.] alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+     0.36%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17h442acb91a0472a2fE.llvm.5313156570233846561
+     0.30%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::model::document::model::RtfDocument::parse_string
+     0.30%  litchi-perf-005  litchi-perf-0055-final-v2            [.] <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+     0.30%  litchi-perf-005  litchi-perf-0055-final-v2            [.] <litchi_rtf::api::story::Inlines as core::iter::traits::iterator::Iterator>::next
+     0.24%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::model::document::model::RtfDocument::parse_internal
+     0.24%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::error::try_reserve_one
+     0.18%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::lexer::codec::scanner::cursor::<impl litchi_rtf::codec::lexer::codec::lexer::Lexer>::current_char
+     0.18%  litchi-perf-005  litchi-perf-0055-final-v2            [.] alloc::vec::Vec<T,A>::push_mut
+     0.18%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::lexer::codec::scanner::cursor::<impl litchi_rtf::codec::lexer::codec::lexer::Lexer>::advance
+     0.18%  rustc            [unknown]                            [k] 0xffffffff9c5a56ba
+     0.18%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write10write_char
+     0.18%  litchi-perf-005  [unknown]                            [k] 0xffffffff9d5cfb97
+     0.12%  litchi-perf-005  litchi-perf-0055-final-v2            [.] alloc::str::join_generic_copy
+     0.12%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter3pad
+     0.12%  litchi-perf-005  libc.so.6                            [.] alloc_perturb
+     0.12%  litchi-perf-005  litchi-perf-0055-final-v2            [.] core::result::Result<T,E>::is_ok_and
+     0.12%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::lexer::codec::scanner::cursor::<impl litchi_rtf::codec::lexer::codec::lexer::Lexer>::source_range
+     0.12%  git              [unknown]                            [k] 0xffffffff9c91b273
+     0.12%  rustc            [unknown]                            [k] 0xffffffff9d6600b7
+     0.12%  git              [unknown]                            [k] 0xffffffff9d5cfb97
+     0.12%  git              git                                  [.] 0x00000000001b3fcc
+     0.09%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17h50466fe06bf49435E.llvm.5313156570233846561
+     0.07%  litchi-perf-005  [unknown]                            [k] 0xffffffff9d6602e0
+     0.06%  litchi-perf-005  [unknown]                            [k] 0xffffffff9c7a4704
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvCsfLfy6EI15iL_7___rustc35___rust_no_alloc_shim_is_unstable_v2
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB7_9Formatter12pad_integral12write_prefix
+     0.06%  litchi-perf-005  [unknown]                            [k] 0xffffffff9d64e1d2
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvCsfLfy6EI15iL_7___rustc13___rdl_dealloc
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] litchi_rtf::codec::parser::codec::info::<impl litchi_rtf::codec::parser::codec::Parser>::current_state
+     0.06%  litchi-perf-005  [unknown]                            [k] 0xffffffff9d800f30
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] _RNvXsb_NtCsgEmfK2I1SDS_4core3fmtNtB5_9FormatterNtB5_5Write9write_str
+     0.06%  rustc            rustup                               [.] std::sys::process::unix::unix::<impl std::sys::process::unix::common::Command>::do_exec
+     0.06%  litchi-perf-005  [unknown]                            [k] 0xffffffff9c4c7c46
+     0.06%  rustc            [unknown]                            [k] 0xffffffff9c86b31d
+     0.06%  rustc            ld-linux-x86-64.so.2                 [.] do_lookup_x
+     0.06%  rustc            libc.so.6                            [.] _int_free
+     0.06%  litchi-perf-005  [unknown]                            [k] 0xffffffff9c4ad0d1
+     0.06%  litchi-perf-005  [unknown]                            [k] 0xffffffff9c7a46f4
+     0.06%  rustc            [unknown]                            [k] 0xffffffff9c848383
+     0.06%  git              [unknown]                            [k] 0xffffffff9c9dff0a
+     0.06%  git              git                                  [.] 0x00000000001d3bbb
+     0.06%  git              [unknown]                            [k] 0xffffffff9d5cc446
+     0.06%  litchi-perf-005  [unknown]                            [k] 0xffffffff9c9511a7
+     0.06%  rustc            rustup                               [.] alloc::collections::btree::map::entry::VacantEntry<K,V,A>::insert_entry
+     0.06%  rustc            librustc_driver-6108105cd7e839cf.so  [.] 0x0000000006271081
+     0.06%  rustc            [unknown]                            [k] 0xffffffff9c835bd4
+     0.06%  rustc            libLLVM.so.22.1-rust-1.95.0-stable   [.] llvm::cl::Option::addArgument()
+     0.06%  rustc            rustup                               [.] toml::de::parser::array::on_array
+     0.06%  rustc            [unknown]                            [k] 0xffffffff9d5cfb97
+     0.06%  rustc            libc.so.6                            [.] malloc
+     0.06%  rustc            rustup                               [.] toml_parser::parser::document::on_scalar
+     0.06%  rustc            [unknown]                            [k] 0xffffffff9c844f9d
+     0.06%  rustc            [unknown]                            [k] 0xffffffff9c4c7755
+     0.06%  litchi-perf-005  litchi-perf-0055-final-v2            [.] alloc::vec::in_place_collect::from_iter_in_place
+     0.06%  rustc            [unknown]                            [k] 0xffffffff9d5ae3a5
+     0.06%  git              [unknown]                            [k] 0xffffffff9c9f2b11
+     0.06%  rustc            ld-linux-x86-64.so.2                 [.] _dl_relocate_object
+     0.06%  git              [unknown]                            [k] 0xffffffff9c9f2814
+     0.06%  git              [unknown]                            [k] 0xffffffff9c9f2be8
+     0.06%  git              libc.so.6                            [.] __strncmp_evex
+     0.06%  git              libc.so.6                            [.] realloc
+     0.06%  git              [unknown]                            [k] 0xffffffff9c8ef491
+     0.00%  litchi-perf-005  [unknown]                            [k] 0xffffffff9d6600b7
+     0.00%  perf-exec        [unknown]                            [k] 0xffffffff9d6602e0
+     0.00%  perf-exec        [unknown]                            [k] 0xffffffff9c7a0a61
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

@@ -433,6 +433,7 @@ impl<'a> Parser<'a> {
         self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
             RtfError::MalformedDocument("RTF body text length overflow".to_string())
         })?;
+        self.prepare_body_block_push()?;
         self.blocks.push(block);
         if !decoded_str.trim().is_empty() {
             self.current_state_mut()?.paragraph_content_started = true;
@@ -498,6 +499,7 @@ impl<'a> Parser<'a> {
             .ok_or_else(|| {
                 RtfError::MalformedDocument("RTF body text length overflow".to_string())
             })?;
+        self.prepare_body_block_push()?;
         self.blocks.push(StyleBlock::new(
             Cow::Borrowed(arena_text),
             state.formatting,
@@ -505,6 +507,24 @@ impl<'a> Parser<'a> {
         ));
         self.current_state_mut()?.paragraph_content_started = true;
         self.append_revision_text(&state, arena_text, start, self.body_text_len)
+    }
+
+    #[inline]
+    pub(super) fn prepare_body_block_push(&mut self) -> RtfResult<()> {
+        if self.blocks.is_empty() {
+            let hint = std::mem::take(&mut self.body_block_capacity_hint);
+            if hint != 0
+                && crate::codec::error::try_reserve_additional(
+                    &mut self.blocks,
+                    hint,
+                    "body style blocks",
+                )
+                .is_err()
+            {
+                crate::codec::error::try_reserve_one(&mut self.blocks, "body style blocks")?;
+            }
+        }
+        Ok(())
     }
 
     /// Record a nonrequired (soft) break marker in the body story.

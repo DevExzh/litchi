@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `fcc89cbeaab2c38cd11d9bb5cfb634f9f2e340f2`
+Production base for the latest measured tranche: `3afe6c9610e01b56c385b92e41582f5ca7a9b9d5`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -72,6 +72,7 @@ is still not broad program or CRUD coverage.
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
 | RTF byte delimiter scanning | Large open p50 **-17.23%**, mean **-17.99%**; one-edit/save p50 **-14.65%**, mean **-14.84%**; instructions **-21.27%** | Ordinary-text lexer only; plain/CP-1252/LZFu opens improve; prepared LZFu no-op segment +0.290 us/+6.41% p50 is disclosed while complete open improves 19.39%; peak heap/RSS flat |
 | RTF retained body source span | Large one-edit/save p50 **-10.72%**, mean **-10.11%**, p95 **-8.76%**; instructions **-10.64%** | Direct uncompressed ASCII ordinary bodies only; cached range is proven during full parser preflight, while ambiguous/binary/non-ASCII/LZFu inputs keep the established locator/refusal and candidate parse/readback |
+| RTF bounded body-block reservation | Large open p50 **-21.17%**, mean **-21.00%**, p95 **-21.04%**; one-edit/save p50 **-1.46%**; peak heap **-29.73%** | Sources >=64 KiB only; exact root-text count, token/source/16 MiB caps, lazy fallible allocation, and table/deletion fallback retain semantic behavior; medium plain/CP-1252 +0.49%/+2.84% p50 disclosed |
 | Rejected RTF decoded-body ownership | Broad raw CP-1252 open **-3.08% p50 / -3.28% mean**; allocation calls **-20.15%** | Fully reverted: plain large open **+25.53% p50 / +22.45% mean**; owned-only variants were compiler-layout sensitive at -1.41% and +1.02% p50 |
 | OPC shared changed-Part payload | Few-large compressible targeted save **-20.73%** p50 / **-18.49%** mean; cache misses **-31.12%** | Removes one 4.19 MiB handoff copy; peak heap -3.42%, uninstrumented RSS +0.22% (flat); the remaining local-span copy is removed by the follow-up below |
 | ZIP generated local-span move | Few-large compressible/incompressible targeted save **-4.09% / -2.70%** p50; means **-4.08% / -2.25%** | Removes the separate 4.20 MiB post-validation local-span copy; peak heap -3.20%, uninstrumented RSS -0.10% (flat); required compressor/archive buffer remains |
@@ -384,6 +385,13 @@ counters. The complete validation contract and rejected shared-parser design
 are summarized in
 [`change 0047`](changes/0047-odt-indexed-paragraph-selector.md).
 
+The RTF block-reservation evidence pools six balanced pairs and retains every
+sample in the [`primary summary`](results/rtf-body-block-reservation-primary-summary.json).
+The [`medium guard summary`](results/rtf-body-block-reservation-medium-guards-summary.json)
+covers plain, raw CP-1252 and LZFu with the same six-pair protocol. Allocation,
+RSS, profile, counter, tiny-variant and binary-provenance artifacts are indexed
+in [`change 0055`](changes/0055-rtf-body-block-reservation.md).
+
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
 charged to hierarchical `Budget`. Raw ZIP preservation is integrated for owned
 same-topology OPC mutations and the narrow consuming source-backed one-Part
@@ -457,6 +465,8 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | RTF byte-delimiter scan, open, 10,000 paragraphs | 2.479 ms | 2.052 ms | **-17.23% p50 / -17.99% mean** | `tokenize_with_spans` share 17.36% -> 11.06%; instructions -21.27%; peak heap/RSS flat |
 | RTF byte-delimiter scan, one paragraph edit/save, 10,000 paragraphs | 7.554 ms | 6.447 ms | **-14.65% p50 / -14.84% mean** | p95 -16.34%; allocations effectively flat; complete edit/save readback unchanged |
 | RTF retained body span, one paragraph edit/save, 10,000 paragraphs | 6.053 ms | 5.404 ms | **-10.72% p50 / -10.11% mean** | p95 -8.76%; 588 locator-subtree allocation calls over 20 edits removed; peak heap/RSS flat; candidate parse/readback unchanged |
+| RTF bounded body-block reservation, open, 10,000 paragraphs | 2.073 ms | 1.634 ms | **-21.17% p50 / -21.00% mean** | p95 -21.04%; body-vector allocations 264 -> 22 over 22 parses; peak heap -29.73%; uninstrumented RSS flat |
+| RTF bounded body-block reservation, one paragraph edit/save | 5.585 ms | 5.503 ms | **-1.46% p50 / -1.75% mean** | p95 -1.87%, p99 -4.11%; complete candidate parse/readback unchanged |
 | ODT no-op edit/save, 10,000 paragraphs | 3.950 us | 3.219 us | -18.51% p50 / -29.58% mean | Exactly two allocations and one 28.42 KiB archive copy removed per snapshot; peak heap/RSS flat |
 | ODT full text, 10,000 blocks | 4.127 ms | 3.993 ms | **-3.25% p50 / -4.81% mean** | Allocation calls -15.48%, temporary allocations -45.52%; peak heap/RSS flat; open guard disclosed |
 | ODT middle paragraph, 10,000 paragraphs | 3.202 ms | 1.647 ms | **-48.56% p50 / -48.33% mean** | Allocation calls -27.05%; peak heap -24.74%; uninstrumented RSS -10.93%; complete EOF validation retained |
@@ -534,6 +544,7 @@ The underlying records are:
 - [`0052-odt-final-result-byte-handoff.md`](changes/0052-odt-final-result-byte-handoff.md)
 - [`0053-doc-chpx-range-index.md`](changes/0053-doc-chpx-range-index.md)
 - [`0054-ods-shared-durable-patch-blobs.md`](changes/0054-ods-shared-durable-patch-blobs.md)
+- [`0055-rtf-body-block-reservation.md`](changes/0055-rtf-body-block-reservation.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on

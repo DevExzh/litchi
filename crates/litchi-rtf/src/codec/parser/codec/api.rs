@@ -1,7 +1,8 @@
 use super::{
-    Bump, ColorTable, ControlWord, Cow, DrawingStoryCapture, FontTable, HashMap, ParseLimits,
-    ParsedDocument, Parser, Range, RefCell, RtfError, RtfResult, SmallVec, State, Token,
-    control_symbol_text,
+    Bump, ColorTable, ControlWord, Cow, DrawingStoryCapture, FontTable, HashMap,
+    MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParseLimits, ParsedDocument, Parser, Range, RefCell,
+    RtfError, RtfResult, SmallVec, State, Token, control_symbol_text,
+    disables_body_block_reservation, initial_body_block_capacity,
 };
 
 impl<'a> Parser<'a> {
@@ -37,6 +38,7 @@ impl<'a> Parser<'a> {
             unicode_alternate_depth: 0,
             color_table: RefCell::new(ColorTable::new()),
             blocks: Vec::new(),
+            body_block_capacity_hint: 0,
             arena,
             tables: Vec::new(),
             current_table: None,
@@ -259,6 +261,10 @@ impl<'a> Parser<'a> {
         let mut ordinary_body_start = None;
         let mut ordinary_body_end = None;
         let mut ordinary_body_cacheable = true;
+        let mut potential_root_body_blocks = 0usize;
+        let mut body_block_reservation_eligible = self
+            .source
+            .is_some_and(|source| source.len() >= MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES);
         for (index, token) in self.tokens.iter().enumerate() {
             match token {
                 Token::OpenBrace => {
@@ -401,11 +407,14 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Token::Text(text) if !text.is_empty() => {
-                    if contexts.len() == 1 && ordinary_body_start.is_none() {
-                        ordinary_body_start = self
-                            .token_spans
-                            .and_then(|spans| spans.get(index))
-                            .map(|span| span.start);
+                    if contexts.len() == 1 {
+                        potential_root_body_blocks += 1;
+                        if ordinary_body_start.is_none() {
+                            ordinary_body_start = self
+                                .token_spans
+                                .and_then(|spans| spans.get(index))
+                                .map(|span| span.start);
+                        }
                     }
                     if let Some(context) = contexts.last_mut() {
                         context.inert_section_format = false;
@@ -459,6 +468,13 @@ impl<'a> Parser<'a> {
                             .to_string(),
                     ));
                 },
+                Token::Control(control)
+                    if body_block_reservation_eligible
+                        && contexts.len() == 1
+                        && disables_body_block_reservation(control) =>
+                {
+                    body_block_reservation_eligible = false;
+                },
                 Token::Binary(_) if contexts.len() == 1 => ordinary_body_cacheable = false,
                 Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
             }
@@ -476,6 +492,14 @@ impl<'a> Parser<'a> {
             return Err(RtfError::MalformedDocument(
                 "Document must start with {".to_string(),
             ));
+        }
+
+        if body_block_reservation_eligible {
+            self.body_block_capacity_hint = initial_body_block_capacity(
+                self.source.map(str::len),
+                potential_root_body_blocks,
+                self.limits.max_tokens(),
+            );
         }
 
         // Parse document content

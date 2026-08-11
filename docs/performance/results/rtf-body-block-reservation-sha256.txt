@@ -1,0 +1,20 @@
+Base revision
+3afe6c9610e01b56c385b92e41582f5ca7a9b9d5
+
+Control binary
+531af2133a9af3aafb51db0ac1c946649e66b4b9fe34651171d66645cc2322f5  /tmp/litchi-perf-0055-before-3afe6c961
+
+Final binary
+d23e562184fd71f6e9032de63d98707335ef61f76cc1afc7a1cc482707ea6836  /tmp/litchi-perf-0055-final-v2
+
+Corpus
+957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e  rtf-semantic-plain-large
+
+Build and measurement
+rustc 1.95.0 (59807616e 2026-04-14)
+Cargo release profile, locked dependencies, Rust system allocator
+CPU 9, warm-memory, one selected case per process
+
+Profiler limitations
+Kernel symbols were restricted during perf record; user-space symbols resolved.
+Heaptrack RSS includes profiler overhead; matched GNU Time RSS is also recorded.
