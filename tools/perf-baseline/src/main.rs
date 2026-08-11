@@ -337,6 +337,9 @@ enum Case {
     CfbReadOne,
     CfbCreateStreamBorrowed,
     CfbCreateStreamOwned,
+    OleCommonOpen,
+    OleCommonPutStreamPublish,
+    OleCommonFinishRender,
     OleCommonOneEditSave,
     CfbSharedOpen,
     CfbSharedReadOne,
@@ -495,6 +498,9 @@ impl Case {
             Self::CfbReadOne => "cfb_read_one",
             Self::CfbCreateStreamBorrowed => "cfb_create_stream_borrowed",
             Self::CfbCreateStreamOwned => "cfb_create_stream_owned",
+            Self::OleCommonOpen => "ole_common_open",
+            Self::OleCommonPutStreamPublish => "ole_common_put_stream_publish",
+            Self::OleCommonFinishRender => "ole_common_finish_render",
             Self::OleCommonOneEditSave => "ole_common_one_edit_save",
             Self::CfbSharedOpen => "cfb_shared_open",
             Self::CfbSharedReadOne => "cfb_shared_read_one",
@@ -607,6 +613,9 @@ impl Case {
                 | Self::CfbReadOne
                 | Self::CfbCreateStreamBorrowed
                 | Self::CfbCreateStreamOwned
+                | Self::OleCommonOpen
+                | Self::OleCommonPutStreamPublish
+                | Self::OleCommonFinishRender
                 | Self::OleCommonOneEditSave
                 | Self::CfbSharedOpen
                 | Self::CfbSharedReadOne
@@ -2135,6 +2144,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "cfb_read_one" => Some(Case::CfbReadOne),
         "cfb_create_stream_borrowed" => Some(Case::CfbCreateStreamBorrowed),
         "cfb_create_stream_owned" => Some(Case::CfbCreateStreamOwned),
+        "ole_common_open" => Some(Case::OleCommonOpen),
+        "ole_common_put_stream_publish" => Some(Case::OleCommonPutStreamPublish),
+        "ole_common_finish_render" => Some(Case::OleCommonFinishRender),
         "ole_common_one_edit_save" => Some(Case::OleCommonOneEditSave),
         "cfb_shared_open" => Some(Case::CfbSharedOpen),
         "cfb_shared_read_one" => Some(Case::CfbSharedReadOne),
@@ -2307,6 +2319,8 @@ fn print_usage() {
                                        opc_source_concurrent_same_part,\n\
                                        cfb_open,cfb_list_streams,cfb_read_one,\n\
                                        cfb_create_stream_borrowed,cfb_create_stream_owned,\n\
+                                       ole_common_open,ole_common_put_stream_publish,\n\
+                                       ole_common_finish_render,\n\
                                        ole_common_one_edit_save,\n\
                                        cfb_shared_open,cfb_shared_read_one,\n\
                                        cfb_shared_concurrent_reads,\n\
@@ -3834,6 +3848,13 @@ fn run_case_with_config(
         },
         Case::CfbCreateStreamOwned => {
             run_cfb_create_stream(corpus, warmup_iterations, samples, true)
+        },
+        Case::OleCommonOpen => run_ole_common_open(corpus, warmup_iterations, samples),
+        Case::OleCommonPutStreamPublish => {
+            run_ole_common_put_stream_publish(corpus, warmup_iterations, samples)
+        },
+        Case::OleCommonFinishRender => {
+            run_ole_common_finish_render(corpus, warmup_iterations, samples)
         },
         Case::OleCommonOneEditSave => {
             run_ole_common_one_edit_save(corpus, warmup_iterations, samples)
@@ -7828,6 +7849,161 @@ fn run_ole_common_one_edit_save(
     Ok(result(Case::OleCommonOneEditSave, &corpus, elapsed, None))
 }
 
+fn run_ole_common_open(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let corpus = build_ole_common_corpus(corpus)?;
+    let targets = OleObjectTargets::default();
+    let limits = ole_common_limits(&corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut final_editor = None;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = corpus.archive.clone();
+        let targets = targets.clone();
+        let started = Instant::now();
+        let editor = OleObjectEditor::open(source, targets, limits)?;
+        let duration = started.elapsed();
+        if editor.is_changed() {
+            return Err("fresh OLE common editor unexpectedly reports a change".into());
+        }
+        std::hint::black_box(&editor);
+        final_editor = Some(editor);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    verify_ole_common_source_editor(
+        &corpus,
+        final_editor
+            .as_ref()
+            .ok_or("OLE common open produced no final editor")?,
+    )?;
+    Ok(result(Case::OleCommonOpen, &corpus, elapsed, None))
+}
+
+fn run_ole_common_put_stream_publish(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let corpus = build_ole_common_corpus(corpus)?;
+    let expected = ole_common_changed_output(&corpus)?;
+    let path = vec![corpus.target_name.clone()];
+    let opened = OleObjectEditor::open(
+        corpus.archive.clone(),
+        OleObjectTargets::default(),
+        ole_common_limits(&corpus)?,
+    )?;
+    let source = opened.snapshot();
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut final_editor = None;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut editor = source.edit();
+        let replacement = OLE_COMMON_REPLACEMENT.to_vec();
+        let started = Instant::now();
+        editor.put_stream(&path, replacement)?;
+        let duration = started.elapsed();
+        if !editor.is_changed()
+            || editor
+                .stream(&path)
+                .ok_or("OLE common target disappeared")?
+                != OLE_COMMON_REPLACEMENT
+        {
+            return Err("OLE common candidate publication did not retain the replacement".into());
+        }
+        std::hint::black_box(&editor);
+        final_editor = Some(editor);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let output = final_editor
+        .ok_or("OLE common candidate publication produced no final editor")?
+        .finish()?;
+    if output != expected {
+        return Err("OLE common candidate publication changed deterministic output".into());
+    }
+    verify_ole_common_changed_output(&corpus, &output)?;
+    Ok(result(
+        Case::OleCommonPutStreamPublish,
+        &corpus,
+        elapsed,
+        None,
+    ))
+}
+
+fn run_ole_common_finish_render(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let corpus = build_ole_common_corpus(corpus)?;
+    let expected = ole_common_changed_output(&corpus)?;
+    let path = vec![corpus.target_name.clone()];
+    let mut editor = OleObjectEditor::open(
+        corpus.archive.clone(),
+        OleObjectTargets::default(),
+        ole_common_limits(&corpus)?,
+    )?;
+    editor.put_stream(&path, OLE_COMMON_REPLACEMENT.to_vec())?;
+    let changed = editor.snapshot();
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut final_output = None;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let editor = changed.edit();
+        let started = Instant::now();
+        let output = editor.finish()?;
+        let duration = started.elapsed();
+        std::hint::black_box(&output);
+        final_output = Some(output);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let output = final_output
+        .as_deref()
+        .ok_or("OLE common changed finish produced no final output")?;
+    if output != expected {
+        return Err("OLE common changed finish changed deterministic output".into());
+    }
+    verify_ole_common_changed_output(&corpus, output)?;
+    Ok(result(Case::OleCommonFinishRender, &corpus, elapsed, None))
+}
+
+fn verify_ole_common_source_editor(
+    corpus: &Corpus,
+    editor: &OleObjectEditor,
+) -> Result<(), Box<dyn Error>> {
+    let kind = corpus_payload_kind(corpus)?;
+    let unchanged_stream_count = corpus
+        .manifest
+        .entry_count
+        .checked_sub(1)
+        .ok_or("OLE common corpus has no edit target")?;
+    for index in 0..unchanged_stream_count {
+        let name = cfb_entry_name(index);
+        let path = [name];
+        if editor
+            .stream(&path)
+            .ok_or("OLE common source stream disappeared")?
+            != payload_bytes(kind, index, corpus.manifest.entry_bytes)
+        {
+            return Err("OLE common open changed an opaque source stream".into());
+        }
+    }
+    let target = [corpus.target_name.clone()];
+    if editor
+        .stream(&target)
+        .ok_or("OLE common source target disappeared")?
+        != OLE_COMMON_ORIGINAL
+    {
+        return Err("OLE common open changed its source target".into());
+    }
+    Ok(())
+}
+
 fn ole_common_changed_output(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn Error>> {
     let path = vec![corpus.target_name.clone()];
     let mut editor = OleObjectEditor::open(
@@ -8623,10 +8799,17 @@ mod tests {
             "b9323eeace80e2c9c88801879265bfdfac83690bb2550880f5ef6bf87b48d131"
         );
 
-        let measured = run_case(Case::OleCommonOneEditSave, &base, 0, 1).unwrap();
-        assert_eq!(measured.case, Case::OleCommonOneEditSave.name());
-        assert_eq!(measured.corpus.entry_count, 5);
-        assert_eq!(measured.elapsed_ns.samples.len(), 1);
+        for case in [
+            Case::OleCommonOpen,
+            Case::OleCommonPutStreamPublish,
+            Case::OleCommonFinishRender,
+            Case::OleCommonOneEditSave,
+        ] {
+            let measured = run_case(case, &base, 0, 1).unwrap();
+            assert_eq!(measured.case, case.name());
+            assert_eq!(measured.corpus.entry_count, 5);
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+        }
     }
 
     #[test]
