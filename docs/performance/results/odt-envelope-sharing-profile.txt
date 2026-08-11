@@ -1,0 +1,29 @@
+ODT envelope-classification package sharing: sampled profile summary
+
+Command shape:
+  MALLOC_MMAP_THRESHOLD_=33554432 MALLOC_TRIM_THRESHOLD_=-1 \
+    taskset -c 11 perf record -F 999 -g --call-graph dwarf \
+    -o <state>.perf.data -- <binary> --warmup 3 --samples 30 \
+    --case odt_media_paragraph_edit_save --json <state>.json
+
+Before:
+  samples: 1683 cycles:P samples
+  approximate event count: 8,132,329,159
+  __memmove_avx512_unaligned_erms: 13.81% exclusive
+  resolved envelope_kind memmove caller: 1.44%
+  retained transaction copy_bytes caller: 1.49%
+
+After:
+  samples: 1676 cycles:P samples
+  approximate event count: 8,085,570,178
+  __memmove_avx512_unaligned_erms: 15.00% exclusive
+  resolved envelope_kind memmove caller: absent
+  retained transaction copy_bytes caller: 1.85%
+
+The removed envelope-specific memmove caller is absent. The total memmove
+share rises because independent result materialization, verification and raw
+ZIP preservation remain and sampling/denominator noise dominates this small
+whole-process profile. Matched timing, perf-stat counters and Heaptrack are the
+quantitative attribution records.
+
+Kernel symbols were restricted on this host. No samples were lost.

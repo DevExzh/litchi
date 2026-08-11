@@ -369,6 +369,13 @@ incomplete program and CRUD matrix.
   heap/RSS remain flat. A dedicated exact no-op segment, which returns before
   the changed path, moves +39 ns p50 and is explicitly disclosed. See
   [`0041`](changes/0041-odt-compact-audit-package-sharing.md).
+- ODT changed-commit envelope classification now shares the immutable snapshot
+  package instead of allocating/copying one complete archive into a temporary
+  owner. Across two balanced ABBA cycles, the fixed 16 MiB-media edit/save
+  improves 11.40% p50, 11.95% mean and 12.19% p95; Heaptrack removes exactly
+  two allocation calls per commit and peak heap/RSS remain flat. Archive,
+  manifest, encryption and signature checks remain. See
+  [`0042`](changes/0042-odt-envelope-package-sharing.md).
 - Targeted OPC changed-Part publication now shares the Part's existing
   immutable payload with the ZIP regeneration layer. Heaptrack removes one
   4.19 MiB allocation and peak heap falls 3.42%. Few-large compressible save

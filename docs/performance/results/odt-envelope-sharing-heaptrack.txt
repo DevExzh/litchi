@@ -1,0 +1,31 @@
+ODT envelope-classification package sharing: Heaptrack summary
+
+Pinned command shape:
+  MALLOC_MMAP_THRESHOLD_=33554432 MALLOC_TRIM_THRESHOLD_=-1 \
+    taskset -c 11 heaptrack -o <state>.heaptrack.zst <binary> \
+    --warmup 2 --samples 20 \
+    --case odt_media_paragraph_edit_save --json <state>.json
+
+Before executable:
+  calls to allocation functions: 274619
+  temporary memory allocations: 48789
+  peak heap memory consumption: 106.03M
+  peak RSS including Heaptrack overhead: 120.60M
+  total memory leaked: 1.78K
+
+After executable:
+  calls to allocation functions: 274575
+  temporary memory allocations: 48789
+  peak heap memory consumption: 106.03M
+  peak RSS including Heaptrack overhead: 120.60M
+  total memory leaked: 1.78K
+
+Delta:
+  allocation calls: -44 (-0.0160%) across 22 complete iterations
+  allocation calls per changed commit: -2
+  temporary allocations: unchanged
+  peak heap: unchanged
+  Heaptrack RSS: unchanged
+
+The two removed calls per iteration are the archive-sized Vec allocation and
+the temporary Arc owner allocation. Archive and manifest parsing still run.
