@@ -229,9 +229,7 @@ fn checked_limit_builders_reject_zero_and_hard_ceiling_overflow() {
 #[test]
 fn libreoffice_formula_fixtures_open_and_remain_byte_exact() {
     let fixtures: [&[u8]; 2] = [
-        include_bytes!(
-            "../../../test-data/odf/native-resave/source/font-styles.odf"
-        ),
+        include_bytes!("../../../test-data/odf/native-resave/source/font-styles.odf"),
         include_bytes!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf151842.odf"),
     ];
 

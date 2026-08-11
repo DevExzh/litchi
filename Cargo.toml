@@ -32,7 +32,6 @@ unexpected_cfgs = "deny"
 unused_must_use = "deny"
 unused_qualifications = "deny"
 
-
 [workspace.lints.rustdoc]
 bare_urls = "deny"
 broken_intra_doc_links = "deny"
@@ -42,7 +41,6 @@ invalid_rust_codeblocks = "deny"
 private_intra_doc_links = "deny"
 redundant_explicit_links = "deny"
 unescaped_backticks = "deny"
-
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -2 }
@@ -59,69 +57,6 @@ manual_saturating_arithmetic = "allow"
 needless_return = "allow"
 
 [workspace.dependencies]
-# Path deps to internal crates.
-litchi              = { version = "0.0.1", path = "crates/litchi" }
-litchi-biff         = { version = "0.0.1", path = "crates/litchi-biff" }
-litchi-cfb          = { version = "0.0.1", path = "crates/litchi-cfb" }
-litchi-codepage     = { version = "0.0.1", path = "crates/litchi-codepage" }
-litchi-core         = { version = "0.0.1", path = "crates/litchi-core" }
-litchi-crypto       = { version = "0.0.1", path = "crates/litchi-crypto" }
-litchi-doc          = { version = "0.0.1", path = "crates/litchi-doc" }
-litchi-docx         = { version = "0.0.1", path = "crates/litchi-docx" }
-litchi-drawingml    = { version = "0.0.1", path = "crates/litchi-drawingml" }
-litchi-eval         = { version = "0.0.1", path = "crates/litchi-eval" }
-litchi-fonts        = { version = "0.0.1", path = "crates/litchi-fonts" }
-litchi-formula      = { version = "0.0.1", path = "crates/litchi-formula" }
-litchi-imgconv      = { version = "0.0.1", path = "crates/litchi-imgconv" }
-litchi-iwa-archive  = { version = "0.0.1", path = "crates/litchi-iwa-archive" }
-litchi-iwa-cache    = { version = "0.0.1", path = "crates/litchi-iwa-cache" }
-litchi-iwa-common   = { version = "0.0.1", path = "crates/litchi-iwa-common" }
-litchi-iwa-core     = { version = "0.0.1", path = "crates/litchi-iwa-core" }
-litchi-iwa-detect   = { version = "0.0.1", path = "crates/litchi-iwa-detect" }
-litchi-iwa-graph    = { version = "0.0.1", path = "crates/litchi-iwa-graph" }
-litchi-iwa-index    = { version = "0.0.1", path = "crates/litchi-iwa-index" }
-litchi-iwa-package  = { version = "0.0.1", path = "crates/litchi-iwa-package" }
-litchi-iwa-structured = { version = "0.0.1", path = "crates/litchi-iwa-structured" }
-litchi-iwa-text     = { version = "0.0.1", path = "crates/litchi-iwa-text" }
-litchi-iwa-text-wire = { version = "0.0.1", path = "crates/litchi-iwa-text-wire" }
-litchi-iwa-protos   = { version = "0.0.1", path = "crates/litchi-iwa-protos" }
-litchi-keynote      = { version = "0.0.1", path = "crates/litchi-keynote" }
-litchi-markdown     = { version = "0.0.1", path = "crates/litchi-markdown" }
-litchi-numbers      = { version = "0.0.1", path = "crates/litchi-numbers" }
-litchi-numbers-wire = { version = "0.0.1", path = "crates/litchi-numbers-wire" }
-litchi-odb          = { version = "0.0.1", path = "crates/litchi-odb" }
-litchi-odc          = { version = "0.0.1", path = "crates/litchi-odc" }
-litchi-pages        = { version = "0.0.1", path = "crates/litchi-pages" }
-litchi-odf          = { version = "0.0.1", path = "crates/litchi-odf" }
-litchi-odf-common   = { version = "0.0.1", path = "crates/litchi-odf-common" }
-litchi-odf-formula  = { version = "0.0.1", path = "crates/litchi-odf-formula" }
-litchi-odg          = { version = "0.0.1", path = "crates/litchi-odg" }
-litchi-odi          = { version = "0.0.1", path = "crates/litchi-odi" }
-litchi-odm          = { version = "0.0.1", path = "crates/litchi-odm" }
-litchi-odp          = { version = "0.0.1", path = "crates/litchi-odp" }
-litchi-ods          = { version = "0.0.1", path = "crates/litchi-ods" }
-litchi-odt          = { version = "0.0.1", path = "crates/litchi-odt" }
-litchi-odraw        = { version = "0.0.1", path = "crates/litchi-odraw" }
-litchi-ograph       = { version = "0.0.1", path = "crates/litchi-ograph" }
-litchi-ole-common   = { version = "0.0.1", path = "crates/litchi-ole-common" }
-litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
-litchi-opc          = { version = "0.0.1", path = "crates/litchi-opc", default-features = false }
-litchi-oth          = { version = "0.0.1", path = "crates/litchi-oth" }
-litchi-ppt          = { version = "0.0.1", path = "crates/litchi-ppt" }
-litchi-pptx         = { version = "0.0.1", path = "crates/litchi-pptx" }
-litchi-rtf          = { version = "0.0.1", path = "crates/litchi-rtf" }
-litchi-sheet        = { version = "0.0.1", path = "crates/litchi-sheet" }
-litchi-sign         = { version = "0.0.1", path = "crates/litchi-sign" }
-litchi-spreadsheet-drawing = { version = "0.0.1", path = "crates/litchi-spreadsheet-drawing" }
-litchi-slide        = { version = "0.0.1", path = "crates/litchi-slide" }
-litchi-vba          = { version = "0.0.1", path = "crates/litchi-vba" }
-litchi-word         = { version = "0.0.1", path = "crates/litchi-word" }
-litchi-xls          = { version = "0.0.1", path = "crates/litchi-xls" }
-litchi-xlsb         = { version = "0.0.1", path = "crates/litchi-xlsb" }
-litchi-xlsx         = { version = "0.0.1", path = "crates/litchi-xlsx" }
-soapberry-zip       = { path = "crates/soapberry-zip" }
-xml-minifier        = { version = "0.1.0", path = "crates/xml-minifier" }
-xml-minifier-macros = { version = "0.1.0", path = "crates/xml-minifier-macros" }
 
 # External deps used by ≥2 crates — declared once, inherited by members.
 # VERSIONS PRESERVED VERBATIM FROM CURRENT root Cargo.toml.
@@ -149,6 +84,66 @@ font-kit      = "0.14"
 hmac          = "0.13"
 image         = { version = "0.25", features = ["default-formats", "rayon"] }
 itoa          = "1.0"
+# Path deps to internal crates.
+litchi              = { version = "0.0.1", path = "crates/litchi" }
+litchi-biff         = { version = "0.0.1", path = "crates/litchi-biff" }
+litchi-cfb          = { version = "0.0.1", path = "crates/litchi-cfb" }
+litchi-codepage     = { version = "0.0.1", path = "crates/litchi-codepage" }
+litchi-core         = { version = "0.0.1", path = "crates/litchi-core" }
+litchi-crypto       = { version = "0.0.1", path = "crates/litchi-crypto" }
+litchi-doc          = { version = "0.0.1", path = "crates/litchi-doc" }
+litchi-docx         = { version = "0.0.1", path = "crates/litchi-docx" }
+litchi-drawingml    = { version = "0.0.1", path = "crates/litchi-drawingml" }
+litchi-eval         = { version = "0.0.1", path = "crates/litchi-eval" }
+litchi-fonts        = { version = "0.0.1", path = "crates/litchi-fonts" }
+litchi-formula      = { version = "0.0.1", path = "crates/litchi-formula" }
+litchi-imgconv      = { version = "0.0.1", path = "crates/litchi-imgconv" }
+litchi-iwa-archive  = { version = "0.0.1", path = "crates/litchi-iwa-archive" }
+litchi-iwa-cache    = { version = "0.0.1", path = "crates/litchi-iwa-cache" }
+litchi-iwa-common   = { version = "0.0.1", path = "crates/litchi-iwa-common" }
+litchi-iwa-core     = { version = "0.0.1", path = "crates/litchi-iwa-core" }
+litchi-iwa-detect   = { version = "0.0.1", path = "crates/litchi-iwa-detect" }
+litchi-iwa-graph    = { version = "0.0.1", path = "crates/litchi-iwa-graph" }
+litchi-iwa-index    = { version = "0.0.1", path = "crates/litchi-iwa-index" }
+litchi-iwa-package  = { version = "0.0.1", path = "crates/litchi-iwa-package" }
+litchi-iwa-protos   = { version = "0.0.1", path = "crates/litchi-iwa-protos" }
+litchi-iwa-structured = { version = "0.0.1", path = "crates/litchi-iwa-structured" }
+litchi-iwa-text     = { version = "0.0.1", path = "crates/litchi-iwa-text" }
+litchi-iwa-text-wire = { version = "0.0.1", path = "crates/litchi-iwa-text-wire" }
+litchi-keynote      = { version = "0.0.1", path = "crates/litchi-keynote" }
+litchi-markdown     = { version = "0.0.1", path = "crates/litchi-markdown" }
+litchi-numbers      = { version = "0.0.1", path = "crates/litchi-numbers" }
+litchi-numbers-wire = { version = "0.0.1", path = "crates/litchi-numbers-wire" }
+litchi-odb          = { version = "0.0.1", path = "crates/litchi-odb" }
+litchi-odc          = { version = "0.0.1", path = "crates/litchi-odc" }
+litchi-odf          = { version = "0.0.1", path = "crates/litchi-odf" }
+litchi-odf-common   = { version = "0.0.1", path = "crates/litchi-odf-common" }
+litchi-odf-formula  = { version = "0.0.1", path = "crates/litchi-odf-formula" }
+litchi-odg          = { version = "0.0.1", path = "crates/litchi-odg" }
+litchi-odi          = { version = "0.0.1", path = "crates/litchi-odi" }
+litchi-odm          = { version = "0.0.1", path = "crates/litchi-odm" }
+litchi-odp          = { version = "0.0.1", path = "crates/litchi-odp" }
+litchi-odraw        = { version = "0.0.1", path = "crates/litchi-odraw" }
+litchi-ods          = { version = "0.0.1", path = "crates/litchi-ods" }
+litchi-odt          = { version = "0.0.1", path = "crates/litchi-odt" }
+litchi-ograph       = { version = "0.0.1", path = "crates/litchi-ograph" }
+litchi-ole-common   = { version = "0.0.1", path = "crates/litchi-ole-common" }
+litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
+litchi-opc          = { version = "0.0.1", path = "crates/litchi-opc", default-features = false }
+litchi-oth          = { version = "0.0.1", path = "crates/litchi-oth" }
+litchi-pages        = { version = "0.0.1", path = "crates/litchi-pages" }
+litchi-ppt          = { version = "0.0.1", path = "crates/litchi-ppt" }
+litchi-pptx         = { version = "0.0.1", path = "crates/litchi-pptx" }
+litchi-rtf          = { version = "0.0.1", path = "crates/litchi-rtf" }
+litchi-sheet        = { version = "0.0.1", path = "crates/litchi-sheet" }
+litchi-sign         = { version = "0.0.1", path = "crates/litchi-sign" }
+litchi-slide        = { version = "0.0.1", path = "crates/litchi-slide" }
+litchi-spreadsheet-drawing = { version = "0.0.1", path = "crates/litchi-spreadsheet-drawing" }
+litchi-vba          = { version = "0.0.1", path = "crates/litchi-vba" }
+litchi-word         = { version = "0.0.1", path = "crates/litchi-word" }
+litchi-xls          = { version = "0.0.1", path = "crates/litchi-xls" }
+litchi-xlsb         = { version = "0.0.1", path = "crates/litchi-xlsb" }
+litchi-xlsx         = { version = "0.0.1", path = "crates/litchi-xlsx" }
 md-5          = { version = "0.11", features = ["zeroize"] }
 memchr        = "2.7"
 num-complex   = "0.4"
@@ -171,8 +166,8 @@ rowan         = "0.16"
 rsa           = { version = "0.9", features = ["sha1", "sha2"] }
 ryu           = "1.0"
 serde         = { version = "1", features = ["derive"] }
-serde_json    = "1"
 serde-saphyr  = "0"
+serde_json    = "1"
 sha1          = { version = "0.11", features = ["zeroize"] }
 sha1_legacy   = { package = "sha1", version = "0.10" }
 sha2          = "0.11"
@@ -180,6 +175,7 @@ sha2_legacy   = { package = "sha2", version = "0.10" }
 signature     = "2.2"
 smallvec      = "1.15"
 snap          = "1"
+soapberry-zip       = { path = "crates/soapberry-zip" }
 statrs        = "0.18"
 subtle        = "2"
 sxd-document  = "0.3"
@@ -191,6 +187,8 @@ unicode-normalization = "0.1"
 url           = "2.5"
 urlencoding   = "2.1"
 x509-cert     = { version = "0.2", features = ["pem"] }
+xml-minifier        = { version = "0.1.0", path = "crates/xml-minifier" }
+xml-minifier-macros = { version = "0.1.0", path = "crates/xml-minifier-macros" }
 zerocopy      = { version = "0.8", features = ["std"] }
 zerocopy-derive = "0.8"
 zeroize       = "1"

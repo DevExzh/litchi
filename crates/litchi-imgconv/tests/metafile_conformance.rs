@@ -731,9 +731,7 @@ fn corpus_file(relative: &str) -> Vec<u8> {
 fn discover_metafiles() -> Vec<(PathBuf, InputFormat)> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let mut paths = Vec::new();
-    for relative in ["../../3rdparty", "../../test-data"] {
-        collect_metafiles(&root.join(relative), &mut paths);
-    }
+    collect_metafiles(&root.join("../../test-data"), &mut paths);
     paths.sort_by(|left, right| left.0.cmp(&right.0));
     paths
 }

@@ -231,10 +231,7 @@ pub fn decode_form_sheet_name(
     )?;
     let view: projection::NumbersFormBasedSheetArchiveLazyView<'_> =
         options.buffa().decode_lazy_view(source)?;
-    let super_view = view
-        .super_
-        .get()?
-        .ok_or_else(|| DecodeError(Kind::Projection))?;
+    let super_view = view.super_.get()?.ok_or(DecodeError(Kind::Projection))?;
     if super_view.name != strict.name {
         return Err(DecodeError(Kind::Projection));
     }
@@ -324,7 +321,7 @@ impl Budget {
         let observed = self
             .fields
             .checked_add(1)
-            .ok_or_else(|| DecodeError(Kind::Projection))?;
+            .ok_or(DecodeError(Kind::Projection))?;
         if observed > self.max_fields {
             return Err(DecodeError(Kind::Field {
                 observed,
@@ -338,7 +335,7 @@ impl Budget {
         let observed = n
             .checked_mul(2)
             .and_then(|x| self.work.checked_add(x))
-            .ok_or_else(|| DecodeError(Kind::Projection))?;
+            .ok_or(DecodeError(Kind::Projection))?;
         if observed > self.max_work {
             return Err(DecodeError(Kind::Work {
                 observed,
