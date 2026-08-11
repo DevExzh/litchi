@@ -1,0 +1,42 @@
+ODT consecutive paragraph replacement profile summary
+Date: 2026-08-11
+Host: Linux x86_64, 12 logical CPUs, rustc 1.95.0
+Corpus: odt-semantic-large, 10,000 paragraphs, 100 evenly spaced replacements
+
+perf stat, three process repeats; each process uses one warmup and five samples:
+
+counter                 before          after           delta
+task-clock (ms)         5,636.47        232.64          -95.87%
+cycles                  27,555,751,797  1,121,825,593   -95.93%
+instructions            121,307,498,522 3,755,672,004   -96.90%
+branches                26,729,911,240  775,049,661     -97.10%
+branch misses           24,589,949      1,483,960       -93.97%
+cache references        1,588,420,804   64,629,411      -95.93%
+cache misses            55,485,875      3,563,365       -93.58%
+
+Single-sample Heaptrack process; zero warmups, one sample:
+
+metric                  before          after           delta
+allocation calls        16,649,546      643,841         -96.13%
+temporary allocations   3,133,789       140,632         -95.51%
+peak heap               18.23 MiB       18.23 MiB       flat
+peak RSS incl. tool     28.19 MiB       30.99 MiB       +9.93%
+retained leak report    1.78 KiB        1.78 KiB        flat
+
+Uninstrumented GNU Time process; one warmup and five samples:
+
+metric                  before          after           delta
+elapsed                 5.61 s          0.22 s          -96.08%
+maximum RSS             30,848 KiB      30,848 KiB      flat
+
+Matched perf record processes used one warmup and five samples. The before
+profile collected 23K cycles samples with zero lost samples; its leading
+production frames include Parser::parse_elements_in_order (7.09% exclusive),
+xml_splice_publication (5.84%), Element::clone (4.81%), and repeated memory
+copying. The after profile collected 1K cycles samples with zero lost samples;
+the former repeated parser/publication frames are below the 0.5% exclusive
+report cutoff, while the retained compact XML audit is visible at 4.16%.
+
+Commands use the frozen binaries named in odt-paragraph-batch-sha256.txt and
+the public odt_semantic_one_percent_edit_save harness case. Full perf reports,
+perf-stat CSV, GNU Time output, and ABBA JSON are retained beside this file.

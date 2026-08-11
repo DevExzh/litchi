@@ -26,8 +26,8 @@ range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, one XLSX commit/read attribution case,
 four opaque-heavy common OLE2 stage/edit-save cases, 20 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, seven RTF semantic cases, and 25 ODF semantic cases
-are opt-in, for 120 selectable cases in total:
+DOCX/PPTX semantic cases, seven RTF semantic cases, and 26 ODF semantic cases
+are opt-in, for 121 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -155,12 +155,12 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/semantic-office-smoke.json
 ```
 
-Run the complete tiny semantic ODF smoke matrix (22 records):
+Run the complete tiny semantic ODF smoke matrix (23 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
-  --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_cell_sweep,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
+  --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_cell_sweep,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
   --json target/perf/semantic-odf-smoke.json
 ```
 
@@ -363,6 +363,10 @@ full-text extraction, and the source-bound `Document::edit` transaction.
 `odt_semantic_one_paragraph` necessarily calls the public `paragraphs()` API
 and then selects the middle value because ODT has no public indexed paragraph
 query; it is deliberately not described as a lazy lookup.
+`odt_semantic_one_percent_edit_save` stages deterministic evenly spaced
+replacements through the ordinary scalar transaction API, then commits once,
+materializes the package, reopens it, verifies every paragraph and full text,
+and checks that the operation result count equals the selected 1% closure.
 
 Each ODS batch uses `Builder`, `Spreadsheet::from_bytes`, `sheets()`, the
 public logical `cell()` view, a row-major cell sweep without cell-text
@@ -381,7 +385,7 @@ eight deterministic 2 MiB resources under `Pictures/`. It times public unified
 snapshot open, one middle-cell edit, commit and output materialization. Outside
 timing it reopens the complete grid and verifies every resource path, manifest
 media type, exact payload and deterministic output. This case does not vary
-with `--semantic-shape` and is not part of the 22-record tiny ODF smoke matrix.
+with `--semantic-shape` and is not part of the 23-record tiny ODF smoke matrix.
 
 `odt_media_paragraph_edit_save` is a separate fixed-medium corpus: 200
 paragraphs plus eight deterministic 2 MiB resources under `Pictures/`. It

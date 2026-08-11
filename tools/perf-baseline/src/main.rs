@@ -432,6 +432,7 @@ enum Case {
     OdtSemanticCreateSmall,
     OdtSemanticNoopEditSave,
     OdtSemanticOneEditSave,
+    OdtSemanticOnePercentEditSave,
     OdtMediaParagraphEditSave,
     OdsSemanticOpen,
     OdsSemanticListSheets,
@@ -598,6 +599,7 @@ impl Case {
             Self::OdtSemanticCreateSmall => "odt_semantic_create_small",
             Self::OdtSemanticNoopEditSave => "odt_semantic_noop_edit_save",
             Self::OdtSemanticOneEditSave => "odt_semantic_one_edit_save",
+            Self::OdtSemanticOnePercentEditSave => "odt_semantic_one_percent_edit_save",
             Self::OdtMediaParagraphEditSave => "odt_media_paragraph_edit_save",
             Self::OdsSemanticOpen => "ods_semantic_open",
             Self::OdsSemanticListSheets => "ods_semantic_list_sheets",
@@ -779,6 +781,7 @@ impl Case {
                 | Self::OdtSemanticCreateSmall
                 | Self::OdtSemanticNoopEditSave
                 | Self::OdtSemanticOneEditSave
+                | Self::OdtSemanticOnePercentEditSave
         )
     }
 
@@ -2303,6 +2306,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_semantic_create_small" => Some(Case::OdtSemanticCreateSmall),
         "odt_semantic_noop_edit_save" => Some(Case::OdtSemanticNoopEditSave),
         "odt_semantic_one_edit_save" => Some(Case::OdtSemanticOneEditSave),
+        "odt_semantic_one_percent_edit_save" => Some(Case::OdtSemanticOnePercentEditSave),
         "odt_media_paragraph_edit_save" => Some(Case::OdtMediaParagraphEditSave),
         "ods_semantic_open" => Some(Case::OdsSemanticOpen),
         "ods_semantic_list_sheets" => Some(Case::OdsSemanticListSheets),
@@ -2441,7 +2445,8 @@ fn print_usage() {
                                        odt_semantic_open,odt_semantic_list_paragraphs,\n\
                                        odt_semantic_one_paragraph,odt_semantic_full_text,\n\
                                        odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
-                                       odt_semantic_one_edit_save,odt_media_paragraph_edit_save,\n\
+                                       odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,\n\
+                                       odt_media_paragraph_edit_save,\n\
                                        ods_semantic_open,\n\
                                        ods_semantic_list_sheets,ods_semantic_one_cell,\n\
                                        ods_semantic_cell_sweep,\n\
@@ -3454,7 +3459,7 @@ fn odp_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
 fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_odt_bytes(shape)?;
     let document = litchi_odt::Document::from_bytes(archive.clone())?;
-    verify_semantic_odt(&document, shape, false)?;
+    verify_semantic_odt(&document, shape, &[])?;
     let target_payload = semantic_odt_text(0, false).into_bytes();
     let content_bytes = (0..shape.docx_paragraphs()).try_fold(0usize, |total, index| {
         total
@@ -4237,7 +4242,8 @@ fn run_case_with_config(
         | Case::OdtSemanticFullText
         | Case::OdtSemanticCreateSmall
         | Case::OdtSemanticNoopEditSave
-        | Case::OdtSemanticOneEditSave => {
+        | Case::OdtSemanticOneEditSave
+        | Case::OdtSemanticOnePercentEditSave => {
             run_semantic_odt(case, corpus, warmup_iterations, samples)
         },
         Case::OdtMediaParagraphEditSave => {
@@ -4646,20 +4652,20 @@ fn verify_pptx_source_edit_semantics(
 fn verify_semantic_odt(
     document: &litchi_odt::Document,
     shape: SemanticShape,
-    updated: bool,
+    updated: &[usize],
 ) -> Result<(), Box<dyn Error>> {
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != shape.docx_paragraphs() {
         return Err("semantic ODT paragraph count differs from specification".into());
     }
     for (index, paragraph) in paragraphs.iter().enumerate() {
-        let is_updated = updated && index == shape.docx_paragraphs() / 2;
+        let is_updated = updated.binary_search(&index).is_ok();
         if paragraph.text()? != semantic_odt_text(index, is_updated) {
             return Err("semantic ODT paragraph text differs from specification".into());
         }
     }
     let expected = (0..shape.docx_paragraphs())
-        .map(|index| semantic_odt_text(index, updated && index == shape.docx_paragraphs() / 2))
+        .map(|index| semantic_odt_text(index, updated.binary_search(&index).is_ok()))
         .collect::<Vec<_>>()
         .join("\n");
     if document.text()? != expected {
@@ -4670,7 +4676,8 @@ fn verify_semantic_odt(
 
 fn verify_odt_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
     let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
-    verify_semantic_odt(&document, SemanticShape::Medium, updated)?;
+    let updated = updated.then_some(SemanticShape::Medium.docx_paragraphs() / 2);
+    verify_semantic_odt(&document, SemanticShape::Medium, updated.as_slice())?;
 
     let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
     let package = package.package()?;
@@ -5963,6 +5970,12 @@ fn run_semantic_odt(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let shape = semantic_shape(corpus)?;
     let index = shape.docx_paragraphs() / 2;
+    let updates = semantic_update_indices(shape.docx_paragraphs())?;
+    let selected = match case {
+        Case::OdtSemanticOneEditSave => vec![index],
+        Case::OdtSemanticOnePercentEditSave => updates,
+        _ => Vec::new(),
+    };
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         match case {
@@ -5971,7 +5984,7 @@ fn run_semantic_odt(
                 let bytes = semantic_odt_bytes(SemanticShape::Tiny)?;
                 let duration = started.elapsed();
                 let reopened = litchi_odt::Document::from_bytes(bytes.clone())?;
-                verify_semantic_odt(&reopened, SemanticShape::Tiny, false)?;
+                verify_semantic_odt(&reopened, SemanticShape::Tiny, &[])?;
                 if bytes != corpus.archive && shape == SemanticShape::Tiny {
                     return Err(
                         "semantic ODT creation differs from its deterministic corpus".into(),
@@ -5985,7 +5998,7 @@ fn run_semantic_odt(
                 let started = Instant::now();
                 let document = litchi_odt::Document::from_bytes(owned)?;
                 let duration = started.elapsed();
-                verify_semantic_odt(&document, shape, false)?;
+                verify_semantic_odt(&document, shape, &[])?;
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdtSemanticListParagraphs => {
@@ -5996,7 +6009,7 @@ fn run_semantic_odt(
                 if paragraphs.len() != shape.docx_paragraphs() {
                     return Err("semantic ODT paragraph list differs from specification".into());
                 }
-                verify_semantic_odt(&document, shape, false)?;
+                verify_semantic_odt(&document, shape, &[])?;
                 std::hint::black_box(paragraphs);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
@@ -6012,7 +6025,7 @@ fn run_semantic_odt(
                 if text != semantic_odt_text(index, false) {
                     return Err("semantic ODT selected paragraph differs from specification".into());
                 }
-                verify_semantic_odt(&document, shape, false)?;
+                verify_semantic_odt(&document, shape, &[])?;
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdtSemanticFullText => {
@@ -6020,28 +6033,32 @@ fn run_semantic_odt(
                 let started = Instant::now();
                 let text = document.text()?;
                 let duration = started.elapsed();
-                verify_semantic_odt(&document, shape, false)?;
+                verify_semantic_odt(&document, shape, &[])?;
                 std::hint::black_box(text);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
-            Case::OdtSemanticNoopEditSave | Case::OdtSemanticOneEditSave => {
+            Case::OdtSemanticNoopEditSave
+            | Case::OdtSemanticOneEditSave
+            | Case::OdtSemanticOnePercentEditSave => {
                 let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
                 let started = Instant::now();
                 let mut edit = document.edit()?;
-                let updated = matches!(case, Case::OdtSemanticOneEditSave);
-                if updated {
-                    edit.replace_paragraph(Position::new(index), semantic_odt_text(index, true))?;
+                for index in &selected {
+                    edit.replace_paragraph(Position::new(*index), semantic_odt_text(*index, true))?;
                 }
                 let commit = edit.commit()?;
                 let bytes = commit.snapshot().as_bytes().to_vec();
                 let duration = started.elapsed();
-                if (bytes != corpus.archive) != updated {
+                if (bytes != corpus.archive) == selected.is_empty()
+                    || commit.results().len() != selected.len()
+                {
                     return Err(
-                        "semantic ODT edit/save changed-state differs from specification".into(),
+                        "semantic ODT edit/save changed-state or result count differs from specification"
+                            .into(),
                     );
                 }
                 let reopened = litchi_odt::Document::from_bytes(bytes.clone())?;
-                verify_semantic_odt(&reopened, shape, updated)?;
+                verify_semantic_odt(&reopened, shape, &selected)?;
                 std::hint::black_box(bytes);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
@@ -9450,6 +9467,7 @@ mod tests {
         );
         assert_eq!(odt.manifest.entry_count, 24);
         run_case(Case::OdtSemanticOneEditSave, &odt, 0, 1).unwrap();
+        run_case(Case::OdtSemanticOnePercentEditSave, &odt, 0, 1).unwrap();
 
         let ods = build_semantic_ods_corpus(SemanticShape::Tiny).unwrap();
         assert_eq!(
@@ -9471,6 +9489,17 @@ mod tests {
         );
         assert_eq!(odp.manifest.entry_count, 3);
         run_case(Case::OdpSemanticOneEditSave, &odp, 0, 1).unwrap();
+    }
+
+    #[test]
+    fn semantic_odt_medium_one_percent_edit_exercises_repeated_publication() {
+        let odt = build_semantic_odt_corpus(SemanticShape::Medium).unwrap();
+        assert_eq!(odt.manifest.entry_count, 200);
+
+        let result = run_case(Case::OdtSemanticOnePercentEditSave, &odt, 0, 1).unwrap();
+
+        assert_eq!(result.case, "odt_semantic_one_percent_edit_save");
+        assert!(result.sink.is_none());
     }
 
     #[test]

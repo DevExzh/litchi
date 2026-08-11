@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 120 selectable
+This is a coverage map, not a completion claim. It compares the 121 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -19,13 +19,13 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
 | One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types, while source-backed DOCX and PPTX publication verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
-| About 1% semantic update and save | Covered for XLSX/DOCX/PPTX generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch and reopens the package |
+| About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/ODT generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch, while ODT coalesces ordinary scalar durable replacements internally; both reopen the package |
 | Bulk update matching objects | Missing | No semantic end-to-end case |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
 | Sanitization and irreversible redaction | Missing | No complete matrix |
 | Copy object with dependency closure | Missing | No measured format case |
 | Merge and split | Missing | No measured format case |
-| Patch encode/apply/invert/merge | Partial | DOCX coalesced replacement correctness covers deterministic durable encode/decode/apply/inverse, but no durable lifecycle timing; broader formats/merge remain missing |
+| Patch encode/apply/invert/merge | Partial | DOCX and ODT coalesced replacement correctness covers deterministic durable encode/decode/apply/inverse, but no durable lifecycle timing; broader formats/merge remain missing |
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring paragraph/cell/text-box edits; broader format-semantic extension corpora remain missing |
@@ -73,7 +73,9 @@ conversion remain.
 11. Broaden ODF beyond generated text/grid/deck and accepted compact ODT/ODS/ODP
    unchanged-member publication: source-backed selectors, resource-adding and
    structural publication, 1% and bulk edits, unknown extensions, real
-   producers, richer media, security and source-backed I/O.
+   producers, richer media, security and source-backed I/O. The generated ODT
+   1% paragraph case is covered by change 0045; broader bulk and structural
+   operations remain.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
 
 The former first item is complete for existing-document ODT transaction
