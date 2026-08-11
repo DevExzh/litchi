@@ -1,0 +1,627 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cycles:P'
+# Event count (approx.): 7367181907
+#
+# Overhead  Command          Shared Object         Symbol
+# ........  ...............  ....................  ....................................................................................................................................
+#
+    16.65%  candidate-final  candidate-final       [.] litchi_perf_baseline::payload_bytes
+            |
+            ---litchi_perf_baseline::payload_bytes
+               |
+               |--15.39%--litchi_perf_baseline::verify_ods_media_archive
+               |          |
+               |          |--14.14%--litchi_perf_baseline::run_ods_media_one_edit_save
+               |          |          litchi_perf_baseline::main
+               |          |          0xffffffffffffffff
+               |          |
+               |           --1.25%--litchi_perf_baseline::build_ods_media_corpus
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+                --1.26%--litchi_perf_baseline::build_ods_media_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+    14.49%  candidate-final  libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memcpy_avx512_unaligned_erms (inlined)
+               |
+               |--3.26%--litchi_ods::document::changed_package_files
+               |          |
+               |          |--1.30%--litchi_ods::document::Edit::stage
+               |          |          litchi_ods::document::Edit::stage_spliced
+               |          |          litchi_ods::document::Edit::worksheets
+               |          |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          |          litchi_perf_baseline::main
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.98%--litchi_ods::document::Patch::build
+               |          |          litchi_ods::document::Edit::commit_with_security
+               |          |          litchi_ods::document::Edit::commit
+               |          |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          |          litchi_perf_baseline::main
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.97%--litchi_ods::document::Edit::commit_with_security
+               |                     litchi_ods::document::Edit::commit
+               |                     litchi_perf_baseline::run_ods_media_one_edit_save
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+               |--1.24%--litchi_perf_baseline::run_ods_media_one_edit_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+               |--1.17%--litchi_ods::document::Edit::commit_with_security
+               |          litchi_ods::document::Edit::commit
+               |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+               |--0.98%--litchi_ods::document::Edit::worksheets
+               |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+               |--0.84%--_ZN10litchi_ods9worksheet8snapshot8Snapshot8from_arc17h1f7eb122ec7f8934E.llvm.4350050576790515524
+               |          litchi_ods::worksheet::snapshot::Snapshot::from_bytes
+               |          |
+               |           --0.52%--litchi_ods::document::Edit::worksheets
+               |                     litchi_perf_baseline::run_ods_media_one_edit_save
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+               |--0.78%--_ZN10litchi_ods8document8Snapshot8from_arc17h31ec9b370dbc7a18E.llvm.11673210452516189309
+               |
+               |--0.78%--soapberry_zip::preserve::PreservationIndex<R>::write_to
+               |          0xffffffffffffffff
+               |
+               |--0.78%--quick_xml::reader::state::ReaderState::emit_start
+               |          |
+               |           --0.71%--quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |
+               |--0.66%--litchi_perf_baseline::verify_ods_media_archive
+               |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+               |--0.59%--litchi_ods::worksheet::snapshot::Snapshot::from_bytes
+               |
+               |--0.59%--litchi_ods::document::enforce_security_policy
+               |          litchi_ods::document::Edit::commit_with_security
+               |          litchi_ods::document::Edit::commit
+               |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --0.52%--litchi_ods::document::Edit::stage
+                          litchi_ods::document::Edit::stage_spliced
+                          litchi_ods::document::Edit::worksheets
+                          litchi_perf_baseline::run_ods_media_one_edit_save
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+    14.28%  candidate-final  candidate-final       [.] sha2::sha256::x86_sha::compress
+            |
+            ---sha2::sha256::x86_sha::compress
+               |
+               |--9.17%--<D as digest::digest::Digest>::digest
+               |          litchi_core::patch::BlobBundle::insert_shared
+               |          litchi_ods::document::Patch::build
+               |          litchi_ods::document::Edit::commit_with_security
+               |          litchi_ods::document::Edit::commit
+               |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --5.11%--litchi_perf_baseline::sha256_hex
+                          |
+                           --4.65%--litchi_perf_baseline::run_ods_media_one_edit_save
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+    10.86%  candidate-final  candidate-final       [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+                --10.20%--flate2::zio::Writer<W,D>::write_with_status
+                          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17h622ec3d313453d2dE.llvm.12592586514332291734
+                          litchi_odf_common::core::writer::PackageWriter<W>::add_file_with_media_type
+                          litchi_perf_baseline::build_ods_media_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     3.00%  candidate-final  [unknown]             [k] 0xffffffff9c5a56ba
+            |
+            ---0xffffffff9c5a56ba
+               0xffffffff9c4d7ef8
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               __memcpy_avx512_unaligned_erms (inlined)
+               |
+               |--0.65%--litchi_ods::worksheet::snapshot::Snapshot::from_bytes
+               |
+                --0.59%--litchi_perf_baseline::verify_ods_media_archive
+                          litchi_perf_baseline::run_ods_media_one_edit_save
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     2.98%  candidate-final  candidate-final       [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---zlib_rs::deflate::longest_match::longest_match
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+                --2.91%--flate2::zio::Writer<W,D>::write_with_status
+                          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17h622ec3d313453d2dE.llvm.12592586514332291734
+                          litchi_odf_common::core::writer::PackageWriter<W>::add_file_with_media_type
+                          litchi_perf_baseline::build_ods_media_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     2.87%  candidate-final  libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |
+               |--1.56%--core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut
+               |          <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+               |          <alloc::collections::btree::set::BTreeSet<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+               |          litchi_odf_common::package::edit::raw_identical_members
+               |          litchi_ods::document::changed_package_files
+               |          |
+               |          |--0.52%--litchi_ods::document::Patch::build
+               |          |          litchi_ods::document::Edit::commit_with_security
+               |          |          litchi_ods::document::Edit::commit
+               |          |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          |          litchi_perf_baseline::main
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--0.52%--litchi_ods::document::Edit::stage
+               |          |          litchi_ods::document::Edit::stage_spliced
+               |          |          litchi_ods::document::Edit::worksheets
+               |          |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          |          litchi_perf_baseline::main
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.52%--litchi_ods::document::Edit::commit_with_security
+               |                     litchi_ods::document::Edit::commit
+               |                     litchi_perf_baseline::run_ods_media_one_edit_save
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+                --0.66%--quick_xml::reader::state::ReaderState::emit_end
+                          |
+                           --0.52%--quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+
+     2.61%  candidate-final  [unknown]             [k] 0xffffffff9d6600b7
+            |
+            ---0xffffffff9d6600b7
+               |
+                --2.41%--0xffffffff9c82e7e3
+                          0xffffffff9c82f8db
+                          0xffffffff9c82ff44
+                          0xffffffff9c83021a
+                          0xffffffff9c4d7f29
+                          0xffffffff9d64e923
+                          0xffffffff9d800bc7
+                          |
+                           --2.35%--__memcpy_avx512_unaligned_erms (inlined)
+                                     |
+                                     |--0.78%--litchi_ods::worksheet::snapshot::Snapshot::from_bytes
+                                     |
+                                      --0.52%--litchi_perf_baseline::verify_ods_media_archive
+
+     1.89%  candidate-final  candidate-final       [.] quick_xml::name::NamespaceResolver::resolve_event
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_event
+               |
+                --0.85%--litchi_ods::authoring::builder::validate_content_xml
+                          litchi_ods::package::document::Package::from_bytes
+
+     1.73%  candidate-final  [unknown]             [k] 0xffffffff9d800ba0
+            |
+            ---0xffffffff9d800ba0
+               |
+                --1.69%--__memcpy_avx512_unaligned_erms (inlined)
+
+     1.18%  candidate-final  candidate-final       [.] _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.65119049711059949
+            |
+            ---_ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.65119049711059949
+               |
+                --0.72%--litchi_ods::facade::Spreadsheet::from_package
+
+     0.85%  candidate-final  candidate-final       [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate
+               crc32fast::Hasher::update
+               <soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+               std::io::default_read_to_end
+               soapberry_zip::office::ArchiveReader::read
+               litchi_odf_common::package::codec::<impl litchi_odf_common::package::model::Archive>::read
+               litchi_odf_common::core::package::Package::get_file
+               |
+                --0.59%--litchi_perf_baseline::verify_ods_media_archive
+                          litchi_perf_baseline::run_ods_media_one_edit_save
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     0.85%  candidate-final  [unknown]             [k] 0xffffffff9c848383
+            |
+            ---0xffffffff9c848383
+               0xffffffff9c82797f
+               0xffffffff9c8284e0
+               0xffffffff9c8290c6
+               0xffffffff9c829389
+               0xffffffff9c8299c5
+               0xffffffff9c835a28
+               0xffffffff9c836b98
+               |
+                --0.72%--0xffffffff9c83a981
+                          0xffffffff9c83aa12
+                          0xffffffff9c40747b
+                          0xffffffff9d6485af
+                          0xffffffff9d800130
+                          __brk
+                          __GI___sbrk (inlined)
+                          __glibc_morecore (inlined)
+                          systrim (inlined)
+                          __GI___libc_free (inlined)
+
+     0.84%  candidate-final  candidate-final       [.] litchi_ods::worksheet::validation::validate_text
+            |
+            ---litchi_ods::worksheet::validation::validate_text
+
+     0.78%  candidate-final  [unknown]             [k] 0xffffffff9d5cfb97
+            |
+            ---0xffffffff9d5cfb97
+               0xffffffff9c85c182
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               0xffffffff9c897834
+               0xffffffff9c82e51c
+               0xffffffff9c82e70c
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --0.72%--__memcpy_avx512_unaligned_erms (inlined)
+
+     0.72%  candidate-final  candidate-final       [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+            |
+            ---quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+               quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+
+     0.65%  candidate-final  candidate-final       [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+            |
+            ---memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+               |
+                --0.52%--quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+                          quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+
+     0.60%  candidate-final  candidate-final       [.] quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+            |
+            ---quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+               |
+                --0.53%--litchi_ods::authoring::builder::validate_content_xml
+
+     0.59%  candidate-final  [unknown]             [k] 0xffffffff9d5cfb9a
+            |
+            ---0xffffffff9d5cfb9a
+               0xffffffff9c85c182
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               0xffffffff9c897834
+               0xffffffff9c82e51c
+               0xffffffff9c82e70c
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               __memcpy_avx512_unaligned_erms (inlined)
+
+     0.59%  candidate-final  [unknown]             [k] 0xffffffff9d65f8cb
+            |
+            ---0xffffffff9d65f8cb
+               0xffffffff9c85c168
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               0xffffffff9c897834
+               0xffffffff9c82e51c
+               0xffffffff9c82e70c
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --0.52%--__memcpy_avx512_unaligned_erms (inlined)
+
+     0.59%  candidate-final  candidate-final       [.] litchi_ods::authoring::builder::validate_content_xml
+            |
+            ---litchi_ods::authoring::builder::validate_content_xml
+               litchi_ods::package::document::Package::from_bytes
+
+     0.53%  candidate-final  candidate-final       [.] zlib_rs::deflate::Heap::pqdownheap
+            |
+            ---zlib_rs::deflate::Heap::pqdownheap
+
+     0.52%  candidate-final  [unknown]             [k] 0xffffffff9d800f30
+            |
+            ---0xffffffff9d800f30
+
+     0.52%  candidate-final  [unknown]             [k] 0xffffffff9c7d8dce
+            |
+            ---0xffffffff9c7d8dce
+               0xffffffff9c7d9d5f
+               0xffffffff9c82ea11
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+
+     0.45%  candidate-final  candidate-final       [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+     0.45%  candidate-final  libc.so.6             [.] _int_free
+     0.45%  candidate-final  libc.so.6             [.] _int_malloc
+     0.39%  candidate-final  candidate-final       [.] quick_xml::events::attributes::IterState::next
+     0.39%  candidate-final  libc.so.6             [.] unlink_chunk.isra.0
+     0.39%  candidate-final  candidate-final       [.] quick_xml::reader::state::ReaderState::emit_start
+     0.35%  candidate-final  libc.so.6             [.] __memmove_avx512_unaligned
+     0.34%  candidate-final  [unknown]             [k] 0xffffffff9d6602e0
+     0.33%  candidate-final  [unknown]             [k] 0xffffffff9c5db490
+     0.33%  candidate-final  [unknown]             [k] 0xffffffff9c827cc6
+     0.33%  candidate-final  candidate-final       [.] litchi_ods::protection::codec::parse
+     0.33%  candidate-final  candidate-final       [.] zlib_rs::inflate::inflate_fast_help_avx2
+     0.26%  candidate-final  candidate-final       [.] _ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.15986261875563105133
+     0.26%  candidate-final  [unknown]             [k] 0xffffffff9c5a5c2c
+     0.26%  candidate-final  libc.so.6             [.] __memset_avx512_unaligned_erms
+     0.26%  candidate-final  [unknown]             [k] 0xffffffff9c7d873c
+     0.26%  candidate-final  candidate-final       [.] litchi_ods::settings::codec::locate
+     0.26%  candidate-final  candidate-final       [.] _ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17ha34f0284a646bfcbE.llvm.410775697957024005
+     0.26%  candidate-final  candidate-final       [.] quick_xml::reader::state::ReaderState::emit_end
+     0.20%  candidate-final  libc.so.6             [.] cfree@GLIBC_2.2.5
+     0.20%  candidate-final  candidate-final       [.] zlib_rs::deflate::Heap::construct_huffman_tree
+     0.20%  candidate-final  [unknown]             [k] 0xffffffff9c82e9d2
+     0.20%  candidate-final  libc.so.6             [.] malloc
+     0.19%  candidate-final  [unknown]             [k] 0xffffffff9c7d8d33
+     0.19%  candidate-final  candidate-final       [.] _RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8
+     0.19%  candidate-final  candidate-final       [.] litchi_ods::worksheet::package::scan
+     0.17%  rustc            rustup                [.] toml_parser::decoder::string::decode_basic_string
+     0.14%  git              [unknown]             [k] 0xffffffff9ca06050
+     0.13%  candidate-final  candidate-final       [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+     0.13%  candidate-final  candidate-final       [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+     0.13%  candidate-final  [unknown]             [k] 0xffffffff9c7d8c36
+     0.13%  candidate-final  libc.so.6             [.] malloc_consolidate
+     0.13%  candidate-final  candidate-final       [.] quick_xml::name::NamespaceResolver::set_level
+     0.13%  candidate-final  [unknown]             [k] 0xffffffff9c8cdebc
+     0.13%  candidate-final  [unknown]             [k] 0xffffffff9c8c4895
+     0.13%  candidate-final  candidate-final       [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+     0.13%  candidate-final  candidate-final       [.] _ZN71_$LT$core..hash..sip..Hasher$LT$S$GT$$u20$as$u20$core..hash..Hasher$GT$5write17ha1fc6b778c84e4eaE.llvm.13002261113225761485
+     0.13%  candidate-final  [unknown]             [k] 0xffffffff9cbfedc2
+     0.13%  candidate-final  [unknown]             [k] 0xffffffff9c8480f8
+     0.13%  candidate-final  candidate-final       [.] litchi_odf_common::compact_xml::validate_with_limits
+     0.13%  candidate-final  candidate-final       [.] litchi_ods::worksheet::codec::Attributes::from_element
+     0.12%  rustc            rustup                [.] once_cell::imp::initialize_or_wait
+     0.12%  git              libc.so.6             [.] __GI___readdir64
+     0.11%  rustc            rustup                [.] toml::de::parser::parse_document
+     0.11%  git              [unknown]             [k] 0xffffffff9c5f8127
+     0.11%  rustc            [unknown]             [k] 0xffffffff9cb6832f
+     0.10%  rustc            rustup                [.] <toml_parser::parser::event::RecursionGuard as toml_parser::parser::event::EventReceiver>::simple_key
+     0.09%  git              [unknown]             [k] 0xffffffff9c91b273
+     0.08%  candidate-final  candidate-final       [.] aho_corasick::automaton::try_find_fwd
+     0.08%  rustc            rustup                [.] toml::de::parser::value::on_scalar
+     0.08%  rustc            [unknown]             [k] 0xffffffff9d5cc446
+     0.07%  rustc            libc.so.6             [.] malloc
+     0.07%  rustc            ld-linux-x86-64.so.2  [.] _dl_relocate_object
+     0.07%  rustc            rustup                [.] rustup::dist::manifest::Manifest::validate_targeted_package
+     0.07%  rustc            ld-linux-x86-64.so.2  [.] _dl_lookup_symbol_x
+     0.07%  rustc            [unknown]             [k] 0xffffffff9c827927
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c7c6082
+     0.07%  git              [unknown]             [k] 0xffffffff9cc69e68
+     0.07%  rustc            [unknown]             [k] 0xffffffff9d5cfb97
+     0.07%  rustc            [unknown]             [k] 0xffffffff9caf384e
+     0.07%  candidate-final  candidate-final       [.] xml_minifier::audit::verify_with_policy
+     0.07%  rustc            libc.so.6             [.] __cxa_atexit
+     0.07%  rustc            [unknown]             [k] 0xffffffff9c7c6067
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c8591bf
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c8ca79c
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c859297
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c85bf90
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c82e635
+     0.07%  candidate-final  candidate-final       [.] _ZN4core3ptr55drop_in_place$LT$litchi_ods..worksheet..model..Cell$GT$17h2a698f67638226dfE.llvm.11656104974821158729
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c86e8aa
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c82e797
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c859485
+     0.07%  candidate-final  libc.so.6             [.] __brk
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c82b315
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c8942a9
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c7ff7e5
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c7d6d20
+     0.07%  candidate-final  candidate-final       [.] <litchi_odf_common::core::metadata::model::Metadata as core::clone::Clone>::clone
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c8942b8
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9d6573e6
+     0.07%  candidate-final  candidate-final       [.] flate2::zio::read
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c84503c
+     0.07%  candidate-final  libc.so.6             [.] _int_free_merge_chunk
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c85d978
+     0.07%  candidate-final  candidate-final       [.] litchi_ods::worksheet::model::CellValue::validate
+     0.07%  candidate-final  libc.so.6             [.] _int_realloc
+     0.07%  candidate-final  candidate-final       [.] alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c5db496
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c5db4b1
+     0.07%  candidate-final  candidate-final       [.] litchi_odf_common::compact_xml::xml_space
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c59b2ab
+     0.07%  candidate-final  candidate-final       [.] _ZN71_$LT$core..hash..sip..Hasher$LT$S$GT$$u20$as$u20$core..hash..Hasher$GT$5write17h1c4d815f2636c73fE.llvm.12415526586518285900
+     0.07%  candidate-final  candidate-final       [.] litchi_ods::worksheet::codec::Attributes::cell
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c7fcde9
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9d5b805d
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c82f75d
+     0.07%  candidate-final  candidate-final       [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c817900
+     0.07%  candidate-final  candidate-final       [.] memchr::arch::x86_64::avx2::memchr::One::find_raw
+     0.07%  candidate-final  candidate-final       [.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+     0.07%  candidate-final  candidate-final       [.] soapberry_zip::office::ArchiveReader::new_with_limits
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c8d0fa8
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c85c0be
+     0.07%  candidate-final  candidate-final       [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9d5ae295
+     0.07%  candidate-final  candidate-final       [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.8691698452930104947
+     0.07%  candidate-final  candidate-final       [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.07%  candidate-final  candidate-final       [.] <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+     0.07%  candidate-final  candidate-final       [.] litchi_ods::model::protection::parse_protection
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c4da26c
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c64833f
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c7d7cc2
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c538418
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c85da34
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9c56e4df
+     0.07%  candidate-final  [unknown]             [k] 0xffffffff9cc743bf
+     0.07%  git              libc.so.6             [.] realloc
+     0.06%  candidate-final  candidate-final       [.] quick_xml::name::NamespaceResolver::resolve_prefix
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c56e0ba
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c70e4f3
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c4c7c46
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c857b24
+     0.06%  candidate-final  candidate-final       [.] quick_xml::name::NamespaceResolver::push
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c827927
+     0.06%  candidate-final  candidate-final       [.] _ZN10litchi_ods9worksheet7package17changed_row_edits17h1633dd1bd67f83d3E.llvm.9692077567933371021
+     0.06%  git              git                   [.] 0x000000000020a537
+     0.06%  candidate-final  candidate-final       [.] litchi_perf_baseline::expected_semantic_ods_full_cell_text
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c82e853
+     0.06%  candidate-final  candidate-final       [.] litchi_ods::worksheet::package::one_spreadsheet
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c567b4f
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c8977d6
+     0.06%  candidate-final  candidate-final       [.] crc32fast::baseline::update_fast_16
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9d5ae0a1
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c844f30
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c4ad284
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c8452a7
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c877989
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9d5ac26d
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c82b28c
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c85a2ee
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c85a2df
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c859b30
+     0.06%  candidate-final  candidate-final       [.] _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c4db4a9
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c897477
+     0.06%  candidate-final  candidate-final       [.] quick_xml::events::attributes::IterState::check_for_duplicates
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c845245
+     0.06%  candidate-final  candidate-final       [.] litchi_ods::document::enforce_security_policy
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9cbfedd0
+     0.06%  git              [unknown]             [k] 0xffffffff9cb87ed5
+     0.06%  candidate-final  candidate-final       [.] litchi_odf_common::calculation::codec::parse
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c5ebfad
+     0.06%  candidate-final  candidate-final       [.] zlib_rs::inflate::inftrees::inflate_table
+     0.06%  candidate-final  candidate-final       [.] core::ptr::drop_in_place<litchi_core::metadata::Metadata>
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c7fce0e
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9d6573d0
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9d5c05f3
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c5db4b2
+     0.06%  candidate-final  [unknown]             [k] 0xffffffff9c56d4c4
+     0.06%  git              [unknown]             [k] 0xffffffff9c9516f0
+     0.06%  git              [unknown]             [k] 0xffffffff9c7c79ca
+     0.06%  rustc            [unknown]             [k] 0xffffffff9d800ba0
+     0.06%  git              [unknown]             [k] 0xffffffff9cb666ce
+     0.06%  git              libc.so.6             [.] getenv
+     0.06%  git              [unknown]             [k] 0xffffffff9cb6832f
+     0.05%  git              [unknown]             [k] 0xffffffff9c9f2a9c
+     0.05%  git              [unknown]             [k] 0xffffffff9cc69fbc
+     0.05%  git              [unknown]             [k] 0xffffffff9c952814
+     0.05%  git              [unknown]             [k] 0xffffffff9d80008c
+     0.04%  git              [unknown]             [k] 0xffffffff9c90bfc6
+     0.04%  git              [unknown]             [k] 0xffffffff9d5cc446
+     0.04%  git              [unknown]             [k] 0xffffffff9c91b2b0
+     0.04%  git              [unknown]             [k] 0xffffffff9d65065e
+     0.04%  git              [unknown]             [k] 0xffffffff9c91b251
+     0.04%  git              [unknown]             [k] 0xffffffff9d800ba0
+     0.03%  git              git                   [.] 0x00000000001b3fcc
+     0.03%  git              [unknown]             [k] 0xffffffff9d650650
+     0.03%  git              [unknown]             [k] 0xffffffff9c91b2c1
+     0.03%  git              [unknown]             [k] 0xffffffff9cb6814b
+     0.01%  git              [unknown]             [k] 0xffffffff9c929ddd
+     0.01%  candidate-final  [unknown]             [k] 0xffffffff9cc79907
+     0.01%  candidate-final  [unknown]             [k] 0xffffffff9c4da68b
+     0.01%  git              [unknown]             [k] 0xffffffff9d800f30
+     0.00%  tokio-runtime-w  [unknown]             [k] 0xffffffff9c5a653b
+     0.00%  candidate-final  [unknown]             [k] 0xffffffff9cb67720
+     0.00%  git              [unknown]             [k] 0xffffffff9c8fd457
+     0.00%  git              [unknown]             [k] 0xffffffff9ca061c6
+     0.00%  tokio-runtime-w  [unknown]             [k] 0xffffffff9c5a5eab
+     0.00%  git              [unknown]             [k] 0xffffffff9cad0a17
+     0.00%  git              [unknown]             [k] 0xffffffff9c86847e
+     0.00%  git              [unknown]             [k] 0xffffffff9d5ad7b1
+     0.00%  rustc            [unknown]             [k] 0xffffffff9d800116
+     0.00%  ctrl-c           [unknown]             [k] 0xffffffff9d5ae0a1
+     0.00%  rustc            rustup                [.] std::sys::thread::unix::Thread::new::thread_start
+     0.00%  rustc            libc.so.6             [.] _setjmp
+     0.00%  git              [unknown]             [k] 0xffffffff9c896dad
+     0.00%  git              [unknown]             [k] 0xffffffff9d6602e0
+     0.00%  candidate-final  [unknown]             [k] 0xffffffff9cc743c1
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c5a653b
+     0.00%  git              [unknown]             [k] 0xffffffff9c46d0a4
+     0.00%  rustc            [unknown]             [k] 0xffffffff9d5c30b2
+     0.00%  git              libc.so.6             [.] __printf_buffer
+     0.00%  git              libc.so.6             [.] __ctype_init
+     0.00%  git              [unknown]             [k] 0xffffffff9c7bebc6
+     0.00%  candidate-final  [unknown]             [k] 0xffffffff9c868568
+     0.00%  git              [unknown]             [k] 0xffffffff9c5a653b
+     0.00%  git              [unknown]             [k] 0xffffffff9d5cfb97
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c85c0a0
+     0.00%  git              [unknown]             [k] 0xffffffff9cbfedd0
+     0.00%  git              [unknown]             [k] 0xffffffff9c5a584e
+     0.00%  perf-exec        [unknown]             [k] 0xffffffff9c648e93
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c8cdbe7
+     0.00%  git              [unknown]             [k] 0xffffffff9d6502f0
+     0.00%  git              [unknown]             [k] 0xffffffff9c85a2df
+     0.00%  git              [unknown]             [k] 0xffffffff9d65f8b5
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c58acec
+     0.00%  rustc            libc.so.6             [.] clone3
+     0.00%  git              [unknown]             [k] 0xffffffff9c7a9843
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c7a0a61
+     0.00%  git              [unknown]             [k] 0xffffffff9c7a0a61
+     0.00%  rustc            [unknown]             [k] 0xffffffff9d6602e0
+     0.00%  git              [unknown]             [k] 0xffffffff9d5ae24c
+     0.00%  rustc            [unknown]             [k] 0xffffffff9d660135
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c51f023
+     0.00%  candidate-final  [unknown]             [k] 0xffffffff9d801050
+     0.00%  git              [unknown]             [k] 0xffffffff9d800fd0
+     0.00%  candidate-final  [unknown]             [k] 0xffffffff9d6601e5
+     0.00%  git              [unknown]             [k] 0xffffffff9d660135
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c7a0a65
+     0.00%  git              [unknown]             [k] 0xffffffff9c7a9846
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c7a0a5e
+     0.00%  git              [unknown]             [k] 0xffffffff9c7a0a88
+     0.00%  git              [unknown]             [k] 0xffffffff9c40e323
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c7a9843
+     0.00%  git              [unknown]             [k] 0xffffffff9d6601e5
+     0.00%  perf-exec        [unknown]             [k] 0xffffffff9c4c7c48
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c40e31a
+     0.00%  git              [unknown]             [k] 0xffffffff9c7a0a65
+     0.00%  rustc            [unknown]             [k] 0xffffffff9c7a9930
+     0.00%  candidate-final  [unknown]             [k] 0xffffffff9c7a9930
+     0.00%  candidate-final  [unknown]             [k] 0xffffffff9c40e31a
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

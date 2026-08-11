@@ -1,4 +1,5 @@
 use litchi_core::Position;
+use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
 use litchi_ods::{
     Builder, Cell, CellValue, MutableSpreadsheet, Sheet, Spreadsheet, worksheet::Snapshot,
 };
@@ -25,6 +26,19 @@ fn row_splice_content() -> String {
         ),
         OPAQUE_ROW = OPAQUE_ROW,
     )
+}
+
+fn row_splice_package() -> litchi_core::Result<Vec<u8>> {
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(constants::ODF_SPREADSHEET)?;
+    writer.add_file("content.xml", row_splice_content().as_bytes())?;
+    let opaque_payload = vec![0x5a; 128 * 1024];
+    writer.add_file_with_media_type(
+        "Pictures/opaque.bin",
+        &opaque_payload,
+        "application/octet-stream",
+    )?;
+    writer.finish_to_bytes()
 }
 
 #[test]
@@ -98,7 +112,7 @@ fn mutable_facade_publishes_batched_worksheet_edits() -> litchi_core::Result<()>
 #[test]
 fn row_local_commit_preserves_untouched_opaque_rows_and_refuses_touched_ones()
 -> litchi_core::Result<()> {
-    let source = Builder::new().content_xml(row_splice_content()).build()?;
+    let source = row_splice_package()?;
     let snapshot = Snapshot::from_bytes(source.clone())?;
     let mut edit = snapshot.edit();
     edit.set_cell(
@@ -117,6 +131,14 @@ fn row_local_commit_preserves_untouched_opaque_rows_and_refuses_touched_ones()
         reopened.cell("Data", 1, 0),
         Some(litchi_ods::CellView::Stored(cell)) if cell.text == "changed"
     ));
+    let identical =
+        raw_identical_members(&source, commit.snapshot().as_bytes()).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("raw ODS comparison failed".to_string())
+        })?;
+    assert!(identical.contains("mimetype"));
+    assert!(identical.contains("META-INF/manifest.xml"));
+    assert!(identical.contains("Pictures/opaque.bin"));
+    assert!(!identical.contains("content.xml"));
     assert_eq!(
         commit
             .patch()
@@ -141,5 +163,43 @@ fn row_local_commit_preserves_untouched_opaque_rows_and_refuses_touched_ones()
         })?;
     assert!(refused.commit().is_err());
     assert_eq!(untouched.as_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn unified_row_local_commit_retains_raw_package_members() -> litchi_core::Result<()> {
+    let source = row_splice_package()?;
+    let snapshot = litchi_ods::document::Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.worksheets(|worksheets| {
+        worksheets
+            .set_cell(
+                "Data",
+                1,
+                0,
+                Cell::new(CellValue::Text("unified".to_string()), "unified"),
+            )?
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "the selected unified worksheet is missing".to_string(),
+                )
+            })?;
+        Ok(())
+    })?;
+    let commit = edit.commit()?;
+    let identical =
+        raw_identical_members(&source, commit.snapshot().as_bytes()).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("raw unified ODS comparison failed".to_string())
+        })?;
+    assert!(identical.contains("mimetype"));
+    assert!(identical.contains("META-INF/manifest.xml"));
+    assert!(identical.contains("Pictures/opaque.bin"));
+    assert!(!identical.contains("content.xml"));
+
+    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    assert!(matches!(
+        reopened.cell("Data", 1, 0),
+        Some(litchi_ods::CellView::Stored(cell)) if cell.text == "unified"
+    ));
     Ok(())
 }

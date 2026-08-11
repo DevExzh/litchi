@@ -1,7 +1,9 @@
 use litchi_core::{Error, Result};
 use litchi_odf_common::calculation::Settings;
-use litchi_odf_common::core::{OwnedPackage, PackageWriter, family};
-use litchi_odf_common::package::replace_content_xml as replace_package_content_xml;
+use litchi_odf_common::core::{OwnedPackage, PackageWriter, XmlSplicePublication, family};
+use litchi_odf_common::package::{
+    replace_content_xml as replace_package_content_xml, replace_content_xml_spliced,
+};
 use std::path::Path;
 
 use crate::model::names::Definition;
@@ -111,6 +113,16 @@ impl Package {
     /// Rebuild this package with a replacement `content.xml`.
     pub(crate) fn replace_content_xml(&self, content_xml: &str) -> Result<Self> {
         let bytes = replace_package_content_xml(self.package(), content_xml)?;
+        Self::from_bytes(bytes)
+    }
+
+    /// Rebuild this package from exact checked `content.xml` source ranges.
+    pub(crate) fn replace_spliced_content_xml(
+        &self,
+        content_xml: &str,
+        publication: XmlSplicePublication,
+    ) -> Result<Self> {
+        let bytes = replace_content_xml_spliced(self.package(), content_xml, publication)?;
         Self::from_bytes(bytes)
     }
 

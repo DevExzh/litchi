@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 
 use litchi_odf_common::{
     constants,
-    core::{OwnedPackage, PackageWriter},
-    package::{raw_identical_members, replace_content_xml},
+    core::{AuthoredXmlFragment, OwnedPackage, PackageWriter, XmlSourcePart, XmlSplicePublication},
+    package::{raw_identical_members, replace_content_xml, replace_content_xml_spliced},
 };
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
@@ -91,6 +91,25 @@ fn raw_members(bytes: &[u8]) -> BTreeMap<String, RawMember> {
         .collect()
 }
 
+fn text_replacement_publication(source: &OwnedPackage) -> XmlSplicePublication {
+    let part = XmlSourcePart::load(source, "content.xml").unwrap();
+    let start = part
+        .bytes()
+        .windows(b"source".len())
+        .position(|window| window == b"source")
+        .unwrap();
+    let range = start..start + b"source".len();
+    let proof = part.checked_range(range, b"source").unwrap();
+    let mut publication = XmlSplicePublication::new(part);
+    publication
+        .replace(
+            proof,
+            AuthoredXmlFragment::text(b"target".to_vec()).unwrap(),
+        )
+        .unwrap();
+    publication
+}
+
 #[test]
 fn content_replacement_raw_copies_every_untouched_member() {
     let source = source_package(false);
@@ -154,5 +173,57 @@ fn signed_content_replacement_uses_the_signature_stripping_fallback() {
     assert_eq!(
         reopened.get_file("Pictures/opaque.bin").unwrap(),
         media_payload()
+    );
+
+    let spliced_output = replace_content_xml_spliced(
+        &source,
+        TARGET_CONTENT,
+        text_replacement_publication(&source),
+    )
+    .unwrap();
+    let spliced = OwnedPackage::from_bytes(spliced_output).unwrap();
+    assert_eq!(
+        spliced.get_file("content.xml").unwrap(),
+        TARGET_CONTENT.as_bytes()
+    );
+    assert!(!spliced.has_file("META-INF/documentsignatures.xml").unwrap());
+    assert_eq!(
+        spliced.get_file("Pictures/opaque.bin").unwrap(),
+        media_payload()
+    );
+}
+
+#[test]
+fn explicit_content_splice_preserves_raw_members_and_checks_provenance() {
+    let source = source_package(false);
+    let source_package = OwnedPackage::from_bytes(source.clone()).unwrap();
+    let output = replace_content_xml_spliced(
+        &source_package,
+        TARGET_CONTENT,
+        text_replacement_publication(&source_package),
+    )
+    .unwrap();
+    let identical = raw_identical_members(&source, &output).unwrap();
+    assert!(identical.contains("META-INF/manifest.xml"));
+    assert!(identical.contains("Pictures/opaque.bin"));
+    assert!(identical.contains("Vendor/unknown.bin"));
+    assert!(!identical.contains("content.xml"));
+
+    let identical_but_foreign = OwnedPackage::from_bytes(source).unwrap();
+    assert!(
+        replace_content_xml_spliced(
+            &identical_but_foreign,
+            TARGET_CONTENT,
+            text_replacement_publication(&source_package),
+        )
+        .is_err()
+    );
+    assert!(
+        replace_content_xml_spliced(
+            &source_package,
+            SOURCE_CONTENT,
+            text_replacement_publication(&source_package),
+        )
+        .is_err()
     );
 }

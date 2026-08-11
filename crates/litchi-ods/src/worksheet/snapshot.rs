@@ -269,21 +269,28 @@ impl Edit {
             return Ok(Commit::unchanged(self.before));
         }
         let package = Package::from_bytes(self.before.source.as_ref().to_vec())?;
-        let content = match super::package::try_replace_changed_rows(
-            package.content_xml(),
+        let row_local = super::package::try_replace_changed_rows_spliced(
+            package.package(),
             self.before.sheets(),
             &self.draft,
             validation::MAX_CONTENT_XML_BYTES,
-        )? {
-            Some(content)
-                if litchi_odf_common::compact_xml::validate(content.as_bytes()).is_ok() =>
+        )?;
+        let (content, target_package, provenance_spliced) = match row_local {
+            Some(changed)
+                if litchi_odf_common::compact_xml::validate(changed.content.as_bytes()).is_ok() =>
             {
-                content
+                let target =
+                    package.replace_spliced_content_xml(&changed.content, changed.publication)?;
+                (changed.content, target, true)
             },
-            Some(_) | None => super::package::replace_tables(package.content_xml(), &self.draft)?,
+            Some(_) | None => {
+                let content = super::package::replace_tables(package.content_xml(), &self.draft)?;
+                let target = package.replace_content_xml(&content)?;
+                (content, target, false)
+            },
         };
         litchi_odf_common::compact_xml::validate(content.as_bytes()).map_err(Error::from)?;
-        let target = Snapshot::from_bytes(package.replace_content_xml(&content)?.into_bytes())?;
+        let target = Snapshot::from_bytes(target_package.into_bytes())?;
         if target.sheets() != self.draft {
             return Err(Error::InvalidFormat(
                 "ODS worksheet typed readback does not match the staged edit".to_string(),
@@ -295,6 +302,7 @@ impl Edit {
                 target: target.source.clone(),
             },
             snapshot: target,
+            provenance_spliced,
         })
     }
 
@@ -361,6 +369,7 @@ impl Patch {
         Ok(Commit {
             snapshot: Snapshot::from_arc(self.target.clone())?,
             patch: self.clone(),
+            provenance_spliced: false,
         })
     }
 
@@ -378,6 +387,7 @@ impl Patch {
 pub struct Commit {
     snapshot: Snapshot,
     patch: Patch,
+    provenance_spliced: bool,
 }
 
 impl Commit {
@@ -389,6 +399,7 @@ impl Commit {
                 source: source.clone(),
                 target: source,
             },
+            provenance_spliced: false,
         }
     }
 
@@ -405,6 +416,10 @@ impl Commit {
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
+    }
+
+    pub(crate) const fn content_provenance_spliced(&self) -> bool {
+        self.provenance_spliced
     }
 
     #[must_use]

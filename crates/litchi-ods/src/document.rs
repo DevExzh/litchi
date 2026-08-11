@@ -584,11 +584,12 @@ impl Edit {
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
-        self.stage(
-            "worksheet.edit",
-            "worksheets",
-            commit.snapshot().as_bytes().to_vec(),
-        )
+        let candidate = commit.snapshot().as_bytes().to_vec();
+        if commit.content_provenance_spliced() {
+            self.stage_spliced("worksheet.edit", "worksheets", candidate)
+        } else {
+            self.stage("worksheet.edit", "worksheets", candidate)
+        }
     }
 
     /// Stage ordered named-range and named-expression changes.
