@@ -8,6 +8,7 @@ use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
     Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
     TableSelector,
+    sheet::order::{Commit as SheetOrderCommit, Error as SheetOrderError},
 };
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
@@ -55,12 +56,15 @@ fn fuzz_options() -> PackageReadOptions {
             MAX_IWA_STREAM_BYTES,
         )
         .unwrap_or_else(|error| unreachable!("valid Numbers fuzz archive limits: {error}"));
-        let semantic = PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
-            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz semantic limits: {error}"))
-            .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
-            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz projection limits: {error}"))
-            .with_formula_render_limits(MAX_FORMULA_WORK, MAX_FORMULA_DEPTH)
-            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz formula limits: {error}"));
+        let semantic =
+            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
+                .unwrap_or_else(|error| unreachable!("valid Numbers fuzz semantic limits: {error}"))
+                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
+                .unwrap_or_else(|error| {
+                    unreachable!("valid Numbers fuzz projection limits: {error}")
+                })
+                .with_formula_render_limits(MAX_FORMULA_WORK, MAX_FORMULA_DEPTH)
+                .unwrap_or_else(|error| unreachable!("valid Numbers fuzz formula limits: {error}"));
         PackageReadOptions::new(archive, semantic)
     })
 }
@@ -75,12 +79,17 @@ fn native_package() -> &'static Package {
             .sheets()
             .first()
             .unwrap_or_else(|| panic!("native Numbers names fuzz seed must have a sheet"));
-        assert!(sheet.tables().next().is_some(), "native Numbers names fuzz seed must have a table");
+        assert!(
+            sheet.tables().next().is_some(),
+            "native Numbers names fuzz seed must have a table"
+        );
         package
     })
 }
 
 fn exercise_package(package: &Package, data: &[u8]) {
+    exercise_sheet_order(package, data);
+
     let Some(sheet) = package.document().sheets().first() else {
         return;
     };
@@ -104,8 +113,12 @@ fn exercise_package(package: &Package, data: &[u8]) {
     let sheet_after = replacement(data, "sheet");
     let table_after = replacement(data, "table");
     let edit = match command {
-        0 => package.edit_names().rename_sheet(SheetSelector::index(0), &sheet_name),
-        1 => package.edit_names().rename_sheet(SheetSelector::index(0), sheet_after.as_ref()),
+        0 => package
+            .edit_names()
+            .rename_sheet(SheetSelector::index(0), &sheet_name),
+        1 => package
+            .edit_names()
+            .rename_sheet(SheetSelector::index(0), sheet_after.as_ref()),
         2 => package.edit_names().rename_table(
             SheetSelector::name(sheet_name.as_str()),
             TableSelector::name(table_name.as_str()),
@@ -142,14 +155,31 @@ fn exercise_package(package: &Package, data: &[u8]) {
     } else {
         assert!(diagnostics.touched_components() > 0);
     }
-    assert_names(commit.package(), command, &sheet_name, &table_name, &sheet_after, &table_after);
+    assert_names(
+        commit.package(),
+        command,
+        &sheet_name,
+        &table_name,
+        &sheet_after,
+        &table_after,
+    );
     black_box((&patch, diagnostics));
 
     let applied = package
         .apply_names(&patch)
         .unwrap_or_else(|error| panic!("fresh Numbers names patch must apply: {error}"));
-    assert_names(applied.package(), command, &sheet_name, &table_name, &sheet_after, &table_after);
-    assert_eq!(package_bytes(applied.package()), package_bytes(commit.package()));
+    assert_names(
+        applied.package(),
+        command,
+        &sheet_name,
+        &table_name,
+        &sheet_after,
+        &table_after,
+    );
+    assert_eq!(
+        package_bytes(applied.package()),
+        package_bytes(commit.package())
+    );
 
     let inverse = patch.inverse();
     assert_eq!(inverse.inverse(), patch);
@@ -161,8 +191,150 @@ fn exercise_package(package: &Package, data: &[u8]) {
         .package()
         .apply_names(&inverse)
         .unwrap_or_else(|error| panic!("fresh Numbers names inverse must apply: {error}"));
-    assert_names(restored.package(), 0, &sheet_name, &table_name, &sheet_after, &table_after);
+    assert_names(
+        restored.package(),
+        0,
+        &sheet_name,
+        &table_name,
+        &sheet_after,
+        &table_after,
+    );
     assert_eq!(package_bytes(restored.package()), package_bytes(package));
+}
+
+fn exercise_sheet_order(package: &Package, data: &[u8]) {
+    let sheets = package.document().sheets();
+    let sheet_count = sheets.len();
+    let Some(_) = sheets.first() else {
+        return;
+    };
+    let source = usize::from(read_u16(data, 3)) % sheet_count;
+    let source_name = sheets[source].name();
+    let before: Vec<String> = sheets.iter().map(|sheet| sheet.name().to_owned()).collect();
+
+    if let Err(error) = package
+        .edit_sheet_order()
+        .move_sheet(SheetSelector::name(PRIVATE_SELECTOR), 0)
+    {
+        observe_redacted(error, PRIVATE_SELECTOR);
+    }
+    assert!(matches!(
+        package
+            .edit_sheet_order()
+            .move_sheet(SheetSelector::index(sheet_count), 0),
+        Err(SheetOrderError::SheetNotFound)
+    ));
+    assert!(matches!(
+        package
+            .edit_sheet_order()
+            .move_sheet(SheetSelector::index(source), sheet_count),
+        Err(SheetOrderError::DestinationOutOfRange { .. })
+    ));
+
+    let command = control(data, 0) % 3;
+    let destination = if command == 0 || sheet_count == 1 {
+        source
+    } else {
+        (source + 1) % sheet_count
+    };
+    let staged = if command == 2 {
+        package
+            .edit_sheet_order()
+            .move_sheet(SheetSelector::name(source_name), destination)
+    } else {
+        package
+            .edit_sheet_order()
+            .move_sheet(SheetSelector::index(source), destination)
+    };
+    let edit = match staged {
+        Ok(edit) => edit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    let commit = match edit.commit() {
+        Ok(commit) => commit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    publish_sheet_order_and_reverse(package, &before, source, destination, commit);
+}
+
+fn publish_sheet_order_and_reverse(
+    package: &Package,
+    before: &[String],
+    source: usize,
+    destination: usize,
+    commit: SheetOrderCommit,
+) {
+    let patch = commit.patch().clone();
+    let diagnostics = commit.diagnostics();
+    assert_eq!(patch.source_position(), source);
+    assert_eq!(patch.destination_position(), destination);
+    assert_eq!(patch.is_noop(), source == destination);
+    assert_eq!(diagnostics.changed(), source != destination);
+    assert_eq!(diagnostics.full_reparse_performed(), source != destination);
+    if source == destination {
+        assert_eq!(diagnostics.touched_components(), 0);
+        assert_eq!(diagnostics.deleted_previews(), 0);
+    } else {
+        assert!(diagnostics.touched_components() > 0);
+    }
+    let expected = moved_sheet_order(before, source, destination);
+    assert_sheet_order(commit.package(), &expected);
+    let source_bytes = package_bytes(package);
+    let committed_bytes = package_bytes(commit.package());
+    assert_eq!(patch.is_noop(), source_bytes == committed_bytes);
+    black_box((
+        patch.source_fingerprint(),
+        patch.target_fingerprint(),
+        &patch,
+    ));
+
+    let applied = package
+        .apply_sheet_order(&patch)
+        .unwrap_or_else(|error| panic!("fresh sheet-order patch must apply: {error}"));
+    assert_eq!(package_bytes(applied.package()), committed_bytes);
+    assert_sheet_order(applied.package(), &expected);
+
+    let inverse = patch.inverse();
+    assert_eq!(inverse.inverse(), patch);
+    if !patch.is_noop() {
+        assert!(applied.package().apply_sheet_order(&patch).is_err());
+        assert!(package.apply_sheet_order(&inverse).is_err());
+    }
+    let restored = applied
+        .package()
+        .apply_sheet_order(&inverse)
+        .unwrap_or_else(|error| panic!("fresh sheet-order inverse must apply: {error}"));
+    assert_eq!(package_bytes(restored.package()), source_bytes);
+    assert_sheet_order(restored.package(), before);
+}
+
+fn moved_sheet_order(before: &[String], source: usize, destination: usize) -> Vec<String> {
+    let mut expected = before.to_vec();
+    let moved = expected.remove(source);
+    expected.insert(destination, moved);
+    expected
+}
+
+fn assert_sheet_order(package: &Package, expected: &[String]) {
+    let actual: Vec<&str> = package
+        .document()
+        .sheets()
+        .iter()
+        .map(|sheet| sheet.name())
+        .collect();
+    assert_eq!(actual.len(), expected.len());
+    assert!(
+        actual
+            .iter()
+            .zip(expected)
+            .all(|(actual, expected)| *actual == expected)
+    );
 }
 
 fn assert_names(
@@ -182,8 +354,22 @@ fn assert_names(
         .tables()
         .next()
         .unwrap_or_else(|| panic!("names transaction must retain its first table"));
-    assert_eq!(sheet.name(), if matches!(command, 1 | 3) { sheet_after } else { sheet_before });
-    assert_eq!(table.name(), if matches!(command, 2 | 3) { table_after } else { table_before });
+    assert_eq!(
+        sheet.name(),
+        if matches!(command, 1 | 3) {
+            sheet_after
+        } else {
+            sheet_before
+        }
+    );
+    assert_eq!(
+        table.name(),
+        if matches!(command, 2 | 3) {
+            table_after
+        } else {
+            table_before
+        }
+    );
 }
 
 fn exercise_unicode(package: &Package) {
@@ -222,7 +408,10 @@ fn replacement(data: &[u8], role: &str) -> String {
     let start = data.len().min(8);
     let end = data.len().min(start.saturating_add(MAX_NAME_BYTES));
     let value = String::from_utf8_lossy(&data[start..end]);
-    let sanitized: String = value.chars().filter(|character| *character != '\0').collect();
+    let sanitized: String = value
+        .chars()
+        .filter(|character| *character != '\0')
+        .collect();
     format!("Litchi {role} 名 {sanitized}")
 }
 
@@ -236,9 +425,9 @@ fn control(data: &[u8], index: usize) -> u8 {
 
 fn package_bytes(package: &Package) -> Vec<u8> {
     let mut bytes = Vec::new();
-    package
-        .write_to(&mut bytes)
-        .unwrap_or_else(|error| panic!("writing a Numbers package to memory must succeed: {error}"));
+    package.write_to(&mut bytes).unwrap_or_else(|error| {
+        panic!("writing a Numbers package to memory must succeed: {error}")
+    });
     bytes
 }
 

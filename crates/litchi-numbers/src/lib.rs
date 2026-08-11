@@ -12,6 +12,37 @@
 //! ```compile_fail,E0603
 //! use litchi_numbers::cell::wire::BncCell;
 //! ```
+//!
+//! # Reorder sheets
+//!
+//! Use the direct [`sheet::order`] namespace for the transaction types. A move
+//! selects a sheet in the immutable source snapshot and supplies its final
+//! zero-based position: conceptually, `remove(source); insert(destination,
+//! sheet)`. Only destinations already in the source sequence are valid.
+//! Selecting position `n` and supplying destination `n` is an exact no-op.
+//!
+//! ```no_run
+//! use litchi_numbers::{Package, SheetSelector};
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::open("input.numbers")?;
+//! let commit = package
+//!     .edit_sheet_order()
+//!     .move_sheet(SheetSelector::name("Summary"), 0)?
+//!     .commit()?;
+//!
+//! // Changed moves require all three canonical previews and remove them.
+//! // Patches authorize only their retained exact source; this inverse restores
+//! // the original artifact and its previews exactly.
+//! let restored = commit
+//!     .package()
+//!     .apply_sheet_order(&commit.patch().inverse())?;
+//!
+//! let mut output = Vec::new();
+//! restored.package().write_to(&mut output)?;
+//! # Ok(())
+//! # }
+//! ```
 
 #![forbid(unsafe_code)]
 

@@ -1428,3 +1428,105 @@ cases, plus formatting, strict library, all-target, example, live-host, and
 diff checks. The boundary unit suite passed 152/152; live host and focused
 audits were empty, and the full checker retained only the unchanged 14
 baselines: six development-only annotations and eight edge classifications.
+
+## 2026-08-11 amendment: focused Numbers sheet-order API
+
+The canonical surface is
+`litchi_numbers::sheet::order::{Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` with `Package::{edit_sheet_order, apply_sheet_order}`. Existing
+semantic Document/Package sheet iteration is the read surface. No
+`sheet_order()` reader, flat `SheetOrder*` alias, package-root transaction
+export, raw object ID, component path, archive/protobuf value, or source byte
+slice is public.
+
+`edit_sheet_order(&self) -> Edit<'_>` is an infallible borrow. Consuming
+`move_sheet(self, selector, destination) -> Result<Self, Error>` accepts one
+exact-name or checked-index selector and one existing final zero-based
+destination after removal. A second move and an empty commit are typed errors.
+Selection is against the immutable base snapshot; the edit is not a mutable
+cursor and cannot accumulate a batch. A same-position move is an exact shared-
+artifact no-op with zero changed diagnostics, preview deletion, or reopen.
+
+The semantic write set is the relative order of existing rooted sheets. The
+physical write set is deliberately dual: raw `TN.DocumentArchive` field-1
+reference records and raw type-205 sidebar-root `TSK.TreeNode` field-2 child
+records, together with their selected subsequences in the two MessageInfo
+aggregate object-reference lists. Required Document field 5 resolves the
+sidebar root, and each child field 3 must associate positionally with the
+matching sheet. Every existing reference record, identifier, child/descendant
+node, sheet, table, and data subgraph is retained exactly. Selected order IDs
+appearing in any FieldInfo are `UnsupportedSource`, not a license to rewrite
+field attribution. Optional non-order field declarations are permitted only
+when their path and reference are exact.
+
+Changed support is intentionally narrower than semantic read support: rooted
+owners, children, descendants, and ordinary `TN.Sheet` objects must share
+`Index/Document.iwa`. A `FormBasedSheet`, split owner, external/zero/duplicate
+or role-aliased reference, mismatched sidebar order, merge/diff state, or
+noncanonical selected framing fails closed. `FormBasedSheet` reorder remains
+native-unproven P2 debt, not an inferred compatibility claim.
+
+A change is admitted only when the source has exactly one each of
+`preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg`; a missing or
+non-unique canonical preview refuses the changed edit. It raw-splices the two
+existing reference sequences, reorders only the matching aggregate
+subsequences, rewrites one component, deletes all three previews, and reopens
+the complete candidate. `Diagnostics` exposes changed, touched-component,
+deleted-preview, and full-reparse facts. All unknown fields,
+ViewState and CalculationEngine state, child/sheet/table content, unrelated
+messages/objects/members, and ZIP metadata apart from derived sizes/checksums
+and offsets remain exact. Forward apply requires the retained exact source and
+prior moved-sheet position and validates the three-to-zero preview transition;
+inverse swaps directional artifacts/proofs, validates zero-to-three, and
+restores the complete original package including all three previews. Patches
+are process-local two-artifact capabilities, not semantic logs, merge formats,
+or durable save protocols; publication remains `Package::write_to`.
+
+The sole generated schema is the frozen scalar-reference projection
+`TNNumbersSheetReferenceArchive.proto`. Handwritten two-pass routers own
+Document fields 1/5 and TreeNode fields 2/3, force each selected reference
+through borrowed Buffa parity, and merge exact byte/field/work/reference
+reports into one transaction budget. Generated production code has zero
+repeated views and no encoder. Its deterministic five-file closure is 32,579
+bytes under 33 KiB with SHA-256
+`2a0850fd82cfbf337ed48e582d4a998bd27e5046eb63c61f6939fa5ff1a09854`.
+
+Budgeting covers selected wire and metadata structure, indexed native lookup,
+raw/aggregate reorder, component decode/encode, package reassembly, complete
+candidate reopen, and locality verification. The real production path's
+4,096-to-8,192 regression keeps work, references, and payload within 2.3 times
+plus a fixed 32-unit allowance and rejects a max-minus-one reference budget in
+preflight; it is deterministic resource evidence, not a wall-clock benchmark.
+Performance review is P0/P1 clean. Bounded P2 costs are the roughly
+four-per-sheet reference snapshots
+retained by a changed patch under the 4,096-sheet cap, transient Vec-to-Arc
+target duplication, and one possible full-byte authorization comparison for a
+separately allocated but equal source. The identity path and patch inverse are
+constant time.
+
+ADR 0003 records the complete source/control/native/Rust/resave and preview
+hashes. Together they prove warning-free Numbers 14.4 open, visible tab and
+cell-marker correctness, Save As/close/exact-path reopen, exact Rust inverse,
+exact post-native positional no-op, and preview regeneration equal to an Apple
+reorder. Apple-only fresh tree/ViewState/revision identity, metadata/physical
+ordering, and CalculationEngine cache culling are normalization evidence, not
+an expansion of this API's minimal write set.
+
+The accepted production gates include 7/7 codec, 132/132 proto, 109/109
+library, 4/4 private, and 1/1 public focused cases, plus all-target,
+all-feature, formatting, and diff checks. There is no sheet-order strict-Clippy
+finding; unrelated legacy baseline diagnostics remain elsewhere. Package,
+feature, dependency, declaration, and ordered-debt topology is unchanged at
+64 packages, 235 internal declarations, 14 host declarations, and 14 debts.
+
+The host-retirement boundary removes only direct
+`NumbersEditor::move_sheet`, exclusive `selectors::sheet_index`, its legacy
+example, move-specific direct/mixed tests, and README call. The exact cut is 58
+production deletions, +2/-43 host-test lines, and the 23-line move example; the
+retained remove-sheet example's semantic-selector migration is +2/-6. Sheet
+reads, add/duplicate/remove CRUD, table moves, drawable ordering, creation, and
+shared `update_numbers_document` writing remain outside this handoff. The
+boundary suite passes 165/165; host and focused audits each report zero, and
+the full checker reports only the unchanged 14 baselines: six development-only
+annotations and eight edge classifications. The focused boundary inventory is
+the private error/resolve/rewrite helper tuple and five source files.

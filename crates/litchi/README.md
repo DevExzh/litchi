@@ -261,6 +261,46 @@ migration host's retained collection scope. Use
 `litchi-keynote/examples/edit_soundtrack_settings.rs` for synchronized,
 distinct-output, no-clobber publication through `Package::write_to`.
 
+## Focused Numbers sheet-order edits
+
+Enable the `numbers` feature to reorder existing sheets through
+`litchi::numbers::sheet::order`. A sheet selector uses its exact name or
+zero-based position; the destination is the moved sheet's final position. The
+transaction updates the document and navigator/sidebar orders together without
+exposing physical identifiers.
+
+```rust,no_run
+use litchi::numbers::{Package, SheetSelector};
+
+let package = Package::open("input.numbers")?;
+let commit = package
+    .edit_sheet_order()
+    .move_sheet(SheetSelector::name("Archive"), 0)?
+    .commit()?;
+assert!(commit.diagnostics().changed());
+assert_eq!(commit.diagnostics().touched_components(), 1);
+assert_eq!(commit.diagnostics().deleted_previews(), 3);
+assert!(commit.diagnostics().full_reparse_performed());
+
+let restored = commit
+    .package()
+    .apply_sheet_order(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+A move to the current position is exact no-op. A changed edit updates one
+owning component, removes the three stale root previews, and fully reopens its
+candidate; its inverse restores all three previews and the exact source. The
+native gate verifies a warning-free Numbers open plus Save As/reopen. For safe
+publication, use `litchi-numbers/examples/edit_sheet_order.rs`, which writes a
+distinct output via `Package::write_to`, a synchronized sibling temporary
+file, and no-clobber publication.
+
 ## Focused Numbers table-header edits
 
 Enable the `numbers` feature to use the focused immutable Numbers package API

@@ -7526,7 +7526,7 @@ fn removes_table_from_owning_sheet_transactionally() {
 }
 
 #[test]
-fn reorders_and_removes_sheets_transactionally() {
+fn removes_sheets_transactionally() {
     let mut editor = NumbersEditor::from_package(two_sheet_package()).unwrap();
     assert_eq!(
         editor
@@ -7537,8 +7537,6 @@ fn reorders_and_removes_sheets_transactionally() {
             .collect::<Vec<_>>(),
         ["Sheet 1", "Second"]
     );
-    editor.move_sheet(SheetSelector::index(1), 0).unwrap();
-    assert_eq!(editor.sheets().unwrap()[0].object_id, 50);
     let removed = editor
         .remove_sheet(test_sheet_selector(&editor, 50))
         .unwrap();
@@ -7680,7 +7678,7 @@ fn moves_populated_table_between_sheets_losslessly() {
 }
 
 #[test]
-fn sheet_list_crud_preserves_raw_references_and_restores_exact_component() {
+fn sheet_add_remove_preserves_raw_references_and_restores_exact_component() {
     let mut package = two_sheet_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -7720,18 +7718,6 @@ fn sheet_list_crud_preserves_raw_references_and_restores_exact_component() {
         .to_bytes()
         .unwrap();
 
-    editor.move_sheet(SheetSelector::index(0), 1).unwrap();
-    editor.move_sheet(SheetSelector::index(1), 0).unwrap();
-    assert_eq!(
-        editor
-            .package()
-            .archive("Index/Document.iwa")
-            .unwrap()
-            .to_bytes()
-            .unwrap(),
-        baseline
-    );
-
     let created = editor.add_empty_sheet("Temporary").unwrap();
     editor
         .remove_sheet(test_sheet_selector(&editor, created.object_id))
@@ -7745,33 +7731,6 @@ fn sheet_list_crud_preserves_raw_references_and_restores_exact_component() {
             .unwrap(),
         baseline
     );
-}
-
-#[test]
-fn duplicate_sheet_references_fail_transactionally() {
-    let mut package = two_sheet_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(1).unwrap();
-            let message = object.messages[0].clone();
-            let first = crate::wire::repeated_length_delimited_payloads(&message.data, 1)?[0];
-            let data =
-                crate::wire::append_repeated_length_delimited_field(&message.data, 1, first)?;
-            Ok(object
-                .replace_message(
-                    0,
-                    RawMessage {
-                        type_: message.type_,
-                        data,
-                    },
-                )
-                .map(|_| ())?)
-        })
-        .unwrap();
-    let mut editor = NumbersEditor::from_package(package).unwrap();
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.move_sheet(SheetSelector::index(0), 1).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]

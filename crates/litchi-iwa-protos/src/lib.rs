@@ -308,6 +308,26 @@ mod buffa_keynote_soundtrack_settings_generated {
     ));
 }
 
+#[doc(hidden)]
+mod buffa_numbers_sheet_order_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-sheet-order/iwa_numbers_sheet_order_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for `TST.TableInfoArchive.table_model`.
 ///
 /// The required drawable base archive and all unselected table metadata remain
@@ -632,6 +652,9 @@ pub mod pages_document_settings_codec;
 /// and all decoded names borrow caller-owned source bytes.
 #[doc(hidden)]
 pub mod numbers_names_codec;
+
+#[doc(hidden)]
+pub mod numbers_sheet_order_codec;
 
 /// Internal strict Numbers table-header settings projection. Generated types
 /// remain private and scalar facts borrow only caller-owned source bytes.

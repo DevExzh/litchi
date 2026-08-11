@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use sha2::{Digest, Sha256};
+
 fn main() -> Result<(), Box<dyn Error>> {
     const PROTO_DIRECTORY: &str = "src/protos";
     const BUFFA_PROJECTION_DIRECTORY: &str = "src/buffa-projections";
@@ -22,6 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_soundtrack_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
@@ -67,6 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_numbers_names_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_numbers_sheet_order_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_header_settings_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -202,6 +206,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_numbers_names_projection_budget(&buffa_numbers_names_out_directory)?;
+
+    let buffa_numbers_sheet_order_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-sheet-order");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TNNumbersSheetReferenceArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_numbers_sheet_order_out_directory)
+        .include_file("iwa_numbers_sheet_order_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_numbers_sheet_order_projection_budget(&buffa_numbers_sheet_order_out_directory)?;
 
     // Numbers table-header settings require only dimensions and nine scalar
     // header/footer/freeze/repetition facts. Keep required style/data-store
@@ -667,6 +688,80 @@ required string table_name = 8;\n\
             "derived Numbers names projection/codec drifted from TN sheet/form or TST table-model fields, exceeded its 1 KiB source budget, exposed generated code, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
+    }
+    Ok(())
+}
+
+fn enforce_numbers_sheet_order_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message NumbersSheetReferenceArchive {\n\
+required uint64 identifier = 1;\n\
+optional int32 deprecated_type = 2;\n\
+optional bool deprecated_is_external = 3;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 12] = [
+        "const DOCUMENT_SHEETS_FIELD: u32 = 1;",
+        "const DOCUMENT_SIDEBAR_ORDER_FIELD: u32 = 5;",
+        "const TREE_NODE_CHILDREN_FIELD: u32 = 2;",
+        "const TREE_NODE_OBJECT_FIELD: u32 = 3;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;",
+        "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
+        "const MAX_RECURSION: u32 = 64;",
+        "pub fn decode_document_sheet_order(",
+        "pub fn decode_document_sheet_order_with_report(",
+        "pub fn decode_tree_node(",
+        "pub fn decode_tree_node_with_report(",
+    ];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_numbers_sheet_order_generated {",
+        "\"/buffa-numbers-sheet-order/iwa_numbers_sheet_order_buffa_protos.rs\"",
+    ];
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let tn = fs::read_to_string(proto_directory.join("TNArchives.proto"))?;
+    let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TNNumbersSheetReferenceArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let codec = fs::read_to_string("src/numbers_sheet_order_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if tsp.matches(REFERENCE).count() != 1
+        || tn.matches("repeated .TSP.Reference sheets = 1;").count() != 1
+        || tn
+            .matches("required .TSP.Reference sidebar_order = 5;")
+            .count()
+            != 1
+        || tsk.matches("repeated .TSP.Reference children = 2;").count() != 1
+        || tsk.matches("optional .TSP.Reference object = 3;").count() != 1
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.contains("repeated ")
+        || projection.len() > 1024
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| codec.matches(declaration).count() == 1)
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || production_codec.contains("prost")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err("Numbers sheet-order projection/codec drifted from the exact TN/TSK/TSP reference routes, exposed generated code, introduced repeated storage, or added Prost/production encoding".into());
     }
     Ok(())
 }
@@ -1595,6 +1690,75 @@ fn enforce_numbers_names_projection_budget(directory: &Path) -> Result<(), Box<d
     {
         return Err(format!(
             "Numbers names projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_sheet_order_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    const EXPECTED_FILES: [&str; 5] = [
+        "LitchiIwaProjection.mod.rs",
+        "TNNumbersSheetReferenceArchive.__lazy_view.rs",
+        "TNNumbersSheetReferenceArchive.__view.rs",
+        "TNNumbersSheetReferenceArchive.rs",
+        "iwa_numbers_sheet_order_buffa_protos.rs",
+    ];
+    // Buffa 0.9.1 emits 32,579 bytes for the isolated three-scalar reference.
+    // Retain only a small formatter/codegen allowance without admitting a
+    // second message or generated repeated-field machinery.
+    const MAX_GENERATED_BYTES: u64 = 33 * 1024;
+    const EXPECTED_DIGEST: &str =
+        "2a0850fd82cfbf337ed48e582d4a998bd27e5046eb63c61f6939fa5ff1a09854";
+
+    let mut entries = fs::read_dir(directory)?
+        .map(|entry| entry.map(|value| value.path()))
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.retain(|path| path.is_file());
+    entries.sort_unstable_by(|left, right| left.file_name().cmp(&right.file_name()));
+    let names = entries
+        .iter()
+        .map(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(str::to_owned)
+                .ok_or_else(|| {
+                    format!(
+                        "generated Numbers sheet-order path is not UTF-8: {}",
+                        path.display()
+                    )
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut digest = Sha256::new();
+    for path in &entries {
+        let generated = fs::read(path)?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("Numbers sheet-order generated-byte count overflow")?;
+        let text = std::str::from_utf8(&generated)?;
+        repeated_views += text.matches("RepeatedView").count();
+        lazy_repeated_views += text.matches("LazyRepeatedView").count();
+        digest.update(generated);
+    }
+    let finalized = digest.finalize();
+    let mut aggregate_digest = String::with_capacity(finalized.len() * 2);
+    for byte in finalized {
+        aggregate_digest.push(char::from(HEX[usize::from(byte >> 4)]));
+        aggregate_digest.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    if names != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+        || aggregate_digest != EXPECTED_DIGEST
+    {
+        return Err(format!(
+            "Numbers sheet-order projection generated {names:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected {EXPECTED_FILES:?}, at most {MAX_GENERATED_BYTES} bytes, zero repeated views, and digest {EXPECTED_DIGEST}"
         )
         .into());
     }

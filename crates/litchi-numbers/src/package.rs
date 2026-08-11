@@ -28,6 +28,7 @@ pub(crate) mod names;
     reason = "Decoded sheets expose only the construction path used at package ingress."
 )]
 mod sheet;
+pub(crate) mod sheet_order;
 #[allow(
     dead_code,
     reason = "Private native tables retain sidecar helpers while the public surface exposes only semantic tables."
